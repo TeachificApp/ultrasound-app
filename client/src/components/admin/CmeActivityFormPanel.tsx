@@ -17,9 +17,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
+  Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
   Loader2, Sparkles, Download, Save, ChevronDown, ChevronUp,
   FileText, RefreshCw, Calendar, CheckSquare, Square,
-  PenLine, Trash2, FileDown, Send, Mail,
+  PenLine, Trash2, FileDown, Send, Mail, ChevronsUpDown,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -399,6 +403,8 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
     { courseId },
     { enabled: !!courseId }
   );
+  const { data: instructorsList } = trpc.lmsAdmin.getInstructorsForCme.useQuery();
+  const [openInstructorPopover, setOpenInstructorPopover] = useState<number | null>(null);
 
   const landingPageUrl = courseSlug
     ? `https://learn.allaboutultrasound.com/courses/${courseSlug}`
@@ -847,16 +853,54 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           <div key={i} className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 border rounded bg-yellow-50 border-yellow-300">
             <div>
               <Label className="text-xs text-gray-600">Name</Label>
-              <Input
-                value={f.name}
-                onChange={e => {
-                  const updated = [...form.facultyJson];
-                  updated[i] = { ...updated[i], name: e.target.value };
-                  set("facultyJson", updated);
-                }}
-                className="mt-1 h-7 text-xs"
-                placeholder="Full name"
-              />
+              <Popover open={openInstructorPopover === i} onOpenChange={open => setOpenInstructorPopover(open ? i : null)}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="mt-1 w-full h-7 text-xs flex items-center justify-between gap-1 rounded-md border border-input bg-background px-2 hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <span className={cn("truncate", !f.name && "text-muted-foreground")}>{f.name || "Select or type name…"}</span>
+                    <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-0" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="Search or type name…"
+                      value={f.name}
+                      onValueChange={val => {
+                        const updated = [...form.facultyJson];
+                        updated[i] = { ...updated[i], name: val };
+                        set("facultyJson", updated);
+                      }}
+                      className="text-xs"
+                    />
+                    <CommandList>
+                      <CommandEmpty className="py-2 text-center text-xs text-muted-foreground">No instructors found — type to enter manually.</CommandEmpty>
+                      <CommandGroup heading="Instructors">
+                        {(instructorsList ?? []).map(inst => (
+                          <CommandItem
+                            key={inst.id}
+                            value={inst.name}
+                            onSelect={() => {
+                              const updated = [...form.facultyJson];
+                              updated[i] = { ...updated[i], name: inst.name, credentials: inst.title ?? updated[i].credentials };
+                              set("facultyJson", updated);
+                              setOpenInstructorPopover(null);
+                            }}
+                            className="text-xs"
+                          >
+                            <div>
+                              <div className="font-medium">{inst.name}</div>
+                              {inst.title && <div className="text-muted-foreground text-[10px]">{inst.title}</div>}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <Label className="text-xs text-gray-600">Credentials</Label>

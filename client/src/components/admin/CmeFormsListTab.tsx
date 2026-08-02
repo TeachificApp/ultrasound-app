@@ -20,8 +20,10 @@ import {
 } from "@/components/ui/select";
 import {
   CheckCircle, Clock, AlertCircle, Download, Edit2, Search,
-  Loader2, FileText, RefreshCw, FileDown, Mail, Send, TriangleAlert,
+  Loader2, FileText, RefreshCw, FileDown, Mail, Send, TriangleAlert, CalendarIcon, X,
 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { CmeActivityFormPanel } from "./CmeActivityFormPanel";
 
 // ─── Form Status config ───────────────────────────────────────────────────────
@@ -120,6 +122,20 @@ export function CmeFormsListTab() {
   const downloadPdfMutation = trpc.lmsAdmin.downloadCmeActivityFormPdf.useMutation();
   const sendMutation = trpc.lmsAdmin.sendCmeFormToCardioServ.useMutation();
   const updateStatusMutation = trpc.lmsAdmin.updateCardioServStatus.useMutation();
+  const updateApprovedAtMutation = trpc.lmsAdmin.updateApprovedAt.useMutation();
+  const [openDatePickerRow, setOpenDatePickerRow] = useState<number | null>(null);
+
+  const handleApprovedAtChange = async (courseId: number, date: Date | undefined) => {
+    const ts = date ? date.getTime() : null;
+    try {
+      await updateApprovedAtMutation.mutateAsync({ courseId, approvedAt: ts });
+      refetch();
+      setOpenDatePickerRow(null);
+      toast.success(date ? `Approved date set to ${date.toLocaleDateString()}` : "Approved date cleared");
+    } catch (e: any) {
+      toast.error("Failed to update date: " + (e?.message ?? "Unknown error"));
+    }
+  };
 
   const handleDownloadPdf = async (courseId: number, courseTitle: string) => {
     setDownloadingPdf(courseId);
@@ -396,16 +412,46 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                       </div>
                     </TableCell>
                     <TableCell className="text-sm">
-                      {row.approvedAt ? (
-                        <div>
-                          <span className="text-gray-700 font-medium">{fmtDate(row.approvedAt)}</span>
-                          <p className="text-[10px] text-gray-400 mt-0.5">
-                            Expires {fmtDate(row.approvedAt + TWO_YEARS_MS)}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
+                      <Popover open={openDatePickerRow === row.id} onOpenChange={open => setOpenDatePickerRow(open ? row.id : null)}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="flex items-center gap-1 text-left hover:bg-gray-50 rounded px-1 py-0.5 group"
+                          >
+                            {row.approvedAt ? (
+                              <div>
+                                <span className="text-gray-700 font-medium text-xs">{fmtDate(row.approvedAt)}</span>
+                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                  Expires {fmtDate(row.approvedAt + TWO_YEARS_MS)}
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                            <CalendarIcon className="w-3 h-3 text-gray-300 group-hover:text-[#189aa1] shrink-0 ml-1" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <div className="p-2 border-b flex items-center justify-between">
+                            <span className="text-xs font-medium text-gray-700">Set Approved Date</span>
+                            {row.approvedAt && (
+                              <button
+                                type="button"
+                                className="text-[10px] text-red-500 hover:text-red-700 flex items-center gap-0.5"
+                                onClick={() => handleApprovedAtChange(row.id, undefined)}
+                              >
+                                <X className="w-3 h-3" /> Clear
+                              </button>
+                            )}
+                          </div>
+                          <Calendar
+                            mode="single"
+                            selected={row.approvedAt ? new Date(row.approvedAt) : undefined}
+                            onSelect={(date) => handleApprovedAtChange(row.id, date)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
                     <TableCell className="text-sm">
                       {row.lastSentAt ? (

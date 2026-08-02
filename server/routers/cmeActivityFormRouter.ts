@@ -13,7 +13,7 @@ import { eq, leftJoin } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { assertAdmin } from "./lmsHelpers";
-import { cmeActivityForms, cmeSendHistory, lmsCourses } from "../../drizzle/schema";
+import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
 import { generateCmeActivityDocx } from "../lib/cmeActivityDocx";
@@ -577,6 +577,36 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       if (input.status !== "approved") updateData.approvedAt = null;
       await db.update(cmeActivityForms)
         .set(updateData as any)
+        .where(eq(cmeActivityForms.courseId, input.courseId));
+      return { success: true };
+    }),
+
+  // ── Get instructors list for CME faculty autocomplete ─────────────────────
+  getInstructorsForCme: protectedProcedure
+    .query(async ({ ctx }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db
+        .select({ id: lmsInstructors.id, name: lmsInstructors.name, title: lmsInstructors.title })
+        .from(lmsInstructors)
+        .where(eq(lmsInstructors.isActive, true))
+        .orderBy(lmsInstructors.name);
+      return rows;
+    }),
+
+  // ── Manually set approvedAt date ─────────────────────────────────────────
+  updateApprovedAt: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      approvedAt: z.number().int().nullable(), // UTC ms timestamp, null to clear
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(cmeActivityForms)
+        .set({ approvedAt: input.approvedAt } as any)
         .where(eq(cmeActivityForms.courseId, input.courseId));
       return { success: true };
     }),
