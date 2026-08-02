@@ -9,13 +9,14 @@
  *  - Sender profiles management tab
  *  - Unsubscribe list management
  */
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import {
   Mail, Plus, BarChart2, Users, Send, Clock, CheckCircle, XCircle,
   RefreshCw, Trash2, Copy, Eye, TrendingUp, MousePointer, UserMinus,
   Shield, ChevronRight, ChevronLeft, Settings, UserCircle, Edit, Star, StarOff,
   AlertTriangle, Download, Zap, Code, List, Globe, MapPin, UserCheck, Link2,
+  Newspaper, UserX, Search,
 } from "lucide-react";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -686,6 +687,200 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
   );
 }
 
+// ─── Newsletter Subscribers Tab ──────────────────────────────────────────────
+function NewsletterSubscribersTab() {
+  const [search, setSearch] = useState("");
+  const { data: subscribers, isLoading, isError, refetch } = trpc.newsletter.listSubscribers.useQuery();
+
+  const filtered = useMemo(() => {
+    if (!subscribers) return [];
+    const q = search.toLowerCase().trim();
+    if (!q) return subscribers;
+    return subscribers.filter((s) =>
+      s.email.toLowerCase().includes(q) ||
+      (s.firstName ?? "").toLowerCase().includes(q) ||
+      (s.lastName ?? "").toLowerCase().includes(q) ||
+      (s.profession ?? "").toLowerCase().includes(q)
+    );
+  }, [subscribers, search]);
+
+  const activeCount = (subscribers ?? []).filter((s) => s.isActive).length;
+  const unsubCount = (subscribers ?? []).filter((s) => !s.isActive).length;
+
+  // Profession breakdown
+  const professionBreakdown = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const s of (subscribers ?? [])) {
+      if (!s.isActive) continue;
+      const p = s.profession ?? "Not specified";
+      map[p] = (map[p] ?? 0) + 1;
+    }
+    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  }, [subscribers]);
+
+  // Recent sign-ups (last 10 active)
+  const recent = useMemo(() => {
+    return [...(subscribers ?? [])]
+      .filter((s) => s.isActive)
+      .sort((a, b) => (b.subscribedAt ?? 0) - (a.subscribedAt ?? 0))
+      .slice(0, 10);
+  }, [subscribers]);
+
+  function exportCsv() {
+    const rows = filtered;
+    if (rows.length === 0) return;
+    const header = ["Email", "First Name", "Last Name", "Profession", "Source", "Subscribed At", "Status"];
+    const csvRows = rows.map((r) => [
+      `"${(r.email ?? "").replace(/"/g, '""')}"`,
+      `"${(r.firstName ?? "").replace(/"/g, '""')}"`,
+      `"${(r.lastName ?? "").replace(/"/g, '""')}"`,
+      `"${(r.profession ?? "").replace(/"/g, '""')}"`,
+      `"${(r.source ?? "").replace(/"/g, '""')}"`,
+      `"${r.subscribedAt ? new Date(r.subscribedAt).toLocaleDateString() : ""}"`,
+      r.isActive ? "Active" : "Unsubscribed",
+    ].join(","));
+    const csv = [header.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `newsletter-subscribers-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (isLoading) return <div className="flex justify-center py-12"><RefreshCw className="w-6 h-6 animate-spin text-[#189aa1]" /></div>;
+  if (isError) return (
+    <div className="text-center py-16 text-gray-400">
+      <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-red-400" />
+      <p className="font-medium text-gray-700">Failed to load subscribers</p>
+      <p className="text-sm mt-1 mb-4">There was a problem fetching the subscriber list.</p>
+      <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCw className="w-4 h-4 mr-1.5" /> Retry</Button>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={<Newspaper className="w-5 h-5" />} label="Total Subscribers" value={(subscribers ?? []).length.toLocaleString()} />
+        <StatCard icon={<UserCheck className="w-5 h-5" />} label="Active" value={activeCount.toLocaleString()} sub="currently subscribed" color="#10b981" />
+        <StatCard icon={<UserX className="w-5 h-5" />} label="Unsubscribed" value={unsubCount.toLocaleString()} sub="opted out" color="#ef4444" />
+        <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Recent Sign-ups" value={recent.length} sub="most recent 10" color="#3b82f6" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Profession breakdown */}
+        <div className="border rounded-xl bg-white shadow-sm p-4">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Profession Breakdown</p>
+          {professionBreakdown.length === 0 ? (
+            <p className="text-xs text-gray-400">No data yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {professionBreakdown.map(([profession, count]) => (
+                <div key={profession}>
+                  <div className="flex items-center justify-between text-xs mb-0.5">
+                    <span className="text-gray-700 truncate max-w-[160px]">{profession}</span>
+                    <span className="font-semibold text-gray-900 ml-2">{count}</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full"
+                      style={{ width: `${Math.round((count / activeCount) * 100)}%`, background: "#189aa1" }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Recent sign-ups */}
+        <div className="lg:col-span-2 border rounded-xl bg-white shadow-sm p-4">
+          <p className="text-sm font-semibold text-gray-700 mb-3">Recent Sign-ups</p>
+          {recent.length === 0 ? (
+            <p className="text-xs text-gray-400">No subscribers yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {recent.map((s) => (
+                <div key={s.id} className="flex items-center gap-3 text-sm">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: "#189aa1" }}>
+                    {(s.firstName?.[0] ?? s.email[0]).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-gray-900 truncate">
+                      {[s.firstName, s.lastName].filter(Boolean).join(" ") || s.email}
+                    </div>
+                    {(s.firstName || s.lastName) && <div className="text-xs text-gray-400 truncate">{s.email}</div>}
+                  </div>
+                  {s.profession && <span className="text-xs text-gray-500 shrink-0">{s.profession}</span>}
+                  <span className="text-xs text-gray-400 shrink-0">{s.subscribedAt ? new Date(s.subscribedAt).toLocaleDateString() : "—"}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Full subscriber table */}
+      <div className="border rounded-xl bg-white shadow-sm">
+        <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search subscribers…"
+                className="pl-8 pr-3 py-1.5 text-sm border rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetch()}><RefreshCw className="w-4 h-4" /></Button>
+          </div>
+          <Button size="sm" variant="outline" onClick={exportCsv} className="gap-1.5">
+            <Download className="w-4 h-4" /> Export CSV
+          </Button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[600px] text-sm">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">EMAIL</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">NAME</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">PROFESSION</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">SOURCE</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">SUBSCRIBED</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">STATUS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {filtered.length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400 text-sm">No subscribers found.</td></tr>
+              ) : (
+                filtered.map((s) => (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-gray-900 font-medium">{s.email}</td>
+                    <td className="px-4 py-2.5 text-gray-600">{[s.firstName, s.lastName].filter(Boolean).join(" ") || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{s.profession || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs">{s.source || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">{s.subscribedAt ? new Date(s.subscribedAt).toLocaleDateString() : "—"}</td>
+                    <td className="px-4 py-2.5">
+                      {s.isActive
+                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>
+                        : <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">Unsubscribed</span>
+                      }
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 export default function EmailCampaignDashboard() {
   const [, navigate] = useLocation();
@@ -815,6 +1010,9 @@ export default function EmailCampaignDashboard() {
             </TabsTrigger>
             <TabsTrigger value="lists" className="flex items-center gap-1.5">
               <List className="w-4 h-4" /> Email Lists
+            </TabsTrigger>
+            <TabsTrigger value="newsletter" className="flex items-center gap-1.5">
+              <Newspaper className="w-4 h-4" /> Newsletter Subscribers
             </TabsTrigger>
           </TabsList>
 
@@ -1047,6 +1245,11 @@ export default function EmailCampaignDashboard() {
           {/* ── Email Lists tab ─────────────────────────────────────────────── */}
           <TabsContent value="lists">
             <EmailListsTab />
+          </TabsContent>
+
+          {/* ── Newsletter Subscribers tab ─────────────────────────────────── */}
+          <TabsContent value="newsletter">
+            <NewsletterSubscribersTab />
           </TabsContent>
         </Tabs>
       </div>
