@@ -490,13 +490,14 @@ All About Ultrasound`;
           }
         }}
       >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="w-[98vw] max-w-[98vw] h-[96vh] max-h-[96vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
             <DialogTitle className="text-base flex items-center gap-2">
               <FileText className="w-4 h-4 text-[#189aa1]" />
               CME Activity Form — {editCourseTitle}
             </DialogTitle>
           </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-4">
           {editCourseId !== null && (
             <CmeActivityFormPanel
               courseId={editCourseId}
@@ -504,6 +505,7 @@ All About Ultrasound`;
               creditHours={editCreditHours}
             />
           )}
+          </div>
         </DialogContent>
       </Dialog>
 
