@@ -35,6 +35,7 @@ import {
   Calculator, Activity, BookOpen, FileText,
   ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Heart, ClipboardCheck, BrainCircuit
 } from "lucide-react";
+import NewsletterInlineWidget from "@/components/NewsletterInlineWidget";
 
 const BRAND = "#189aa1";
 
@@ -398,6 +399,11 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* Newsletter Subscribe */}
+        <div className="mt-6">
+          <NewsletterInlineWidget dark source="home_page" />
+        </div>
       </div>
     </Layout>
   );

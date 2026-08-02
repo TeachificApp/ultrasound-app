@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package, Truck, GraduationCap, ArrowRight } from "lucide-react";
+import NewsletterInlineWidget from "@/components/NewsletterInlineWidget";
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-4 h-4" />,
@@ -420,6 +421,11 @@ export default function EducationLibrary() {
             <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
           </div>
         )}
+      </div>
+
+      {/* Newsletter Subscribe */}
+      <div className="max-w-3xl mx-auto px-6 py-8">
+        <NewsletterInlineWidget source="education_library" />
       </div>
 
       {/* Educator CTA */}

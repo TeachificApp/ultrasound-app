@@ -9,6 +9,8 @@ import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { newsletterSubscribers } from "../../drizzle/schema";
 import { notifyOwner } from "../_core/notification";
+import { addToAllContacts } from "../lib/emailListHelper";
+import { upsertSendGridContacts, getOrCreateSendGridList } from "../lib/sendgridContacts";
 
 export const newsletterRouter = router({
   // ── Public: subscribe ──────────────────────────────────────────────────────
@@ -60,8 +62,29 @@ export const newsletterRouter = router({
         isActive: 1,
       });
 
-      // Notify owner of new subscriber
+      // Sync to SendGrid Marketing Contacts and internal email list
       const name = [input.firstName, input.lastName].filter(Boolean).join(" ") || email;
+      (async () => {
+        try {
+          // Add to internal email list (All Contacts)
+          await addToAllContacts(email, name || null, { source: "newsletter_subscribe" });
+          // Add to SendGrid Marketing Contacts under "Newsletter Subscribers" list
+          const listId = await getOrCreateSendGridList("Newsletter Subscribers");
+          await upsertSendGridContacts(
+            [{
+              email,
+              first_name: input.firstName,
+              last_name: input.lastName,
+              list_ids: listId ? [listId] : undefined,
+            }],
+            listId ? [listId] : undefined,
+          );
+        } catch (err) {
+          console.error("[newsletter] SendGrid/list sync error:", err);
+        }
+      })();
+
+      // Notify owner of new subscriber
       await notifyOwner({
         title: "New Newsletter Subscriber",
         content: `${name} (${email}) subscribed to the newsletter${input.profession ? ` — ${input.profession}` : ""}.`,
