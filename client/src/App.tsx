@@ -44,6 +44,7 @@ import MagicLinkError from "./pages/MagicLinkError";
 import AccessLinkCallback from "./pages/AccessLinkCallback";
 import Enrolled from "./pages/Enrolled";
 import Unsubscribe from "./pages/Unsubscribe";
+import NewsletterSubscribe from "./pages/NewsletterSubscribe";
 
 // ── All other pages — lazy loaded for code splitting ─────────────────────────
 const Profile = lazy(() => import("./pages/Profile"));
