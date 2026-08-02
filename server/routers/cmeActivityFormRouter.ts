@@ -13,7 +13,7 @@ import { eq, leftJoin } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { assertAdmin } from "./lmsHelpers";
-import { cmeActivityForms, lmsCourses } from "../../drizzle/schema";
+import { cmeActivityForms, cmeSendHistory, lmsCourses } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
 import { generateCmeActivityDocx } from "../lib/cmeActivityDocx";
@@ -152,6 +152,7 @@ export const cmeActivityFormRouter = router({
           learningObjectives: cmeActivityForms.learningObjectives,
           attestationDate: cmeActivityForms.attestationDate,
           updatedAt: cmeActivityForms.updatedAt,
+          lastSentAt: cmeActivityForms.lastSentAt,
         })
         .from(cmeActivityForms);
 
@@ -170,6 +171,7 @@ export const cmeActivityFormRouter = router({
           formStatus: isComplete ? "complete" : isStarted ? "in_progress" : "pending",
           formUpdatedAt: form?.updatedAt ?? null,
           formProposedDate: form?.proposedDate ?? null,
+          lastSentAt: form?.lastSentAt ?? null,
         };
       });
     }),
@@ -508,15 +510,36 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Email send failed: ${res.status}` });
       }
 
-      // Save lastSentAt timestamp
+      // Save lastSentAt timestamp and insert history record
       const now = Date.now();
       if (form) {
         await db.update(cmeActivityForms)
           .set({ lastSentAt: now })
           .where(eq(cmeActivityForms.courseId, input.courseId));
       }
+      await db.insert(cmeSendHistory).values({
+        courseId: input.courseId,
+        sentAt: now,
+        subject: input.subject,
+        sentBy: ctx.user?.name ?? ctx.user?.email ?? "Admin",
+      });
 
       console.log(`[CME Email] Sent "${input.subject}" to don@cardioserv.net for course ${course.title}`);
       return { success: true, lastSentAt: now };
+    }),
+
+  // ── Get send history for a course ────────────────────────────────────────
+  getCmeSendHistory: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db
+        .select()
+        .from(cmeSendHistory)
+        .where(eq(cmeSendHistory.courseId, input.courseId))
+        .orderBy(cmeSendHistory.sentAt);
+      return rows;
     }),
 });

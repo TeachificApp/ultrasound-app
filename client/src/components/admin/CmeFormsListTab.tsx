@@ -232,6 +232,7 @@ export function CmeFormsListTab() {
                 <TableHead className="text-xs font-semibold text-gray-600 w-36">Form Status</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-36">Proposed Date</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-36">Last Updated</TableHead>
+                <TableHead className="text-xs font-semibold text-gray-600 w-36">Last Sent</TableHead>
                 <TableHead className="text-xs font-semibold text-gray-600 w-28 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -257,6 +258,15 @@ export function CmeFormsListTab() {
                   </TableCell>
                   <TableCell className="text-sm text-gray-500">
                     {fmtDate(row.formUpdatedAt)}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {row.lastSentAt ? (
+                      <span className="text-purple-600 font-medium">
+                        {fmtDate(new Date(row.lastSentAt))}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">Never</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">

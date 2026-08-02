@@ -393,7 +393,12 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
   const [lastSentAt, setLastSentAt] = useState<number | null>(null);
   const [courseSlug, setCourseSlug] = useState<string | null>(null);
   const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const sendMutation = trpc.lmsAdmin.sendCmeFormToCardioServ.useMutation();
+  const { data: sendHistory, refetch: refetchHistory } = trpc.lmsAdmin.getCmeSendHistory.useQuery(
+    { courseId },
+    { enabled: !!courseId }
+  );
 
   const landingPageUrl = courseSlug
     ? `https://learn.allaboutultrasound.com/courses/${courseSlug}`
@@ -463,6 +468,7 @@ All About Ultrasound`;
       if (result.lastSentAt) setLastSentAt(result.lastSentAt);
       toast.success("Email sent to CardioServ with PDF attached.");
       setSendDialogOpen(false);
+      refetchHistory();
     } catch (e: any) {
       toast.error("Send failed: " + (e?.message ?? "Unknown error"));
     } finally {
@@ -510,7 +516,7 @@ All About Ultrasound`;
         marketingMentionsCme: f.marketingMentionsCme ?? "yes",
         registrationFee: f.registrationFee ?? "yes",
         attestationName: f.attestationName ?? "Lara Williams",
-        attestationDate: f.attestationDate ?? "",
+        attestationDate: f.attestationDate || new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" }),
         attestationTitle: f.attestationTitle ?? "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE",
         signatureDataUrl: f.signatureDataUrl ?? null,
       });
@@ -518,6 +524,7 @@ All About Ultrasound`;
       if ((data.form as any).lastSentAt) setLastSentAt((data.form as any).lastSentAt);
       if ((data.course as any).slug) setCourseSlug((data.course as any).slug);
       setLoaded(true);
+      refetchHistory();
     }
   }, [data, loaded, courseTitle, creditHours]);
 
@@ -958,6 +965,49 @@ All About Ultrasound`;
           <SignatureCanvas value={form.signatureDataUrl} onChange={v => set("signatureDataUrl", v)} />
         </div>
       </Section>
+
+      {/* ── Send History ── */}
+      <div className="border rounded-lg overflow-hidden">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2.5 bg-purple-50 hover:bg-purple-100 transition-colors text-left"
+          onClick={() => setHistoryOpen(o => !o)}
+        >
+          <span className="text-xs font-semibold text-purple-700 flex items-center gap-2">
+            <Mail className="w-3.5 h-3.5" />
+            Send History ({sendHistory?.length ?? 0})
+          </span>
+          <ChevronDown className={`w-4 h-4 text-purple-500 transition-transform ${historyOpen ? "rotate-180" : ""}`} />
+        </button>
+        {historyOpen && (
+          <div className="p-3">
+            {!sendHistory || sendHistory.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">No emails sent yet.</p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-1 pr-3 font-medium text-gray-600">Sent At</th>
+                    <th className="text-left py-1 pr-3 font-medium text-gray-600">Subject</th>
+                    <th className="text-left py-1 font-medium text-gray-600">Sent By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...sendHistory].reverse().map(row => (
+                    <tr key={row.id} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="py-1.5 pr-3 whitespace-nowrap text-gray-700">
+                        {new Date(row.sentAt).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })}
+                      </td>
+                      <td className="py-1.5 pr-3 text-gray-700 break-words max-w-xs">{row.subject}</td>
+                      <td className="py-1.5 text-gray-500">{row.sentBy ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Bottom action bar */}
       <div className="flex items-center justify-end gap-2 pt-2 border-t">

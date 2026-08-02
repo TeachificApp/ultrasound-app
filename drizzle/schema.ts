@@ -8056,6 +8056,15 @@ export const cmeActivityForms = mysqlTable("cme_activity_forms", {
 export type CmeActivityForm = typeof cmeActivityForms.$inferSelect;
 export type InsertCmeActivityForm = typeof cmeActivityForms.$inferInsert;
 
+export const cmeSendHistory = mysqlTable("cme_send_history", {
+  id: int("id").primaryKey().autoincrement(),
+  courseId: int("courseId").notNull(),
+  sentAt: bigint("sentAt", { mode: "number" }).notNull(),
+  subject: varchar("subject", { length: 512 }).notNull(),
+  sentBy: varchar("sentBy", { length: 256 }),
+});
+export type CmeSendHistory = typeof cmeSendHistory.$inferSelect;
+
 // ─── Revenue Sharing (Stripe Connect) ────────────────────────────────────────
 export const revenueSharePartners = mysqlTable("revenue_share_partners", {
   id: int("id").autoincrement().primaryKey(),
