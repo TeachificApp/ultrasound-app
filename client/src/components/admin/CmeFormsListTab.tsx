@@ -490,7 +490,10 @@ All About Ultrasound`;
           }
         }}
       >
-        <DialogContent className="w-[98vw] max-w-[98vw] h-[96vh] max-h-[96vh] flex flex-col p-0 gap-0">
+        <DialogContent
+          className="h-[96vh] max-h-[96vh] flex flex-col p-0 gap-0"
+          style={{ width: "98vw", maxWidth: "98vw" }}
+        >
           <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
             <DialogTitle className="text-base flex items-center gap-2">
               <FileText className="w-4 h-4 text-[#189aa1]" />
