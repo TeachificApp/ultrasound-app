@@ -100,7 +100,7 @@ export default function NewsletterInlineWidget({ dark = false, source = "inline_
       </form>
       <p className={`text-xs mt-3 ${dark ? "text-white/40" : "text-gray-400"}`}>
         No spam. Unsubscribe at any time.{" "}
-        <a href="/subscribe" className={`underline ${dark ? "text-white/60 hover:text-white" : "text-[#189aa1] hover:text-[#147f85]"}`}>
+        <a href="https://app.allaboutultrasound.com/subscribe" target="_blank" rel="noopener noreferrer" className={`underline ${dark ? "text-white/60 hover:text-white" : "text-[#189aa1] hover:text-[#147f85]"}`}>
           More options →
         </a>
       </p>
