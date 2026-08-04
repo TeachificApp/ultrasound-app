@@ -114,6 +114,9 @@ interface FormData {
   activityTitle: string;
   activityType: string;
   proposedDate: string;
+  originalReleaseDate: string;
+  mostRecentReviewDate: string;
+  expirationDate: string;
   activityLengthHours: string;
   cmeCreditsRequested: string;
   offerMocCredit: string;
@@ -148,6 +151,9 @@ const DEFAULT_FORM: FormData = {
   activityTitle: "",
   activityType: "enduring",
   proposedDate: "",
+  originalReleaseDate: "",
+  mostRecentReviewDate: "",
+  expirationDate: "",
   activityLengthHours: "",
   cmeCreditsRequested: "",
   offerMocCredit: "no",
@@ -496,6 +502,9 @@ All About Ultrasound, Inc. dba iHeartEcho`;
         activityTitle: f.activityTitle ?? courseTitle ?? "",
         activityType: f.activityType ?? "enduring",
         proposedDate: f.proposedDate ?? "",
+        originalReleaseDate: f.originalReleaseDate ?? "",
+        mostRecentReviewDate: f.mostRecentReviewDate ?? "",
+        expirationDate: f.expirationDate ?? "",
         activityLengthHours: f.activityLengthHours ?? creditHours ?? "",
         cmeCreditsRequested: f.cmeCreditsRequested ?? creditHours ?? "",
         offerMocCredit: f.offerMocCredit ?? "no",
@@ -757,6 +766,9 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           </div>
           <RadioGroup label="2. Activity Type" options={ACTIVITY_TYPE_OPTS} value={form.activityType} onChange={v => set("activityType", v)} />
           <YellowField label="3. Proposed Date(s) or Launch Date" value={form.proposedDate} onChange={v => set("proposedDate", v)} placeholder="e.g. ASAP or 2026-09-01" />
+          <YellowField label="Original Release Date" value={form.originalReleaseDate} onChange={v => set("originalReleaseDate", v)} placeholder="e.g. 2024-01-15" />
+          <YellowField label="Most Recent Review Date" value={form.mostRecentReviewDate} onChange={v => set("mostRecentReviewDate", v)} placeholder="e.g. 2025-06-01" />
+          <YellowField label="Expiration Date" value={form.expirationDate} onChange={v => set("expirationDate", v)} placeholder="e.g. 2027-01-15" />
           <div>
             <Label className="text-xs font-medium text-gray-700">4. Estimated Activity Length (hours)</Label>
             <Input value={form.activityLengthHours} onChange={e => set("activityLengthHours", e.target.value)} className="mt-1 h-8 text-sm border-green-400 bg-green-50" placeholder="e.g. 3" />

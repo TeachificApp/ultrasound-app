@@ -228,6 +228,9 @@ export async function generateCmeActivityDocx(form: Record<string, any>): Promis
   }
 
   children.push(inlineField("3. Proposed Date(s) or Launch Date:", form.proposedDate));
+  children.push(inlineField("3a. Original Release Date:", (form as any).originalReleaseDate));
+  children.push(inlineField("3b. Most Recent Review Date:", (form as any).mostRecentReviewDate));
+  children.push(inlineField("3c. Expiration Date:", (form as any).expirationDate));
   children.push(inlineField("4. Estimated Activity Length (in hours):", form.activityLengthHours));
   children.push(inlineField("5. Estimated CME credit hours requested (if known):", form.cmeCreditsRequested));
 

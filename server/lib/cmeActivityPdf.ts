@@ -10,6 +10,9 @@ export interface CmeFormDataForPdf {
   activityTitle?: string | null;
   activityType?: string | null;
   proposedDate?: string | null;
+  originalReleaseDate?: string | null;
+  mostRecentReviewDate?: string | null;
+  expirationDate?: string | null;
   activityLengthHours?: string | null;
   cmeCreditsRequested?: string | null;
   offerMocCredit?: string | null;
@@ -199,10 +202,11 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
     sectionHeader(1, "Activity Overview");
     field("Activity Title", data.activityTitle);
     twoFields("Activity Type", label(data.activityType), "Activity Structure", label(data.activityStructure));
-    twoFields("Proposed Date(s)", data.proposedDate, "Activity Length (Hours)", data.activityLengthHours);
-    twoFields("CME Credits Requested", data.cmeCreditsRequested, "Offer MOC Credit?", label(data.offerMocCredit));
-    twoFields("Offered More Than Once?", label(data.offeredMoreThanOnce), "Target Audience", label(data.targetAudience));
-    field("Estimated Number of Learners", data.estimatedLearners);
+    twoFields("Proposed Date(s)", data.proposedDate, "Original Release Date", data.originalReleaseDate);
+    twoFields("Most Recent Review Date", data.mostRecentReviewDate, "Expiration Date", data.expirationDate);
+    twoFields("Activity Length (Hours)", data.activityLengthHours, "CME Credits Requested", data.cmeCreditsRequested);
+    twoFields("Offer MOC Credit?", label(data.offerMocCredit), "Offered More Than Once?", label(data.offeredMoreThanOnce));
+    twoFields("Target Audience", label(data.targetAudience), "Estimated Number of Learners", data.estimatedLearners);
     spacer();
 
     // ═══════════════════════════════════════════════════════════════════════════
