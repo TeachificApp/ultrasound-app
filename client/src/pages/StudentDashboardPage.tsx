@@ -1456,14 +1456,24 @@ function SubscriptionsTab() {
     onSuccess: (res) => { toast.success(res.message); utils.dashboard.getMySubscriptions.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
+  const cancelEnrollmentSub = trpc.dashboard.cancelEnrollmentSubscription.useMutation({
+    onSuccess: (res) => { toast.success(res.message); utils.dashboard.getMySubscriptions.invalidate(); setConfirmCancelEnrollment(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const reactivateEnrollmentSub = trpc.dashboard.reactivateEnrollmentSubscription.useMutation({
+    onSuccess: (res) => { toast.success(res.message); utils.dashboard.getMySubscriptions.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
   const [confirmCancel, setConfirmCancel] = useState<number | null>(null);
   const [confirmCancelCourse, setConfirmCancelCourse] = useState<number | null>(null);
+  const [confirmCancelEnrollment, setConfirmCancelEnrollment] = useState<{ enrollmentId: number; courseTitle: string } | null>(null);
 
   if (isLoading) return <LoadingSpinner />;
 
   const memberships = data?.memberships ?? [];
   const courseSubscriptions = data?.courseSubscriptions ?? [];
-  const hasAnything = memberships.length > 0 || courseSubscriptions.length > 0;
+  const enrollmentSubscriptions = (data as any)?.enrollmentSubscriptions ?? [];
+  const hasAnything = memberships.length > 0 || courseSubscriptions.length > 0 || enrollmentSubscriptions.length > 0;
 
   if (!data || !hasAnything) {
     return (
@@ -1603,7 +1613,7 @@ function SubscriptionsTab() {
         </div>
       )}
 
-      {/* ── Learn Subscriptions (courses, quizzes, downloads, products, etc.) ── */}
+      {/* ── Learn Subscriptions (order-based: courses, quizzes, downloads, products) ── */}
       {courseSubscriptions.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-4">
@@ -1677,6 +1687,79 @@ function SubscriptionsTab() {
         </div>
       )}
 
+      {/* ── Enrollment-based Subscriptions (direct enrollment with Stripe sub) ── */}
+      {enrollmentSubscriptions.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="h-px flex-1 bg-gray-100" />
+            <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border bg-teal-50 text-teal-700 border-teal-200">
+              Content Subscriptions
+            </span>
+            <div className="h-px flex-1 bg-gray-100" />
+          </div>
+          <div className="space-y-4">
+            {enrollmentSubscriptions.map((sub: any) => {
+              const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
+              const isCancelled = sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled";
+              return (
+                <div key={sub.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-800">{sub.courseTitle}</span>
+                        <StatusBadge status={sub.stripe?.status ?? "active"} />
+                        {isCancelPending && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
+                            <XCircle className="w-3 h-3" /> Cancels at period end
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-500 space-y-0.5">
+                        {sub.stripe?.amount != null && (
+                          <p>{formatCurrency(sub.stripe.amount, sub.stripe.currency ?? "usd")} / {sub.stripe.interval}</p>
+                        )}
+                        {sub.stripe?.currentPeriodEnd && (
+                          <p className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            {isCancelPending ? "Access until" : "Renews"}: {formatDate(sub.stripe.currentPeriodEnd)}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-400">Since: {formatDate(sub.createdAt)}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 items-end">
+                      {isCancelPending ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => reactivateEnrollmentSub.mutate({ enrollmentId: sub.enrollmentId })}
+                          disabled={reactivateEnrollmentSub.isPending}
+                          className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                        >
+                          {reactivateEnrollmentSub.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                          Reactivate
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConfirmCancelEnrollment({ enrollmentId: sub.enrollmentId, courseTitle: sub.courseTitle })}
+                          disabled={isCancelled}
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                        >
+                          <XCircle className="w-3.5 h-3.5 mr-1" />
+                          Cancel Subscription
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Cancel membership confirmation */}
       <AlertDialog open={confirmCancel !== null} onOpenChange={open => !open && setConfirmCancel(null)}>
         <AlertDialogContent>
@@ -1698,6 +1781,32 @@ function SubscriptionsTab() {
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Yes, Cancel
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel enrollment subscription confirmation */}
+      <AlertDialog open={confirmCancelEnrollment !== null} onOpenChange={open => !open && setConfirmCancelEnrollment(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your access to <strong>{confirmCancelEnrollment?.courseTitle}</strong> will continue until the end of the current billing period. You will not be charged again after that. You can reactivate at any time before then.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmCancelEnrollment !== null) {
+                  cancelEnrollmentSub.mutate({ enrollmentId: confirmCancelEnrollment.enrollmentId });
+                }
+              }}
+              disabled={cancelEnrollmentSub.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {cancelEnrollmentSub.isPending ? "Cancelling..." : "Yes, Cancel"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

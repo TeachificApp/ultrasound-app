@@ -2950,20 +2950,35 @@ export const adminUserRouter = router({
         stripeSubId = order?.stripeSubscriptionId ?? null;
       }
 
-      if (!stripeSubId) throw new TRPCError({ code: "BAD_REQUEST", message: "No Stripe subscription linked to this enrollment" });
       const stripe = getStripeClient();
 
       if (input.immediately) {
-        await stripe.subscriptions.cancel(stripeSubId);
+        // Remove access now — cancel Stripe subscription immediately if linked
+        if (stripeSubId) {
+          try { await stripe.subscriptions.cancel(stripeSubId); } catch (e) {
+            console.warn("[Admin] Stripe cancel failed for", stripeSubId, e);
+          }
+        }
         await db.update(lmsEnrollments)
           .set({ accessExpiresAt: new Date() })
           .where(eq(lmsEnrollments.id, input.enrollmentId));
       } else {
-        const updatedSub = await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: true });
-        const periodEnd = new Date(updatedSub.current_period_end * 1000);
-        await db.update(lmsEnrollments)
-          .set({ accessExpiresAt: periodEnd })
-          .where(eq(lmsEnrollments.id, input.enrollmentId));
+        // Cancel at period end — set cancel_at_period_end on Stripe if linked, otherwise just stamp DB
+        if (stripeSubId) {
+          try {
+            const updatedSub = await stripe.subscriptions.update(stripeSubId, { cancel_at_period_end: true }) as any;
+            const periodEnd = new Date(updatedSub.current_period_end * 1000);
+            await db.update(lmsEnrollments)
+              .set({ accessExpiresAt: periodEnd })
+              .where(eq(lmsEnrollments.id, input.enrollmentId));
+          } catch (e) {
+            console.warn("[Admin] Stripe update failed for", stripeSubId, e);
+            // Fall through — access_expires_at not set, enrollment still active
+          }
+        } else {
+          // No Stripe subscription — just unenroll immediately (no billing period to respect)
+          await db.delete(lmsEnrollments).where(eq(lmsEnrollments.id, input.enrollmentId));
+        }
       }
 
       return { success: true };

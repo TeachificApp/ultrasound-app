@@ -46,7 +46,7 @@ import {
   manualInvoices,
   deferredCheckoutSessions,
 } from "../../drizzle/schema";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -691,7 +691,7 @@ export const dashboardRouter = router({
           currency: string | null;
         } | null = null;
 
-        if (m.stripeSubscriptionId && m.source && ["stripe", "stripe_dual"].includes(m.source)) {
+        if (m.stripeSubscriptionId) {
           try {
             const sub = await getStripeClient().subscriptions.retrieve(m.stripeSubscriptionId) as any;
             const item = sub.items?.data?.[0];
@@ -790,7 +790,73 @@ export const dashboardRouter = router({
         })
     );
 
-    return { memberships: enriched, courseSubscriptions: enrichedCourseOrders };
+    // Also fetch enrollment-based subscriptions (stripeSubscriptionId on lms_enrollments directly,
+    // not via an lms_orders row — e.g. admin-granted recurring subscriptions)
+    const enrollmentSubs = await db.execute(
+      sql`
+        SELECT
+          e.id AS enrollmentId,
+          e.stripe_subscription_id AS stripeSubscriptionId,
+          e.enrolled_at AS createdAt,
+          e.access_expires_at AS accessExpiresAt,
+          c.id AS courseId,
+          c.title AS courseTitle,
+          c.slug AS courseSlug
+        FROM lms_enrollments e
+        JOIN lms_courses c ON c.id = e.course_id
+        WHERE e.user_id = ${ctx.user.id}
+          AND e.stripe_subscription_id IS NOT NULL
+          AND (
+            e.order_id IS NULL
+            OR e.order_id NOT IN (
+              SELECT id FROM lms_orders WHERE stripe_subscription_id IS NOT NULL
+            )
+          )
+        ORDER BY e.enrolled_at DESC
+      `
+    );
+
+    const enrichedEnrollmentSubs = await Promise.all(
+      (enrollmentSubs[0] as any[]).map(async (e: any) => {
+        let stripeData: {
+          status: string;
+          currentPeriodEnd: Date | null;
+          cancelAtPeriodEnd: boolean;
+          interval: string | null;
+          amount: number | null;
+          currency: string | null;
+        } | null = null;
+
+        if (e.stripeSubscriptionId) {
+          try {
+            const sub = await getStripeClient().subscriptions.retrieve(e.stripeSubscriptionId) as any;
+            const item = sub.items?.data?.[0];
+            stripeData = {
+              status: sub.status,
+              currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+              cancelAtPeriodEnd: sub.cancel_at_period_end,
+              interval: item?.price?.recurring?.interval ?? null,
+              amount: item?.price?.unit_amount ?? null,
+              currency: item?.price?.currency ?? null,
+            };
+          } catch (err) {
+            console.warn("[Dashboard] Failed to fetch Stripe subscription for enrollment:", e.enrollmentId, err);
+          }
+        }
+
+        return {
+          enrollmentId: e.enrollmentId as number,
+          type: "enrollment" as const,
+          courseTitle: (e.courseTitle as string) ?? "Course Subscription",
+          courseSlug: (e.courseSlug as string) ?? null,
+          stripeSubscriptionId: e.stripeSubscriptionId as string,
+          createdAt: e.createdAt as Date,
+          stripe: stripeData,
+        };
+      })
+    );
+
+    return { memberships: enriched, courseSubscriptions: enrichedCourseOrders, enrollmentSubscriptions: enrichedEnrollmentSubs };
   }),
 
   // ── Cancel Course Subscription (student-accessible) ───────────────────────────
@@ -841,6 +907,77 @@ export const dashboardRouter = router({
       if (!order.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found" });
 
       await getStripeClient().subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: false });
+
+      return { success: true, message: "Your subscription has been reactivated." };
+    }),
+
+  // ── Cancel Enrollment Subscription (student-accessible, for enrollment-based subs) ──────────────
+
+  cancelEnrollmentSubscription: protectedProcedure
+    .input(z.object({ enrollmentId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      // Verify ownership — student can only cancel their own enrollment
+      const [enrollment] = await db
+        .select()
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.id, input.enrollmentId), eq(lmsEnrollments.userId, ctx.user.id)))
+        .limit(1);
+
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
+
+      // Resolve stripeSubscriptionId — from enrollment directly, or via linked order
+      let stripeSubId = enrollment.stripeSubscriptionId;
+      if (!stripeSubId && enrollment.orderId) {
+        const [order] = await db.select({ stripeSubscriptionId: lmsOrders.stripeSubscriptionId })
+          .from(lmsOrders).where(eq(lmsOrders.id, enrollment.orderId)).limit(1);
+        stripeSubId = order?.stripeSubscriptionId ?? null;
+      }
+
+      if (!stripeSubId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Stripe subscription linked to this enrollment" });
+
+      // Cancel at period end — student keeps access until billing period ends
+      const updatedSub = await getStripeClient().subscriptions.update(stripeSubId, { cancel_at_period_end: true }) as any;
+      const periodEnd = new Date(updatedSub.current_period_end * 1000);
+      await db.update(lmsEnrollments)
+        .set({ accessExpiresAt: periodEnd })
+        .where(eq(lmsEnrollments.id, input.enrollmentId));
+
+      return { success: true, message: "Your subscription will be cancelled at the end of the current billing period. You will retain access until then." };
+    }),
+
+  // ── Reactivate Enrollment Subscription (student-accessible) ──────────────────
+
+  reactivateEnrollmentSubscription: protectedProcedure
+    .input(z.object({ enrollmentId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [enrollment] = await db
+        .select()
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.id, input.enrollmentId), eq(lmsEnrollments.userId, ctx.user.id)))
+        .limit(1);
+
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
+
+      let stripeSubId = enrollment.stripeSubscriptionId;
+      if (!stripeSubId && enrollment.orderId) {
+        const [order] = await db.select({ stripeSubscriptionId: lmsOrders.stripeSubscriptionId })
+          .from(lmsOrders).where(eq(lmsOrders.id, enrollment.orderId)).limit(1);
+        stripeSubId = order?.stripeSubscriptionId ?? null;
+      }
+
+      if (!stripeSubId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Stripe subscription linked to this enrollment" });
+
+      await getStripeClient().subscriptions.update(stripeSubId, { cancel_at_period_end: false });
+      // Clear the access_expires_at that was set when cancellation was scheduled
+      await db.update(lmsEnrollments)
+        .set({ accessExpiresAt: null })
+        .where(eq(lmsEnrollments.id, input.enrollmentId));
 
       return { success: true, message: "Your subscription has been reactivated." };
     }),
