@@ -1637,7 +1637,6 @@ export default function PlatformAdmin() {
     { id: "quickfire", basePath: "/admin/quickfire", icon: Zap, label: "Daily Challenge", description: "Manage daily quiz challenges and questions", color: "#f59e0b" },
     { id: "scancoach", basePath: "/admin/scancoach", icon: Scan, label: "ScanCoach Editor", description: "Edit ScanCoach protocols and content", color: "#0891b2" },
     { id: "navigator", basePath: "/admin/navigator", icon: Globe, label: "Navigator Editor", description: "Edit Navigator pathways and content", color: "#7c3aed" },
-    { id: "thinkific-webhook", basePath: "/admin/thinkific-webhook", icon: Webhook, label: "Thinkific Webhook", description: "Configure Thinkific course sync webhooks", color: "#be185d" },
     { id: "challenge-cards", basePath: "/admin/challenge-cards", icon: GraduationCap, label: "Challenge Card Generator", description: "Generate visual challenge cards for social media", color: "#059669" },
     { id: "social-content", basePath: "/admin/social-content", icon: Image, label: "Social Content Generator", description: "Create branded social media content", color: "#f97316" },
     { id: "soundbytes", basePath: "/admin/soundbytes", icon: Volume2, label: "SoundBytes Admin", description: "Manage SoundBytes audio content and playlists", color: "#7c3aed" },
@@ -1711,33 +1710,7 @@ export default function PlatformAdmin() {
     onError: (err) => toast.error(err.message),
   });
 
-  const [lastSyncResult, setLastSyncResult] = useState<{ count: number; syncedAt: Date } | null>(null);
   const [lastRegistrySyncResult, setLastRegistrySyncResult] = useState<{ count: number; syncedAt: Date } | null>(null);
-  const [lastMemberSyncResult, setLastMemberSyncResult] = useState<{ total: number; created: number; skipped: number; errors: number; syncedAt: Date } | null>(null);
-  const [lastBackfillResult, setLastBackfillResult] = useState<{ total: number; membershipGranted: number; communityGranted: number; errors: number; completedAt: Date } | null>(null);
-  const backfillAccessMutation = trpc.platformAdmin.backfillThinkificAccess.useMutation({
-    onSuccess: (data) => {
-      setLastBackfillResult(data);
-      toast.success(`Access backfill complete: ${data.membershipGranted} memberships + ${data.communityGranted} community memberships granted across ${data.total} users.`);
-    },
-    onError: (err) => toast.error(`Backfill failed: ${err.message}`),
-  });
-  const syncAllMembersMutation = trpc.platformAdmin.syncAllThinkificMembers.useMutation({
-    onSuccess: (data) => {
-      setLastMemberSyncResult(data);
-      toast.success(`Member sync complete: ${data.created} new accounts created, ${data.skipped} already existed.`);
-    },
-    onError: (err) => toast.error(`Member sync failed: ${err.message}`),
-  });
-  // ── Thinkific Community Sync ──────────────────────────────────────────────
-  const [communitySyncResult, setCommunitySyncResult] = useState<{ triggeredAt: number } | null>(null);
-  const triggerCommunitySyncMutation = trpc.community.admin.triggerFullSync.useMutation({
-    onSuccess: () => {
-      setCommunitySyncResult({ triggeredAt: Date.now() });
-      toast.success("Community sync started in background — posts, replies, and comments will be imported from Thinkific.");
-    },
-    onError: (err) => toast.error(`Community sync failed: ${err.message}`),
-  });
   // ── Posting Aliases ─────────────────────────────────────────────────────
   const { data: aliasList = [], refetch: refetchAliases } = trpc.admin.listPostingAliases.useQuery();
   const [aliasDialog, setAliasDialog] = useState<{ open: boolean; id?: number; name: string; email: string; avatarUrl: string; bio: string }>({ open: false, name: "", email: "", avatarUrl: "", bio: "" });
@@ -1770,14 +1743,6 @@ export default function PlatformAdmin() {
   const linkCourseMutation = trpc.platformAdmin.linkCmeCourseToNative.useMutation({
     onSuccess: () => refetchCmeLinks(),
     onError: (err) => toast.error(`Link failed: ${err.message}`),
-  });
-
-  const syncCoursesMutation = trpc.platformAdmin.syncThinkificCourses.useMutation({
-    onSuccess: (data) => {
-      setLastSyncResult(data);
-      toast.success(`Synced ${data.count} CME course${data.count !== 1 ? "s" : ""} from Thinkific.`);
-    },
-    onError: (err) => toast.error(`Sync failed: ${err.message}`),
   });
 
   const syncRegistryMutation = trpc.platformAdmin.syncRegistryCourses.useMutation({
@@ -2123,42 +2088,6 @@ export default function PlatformAdmin() {
         {/* Checkout Terms */}
         <CheckoutTermsPanel />
 
-        {/* Sync CME Courses */}
-        <Card className="mb-6 border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <RefreshCw className="w-4 h-4" />
-              CME Course Sync
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 mb-1">
-                  Manually pull the latest course catalog from Thinkific (E-Learning &amp; CME collection).
-                  The catalog also auto-syncs every 6 hours and on webhook events.
-                </p>
-                {lastSyncResult ? (
-                  <p className="text-xs text-[#189aa1] font-medium">
-                    Last sync: {lastSyncResult.count} course{lastSyncResult.count !== 1 ? "s" : ""} &mdash;{" "}
-                    {new Date(lastSyncResult.syncedAt).toLocaleString()}
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400">No sync performed this session.</p>
-                )}
-              </div>
-              <Button
-                onClick={() => syncCoursesMutation.mutate()}
-                disabled={syncCoursesMutation.isPending}
-                className="flex items-center gap-2 flex-shrink-0"
-                style={{ background: "#189aa1" }}
-              >
-                <RefreshCw className={`w-4 h-4 ${syncCoursesMutation.isPending ? "animate-spin" : ""}`} />
-                {syncCoursesMutation.isPending ? "Syncing…" : "Sync Now"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Sync Registry Review Courses */}
         <Card className="mb-6 border-0 shadow-sm">
@@ -2197,116 +2126,7 @@ export default function PlatformAdmin() {
           </CardContent>
         </Card>
 
-        {/* Sync All Thinkific Members */}
-        <Card className="mb-6 border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Sync All Thinkific Members
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 mb-1">
-                  Create All About Ultrasound™ accounts for all existing Thinkific members who don&apos;t have one yet.
-                  No emails are sent. Future members are handled automatically via webhook.
-                </p>
-                {lastMemberSyncResult ? (
-                  <p className="text-xs text-[#189aa1] font-medium">
-                    Last sync: {lastMemberSyncResult.created} created, {lastMemberSyncResult.skipped} already existed
-                    {lastMemberSyncResult.errors > 0 ? `, ${lastMemberSyncResult.errors} errors` : ""} &mdash;{" "}
-                    {new Date(lastMemberSyncResult.syncedAt).toLocaleString()}
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400">No sync performed this session.</p>
-                )}
-              </div>
-              <Button
-                onClick={() => syncAllMembersMutation.mutate()}
-                disabled={syncAllMembersMutation.isPending}
-                className="flex items-center gap-2 flex-shrink-0"
-                style={{ background: "#189aa1" }}
-              >
-                <Users className={`w-4 h-4 ${syncAllMembersMutation.isPending ? "animate-spin" : ""}`} />
-                {syncAllMembersMutation.isPending ? "Syncing…" : "Sync Members"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Backfill Free Membership + Community Access */}
-        <Card className="mb-6 border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <Award className="w-4 h-4" />
-              Backfill Free Membership &amp; Community Access
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 mb-1">
-                  Grant the <strong>Free Membership</strong> plan and <strong>All About Ultrasound | iHeartEcho™ Community</strong> membership to all existing platform users who don&apos;t already have them.
-                  Idempotent — safe to run multiple times. No emails are sent. No premium_user role is assigned.
-                </p>
-                {lastBackfillResult ? (
-                  <p className="text-xs text-[#189aa1] font-medium">
-                    Last backfill: {lastBackfillResult.membershipGranted} memberships granted, {lastBackfillResult.communityGranted} community memberships granted across {lastBackfillResult.total} users
-                    {lastBackfillResult.errors > 0 ? `, ${lastBackfillResult.errors} errors` : ""} &mdash;{" "}
-                    {new Date(lastBackfillResult.completedAt).toLocaleString()}
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400">No backfill performed this session.</p>
-                )}
-              </div>
-              <Button
-                onClick={() => backfillAccessMutation.mutate()}
-                disabled={backfillAccessMutation.isPending}
-                className="flex items-center gap-2 flex-shrink-0"
-                style={{ background: "#189aa1" }}
-              >
-                <Award className={`w-4 h-4 ${backfillAccessMutation.isPending ? "animate-spin" : ""}`} />
-                {backfillAccessMutation.isPending ? "Backfilling…" : "Backfill Access"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-        {/* Thinkific Community Sync */}
-        <Card className="mb-6 border-0 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <RefreshCw className="w-4 h-4" />
-              Thinkific Community Sync
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="flex-1">
-                <p className="text-sm text-gray-600 mb-1">
-                  Import all posts, replies, and comments from Thinkific communities into the native community system.
-                  Runs automatically every 6 hours. Use this button to trigger a manual sync immediately.
-                </p>
-                {communitySyncResult ? (
-                  <p className="text-xs text-[#189aa1] font-medium">
-                    Last sync triggered at {new Date(communitySyncResult.triggeredAt).toLocaleString()} — running in background.
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-400">Scheduled: every 6 hours automatically. Next run: ~6h from last sync.</p>
-                )}
-              </div>
-              <Button
-                onClick={() => triggerCommunitySyncMutation.mutate()}
-                disabled={triggerCommunitySyncMutation.isPending}
-                className="flex items-center gap-2 flex-shrink-0"
-                style={{ background: "#189aa1" }}
-              >
-                <RefreshCw className={`w-4 h-4 ${triggerCommunitySyncMutation.isPending ? "animate-spin" : ""}`} />
-                {triggerCommunitySyncMutation.isPending ? "Triggering…" : "Sync Now"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
         {/* CME Course Linker */}
         <Card className="mb-6 border-0 shadow-sm">
           <CardHeader className="pb-3">
@@ -2317,7 +2137,7 @@ export default function PlatformAdmin() {
           </CardHeader>
           <CardContent className="pt-0">
             <p className="text-sm text-gray-600 mb-3">
-              Link each Thinkific CME course to its native LMS course so the CME Hub routes enrolled users to this platform instead of Thinkific.
+              Link each CME course to its native LMS course so the CME Hub routes enrolled users to this platform.
               {cmeLinkData && (
                 <span className="ml-1 text-xs text-gray-400">
                   ({cmeLinkData.cmeRows.filter(r => r.nativeLmsCourseId).length}/{cmeLinkData.cmeRows.length} linked)
