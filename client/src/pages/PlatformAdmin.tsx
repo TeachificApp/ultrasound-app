@@ -109,6 +109,7 @@ import {
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
 import { isIHeartEchoDomain, LEARN_APP_URL, APP_URL, getAdminUrl } from "@/hooks/useSubdomain";
+import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 
 type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";
@@ -1512,14 +1513,12 @@ function CheckoutTermsPanel() {
         {/* Terms sentence */}
         <div>
           <Label className="text-xs font-medium text-gray-700 mb-1 block">Agreement sentence</Label>
-          <Textarea
-            rows={2}
-            placeholder="e.g. I have reviewed and agree to the"
+          <RichTextEditor
             value={draft.termsText}
-            onChange={e => setDraft(prev => ({ ...prev, termsText: e.target.value }))}
-            className="text-sm resize-none"
+            onChange={val => setDraft(prev => ({ ...prev, termsText: val }))}
+            placeholder="e.g. I have reviewed and agree to the"
           />
-          <p className="text-xs text-gray-400 mt-1">This text appears before the two links.</p>
+          <p className="text-xs text-gray-400 mt-1">This text appears before the two links. HTML formatting is supported.</p>
         </div>
         {/* Link 1 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

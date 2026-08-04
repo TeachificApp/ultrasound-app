@@ -6,7 +6,6 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { registerChatRoutes } from "./chat";
-import { registerThinkificWebhook } from "../webhooks/thinkific";
 import { registerStripeWebhook } from "../webhooks/stripe";
 import { registerSendGridWebhook } from "../webhooks/sendgrid";
 import { registerUploadCaseMediaRoute } from "../routes/uploadCaseMedia";
@@ -44,11 +43,9 @@ import { backfillAllContacts } from "../lib/emailListHelper";
 import { backfillUserOpenIds } from "../lib/backfillUserOpenIds";
 import { getDb } from "../db";
 import { sql as drizzleSql } from "drizzle-orm";
-import { startThinkificMemberSync } from "../jobs/thinkificMemberSync";
 import { initSonoQuizHub } from "../sonoQuizHub";
 import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
-import { thinkificCommunitySyncHandler } from "../routes/thinkificCommunitySyncHandler";
 import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes/scormExtractor";
 import { healStuckScormVersions } from "../scheduled/scormHealthCheck";
 import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
@@ -224,8 +221,6 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Chat API with streaming and tool calling
   registerChatRoutes(app);
-  // Thinkific webhook for live course sync
-  registerThinkificWebhook(app);
   // SendGrid Event Webhook for unsubscribe/spamreport sync
   registerSendGridWebhook(app);
   // Case media upload endpoint (multipart/form-data)
@@ -282,8 +277,6 @@ async function startServer() {
   });
   // Google OAuth2 routes for per-form Google Sheets integration
   registerGoogleOAuthRoutes(app);
-  // Heartbeat: Thinkific community sync (every 6 hours)
-  app.post("/api/scheduled/thinkific-community-sync", thinkificCommunitySyncHandler);
   // Heartbeat: SCORM extraction job (every 60s) — processes pending SCORM ZIP packages
   app.post("/api/scheduled/scorm-extract", scormExtractHeartbeatHandler);
   // Heartbeat: SCORM health-check (every 10 min) — audits done versions and re-queues broken ones
@@ -536,8 +529,6 @@ async function startServer() {
     startChallengeCron();
     // Start the email campaign scheduler (sends scheduled campaigns every 5 minutes)
     startEmailCampaignScheduler();
-    // Start the Thinkific member sync job (imports new members every 6 hours, no emails sent)
-    startThinkificMemberSync();
     // Start the Media Repository purge cron (hard-deletes assets soft-deleted > 30 days ago)
     startMediaPurgeCron();
     // Start the Railway/R2 mirror sync (syncs DB and media every 6 hours)

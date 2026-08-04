@@ -695,7 +695,9 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
                 style={{ accentColor: accent }}
               />
               <span>
-                {data.termsText}{" "}
+                {data.termsText && /^\s*</.test(data.termsText)
+                  ? <span dangerouslySetInnerHTML={{ __html: data.termsText }} />
+                  : <>{data.termsText}</>}{" "}
                 {data.termsLinkText && data.termsLinkUrl && (
                   <a
                     href={data.termsLinkUrl}

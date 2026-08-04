@@ -789,7 +789,9 @@ export default function Checkout() {
                   htmlFor="terms"
                   className={`text-sm leading-relaxed cursor-pointer ${isDark ? "text-gray-300" : "text-gray-700"}`}
                 >
-                  {sessionMeta.checkoutTermsText}{" "}
+                  {sessionMeta.checkoutTermsText && /^\s*</.test(sessionMeta.checkoutTermsText)
+                    ? <span dangerouslySetInnerHTML={{ __html: sessionMeta.checkoutTermsText }} />
+                    : <>{sessionMeta.checkoutTermsText}</>}{" "}
                   {sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url && (
                     <a
                       href={sessionMeta.checkoutTermsLink1Url}
