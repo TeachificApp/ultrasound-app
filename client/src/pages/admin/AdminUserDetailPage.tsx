@@ -496,6 +496,8 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [enrollExpiresAt, setEnrollExpiresAt] = useState("");
   const [unenrollConfirm, setUnenrollConfirm] = useState<number | null>(null);
   const [cancelEnrollSubConfirm, setCancelEnrollSubConfirm] = useState<{ enrollmentId: number; title: string } | null>(null);
+  const [removeAccessNowConfirm, setRemoveAccessNowConfirm] = useState<{ enrollmentId: number; title: string } | null>(null);
+  const [removeAccessAtPeriodEndConfirm, setRemoveAccessAtPeriodEndConfirm] = useState<{ enrollmentId: number; title: string } | null>(null);
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
   const [cancelNativeConfirm, setCancelNativeConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
   const [revokeNativeConfirm, setRevokeNativeConfirm] = useState<number | null>(null);
@@ -532,6 +534,14 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const cancelEnrollSub = trpc.adminUser.cancelLmsEnrollmentSubscription.useMutation({
     onSuccess: () => { toast.success("Subscription cancelled at period end. Access expiry set to billing period end."); refetch(); setCancelEnrollSubConfirm(null); },
     onError: (e) => { toast.error(e.message); setCancelEnrollSubConfirm(null); },
+  });
+  const removeAccessNow = trpc.adminUser.cancelLmsEnrollmentSubscription.useMutation({
+    onSuccess: () => { toast.success("Access removed immediately. Stripe subscription cancelled."); refetch(); setRemoveAccessNowConfirm(null); },
+    onError: (e) => { toast.error(e.message); setRemoveAccessNowConfirm(null); },
+  });
+  const removeAccessAtPeriodEnd = trpc.adminUser.cancelLmsEnrollmentSubscription.useMutation({
+    onSuccess: () => { toast.success("Access will end at the current billing period end."); refetch(); setRemoveAccessAtPeriodEndConfirm(null); },
+    onError: (e) => { toast.error(e.message); setRemoveAccessAtPeriodEndConfirm(null); },
   });
 
   const refundPayment = trpc.adminUser.refundPayment.useMutation({
@@ -748,17 +758,19 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                         </button>
                       );
                     })()}
+                    {e.stripeSubscriptionId && (
+                      <button
+                        onClick={() => setRemoveAccessAtPeriodEndConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
+                      >
+                        <Clock className="w-3 h-3" /> Remove at Period End
+                      </button>
+                    )}
                     <button
-                      onClick={() => cancelEnrollSub.mutate({ enrollmentId: e.enrollmentId, immediately: false })}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
-                    >
-                      <Clock className="w-3 h-3" /> Remove at Period End
-                    </button>
-                    <button
-                      onClick={() => setUnenrollConfirm(e.enrollmentId)}
+                      onClick={() => setRemoveAccessNowConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                     >
-                      <Trash2 className="w-3 h-3" /> Remove Access Now
+                      <ShieldOff className="w-3 h-3" /> Remove Access Now
                     </button>
                     {e.stripeSubscriptionId && (
                       <button
@@ -868,12 +880,46 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     >
                       <Calendar className="w-3 h-3" /> Edit Expiry
                     </button>
+                    {e.stripeSubscriptionId && (() => {
+                      const alreadyExpired = !!(e.accessExpiresAt && new Date(e.accessExpiresAt) < new Date());
+                      return (
+                        <button
+                          disabled={alreadyExpired}
+                          onClick={() => !alreadyExpired && setCancelEnrollSubConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
+                            alreadyExpired
+                              ? "bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
+                              : "bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200"
+                          }`}
+                          title={alreadyExpired ? "Subscription already ended" : "Cancel at period end"}
+                        >
+                          <XCircle className="w-3 h-3" /> Cancel Subscription
+                        </button>
+                      );
+                    })()}
+                    {e.stripeSubscriptionId && (
+                      <button
+                        onClick={() => setRemoveAccessAtPeriodEndConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
+                      >
+                        <Clock className="w-3 h-3" /> Remove at Period End
+                      </button>
+                    )}
                     <button
-                      onClick={() => setUnenrollConfirm(e.enrollmentId)}
+                      onClick={() => setRemoveAccessNowConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                     >
-                      <Trash2 className="w-3 h-3" /> Unenroll
+                      <ShieldOff className="w-3 h-3" /> Remove Access Now
                     </button>
+                    {e.stripeSubscriptionId && (
+                      <button
+                        onClick={() => syncSub.mutate({ stripeSubscriptionId: e.stripeSubscriptionId })}
+                        disabled={syncSub.isPending}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 disabled:opacity-50"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Sync from Stripe
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1001,11 +1047,19 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                         </button>
                       );
                     })()}
+                    {e.stripeSubscriptionId && (
+                      <button
+                        onClick={() => setRemoveAccessAtPeriodEndConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200"
+                      >
+                        <Clock className="w-3 h-3" /> Remove at Period End
+                      </button>
+                    )}
                     <button
-                      onClick={() => setUnenrollConfirm(e.enrollmentId)}
+                      onClick={() => setRemoveAccessNowConfirm({ enrollmentId: e.enrollmentId, title: e.courseTitle })}
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                     >
-                      <Trash2 className="w-3 h-3" /> Remove
+                      <ShieldOff className="w-3 h-3" /> Remove Access Now
                     </button>
                     {e.stripeSubscriptionId && (
                       <button
@@ -1585,6 +1639,50 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               className="bg-orange-600 hover:bg-orange-700 text-white"
             >
               {cancelEnrollSub.isPending ? "Cancelling..." : "Cancel Subscription"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Access Now confirm */}
+      <AlertDialog open={removeAccessNowConfirm !== null} onOpenChange={open => !open && setRemoveAccessNowConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Access Now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will immediately cancel the Stripe subscription for <strong>{removeAccessNowConfirm?.title}</strong> and revoke the student's access right now. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Access</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => removeAccessNowConfirm && removeAccessNow.mutate({ enrollmentId: removeAccessNowConfirm.enrollmentId, immediately: true })}
+              disabled={removeAccessNow.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {removeAccessNow.isPending ? "Removing..." : "Remove Access Now"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Access at Period End confirm */}
+      <AlertDialog open={removeAccessAtPeriodEndConfirm !== null} onOpenChange={open => !open && setRemoveAccessAtPeriodEndConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Access at Period End?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Access to <strong>{removeAccessAtPeriodEndConfirm?.title}</strong> will end at the current billing period end. If a Stripe subscription is linked, it will be set to cancel at period end and the student will not be charged again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Access</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => removeAccessAtPeriodEndConfirm && removeAccessAtPeriodEnd.mutate({ enrollmentId: removeAccessAtPeriodEndConfirm.enrollmentId, immediately: false })}
+              disabled={removeAccessAtPeriodEnd.isPending}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {removeAccessAtPeriodEnd.isPending ? "Scheduling..." : "Remove at Period End"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
