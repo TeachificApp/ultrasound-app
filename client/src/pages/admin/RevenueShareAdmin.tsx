@@ -601,9 +601,11 @@ function AssignmentsTab() {
 function LedgerTab() {
   const [filterPartnerId, setFilterPartnerId] = useState<string>("all");
   const { data: partners = [] } = trpc.revenueShare.listPartners.useQuery();
-  const { data: ledger = [], isLoading } = trpc.revenueShare.getLedger.useQuery({
+  const { data: ledgerData, isLoading } = trpc.revenueShare.getLedger.useQuery({
     partnerId: filterPartnerId !== "all" ? Number(filterPartnerId) : undefined,
   });
+  // getLedger returns { entries: [...], total: N } — extract the array defensively
+  const ledger: any[] = Array.isArray(ledgerData) ? ledgerData : (ledgerData as any)?.entries ?? [];
   const retryMutation = trpc.revenueShare.retryFailedTransfer.useMutation({
     onSuccess: () => toast.success("Transfer retried"),
     onError: (e) => toast.error(e.message),
@@ -613,8 +615,8 @@ function LedgerTab() {
     onError: (e) => toast.error(e.message),
   });
 
-  const totalPaid = (ledger as any[]).filter((r: any) => r.status === "paid").reduce((s: number, r: any) => s + (r.shareAmount ?? 0), 0);
-  const totalPending = (ledger as any[]).filter((r: any) => r.status === "pending").reduce((s: number, r: any) => s + (r.shareAmount ?? 0), 0);
+  const totalPaid = ledger.filter((r: any) => r.status === "paid").reduce((s: number, r: any) => s + (r.shareAmount ?? 0), 0);
+  const totalPending = ledger.filter((r: any) => r.status === "pending").reduce((s: number, r: any) => s + (r.shareAmount ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -663,7 +665,7 @@ function LedgerTab() {
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading ledger…</div>
-      ) : (ledger as any[]).length === 0 ? (
+      ) : ledger.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="py-12 text-center">
             <DollarSign className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -686,7 +688,7 @@ function LedgerTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(ledger as any[]).map((r: any) => (
+              {ledger.map((r: any) => (
                 <TableRow key={r.id}>
                   <TableCell>
                     <div className="font-medium">{r.partnerName}</div>
