@@ -163,11 +163,24 @@ function FormField({
 
   return (
     <div>
-      <label style={{ display: "block", fontSize: parseInt(theme.fontSize), fontWeight: 600, marginBottom: 6, color: theme.labelColor }}>
-        {item.label}
-        {item.isRequired && <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>}
-      </label>
-      {item.helpText && <p style={{ fontSize: parseInt(theme.fontSize) - 2, color: theme.textColor, opacity: 0.6, marginBottom: 8 }}>{item.helpText}</p>}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <label style={{ display: "block", fontSize: parseInt(theme.fontSize), fontWeight: 600, color: theme.labelColor }}>
+          {item.label}
+          {item.isRequired && <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>}
+        </label>
+        {item.helpText && (
+          <span
+            title={item.helpText}
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              width: 16, height: 16, borderRadius: "50%",
+              background: "rgba(0,0,0,0.12)", color: theme.labelColor,
+              fontSize: 10, fontWeight: 700, cursor: "help", flexShrink: 0, lineHeight: 1,
+            }}
+          >?
+          </span>
+        )}
+      </div>
 
       {item.itemType === "short_text" && (
         <input ref={inputRef as any} type="text" value={value ?? ""} onChange={e => onChange(e.target.value)} placeholder={item.placeholder ?? ""} style={base} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} />

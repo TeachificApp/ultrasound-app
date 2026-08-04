@@ -16,7 +16,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle2, AlertCircle, ChevronRight } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, ChevronRight, HelpCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RichTextDisplay } from "@/components/RichTextEditor";
 import { toast } from "sonner";
 import { FormSuccessOutcomeView } from "@/components/FormSuccessOutcomeView";
@@ -211,13 +212,26 @@ function FieldWrapper({ item, isRequired, children }: { item: FormItem; isRequir
   return (
     <div className="space-y-1.5">
       {item.itemType !== "heading" && item.itemType !== "info" && (
-        <Label className="text-sm font-semibold text-gray-700">
-          {item.label}
-          {showRequired && <span className="text-red-500 ml-1">*</span>}
-        </Label>
-      )}
-      {item.helpText && (
-        <p className="text-xs text-gray-500">{item.helpText}</p>
+        <div className="flex items-center gap-1.5">
+          <Label className="text-sm font-semibold text-gray-700">
+            {item.label}
+            {showRequired && <span className="text-red-500 ml-1">*</span>}
+          </Label>
+          {item.helpText && (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-xs text-xs">
+                  {item.helpText}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       )}
       {children}
     </div>
@@ -432,6 +446,44 @@ function InfoField({ item }: { item: FormItem }) {
 
 // ─── Item Dispatcher ──────────────────────────────────────────────────────────
 
+function DateField({ item, value, onChange, readOnly }: {
+  item: FormItem;
+  value: string;
+  onChange: (v: string) => void;
+  readOnly: boolean;
+}) {
+  return (
+    <FieldWrapper item={item}>
+      <input
+        type="date"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        disabled={readOnly}
+        className="text-sm border border-input rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 disabled:opacity-50"
+      />
+    </FieldWrapper>
+  );
+}
+
+function TimeField({ item, value, onChange, readOnly }: {
+  item: FormItem;
+  value: string;
+  onChange: (v: string) => void;
+  readOnly: boolean;
+}) {
+  return (
+    <FieldWrapper item={item}>
+      <input
+        type="time"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        disabled={readOnly}
+        className="text-sm border border-input rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 disabled:opacity-50"
+      />
+    </FieldWrapper>
+  );
+}
+
 function FormItemField({ item, response, onChange, readOnly, isRequired }: {
   item: FormItem;
   response: string | string[];
@@ -453,6 +505,8 @@ function FormItemField({ item, response, onChange, readOnly, isRequired }: {
     case "scale": return <ScaleField item={item} value={strVal} onChange={onChange as (v: string) => void} readOnly={readOnly} />;
     case "heading": return <HeadingField item={item} />;
     case "info": return <InfoField item={item} />;
+    case "date": return <DateField item={item} value={strVal} onChange={onChange as (v: string) => void} readOnly={readOnly} />;
+    case "time": return <TimeField item={item} value={strVal} onChange={onChange as (v: string) => void} readOnly={readOnly} />;
     default: return <TextField item={item} value={strVal} onChange={onChange as (v: string) => void} readOnly={readOnly} />;
   }
 }

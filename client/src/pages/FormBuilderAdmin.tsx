@@ -72,10 +72,11 @@ import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import DIYFormSuccessModulesTab from "@/components/admin/DIYFormSuccessModulesTab";
 import DIYFormAnalyticsDeep from "@/components/admin/DIYFormAnalyticsDeep";
 import FormStripeSettingsPanel, { type FormStripeSettings } from "@/components/admin/FormStripeSettingsPanel";
+import { QRCodeSVG } from "qrcode.react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ItemType = "text" | "textarea" | "email" | "richtext" | "radio" | "checkbox" | "select" | "scale" | "heading" | "info" | "hidden";
+type ItemType = "text" | "textarea" | "email" | "richtext" | "radio" | "checkbox" | "select" | "scale" | "heading" | "info" | "hidden" | "date" | "time";
 type BranchAction = "show" | "hide" | "require" | "unrequire";
 type BranchOperator = "equals" | "not_equals" | "contains" | "not_contains" | "is_empty" | "is_not_empty";
 type BranchLogicOperator = "all" | "any";
@@ -176,6 +177,8 @@ const ITEM_TYPE_META: Record<ItemType, { label: string; icon: React.ElementType;
   heading: { label: "Section Heading", icon: Heading, description: "Visual heading, not a question" },
   info: { label: "Info Text", icon: Info, description: "Informational paragraph" },
   hidden: { label: "Hidden Field", icon: Info, description: "Server-side field, invisible to users" },
+  date: { label: "Date Picker", icon: Info, description: "Date input (calendar picker)" },
+  time: { label: "Time Picker", icon: Info, description: "Time input (HH:MM)" },
 };
 
 const FORM_TYPES = [
@@ -952,7 +955,7 @@ function ItemEditorDialog({ open, onClose, item, existingOptions, sectionId, tem
       scaleMaxLabel: itemType === "scale" ? scaleMaxLabel || undefined : undefined,
       richTextContent: ["richtext", "info"].includes(itemType) ? richTextContent || undefined : undefined,
       emailRoutingRules: itemType === "email" && emailRoutingRules.trim() ? emailRoutingRules : undefined,
-      placeholder: ["text", "textarea", "email"].includes(itemType) ? placeholder || undefined : undefined,
+      placeholder: ["text", "textarea", "email", "date", "time"].includes(itemType) ? placeholder || undefined : undefined,
       validationRegex: ["text", "email"].includes(itemType) ? validationRegex || undefined : undefined,
       options: hasOptions ? options : undefined,
       extraConfig: itemType === "hidden" ? JSON.stringify({ hiddenValue }) : undefined,
@@ -1838,6 +1841,213 @@ function DIYSettingsPanel({ template, templateId, updateTemplateMutation }: {
   );
 }
 
+// ─── Share Panel ─────────────────────────────────────────────────────────────
+
+function SharePanel({ templateId, template, items }: { templateId: number; template: any; items: any[] }) {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<"links" | "embed" | "api">("links");
+
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedKey(key);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setCopiedKey(null), 2000);
+    });
+  };
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  // Accreditation forms use admin preview URL (they don't have a public slug)
+  const formLink = `${origin}/admin/form-builder/${templateId}?tab=preview`;
+  const hostDomain = template.hostDomain ?? "app.allaboutultrasound.com";
+
+  // Build pre-populate link: ?field_ID=VALUE for each input item
+  const inputItems = items.filter(i => !["heading", "info", "richtext", "hidden"].includes(i.itemType));
+  const prePop = inputItems.map(i => `field_${i.id}=`).join("&");
+  const prePopLink = prePop ? `${formLink}&${prePop}` : formLink;
+
+  // Embed code
+  const embedCode = `<iframe\n  src="${formLink}"\n  width="100%"\n  height="700"\n  frameborder="0"\n  style="border:none;border-radius:8px;"\n  title="${template.name}"\n></iframe>`;
+
+  // API base URL (accreditation forms use the REST endpoint by templateId)
+  const apiBaseUrl = `${origin}/api/forms/${templateId}/submissions`;
+
+  const CopyBtn = ({ text, k }: { text: string; k: string }) => (
+    <button
+      onClick={() => copyToClipboard(text, k)}
+      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 transition-colors flex-shrink-0"
+    >
+      {copiedKey === k ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Info className="w-3.5 h-3.5" />}
+      {copiedKey === k ? "Copied" : "Copy"}
+    </button>
+  );
+
+  return (
+    <div className="py-4 max-w-2xl space-y-6">
+      {/* Sub-nav */}
+      <div className="flex gap-1 border-b border-gray-100">
+        {(["links", "embed", "api"] as const).map(s => (
+          <button
+            key={s}
+            onClick={() => setActiveSection(s)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-all ${
+              activeSection === s ? "border-teal-500 text-teal-600" : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {s === "links" ? "Links" : s === "embed" ? "Embed Code" : "API Reference"}
+          </button>
+        ))}
+      </div>
+
+      {activeSection === "links" && (
+        <div className="space-y-6">
+          {/* Form Link */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">Form Link</h3>
+            <p className="text-xs text-gray-500 mb-2">This is the form's main link. Share it on your web page or in an email.</p>
+            <div className="flex items-center gap-2">
+              <input readOnly value={formLink} className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-700 font-mono" />
+              <CopyBtn text={formLink} k="formLink" />
+              <a href={formLink} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 transition-colors">
+                <Eye className="w-3.5 h-3.5" /> View
+              </a>
+            </div>
+          </div>
+
+          {/* QR Code */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">QR Code</h3>
+            <p className="text-xs text-gray-500 mb-3">Scan to open the form. Right-click the QR code to save as an image.</p>
+            <div className="flex items-start gap-4">
+              <div className="border border-gray-200 rounded-lg p-3 bg-white inline-block">
+                <QRCodeSVG value={formLink} size={128} level="M" />
+              </div>
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    const svg = document.querySelector(".share-qr-svg") as SVGElement | null;
+                    if (!svg) return;
+                    const blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url; a.download = `${template.name}-qr.svg`; a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 transition-colors"
+                >
+                  <Info className="w-3.5 h-3.5" /> Download SVG
+                </button>
+                <p className="text-xs text-gray-400">128×128 px — suitable for print and digital use</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pre-populate Link */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">Pre-populate Link</h3>
+            <p className="text-xs text-gray-500 mb-2">
+              Pre-fill fields by passing values in the URL. Replace each empty value after <code className="bg-gray-100 px-1 rounded">field_ID=</code> with the data you want to pre-fill.
+            </p>
+            <div className="flex items-center gap-2">
+              <input readOnly value={prePopLink} className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-700 font-mono overflow-x-auto" />
+              <CopyBtn text={prePopLink} k="prePopLink" />
+            </div>
+            {inputItems.length > 0 && (
+              <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-600">URL Parameter</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-600">Field Label</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-600">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {inputItems.map(i => (
+                      <tr key={i.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 font-mono text-teal-700">field_{i.id}</td>
+                        <td className="px-3 py-2 text-gray-700">{i.label}</td>
+                        <td className="px-3 py-2 text-gray-400">{i.itemType}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeSection === "embed" && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">Embed Code</h3>
+            <p className="text-xs text-gray-500 mb-2">Paste this HTML snippet into any webpage to embed the form in an iframe.</p>
+            <div className="relative">
+              <pre className="text-xs bg-gray-900 text-green-300 rounded-lg p-4 overflow-x-auto font-mono whitespace-pre">{embedCode}</pre>
+              <button
+                onClick={() => copyToClipboard(embedCode, "embed")}
+                className="absolute top-2 right-2 flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200 transition-colors"
+              >
+                {copiedKey === "embed" ? <Check className="w-3 h-3" /> : <Info className="w-3 h-3" />}
+                {copiedKey === "embed" ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-700"><strong>Note:</strong> The form must be Active and the user must be logged in to submit responses. For fully public forms, use a General Form (DIY) instead.</p>
+          </div>
+        </div>
+      )}
+
+      {activeSection === "api" && (
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">API Base URL</h3>
+            <p className="text-xs text-gray-500 mb-2">Use this endpoint to retrieve form submissions programmatically. Requires a Bearer token (set in Form Settings → API Token).</p>
+            <div className="flex items-center gap-2">
+              <input readOnly value={apiBaseUrl} className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-700 font-mono" />
+              <CopyBtn text={apiBaseUrl} k="apiUrl" />
+            </div>
+            <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <p className="text-xs font-semibold text-gray-700 mb-1">Example Request</p>
+              <pre className="text-xs text-gray-600 font-mono whitespace-pre-wrap">{`GET ${apiBaseUrl}?page=1&pageSize=100\nAuthorization: Bearer YOUR_API_TOKEN`}</pre>
+            </div>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 mb-1">Form Items</h3>
+            <p className="text-xs text-gray-500 mb-2">Use these IDs to identify field data in the API response's <code className="bg-gray-100 px-1 rounded">responses</code> object.</p>
+            {items.filter(i => !["heading", "info", "richtext", "hidden"].includes(i.itemType)).length === 0 ? (
+              <p className="text-xs text-gray-400 italic">No input fields yet. Add fields in the Form Editor tab.</p>
+            ) : (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-600">ID</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-600">Label</th>
+                      <th className="text-left px-3 py-2 font-semibold text-gray-600">Type</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {items.filter(i => !["heading", "info", "richtext", "hidden"].includes(i.itemType)).map(i => (
+                      <tr key={i.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 font-mono text-teal-700">{i.id}</td>
+                        <td className="px-3 py-2 text-gray-700">{i.label}</td>
+                        <td className="px-3 py-2 text-gray-400">{i.itemType}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Form Results Tab ────────────────────────────────────────────────────────
 
 function FormResultsTab({ templateId }: { templateId: number }) {
@@ -1941,7 +2151,7 @@ function FormResultsTab({ templateId }: { templateId: number }) {
 
 function FormEditor({ templateId }: { templateId: number }) {
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "style" | "preview" | "settings" | "results" | "success-modules" | "analytics">("editor");
+  const [activeTab, setActiveTab] = useState<"editor" | "branching" | "org-visibility" | "style" | "preview" | "share" | "settings" | "results" | "success-modules" | "analytics">("editor");
   const [urlImportOpen, setUrlImportOpen] = useState(false);
   const [urlImportValue, setUrlImportValue] = useState("");
   const [editingItem, setEditingItem] = useState<FormItem | null>(null);
@@ -2108,6 +2318,7 @@ function FormEditor({ templateId }: { templateId: number }) {
           { id: "org-visibility" as const, label: "Org Visibility", icon: Building2, badge: orgVisRulesCount > 0 ? orgVisRulesCount : null },
           { id: "style" as const, label: "Style", icon: Palette, badge: null },
           { id: "preview" as const, label: "Preview", icon: Eye, badge: null },
+          { id: "share" as const, label: "Share", icon: Info, badge: null },
           { id: "settings" as const, label: "Settings", icon: Save, badge: null },
           { id: "success-modules" as const, label: "Success Modules", icon: CheckCircle2, badge: null },
           { id: "results" as const, label: "Results", icon: BarChart2, badge: null },
@@ -2292,6 +2503,11 @@ function FormEditor({ templateId }: { templateId: number }) {
           branchRules={branchRules}
           orgVisibilityRules={orgVisRules ?? []}
         />
+      )}
+
+      {/* Share Tab */}
+      {activeTab === "share" && (
+        <SharePanel templateId={templateId} template={template} items={items} />
       )}
 
       {/* Settings Tab */}
