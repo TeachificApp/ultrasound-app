@@ -1830,7 +1830,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
           <div className="space-y-3">
             {contentEnrollments.map((e: any) => {
               const isRecurring = !!e.stripeSubscriptionId;
-              const typeLabel = e.isQuiz ? "Quiz" : e.isDownload ? "Download" : e.courseType === "webinar" ? "Webinar" : "Course";
+              const typeLabel = e.isQuiz ? "Quiz" : e.isDownload ? "Download" : e.courseType === "cohort" ? "Cohort" : e.courseType === "webinar" ? "Webinar" : e.courseType === "workshop" ? "Workshop" : "Course";
               return (
                 <div key={e.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
