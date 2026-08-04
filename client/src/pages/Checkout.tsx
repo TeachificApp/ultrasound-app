@@ -789,33 +789,38 @@ export default function Checkout() {
                   htmlFor="terms"
                   className={`text-sm leading-relaxed cursor-pointer ${isDark ? "text-gray-300" : "text-gray-700"}`}
                 >
-                  {sessionMeta.checkoutTermsText && /^\s*</.test(sessionMeta.checkoutTermsText)
-                    ? <span dangerouslySetInnerHTML={{ __html: sessionMeta.checkoutTermsText.replace(/^\s*<p>(.*?)<\/p>\s*$/s, '$1') }} />
-                    : <>{sessionMeta.checkoutTermsText}</>}{" "}
-                  {sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url && (
-                    <a
-                      href={sessionMeta.checkoutTermsLink1Url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium hover:underline"
-                      style={linkStyle}
-                    >
-                      {sessionMeta.checkoutTermsLink1Text}
-                    </a>
-                  )}
-                  {sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url && (
-                    <>{" "}and{" "}
-                    <a
-                      href={sessionMeta.checkoutTermsLink2Url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium hover:underline"
-                      style={linkStyle}
-                    >
-                      {sessionMeta.checkoutTermsLink2Text}
-                    </a></>
-                  )}
-                  .
+                  <div>
+                    {sessionMeta.checkoutTermsText && /^\s*</.test(sessionMeta.checkoutTermsText)
+                      ? <span dangerouslySetInnerHTML={{ __html: sessionMeta.checkoutTermsText.replace(/^\s*<p>(.*?)<\/p>\s*$/s, '$1') }} />
+                      : <>{sessionMeta.checkoutTermsText}</>}
+                  </div>
+                  {(sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url) || (sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url) ? (
+                    <div className="mt-1">
+                      {sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url && (
+                        <a
+                          href={sessionMeta.checkoutTermsLink1Url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium hover:underline"
+                          style={linkStyle}
+                        >
+                          {sessionMeta.checkoutTermsLink1Text}
+                        </a>
+                      )}
+                      {sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url && (
+                        <>{" "}and{" "}
+                        <a
+                          href={sessionMeta.checkoutTermsLink2Url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium hover:underline"
+                          style={linkStyle}
+                        >
+                          {sessionMeta.checkoutTermsLink2Text}
+                        </a></>
+                      )}
+                    </div>
+                  ) : null}
                 </Label>
               </div>
 
