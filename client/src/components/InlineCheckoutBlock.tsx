@@ -696,7 +696,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
               />
               <span>
                 {data.termsText && /^\s*</.test(data.termsText)
-                  ? <span dangerouslySetInnerHTML={{ __html: data.termsText }} />
+                  ? <span dangerouslySetInnerHTML={{ __html: data.termsText.replace(/^\s*<p>(.*?)<\/p>\s*$/s, '$1') }} />
                   : <>{data.termsText}</>}{" "}
                 {data.termsLinkText && data.termsLinkUrl && (
                   <a

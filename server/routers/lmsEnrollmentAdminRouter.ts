@@ -63,7 +63,6 @@ import {
   lmsPricingOptions,
   platformSettings,
   digitalProducts,
-  lmsThinkificImports,
   lmsArchive,
   sonoQuizzes,
   physicalProducts,
@@ -91,7 +90,6 @@ import {
   instructorAnalyticsPermissions,
   instructorCoursePermissions,
 } from "../../drizzle/schema";
-import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -209,175 +207,7 @@ export const lmsEnrollmentAdminRouter = router({
       return { success: true };
     }),
 
-  // ── Thinkific Enrollment Sync ──
-  /**
-   * Returns the Thinkific import record linked to this LMS course (if any).
-   * Used by the UI to determine whether to show the "Sync from Thinkific" button.
-   */
-  getThinkificSyncInfo: protectedProcedure
-    .input(z.object({ courseId: z.number() }))
-    .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [importRecord] = await db
-        .select()
-        .from(lmsThinkificImports)
-        .where(eq(lmsThinkificImports.lmsCourseId, input.courseId))
-        .orderBy(desc(lmsThinkificImports.createdAt))
-        .limit(1);
-      if (!importRecord) return null;
-      return {
-        thinkificCourseId: importRecord.thinkificCourseId,
-        thinkificCourseName: importRecord.thinkificCourseName,
-        lastSyncedAt: importRecord.updatedAt,
-        enrollmentsPending: importRecord.enrollmentsPending,
-        enrollmentsActivated: importRecord.enrollmentsActivated,
-      };
-    }),
 
-  /**
-   * Sync enrollments from Thinkific into lms_enrollments for a specific course.
-   * - Looks up the Thinkific course ID via lms_thinkific_imports
-   * - Fetches all enrollments from Thinkific API
-   * - For each enrollment: finds or creates a stub user by email, inserts into lms_enrollments
-   * - Also updates the course cover image if not already set
-   * - NO welcome emails sent
-   */
-  syncThinkificEnrollments: protectedProcedure
-    .input(z.object({ courseId: z.number() }))
-    .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      // 1. Look up the Thinkific import record for this course
-      const [importRecord] = await db
-        .select()
-        .from(lmsThinkificImports)
-        .where(eq(lmsThinkificImports.lmsCourseId, input.courseId))
-        .orderBy(desc(lmsThinkificImports.createdAt))
-        .limit(1);
-      if (!importRecord) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "No Thinkific import record found for this course." });
-      }
-      const thinkificCourseId = importRecord.thinkificCourseId;
-
-      // 2. Always update the course cover image from Thinkific (overwrite any stale/missing value)
-      try {
-        const thinkificCourse = await getThinkificCourse(thinkificCourseId);
-         const newImageUrl = thinkificCourse.course_card_image_url || thinkificCourse.banner_image_url;
-        if (newImageUrl) {
-          await db.update(lmsCourses).set({ coverImageUrl: newImageUrl, thumbnailUrl: newImageUrl }).where(eq(lmsCourses.id, input.courseId));
-          console.log(`[syncThinkific] Updated cover image for course ${input.courseId}: ${newImageUrl}`);
-        }
-      } catch (e) {
-        console.warn("[syncThinkific] Could not fetch course image:", e);
-      }
-
-      // 3. Fetch all enrollments from Thinkific
-      const thinkificEnrollments = await getEnrollmentsForCourse(thinkificCourseId);
-
-      // 4. Get existing enrollments for this course (to avoid duplicates)
-      const existingEnrollments = await db
-        .select({ userId: lmsEnrollments.userId })
-        .from(lmsEnrollments)
-        .where(eq(lmsEnrollments.courseId, input.courseId));
-      const enrolledUserIds = new Set(existingEnrollments.map(e => e.userId));
-
-      let synced = 0;
-      let skipped = 0;
-
-      // 5. Process in batches of 50
-      const BATCH = 50;
-      for (let i = 0; i < thinkificEnrollments.length; i += BATCH) {
-        const batch = thinkificEnrollments.slice(i, i + BATCH);
-        const emails = batch.map(e => e.user_email.toLowerCase());
-
-        // Find existing users by email
-        const existingUsers = await db
-          .select({ id: users.id, email: users.email })
-          .from(users)
-          .where(inArray(users.email, emails));
-        const emailToUserId = new Map(
-          existingUsers.map(u => [(u.email ?? "").toLowerCase(), u.id])
-        );
-
-        for (const enrollment of batch) {
-          const email = enrollment.user_email.toLowerCase();
-          let userId = emailToUserId.get(email);
-
-          // Create a real account if not found — no email/notification sent
-          if (!userId) {
-            const displayName = enrollment.user_name || email.split("@")[0];
-            const [newUser] = await db.insert(users).values({
-              email: enrollment.user_email.toLowerCase(),
-              name: displayName,
-              displayName,
-              isPending: false,
-              loginMethod: "email",
-              emailVerified: false,
-            });
-            userId = (newUser as any).insertId as number;
-            emailToUserId.set(email, userId);
-            addToAllContacts(enrollment.user_email.toLowerCase(), displayName, { userId, source: "enrollment" }).catch(() => {});
-          }
-
-          // Skip if already enrolled
-          if (enrolledUserIds.has(userId)) {
-            skipped++;
-            continue;
-          }
-
-          // Insert enrollment — NO welcome email
-          const progressPct = Math.round(parseFloat(enrollment.percentage_completed || "0") * 100);
-          await db.insert(lmsEnrollments).values({
-            userId,
-            courseId: input.courseId,
-            enrolledAt: enrollment.created_at ? new Date(enrollment.created_at) : new Date(),
-            completedAt: enrollment.completed && enrollment.completed_at ? new Date(enrollment.completed_at) : null,
-            progressPct,
-          });
-          enrolledUserIds.add(userId);
-          synced++;
-        }
-      }
-
-      // 6. Update import record with sync stats
-      await db.update(lmsThinkificImports)
-        .set({ enrollmentsActivated: synced, updatedAt: new Date() })
-        .where(eq(lmsThinkificImports.id, importRecord.id));
-
-      return {
-        synced,
-        skipped,
-        total: thinkificEnrollments.length,
-      };
-    }),
-
-  /** Bulk-sync cover images from Thinkific for all courses that have a Thinkific import record */
-  syncAllCourseImages: protectedProcedure
-    .mutation(async ({ ctx }) => {
-      await assertAdmin(ctx);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const imports = await db.select({ courseId: lmsThinkificImports.lmsCourseId, thinkificCourseId: lmsThinkificImports.thinkificCourseId }).from(lmsThinkificImports);
-      let updated = 0;
-      let failed = 0;
-      for (const imp of imports) {
-        try {
-          const tc = await getThinkificCourse(imp.thinkificCourseId);
-          const imageUrl = tc.course_card_image_url || tc.banner_image_url;
-          if (imageUrl) {
-            await db.update(lmsCourses).set({ coverImageUrl: imageUrl, thumbnailUrl: imageUrl }).where(eq(lmsCourses.id, imp.courseId));
-            updated++;
-          }
-        } catch {
-          failed++;
-        }
-      }
-      return { updated, failed, total: imports.length };
-    }),
 
   // ── Groups ──
   listGroups: protectedProcedure

@@ -17,7 +17,6 @@ import {
   type AppRole,
   type UserTypeFilter,
 } from "../db";
-import { syncCatalogToDb } from "./cmeRouter";
 import { sendEmail, buildWelcomeEmail } from "../_core/email";
 
 /** Send a branded welcome email to a pre-registered user via SendGrid */
@@ -323,37 +322,6 @@ export const platformAdminRouter = router({
       return { success: true, userId: found.id, displayName: found.displayName ?? found.name, wasPreRegistered: false };
     }),
 
-  /**
-   * Manually trigger a Thinkific course catalog re-sync.
-   * Fetches all products from Thinkific, filters to the E-Learning & CME collection,
-   * and upserts into the cmeCoursesCache table.
-   * Returns the number of courses synced and the timestamp.
-   */
-  syncThinkificCourses: protectedProcedure.mutation(async ({ ctx }) => {
-    const myRoles = await getUserRoles(ctx.user.id);
-    const isOwner = ctx.user.role === "admin";
-    const isPlatformAdmin = myRoles.includes("platform_admin");
-    if (!isOwner && !isPlatformAdmin) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
-    }
-    const count = await syncCatalogToDb();
-    return { count, syncedAt: new Date() };
-  }),
-
-  /**
-   * Manually trigger a Thinkific catalog re-sync for the Registry Review collection.
-   * Same underlying sync as syncThinkificCourses — both collections share the same cache table.
-   */
-  syncRegistryCourses: protectedProcedure.mutation(async ({ ctx }) => {
-    const myRoles = await getUserRoles(ctx.user.id);
-    const isOwner = ctx.user.role === "admin";
-    const isPlatformAdmin = myRoles.includes("platform_admin");
-    if (!isOwner && !isPlatformAdmin) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
-    }
-    const count = await syncCatalogToDb();
-    return { count, syncedAt: new Date() };
-  }),
 
   /**
    * Clean up duplicate and missing user roles.
@@ -389,39 +357,6 @@ export const platformAdminRouter = router({
     return runBackfill(db);
   }),
 
-  /**
-   * Bulk backfill: fetch all users from Thinkific and create UltrasoundAssist™ pending accounts
-   * for anyone not already registered. Runs silently (no emails sent).
-   * Delegates to the shared runThinkificMemberSync job so logic is not duplicated.
-   */
-  syncAllThinkificMembers: protectedProcedure.mutation(async ({ ctx }) => {
-    const myRoles = await getUserRoles(ctx.user.id);
-    const isOwner = ctx.user.role === "admin";
-    const isPlatformAdmin = myRoles.includes("platform_admin");
-    if (!isOwner && !isPlatformAdmin) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
-    }
-    const { runThinkificMemberSync } = await import("../jobs/thinkificMemberSync");
-    const result = await runThinkificMemberSync();
-    return { ...result, syncedAt: new Date() };
-  }),
-
-  /**
-   * Backfill free membership + community access for ALL existing platform users.
-   * Idempotent — safe to run multiple times. Does NOT send emails or grant premium_user role.
-   * Processes users in batches of 500 to handle 14,000+ members.
-   */
-  backfillThinkificAccess: protectedProcedure.mutation(async ({ ctx }) => {
-    const myRoles = await getUserRoles(ctx.user.id);
-    const isOwner = ctx.user.role === "admin";
-    const isPlatformAdmin = myRoles.includes("platform_admin");
-    if (!isOwner && !isPlatformAdmin) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
-    }
-    const { runThinkificAccessBackfill } = await import("../jobs/thinkificMemberSync");
-    const result = await runThinkificAccessBackfill();
-    return { ...result, completedAt: new Date() };
-  }),
 });
 
 // ─── Lab Seat Management Router ───────────────────────────────────────────────

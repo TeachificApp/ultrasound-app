@@ -32,7 +32,6 @@ import { bundlePublicRouter, bundleLearnerRouter, bundleAdminRouter } from "./ro
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
 import { careerNetworkRouter } from "./routers/careerNetworkRouter";
 import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter } from "./routers/webinarRouter";
-import { thinkificImportRouter } from "./routers/thinkificImportRouter";
 import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter } from "./routers/downloadsRouter";
 import { orderBumpsAdminRouter, orderBumpsPublicRouter } from "./routers/orderBumpsRouter";
 import { socialContentRouter } from "./routers/socialContentRouter";
@@ -2128,7 +2127,6 @@ export const appRouter = router({
   webinarAdmin: webinarAdminRouter,
   webinarSession: webinarSessionRouter,
   questionBank: questionBankRouter,
-  thinkificImport: thinkificImportRouter,
   downloads: downloadsPublicRouter,
   downloadsLearner: downloadsLearnerRouter,
   downloadsAdmin: downloadsAdminRouter,
