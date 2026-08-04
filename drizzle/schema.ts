@@ -3253,6 +3253,8 @@ export const lmsEnrollments = mysqlTable("lms_enrollments", {
   accessExpiresAt: timestamp("access_expires_at"),
   source: varchar("source", { length: 32 }).default("manual").notNull(),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
+  /** Timestamp when the Stripe subscription first went past_due — used for the 3-day grace period */
+  paymentFailedAt: timestamp("payment_failed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({
   /** Prevent duplicate enrollments for the same user+course (webhook double-fire guard) */

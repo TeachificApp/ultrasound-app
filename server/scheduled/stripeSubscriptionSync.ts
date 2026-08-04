@@ -1,8 +1,13 @@
 /**
  * stripeSubscriptionSync.ts
  * Heartbeat handler — runs daily to sync all active Stripe enrollment
- * subscriptions with the database, ensuring access_expires_at and
- * cancellation state stay accurate even if a webhook was missed.
+ * subscriptions with the database, ensuring access_expires_at stays accurate
+ * even if a webhook was missed.
+ *
+ * Grace period logic for past_due subscriptions:
+ *  - Day 0 (first past_due detection): stamp payment_failed_at, send warning email, keep access
+ *  - Days 1–3: keep access (Stripe retries payment during this window)
+ *  - Day 4+: revoke access (set access_expires_at = now)
  *
  * Route: POST /api/scheduled/stripe-subscription-sync
  * Cron:  0 0 2 * * *  (daily at 02:00 UTC — low-traffic window)
@@ -10,11 +15,16 @@
 import type { Request, Response } from "express";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
-import { lmsEnrollments, lmsOrders } from "../../drizzle/schema";
+import { getUserById } from "../db";
+import { lmsEnrollments, lmsCourses } from "../../drizzle/schema";
 import { getStripeClient } from "../lib/stripeClient";
 import { notifyOwner } from "../_core/notification";
-import { isNotNull, or, isNull, gt } from "drizzle-orm";
+import { sendEmail, emailWrapper } from "../_core/email";
+import { isNotNull, eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+
+const GRACE_PERIOD_DAYS = 3;
+const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
 export async function stripeSubscriptionSyncHandler(req: Request, res: Response) {
   try {
@@ -28,37 +38,56 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
 
     const now = new Date();
 
-    // ── 1. Fetch all enrollments that have a direct stripeSubscriptionId ──────
+    // ── 1. Fetch all enrollments with a direct stripeSubscriptionId ──────────
     const enrollmentsWithSub = await db
       .select({
         id: lmsEnrollments.id,
+        userId: lmsEnrollments.userId,
+        courseId: lmsEnrollments.courseId,
         stripeSubscriptionId: lmsEnrollments.stripeSubscriptionId,
         accessExpiresAt: lmsEnrollments.accessExpiresAt,
+        paymentFailedAt: lmsEnrollments.paymentFailedAt,
       })
       .from(lmsEnrollments)
-      .where(
-        isNotNull(lmsEnrollments.stripeSubscriptionId)
-      );
+      .where(isNotNull(lmsEnrollments.stripeSubscriptionId));
 
-    // ── 2. Fetch enrollments linked via lms_orders that have a subscription ──
+    // ── 2. Fetch enrollments linked via lms_orders ───────────────────────────
     const enrollmentsViaOrder = await db.execute(sql`
-      SELECT e.id, o.stripe_subscription_id AS stripeSubscriptionId, e.access_expires_at AS accessExpiresAt
+      SELECT e.id, e.user_id AS userId, e.course_id AS courseId,
+             o.stripe_subscription_id AS stripeSubscriptionId,
+             e.access_expires_at AS accessExpiresAt,
+             e.payment_failed_at AS paymentFailedAt
       FROM lms_enrollments e
       JOIN lms_orders o ON o.id = e.order_id
       WHERE o.stripe_subscription_id IS NOT NULL
         AND e.stripe_subscription_id IS NULL
     `);
 
-    const allRows: Array<{ id: number; stripeSubscriptionId: string; accessExpiresAt: Date | null }> = [
-      ...enrollmentsWithSub.filter(r => r.stripeSubscriptionId).map(r => ({
-        id: r.id,
-        stripeSubscriptionId: r.stripeSubscriptionId as string,
-        accessExpiresAt: r.accessExpiresAt,
-      })),
+    const allRows: Array<{
+      id: number;
+      userId: number;
+      courseId: number;
+      stripeSubscriptionId: string;
+      accessExpiresAt: Date | null;
+      paymentFailedAt: Date | null;
+    }> = [
+      ...enrollmentsWithSub
+        .filter(r => r.stripeSubscriptionId)
+        .map(r => ({
+          id: r.id,
+          userId: r.userId,
+          courseId: r.courseId,
+          stripeSubscriptionId: r.stripeSubscriptionId as string,
+          accessExpiresAt: r.accessExpiresAt,
+          paymentFailedAt: r.paymentFailedAt,
+        })),
       ...(enrollmentsViaOrder[0] as any[]).map((r: any) => ({
         id: r.id as number,
+        userId: r.userId as number,
+        courseId: r.courseId as number,
         stripeSubscriptionId: r.stripeSubscriptionId as string,
         accessExpiresAt: r.accessExpiresAt ? new Date(r.accessExpiresAt) : null,
+        paymentFailedAt: r.paymentFailedAt ? new Date(r.paymentFailedAt) : null,
       })),
     ];
 
@@ -71,6 +100,7 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
     let synced = 0;
     let errors = 0;
     let accessRevoked = 0;
+    let warningEmailsSent = 0;
 
     for (const row of allRows) {
       try {
@@ -81,45 +111,113 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
           ? new Date(sub.current_period_end * 1000)
           : null;
 
-        // Determine the correct access_expires_at:
-        // - If subscription is canceled/unpaid and period has ended → set to periodEnd (access should be revoked)
-        // - If cancel_at_period_end is true → set to periodEnd (access ends at period end)
-        // - If active and not canceling → clear access_expires_at (ongoing access)
         let newAccessExpiresAt: Date | null = row.accessExpiresAt;
+        let newPaymentFailedAt: Date | null = row.paymentFailedAt;
 
-        if (status === "canceled" || status === "unpaid") {
-          // Subscription ended — ensure access_expires_at is set to period end
+        if (status === "past_due" || status === "unpaid") {
+          if (!row.paymentFailedAt) {
+            // First time we see this subscription as past_due — stamp the timestamp
+            newPaymentFailedAt = now;
+
+            // Send a payment-failed warning email to the subscriber
+            try {
+              const userRecord = await getUserById(row.userId);
+              if (userRecord?.email) {
+                // Fetch course title for the email
+                const courseRows = await db
+                  .select({ title: lmsCourses.title })
+                  .from(lmsCourses)
+                  .where(eq(lmsCourses.id, row.courseId))
+                  .limit(1);
+                const courseTitle = courseRows[0]?.title ?? "your course";
+
+                const htmlBody = emailWrapper(`
+                  <h2 style="color:#0f766e;margin:0 0 16px">Payment Unsuccessful</h2>
+                  <p>Hi ${userRecord.firstName || "there"},</p>
+                  <p>We were unable to process your payment for <strong>${courseTitle}</strong>. Your access has been maintained while we retry the payment over the next <strong>${GRACE_PERIOD_DAYS} days</strong>.</p>
+                  <p>To avoid losing access, please update your payment method:</p>
+                  <div style="text-align:center;margin:24px 0">
+                    <a href="https://app.allaboutultrasound.com/dashboard/subscriptions"
+                       style="background:#0f766e;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">
+                      Update Payment Method
+                    </a>
+                  </div>
+                  <p style="color:#6b7280;font-size:13px">If payment is not resolved within ${GRACE_PERIOD_DAYS} days, your access to <strong>${courseTitle}</strong> will be suspended. You can reactivate at any time by updating your billing information.</p>
+                  <p>If you have any questions, please contact us at <a href="mailto:support@allaboutultrasound.com">support@allaboutultrasound.com</a>.</p>
+                `);
+
+                const emailSent = await sendEmail({
+                  to: { name: `${userRecord.firstName ?? ""} ${userRecord.lastName ?? ""}`.trim() || userRecord.email, email: userRecord.email },
+                  subject: "Action Required: Payment Unsuccessful — Update Your Payment Method",
+                  htmlBody,
+                  previewText: `Your payment for ${courseTitle} was unsuccessful. Update your payment method to keep access.`,
+                });
+                if (emailSent) {
+                  warningEmailsSent++;
+                } else {
+                  console.warn(`[StripeSubSync] Warning email returned false for enrollment ${row.id} (user ${row.userId})`);
+                }
+              }
+            } catch (emailErr: any) {
+              console.warn(`[StripeSubSync] Warning email failed for enrollment ${row.id}:`, emailErr?.message);
+            }
+
+            // Keep access during grace period — do not set accessExpiresAt yet
+            newAccessExpiresAt = null; // clear any stale expiry
+          } else {
+            // Already past_due — check if grace period has elapsed
+            const gracePeriodEnd = new Date(row.paymentFailedAt.getTime() + GRACE_PERIOD_MS);
+            if (now >= gracePeriodEnd) {
+              // Grace period expired — revoke access
+              newAccessExpiresAt = gracePeriodEnd; // set to when grace period ended
+              accessRevoked++;
+              console.log(`[StripeSubSync] Grace period expired for enrollment ${row.id} — revoking access`);
+            } else {
+              // Still within grace period — keep access
+              newAccessExpiresAt = null;
+            }
+          }
+        } else if (status === "canceled") {
+          // Subscription fully canceled — revoke access at period end
           newAccessExpiresAt = periodEnd ?? now;
+          newPaymentFailedAt = null; // clear grace period flag
           if (!row.accessExpiresAt || row.accessExpiresAt > (periodEnd ?? now)) {
             accessRevoked++;
           }
         } else if (cancelAtPeriodEnd && periodEnd) {
           // Scheduled to cancel — set access expiry to period end
           newAccessExpiresAt = periodEnd;
+          newPaymentFailedAt = null; // clear any past_due flag (payment recovered)
         } else if (status === "active" || status === "trialing") {
-          // Active subscription — clear any stale expiry
+          // Active/healthy subscription — clear any stale expiry and grace period flag
           newAccessExpiresAt = null;
+          newPaymentFailedAt = null;
         }
 
         // Only write if something changed
-        const changed =
+        const accessChanged =
           (newAccessExpiresAt?.getTime() ?? null) !== (row.accessExpiresAt?.getTime() ?? null);
+        const failedAtChanged =
+          (newPaymentFailedAt?.getTime() ?? null) !== (row.paymentFailedAt?.getTime() ?? null);
 
-        if (changed) {
+        if (accessChanged || failedAtChanged) {
           await db
             .update(lmsEnrollments)
-            .set({ accessExpiresAt: newAccessExpiresAt })
+            .set({
+              accessExpiresAt: newAccessExpiresAt,
+              paymentFailedAt: newPaymentFailedAt,
+            })
             .where(sql`id = ${row.id}`);
         }
 
         synced++;
       } catch (err: any) {
-        // Stripe 404 = subscription deleted/not found — revoke access
+        // Stripe 404 = subscription deleted/not found — revoke access immediately
         if (err?.statusCode === 404 || err?.code === "resource_missing") {
           try {
             await db
               .update(lmsEnrollments)
-              .set({ accessExpiresAt: now })
+              .set({ accessExpiresAt: now, paymentFailedAt: null })
               .where(sql`id = ${row.id}`);
             accessRevoked++;
           } catch (_) { /* ignore secondary error */ }
@@ -130,17 +228,24 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
       }
     }
 
-    console.log(`[StripeSubSync] Done. synced=${synced} errors=${errors} accessRevoked=${accessRevoked}`);
+    console.log(
+      `[StripeSubSync] Done. synced=${synced} errors=${errors} accessRevoked=${accessRevoked} warningEmails=${warningEmailsSent}`
+    );
 
-    // Notify owner if any access was revoked (useful for audit trail)
-    if (accessRevoked > 0) {
+    // Notify owner if access was revoked or warning emails were sent
+    if (accessRevoked > 0 || warningEmailsSent > 0) {
       await notifyOwner({
-        title: "Stripe Subscription Sync — Access Revoked",
-        content: `Daily sync revoked or updated access for ${accessRevoked} enrollment(s) whose Stripe subscriptions have ended or been cancelled. Total synced: ${synced}. Errors: ${errors}.`,
+        title: "Stripe Subscription Sync Report",
+        content: [
+          `Daily sync completed. Total subscriptions checked: ${allRows.length}.`,
+          warningEmailsSent > 0 ? `Payment warning emails sent: ${warningEmailsSent} (grace period started).` : null,
+          accessRevoked > 0 ? `Access revoked: ${accessRevoked} enrollment(s) — grace period expired or subscription canceled.` : null,
+          errors > 0 ? `Errors: ${errors} (check server logs).` : null,
+        ].filter(Boolean).join(" "),
       });
     }
 
-    return res.json({ ok: true, total: allRows.length, synced, errors, accessRevoked });
+    return res.json({ ok: true, total: allRows.length, synced, errors, accessRevoked, warningEmailsSent });
   } catch (err: any) {
     console.error("[StripeSubSync] Unhandled error:", err);
     return res.status(500).json({
