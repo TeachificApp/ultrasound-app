@@ -1621,6 +1621,8 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const [cancelNativeSubConfirm, setCancelNativeSubConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
   const [revokeNativeSubConfirm, setRevokeNativeSubConfirm] = useState<number | null>(null);
   const [cancelLmsOrderConfirm, setCancelLmsOrderConfirm] = useState<{ id: number; stripeSubId: string | null } | null>(null);
+  const [unenrollSubConfirm, setUnenrollSubConfirm] = useState<{ enrollmentId: number; courseTitle: string } | null>(null);
+  const [cancelEnrollmentSubConfirm, setCancelEnrollmentSubConfirm] = useState<{ enrollmentId: number; courseTitle: string } | null>(null);
   const [addSubOpen, setAddSubOpen] = useState(false);
   const [addSubStripeId, setAddSubStripeId] = useState("");
   const [addSubEmail, setAddSubEmail] = useState("");
@@ -1653,6 +1655,14 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
     onSuccess: () => { toast.success("Course subscription cancelled at period end."); refetch(); setCancelLmsOrderConfirm(null); },
     onError: (e) => toast.error(e.message),
   });
+  const unenrollSub = trpc.adminUser.unenrollFromCourse.useMutation({
+    onSuccess: () => { toast.success("Enrollment removed."); refetch(); setUnenrollSubConfirm(null); },
+    onError: (e) => toast.error(e.message),
+  });
+  const cancelEnrollmentSub = trpc.adminUser.cancelLmsEnrollmentSubscription.useMutation({
+    onSuccess: () => { toast.success("Subscription cancelled at period end. Access retained until billing period ends."); refetch(); setCancelEnrollmentSubConfirm(null); },
+    onError: (e) => toast.error(e.message),
+  });
   const syncSub = trpc.adminUser.syncStripeSubscription.useMutation({
     onSuccess: (res) => {
       if (res.success) {
@@ -1681,6 +1691,11 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const nativeMemberships = data.nativeMemberships ?? [];
   // Only show subscription-type orders here; one-time purchases appear in Transactions
   const lmsCourseOrders = (data.lmsCourseOrders ?? []).filter((o: any) => !!o.stripeSubscriptionId);
+  // All active enrollments for the Content Subscriptions section (exclude expired access)
+  const now = Date.now();
+  const contentEnrollments = ((data.enrollments ?? []) as any[]).filter(
+    (e: any) => !e.accessExpiresAt || new Date(e.accessExpiresAt).getTime() > now
+  );
 
   // Group app memberships by brand
   const byBrand: Record<string, typeof memberships> = {};
@@ -1792,48 +1807,64 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
 
       {/* ── LMS Content Subscriptions Section ── */}
       <div>
-        <SectionHeader title={`Content Subscriptions (${lmsCourseOrders.length})`} />
-        <p className="text-xs text-gray-400 mb-3">Active LMS course and quiz subscriptions (one-time purchases appear in Transactions)</p>
-        {lmsCourseOrders.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No course orders found.</p>
+        <SectionHeader title={`Content Subscriptions (${contentEnrollments.length})`} />
+        <p className="text-xs text-gray-400 mb-3">Active course, quiz, and download enrollments. Recurring subscriptions show a Cancel option; all enrollments can be removed.</p>
+        {contentEnrollments.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">No active content enrollments.</p>
         ) : (
           <div className="space-y-3">
-            {lmsCourseOrders.map((o: any) => (
-              <div key={o.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-800">{o.courseTitle ?? "Course"}</span>
-                      <StatusBadge status={o.stripeSubscriptionId ? "subscription" : o.status} />
+            {contentEnrollments.map((e: any) => {
+              const isRecurring = !!e.stripeSubscriptionId;
+              const typeLabel = e.isQuiz ? "Quiz" : e.isDownload ? "Download" : e.courseType === "webinar" ? "Webinar" : "Course";
+              return (
+                <div key={e.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-800 truncate">{e.courseTitle ?? "Course"}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold border ${
+                          isRecurring ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-teal-50 text-teal-700 border-teal-200"
+                        }`}>{isRecurring ? "Subscription" : typeLabel}</span>
+                        {e.accessExpiresAt && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold border bg-amber-50 text-amber-700 border-amber-200">
+                            Expires {formatDate(e.accessExpiresAt)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 space-y-0.5">
+                        <p>Enrolled {formatDate(e.enrolledAt)}{e.progressPct > 0 ? ` · ${e.progressPct}% complete` : ""}</p>
+                        {isRecurring && <p className="font-mono text-gray-400 text-[10px]">{e.stripeSubscriptionId}</p>}
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 space-y-0.5">
-                      <p>Order #{o.id} &mdash; {formatDate(o.createdAt)}</p>
-                      {o.amount != null && <p>{formatCurrency(o.amount, o.currency)}</p>}
-                      {o.stripeSubscriptionId && <p className="font-mono text-gray-400">{o.stripeSubscriptionId}</p>}
+                    <div className="flex flex-col gap-1.5 items-end shrink-0">
+                      {isRecurring && (
+                        <button
+                          onClick={() => setCancelEnrollmentSubConfirm({ enrollmentId: e.enrollmentId, courseTitle: e.courseTitle ?? "this course" })}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                        >
+                          <XCircle className="w-3 h-3" /> Cancel Subscription
+                        </button>
+                      )}
+                      {isRecurring && (
+                        <button
+                          onClick={() => syncSub.mutate({ stripeSubscriptionId: e.stripeSubscriptionId })}
+                          disabled={syncSub.isPending}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 disabled:opacity-50"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Sync from Stripe
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setUnenrollSubConfirm({ enrollmentId: e.enrollmentId, courseTitle: e.courseTitle ?? "this course" })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
+                      >
+                        <ShieldOff className="w-3 h-3" /> Unenroll
+                      </button>
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-2 items-end">
-                    {o.stripeSubscriptionId && (
-                      <button
-                        onClick={() => setCancelLmsOrderConfirm({ id: o.id, stripeSubId: o.stripeSubscriptionId })}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                      >
-                        <XCircle className="w-3 h-3" /> Cancel
-                      </button>
-                    )}
-                    {o.stripeSubscriptionId && (
-                      <button
-                        onClick={() => syncSub.mutate({ stripeSubscriptionId: o.stripeSubscriptionId })}
-                        disabled={syncSub.isPending}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 disabled:opacity-50"
-                      >
-                        <RefreshCw className="w-3 h-3" /> Sync from Stripe
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -2127,6 +2158,46 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Cancel enrollment subscription confirm */}
+      <AlertDialog open={cancelEnrollmentSubConfirm !== null} onOpenChange={open => !open && setCancelEnrollmentSubConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Course Subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The subscription for <strong>{cancelEnrollmentSubConfirm?.courseTitle}</strong> will be cancelled at the end of the current billing period. The student retains access until then.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => cancelEnrollmentSubConfirm && cancelEnrollmentSub.mutate({ enrollmentId: cancelEnrollmentSubConfirm.enrollmentId })}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Cancel Subscription
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Unenroll enrollment confirm */}
+      <AlertDialog open={unenrollSubConfirm !== null} onOpenChange={open => !open && setUnenrollSubConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Enrollment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove access to <strong>{unenrollSubConfirm?.courseTitle}</strong>. The student will lose all progress and access immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => unenrollSubConfirm && unenrollSub.mutate({ enrollmentId: unenrollSubConfirm.enrollmentId })}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Remove Enrollment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {/* Cancel LMS order subscription confirm */}
       <AlertDialog open={cancelLmsOrderConfirm !== null} onOpenChange={open => !open && setCancelLmsOrderConfirm(null)}>
         <AlertDialogContent>
