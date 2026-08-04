@@ -63,6 +63,9 @@ function emailWrapper(content: string): string {
               <p style="margin:0;font-size:12px;color:#94a3b8;">
                 © All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:${brandColor};text-decoration:none;">www.allaboutultrasound.com</a>
               </p>
+              <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
+                All sales are final. · <a href="https://app.allaboutultrasound.com/terms" style="color:${brandColor};text-decoration:underline;">Terms of Service</a>
+              </p>
             </td>
           </tr>
         </table>

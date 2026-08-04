@@ -215,7 +215,7 @@ export default function CheckoutComplete() {
               isMembership ? "Your membership is confirmed." : "Your enrollment is confirmed."
             )}
           </p>
-          <p className="text-gray-400 text-xs mb-7">
+          <p className="text-gray-400 text-xs mb-5">
             {autoLoginUrl
               ? "Signing you in now…"
               : isMembership
@@ -225,6 +225,10 @@ export default function CheckoutComplete() {
                   : resolvedContentType === "download"
                     ? "Redirecting you to your download in a moment…"
                     : "Redirecting you to the course in a moment…"}
+          </p>
+          <p className="text-gray-400 text-[10px] mb-7">
+            All sales are final. By completing this purchase you agree to our{" "}
+            <a href="/terms" className="underline hover:text-gray-600">Terms of Service</a>.
           </p>
 
           <div className="flex flex-col gap-3">

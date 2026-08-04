@@ -1416,6 +1416,7 @@ function PurchasesTab() {
                   <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-center">
                     <p className="text-[10px] text-gray-400">All About Ultrasound, Inc. dba iHeartEcho &bull; allaboutultrasound.com</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">Thank you for your purchase. For support, contact hello@allaboutultrasound.com</p>
+                    <p className="text-[10px] text-gray-400 mt-1.5 font-medium">All sales are final. &bull; By completing this purchase you agree to our <a href="https://app.allaboutultrasound.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Terms of Service</a>.</p>
                   </div>
                 </div>
                 {/* Actions */}

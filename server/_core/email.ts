@@ -187,6 +187,9 @@ export function emailWrapper(content: string, brandMode?: BrandMode): string {
               <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
                 You received this email because an account was created for you on ${bc.displayName}.
               </p>
+              <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
+                All sales are final. &bull; <a href="https://app.allaboutultrasound.com/terms" style="color:${bc.primaryColor};text-decoration:underline;" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+              </p>
             </td>
           </tr>
         </table>
@@ -1043,6 +1046,10 @@ export function buildFunnelPurchaseConfirmationEmail(opts: {
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       Questions? Contact us at
       <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
+    </p>
+    <p style="margin:16px 0 0;font-size:11px;color:#cbd5e1;line-height:1.5;border-top:1px solid #e5f7f8;padding-top:12px;">
+      All sales are final. By completing this purchase you agree to our
+      <a href="https://app.allaboutultrasound.com/terms" style="color:${brandColor};text-decoration:underline;" target="_blank" rel="noopener noreferrer">Terms of Service</a>.
     </p>
   `, opts.brandMode);
   return { subject, htmlBody, previewText };
