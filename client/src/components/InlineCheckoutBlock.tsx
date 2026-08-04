@@ -84,6 +84,9 @@ export interface InlineCheckoutBlockData {
   termsText?: string;
   termsLinkText?: string;
   termsLinkUrl?: string;
+  // Subscription
+  isSubscription?: boolean;          // show recurring billing acknowledgment checkbox
+  billingLabel?: string;             // e.g. "Monthly — $19.99/mo" shown in the ack text
   // Submit
   submitText?: string;
   submitIcon?: "none" | "lock" | "shield" | "shopping-cart" | "shopping-bag" | "zap" | "star" | "heart" | "gift" | "award" | "arrow-right" | "sparkles" | "rocket" | "badge-check" | "credit-card";
@@ -184,6 +187,7 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [addedBumps,  setAddedBumps]  = useState<Set<number>>(new Set());
   const [termsOk,     setTermsOk]     = useState(false);
+  const [subscriptionAck, setSubscriptionAck] = useState(false);
   const [promoCode,   setPromoCode]   = useState<string | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
@@ -228,6 +232,10 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
 
     if (data.termsText && !termsOk) {
       toast.error("Please accept the terms to continue.");
+      return;
+    }
+    if (data.isSubscription && !subscriptionAck) {
+      toast.error("Please acknowledge the recurring billing terms to continue.");
       return;
     }
     if (!email.trim()) {
@@ -683,6 +691,25 @@ function InlineCheckoutInner({ data, onSuccess }: InnerFormProps) {
 
           {/* ── Promo Code ──────────────────────────────────────────────── */}
           <PromoCodeInput onApply={(code, _) => setPromoCode(code)} />
+
+          {/* ── Subscription acknowledgment ─────────────────────────── */}
+          {data.isSubscription && (
+            <label className="flex items-start gap-2 cursor-pointer text-xs text-gray-500 leading-relaxed">
+              <input
+                type="checkbox"
+                checked={subscriptionAck}
+                onChange={e => setSubscriptionAck(e.target.checked)}
+                className="mt-0.5 flex-shrink-0 w-4 h-4 rounded"
+                style={{ accentColor: accent }}
+              />
+              <span>
+                {data.billingLabel
+                  ? `I understand this is a recurring subscription (${data.billingLabel.replace(/\s*[—–-].*$/i, "").trim()}). I can cancel anytime from my account.`
+                  : "I understand this is a recurring subscription. I can cancel anytime from my account."
+                }
+              </span>
+            </label>
+          )}
 
           {/* ── Terms ───────────────────────────────────────────────────── */}
           {data.termsText && (
