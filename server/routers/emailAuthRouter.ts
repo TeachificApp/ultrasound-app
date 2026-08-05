@@ -21,10 +21,9 @@ import { sdk } from "../_core/sdk";
 import { addToAllContacts } from "../lib/emailListHelper";
 import { ENV } from "../_core/env";
 import { publicProcedure, router } from "../_core/trpc";
-import { getDb, ensureUserRole, markThinkificEnrolled } from "../db";
+import { getDb, ensureUserRole } from "../db";
 import { sendEmail, buildWelcomeEmail, buildVerificationEmail, buildPasswordResetEmail } from "../_core/email";
 import { type BrandMode, detectBrandMode, getBrandDisplayConfig, BRAND_DOMAINS } from "@shared/brands";
-import { enrollInFreeMembership } from "../thinkific";
 import { users, userEmailAliases } from "../../drizzle/schema";
 import { eq, or } from "drizzle-orm";
 
@@ -212,16 +211,7 @@ export const emailAuthRouter = router({
         await ensureUserRole(newUser[0].id);
         // Auto-add to All Contacts email list
         addToAllContacts(email, fullName, { userId: newUser[0].id, source: "registration" }).catch(() => {});
-        // Auto-enroll in Thinkific free membership
-        if (newUser[0].email) {
-          enrollInFreeMembership(newUser[0].email, input.firstName, input.lastName)
-            .then(async () => {
-              await markThinkificEnrolled(newUser[0].id);
-            })
-            .catch((err: unknown) => {
-              console.error(`[Thinkific] Auto-enrollment failed for ${email}:`, err);
-            });
-        }
+
       }
 
       // Send verification email

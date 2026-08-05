@@ -11,7 +11,14 @@
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { cmeCoursesCache } from "../../drizzle/schema";
-import { getVisibleProducts, buildCourseUrl, buildEnrollUrl, getUserEnrollmentsByEmail } from "../thinkific";
+// Thinkific URL helpers (inlined after thinkific.ts was removed)
+const THINKIFIC_BASE = "https://allaboutultrasound.thinkific.com";
+function buildCourseUrl(slug: string): string {
+  return `${THINKIFIC_BASE}/courses/${slug}`;
+}
+function buildEnrollUrl(slug: string): string {
+  return `${THINKIFIC_BASE}/enroll/${slug}`;
+}
 
 /** Thinkific collection ID for "E-Learning & CME" on allaboutultrasound */
 const CME_COLLECTION_ID = 131827;
@@ -41,49 +48,11 @@ export interface CatalogCourse {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Sync visible products from Thinkific into cmeCoursesCache */
+/** Sync visible products from Thinkific into cmeCoursesCache.
+ * NOTE: Thinkific API client removed — sync is now a no-op; catalog is served from existing DB cache.
+ */
 export async function syncCatalogToDb(): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-
-  const products = await getVisibleProducts();
-  let synced = 0;
-
-  for (const p of products) {
-    const collectionIdsJson = JSON.stringify(p.collection_ids ?? []);
-    await db
-      .insert(cmeCoursesCache)
-      .values({
-        thinkificProductId: p.id,
-        thinkificCourseId: p.productable_type === "Course" ? p.productable_id : null,
-        name: p.name,
-        slug: p.slug,
-        description: p.description,
-        price: p.price,
-        cardImageUrl: p.card_image_url,
-        instructorNames: p.instructor_names,
-        hasCertificate: p.has_certificate,
-        thinkificStatus: p.status,
-        collectionIds: collectionIdsJson,
-        syncedAt: new Date(),
-      })
-      .onDuplicateKeyUpdate({
-        set: {
-          name: p.name,
-          slug: p.slug,
-          description: p.description,
-          price: p.price,
-          cardImageUrl: p.card_image_url,
-          instructorNames: p.instructor_names,
-          hasCertificate: p.has_certificate,
-          thinkificStatus: p.status,
-          collectionIds: collectionIdsJson,
-          syncedAt: new Date(),
-        },
-      });
-    synced++;
-  }
-  return synced;
+  return 0;
 }
 
 /** Map cached DB rows to CatalogCourse objects */
@@ -186,14 +155,8 @@ export const cmeRouter = router({
    * Used by CME Hub and Registry Review Hub to show "Continue Learning" vs "Enroll".
    * Returns an empty array if the user has no Thinkific account.
    */
-  getMyEnrollments: protectedProcedure.query(async ({ ctx }): Promise<number[]> => {
-    const email = ctx.user.email;
-    if (!email) return [];
-    try {
-      return await getUserEnrollmentsByEmail(email);
-    } catch (err) {
-      console.error("[CME] Failed to fetch enrollments:", err);
-      return [];
-    }
+  /** Returns empty array — Thinkific enrollment lookup removed. */
+  getMyEnrollments: protectedProcedure.query(async (): Promise<number[]> => {
+    return [];
   }),
 });

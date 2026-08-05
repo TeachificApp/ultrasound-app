@@ -107,7 +107,6 @@ import {
   lmsQuizGroupQuestions,
   questionBank,
 } from "../../drizzle/schema";
-import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
 import { notifyOwner } from "../_core/notification";
 

@@ -76,7 +76,6 @@ import {
   lmsQuizGroupQuestions,
   questionBank,
 } from "../../drizzle/schema";
-import { getEnrollmentsForCourse, getThinkificCourse } from "../thinkific";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
