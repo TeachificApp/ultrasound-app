@@ -1292,7 +1292,6 @@ function AfterPurchaseWorkflowTab({ productId }: { productId: number }) {
 // ─── Main Export ──────────────────────────────────────────────────────────────────
 import DownloadAnalytics from "./DownloadAnalytics";
 import BundlesAdmin from "./BundlesAdmin";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function DigitalDownloadsAdmin({ initialEditId }: { initialEditId?: number } = {}) {
   const [editingId, setEditingId] = useState<number | null>(initialEditId ?? null);

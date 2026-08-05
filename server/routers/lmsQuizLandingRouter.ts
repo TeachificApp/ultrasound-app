@@ -133,7 +133,7 @@ export const lmsQuizLandingRouter = router({
   addQuestion: protectedProcedure
     .input(z.object({
       quizId: z.number(), question: z.string().min(1),
-      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).default("mcq"),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text"]).default("mcq"),
       options: z.array(z.string()).optional(),
       correctAnswer: z.string().optional(),
       correctAnswers: z.array(z.number().int()).optional(),
@@ -145,6 +145,9 @@ export const lmsQuizLandingRouter = router({
       feedbackImageUrl: z.string().optional(),
       feedbackVideoUrl: z.string().optional(),
       position: z.number().int().default(0),
+      likertLabelsJson: z.string().optional(),
+      starMax: z.number().int().optional(),
+      surveyRequired: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -164,7 +167,7 @@ export const lmsQuizLandingRouter = router({
   updateQuestion: protectedProcedure
     .input(z.object({
       id: z.number(), question: z.string().min(1).optional(),
-      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).optional(),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text"]).optional(),
       options: z.array(z.string()).optional(),
       correctAnswer: z.string().nullable().optional(),
       correctAnswers: z.array(z.number().int()).nullable().optional(),
@@ -176,6 +179,9 @@ export const lmsQuizLandingRouter = router({
       feedbackImageUrl: z.string().nullable().optional(),
       feedbackVideoUrl: z.string().nullable().optional(),
       position: z.number().int().optional(),
+      likertLabelsJson: z.string().nullable().optional(),
+      starMax: z.number().int().nullable().optional(),
+      surveyRequired: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -205,7 +211,7 @@ export const lmsQuizLandingRouter = router({
       topic: z.string().min(1).max(500),
       count: z.number().int().min(1).max(50).default(10),
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
-      questionType: z.enum(["mcq", "truefalse", "mixed"]).default("mcq"),
+      questionType: z.enum(["mcq", "truefalse", "mixed", "survey"]).default("mcq"),
       courseId: z.number().optional(),
       lessonIds: z.array(z.number()).optional(), // specific lesson IDs to extract content from
     }))
@@ -263,29 +269,53 @@ export const lmsQuizLandingRouter = router({
         // Ignore context fetch errors — proceed without course context
       }
 
+      const isSurveyMode = input.questionType === "survey";
       const typeInstruction =
         input.questionType === "mcq"
           ? "All questions must be multiple-choice with exactly 4 options."
           : input.questionType === "truefalse"
           ? 'All questions must be true/false. Options must be exactly ["True", "False"].'
+          : isSurveyMode
+          ? 'All questions must be survey/poll questions for audience polling. Use a mix of: likert (5-point agreement scale), star_rating (1-5 star satisfaction), and open_text (free-text response). Do NOT include correct answers — these are opinion/feedback questions.'
           : 'Mix of multiple-choice (4 options each) and true/false questions (["True", "False"] options).';
 
       const systemPrompt = `You are a medical education expert specializing in ultrasound and sonography. Generate high-quality quiz questions for healthcare professionals and students. Always use United States English spelling. Return ONLY valid JSON — no markdown, no code fences, no extra text.`;
 
-      const userPrompt = `Generate exactly ${input.count} quiz questions about: "${input.topic}".
+      const userPrompt = isSurveyMode
+        ? `Generate exactly ${input.count} survey/poll questions about: "${input.topic}".${courseContext}
+
+Return a JSON object with a "questions" array. Each item must have this exact shape:
+{
+  "question": "string — the survey question text",
+  "type": "likert" | "star_rating" | "open_text",
+  "options": [],
+  "correctAnswer": "",
+  "explanation": "",
+  "likertLabels": ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"] | null,
+  "starMax": 5 | null
+}
+
+Rules:
+- For likert: set likertLabels to a 5-item array, starMax to null.
+- For star_rating: set starMax to 5, likertLabels to null.
+- For open_text: set both likertLabels and starMax to null.
+- Mix types: roughly 40% likert, 30% star_rating, 30% open_text.
+- Questions should gather meaningful feedback/opinions relevant to the topic.
+- options and correctAnswer must always be empty string/array (no correct answer for survey).`
+        : `Generate exactly ${input.count} quiz questions about: "${input.topic}".
 Difficulty: ${input.difficulty}.
 ${typeInstruction}${courseContext}
 
-Return a JSON array of objects with this exact shape:
-[
-  {
-    "question": "string — the question text",
-    "type": "mcq" | "truefalse",
-    "options": ["Option A", "Option B", "Option C", "Option D"],
-    "correctAnswer": "string — must exactly match one of the options",
-    "explanation": "string — brief explanation of why the answer is correct (1-2 sentences)"
-  }
-]
+Return a JSON object with a "questions" array. Each item must have this exact shape:
+{
+  "question": "string — the question text",
+  "type": "mcq" | "truefalse",
+  "options": ["Option A", "Option B", "Option C", "Option D"],
+  "correctAnswer": "string — must exactly match one of the options",
+  "explanation": "string — brief explanation of why the answer is correct (1-2 sentences)",
+  "likertLabels": null,
+  "starMax": null
+}
 
 Rules:
 - Questions must be clinically accurate and relevant to ultrasound/sonography practice
@@ -314,12 +344,19 @@ Rules:
                     type: "object",
                     properties: {
                       question: { type: "string" },
-                      type: { type: "string", enum: ["mcq", "truefalse"] },
+                      type: { type: "string", enum: ["mcq", "truefalse", "likert", "star_rating", "open_text"] },
                       options: { type: "array", items: { type: "string" } },
                       correctAnswer: { type: "string" },
                       explanation: { type: "string" },
+                      likertLabels: {
+                        oneOf: [
+                          { type: "array", items: { type: "string" } },
+                          { type: "null" },
+                        ],
+                      },
+                      starMax: { oneOf: [{ type: "integer" }, { type: "null" }] },
                     },
-                    required: ["question", "type", "options", "correctAnswer", "explanation"],
+                    required: ["question", "type", "options", "correctAnswer", "explanation", "likertLabels", "starMax"],
                     additionalProperties: false,
                   },
                 },
@@ -331,7 +368,7 @@ Rules:
         },
       });
 
-      let questions: Array<{ question: string; type: string; options: string[]; correctAnswer: string; explanation: string }>;
+      let questions: Array<{ question: string; type: string; options: string[]; correctAnswer: string; explanation: string; likertLabels?: string[] | null; starMax?: number | null }>;
       try {
         const raw = response.choices[0].message.content as string;
         const parsed = extractJson(raw);
@@ -349,7 +386,7 @@ Rules:
       quizId: z.number(),
       questions: z.array(z.object({
         question: z.string().min(1),
-        type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]),
+        type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text"]),
         options: z.array(z.string()).optional(),
         correctAnswer: z.string().optional(),
         correctAnswers: z.array(z.number().int()).optional(),
@@ -360,6 +397,9 @@ Rules:
         questionVideoUrl: z.string().optional(),
         feedbackImageUrl: z.string().optional(),
         feedbackVideoUrl: z.string().optional(),
+        likertLabelsJson: z.string().optional(),
+        starMax: z.number().int().optional(),
+        surveyRequired: z.boolean().optional(),
       })),
     }))
     .mutation(async ({ ctx, input }) => {

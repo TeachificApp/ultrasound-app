@@ -25,7 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-export type QuestionType = "mcq" | "truefalse" | "multiselect" | "hotspot" | "matching";
+export type QuestionType = "mcq" | "truefalse" | "multiselect" | "hotspot" | "matching" | "likert" | "star_rating" | "open_text";
 
 export interface HotspotMarker {
   id: string;
@@ -56,6 +56,10 @@ export interface QuizQuestion {
   feedbackVideoUrl?: string;
   imageUrl?: string;
   videoUrl?: string;
+  // Survey fields
+  likertLabels?: string[];
+  starMax?: number;
+  surveyRequired?: boolean;
 }
 
 export interface LessonQuizData {
@@ -86,6 +90,9 @@ const QUESTION_TYPE_ICONS: Record<QuestionType, React.ReactNode> = {
   multiselect: <CheckSquare size={12} />,
   hotspot: <Crosshair size={12} />,
   matching: <Shuffle size={12} />,
+  likert: <span style={{fontSize:10}}>1–5</span>,
+  star_rating: <span style={{fontSize:10}}>★</span>,
+  open_text: <span style={{fontSize:10}}>T</span>,
 };
 
 const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
@@ -94,6 +101,9 @@ const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   multiselect: "Multi-Select",
   hotspot: "Hotspot",
   matching: "Matching",
+  likert: "Likert Scale",
+  star_rating: "Star Rating",
+  open_text: "Open Response",
 };
 
 const EMPTY_QUESTION: QuizQuestion = {
@@ -505,11 +515,14 @@ function QuestionEditor({
       options: newType === "truefalse" ? ["True", "False"] :
                newType === "mcq" ? ["", "", "", ""] :
                newType === "multiselect" ? ["", "", "", ""] :
+               (newType === "likert" || newType === "star_rating" || newType === "open_text") ? [] :
                prev.options,
       correctAnswer: 0,
       correctAnswers: [],
       hotspotMarkers: prev.hotspotMarkers ?? [],
       matchingPairs: prev.matchingPairs ?? [{ id: "p1", left: "", right: "" }, { id: "p2", left: "", right: "" }],
+      likertLabels: newType === "likert" ? (prev.likertLabels ?? ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"]) : prev.likertLabels,
+      starMax: newType === "star_rating" ? (prev.starMax ?? 5) : prev.starMax,
     }));
   };
 
@@ -585,7 +598,7 @@ function QuestionEditor({
       <div>
         <Label className="text-xs text-gray-600 mb-1 block">Question Type</Label>
         <div className="flex flex-wrap gap-1">
-          {(["mcq", "truefalse", "multiselect", "hotspot", "matching"] as QuestionType[]).map(t => (
+          {(["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text"] as QuestionType[]).map(t => (
             <button
               key={t}
               type="button"
@@ -805,6 +818,77 @@ function QuestionEditor({
         />
       )}
 
+      {/* Likert Scale Editor */}
+      {qType === "likert" && (
+        <div className="space-y-3">
+          <Label className="text-xs text-gray-600">Likert Scale Labels (1 = leftmost, 5 = rightmost)</Label>
+          <div className="space-y-1.5">
+            {(q.likertLabels ?? ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"]).map((label, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex items-center justify-center shrink-0">{idx + 1}</span>
+                <Input
+                  value={label}
+                  onChange={(e) => {
+                    const labels = [...(q.likertLabels ?? ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"])];
+                    labels[idx] = e.target.value;
+                    setQ(prev => ({ ...prev, likertLabels: labels }));
+                  }}
+                  placeholder={`Label for ${idx + 1}`}
+                  className="h-7 text-xs flex-1"
+                />
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400">Respondents will select one of these 5 options. This question does not count toward quiz score.</p>
+        </div>
+      )}
+
+      {/* Star Rating Editor */}
+      {qType === "star_rating" && (
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">Maximum Stars</Label>
+          <div className="flex gap-2 flex-wrap">
+            {[3, 4, 5, 7, 10].map(n => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setQ(prev => ({ ...prev, starMax: n }))}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                  (q.starMax ?? 5) === n
+                    ? "border-amber-400 bg-amber-50 text-amber-700"
+                    : "border-gray-200 text-gray-500 hover:border-amber-300"
+                }`}
+              >
+                {n} ★
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1 mt-1">
+            {Array.from({ length: q.starMax ?? 5 }, (_, i) => (
+              <span key={i} className="text-2xl text-amber-400">★</span>
+            ))}
+          </div>
+          <p className="text-xs text-gray-400">Respondents will rate from 1 to {q.starMax ?? 5} stars. This question does not count toward quiz score.</p>
+        </div>
+      )}
+
+      {/* Open Text Editor */}
+      {qType === "open_text" && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="survey-required"
+              checked={q.surveyRequired ?? false}
+              onCheckedChange={(v) => setQ(prev => ({ ...prev, surveyRequired: v }))}
+            />
+            <Label htmlFor="survey-required" className="text-xs text-gray-600">Require a response before proceeding</Label>
+          </div>
+          <div className="p-3 rounded-lg border border-dashed border-gray-200 bg-gray-50">
+            <p className="text-xs text-gray-400 italic">Respondents will see a multi-line text area. Responses are recorded but not scored.</p>
+          </div>
+        </div>
+      )}
+
       {/* Explanation */}
       <div>
         <Label className="text-xs text-gray-600">Explanation / Feedback (optional)</Label>
@@ -880,7 +964,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
   const [aiCustomPrompt, setAiCustomPrompt] = useState("");
   const [aiPreview, setAiPreview] = useState<QuizQuestion[] | null>(null);
   const [editingAiIndex, setEditingAiIndex] = useState<number | null>(null);
-  const [aiQType, setAiQType] = useState<"mcq" | "truefalse" | "multiselect">("mcq");
+  const [aiQType, setAiQType] = useState<"mcq" | "truefalse" | "multiselect" | "likert" | "star_rating" | "open_text">("mcq");
 
   // AI source selection
   const [aiSource, setAiSource] = useState<"lesson" | "course" | "pick" | "topic">("lesson");
@@ -902,10 +986,12 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
       const mapped: QuizQuestion[] = (res.questions ?? []).map((q: any) => ({
         type: (q.type as QuestionType) ?? aiQType,
         question: q.question,
-        options: q.options ?? ["True", "False"],
+        options: q.options ?? [],
         correctAnswer: q.correctAnswer ?? 0,
         correctAnswers: q.correctAnswers ?? [],
         explanation: q.explanation ?? "",
+        likertLabels: q.likertLabels ?? undefined,
+        starMax: q.starMax ?? undefined,
       }));
       setAiPreview(mapped);
       toast.success(`Generated ${mapped.length} questions — review, edit, then apply below.`);
@@ -1204,6 +1290,16 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
                   <button key={t} type="button" onClick={() => setAiQType(t)}
                     className={`flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium transition-all ${
                       aiQType === t ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-200 hover:border-teal-300"
+                    }`}>
+                    {QUESTION_TYPE_ICONS[t]} {QUESTION_TYPE_LABELS[t]}
+                  </button>
+                ))}
+                <div className="w-full h-px bg-gray-100 my-0.5" />
+                <span className="text-xs text-gray-400 w-full">Survey / Poll types (no scoring):</span>
+                {(["likert", "star_rating", "open_text"] as const).map(t => (
+                  <button key={t} type="button" onClick={() => setAiQType(t)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded border text-xs font-medium transition-all ${
+                      aiQType === t ? "bg-amber-500 text-white border-amber-500" : "bg-white text-gray-600 border-gray-200 hover:border-amber-300"
                     }`}>
                     {QUESTION_TYPE_ICONS[t]} {QUESTION_TYPE_LABELS[t]}
                   </button>

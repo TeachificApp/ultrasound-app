@@ -354,7 +354,7 @@ export const lmsAIRouter = router({
       count: z.number().int().min(1).max(50).default(5),
       questionStyle: z.enum(["understanding", "thinking", "compliance", "thought_provoking", "reflection", "custom"]).default("understanding"),
       customPrompt: z.string().max(500).optional(),
-      questionType: z.enum(["mcq", "truefalse", "multiselect", "mixed"]).default("mcq"),
+      questionType: z.enum(["mcq", "truefalse", "multiselect", "mixed", "likert", "star_rating", "open_text"]).default("mcq"),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -414,13 +414,20 @@ export const lmsAIRouter = router({
         if (lessonText.trim().length < 20) throw new TRPCError({ code: "BAD_REQUEST", message: "Lessons have insufficient text content to generate questions." });
       }
 
+      const isSurveyType = ["likert", "star_rating", "open_text"].includes(input.questionType);
       const typeInstruction = input.questionType === "mixed"
         ? "Mix multiple choice (mcq), true/false, and multi-select questions."
         : input.questionType === "truefalse"
           ? "All questions must be true/false with options [\"True\", \"False\"]."
           : input.questionType === "multiselect"
             ? "All questions must be multi-select (multiple correct answers possible) with 4-5 options."
-            : "All questions must be multiple choice with exactly 4 options.";
+            : input.questionType === "likert"
+              ? "All questions must be Likert-scale survey questions. Each should have likertLabels set to a 5-item array (e.g. ['Strongly Disagree','Disagree','Neutral','Agree','Strongly Agree']). options and correctAnswer must be empty."
+              : input.questionType === "star_rating"
+                ? "All questions must be star-rating survey questions. Set starMax to 5. options and correctAnswer must be empty."
+                : input.questionType === "open_text"
+                  ? "All questions must be open-text survey questions asking for free-text responses. options and correctAnswer must be empty."
+                  : "All questions must be multiple choice with exactly 4 options.";
       const styleMap: Record<string, string> = {
         understanding: "Test factual knowledge: definitions, normal values, anatomical landmarks, imaging characteristics of pathology, and standard protocols.",
         thinking: "Write scenario-based questions: present a clinical finding or patient scenario and ask the learner to interpret, diagnose, or choose the correct next step.",
@@ -469,13 +476,15 @@ export const lmsAIRouter = router({
                     type: "object",
                     properties: {
                       question: { type: "string", description: "The question text" },
-                      type: { type: "string", description: "Question type: mcq, truefalse, or multiselect" },
-                      options: { type: "array", items: { type: "string" }, description: "Answer options (2 for truefalse, 4-5 for mcq/multiselect)" },
-                      correctAnswer: { type: "integer", description: "Index of the correct option (for mcq/truefalse)" },
-                      correctAnswers: { type: "array", items: { type: "integer" }, description: "Indices of all correct options (for multiselect)" },
-                      explanation: { type: "string", description: "Brief explanation of the correct answer" },
+                      type: { type: "string", description: "Question type: mcq, truefalse, multiselect, likert, star_rating, or open_text" },
+                      options: { type: "array", items: { type: "string" }, description: "Answer options (2 for truefalse, 4-5 for mcq/multiselect, empty for survey types)" },
+                      correctAnswer: { type: "integer", description: "Index of the correct option (for mcq/truefalse), 0 for survey types" },
+                      correctAnswers: { type: "array", items: { type: "integer" }, description: "Indices of all correct options (for multiselect), empty for others" },
+                      explanation: { type: "string", description: "Brief explanation (empty string for survey types)" },
+                      likertLabels: { type: "array", items: { type: "string" }, description: "5 labels for likert scale, empty array for other types" },
+                      starMax: { type: "integer", description: "Max stars for star_rating (5), 0 for other types" },
                     },
-                    required: ["question", "type", "options", "correctAnswer", "correctAnswers", "explanation"],
+                    required: ["question", "type", "options", "correctAnswer", "correctAnswers", "explanation", "likertLabels", "starMax"],
                     additionalProperties: false,
                   },
                 },
@@ -488,7 +497,13 @@ export const lmsAIRouter = router({
       });
       const raw = response.choices?.[0]?.message?.content ?? "{}";
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      return { questions: (parsed.questions ?? []).slice(0, input.count) };
+      const questions = (parsed.questions ?? []).slice(0, input.count).map((q: any) => ({
+        ...q,
+        // Normalize survey fields
+        likertLabels: Array.isArray(q.likertLabels) && q.likertLabels.length > 0 ? q.likertLabels : undefined,
+        starMax: q.starMax && q.starMax > 0 ? q.starMax : undefined,
+      }));
+      return { questions };
     }),
 
   /** AI: Generate flashcards from lesson content */

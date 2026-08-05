@@ -3219,7 +3219,7 @@ export const lmsQuizQuestions = mysqlTable("lms_quiz_questions", {
   id: int("id").autoincrement().primaryKey(),
   quizId: int("quiz_id").notNull(),
   question: text("question").notNull(),
-  type: mysqlEnum("type", ["mcq", "truefalse", "multiselect", "hotspot", "matching"]).default("mcq").notNull(),
+  type: mysqlEnum("type", ["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text"]).default("mcq").notNull(),
   options: text("options"), // JSON array of strings or {text,imageUrl?,videoUrl?} objects
   correctAnswer: varchar("correct_answer", { length: 255 }).notNull(),
   /** For multiselect: JSON array of correct answer indices. For hotspot: JSON {x,y,radius}. */
@@ -3234,6 +3234,12 @@ export const lmsQuizQuestions = mysqlTable("lms_quiz_questions", {
   feedbackImageUrl: text("feedback_image_url"),
   feedbackVideoUrl: text("feedback_video_url"),
   position: int("position").default(0).notNull(),
+  /** Likert: JSON array of label strings e.g. ["Strongly Disagree","Disagree","Neutral","Agree","Strongly Agree"] */
+  likertLabelsJson: text("likert_labels_json"),
+  /** Star rating: max number of stars (default 5) */
+  starMax: int("star_max").default(5),
+  /** Whether this survey question is required */
+  surveyRequired: boolean("survey_required").default(false).notNull(),
 });
 export type LmsQuizQuestion = typeof lmsQuizQuestions.$inferSelect;
 

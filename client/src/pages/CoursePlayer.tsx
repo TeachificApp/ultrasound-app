@@ -179,6 +179,8 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
   const [submitted, setSubmitted] = useState(false);
   const [hotspotClick, setHotspotClick] = useState<Record<number, {x: number; y: number}>>({});
   const [matchingAnswers, setMatchingAnswers] = useState<Record<number, Record<string, string>>>({});
+  // Survey responses: { [questionIndex]: string | number }
+  const [surveyAnswers, setSurveyAnswers] = useState<Record<number, string | number>>({});
   const hotspotContainerRef = useRef<HTMLDivElement | null>(null);
 
   if (rawQuestions.length === 0) return null;
@@ -214,8 +216,11 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
         const allCorrect = pairs.every((p: any) => answers[p.id] === p.right);
         if (allCorrect && pairs.length > 0) correct++;
       }
+      // Survey types (likert, star_rating, open_text) don't count toward score
     });
-    return Math.round((correct / total) * 100);
+    const scorableCount = shuffledQuestions.filter((q: any) => !["likert", "star_rating", "open_text"].includes(q.type ?? "mcq")).length;
+    if (scorableCount === 0) return 100;
+    return Math.round((correct / scorableCount) * 100);
   };
 
   const score = submitted ? computeScore() : 0;
@@ -230,6 +235,8 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
       const answers = matchingAnswers[currentIndex] ?? {};
       return pairs.every((p: any) => answers[p.id]);
     }
+    if (qType === "likert" || qType === "star_rating") return surveyAnswers[currentIndex] !== undefined;
+    if (qType === "open_text") return true; // always considered answered (optional free text)
     return false;
   };
 
@@ -243,6 +250,8 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
       const answers = matchingAnswers[i] ?? {};
       return pairs.every((p: any) => answers[p.id]);
     }
+    if (qt === "likert" || qt === "star_rating") return surveyAnswers[i] !== undefined;
+    if (qt === "open_text") return true;
     return false;
   });
 
@@ -251,6 +260,7 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
     setSubmitted(false);
     setHotspotClick({});
     setMatchingAnswers({});
+    setSurveyAnswers({});
     setCurrentIndex(0);
   };
 
@@ -325,14 +335,17 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
         <div className="flex items-center gap-2 mb-3">
           <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-teal-600 text-white text-xs font-bold shrink-0">{currentIndex + 1}</span>
           <span className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-            {qType === "mcq" ? "Multiple Choice" : qType === "truefalse" ? "True / False" : qType === "multiselect" ? "Select All That Apply" : qType === "hotspot" ? "Hotspot" : "Matching"}
+            {qType === "mcq" ? "Multiple Choice" : qType === "truefalse" ? "True / False" : qType === "multiselect" ? "Select All That Apply" : qType === "hotspot" ? "Hotspot" : qType === "matching" ? "Matching" : qType === "likert" ? "Opinion Poll" : qType === "star_rating" ? "Star Rating" : "Open Response"}
           </span>
-          {submitted && (
+          {submitted && !(qType === "likert" || qType === "star_rating" || qType === "open_text") && (
             <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full ${
               isCurrentCorrect() ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
             }`}>
               {isCurrentCorrect() ? "✓ Correct" : "✗ Incorrect"}
             </span>
+          )}
+          {submitted && (qType === "likert" || qType === "star_rating" || qType === "open_text") && (
+            <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">✓ Recorded</span>
           )}
         </div>
 
@@ -531,6 +544,100 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Likert Scale */}
+        {qType === "likert" && (() => {
+          const labels: string[] = q.likertLabels ?? q.likertLabelsJson ?? ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"];
+          const parsedLabels = Array.isArray(labels) ? labels : (() => { try { return JSON.parse(labels as any); } catch { return ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"]; } })();
+          const selected = surveyAnswers[currentIndex] as number | undefined;
+          return (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-400 mb-2">Select one option that best reflects your opinion</p>
+              <div className="flex flex-wrap gap-2">
+                {parsedLabels.map((label: string, idx: number) => {
+                  const val = idx + 1;
+                  const isSelected = selected === val;
+                  return (
+                    <button
+                      key={idx}
+                      disabled={submitted}
+                      onClick={() => !submitted && setSurveyAnswers(prev => ({ ...prev, [currentIndex]: val }))}
+                      className={`flex-1 min-w-[80px] px-3 py-2.5 rounded-xl border-2 text-xs font-medium transition-all text-center ${
+                        isSelected
+                          ? "border-teal-500 bg-teal-50 text-teal-800 shadow-sm"
+                          : submitted
+                          ? "border-gray-200 bg-gray-50 text-gray-400"
+                          : "border-gray-200 hover:border-teal-400 hover:bg-teal-50/40 text-gray-600"
+                      }`}
+                    >
+                      <div className={`text-lg font-bold mb-0.5 ${ isSelected ? "text-teal-600" : "text-gray-400" }`}>{val}</div>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {submitted && selected !== undefined && (
+                <p className="text-xs text-teal-600 font-medium">Your response: {parsedLabels[selected - 1]} ({selected}/5)</p>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Star Rating */}
+        {qType === "star_rating" && (() => {
+          const max = q.starMax ?? 5;
+          const selectedVal = surveyAnswers[currentIndex] as number | undefined;
+          return (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-400 mb-2">Rate from 1 to {max} stars</p>
+              <div className="flex gap-2 flex-wrap">
+                {Array.from({ length: max }, (_, i) => i + 1).map(val => {
+                  const isFilled = selectedVal !== undefined && val <= selectedVal;
+                  return (
+                    <button
+                      key={val}
+                      disabled={submitted}
+                      onClick={() => !submitted && setSurveyAnswers(prev => ({ ...prev, [currentIndex]: val }))}
+                      className={`text-3xl transition-transform hover:scale-110 disabled:cursor-default ${
+                        isFilled ? "text-amber-400" : "text-gray-300 hover:text-amber-300"
+                      }`}
+                      title={`${val} star${val !== 1 ? "s" : ""}`}
+                    >
+                      ★
+                    </button>
+                  );
+                })}
+              </div>
+              {submitted && selectedVal !== undefined && (
+                <p className="text-xs text-teal-600 font-medium">Your rating: {selectedVal}/{max} stars</p>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Open Text Response */}
+        {qType === "open_text" && (
+          <div className="space-y-2">
+            <p className="text-xs text-gray-400">Share your thoughts (optional)</p>
+            <textarea
+              disabled={submitted}
+              value={String(surveyAnswers[currentIndex] ?? "")}
+              onChange={e => setSurveyAnswers(prev => ({ ...prev, [currentIndex]: e.target.value }))}
+              placeholder="Type your response here…"
+              rows={4}
+              className={`w-full px-3 py-2.5 rounded-xl border-2 text-sm resize-none transition-colors ${
+                submitted
+                  ? "border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
+                  : "border-gray-200 focus:border-teal-400 focus:outline-none text-gray-800"
+              }`}
+            />
+            {submitted && (
+              <p className="text-xs text-teal-600 font-medium">
+                {surveyAnswers[currentIndex] ? "Response recorded" : "No response provided"}
+              </p>
+            )}
           </div>
         )}
 
