@@ -114,7 +114,7 @@ import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 
 // Lazy-loaded CME Management Hub components
-const CmeFormsListTab = lazy(() => import("@/components/admin/CmeFormsListTab"));
+const CmeFormsListTab = lazy(() => import("@/components/admin/CmeFormsListTab").then(m => ({ default: m.CmeFormsListTab })));
 const CertificateTemplatesAdmin = lazy(() => import("./admin/CertificateTemplatesAdmin"));
 
 type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";

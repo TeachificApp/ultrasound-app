@@ -852,6 +852,48 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       return rows;
     }),
 
+  // ── Download PDF for a generic (non-course-linked) disclosure ────────────────────
+  downloadGenericDisclosurePdf: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { cmeGenericDisclosures } = await import("../../drizzle/schema");
+      const { eq: eqOp } = await import("drizzle-orm");
+      const [row] = await db
+        .select()
+        .from(cmeGenericDisclosures)
+        .where(eqOp(cmeGenericDisclosures.id, input.id))
+        .limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Generic disclosure not found" });
+
+      const roles: string[] = (() => { try { return JSON.parse(row.rolesJson ?? "[]"); } catch { return []; } })();
+      const relationships: Array<{ company: string; relationship: string; ended: boolean }> = (() => {
+        try {
+          const raw: Array<{ company: string; type?: string; relationship?: string; nature?: string; ended: boolean }> = JSON.parse(row.relationshipsJson ?? "[]");
+          return raw.map(r => ({ company: r.company, relationship: r.type ?? r.relationship ?? r.nature ?? "", ended: r.ended }));
+        } catch { return []; }
+      })();
+
+      const pdfBuffer = await generateDisclosurePdf({
+        facultyName: row.facultyName,
+        facultyEmail: row.facultyEmail,
+        courseTitle: row.activityTitle ?? "Generic Submission",
+        roles,
+        hasRelationships: row.noRelationships ? "no" : "yes",
+        relationships,
+        attestationName: row.attestationName ?? "",
+        attestationDate: row.attestationDate ?? "",
+        submittedAt: row.submittedAt ? new Date(row.submittedAt) : new Date(),
+      });
+
+      const safeName = row.facultyName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+      const key = `cme-generic-disclosures/${safeName}-${row.id}-${Date.now()}.pdf`;
+      const { url } = await storagePut(key, pdfBuffer, "application/pdf");
+      return { url };
+    }),
+
   listGenericDisclosures: protectedProcedure
     .input(z.object({
       search: z.string().optional(),
