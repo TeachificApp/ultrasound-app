@@ -117,6 +117,7 @@ const InstructorPortal = lazy(() => import("./pages/InstructorPortal"));
 const RevenueShareAdmin = lazy(() => import("./pages/admin/RevenueShareAdmin"));
 const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
 const PartnerSignup = lazy(() => import("./pages/PartnerSignup"));
+const CmeDisclosureForm = lazy(() => import("./pages/CmeDisclosureForm"));
 const TeachDashboard = lazy(() => import("./pages/teach/TeachDashboard"));
 const TeachPresentationEditor = lazy(() => import("./pages/teach/TeachPresentationEditor"));
 const TeachMasterDesigner = lazy(() => import("./pages/teach/TeachMasterDesigner"));
@@ -515,6 +516,7 @@ function Router() {
         <Route path="/admin/revenue-share">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><RevenueShareAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/partner-portal">{() => <Suspense fallback={pageFallback}><PartnerPortal /></Suspense>}</Route>
         <Route path="/partner-signup">{() => <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>}</Route>
+        <Route path="/cme-disclosure/:token">{() => <Suspense fallback={pageFallback}><CmeDisclosureForm /></Suspense>}</Route>
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePagesAdmin /></Suspense></RoleGuard>}</Route>

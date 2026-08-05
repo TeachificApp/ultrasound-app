@@ -10,7 +10,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { eq, leftJoin } from "drizzle-orm";
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { assertAdmin } from "./lmsHelpers";
 import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures } from "../../drizzle/schema";

@@ -26,7 +26,7 @@ import { sonoQuizRouter } from "./routers/sonoQuizRouter";
 import { emailCampaignRouter } from "./routers/emailCampaignRouter";
 import { menuLinksRouter } from "./routers/menuLinksRouter";
 import { navigatorAdminRouter } from "./routers/navigatorAdminRouter";
-import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter } from "./routers/lmsRouter";
+import { lmsPublicRouter, lmsLearnerRouter, lmsAdminRouter, lmsGroupRouter, lmsDisclosurePublicRouter } from "./routers/lmsRouter";
 import { revenueShareRouter } from "./routers/revenueShareRouter";
 import { bundlePublicRouter, bundleLearnerRouter, bundleAdminRouter } from "./routers/bundleRouter";
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
@@ -2116,7 +2116,7 @@ export const appRouter = router({
 
   // ─── LMS LMS Management ────────────────────────────────────────────────────
   blockTemplates: blockTemplatesRouter,
-  lms: lmsPublicRouter,
+  lms: router({ ...lmsPublicRouter._def.procedures, ...lmsDisclosurePublicRouter._def.procedures }),
   lmsLearner: lmsLearnerRouter,
   lmsAdmin: lmsAdminRouter,
   revenueShare: revenueShareRouter,

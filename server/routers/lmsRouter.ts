@@ -1467,6 +1467,102 @@ export const lmsPublicRouter = router({
 
 // ─── Learner Router ───────────────────────────────────────────────────────────
 
+
+
+// ─── Public Financial Disclosure Procedures ──────────────────────────────────
+export const lmsDisclosurePublicRouter = router({
+  getDisclosureByToken: publicProcedure
+    .input(z.object({ token: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { cmeFinancialDisclosures, lmsCourses } = await import("../../drizzle/schema").then(m => m);
+      const [row] = await db
+        .select({
+          id: cmeFinancialDisclosures.id,
+          token: cmeFinancialDisclosures.token,
+          courseId: cmeFinancialDisclosures.courseId,
+          facultyName: cmeFinancialDisclosures.facultyName,
+          facultyEmail: cmeFinancialDisclosures.facultyEmail,
+          status: cmeFinancialDisclosures.status,
+          sentAt: cmeFinancialDisclosures.sentAt,
+          submittedAt: cmeFinancialDisclosures.submittedAt,
+          responseJson: cmeFinancialDisclosures.responseJson,
+          courseTitle: lmsCourses.title,
+        })
+        .from(cmeFinancialDisclosures)
+        .leftJoin(lmsCourses, eq(cmeFinancialDisclosures.courseId, lmsCourses.id))
+        .where(eq(cmeFinancialDisclosures.token, input.token))
+        .limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "This disclosure link is invalid or has expired." });
+      return row;
+    }),
+
+  submitDisclosure: publicProcedure
+    .input(z.object({
+      token: z.string().min(1),
+      responseJson: z.string(), // JSON string of form responses
+      attestationName: z.string().min(1),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { cmeFinancialDisclosures, lmsCourses } = await import("../../drizzle/schema").then(m => m);
+      const [row] = await db
+        .select()
+        .from(cmeFinancialDisclosures)
+        .where(eq(cmeFinancialDisclosures.token, input.token))
+        .limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "This disclosure link is invalid." });
+      if (row.status === "submitted") throw new TRPCError({ code: "BAD_REQUEST", message: "This disclosure has already been submitted." });
+
+      const now = new Date();
+      await db.update(cmeFinancialDisclosures)
+        .set({
+          status: "submitted",
+          submittedAt: now,
+          responseJson: input.responseJson,
+          attestationName: input.attestationName,
+        })
+        .where(eq(cmeFinancialDisclosures.token, input.token));
+
+      // Get course title for the notification email
+      const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, row.courseId)).limit(1);
+      const courseTitle = course?.title ?? "Unknown Course";
+
+      // Send notification emails to admin and CardioServ defaults
+      const notifyEmails = [
+        { email: "admin@allaboutultrasound.com", name: "Admin" },
+        { email: "don@cardioserv.net", name: "Don Gerig" },
+        { email: "j.buckland@cardioserv.net", name: "Judith Buckland" },
+      ];
+
+      const responseData = (() => { try { return JSON.parse(input.responseJson); } catch { return {}; } })();
+      const htmlBody = `
+        <h2 style="color:#189aa1;">Financial Disclosure Submitted</h2>
+        <p><strong>${row.facultyName}</strong> has completed their Financial Disclosure Form.</p>
+        <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Faculty</td><td style="padding:6px 12px;">${row.facultyName}</td></tr>
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Email</td><td style="padding:6px 12px;">${row.facultyEmail}</td></tr>
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Course</td><td style="padding:6px 12px;">${courseTitle}</td></tr>
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Submitted</td><td style="padding:6px 12px;">${now.toLocaleString("en-US", { timeZone: "America/New_York" })} ET</td></tr>
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Attestation Name</td><td style="padding:6px 12px;">${input.attestationName}</td></tr>
+        </table>
+        <p style="font-size:12px;color:#666;">Log in to the admin panel to view the full submission and mark it as received.</p>
+      `;
+
+      for (const recipient of notifyEmails) {
+        await sendEmail({
+          to: recipient,
+          subject: `Financial Disclosure Submitted — ${row.facultyName} (${courseTitle})`,
+          htmlBody,
+        }).catch(() => {});
+      }
+
+      return { success: true };
+    }),
+});
+
 export const lmsLearnerRouter = router({
   /** Get all enrollments for the current user */
   getMyCourses: protectedProcedure.query(async ({ ctx }) => {
