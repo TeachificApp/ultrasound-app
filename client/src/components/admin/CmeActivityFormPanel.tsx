@@ -391,6 +391,9 @@ interface Props {
 export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Props) {
   const [form, setForm] = useState<FormData>({ ...DEFAULT_FORM, activityTitle: courseTitle, activityLengthHours: creditHours ?? "", cmeCreditsRequested: creditHours ?? "" });
   const [loaded, setLoaded] = useState(false);
+  // Increment on every mount so the hydration useEffect re-runs even when data reference is unchanged (tRPC cache)
+  const [mountId, setMountId] = useState(0);
+  useEffect(() => { setMountId(n => n + 1); }, []);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -559,7 +562,8 @@ All About Ultrasound, Inc. dba iHeartEcho`;
       setLoaded(true);
       refetchHistory();
     }
-  }, [data, courseTitle, creditHours]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, mountId]); // Re-hydrate when data changes OR on every fresh mount
 
   const set = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
