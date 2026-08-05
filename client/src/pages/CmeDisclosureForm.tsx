@@ -2,7 +2,7 @@
  * CmeDisclosureForm.tsx
  * Public electronic Financial Disclosure Form for CME faculty.
  * Accessible at /cme-disclosure/:token (no login required).
- * Teal branding, no CardioServ logo.
+ * Matches CardioServ ACCME format with joint provider statement.
  */
 
 import { useState } from "react";
@@ -11,10 +11,9 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Loader2, CheckCircle2, AlertTriangle, FileText } from "lucide-react";
+import { Loader2, CheckCircle2, AlertTriangle, FileText, Plus, Trash2 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,18 +32,6 @@ const ROLES = [
   "Other",
 ];
 
-const RELATIONSHIP_TYPES = [
-  "Consulting fees",
-  "Honoraria",
-  "Grants / Research support",
-  "Speaker's bureau",
-  "Stock / Ownership interest",
-  "Royalties / Patent",
-  "Employee",
-  "Advisory board",
-  "Other financial relationship",
-];
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CmeDisclosureForm() {
@@ -59,7 +46,9 @@ export default function CmeDisclosureForm() {
 
   // ── Form state ──
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [hasRelationships, setHasRelationships] = useState<"yes" | "no" | null>(null);
+  // Default to "yes" so the table rows show immediately; checking the
+  // "no relationships" checkbox below switches to "no" and hides the rows.
+  const [hasRelationships, setHasRelationships] = useState<"yes" | "no">("yes");
   const [relationships, setRelationships] = useState<Relationship[]>([
     { company: "", relationship: "", ended: false },
   ]);
@@ -93,10 +82,6 @@ export default function CmeDisclosureForm() {
   const handleSubmit = () => {
     if (selectedRoles.length === 0) {
       toast.error("Please select at least one role.");
-      return;
-    }
-    if (hasRelationships === null) {
-      toast.error("Please indicate whether you have financial relationships to disclose.");
       return;
     }
     if (hasRelationships === "yes") {
@@ -146,17 +131,21 @@ export default function CmeDisclosureForm() {
   return (
     <div className="min-h-screen bg-[#f0fafa] py-8 px-4">
       <div className="max-w-2xl mx-auto">
+
         {/* Header */}
         <div className="bg-[#189aa1] text-white rounded-t-xl px-8 py-6">
           <div className="flex items-center gap-3 mb-2">
-            <FileText className="w-6 h-6" />
-            <span className="text-sm font-medium uppercase tracking-wider opacity-80">CME Accreditation</span>
+            <FileText className="w-5 h-5 opacity-80" />
+            <span className="text-xs font-medium uppercase tracking-wider opacity-80">CME Accreditation</span>
           </div>
           <h1 className="text-2xl font-bold">Financial Disclosure Form</h1>
-          <p className="text-sm opacity-80 mt-1">All About Ultrasound™ — Continuing Medical Education</p>
+          <p className="text-sm opacity-80 mt-1">
+            All About Ultrasound™ is a CME joint provider with CardioServ, LLC.
+          </p>
         </div>
 
-        <div className="bg-white rounded-b-xl shadow-sm border border-[#d0f0f2] px-8 py-6 space-y-8">
+        <div className="bg-white rounded-b-xl shadow-sm border border-[#d0f0f2] px-8 py-6 space-y-7">
+
           {/* Pre-filled info */}
           <div className="bg-[#f0fafa] rounded-lg p-4 border border-[#c0e8ec] space-y-2">
             <div className="flex gap-2 text-sm">
@@ -173,24 +162,45 @@ export default function CmeDisclosureForm() {
             </div>
           </div>
 
-          {/* Instructions */}
-          <div className="text-sm text-gray-600 leading-relaxed border-l-4 border-[#189aa1] pl-4">
-            <p className="font-semibold text-gray-800 mb-1">Instructions</p>
+          {/* Intro paragraph — CardioServ text */}
+          <div className="text-sm text-gray-700 leading-relaxed space-y-3">
             <p>
-              All individuals in a position to control the content of this CME activity must disclose all relevant
-              financial relationships with any commercial interest within the past 24 months. "Relevant financial
-              relationships" are those in any amount that create a conflict of interest. If you have no relevant
-              financial relationships, please indicate "No" below.
+              As a prospective planner or faculty member, we would like to ask for your help in protecting our
+              learning environment from industry influence. Please complete the form below and return it to:{" "}
+              <a href="mailto:don@cardioserv.net" className="text-[#189aa1] underline">don@cardioserv.net</a>
+            </p>
+            <p>
+              The ACCME Standards for Integrity and Independence require that individuals who refuse to disclose
+              relevant financial relationships be disqualified from involvement in the planning and implementation
+              of accredited continuing education. Thank you for your diligence and cooperation. If you have
+              questions, please contact:{" "}
+              <a href="mailto:j.buckland@cardioserv.net" className="text-[#189aa1] underline">j.buckland@cardioserv.net</a>
+              {" "}or{" "}
+              <a href="mailto:don@cardioserv.net" className="text-[#189aa1] underline">don@cardioserv.net</a>
+            </p>
+          </div>
+
+          {/* ACCME disclosure instructions */}
+          <div className="text-sm text-gray-700 leading-relaxed space-y-2">
+            <p className="font-bold italic">
+              To be Completed by Planner, Faculty, or Others Who May Control Educational Content
+            </p>
+            <p>
+              Please disclose <strong className="underline">all financial relationships</strong> that you have had
+              in the past 24 months with ineligible companies (see definition below). For each financial
+              relationship, enter the name of the ineligible company and the nature of the financial
+              relationship(s). There is no minimum financial threshold; please disclose all financial
+              relationships, regardless of the amount or perceived relevance to the educational activity.
             </p>
           </div>
 
           {/* Section A: Role */}
           <section>
-            <h2 className="text-base font-semibold text-[#189aa1] mb-3 flex items-center gap-2">
-              <span className="bg-[#189aa1] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">A</span>
+            <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <span className="bg-[#189aa1] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shrink-0">A</span>
               Your Role in This Activity
             </h2>
-            <p className="text-sm text-gray-500 mb-3">Select all that apply.</p>
+            <p className="text-xs text-gray-500 mb-3">Select all that apply.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {ROLES.map(role => (
                 <label key={role} className="flex items-center gap-2 cursor-pointer group">
@@ -205,81 +215,95 @@ export default function CmeDisclosureForm() {
             </div>
           </section>
 
-          {/* Section B: Financial Relationships */}
+          {/* Section B: Financial Relationships Table */}
           <section>
-            <h2 className="text-base font-semibold text-[#189aa1] mb-3 flex items-center gap-2">
-              <span className="bg-[#189aa1] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">B</span>
-              Financial Relationships Disclosure
+            <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <span className="bg-[#189aa1] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shrink-0">B</span>
+              Financial Relationships with Ineligible Companies
             </h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Do you have any relevant financial relationships with commercial interests to disclose?
-            </p>
-            <div className="flex gap-4 mb-4">
-              {(["no", "yes"] as const).map(val => (
-                <label key={val} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="hasRelationships"
-                    value={val}
-                    checked={hasRelationships === val}
-                    onChange={() => setHasRelationships(val)}
-                    className="accent-[#189aa1]"
-                  />
-                  <span className="text-sm font-medium text-gray-700">
-                    {val === "no" ? "No — I have nothing to disclose" : "Yes — I have relationships to disclose"}
-                  </span>
-                </label>
-              ))}
+
+            {/* Definition table — mirrors CardioServ format */}
+            <div className="border border-gray-300 rounded-lg overflow-hidden text-xs mb-4">
+              <div className="grid grid-cols-3 divide-x divide-gray-300">
+                <div className="bg-gray-100 p-3">
+                  <p className="font-bold text-gray-800 mb-1">Enter the Name of Ineligible Company</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    An <strong>ineligible company</strong> is any entity whose primary business is producing,
+                    marketing, selling, re-selling, or distributing healthcare products used by or on patients.
+                  </p>
+                  <p className="text-gray-600 mt-2 leading-relaxed">
+                    For specific examples of ineligible companies visit{" "}
+                    <a href="https://accme.org/standards" target="_blank" rel="noopener noreferrer"
+                      className="text-[#189aa1] underline">accme.org/standards</a>.
+                  </p>
+                </div>
+                <div className="bg-gray-100 p-3">
+                  <p className="font-bold text-gray-800 mb-1">Enter the Nature of Financial Relationship</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    Examples of financial relationships include employee, researcher, consultant, advisor, speaker,
+                    independent contractor (including contracted research), royalties or patent beneficiary,
+                    executive role, and ownership interest. Individual stocks and stock options should be
+                    disclosed; diversified mutual funds do not need to be disclosed. Research funding from
+                    ineligible companies should be disclosed by the principal or named investigator even if that
+                    individual's institution receives the research grant and manages the funds.
+                  </p>
+                </div>
+                <div className="bg-gray-100 p-3">
+                  <p className="font-bold text-gray-800 mb-1">Has the Relationship Ended?</p>
+                  <p className="text-gray-600 leading-relaxed">
+                    If the financial relationship existed during the last 24 months, but has now ended, please
+                    check the box in this column. This will help the education staff determine if any mitigation
+                    steps need to be taken.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {hasRelationships === "yes" && (
-              <div className="space-y-4">
+            {/* Relationship rows */}
+            {hasRelationships !== "no" && (
+              <div className="space-y-3 mb-4">
                 {relationships.map((rel, idx) => (
-                  <div key={idx} className="border border-[#c0e8ec] rounded-lg p-4 bg-[#f8fefe] space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-[#189aa1] uppercase tracking-wide">Relationship {idx + 1}</span>
-                      {relationships.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeRelationship(idx)}
-                          className="text-xs text-red-400 hover:text-red-600"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs text-gray-600">Company / Organization *</Label>
+                  <div key={idx} className="border border-[#c0e8ec] rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-0 divide-x divide-[#c0e8ec]">
+                      <div className="p-3">
+                        <Label className="text-xs text-gray-500 block mb-1">Company / Organization *</Label>
                         <Input
                           value={rel.company}
                           onChange={e => updateRelationship(idx, "company", e.target.value)}
                           placeholder="e.g. Acme Medical Inc."
-                          className="mt-1 h-8 text-sm border-[#c0e8ec] focus:border-[#189aa1]"
+                          className="h-8 text-sm border-[#c0e8ec] focus:border-[#189aa1]"
                         />
                       </div>
-                      <div>
-                        <Label className="text-xs text-gray-600">Nature of Relationship *</Label>
-                        <select
+                      <div className="p-3">
+                        <Label className="text-xs text-gray-500 block mb-1">Nature of Relationship *</Label>
+                        <Input
                           value={rel.relationship}
                           onChange={e => updateRelationship(idx, "relationship", e.target.value)}
-                          className="mt-1 w-full h-8 text-sm border border-[#c0e8ec] rounded-md px-2 focus:outline-none focus:border-[#189aa1] bg-white"
-                        >
-                          <option value="">Select type…</option>
-                          {RELATIONSHIP_TYPES.map(t => (
-                            <option key={t} value={t}>{t}</option>
-                          ))}
-                        </select>
+                          placeholder="e.g. Consultant, Speaker, Employee…"
+                          className="h-8 text-sm border-[#c0e8ec] focus:border-[#189aa1]"
+                        />
+                      </div>
+                      <div className="p-3 flex flex-col items-center justify-center gap-1 min-w-[72px]">
+                        <Label className="text-xs text-gray-500 text-center">Ended?</Label>
+                        <Checkbox
+                          checked={rel.ended}
+                          onCheckedChange={v => updateRelationship(idx, "ended", !!v)}
+                          className="border-[#189aa1] data-[state=checked]:bg-[#189aa1] data-[state=checked]:border-[#189aa1] w-5 h-5"
+                        />
+                      </div>
+                      <div className="p-3 flex items-center justify-center min-w-[44px]">
+                        {relationships.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeRelationship(idx)}
+                            className="text-red-300 hover:text-red-500 transition-colors"
+                            title="Remove row"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={rel.ended}
-                        onCheckedChange={v => updateRelationship(idx, "ended", !!v)}
-                        className="border-[#189aa1] data-[state=checked]:bg-[#189aa1] data-[state=checked]:border-[#189aa1]"
-                      />
-                      <span className="text-xs text-gray-600">This relationship has ended</span>
-                    </label>
                   </div>
                 ))}
                 <Button
@@ -287,33 +311,39 @@ export default function CmeDisclosureForm() {
                   variant="outline"
                   size="sm"
                   onClick={addRelationship}
-                  className="border-[#189aa1] text-[#189aa1] hover:bg-[#f0fafa]"
+                  className="border-dashed border-[#189aa1] text-[#189aa1] hover:bg-[#f0fafa] text-xs"
                 >
-                  + Add Another Relationship
+                  <Plus className="w-3 h-3 mr-1" /> Add Another Relationship
                 </Button>
               </div>
             )}
 
-            {hasRelationships === "no" && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">
-                ✓ You have indicated no relevant financial relationships to disclose.
-              </div>
-            )}
+            {/* No relationships checkbox — CardioServ style */}
+            {/* Checking this hides the table rows and sets hasRelationships to "no" */}
+            <label className="flex items-start gap-3 cursor-pointer p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+              <Checkbox
+                checked={hasRelationships === "no"}
+                onCheckedChange={checked => {
+                  setHasRelationships(checked ? "no" : "yes");
+                }}
+                className="border-gray-400 data-[state=checked]:bg-[#189aa1] data-[state=checked]:border-[#189aa1] mt-0.5 shrink-0"
+              />
+              <span className="text-sm text-gray-700">
+                In the past 24 months, I have not had any financial relationships with any ineligible companies.
+              </span>
+            </label>
+
+            {/* CardioServ notify note */}
+            <p className="text-xs text-gray-500 italic mt-2">
+              *Notify CardioServ CME Program immediately if any new financial relationship with an ineligible
+              company arises within 24 months following the date of this disclosure.
+            </p>
           </section>
 
           {/* Section C: Attestation */}
           <section>
-            <h2 className="text-base font-semibold text-[#189aa1] mb-3 flex items-center gap-2">
-              <span className="bg-[#189aa1] text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">C</span>
-              Attestation &amp; Electronic Signature
-            </h2>
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-600 leading-relaxed mb-4">
-              <p>
-                I certify that the information provided above is complete and accurate to the best of my knowledge.
-                I understand that I am required to disclose all relevant financial relationships and that failure to
-                disclose may result in my removal from this CME activity. I agree to resolve any identified conflicts
-                of interest prior to participating in this activity.
-              </p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed mb-4">
+              <p className="font-bold">I attest that the above information is correct as of this date of submission.</p>
             </div>
             <div>
               <Label className="text-sm font-medium text-gray-700">
@@ -323,7 +353,7 @@ export default function CmeDisclosureForm() {
                 value={attestationName}
                 onChange={e => setAttestationName(e.target.value)}
                 placeholder="Type your full legal name"
-                className="mt-1 border-[#c0e8ec] focus:border-[#189aa1]"
+                className="mt-1 border-[#c0e8ec] focus:border-[#189aa1] max-w-xs"
               />
               <p className="text-xs text-gray-400 mt-1">
                 By typing your name above, you are providing an electronic signature equivalent to a handwritten signature.
@@ -352,7 +382,7 @@ export default function CmeDisclosureForm() {
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 mt-6">
-          All About Ultrasound™ · admin@allaboutultrasound.com · © {new Date().getFullYear()}
+          All About Ultrasound™ · CME Joint Provider with CardioServ, LLC · © {new Date().getFullYear()}
         </p>
       </div>
     </div>
@@ -389,7 +419,7 @@ function SuccessPage({ facultyName, courseTitle }: { facultyName: string; course
           A notification has been sent to admin@allaboutultrasound.com and CardioServ.
         </div>
         <p className="text-xs text-gray-400 mt-6">
-          All About Ultrasound™ · © {new Date().getFullYear()}
+          All About Ultrasound™ · CME Joint Provider with CardioServ, LLC · © {new Date().getFullYear()}
         </p>
       </div>
     </div>
