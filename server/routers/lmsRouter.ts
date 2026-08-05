@@ -1487,7 +1487,8 @@ export const lmsDisclosurePublicRouter = router({
           status: cmeFinancialDisclosures.status,
           sentAt: cmeFinancialDisclosures.sentAt,
           submittedAt: cmeFinancialDisclosures.submittedAt,
-          responseJson: cmeFinancialDisclosures.responseJson,
+          rolesJson: cmeFinancialDisclosures.rolesJson,
+          relationshipsJson: cmeFinancialDisclosures.relationshipsJson,
           courseTitle: lmsCourses.title,
         })
         .from(cmeFinancialDisclosures)
@@ -1517,12 +1518,16 @@ export const lmsDisclosurePublicRouter = router({
       if (row.status === "submitted") throw new TRPCError({ code: "BAD_REQUEST", message: "This disclosure has already been submitted." });
 
       const now = new Date();
+      const parsed = (() => { try { return JSON.parse(input.responseJson); } catch { return {}; } })();
       await db.update(cmeFinancialDisclosures)
         .set({
           status: "submitted",
           submittedAt: now,
-          responseJson: input.responseJson,
+          rolesJson: JSON.stringify(parsed.roles ?? []),
+          relationshipsJson: JSON.stringify(parsed.relationships ?? []),
+          noRelationships: parsed.hasRelationships === "no" ? 1 : 0,
           attestationName: input.attestationName,
+          attestationDate: now.toISOString().split("T")[0],
         })
         .where(eq(cmeFinancialDisclosures.token, input.token));
 
