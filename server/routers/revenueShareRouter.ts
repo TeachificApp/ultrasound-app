@@ -137,10 +137,24 @@ export const revenueShareRouter = router({
           .where(eq(revenueSharePartners.id, input.partnerId));
       }
 
-      const returnUrl = `${input.origin}/admin/revenue-share?onboarding=complete&partner=${input.partnerId}`;
-      const refreshUrl = `${input.origin}/admin/revenue-share?onboarding=refresh&partner=${input.partnerId}`;
+      // Generate a secure token so the partner can access their Stripe setup
+      // without needing to log into the site (token-based public redirect).
+      const { randomBytes } = await import("crypto");
+      const token = randomBytes(32).toString("hex");
+      await db.update(revenueSharePartners)
+        .set({ onboardingToken: token, updatedAt: Date.now() })
+        .where(eq(revenueSharePartners.id, input.partnerId));
+
+      const rawDomain = process.env.CANONICAL_ROOT_DOMAIN ?? "learn.allaboutultrasound.com";
+      const baseUrl = rawDomain.startsWith("http") ? rawDomain : `https://${rawDomain}`;
+      const publicRedirectUrl = `${baseUrl}/stripe-onboarding/${token}`;
+
+      // The return/refresh URLs go back to the public redirect page (re-generates a fresh Stripe link)
+      const returnUrl = `${baseUrl}/partner-portal`;
+      const refreshUrl = `${baseUrl}/stripe-onboarding/${token}`;
       const url = await createOnboardingLink(stripeAccountId, returnUrl, refreshUrl);
-      return { url };
+      // Return both the direct Stripe URL (for admin to copy) and the public token URL (to send to partner)
+      return { url, publicUrl: publicRedirectUrl };
     }),
 
   // ── Admin: Refresh partner Stripe status ─────────────────────────────────
@@ -391,6 +405,18 @@ export const revenueShareRouter = router({
     const totalEarned = ledger.filter(e => e.status === "paid").reduce((s, e) => s + e.shareAmount, 0);
     const totalPending = ledger.filter(e => e.status === "pending" || e.status === "processing").reduce((s, e) => s + e.shareAmount, 0);
 
+    // Strip sensitive fields — partners should only see course/date/amount/status,
+    // not student emails, payment intent IDs, or other internal identifiers.
+    const safeLedger = ledger.map(e => ({
+      id: e.id,
+      courseTitle: e.courseTitle,
+      shareAmount: e.shareAmount,
+      currency: e.currency,
+      status: e.status,
+      createdAt: e.createdAt,
+      paidAt: e.paidAt,
+    }));
+
     return {
       partner: {
         id: partner.id,
@@ -398,9 +424,9 @@ export const revenueShareRouter = router({
         email: partner.email,
         onboardingStatus: partner.onboardingStatus,
         payoutSchedule: partner.payoutSchedule,
-        stripeAccountId: partner.stripeAccountId,
+        stripeAccountId: partner.stripeAccountId ? "[connected]" : null,
       },
-      ledger,
+      ledger: safeLedger,
       totalEarned,
       totalPending,
     };

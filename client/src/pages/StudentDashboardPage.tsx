@@ -20,6 +20,7 @@ import {
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
   Clock, XCircle, RefreshCw, Loader2, ChevronRight, ChevronLeft, ClipboardCheck, ShoppingCart, BarChart2, Bell,
   GraduationCap, BookMarked, PenLine, ArrowRight, Video, Layers, Users, Star, Briefcase, MapPin, CalendarDays, Zap,
+  DollarSign, TrendingUp, Filter, CalendarRange,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,8 +101,8 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "subscriptions" | "purchases" | "certificates" | "instructor";
-const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "purchases", "certificates", "instructor"];
+type Tab = "profile" | "content" | "subscriptions" | "purchases" | "certificates" | "instructor" | "revenue_partner";
+const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "purchases", "certificates", "instructor", "revenue_partner"];
 
 // ─── Profile Tab ─────────────────────────────────────────────────────────────
 
@@ -2295,6 +2296,200 @@ function InstructorTab() {
   );
 }
 
+// ─── Revenue Partner Tab ─────────────────────────────────────────────────────
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
+  paid:       { label: "Paid",        color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", icon: CheckCircle2 },
+  pending:    { label: "Pending",     color: "text-amber-700",   bg: "bg-amber-50 border-amber-200",     icon: Clock },
+  processing: { label: "Processing",  color: "text-blue-700",    bg: "bg-blue-50 border-blue-200",       icon: RefreshCw },
+  failed:     { label: "Failed",      color: "text-red-700",     bg: "bg-red-50 border-red-200",         icon: XCircle },
+  cancelled:  { label: "Chargeback",  color: "text-red-700",     bg: "bg-red-50 border-red-200",         icon: XCircle },
+};
+
+function fmt(cents: number) {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function RevenuePartnerTab() {
+  const { data, isLoading } = trpc.revenueShare.getMyEarnings.useQuery();
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-[#189aa1]" />
+      </div>
+    );
+  }
+
+  if (!data || !data.partner) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-10 text-center">
+        <DollarSign className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+        <p className="text-sm font-medium text-gray-500">No revenue partner profile linked</p>
+        <p className="text-xs text-gray-400 mt-1">Contact the platform administrator if you believe this is an error.</p>
+      </div>
+    );
+  }
+
+  const { partner, ledger = [] } = data;
+
+  // Apply filters
+  const filtered = ledger.filter((e: any) => {
+    if (statusFilter !== "all" && e.status !== statusFilter) return false;
+    const ts = e.createdAt as number;
+    if (dateFrom) {
+      const from = new Date(dateFrom).getTime();
+      if (ts < from) return false;
+    }
+    if (dateTo) {
+      const to = new Date(dateTo).getTime() + 86400000; // inclusive
+      if (ts > to) return false;
+    }
+    return true;
+  });
+
+  const filteredPaid    = filtered.filter((e: any) => e.status === "paid").reduce((s: number, e: any) => s + e.shareAmount, 0);
+  const filteredPending = filtered.filter((e: any) => e.status === "pending" || e.status === "processing").reduce((s: number, e: any) => s + e.shareAmount, 0);
+  const filteredTotal   = filtered.reduce((s: number, e: any) => s + e.shareAmount, 0);
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-[#189aa1]/20 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "#189aa1" }}>
+            <DollarSign className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-gray-800">Revenue Partner</h2>
+            <p className="text-xs text-gray-500">Your course payout history</p>
+          </div>
+        </div>
+        {partner.onboardingStatus !== "active" && (
+          <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            Stripe setup incomplete — contact admin@allaboutultrasound.com
+          </div>
+        )}
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: "Total Paid",    value: fmt(filteredPaid),    icon: CheckCircle2, color: "#10b981" },
+          { label: "Pending",       value: fmt(filteredPending), icon: Clock,        color: "#f59e0b" },
+          { label: "Total Earned",  value: fmt(filteredTotal),   icon: TrendingUp,   color: "#189aa1" },
+        ].map(c => (
+          <div key={c.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: `${c.color}15` }}>
+              <c.icon className="w-4.5 h-4.5" style={{ color: c.color }} />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">{c.label}</p>
+              <p className="text-lg font-bold text-gray-800">{c.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+            <Filter className="w-3.5 h-3.5" /> Filter
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wide">From</label>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#189aa1]" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wide">To</label>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#189aa1]" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wide">Status</label>
+            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#189aa1] bg-white">
+              <option value="all">All</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="cancelled">Chargeback</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+          {(dateFrom || dateTo || statusFilter !== "all") && (
+            <button onClick={() => { setDateFrom(""); setDateTo(""); setStatusFilter("all"); }}
+              className="text-xs text-gray-400 hover:text-gray-600 underline mt-4">
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Payout table */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        {filtered.length === 0 ? (
+          <div className="p-10 text-center">
+            <CalendarRange className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm font-medium text-gray-500">No payouts found</p>
+            <p className="text-xs text-gray-400 mt-1">Try adjusting your date range or status filter.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50">
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Course</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Date</th>
+                  <th className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Status</th>
+                  <th className="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Payout</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filtered.map((e: any) => {
+                  const cfg = STATUS_CONFIG[e.status] ?? STATUS_CONFIG.pending;
+                  const StatusIcon = cfg.icon;
+                  return (
+                    <tr key={e.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-gray-800 text-sm">{e.courseTitle ?? "—"}</span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                        {e.createdAt ? new Date(e.createdAt).toLocaleDateString() : "—"}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${cfg.bg} ${cfg.color}`}>
+                          <StatusIcon className="w-3 h-3" />
+                          {cfg.label}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-gray-800">
+                        {fmt(e.shareAmount)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-gray-200 bg-gray-50">
+                  <td colSpan={3} className="px-4 py-3 text-xs font-bold text-gray-600 uppercase tracking-wide">Filtered Total</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-800">{fmt(filteredTotal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Dashboard Page ──────────────────────────────────────────────────────
 
 // TABS is built dynamically in the component based on user roles (see below)
@@ -2312,6 +2507,13 @@ export default function StudentDashboardPage() {
   const isAdmin = (user as any)?.role === "admin";
   const isInstructor = isAdmin || (user as any)?.appRoles?.includes("instructor") || (user as any)?.appRoles?.includes("platform_admin") || (user as any)?.appRoles?.includes("platform_owner");
 
+  // Check if user is a revenue partner (by email match) — query only when needed
+  const { data: partnerCheck } = trpc.revenueShare.getMyEarnings.useQuery(undefined, {
+    staleTime: 60_000,
+    select: (d) => d ? { isPartner: true, onboardingStatus: d.partner?.onboardingStatus } : null,
+  });
+  const isPartner = !!partnerCheck?.isPartner;
+
   const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "content",       label: "My Content",    icon: BookOpen },
     { key: "profile",       label: "Profile",       icon: User },
@@ -2319,6 +2521,7 @@ export default function StudentDashboardPage() {
     { key: "purchases",     label: "Purchases",     icon: ShoppingCart },
     { key: "certificates",  label: "Certificates",  icon: Award },
     ...(isInstructor ? [{ key: "instructor" as Tab, label: "Instructor", icon: GraduationCap }] : []),
+    ...(isPartner ? [{ key: "revenue_partner" as Tab, label: "Revenue", icon: DollarSign }] : []),
   ];
 
   // Parse ?tab= from URL
@@ -2493,6 +2696,7 @@ export default function StudentDashboardPage() {
           {activeTab === "purchases"     && <PurchasesTab />}
           {activeTab === "certificates"  && <CertificatesTab />}
           {activeTab === "instructor"    && <InstructorTab />}
+          {activeTab === "revenue_partner" && <RevenuePartnerTab />}
         </div>
       </div>
   );

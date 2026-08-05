@@ -147,7 +147,17 @@ function PartnersTab() {
   });
   const onboardingMutation = trpc.revenueShare.getOnboardingLink.useMutation({
     onSuccess: (data) => {
-      if (data?.url) window.open(data.url, "_blank");
+      // Open the public token-based URL (no site login required for partner)
+      const linkToOpen = (data as any)?.publicUrl || data?.url;
+      if (linkToOpen) {
+        window.open(linkToOpen, "_blank");
+        // Also copy to clipboard for easy sharing
+        navigator.clipboard?.writeText(linkToOpen).then(() => {
+          toast.success("Onboarding link opened and copied to clipboard");
+        }).catch(() => {
+          toast.success("Onboarding link opened in new tab");
+        });
+      }
     },
     onError: (e) => toast.error(e.message),
   });
