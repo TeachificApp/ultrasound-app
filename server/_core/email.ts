@@ -59,6 +59,17 @@ interface EmailRecipient {
   email: string;
 }
 
+interface EmailAttachment {
+  /** Base64-encoded file content */
+  content: string;
+  /** MIME type, e.g. "application/pdf" */
+  type: string;
+  /** File name shown in the email client */
+  filename: string;
+  /** SendGrid disposition: "attachment" (default) or "inline" */
+  disposition?: "attachment" | "inline";
+}
+
 interface SendEmailOptions {
   to: EmailRecipient;
   subject: string;
@@ -72,6 +83,8 @@ interface SendEmailOptions {
   fromEmail?: string;
   /** List-Unsubscribe header value (RFC 8058 one-click) */
   listUnsubscribeUrl?: string;
+  /** Optional file attachments */
+  attachments?: EmailAttachment[];
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
@@ -106,6 +119,14 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
         click_tracking: { enable: false },
         open_tracking: { enable: false },
       },
+      ...(opts.attachments && opts.attachments.length > 0 ? {
+        attachments: opts.attachments.map(a => ({
+          content: a.content,
+          type: a.type,
+          filename: a.filename,
+          disposition: a.disposition ?? "attachment",
+        })),
+      } : {}),
       ...(opts.listUnsubscribeUrl ? {
         headers: {
           "List-Unsubscribe": `<${opts.listUnsubscribeUrl}>`,

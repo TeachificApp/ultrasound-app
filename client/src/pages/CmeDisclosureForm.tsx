@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { useRoute } from "wouter";
+import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,8 +48,8 @@ const RELATIONSHIP_TYPES = [
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CmeDisclosureForm() {
-  const [, params] = useRoute("/cme-disclosure/:token");
-  const token = params?.token ?? "";
+  const { token: routeToken } = useParams<{ token: string }>();
+  const token = routeToken ?? "";
 
   // ── Query: load disclosure record ──
   const { data, isLoading, error } = trpc.lmsDisclosure.getDisclosureByToken.useQuery(

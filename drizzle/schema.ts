@@ -3339,6 +3339,7 @@ export const lmsInstructors = mysqlTable("lms_instructors", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("user_id"), // optional link to app user account
   name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
   title: varchar("title", { length: 255 }),
   bio: longtext("bio"),
   avatarUrl: text("avatar_url"),

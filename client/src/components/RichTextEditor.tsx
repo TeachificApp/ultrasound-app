@@ -754,11 +754,13 @@ export default function RichTextEditor({
           // We merge them: <p>🏆</p><p>Bragging rights</p> → <p>🏆 Bragging rights</p>
           // Use a broad emoji-detection function that covers all Unicode emoji ranges
           const isEmojiOnly = (text: string): boolean => {
-            // Strip all emoji, variation selectors, ZWJ, and whitespace
+            if (!text.trim()) return false;
+            // Use Unicode property \p{Emoji} to strip all emoji chars + modifiers
             const stripped = text
-              .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}\u{1F300}-\u{1FFFF}\u{200D}\u{20E3}\u{FE0F}\u{2B50}\u{2B55}\u{00A9}\u{00AE}\u{203C}\u{2049}\u{0023}\u{002A}\u{0030}-\u{0039}\u{20E3}\u{2122}\u{2139}\u{2194}-\u{2199}\u{21A9}\u{21AA}\u{231A}\u{231B}\u{2328}\u{23CF}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{24C2}\u{25AA}\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{2600}-\u{2604}\u{260E}\u{2611}\u{2614}\u{2615}\u{2618}\u{261D}\u{2620}\u{2622}\u{2623}\u{2626}\u{262A}\u{262E}\u{262F}\u{2638}-\u{263A}\u{2640}\u{2642}\u{2648}-\u{2653}\u{265F}\u{2660}\u{2663}\u{2665}\u{2666}\u{2668}\u{267B}\u{267E}\u{267F}\u{2692}-\u{2697}\u{2699}\u{269B}\u{269C}\u{26A0}\u{26A1}\u{26A7}\u{26AA}\u{26AB}\u{26B0}\u{26B1}\u{26BD}\u{26BE}\u{26C4}\u{26C5}\u{26CE}\u{26CF}\u{26D1}\u{26D3}\u{26D4}\u{26E9}\u{26EA}\u{26F0}-\u{26F5}\u{26F7}-\u{26FA}\u{26FD}\u{2702}\u{2705}\u{2708}-\u{270D}\u{270F}\u{2712}\u{2714}\u{2716}\u{271D}\u{2721}\u{2728}\u{2733}\u{2734}\u{2744}\u{2747}\u{274C}\u{274E}\u{2753}-\u{2755}\u{2757}\u{2763}\u{2764}\u{2795}-\u{2797}\u{27A1}\u{27B0}\u{27BF}\u{2934}\u{2935}\u{2B05}-\u{2B07}\u{2B1B}\u{2B1C}\u{3030}\u{303D}\u{3297}\u{3299}]/gu, "")
+              .replace(/\p{Emoji}/gu, "")
+              .replace(/[\u200D\uFE0F\u20E3]/g, "")
               .replace(/\s/g, "");
-            return stripped.length === 0 && text.trim().length > 0;
+            return stripped.length === 0;
           };
           const blockEls = Array.from(doc.body.querySelectorAll<HTMLElement>("p, li, div"));
           for (let bi = 0; bi < blockEls.length - 1; bi++) {
@@ -780,14 +782,16 @@ export default function RichTextEditor({
           return html;
         }
       },
-      // Merge lines where an emoji-only line is followed by text (e.g. "🏆\nBragging rights" → "🏆 Bragging rights")
-      transformPastedText: (text: string, plain: boolean) => {
-        if (!plain) return text;
-        const isEmojiOnlyStr = (s: string): boolean => {
-          const stripped = s
-            .replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}\u{1F300}-\u{1FFFF}\u{200D}\u{20E3}\u{FE0F}\u{2B50}\u{2B55}\u{00A9}\u{00AE}\u{203C}\u{2049}\u{0023}\u{002A}\u{0030}-\u{0039}\u{2122}\u{2139}\u{2194}-\u{2199}\u{21A9}\u{21AA}\u{231A}\u{231B}\u{2328}\u{23CF}\u{23E9}-\u{23F3}\u{23F8}-\u{23FA}\u{24C2}\u{25AA}\u{25AB}\u{25B6}\u{25C0}\u{25FB}-\u{25FE}\u{2600}-\u{2604}\u{260E}\u{2611}\u{2614}\u{2615}\u{2618}\u{261D}\u{2620}\u{2622}\u{2623}\u{2626}\u{262A}\u{262E}\u{262F}\u{2638}-\u{263A}\u{2640}\u{2642}\u{2648}-\u{2653}\u{265F}\u{2660}\u{2663}\u{2665}\u{2666}\u{2668}\u{267B}\u{267E}\u{267F}\u{2692}-\u{2697}\u{2699}\u{269B}\u{269C}\u{26A0}\u{26A1}\u{26A7}\u{26AA}\u{26AB}\u{26B0}\u{26B1}\u{26BD}\u{26BE}\u{26C4}\u{26C5}\u{26CE}\u{26CF}\u{26D1}\u{26D3}\u{26D4}\u{26E9}\u{26EA}\u{26F0}-\u{26F5}\u{26F7}-\u{26FA}\u{26FD}\u{2702}\u{2705}\u{2708}-\u{270D}\u{270F}\u{2712}\u{2714}\u{2716}\u{271D}\u{2721}\u{2728}\u{2733}\u{2734}\u{2744}\u{2747}\u{274C}\u{274E}\u{2753}-\u{2755}\u{2757}\u{2763}\u{2764}\u{2795}-\u{2797}\u{27A1}\u{27B0}\u{27BF}\u{2934}\u{2935}\u{2B05}-\u{2B07}\u{2B1B}\u{2B1C}\u{3030}\u{303D}\u{3297}\u{3299}]/gu, "")
-            .replace(/\s/g, "");
-          return stripped.length === 0 && s.trim().length > 0;
+      // Merge emoji-only lines with the following text line for plain-text paste
+      transformPastedText: (text: string) => {
+        // Merge lines where an emoji-only line precedes a text line
+        // e.g. "🏆\nBragging rights" → "🏆 Bragging rights"
+        const isEmojiOnlyLine = (s: string): boolean => {
+          if (!s.trim()) return false;
+          // Remove all emoji, variation selectors, ZWJ sequences, and whitespace
+          // Use a simple approach: remove chars in known emoji ranges + modifiers
+          const noEmoji = s.replace(/\p{Emoji}/gu, "").replace(/[\u200D\uFE0F\u20E3]/g, "").replace(/\s/g, "");
+          return noEmoji.length === 0;
         };
         const lines = text.split('\n');
         const merged: string[] = [];
@@ -795,7 +799,7 @@ export default function RichTextEditor({
         while (i < lines.length) {
           const line = lines[i];
           const trimmed = line.trim();
-          if (trimmed && isEmojiOnlyStr(trimmed) && i + 1 < lines.length && lines[i + 1].trim()) {
+          if (trimmed && isEmojiOnlyLine(trimmed) && i + 1 < lines.length && lines[i + 1].trim()) {
             merged.push(trimmed + ' ' + lines[i + 1].trim());
             i += 2;
           } else {

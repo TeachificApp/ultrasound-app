@@ -109,6 +109,7 @@ import {
   questionBank,
 } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
+import { generateDisclosurePdf } from "../lib/disclosurePdf";
 import { notifyOwner } from "../_core/notification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1556,11 +1557,35 @@ export const lmsDisclosurePublicRouter = router({
         <p style="font-size:12px;color:#666;">Log in to the admin panel to view the full submission and mark it as received.</p>
       `;
 
+      // Generate PDF of the completed disclosure form and attach to notification emails
+      let pdfAttachment: { content: string; type: string; filename: string } | null = null;
+      try {
+        const pdfBuffer = await generateDisclosurePdf({
+          facultyName: row.facultyName,
+          facultyEmail: row.facultyEmail,
+          courseTitle,
+          roles: parsed.roles ?? [],
+          hasRelationships: parsed.hasRelationships === "yes" ? "yes" : "no",
+          relationships: parsed.relationships ?? [],
+          attestationName: input.attestationName,
+          attestationDate: now.toISOString().split("T")[0],
+          submittedAt: now,
+        });
+        pdfAttachment = {
+          content: pdfBuffer.toString("base64"),
+          type: "application/pdf",
+          filename: `Financial-Disclosure-${row.facultyName.replace(/[^a-z0-9]/gi, "-")}-${now.toISOString().split("T")[0]}.pdf`,
+        };
+      } catch (pdfErr) {
+        console.error("[disclosure] Failed to generate PDF attachment:", pdfErr);
+      }
+
       for (const recipient of notifyEmails) {
         await sendEmail({
           to: recipient,
           subject: `Financial Disclosure Submitted — ${row.facultyName} (${courseTitle})`,
           htmlBody,
+          ...(pdfAttachment ? { attachments: [pdfAttachment] } : {}),
         }).catch(() => {});
       }
 

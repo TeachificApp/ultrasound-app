@@ -438,6 +438,8 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours, onDir
   const [markReceivedDialogId, setMarkReceivedDialogId] = useState<number | null>(null);
   const [markReceivedNotes, setMarkReceivedNotes] = useState("");
   const [disclosureEmailDialog, setDisclosureEmailDialog] = useState<{ idx: number; name: string; email: string } | null>(null);
+  const [viewSubmissionDisclosure, setViewSubmissionDisclosure] = useState<{ id: number; facultyName: string; rolesJson: string | null; relationshipsJson: string | null; attestationName: string | null; submittedAt: Date | null } | null>(null);
+  const [bulkSendingDisclosures, setBulkSendingDisclosures] = useState(false);
   const { data: disclosureStatuses, refetch: refetchDisclosures } = trpc.lmsAdmin.getFinancialDisclosureStatus.useQuery(
     { courseId },
     { enabled: !!courseId }
@@ -450,6 +452,38 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours, onDir
     onSuccess: () => { refetchDisclosures(); setMarkReceivedDialogId(null); setMarkReceivedNotes(""); },
     onError: (e: any) => toast.error("Failed to mark received: " + e.message),
   });
+
+  // ── Bulk Send Disclosures ─────────────────────────────────────────────────
+  const handleBulkSendDisclosures = async () => {
+    const facultyWithEmail = form.facultyJson.filter(f => f.name.trim() && f.email?.trim());
+    const facultyWithoutEmail = form.facultyJson.filter(f => f.name.trim() && !f.email?.trim());
+    if (facultyWithoutEmail.length > 0) {
+      toast.error(`Please add email addresses for: ${facultyWithoutEmail.map(f => f.name).join(", ")}`);
+      return;
+    }
+    if (facultyWithEmail.length === 0) {
+      toast.error("No faculty members with email addresses found.");
+      return;
+    }
+    setBulkSendingDisclosures(true);
+    let sent = 0;
+    let failed = 0;
+    for (const f of facultyWithEmail) {
+      try {
+        await sendDisclosureMutation.mutateAsync({
+          courseId,
+          facultyName: f.name.trim(),
+          facultyEmail: f.email!.trim(),
+        });
+        sent++;
+      } catch {
+        failed++;
+      }
+    }
+    setBulkSendingDisclosures(false);
+    if (failed === 0) toast.success(`Disclosure sent to ${sent} faculty member${sent !== 1 ? "s" : ""}`);
+    else toast.error(`Sent ${sent}, failed ${failed}. Check emails and retry.`);
+  };
 
   const landingPageUrl = courseSlug
     ? `https://learn.allaboutultrasound.com/courses/${courseSlug}`
@@ -1074,7 +1108,13 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                             value={inst.name}
                             onSelect={() => {
                               const updated = [...form.facultyJson];
-                              updated[i] = { ...updated[i], name: inst.name, credentials: inst.title ?? updated[i].credentials };
+                              updated[i] = {
+                                ...updated[i],
+                                name: inst.name,
+                                credentials: inst.title ?? updated[i].credentials,
+                                // Auto-populate email from instructor profile if available
+                                email: inst.email ?? updated[i].email ?? '',
+                              };
                               set("facultyJson", updated);
                               setOpenInstructorPopover(null);
                             }}
@@ -1192,9 +1232,12 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                       disabled={sendingDisclosureIdx === i || !f.name.trim()}
                       onClick={() => {
                         if (!f.name.trim()) { toast.error('Enter a faculty name first'); return; }
-                        // Pre-fill email from faculty row or existing disclosure record
-                        const existingEmail = f.email || disc?.facultyEmail || '';
-                        setDisclosureEmailDialog({ idx: i, name: f.name.trim(), email: existingEmail });
+                        // Priority: saved faculty email > existing disclosure email > instructor profile email
+                        const instEmail = (instructorsList ?? []).find(
+                          inst => inst.name.toLowerCase() === f.name.trim().toLowerCase()
+                        )?.email ?? null;
+                        const bestEmail = f.email?.trim() || disc?.facultyEmail?.trim() || instEmail || '';
+                        setDisclosureEmailDialog({ idx: i, name: f.name.trim(), email: bestEmail });
                       }}
                     >
                       {sendingDisclosureIdx === i ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Mail className="w-3 h-3 mr-1" />}
@@ -1218,21 +1261,53 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                         Copy Link
                       </Button>
                     )}
+                    {disc?.status === 'submitted' && (
+                      <Button
+                        type="button" size="sm" variant="outline"
+                        className="h-6 text-[10px] px-2 text-teal-600 border-teal-300 hover:bg-teal-50"
+                        onClick={() => setViewSubmissionDisclosure({
+                          id: disc.id,
+                          facultyName: disc.facultyName,
+                          rolesJson: disc.rolesJson ?? null,
+                          relationshipsJson: disc.relationshipsJson ?? null,
+                          attestationName: disc.attestationName ?? null,
+                          submittedAt: disc.submittedAt ?? null,
+                        })}
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        View Submission
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
             })()}
           </div>
         ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="text-xs"
-          onClick={() => set("facultyJson", [...form.facultyJson, { name: "", credentials: "", role: "" }])}
-        >
-          + Add Faculty Member
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => set("facultyJson", [...form.facultyJson, { name: "", credentials: "", role: "" }])}
+          >
+            + Add Faculty Member
+          </Button>
+          {form.facultyJson.some(f => f.name.trim()) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs text-[#189aa1] border-[#189aa1] hover:bg-teal-50"
+              disabled={bulkSendingDisclosures}
+              onClick={handleBulkSendDisclosures}
+            >
+              {bulkSendingDisclosures ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Mail className="w-3 h-3 mr-1" />}
+              Bulk Send Disclosures
+            </Button>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground italic">Note: All listed individuals must complete a Financial Disclosure Form before participating in planning or delivery.</p>
       </Section>
 
@@ -1254,6 +1329,22 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                 className="mt-1 h-8 text-sm"
                 autoFocus
               />
+              {/* Show instructor profile email as a quick-fill hint if different */}
+              {(() => {
+                const instEmail = (instructorsList ?? []).find(
+                  inst => inst.name.toLowerCase() === disclosureEmailDialog?.name?.toLowerCase()
+                )?.email;
+                if (!instEmail || instEmail === disclosureEmailDialog?.email) return null;
+                return (
+                  <button
+                    type="button"
+                    className="mt-1 text-[10px] text-teal-600 hover:underline text-left"
+                    onClick={() => setDisclosureEmailDialog(d => d ? { ...d, email: instEmail } : null)}
+                  >
+                    Use instructor profile email: {instEmail}
+                  </button>
+                );
+              })()}
             </div>
           </div>
           <DialogFooter>
@@ -1463,6 +1554,26 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           </DialogHeader>
 
           <div className="space-y-4 py-2">
+            {/* Disclosure warning — show if any faculty hasn't submitted */}
+            {(() => {
+              const facultyWithNames = form.facultyJson.filter(f => f.name.trim());
+              const unsubmitted = facultyWithNames.filter(f => {
+                const disc = disclosureStatuses?.find(d => d.facultyName === f.name.trim());
+                return !disc || disc.status !== 'submitted';
+              });
+              if (unsubmitted.length === 0) return null;
+              return (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-amber-800">Pending Financial Disclosures</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      {unsubmitted.map(f => f.name).join(", ")} {unsubmitted.length === 1 ? "has" : "have"} not yet submitted their Financial Disclosure Form. CardioServ requires all faculty disclosures before processing.
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
             {/* Editable Recipients */}
             <div className="rounded-lg border border-gray-200 p-3 space-y-3">
               <div className="flex items-center justify-between">
@@ -1676,6 +1787,66 @@ All About Ultrasound, Inc. dba iHeartEcho`;
               <Mail className="w-3 h-3 mr-1" />
               Send Again
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Submission Modal */}
+      <Dialog open={viewSubmissionDisclosure !== null} onOpenChange={open => { if (!open) setViewSubmissionDisclosure(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              Financial Disclosure — {viewSubmissionDisclosure?.facultyName}
+            </DialogTitle>
+          </DialogHeader>
+          {viewSubmissionDisclosure && (() => {
+            const roles: string[] = (() => { try { return JSON.parse(viewSubmissionDisclosure.rolesJson || '[]'); } catch { return []; } })();
+            const relationships: Array<{ company: string; type: string; ended: boolean }> = (() => { try { return JSON.parse(viewSubmissionDisclosure.relationshipsJson || '[]'); } catch { return []; } })();
+            return (
+              <div className="space-y-4 py-2">
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-1">Submitted</p>
+                  <p className="text-sm">{viewSubmissionDisclosure.submittedAt ? new Date(viewSubmissionDisclosure.submittedAt).toLocaleString() : '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-1">Role(s)</p>
+                  {roles.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">{roles.map((r, i) => <span key={i} className="px-2 py-0.5 rounded text-xs bg-teal-100 text-teal-800 border border-teal-200">{r}</span>)}</div>
+                  ) : <p className="text-sm text-muted-foreground">No roles recorded</p>}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-1">Financial Relationships</p>
+                  {relationships.length > 0 ? (
+                    <table className="w-full text-xs border-collapse">
+                      <thead><tr className="bg-gray-50">
+                        <th className="text-left p-2 border border-gray-200 font-medium">Company / Entity</th>
+                        <th className="text-left p-2 border border-gray-200 font-medium">Relationship Type</th>
+                        <th className="text-center p-2 border border-gray-200 font-medium">Ended?</th>
+                      </tr></thead>
+                      <tbody>{relationships.map((rel, i) => (
+                        <tr key={i} className="border-b border-gray-100">
+                          <td className="p-2 border border-gray-200">{rel.company}</td>
+                          <td className="p-2 border border-gray-200">{rel.type}</td>
+                          <td className="p-2 border border-gray-200 text-center">{rel.ended ? '✓ Yes' : 'No'}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  ) : (
+                    <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded px-3 py-2">
+                      ✓ No financial relationships disclosed
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-600 mb-1">Attestation</p>
+                  <p className="text-sm italic">{viewSubmissionDisclosure.attestationName || '—'}</p>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button type="button" variant="outline" size="sm" onClick={() => setViewSubmissionDisclosure(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

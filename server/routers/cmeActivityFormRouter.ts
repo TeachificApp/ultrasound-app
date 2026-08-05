@@ -627,12 +627,26 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { users } = await import("../../drizzle/schema").then(m => m);
       const rows = await db
-        .select({ id: lmsInstructors.id, name: lmsInstructors.name, title: lmsInstructors.title })
+        .select({
+          id: lmsInstructors.id,
+          name: lmsInstructors.name,
+          email: lmsInstructors.email,
+          title: lmsInstructors.title,
+          userEmail: users.email,
+        })
         .from(lmsInstructors)
+        .leftJoin(users, eq(users.id, lmsInstructors.userId))
         .where(eq(lmsInstructors.isActive, true))
         .orderBy(lmsInstructors.name);
-      return rows;
+      // Prefer direct email column; fall back to linked user account email
+      return rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        email: r.email || r.userEmail || null,
+        title: r.title,
+      }));
     }),
 
   // ── Manually set approvedAt date ─────────────────────────────────────────
