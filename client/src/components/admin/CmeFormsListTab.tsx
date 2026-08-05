@@ -26,6 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CmeActivityFormPanel } from "./CmeActivityFormPanel";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Users } from "lucide-react";
 
 // ─── Form Status config ───────────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -694,6 +695,149 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Generic Disclosure Submissions ── */}
+      <GenericDisclosuresSection />
+    </div>
+  );
+}
+
+// ─── Generic Disclosures Section ─────────────────────────────────────────────
+function GenericDisclosuresSection() {
+  const [search, setSearch] = useState("");
+  const [viewRow, setViewRow] = useState<any>(null);
+
+  const { data, isLoading, refetch } = trpc.lmsAdmin.listGenericDisclosures.useQuery(
+    { search: search || undefined },
+    { refetchOnWindowFocus: false }
+  );
+  const rows: any[] = (data as any)?.rows ?? [];
+
+  return (
+    <div className="space-y-4 pt-2 border-t border-gray-100 mt-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Users className="w-5 h-5 text-[#189aa1]" />
+            Generic Disclosure Submissions
+          </h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Financial disclosures submitted via the generic public form (not linked to a specific course).
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search name, email, activity…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="text-sm w-56"
+          />
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="text-xs flex-shrink-0">
+            <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center h-24"><Loader2 className="w-5 h-5 animate-spin text-teal-500" /></div>
+      ) : rows.length === 0 ? (
+        <div className="text-center py-8 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
+          No generic disclosure submissions yet.
+        </div>
+      ) : (
+        <div className="rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead className="text-xs">Faculty</TableHead>
+                <TableHead className="text-xs">Email</TableHead>
+                <TableHead className="text-xs">Activity</TableHead>
+                <TableHead className="text-xs">Submitted</TableHead>
+                <TableHead className="text-xs">Relationships</TableHead>
+                <TableHead className="text-xs"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row: any) => (
+                <TableRow key={row.id} className="hover:bg-gray-50">
+                  <TableCell className="text-xs font-medium">{row.facultyName}</TableCell>
+                  <TableCell className="text-xs text-gray-600">{row.facultyEmail}</TableCell>
+                  <TableCell className="text-xs text-gray-600 max-w-[180px] truncate">{row.activityTitle}</TableCell>
+                  <TableCell className="text-xs text-gray-500">
+                    {row.submittedAt ? new Date(row.submittedAt).toLocaleDateString() : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    {row.noRelationships ? (
+                      <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-xs font-medium">None</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">Disclosed</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">
+                    <Button size="sm" variant="ghost" className="h-6 text-xs text-teal-600" onClick={() => setViewRow(row)}>
+                      View
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* View Dialog */}
+      {viewRow && (
+        <Dialog open={!!viewRow} onOpenChange={() => setViewRow(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-sm">Generic Disclosure — {viewRow.facultyName}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-2 gap-3 bg-gray-50 rounded-lg p-3 text-xs">
+                <div><span className="font-medium text-gray-600">Faculty:</span> {viewRow.facultyName}</div>
+                <div><span className="font-medium text-gray-600">Email:</span> {viewRow.facultyEmail}</div>
+                <div><span className="font-medium text-gray-600">Activity:</span> {viewRow.activityTitle}</div>
+                <div><span className="font-medium text-gray-600">Submitted:</span> {viewRow.submittedAt ? new Date(viewRow.submittedAt).toLocaleString() : "—"}</div>
+                <div><span className="font-medium text-gray-600">Attestation:</span> {viewRow.attestationName}</div>
+              </div>
+              {viewRow.rolesJson && (() => {
+                try {
+                  const roles: string[] = JSON.parse(viewRow.rolesJson);
+                  return roles.length > 0 ? (
+                    <div>
+                      <p className="text-xs font-medium text-gray-600 mb-1">Roles</p>
+                      <p className="text-xs text-gray-700">{roles.join(", ")}</p>
+                    </div>
+                  ) : null;
+                } catch { return null; }
+              })()}
+              {viewRow.noRelationships ? (
+                <div className="bg-green-50 rounded-lg p-3 text-xs text-green-700">
+                  No financial relationships disclosed in the past 24 months.
+                </div>
+              ) : (
+                <div>
+                  <p className="text-xs font-medium text-gray-600 mb-1">Financial Relationships</p>
+                  {(() => {
+                    try {
+                      const rels = JSON.parse(viewRow.relationshipsJson ?? "[]");
+                      return rels.filter((r: any) => r.company?.trim()).map((r: any, i: number) => (
+                        <div key={i} className="bg-gray-50 rounded p-2 text-xs mb-1">
+                          <span className="font-medium">{r.company}</span> — {r.nature}
+                          {r.ended && <span className="ml-2 text-amber-600">(Ended)</span>}
+                        </div>
+                      ));
+                    } catch { return <p className="text-xs text-gray-500">Unable to parse relationships.</p>; }
+                  })()}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" size="sm" onClick={() => setViewRow(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
