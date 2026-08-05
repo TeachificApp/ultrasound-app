@@ -44,12 +44,10 @@ export async function generateDisclosurePdf(data: DisclosurePdfData): Promise<Bu
     let y = 50;
 
     // ── Header ────────────────────────────────────────────────────────────────
-    doc.rect(50, y, pageWidth, 60).fill(TEAL);
+    doc.rect(50, y, pageWidth, 44).fill(TEAL);
     doc.fillColor("white").fontSize(16).font("Helvetica-Bold")
-      .text("Financial Disclosure Form", 60, y + 10, { width: pageWidth - 20 });
-    doc.fontSize(10).font("Helvetica")
-      .text("All About Ultrasound™ — CME Accreditation Program", 60, y + 32, { width: pageWidth - 20 });
-    y += 75;
+      .text("Financial Disclosure Form", 60, y + 13, { width: pageWidth - 20 });
+    y += 58;
 
     // ── Helper ────────────────────────────────────────────────────────────────
     const row = (labelText: string, value: string) => {
