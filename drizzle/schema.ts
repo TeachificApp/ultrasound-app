@@ -8210,3 +8210,20 @@ export const cmeFinancialDisclosures = mysqlTable("cme_financial_disclosures", {
 });
 export type CmeFinancialDisclosure = typeof cmeFinancialDisclosures.$inferSelect;
 export type InsertCmeFinancialDisclosure = typeof cmeFinancialDisclosures.$inferInsert;
+
+// ─── CME Generic Disclosures (standalone form, no course link) ─────────────────────────────────
+export const cmeGenericDisclosures = mysqlTable("cme_generic_disclosures", {
+  id: int("id").autoincrement().primaryKey(),
+  facultyName: varchar("faculty_name", { length: 255 }).notNull(),
+  facultyEmail: varchar("faculty_email", { length: 320 }).notNull(),
+  activityTitle: varchar("activity_title", { length: 500 }).notNull(),
+  rolesJson: text("roles_json"),
+  relationshipsJson: text("relationships_json"),
+  noRelationships: int("no_relationships").notNull().default(0),
+  attestationName: varchar("attestation_name", { length: 255 }),
+  attestationDate: varchar("attestation_date", { length: 32 }),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type CmeGenericDisclosure = typeof cmeGenericDisclosures.$inferSelect;
+export type InsertCmeGenericDisclosure = typeof cmeGenericDisclosures.$inferInsert;

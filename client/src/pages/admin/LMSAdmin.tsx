@@ -1492,6 +1492,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
           <TabsTrigger value="overview" className="text-xs">Course Overview</TabsTrigger>
           <TabsTrigger value="player-sidebar" className="text-xs">Player Sidebar</TabsTrigger>
           <TabsTrigger value="instructors" className="text-xs">Instructors</TabsTrigger>
+          <TabsTrigger value="revenue-share" className="text-xs">Revenue Share</TabsTrigger>
           <TabsTrigger value="users" className="text-xs">Students</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
           <TabsTrigger value="sales" className="text-xs">Sales</TabsTrigger>
@@ -1658,6 +1659,11 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
         {/* Instructors Tab */}
         <TabsContent value="instructors" className="mt-4">
           <CourseInstructorsEditor courseId={courseId} courseInstructors={course.courseInstructors} onSaved={() => refetch()} />
+        </TabsContent>
+
+        {/* Revenue Share Tab */}
+        <TabsContent value="revenue-share" className="mt-4">
+          <CourseRevenueShareEditor courseId={courseId} />
         </TabsContent>
 
         {/* Students Tab */}
@@ -3875,6 +3881,85 @@ function CourseOverviewEditor({
 
 // ─── Course Instructors Editor ────────────────────────────────────────────────
 
+function CourseRevenueShareEditor({ courseId }: { courseId: number }) {
+  const { data: partners, isLoading: partnersLoading } = trpc.revenueShare.listPartners.useQuery();
+  const { data: assignments, isLoading: assignmentsLoading, refetch } = trpc.revenueShare.listAssignments.useQuery({ courseId });
+
+  const createAssignment = trpc.revenueShare.createAssignment.useMutation({
+    onSuccess: () => { toast.success("Revenue share assignment saved"); refetch(); },
+    onError: (e: any) => toast.error(`Error: ${e.message}`),
+  });
+  const updateAssignment = trpc.revenueShare.updateAssignment.useMutation({
+    onSuccess: () => { toast.success("Updated"); refetch(); },
+    onError: (e: any) => toast.error(`Error: ${e.message}`),
+  });
+  const deleteAssignment = trpc.revenueShare.deleteAssignment.useMutation({
+    onSuccess: () => { toast.success("Assignment removed"); refetch(); },
+    onError: (e: any) => toast.error(`Error: ${e.message}`),
+  });
+
+  const isLoading = partnersLoading || assignmentsLoading;
+  const partnerList: any[] = (partners as any[]) ?? [];
+  // listAssignments returns all; filter to this course
+  const allAssignments: any[] = (assignments as any[]) ?? [];
+  const assignmentList = allAssignments.filter((a: any) => a.courseId === courseId);
+  const assignedPartnerIds = new Set(assignmentList.map((a: any) => a.partnerId));
+  const availablePartners = partnerList.filter((p: any) => !assignedPartnerIds.has(p.id));
+
+  if (isLoading) return (
+    <div className="flex items-center justify-center h-32"><Loader2 className="w-5 h-5 animate-spin text-teal-600" /></div>
+  );
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold text-gray-800">Revenue Share Partners</h3>
+        <p className="text-xs text-gray-500 mt-0.5">Assign revenue partners and their payout percentage for this product. Partners are managed in Admin → Revenue Share.</p>
+      </div>
+      {assignmentList.length === 0 ? (
+        <div className="text-center py-8 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">No revenue share partners assigned to this product yet.</div>
+      ) : (
+        <div className="space-y-3">
+          {assignmentList.map((a: any) => (
+            <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-800">{a.partnerName ?? `Partner #${a.partnerId}`}</p>
+                <p className="text-xs text-gray-400">{a.partnerEmail ?? ""}</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Input type="number" min="0" max="100" step="0.5" defaultValue={parseFloat(a.percentage ?? "0")} className="w-20 h-8 text-sm text-center"
+                  onBlur={(e: React.FocusEvent<HTMLInputElement>) => {
+                    const pct = parseFloat(e.target.value) || 0;
+                    if (pct !== parseFloat(a.percentage ?? "0")) updateAssignment.mutate({ id: a.id, percentage: pct });
+                  }} />
+                <span className="text-xs text-gray-500">%</span>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                a.active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'
+              }`}>{a.active ? 'active' : 'paused'}</span>
+              <Button size="sm" variant="ghost" className="h-7 text-red-400" onClick={() => deleteAssignment.mutate({ id: a.id })}><Trash2 className="w-3 h-3" /></Button>
+            </div>
+          ))}
+        </div>
+      )}
+      {availablePartners.length > 0 && (
+        <div className="pt-2">
+          <p className="text-xs text-gray-500 mb-2">Add a partner:</p>
+          <div className="flex flex-wrap gap-2">
+            {availablePartners.map((p: any) => (
+              <Button key={p.id} size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50 text-xs"
+                onClick={() => createAssignment.mutate({ partnerId: p.id, courseId, percentage: 10 })}>
+                <Plus className="w-3 h-3 mr-1" /> {p.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+      {partnerList.length === 0 && <p className="text-xs text-gray-400 italic">No revenue partners found. Add partners in Admin → Revenue Share first.</p>}
+    </div>
+  );
+}
+
 function CourseInstructorsEditor({ courseId, courseInstructors, onSaved }: { courseId: number; courseInstructors: any[]; onSaved: () => void }) {
   
   const { data: allInstructors, refetch: refetchInstructors } = trpc.lmsAdmin.listInstructors.useQuery();
@@ -3923,10 +4008,7 @@ function CourseInstructorsEditor({ courseId, courseInstructors, onSaved }: { cou
                   {(allInstructors ?? []).map((i: any) => <SelectItem key={i.id} value={String(i.id)}>{i.name}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <div className="flex items-center gap-1">
-                <Input type="number" min="0" max="100" value={a.revenueSharePct} onChange={e => setAssignments(prev => prev.map((x, i) => i === idx ? { ...x, revenueSharePct: parseInt(e.target.value) || 0 } : x))} className="w-16 h-8 text-sm text-center" />
-                <span className="text-xs text-gray-500">% rev share</span>
-              </div>
+              {/* % rev share moved to dedicated Revenue Share tab */}
               <div className="flex items-center gap-2">
                 <Switch checked={a.isPrimary} onCheckedChange={v => setAssignments(prev => prev.map((x, i) => ({ ...x, isPrimary: i === idx ? v : false })))} id={`primary-${idx}`} />
                 <Label htmlFor={`primary-${idx}`} className="text-xs">Primary</Label>

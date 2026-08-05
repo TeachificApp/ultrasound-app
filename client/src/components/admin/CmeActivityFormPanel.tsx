@@ -24,7 +24,7 @@ import {
   Loader2, Sparkles, Download, Save, ChevronDown, ChevronUp,
   FileText, RefreshCw, Calendar, CheckSquare, Square,
   PenLine, Trash2, FileDown, Send, Mail, ChevronsUpDown,
-  X, Plus, UserPlus, AlertTriangle, CheckCircle2,
+  X, Plus, UserPlus, AlertTriangle, CheckCircle2, Link2, Copy,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -1332,6 +1332,24 @@ All About Ultrasound, Inc. dba iHeartEcho`;
               Bulk Send Disclosures
             </Button>
           )}
+          {/* Copy Generic Form Link */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="text-xs text-gray-600 border-gray-300 hover:bg-gray-50 ml-auto"
+            onClick={() => {
+              const genericUrl = `${window.location.origin}/cme-disclosure/generic`;
+              navigator.clipboard.writeText(genericUrl).then(() => {
+                toast.success("Generic disclosure form link copied to clipboard");
+              }).catch(() => {
+                toast.info(`Generic form link: ${genericUrl}`);
+              });
+            }}
+          >
+            <Link2 className="w-3 h-3 mr-1" />
+            Copy Generic Form Link
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground italic">Note: All listed individuals must complete a Financial Disclosure Form before participating in planning or delivery.</p>
       </Section>

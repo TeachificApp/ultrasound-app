@@ -131,8 +131,8 @@ export const cmeActivityFormRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // Get all CME-eligible products from lms_courses (all types: course, quiz, cohort, workshop, download)
-      // Exclude archived/draft status courses to keep the list actionable
+      // Get CME-eligible products: only courses with certificate enabled OR non-empty creditHours
+      const { or, eq, isNotNull, and, ne } = await import("drizzle-orm");
       const courses = await db
         .select({
           id: lmsCourses.id,
@@ -144,6 +144,17 @@ export const cmeActivityFormRouter = router({
           type: lmsCourses.type,
         })
         .from(lmsCourses)
+        .where(
+          or(
+            // Has certificate enabled (boolean true)
+            eq(lmsCourses.hasCertificate, true),
+            // Has CME credit hours set (non-null AND non-empty string)
+            and(
+              isNotNull(lmsCourses.creditHours),
+              ne(lmsCourses.creditHours, ""),
+            ),
+          )
+        )
         .orderBy(lmsCourses.title);
 
       if (courses.length === 0) return [];
@@ -839,5 +850,35 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         .where(eq(cmeSendHistory.courseId, input.courseId))
         .orderBy(cmeSendHistory.sentAt);
       return rows;
+    }),
+
+  listGenericDisclosures: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      limit: z.number().int().min(1).max(200).optional().default(100),
+      offset: z.number().int().min(0).optional().default(0),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) return { rows: [] };
+      const { cmeGenericDisclosures } = await import("../../drizzle/schema").then(m => m);
+      const { desc: descOrd, like, or } = await import("drizzle-orm");
+      const searchTerm = input?.search?.trim();
+      const whereClause = searchTerm
+        ? or(
+            like(cmeGenericDisclosures.facultyName, `%${searchTerm}%`),
+            like(cmeGenericDisclosures.facultyEmail, `%${searchTerm}%`),
+            like(cmeGenericDisclosures.activityTitle, `%${searchTerm}%`),
+          )
+        : undefined;
+      const rows = await db
+        .select()
+        .from(cmeGenericDisclosures)
+        .where(whereClause)
+        .orderBy(descOrd(cmeGenericDisclosures.submittedAt))
+        .limit(input?.limit ?? 100)
+        .offset(input?.offset ?? 0);
+      return { rows };
     }),
 });

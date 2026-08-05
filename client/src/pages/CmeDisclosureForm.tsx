@@ -130,7 +130,7 @@ export default function CmeDisclosureForm() {
   // ── Main Form ──
   return (
     <div className="min-h-screen bg-[#f0fafa] py-8 px-4">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
 
         {/* Header */}
         <div className="bg-[#189aa1] text-white rounded-t-xl px-8 py-6">
@@ -223,14 +223,14 @@ export default function CmeDisclosureForm() {
             <div className="border border-gray-300 rounded-lg overflow-hidden text-xs mb-4">
 
               {/* Row 1: Column header labels */}
-              <div className="grid grid-cols-[1fr_1fr_90px] divide-x divide-gray-300 border-b border-gray-300">
+              <div className="grid grid-cols-[1fr_1fr_160px] divide-x divide-gray-300 border-b border-gray-300">
                 <div className="bg-gray-100 px-3 py-2 font-bold text-gray-800">Enter the Name of Ineligible Company</div>
                 <div className="bg-gray-100 px-3 py-2 font-bold text-gray-800">Enter the Nature of Financial Relationship</div>
                 <div className="bg-gray-100 px-3 py-2 font-bold text-gray-800 text-center">Has the Relationship Ended?</div>
               </div>
 
               {/* Row 2: Definition text */}
-              <div className="grid grid-cols-[1fr_1fr_90px] divide-x divide-gray-300 border-b border-gray-300">
+              <div className="grid grid-cols-[1fr_1fr_160px] divide-x divide-gray-300 border-b border-gray-300">
                 <div className="bg-gray-50 px-3 py-3 text-gray-600 leading-relaxed">
                   An <strong>ineligible company</strong> is any entity whose primary business is producing,
                   marketing, selling, re-selling, or distributing healthcare products used by or on patients.
@@ -258,7 +258,7 @@ export default function CmeDisclosureForm() {
               {hasRelationships !== "no" && (
                 <div className="divide-y divide-gray-200">
                   {relationships.map((rel, idx) => (
-                    <div key={idx} className={`grid grid-cols-[1fr_1fr_90px] divide-x divide-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                    <div key={idx} className={`grid grid-cols-[1fr_1fr_160px] divide-x divide-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                       <div className="px-2 py-1.5">
                         <input
                           type="text"

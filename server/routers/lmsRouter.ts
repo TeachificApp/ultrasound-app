@@ -1610,6 +1610,29 @@ export const lmsDisclosurePublicRouter = router({
       const now = new Date();
       const parsed = (() => { try { return JSON.parse(input.responseJson); } catch { return {}; } })();
 
+      // Save to DB for admin tracking
+      try {
+        const db = await getDb();
+        if (db) {
+          const { cmeGenericDisclosures } = await import("../../drizzle/schema").then(m => m);
+          await db.insert(cmeGenericDisclosures).values({
+            facultyName: input.facultyName,
+            facultyEmail: input.facultyEmail,
+            activityTitle: input.activityTitle,
+            rolesJson: JSON.stringify(parsed.roles ?? []),
+            relationshipsJson: JSON.stringify(parsed.relationships ?? []),
+            noRelationships: parsed.hasRelationships === "no" ? 1 : 0,
+            attestationName: input.attestationName,
+            attestationDate: now.toISOString().split("T")[0],
+            submittedAt: now,
+            createdAt: now,
+          });
+        }
+      } catch (dbErr) {
+        console.error("[generic-disclosure] Failed to save to DB:", dbErr);
+        // Non-fatal: still send emails
+      }
+
       const notifyEmails = [
         { email: "admin@allaboutultrasound.com", name: "Admin" },
         { email: "don@cardioserv.net", name: "Don Gerig" },
