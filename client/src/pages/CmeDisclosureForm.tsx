@@ -222,86 +222,75 @@ export default function CmeDisclosureForm() {
               Financial Relationships with Ineligible Companies
             </h2>
 
-            {/* Definition table — mirrors CardioServ format */}
+            {/* Unified CardioServ-style table: definition header rows + entry rows */}
             <div className="border border-gray-300 rounded-lg overflow-hidden text-xs mb-4">
-              <div className="grid grid-cols-3 divide-x divide-gray-300">
-                <div className="bg-gray-100 p-3">
-                  <p className="font-bold text-gray-800 mb-1">Enter the Name of Ineligible Company</p>
-                  <p className="text-gray-600 leading-relaxed">
-                    An <strong>ineligible company</strong> is any entity whose primary business is producing,
-                    marketing, selling, re-selling, or distributing healthcare products used by or on patients.
-                  </p>
-                  <p className="text-gray-600 mt-2 leading-relaxed">
-                    For specific examples of ineligible companies visit{" "}
-                    <a href="https://accme.org/standards" target="_blank" rel="noopener noreferrer"
-                      className="text-[#189aa1] underline">accme.org/standards</a>.
-                  </p>
+
+              {/* Row 1: Column header labels */}
+              <div className="grid grid-cols-[1fr_1fr_90px] divide-x divide-gray-300 border-b border-gray-300">
+                <div className="bg-gray-100 px-3 py-2 font-bold text-gray-800">Enter the Name of Ineligible Company</div>
+                <div className="bg-gray-100 px-3 py-2 font-bold text-gray-800">Enter the Nature of Financial Relationship</div>
+                <div className="bg-gray-100 px-3 py-2 font-bold text-gray-800 text-center">Has the Relationship Ended?</div>
+              </div>
+
+              {/* Row 2: Definition text */}
+              <div className="grid grid-cols-[1fr_1fr_90px] divide-x divide-gray-300 border-b border-gray-300">
+                <div className="bg-gray-50 px-3 py-3 text-gray-600 leading-relaxed">
+                  An <strong>ineligible company</strong> is any entity whose primary business is producing,
+                  marketing, selling, re-selling, or distributing healthcare products used by or on patients.
+                  <br /><br />
+                  For specific examples of ineligible companies visit{" "}
+                  <a href="https://accme.org/standards" target="_blank" rel="noopener noreferrer"
+                    className="text-[#189aa1] underline">accme.org/standards</a>.
                 </div>
-                <div className="bg-gray-100 p-3">
-                  <p className="font-bold text-gray-800 mb-1">Enter the Nature of Financial Relationship</p>
-                  <p className="text-gray-600 leading-relaxed">
-                    Examples of financial relationships include employee, researcher, consultant, advisor, speaker,
-                    independent contractor (including contracted research), royalties or patent beneficiary,
-                    executive role, and ownership interest. Individual stocks and stock options should be
-                    disclosed; diversified mutual funds do not need to be disclosed. Research funding from
-                    ineligible companies should be disclosed by the principal or named investigator even if that
-                    individual's institution receives the research grant and manages the funds.
-                  </p>
+                <div className="bg-gray-50 px-3 py-3 text-gray-600 leading-relaxed">
+                  Examples of financial relationships include employee, researcher, consultant, advisor, speaker,
+                  independent contractor (including contracted research), royalties or patent beneficiary,
+                  executive role, and ownership interest. Individual stocks and stock options should be
+                  disclosed; diversified mutual funds do not need to be disclosed. Research funding from
+                  ineligible companies should be disclosed by the principal or named investigator even if that
+                  individual's institution receives the research grant and manages the funds.
                 </div>
-                <div className="bg-gray-100 p-3">
-                  <p className="font-bold text-gray-800 mb-1">Has the Relationship Ended?</p>
-                  <p className="text-gray-600 leading-relaxed">
-                    If the financial relationship existed during the last 24 months, but has now ended, please
-                    check the box in this column. This will help the education staff determine if any mitigation
-                    steps need to be taken.
-                  </p>
+                <div className="bg-gray-50 px-3 py-3 text-gray-600 leading-relaxed">
+                  If the financial relationship existed during the last 24 months, but has now ended, please
+                  check the box in this column. This will help the education staff determine if any mitigation
+                  steps need to be taken.
                 </div>
               </div>
-            </div>
 
-            {/* Entry rows — always shown unless "no relationships" is checked */}
-            {hasRelationships !== "no" && (
-              <div className="mb-4">
-                {/* Column header row for the entry table */}
-                <div className="grid grid-cols-[1fr_1fr_80px_36px] border border-gray-300 rounded-t-lg overflow-hidden">
-                  <div className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 border-r border-gray-300">Company / Ineligible Entity</div>
-                  <div className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 border-r border-gray-300">Nature of Financial Relationship</div>
-                  <div className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 text-center border-r border-gray-300">Ended?</div>
-                  <div className="bg-gray-100 px-3 py-2"></div>
-                </div>
-                {/* Data entry rows */}
-                <div className="border-x border-b border-gray-300 rounded-b-lg overflow-hidden divide-y divide-gray-200">
+              {/* Entry rows — hidden when "no relationships" is checked */}
+              {hasRelationships !== "no" && (
+                <div className="divide-y divide-gray-200">
                   {relationships.map((rel, idx) => (
-                    <div key={idx} className={`grid grid-cols-[1fr_1fr_80px_36px] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                      <div className="px-2 py-1.5 border-r border-gray-200">
-                        <Input
+                    <div key={idx} className={`grid grid-cols-[1fr_1fr_90px] divide-x divide-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                      <div className="px-2 py-1.5">
+                        <input
+                          type="text"
                           value={rel.company}
                           onChange={e => updateRelationship(idx, "company", e.target.value)}
-                          placeholder="e.g. Acme Medical Inc."
-                          className="h-7 text-sm border-0 bg-transparent focus:ring-0 focus:outline-none px-0 placeholder:text-gray-300"
+                          placeholder="Company name"
+                          className="w-full h-7 text-sm bg-transparent border-0 outline-none focus:outline-none placeholder:text-gray-300"
                         />
                       </div>
-                      <div className="px-2 py-1.5 border-r border-gray-200">
-                        <Input
+                      <div className="px-2 py-1.5">
+                        <input
+                          type="text"
                           value={rel.relationship}
                           onChange={e => updateRelationship(idx, "relationship", e.target.value)}
                           placeholder="e.g. Consultant, Speaker…"
-                          className="h-7 text-sm border-0 bg-transparent focus:ring-0 focus:outline-none px-0 placeholder:text-gray-300"
+                          className="w-full h-7 text-sm bg-transparent border-0 outline-none focus:outline-none placeholder:text-gray-300"
                         />
                       </div>
-                      <div className="px-2 py-1.5 flex items-center justify-center border-r border-gray-200">
+                      <div className="px-2 py-1.5 flex items-center justify-center gap-2">
                         <Checkbox
                           checked={rel.ended}
                           onCheckedChange={v => updateRelationship(idx, "ended", !!v)}
                           className="border-gray-400 data-[state=checked]:bg-[#189aa1] data-[state=checked]:border-[#189aa1] w-4 h-4"
                         />
-                      </div>
-                      <div className="flex items-center justify-center">
                         {relationships.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeRelationship(idx)}
-                            className="text-red-300 hover:text-red-500 transition-colors p-1"
+                            className="text-red-300 hover:text-red-500 transition-colors"
                             title="Remove row"
                           >
                             <Trash2 className="w-3 h-3" />
@@ -311,16 +300,19 @@ export default function CmeDisclosureForm() {
                     </div>
                   ))}
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addRelationship}
-                  className="mt-2 border-dashed border-[#189aa1] text-[#189aa1] hover:bg-[#f0fafa] text-xs"
-                >
-                  <Plus className="w-3 h-3 mr-1" /> Add Another Row
-                </Button>
-              </div>
+              )}
+            </div>
+
+            {hasRelationships !== "no" && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addRelationship}
+                className="mb-4 border-dashed border-[#189aa1] text-[#189aa1] hover:bg-[#f0fafa] text-xs"
+              >
+                <Plus className="w-3 h-3 mr-1" /> Add Another Row
+              </Button>
             )}
 
             {/* No relationships checkbox — CardioServ style */}
