@@ -1212,9 +1212,11 @@ function MobileSidebarContent({
               const done = completedIds.has(lesson.id);
               const active = lesson.id === selectedLessonId;
               const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+              const dripExpired = !dripBypassed && (lesson.dripOutDays ?? 0) > 0 && daysSinceEnroll >= lesson.dripOutDays;
               const prereqLocked = prereqLockedIds.has(lesson.id);
-              const lessonLocked = dripLocked || prereqLocked;
+              const lessonLocked = dripLocked || dripExpired || prereqLocked;
               const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+              const lessonExpiredDate = dripExpired ? new Date(enrolledAt.getTime() + (lesson.dripOutDays ?? 0) * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
               return (
                 <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
                   className={cn("w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
@@ -1226,7 +1228,8 @@ function MobileSidebarContent({
                   <div className="flex-1 min-w-0">
                     <span className="leading-snug font-semibold uppercase tracking-wide truncate block">{lesson.title}</span>
                     {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400 font-normal normal-case">Unlocks {lessonUnlockDate}</span>}
-                    {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete prerequisite lesson first</span>}
+                    {dripExpired && lessonExpiredDate && <span className="text-[10px] text-red-400 font-normal normal-case">Expired {lessonExpiredDate}</span>}
+                    {prereqLocked && !dripLocked && !dripExpired && <span className="text-[10px] text-orange-500 font-normal normal-case">Complete prerequisite lesson first</span>}
                   </div>
                 </button>
               );
@@ -1273,9 +1276,11 @@ function MobileSidebarContent({
                         const done = completedIds.has(lesson.id);
                         const active = lesson.id === selectedLessonId;
                         const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+                        const dripExpired = !dripBypassed && (lesson.dripOutDays ?? 0) > 0 && daysSinceEnroll >= lesson.dripOutDays;
                         const prereqLocked = prereqLockedIds.has(lesson.id);
-                        const lessonLocked = dripLocked || prereqLocked;
+                        const lessonLocked = dripLocked || dripExpired || prereqLocked;
                         const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                        const lessonExpiredDate = dripExpired ? new Date(enrolledAt.getTime() + (lesson.dripOutDays ?? 0) * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
                         return (
                           <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
                             className={cn("w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
@@ -1285,7 +1290,8 @@ function MobileSidebarContent({
                             <div className="flex-1 min-w-0">
                               <span className="truncate block">{lesson.title}</span>
                               {dripLocked && lessonUnlockDate && <span className="text-[10px] text-gray-400">Unlocks {lessonUnlockDate}</span>}
-                              {prereqLocked && !dripLocked && <span className="text-[10px] text-orange-500">Complete prerequisite lesson first</span>}
+                              {dripExpired && lessonExpiredDate && <span className="text-[10px] text-red-400">Expired {lessonExpiredDate}</span>}
+                              {prereqLocked && !dripLocked && !dripExpired && <span className="text-[10px] text-orange-500">Complete prerequisite lesson first</span>}
                             </div>
                             {lesson.durationMinutes && !lessonLocked && <span className="text-[10px] text-gray-400 shrink-0">{lesson.durationMinutes}m</span>}
                           </button>

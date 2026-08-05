@@ -38,6 +38,7 @@ import { socialContentRouter } from "./routers/socialContentRouter";
 import { funnelRouter, funnelPublicRouter, funnelAdminRouter } from "./routers/funnelRouter";
 import { sharingMonitorRouter } from "./routers/sharingMonitorRouter";
 import { analyticsTrackRouter, analyticsAdminRouter } from "./routers/analyticsRouter";
+import { quizResultsRouter } from "./routers/quizResultsRouter";
 import { soundBytesRouter } from "./routers/soundBytesRouter";
 import { leaderboardRouter } from "./routers/leaderboardRouter";
 import { abTestRouter } from "./routers/abTestRouter";
@@ -2142,6 +2143,7 @@ export const appRouter = router({
   sharingMonitor: sharingMonitorRouter,
   analyticsTrack: analyticsTrackRouter,
   analyticsAdmin: analyticsAdminRouter,
+  quizResults: quizResultsRouter,
 
   // ─── iHeartEcho Routers ──────────────────────────────────────────────────────
   soundBytes: soundBytesRouter,

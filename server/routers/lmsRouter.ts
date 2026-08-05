@@ -103,6 +103,7 @@ import {
   workshops,
   workshopInstances,
   lmsQuizAttempts,
+  lmsQuizAttemptAnswers,
   lmsQuizQuestionGroups,
   lmsQuizGroupQuestions,
   questionBank,
@@ -1518,6 +1519,7 @@ export const lmsLearnerRouter = router({
           isPreview: lmsLessons.isPreview,
           previewMode: lmsLessons.previewMode,
           dripDays: lmsLessons.dripDays,
+          dripOutDays: lmsLessons.dripOutDays,
           durationMinutes: lmsLessons.durationMinutes,
           requireVideoCompletion: lmsLessons.requireVideoCompletion,
           requireManualComplete: lmsLessons.requireManualComplete,
@@ -1645,6 +1647,13 @@ export const lmsLearnerRouter = router({
       if (pm !== "preview" && !isAdmin) {
         const { getActiveEnrollment: getActiveEnrollmentLesson } = await import("../lib/enrollmentAccess");
         const enrollment = await getActiveEnrollmentLesson(db as any, ctx.user.id, resolvedCourseId);
+        // Block expired lessons (drip-out): lesson is unavailable after dripOutDays from enrollment
+        if ((lesson as any).dripOutDays != null && enrollment?.enrolledAt) {
+          const daysSinceEnroll = Math.floor((Date.now() - new Date(enrollment.enrolledAt).getTime()) / 86400000);
+          if (daysSinceEnroll >= (lesson as any).dripOutDays) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "This lesson is no longer available" });
+          }
+        }
         if (pm === "preview_hide_after_purchase" && enrollment && enrollment.enrollmentType !== "free_preview") {
           // Purchased (full access) — hide this lesson (it was a pre-purchase teaser)
           throw new TRPCError({ code: "FORBIDDEN", message: "This preview lesson is no longer available after purchase" });
@@ -1863,6 +1872,47 @@ export const lmsLearnerRouter = router({
         });
       }
       if (passed) await recalcProgress(db, enrollment.id);
+
+      // Store attempt + per-question answers server-side (fire-and-forget — don't block response)
+      void (async () => {
+        try {
+          const SURVEY_TYPES = ["likert", "star_rating", "open_text"];
+          const [attemptResult] = await db.insert(lmsQuizAttempts).values({
+            userId: ctx.user.id,
+            lessonId: input.lessonId,
+            courseId: course.id,
+            score,
+            passed,
+            totalQuestions: questions.length,
+            correctAnswers: correct,
+            answersJson: JSON.stringify(results),
+            selectedQuestionIds: selectedBankIds ? JSON.stringify(selectedBankIds) : null,
+          }).$returningId();
+          const attemptId = attemptResult.id;
+          if (attemptId && questions.length > 0) {
+            const answerRows = questions.map(q => {
+              const qType = (q as any).questionType ?? (q as any).type ?? "mcq";
+              const isSurvey = SURVEY_TYPES.includes(qType);
+              const given = input.answers[String(q.id)] ?? "";
+              const givenStr = Array.isArray(given) ? JSON.stringify(given) : String(given);
+              const resultRow = results.find((r: any) => r.questionId === q.id);
+              return {
+                attemptId,
+                questionId: q.id,
+                questionText: (q as any).question ?? "",
+                questionType: qType,
+                answerValue: givenStr,
+                isCorrect: isSurvey ? null : (resultRow?.correct ? 1 : 0),
+                correctAnswer: isSurvey ? null : (String(q.correctAnswer ?? "")),
+              };
+            });
+            await db.insert(lmsQuizAttemptAnswers).values(answerRows);
+          }
+        } catch (err) {
+          console.error("[submitQuiz] Failed to store attempt answers:", err);
+        }
+      })();
+
       return { score, passed, passingScore: quiz.passingScore, results };
     }),
 
@@ -2872,6 +2922,7 @@ export const lmsLearnerRouter = router({
           requireManualComplete: lmsLessons.requireManualComplete,
           previewMode: lmsLessons.previewMode,
           dripDays: lmsLessons.dripDays,
+          dripOutDays: lmsLessons.dripOutDays,
           dripDate: lmsLessons.dripDate,
           prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
           thumbnailUrl: lmsLessons.thumbnailUrl,

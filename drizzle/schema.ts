@@ -3110,6 +3110,7 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   //   'preview_hide_after_purchase' = free preview for non-enrolled, hidden once user purchases
   previewMode: mysqlEnum("preview_mode", ["none", "preview", "preview_hide_after_purchase"]).default("none").notNull(),
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment to unlock
+  dripOutDays: int("drip_out_days"), // days after enrollment after which lesson expires (null = never expires)
   durationMinutes: int("duration_minutes"),
   requireVideoCompletion: int("require_video_completion").default(0).notNull(), // 1 = must watch video before marking complete
   // null = inherit from course default, 0 = hide, 1 = show
@@ -4003,6 +4004,21 @@ export const lmsQuizAttempts = mysqlTable("lms_quiz_attempts", {
 });
 export type LmsQuizAttempt = typeof lmsQuizAttempts.$inferSelect;
 export type InsertLmsQuizAttempt = typeof lmsQuizAttempts.$inferInsert;
+
+// ─── Per-question answer records for quiz/survey attempts ────────────────────
+export const lmsQuizAttemptAnswers = mysqlTable("lms_quiz_attempt_answers", {
+  id: int("id").autoincrement().primaryKey(),
+  attemptId: int("attempt_id").notNull(),          // FK → lms_quiz_attempts.id
+  questionId: int("question_id").notNull(),         // FK → lms_quiz_questions.id or question_bank.id
+  questionText: text("question_text").notNull(),
+  questionType: varchar("question_type", { length: 32 }).notNull().default("mcq"),
+  answerValue: text("answer_value"),                // student's answer (string, JSON array, or free text)
+  isCorrect: int("is_correct"),                     // null for survey types, 0/1 for graded
+  correctAnswer: text("correct_answer"),             // null for survey types
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsQuizAttemptAnswer = typeof lmsQuizAttemptAnswers.$inferSelect;
+export type InsertLmsQuizAttemptAnswer = typeof lmsQuizAttemptAnswers.$inferInsert;
 
 // ─── Brand Memberships (Multi-Tenant Premium) ────────────────────────────────
 // Tracks per-brand premium subscriptions. A user can have separate premium status

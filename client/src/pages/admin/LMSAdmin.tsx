@@ -76,6 +76,7 @@ import { CourseWaitlistTab } from "@/components/CourseWaitlistTab";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
 import TeachAdminPanel from "@/pages/admin/TeachAdminPanel";
 import { QuizQuestionGroups } from "@/components/QuizQuestionGroups";
+import { QuizResultsAdmin } from "./QuizResultsAdmin";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -4777,6 +4778,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     lesson.requireManualComplete === null || lesson.requireManualComplete === undefined ? null : lesson.requireManualComplete === 1
   );
   const [dripDays, setDripDays] = useState(String(lesson.dripDays ?? ""));
+  const [dripOutDays, setDripOutDays] = useState(String((lesson as any).dripOutDays ?? ""));
   const [showInstructor, setShowInstructor] = useState<"inherit" | "show" | "hide">(lesson.showInstructor ?? "inherit");
   const [isPrerequisite, setIsPrerequisite] = useState<boolean>(!!lesson.isPrerequisite);
   const [commentsEnabled, setCommentsEnabled] = useState<boolean>(!!(lesson as any).commentsEnabled);
@@ -4803,6 +4805,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       lessonShallow.requireManualComplete === null || lessonShallow.requireManualComplete === undefined ? null : lessonShallow.requireManualComplete === 1
     );
     setDripDays(String(lessonShallow.dripDays ?? ""));
+    setDripOutDays(String((lessonShallow as any).dripOutDays ?? ""));
     setShowInstructor(lessonShallow.showInstructor ?? "inherit");
     setIsPrerequisite(!!lessonShallow.isPrerequisite);
     setCommentsEnabled(!!(lessonShallow as any).commentsEnabled);
@@ -4835,6 +4838,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       setPreviewMode((fullLesson as any).previewMode ?? (fullLesson.isPreview ? "preview" : "none"));
       setDurationMinutes(String(fullLesson.durationMinutes ?? ""));
       setDripDays(String(fullLesson.dripDays ?? ""));
+      setDripOutDays(String((fullLesson as any).dripOutDays ?? ""));
       setShowInstructor(fullLesson.showInstructor ?? "inherit");
       setMeetingLink((fullLesson as any).meetingLink ?? "");
     }
@@ -4888,6 +4892,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       requireVideoCompletion: (isPrerequisite && (lessonType === "video" || lessonType === "video_text")) ? true : requireVideoCompletion,
       requireManualComplete,
       dripDays: dripDays.trim() ? parseInt(dripDays) : null,
+      dripOutDays: dripOutDays.trim() && parseInt(dripOutDays) > 0 ? parseInt(dripOutDays) : null,
       showInstructor,
       isPrerequisite,
       commentsEnabled,
@@ -5195,6 +5200,28 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             </div>
             {dripDays && parseInt(dripDays) > 0 && (
               <p className="text-xs text-teal-600">Students enrolled today will unlock this lesson on day {dripDays}.</p>
+            )}
+          </div>
+          {/* Drip-out (expiry) scheduling */}
+          <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
+            <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><XCircle className="w-4 h-4 text-red-400" /> Drip-Out (Expiry)</p>
+            <p className="text-xs text-gray-500">Optionally remove access to this lesson after a set number of days from enrollment. Leave blank to never expire.</p>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min="1"
+                value={dripOutDays}
+                onChange={e => setDripOutDays(e.target.value)}
+                placeholder="e.g. 30"
+                className="w-28"
+              />
+              <span className="text-sm text-gray-500">days after enrollment</span>
+              {dripOutDays && parseInt(dripOutDays) > 0 && (
+                <button className="text-xs text-red-500 hover:text-red-700 underline ml-2" onClick={() => setDripOutDays("")}>Clear</button>
+              )}
+            </div>
+            {dripOutDays && parseInt(dripOutDays) > 0 && (
+              <p className="text-xs text-red-500">This lesson will become unavailable {dripOutDays} days after enrollment.</p>
             )}
           </div>
           {/* Instructor display override */}
@@ -7829,6 +7856,7 @@ const LMS_NAV_GROUPS = [
     color: "teal",
     items: [
       { value: "analytics",   label: "Analytics",   icon: TrendingUp },
+      { value: "quiz_results", label: "Quiz Results", icon: BarChart2 },
       { value: "affiliates",  label: "Affiliates",  icon: DollarSign },
       { value: "activity_log", label: "Activity Log ↗", icon: Activity, href: getAdminUrl("/admin/members?tab=activity") },
     ],
@@ -8006,6 +8034,7 @@ export default function LMSAdmin() {
               {activeTab === "orders"      && <OrdersManagementTab />}
               {activeTab === "export"      && <EnrollmentExportTab />}
               {activeTab === "analytics"   && <AnalyticsTab />}
+              {activeTab === "quiz_results" && <QuizResultsAdmin />}
               {activeTab === "affiliates"  && <AffiliatesTab />}
               {activeTab === "question_bank"    && <QuestionBankAdmin />}
               {activeTab === "publish_requests" && <PublishRequestsTab />}

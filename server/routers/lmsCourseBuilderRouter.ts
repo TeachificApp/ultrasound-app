@@ -1002,6 +1002,7 @@ export const lmsCourseBuilderRouter = router({
       isPreview: z.boolean().optional(),
       previewMode: z.enum(["none", "preview", "preview_hide_after_purchase"]).optional(),
       dripDays: z.number().int().nullable().optional(),
+      dripOutDays: z.number().int().min(1).nullable().optional(),
       durationMinutes: z.number().int().nullable().optional(),
       requireVideoCompletion: z.boolean().optional(),
       // null = inherit from course default, true = always show, false = always hide
