@@ -2227,6 +2227,18 @@ export const adminUserRouter = router({
       if (fields.displayName !== undefined) updateData.displayName = fields.displayName || null;
       if (fields.firstName !== undefined) updateData.firstName = fields.firstName || null;
       if (fields.lastName !== undefined) updateData.lastName = fields.lastName || null;
+      // When first/last name changes, also update the canonical `name` field so the
+      // page header (which reads `displayName ?? name`) reflects the change immediately.
+      if (fields.firstName !== undefined || fields.lastName !== undefined) {
+        const [existing] = await db.select({ firstName: users.firstName, lastName: users.lastName, name: users.name })
+          .from(users).where(eq(users.id, userId)).limit(1);
+        if (existing) {
+          const newFirst = fields.firstName !== undefined ? (fields.firstName || "") : (existing.firstName ?? "");
+          const newLast = fields.lastName !== undefined ? (fields.lastName || "") : (existing.lastName ?? "");
+          const combined = [newFirst, newLast].filter(Boolean).join(" ");
+          if (combined) updateData.name = combined;
+        }
+      }
       if (fields.email !== undefined) {
         const newEmail = fields.email.trim().toLowerCase();
         updateData.email = newEmail;
