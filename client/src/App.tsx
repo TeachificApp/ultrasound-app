@@ -119,6 +119,7 @@ const PartnerPortal = lazy(() => import("./pages/PartnerPortal"));
 const PartnerSignup = lazy(() => import("./pages/PartnerSignup"));
 const StripeOnboardingRedirect = lazy(() => import("./pages/StripeOnboardingRedirect"));
 const CmeDisclosureForm = lazy(() => import("./pages/CmeDisclosureForm"));
+const CmeDisclosureFormGeneric = lazy(() => import("./pages/CmeDisclosureFormGeneric"));
 const TeachDashboard = lazy(() => import("./pages/teach/TeachDashboard"));
 const TeachPresentationEditor = lazy(() => import("./pages/teach/TeachPresentationEditor"));
 const TeachMasterDesigner = lazy(() => import("./pages/teach/TeachMasterDesigner"));
@@ -519,6 +520,8 @@ function Router() {
         <Route path="/partner-signup">{() => <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>}</Route>
         {/* Public Stripe onboarding redirect — no site login required */}
         <Route path="/stripe-onboarding/:token">{() => <Suspense fallback={pageFallback}><StripeOnboardingRedirect /></Suspense>}</Route>
+        {/* Generic CME disclosure form — must be registered BEFORE the :token route */}
+        <Route path="/cme-disclosure/generic">{() => <Suspense fallback={pageFallback}><CmeDisclosureFormGeneric /></Suspense>}</Route>
         <Route path="/cme-disclosure/:token">{() => <Suspense fallback={pageFallback}><CmeDisclosureForm /></Suspense>}</Route>
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>

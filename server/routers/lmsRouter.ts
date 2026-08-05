@@ -1594,6 +1594,75 @@ export const lmsDisclosurePublicRouter = router({
 
       return { success: true };
     }),
+
+  // ── Generic (no-token) disclosure form submission ─────────────────────────────────
+  // Used by the standalone /cme-disclosure/generic page.
+  // No token or course link required — faculty enter their own details.
+  submitGenericDisclosure: publicProcedure
+    .input(z.object({
+      facultyName: z.string().min(1),
+      facultyEmail: z.string().email(),
+      activityTitle: z.string().min(1),
+      responseJson: z.string(),
+      attestationName: z.string().min(1),
+    }))
+    .mutation(async ({ input }) => {
+      const now = new Date();
+      const parsed = (() => { try { return JSON.parse(input.responseJson); } catch { return {}; } })();
+
+      const notifyEmails = [
+        { email: "admin@allaboutultrasound.com", name: "Admin" },
+        { email: "don@cardioserv.net", name: "Don Gerig" },
+        { email: "j.buckland@cardioserv.net", name: "Judith Buckland" },
+      ];
+
+      const htmlBody = `
+        <h2 style="color:#189aa1;">Financial Disclosure Submitted (Generic Form)</h2>
+        <p><strong>${input.facultyName}</strong> has completed a Financial Disclosure Form.</p>
+        <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Faculty</td><td style="padding:6px 12px;">${input.facultyName}</td></tr>
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Email</td><td style="padding:6px 12px;">${input.facultyEmail}</td></tr>
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Activity</td><td style="padding:6px 12px;">${input.activityTitle}</td></tr>
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Submitted</td><td style="padding:6px 12px;">${now.toLocaleString("en-US", { timeZone: "America/New_York" })} ET</td></tr>
+          <tr><td style="padding:6px 12px;background:#f0fafa;font-weight:600;">Attestation Name</td><td style="padding:6px 12px;">${input.attestationName}</td></tr>
+        </table>
+        <p style="font-size:12px;color:#666;">This was submitted via the generic (standalone) disclosure form.</p>
+      `;
+
+      // Generate PDF attachment
+      let pdfAttachment: { content: string; type: string; filename: string } | null = null;
+      try {
+        const pdfBuffer = await generateDisclosurePdf({
+          facultyName: input.facultyName,
+          facultyEmail: input.facultyEmail,
+          courseTitle: input.activityTitle,
+          roles: parsed.roles ?? [],
+          hasRelationships: parsed.hasRelationships === "yes" ? "yes" : "no",
+          relationships: parsed.relationships ?? [],
+          attestationName: input.attestationName,
+          attestationDate: now.toISOString().split("T")[0],
+          submittedAt: now,
+        });
+        pdfAttachment = {
+          content: pdfBuffer.toString("base64"),
+          type: "application/pdf",
+          filename: `Financial-Disclosure-${input.facultyName.replace(/[^a-z0-9]/gi, "-")}-${now.toISOString().split("T")[0]}.pdf`,
+        };
+      } catch (pdfErr) {
+        console.error("[generic-disclosure] Failed to generate PDF:", pdfErr);
+      }
+
+      for (const recipient of notifyEmails) {
+        await sendEmail({
+          to: recipient,
+          subject: `Financial Disclosure Submitted — ${input.facultyName} (${input.activityTitle})`,
+          htmlBody,
+          ...(pdfAttachment ? { attachments: [pdfAttachment] } : {}),
+        }).catch(() => {});
+      }
+
+      return { success: true };
+    }),
 });
 
 export const lmsLearnerRouter = router({
