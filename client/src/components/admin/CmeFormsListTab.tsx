@@ -311,9 +311,40 @@ All About Ultrasound, Inc. dba iHeartEcho`;
             Track CardioServ accreditation form completion for all CME-eligible courses.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} className="text-xs flex-shrink-0">
-          <RefreshCw className="w-3 h-3 mr-1" /> Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs flex-shrink-0 gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50"
+            onClick={() => {
+              if (!data?.length) return;
+              const rows = data.map((r: any) => ({
+                ID: r.id,
+                Title: r.title,
+                Type: r.productType ?? r.type ?? "",
+                "Credit Hours": r.creditHours ?? "",
+                "CME Status": r.cmeStatus ?? "",
+                "Form Status": r.formStatus ?? "",
+                "Proposed Date": r.formProposedDate ?? "",
+                "Last Updated": r.formUpdatedAt ? new Date(r.formUpdatedAt).toLocaleDateString() : "",
+                "Last Sent": r.lastSentAt ? new Date(r.lastSentAt).toLocaleDateString() : "",
+                "Approved Date": r.approvedAt ? new Date(r.approvedAt).toLocaleDateString() : "",
+              }));
+              const headers = Object.keys(rows[0]);
+              const escape = (v: any) => { const s = v == null ? "" : String(v).replace(/"/g, '""'); return /[,"\n]/.test(s) ? `"${s}"` : s; };
+              const csv = [headers.join(","), ...rows.map((r: any) => headers.map(h => escape(r[h])).join(","))].join("\n");
+              const blob = new Blob([csv], { type: "text/csv" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a"); a.href = url; a.download = `cme-activity-forms-${new Date().toISOString().slice(0,10)}.csv`; a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            <Download className="w-3 h-3" /> Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="text-xs flex-shrink-0">
+            <RefreshCw className="w-3 h-3 mr-1" /> Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Summary cards — CardioServ Status counts */}

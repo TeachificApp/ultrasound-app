@@ -106,6 +106,8 @@ import {
   DollarSign,
   SplitSquareHorizontal,
   Link2,
+  Download,
+  Filter,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadPanel";
@@ -2526,18 +2528,42 @@ export default function PlatformAdmin() {
   );
 }
 
+// ─── CSV Export Helper ────────────────────────────────────────────────────────
+function exportToCsv(filename: string, rows: Record<string, any>[]) {
+  if (!rows.length) return;
+  const headers = Object.keys(rows[0]);
+  const escape = (v: any) => {
+    const s = v == null ? "" : String(v).replace(/"/g, '""');
+    return /[,"\n]/.test(s) ? `"${s}"` : s;
+  };
+  const csv = [headers.join(","), ...rows.map(r => headers.map(h => escape(r[h])).join(","))].join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── CME Management Hub ────────────────────────────────────────────────────────
 function CmeManagementHub() {
   const [activeTab, setActiveTab] = useState<"certificates" | "activity_forms" | "disclosures" | "sdms_cme">("activity_forms");
   const [disclosureSubTab, setDisclosureSubTab] = useState<"course_linked" | "generic">("course_linked");
   const [genericSearch, setGenericSearch] = useState("");
+  const [genericRelFilter, setGenericRelFilter] = useState<"all" | "none" | "disclosed">("all");
+  const [courseDiscSearch, setCourseDiscSearch] = useState("");
+  const [courseDiscStatus, setCourseDiscStatus] = useState<"all" | "sent" | "submitted" | "received">("all");
   const [viewDisclosure, setViewDisclosure] = useState<any>(null);
 
   const { data: genericData, isLoading: genericLoading, refetch: refetchGeneric } = trpc.lmsAdmin.listGenericDisclosures.useQuery(
-    { search: genericSearch || undefined },
+    { search: genericSearch || undefined, relationships: genericRelFilter === "all" ? undefined : genericRelFilter },
     { enabled: activeTab === "disclosures" && disclosureSubTab === "generic" }
   );
   const genericRows: any[] = (genericData as any)?.rows ?? [];
+
+  const { data: courseDiscData, isLoading: courseDiscLoading, refetch: refetchCourseDisc } = trpc.lmsAdmin.listAllCourseDisclosures.useQuery(
+    { search: courseDiscSearch || undefined, status: courseDiscStatus },
+    { enabled: activeTab === "disclosures" && disclosureSubTab === "course_linked" }
+  );
+  const courseDiscRows: any[] = (courseDiscData as any)?.rows ?? [];
 
   const pageFallback = (
     <div className="flex items-center justify-center h-32">
@@ -2616,24 +2642,146 @@ function CmeManagementHub() {
             </div>
 
             {disclosureSubTab === "course_linked" && (
-              <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-4">
-                Course-linked financial disclosures are managed within each course's CME settings (LMS Admin → Course → CME Section 6).
-                <br />
-                <a href="/admin/lms" className="text-teal-600 underline mt-1 inline-block">Open LMS Admin →</a>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Input
+                    placeholder="Search by faculty, email, or course…"
+                    value={courseDiscSearch}
+                    onChange={e => setCourseDiscSearch(e.target.value)}
+                    className="text-sm max-w-sm"
+                  />
+                  <Select value={courseDiscStatus} onValueChange={v => setCourseDiscStatus(v as any)}>
+                    <SelectTrigger className="h-8 text-xs w-36"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="sent">Sent</SelectItem>
+                      <SelectItem value="submitted">Submitted</SelectItem>
+                      <SelectItem value="received">Received</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="outline" onClick={() => refetchCourseDisc()}>
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto gap-1.5 text-xs text-teal-700 border-teal-200 hover:bg-teal-50"
+                    disabled={courseDiscRows.length === 0}
+                    onClick={() => {
+                      exportToCsv(`cme-course-disclosures-${new Date().toISOString().slice(0,10)}.csv`,
+                        courseDiscRows.map((r: any) => ({
+                          ID: r.id,
+                          "Course ID": r.courseId,
+                          Course: r.courseTitle ?? "",
+                          Faculty: r.facultyName,
+                          Email: r.facultyEmail,
+                          Status: r.status,
+                          "Sent At": r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "",
+                          "Submitted At": r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : "",
+                          "Received At": r.receivedAt ? new Date(r.receivedAt).toLocaleDateString() : "",
+                          "Attestation Name": r.attestationName ?? "",
+                          "No Relationships": r.noRelationships ? "Yes" : "No",
+                        }))
+                      );
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export CSV
+                  </Button>
+                </div>
+                {courseDiscLoading ? pageFallback : courseDiscRows.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
+                    No course-linked disclosures found.
+                  </div>
+                ) : (
+                  <div className="rounded-lg border overflow-x-auto">
+                    <table className="w-full text-xs min-w-[700px]">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Faculty</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Email</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Course</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Status</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Submitted</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Received</th>
+                          <th className="text-left px-3 py-2 font-medium text-gray-600">Relationships</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {courseDiscRows.map((row: any) => (
+                          <tr key={row.id} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 font-medium text-gray-800">{row.facultyName}</td>
+                            <td className="px-3 py-2 text-gray-600">{row.facultyEmail}</td>
+                            <td className="px-3 py-2 text-gray-600 max-w-[160px] truncate" title={row.courseTitle ?? ""}>{row.courseTitle ?? "—"}</td>
+                            <td className="px-3 py-2">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                row.status === "submitted" ? "bg-green-50 text-green-700" :
+                                row.status === "received" ? "bg-teal-50 text-teal-700" :
+                                row.status === "sent" ? "bg-blue-50 text-blue-700" :
+                                "bg-gray-100 text-gray-500"
+                              }`}>{row.status}</span>
+                            </td>
+                            <td className="px-3 py-2 text-gray-500">{row.submittedAt ? new Date(row.submittedAt).toLocaleDateString() : "—"}</td>
+                            <td className="px-3 py-2 text-gray-500">{row.receivedAt ? new Date(row.receivedAt).toLocaleDateString() : "—"}</td>
+                            <td className="px-3 py-2">
+                              {row.noRelationships ? (
+                                <span className="px-2 py-0.5 rounded-full bg-green-50 text-green-700 font-medium text-[10px]">None</span>
+                              ) : row.status === "submitted" || row.status === "received" ? (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium text-[10px]">Disclosed</span>
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 
             {disclosureSubTab === "generic" && (
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Input
                     placeholder="Search by name, email, or activity…"
                     value={genericSearch}
                     onChange={e => setGenericSearch(e.target.value)}
                     className="text-sm max-w-sm"
                   />
+                  <Select value={genericRelFilter} onValueChange={v => setGenericRelFilter(v as any)}>
+                    <SelectTrigger className="h-8 text-xs w-36"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="none">No Relationships</SelectItem>
+                      <SelectItem value="disclosed">Disclosed</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button size="sm" variant="outline" onClick={() => refetchGeneric()}>
                     <RefreshCw className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto gap-1.5 text-xs text-teal-700 border-teal-200 hover:bg-teal-50"
+                    disabled={genericRows.length === 0}
+                    onClick={() => {
+                      exportToCsv(`cme-generic-disclosures-${new Date().toISOString().slice(0,10)}.csv`,
+                        genericRows.map((r: any) => ({
+                          ID: r.id,
+                          Faculty: r.facultyName,
+                          Email: r.facultyEmail,
+                          Activity: r.activityTitle ?? "",
+                          Roles: r.roles ?? "",
+                          "No Relationships": r.hasNoRelationships ? "Yes" : "No",
+                          "Attestation Name": r.attestationName ?? "",
+                          "Submitted At": r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : "",
+                          "Linked Course ID": r.linkedCourseId ?? "",
+                        }))
+                      );
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export CSV
                   </Button>
                 </div>
                 {genericLoading ? pageFallback : genericRows.length === 0 ? (

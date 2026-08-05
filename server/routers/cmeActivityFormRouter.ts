@@ -933,7 +933,8 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
   listGenericDisclosures: protectedProcedure
     .input(z.object({
       search: z.string().optional(),
-      limit: z.number().int().min(1).max(200).optional().default(100),
+      relationships: z.enum(["all", "none", "disclosed"]).optional(),
+      limit: z.number().int().min(1).max(500).optional().default(200),
       offset: z.number().int().min(0).optional().default(0),
     }).optional())
     .query(async ({ ctx, input }) => {
@@ -941,21 +942,28 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       const db = await getDb();
       if (!db) return { rows: [] };
       const { cmeGenericDisclosures } = await import("../../drizzle/schema").then(m => m);
-      const { desc: descOrd, like, or } = await import("drizzle-orm");
+      const { desc: descOrd, like, or, eq: eqOp, and: andOp, ne } = await import("drizzle-orm");
       const searchTerm = input?.search?.trim();
-      const whereClause = searchTerm
-        ? or(
-            like(cmeGenericDisclosures.facultyName, `%${searchTerm}%`),
-            like(cmeGenericDisclosures.facultyEmail, `%${searchTerm}%`),
-            like(cmeGenericDisclosures.activityTitle, `%${searchTerm}%`),
-          )
-        : undefined;
+      const conditions = [];
+      if (searchTerm) {
+        conditions.push(or(
+          like(cmeGenericDisclosures.facultyName, `%${searchTerm}%`),
+          like(cmeGenericDisclosures.facultyEmail, `%${searchTerm}%`),
+          like(cmeGenericDisclosures.activityTitle, `%${searchTerm}%`),
+        ));
+      }
+      if (input?.relationships === "none") {
+        conditions.push(eqOp(cmeGenericDisclosures.noRelationships, 1));
+      } else if (input?.relationships === "disclosed") {
+        conditions.push(eqOp(cmeGenericDisclosures.noRelationships, 0));
+      }
+      const whereClause = conditions.length > 0 ? andOp(...conditions) : undefined;
       const rows = await db
         .select()
         .from(cmeGenericDisclosures)
-        .where(whereClause)
+        .where(whereClause as any)
         .orderBy(descOrd(cmeGenericDisclosures.submittedAt))
-        .limit(input?.limit ?? 100)
+        .limit(input?.limit ?? 200)
         .offset(input?.offset ?? 0);
       return { rows };
     }),
@@ -993,5 +1001,55 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         .set({ linkedCourseId: null })
         .where(eqOp(cmeGenericDisclosures.id, input.id));
       return { success: true };
+    }),
+
+  // ── List ALL course-linked disclosures for CME Management Hub ───────────────────
+  listAllCourseDisclosures: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      status: z.enum(["all", "sent", "submitted", "received"]).optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) return { rows: [] };
+      const { or, like, eq: eqOp, desc: descOp } = await import("drizzle-orm");
+      let query = db
+        .select({
+          id: cmeFinancialDisclosures.id,
+          courseId: cmeFinancialDisclosures.courseId,
+          courseTitle: cmeFinancialDisclosures.courseTitle,
+          facultyName: cmeFinancialDisclosures.facultyName,
+          facultyEmail: cmeFinancialDisclosures.facultyEmail,
+          status: cmeFinancialDisclosures.status,
+          submittedAt: cmeFinancialDisclosures.submittedAt,
+          receivedAt: cmeFinancialDisclosures.receivedAt,
+          createdAt: cmeFinancialDisclosures.createdAt,
+          attestationName: cmeFinancialDisclosures.attestationName,
+          noRelationships: cmeFinancialDisclosures.noRelationships,
+          rolesJson: cmeFinancialDisclosures.rolesJson,
+          relationshipsJson: cmeFinancialDisclosures.relationshipsJson,
+        })
+        .from(cmeFinancialDisclosures)
+        .$dynamic();
+
+      const conditions = [];
+      if (input?.search) {
+        const s = `%${input.search}%`;
+        conditions.push(or(
+          like(cmeFinancialDisclosures.facultyName, s),
+          like(cmeFinancialDisclosures.facultyEmail, s),
+          like(cmeFinancialDisclosures.courseTitle, s),
+        ));
+      }
+      if (input?.status && input.status !== "all") {
+        conditions.push(eqOp(cmeFinancialDisclosures.status, input.status));
+      }
+      if (conditions.length > 0) {
+        const { and: andOp } = await import("drizzle-orm");
+        query = query.where(andOp(...conditions) as any);
+      }
+      const rows = await query.orderBy(descOp(cmeFinancialDisclosures.createdAt)).limit(500);
+      return { rows };
     }),
 });
