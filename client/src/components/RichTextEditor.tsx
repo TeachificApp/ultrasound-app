@@ -749,10 +749,52 @@ export default function RichTextEditor({
             });
           });
 
+          // ── Merge emoji-only <p> tags with the following <p> ──────────────────────────
+          // Email clients often put each emoji on its own <p> line.
+          // We merge them: <p>🏆</p><p>Bragging rights</p> → <p>🏆 Bragging rights</p>
+          const emojiOnlyRe = /^[\s\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}\u{1F300}-\u{1F9FF}\u{2300}-\u{23FF}\u{2B50}\u{2B55}\u{00A9}\u{00AE}\u{203C}\u{2049}\u{20E3}]+$/u;
+          const blockEls = Array.from(doc.body.querySelectorAll<HTMLElement>("p, li, div"));
+          for (let bi = 0; bi < blockEls.length - 1; bi++) {
+            const el = blockEls[bi];
+            const next = blockEls[bi + 1];
+            if (!el.parentNode || el.parentNode !== next.parentNode) continue;
+            const text = el.textContent?.trim() ?? "";
+            if (text && emojiOnlyRe.test(text)) {
+              // Prepend emoji text to the next sibling
+              const space = doc.createTextNode(text + " ");
+              next.insertBefore(space, next.firstChild);
+              el.remove();
+              bi--; // re-check from same position
+            }
+          }
+
           return doc.body.innerHTML;
         } catch {
           return html;
         }
+      },
+      // Merge lines where an emoji-only line is followed by text (e.g. "🏆\nBragging rights" → "🏆 Bragging rights")
+      transformPastedText: (text: string, plain: boolean) => {
+        if (!plain) return text;
+        // Regex: a line that contains ONLY emoji/whitespace followed by a non-empty text line
+        // We join them with a space so they become a single inline line
+        const emojiOnlyLine = /^[\s\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{FE00}-\u{FEFF}\u{1F300}-\u{1F9FF}\u{2300}-\u{23FF}\u{2B50}\u{2B55}\u{2702}\u{2705}\u{2708}-\u{270D}\u{270F}\u{2712}\u{2714}\u{2716}\u{271D}\u{2721}\u{2728}\u{2733}\u{2734}\u{2744}\u{2747}\u{274C}\u{274E}\u{2753}-\u{2755}\u{2757}\u{2763}\u{2764}\u{2795}-\u{2797}\u{27A1}\u{27B0}\u{27BF}\u{2934}\u{2935}\u{2B05}-\u{2B07}\u{2B1B}\u{2B1C}\u{2B50}\u{2B55}\u{3030}\u{303D}\u{3297}\u{3299}\u{00A9}\u{00AE}\u{203C}\u{2049}\u{0023}\u{002A}\u{0030}-\u{0039}\u{20E3}]+$/u;
+        const lines = text.split('\n');
+        const merged: string[] = [];
+        let i = 0;
+        while (i < lines.length) {
+          const line = lines[i];
+          const trimmed = line.trim();
+          // If this line is emoji-only and the next line has actual text content, merge them
+          if (trimmed && emojiOnlyLine.test(trimmed) && i + 1 < lines.length && lines[i + 1].trim()) {
+            merged.push(trimmed + ' ' + lines[i + 1].trim());
+            i += 2;
+          } else {
+            merged.push(line);
+            i++;
+          }
+        }
+        return merged.join('\n');
       },
       handlePaste: (view, event) => {
         const pastedHtml = event.clipboardData?.getData("text/html");
