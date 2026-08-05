@@ -8222,6 +8222,7 @@ export const cmeGenericDisclosures = mysqlTable("cme_generic_disclosures", {
   noRelationships: int("no_relationships").notNull().default(0),
   attestationName: varchar("attestation_name", { length: 255 }),
   attestationDate: varchar("attestation_date", { length: 32 }),
+  linkedCourseId: int("linked_course_id"),
   submittedAt: timestamp("submitted_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

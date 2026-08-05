@@ -1226,7 +1226,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
             </div>
             {/* Financial Disclosure row */}
             {(() => {
-              const disc = (disclosureStatuses ?? []).find(
+              const disc = (disclosureStatuses?.disclosures ?? []).find(
                 (d: any) => f.email
                   ? d.facultyEmail?.toLowerCase() === f.email.toLowerCase()
                   : d.facultyName?.toLowerCase() === f.name?.trim().toLowerCase()
@@ -1352,6 +1352,31 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           </Button>
         </div>
         <p className="text-xs text-muted-foreground italic">Note: All listed individuals must complete a Financial Disclosure Form before participating in planning or delivery.</p>
+
+        {/* Linked Generic Disclosures */}
+        {disclosureStatuses?.linkedGeneric && disclosureStatuses.linkedGeneric.length > 0 && (
+          <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50/40 p-3 space-y-2">
+            <p className="text-xs font-semibold text-teal-700 flex items-center gap-1.5">
+              <Link2 className="w-3.5 h-3.5" />
+              Linked Generic Disclosures ({disclosureStatuses.linkedGeneric.length})
+            </p>
+            {disclosureStatuses.linkedGeneric.map((g: any) => (
+              <div key={g.id} className="flex items-center justify-between bg-white rounded-lg border border-teal-100 px-3 py-2">
+                <div>
+                  <p className="text-xs font-medium text-gray-800">{g.facultyName}</p>
+                  <p className="text-xs text-gray-500">{g.facultyEmail} · Submitted {g.submittedAt ? new Date(g.submittedAt).toLocaleDateString() : '—'}</p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                    g.noRelationships ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                  }`}>
+                    {g.noRelationships ? 'None' : 'Disclosed'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
       {/* Send Financial Disclosure Email Dialog */}
@@ -1601,7 +1626,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
             {(() => {
               const facultyWithNames = form.facultyJson.filter(f => f.name.trim());
               const unsubmitted = facultyWithNames.filter(f => {
-                const disc = disclosureStatuses?.find(d => d.facultyName === f.name.trim());
+                const disc = disclosureStatuses?.disclosures?.find(d => d.facultyName === f.name.trim());
                 return !disc || disc.status !== 'submitted';
               });
               if (unsubmitted.length === 0) return null;

@@ -26,7 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CmeActivityFormPanel } from "./CmeActivityFormPanel";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Users } from "lucide-react";
+import { Users, Link2 } from "lucide-react";
 
 // ─── Form Status config ───────────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -707,8 +707,47 @@ function GenericDisclosuresSection() {
   const [search, setSearch] = useState("");
   const [viewRow, setViewRow] = useState<any>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [linkingCourseId, setLinkingCourseId] = useState<string>("");
+  const [linkingInProgress, setLinkingInProgress] = useState(false);
 
   const downloadPdfMutation = trpc.lmsAdmin.downloadGenericDisclosurePdf.useMutation();
+  const linkMutation = trpc.lmsAdmin.linkGenericDisclosureToCourse.useMutation();
+  const unlinkMutation = trpc.lmsAdmin.unlinkGenericDisclosure.useMutation();
+
+  const { data: cmeCoursesData } = trpc.lmsAdmin.listCmeActivityForms.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const cmeCourses = Array.isArray(cmeCoursesData) ? cmeCoursesData : [];
+
+  const handleLinkCourse = async (row: any) => {
+    if (!linkingCourseId) return;
+    setLinkingInProgress(true);
+    try {
+      await linkMutation.mutateAsync({ id: row.id, courseId: parseInt(linkingCourseId) });
+      toast.success("Linked to course successfully");
+      setViewRow((prev: any) => prev ? { ...prev, linkedCourseId: parseInt(linkingCourseId) } : null);
+      setLinkingCourseId("");
+      refetch();
+    } catch {
+      toast.error("Failed to link course");
+    } finally {
+      setLinkingInProgress(false);
+    }
+  };
+
+  const handleUnlink = async (row: any) => {
+    setLinkingInProgress(true);
+    try {
+      await unlinkMutation.mutateAsync({ id: row.id });
+      toast.success("Unlinked from course");
+      setViewRow((prev: any) => prev ? { ...prev, linkedCourseId: null } : null);
+      refetch();
+    } catch {
+      toast.error("Failed to unlink");
+    } finally {
+      setLinkingInProgress(false);
+    }
+  };
 
   const handleDownloadPdf = async (row: any) => {
     setDownloadingPdf(true);
@@ -847,6 +886,55 @@ function GenericDisclosuresSection() {
                 </div>
               )}
             </div>
+
+            {/* Link to Course */}
+            <div className="border-t border-gray-100 pt-3 space-y-2">
+              <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+                <Link2 className="w-3.5 h-3.5 text-teal-600" />
+                Link to Course / Webinar
+              </p>
+              {viewRow.linkedCourseId ? (
+                <div className="flex items-center justify-between bg-teal-50 rounded-lg px-3 py-2">
+                  <p className="text-xs text-teal-700 font-medium">
+                    Linked to: {cmeCourses.find((c: any) => c.id === viewRow.linkedCourseId)?.title ?? `Course #${viewRow.linkedCourseId}`}
+                  </p>
+                  <Button
+                    size="sm" variant="ghost"
+                    className="h-6 text-xs text-red-500 hover:text-red-700"
+                    disabled={linkingInProgress}
+                    onClick={() => handleUnlink(viewRow)}
+                  >
+                    {linkingInProgress ? <Loader2 className="w-3 h-3 animate-spin" /> : "Unlink"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Select value={linkingCourseId} onValueChange={setLinkingCourseId}>
+                    <SelectTrigger className="h-8 text-xs flex-1">
+                      <SelectValue placeholder="Select a CME course or webinar…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cmeCourses.map((c: any) => (
+                        <SelectItem key={c.id} value={String(c.id)} className="text-xs">
+                          {c.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    disabled={!linkingCourseId || linkingInProgress}
+                    onClick={() => handleLinkCourse(viewRow)}
+                    style={{ background: "#189aa1" }}
+                    className="text-white h-8 text-xs flex-shrink-0"
+                  >
+                    {linkingInProgress ? <Loader2 className="w-3 h-3 animate-spin" /> : "Link"}
+                  </Button>
+                </div>
+              )}
+              <p className="text-[10px] text-gray-400">Linking associates this disclosure with the course's CME Section 6 faculty disclosures.</p>
+            </div>
+
             <DialogFooter>
               <Button
                 variant="outline"

@@ -774,10 +774,17 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
-      if (!db) return [];
-      return db.select().from(cmeFinancialDisclosures)
-        .where(eq(cmeFinancialDisclosures.courseId, input.courseId))
-        .orderBy(cmeFinancialDisclosures.createdAt);
+      if (!db) return { disclosures: [], linkedGeneric: [] };
+      const { cmeGenericDisclosures } = await import("../../drizzle/schema");
+      const [disclosures, linkedGeneric] = await Promise.all([
+        db.select().from(cmeFinancialDisclosures)
+          .where(eq(cmeFinancialDisclosures.courseId, input.courseId))
+          .orderBy(cmeFinancialDisclosures.createdAt),
+        db.select().from(cmeGenericDisclosures)
+          .where(eq(cmeGenericDisclosures.linkedCourseId, input.courseId))
+          .orderBy(cmeGenericDisclosures.submittedAt),
+      ]);
+      return { disclosures, linkedGeneric };
     }),
 
   // ── Financial Disclosure: Mark as received (internal tracking) ───────────
@@ -922,5 +929,40 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         .limit(input?.limit ?? 100)
         .offset(input?.offset ?? 0);
       return { rows };
+    }),
+
+  // ── Link a generic disclosure to a specific course ─────────────────────────────────
+  linkGenericDisclosureToCourse: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      courseId: z.number().int().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { cmeGenericDisclosures } = await import("../../drizzle/schema");
+      const { eq: eqOp, set } = await import("drizzle-orm");
+      await db
+        .update(cmeGenericDisclosures)
+        .set({ linkedCourseId: input.courseId })
+        .where(eqOp(cmeGenericDisclosures.id, input.id));
+      return { success: true };
+    }),
+
+  // ── Unlink a generic disclosure from its course ─────────────────────────────────
+  unlinkGenericDisclosure: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { cmeGenericDisclosures } = await import("../../drizzle/schema");
+      const { eq: eqOp } = await import("drizzle-orm");
+      await db
+        .update(cmeGenericDisclosures)
+        .set({ linkedCourseId: null })
+        .where(eqOp(cmeGenericDisclosures.id, input.id));
+      return { success: true };
     }),
 });

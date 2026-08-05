@@ -22,6 +22,7 @@
  */
 
 import { useEditor, EditorContent, Node, mergeAttributes } from "@tiptap/react";
+import { DOMParser as PmDOMParser } from "prosemirror-model";
 import { Mathematics } from "@tiptap/extension-mathematics";
 import katex from "katex";
 import "katex/dist/katex.min.css";
@@ -837,7 +838,14 @@ export default function RichTextEditor({
               return `<p>${inner}</p>`;
             })
             .join("");
-          editorRef.current?.chain().focus().insertContent(htmlContent).run();
+          // Use ProseMirror's DOMParser to parse the HTML and dispatch a transaction
+          // directly via the view — this avoids any dependency on editorRef.current
+          // which is set asynchronously via useEffect and may be null on first paste.
+          const domEl = document.createElement("div");
+          domEl.innerHTML = htmlContent;
+          const pmSlice = PmDOMParser.fromSchema(view.state.schema).parseSlice(domEl, { preserveWhitespace: true });
+          const tr = view.state.tr.replaceSelection(pmSlice);
+          view.dispatch(tr);
           return true;
         }
 
