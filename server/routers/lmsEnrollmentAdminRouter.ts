@@ -524,20 +524,20 @@ export const lmsEnrollmentAdminRouter = router({
   }),
 
   createInstructor: protectedProcedure
-    .input(z.object({ name: z.string().min(1), title: z.string().optional(), bio: z.string().optional(), avatarUrl: z.string().optional(), website: z.string().optional(), userId: z.number().optional() }))
+    .input(z.object({ name: z.string().min(1), email: z.string().email().optional(), title: z.string().optional(), bio: z.string().optional(), avatarUrl: z.string().optional(), website: z.string().optional(), userId: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [result] = await db.insert(lmsInstructors).values({
-        name: input.name, title: input.title ?? null, bio: input.bio ?? null,
+        name: input.name, email: input.email ?? null, title: input.title ?? null, bio: input.bio ?? null,
         avatarUrl: input.avatarUrl ?? null, website: input.website ?? null, userId: input.userId ?? null,
       }).$returningId();
       return { id: result.id };
     }),
 
   updateInstructor: protectedProcedure
-    .input(z.object({ id: z.number(), name: z.string().min(1).optional(), title: z.string().optional(), bio: z.string().optional(), avatarUrl: z.string().optional(), website: z.string().optional(), isActive: z.boolean().optional() }))
+    .input(z.object({ id: z.number(), name: z.string().min(1).optional(), email: z.string().email().optional().nullable(), title: z.string().optional(), bio: z.string().optional(), avatarUrl: z.string().optional(), website: z.string().optional(), isActive: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();

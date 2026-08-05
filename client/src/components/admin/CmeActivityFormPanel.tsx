@@ -444,6 +444,31 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours, onDir
     { courseId },
     { enabled: !!courseId }
   );
+  const downloadDisclosurePdfMutation = trpc.lmsAdmin.downloadDisclosurePdf.useMutation();
+  const [downloadingDisclosurePdf, setDownloadingDisclosurePdf] = useState(false);
+
+  const handleDownloadDisclosurePdf = async (disclosureId: number, facultyName: string) => {
+    setDownloadingDisclosurePdf(true);
+    try {
+      const result = await downloadDisclosurePdfMutation.mutateAsync({ disclosureId });
+      const resp = await fetch(result.url);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `Financial-Disclosure-${facultyName.replace(/[^a-z0-9]/gi, '-')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      toast.success('PDF downloaded');
+    } catch (e: any) {
+      toast.error('Download failed: ' + (e?.message ?? 'Unknown error'));
+    } finally {
+      setDownloadingDisclosurePdf(false);
+    }
+  };
+
   const sendDisclosureMutation = trpc.lmsAdmin.sendFinancialDisclosure.useMutation({
     onSuccess: () => { refetchDisclosures(); },
     onError: (e: any) => toast.error("Failed to send disclosure: " + e.message),
@@ -1846,6 +1871,17 @@ All About Ultrasound, Inc. dba iHeartEcho`;
             );
           })()}
           <DialogFooter>
+            <Button
+              type="button" variant="outline" size="sm"
+              className="text-teal-600 border-teal-300 hover:bg-teal-50"
+              disabled={downloadingDisclosurePdf}
+              onClick={() => viewSubmissionDisclosure && handleDownloadDisclosurePdf(viewSubmissionDisclosure.id, viewSubmissionDisclosure.facultyName)}
+            >
+              {downloadingDisclosurePdf
+                ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Generating...</>
+                : <><svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>Download PDF</>
+              }
+            </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => setViewSubmissionDisclosure(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>

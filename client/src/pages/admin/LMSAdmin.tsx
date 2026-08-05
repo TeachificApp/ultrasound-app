@@ -7017,6 +7017,7 @@ function InstructorsTab() {
 
 function InstructorFormDialog({ title, instructor, onClose, onSave, saving }: { title: string; instructor?: any; onClose: () => void; onSave: (data: any) => void; saving: boolean }) {
   const [name, setName] = useState(instructor?.name ?? "");
+  const [email, setEmail] = useState(instructor?.email ?? "");
   const [instrTitle, setInstrTitle] = useState(instructor?.title ?? "");
   const [bio, setBio] = useState(instructor?.bio ?? "");
   const [avatarUrl, setAvatarUrl] = useState(instructor?.avatarUrl ?? "");
@@ -7037,6 +7038,11 @@ function InstructorFormDialog({ title, instructor, onClose, onSave, saving }: { 
               <Label className="text-sm">Title / Credentials</Label>
               <Input value={instrTitle} onChange={e => setInstrTitle(e.target.value)} placeholder="RDCS, FASE" className="mt-1" />
             </div>
+          </div>
+          <div>
+            <Label className="text-sm">Email Address</Label>
+            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="instructor@example.com" className="mt-1" />
+            <p className="text-[11px] text-gray-400 mt-0.5">Used to auto-populate the Financial Disclosure send dialog.</p>
           </div>
           <div>
             <Label className="text-sm">Avatar URL</Label>
@@ -7060,7 +7066,7 @@ function InstructorFormDialog({ title, instructor, onClose, onSave, saving }: { 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!name.trim() || saving}
-            onClick={() => onSave({ name: name.trim(), title: instrTitle.trim() || undefined, bio: bio || undefined, avatarUrl: avatarUrl.trim() || undefined, website: website.trim() || undefined, isActive })}>
+            onClick={() => onSave({ name: name.trim(), email: email.trim() || undefined, title: instrTitle.trim() || undefined, bio: bio || undefined, avatarUrl: avatarUrl.trim() || undefined, website: website.trim() || undefined, isActive })}>
             {saving ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>

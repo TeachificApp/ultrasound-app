@@ -19,6 +19,7 @@ import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
 import { generateCmeActivityDocx } from "../lib/cmeActivityDocx";
 import { generateCmeActivityPdf } from "../lib/cmeActivityPdf";
+import { generateDisclosurePdf } from "../lib/disclosurePdf";
 
 // ─── Zod schema for the form data ────────────────────────────────────────────
 const cmeFormDataSchema = z.object({
@@ -783,6 +784,47 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         .set({ receivedAt: new Date(), receivedNotes: input.receivedNotes || null, updatedAt: new Date() })
         .where(eq(cmeFinancialDisclosures.id, input.disclosureId));
       return { success: true };
+    }),
+
+  // ── Download a submitted disclosure as PDF ──────────────────────────────
+  downloadDisclosurePdf: protectedProcedure
+    .input(z.object({ disclosureId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [row] = await db
+        .select()
+        .from(cmeFinancialDisclosures)
+        .where(eq(cmeFinancialDisclosures.id, input.disclosureId))
+        .limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Disclosure not found" });
+      if (row.status !== "submitted") throw new TRPCError({ code: "BAD_REQUEST", message: "Disclosure has not been submitted yet" });
+
+      const roles: string[] = (() => { try { return JSON.parse(row.rolesJson ?? "[]"); } catch { return []; } })();
+      const relationships: Array<{ company: string; relationship: string; ended: boolean }> = (() => {
+        try {
+          const raw: Array<{ company: string; type?: string; relationship?: string; ended: boolean }> = JSON.parse(row.relationshipsJson ?? "[]");
+          return raw.map(r => ({ company: r.company, relationship: r.type ?? r.relationship ?? "", ended: r.ended }));
+        } catch { return []; }
+      })();
+
+      const pdfBuffer = await generateDisclosurePdf({
+        facultyName: row.facultyName,
+        facultyEmail: row.facultyEmail,
+        courseTitle: row.courseTitle ?? "Unknown Course",
+        roles,
+        hasRelationships: (row.noRelationships === 1 || relationships.length === 0) ? "no" : "yes",
+        relationships,
+        attestationName: row.attestationName ?? "",
+        attestationDate: row.attestationDate ?? "",
+        submittedAt: row.submittedAt ?? new Date(),
+      });
+
+      const safeName = row.facultyName.replace(/[^a-z0-9]/gi, "-").toLowerCase();
+      const key = `cme-disclosures/${safeName}-${row.id}-${Date.now()}.pdf`;
+      const { url } = await storagePut(key, pdfBuffer, "application/pdf");
+      return { url };
     }),
 
   // ── Get send history for a course ────────────────────────────────────────
