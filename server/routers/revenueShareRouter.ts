@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { eq, and, desc, isNull, or, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   revenueSharePartners,
@@ -19,6 +19,7 @@ import {
   bundles,
   membershipPlans,
   workshops,
+  partnerAllowlist,
 } from "../../drizzle/schema";
 import {
   createStripeConnectAccount,
@@ -560,4 +561,135 @@ export const revenueShareRouter = router({
       ...wshops.map(r => ({ ...r, productType: "workshop" as const })),
     ];
   }),
+
+  // ── Public: Check if email is on the partner allowlist ───────────────────
+  checkPartnerAllowlist: publicProcedure
+    .input(z.object({ email: z.string().email() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [row] = await db
+        .select({ id: partnerAllowlist.id, name: partnerAllowlist.name, usedAt: partnerAllowlist.usedAt })
+        .from(partnerAllowlist)
+        .where(eq(partnerAllowlist.email, input.email.toLowerCase().trim()))
+        .limit(1);
+      if (!row) return { allowed: false, alreadyRegistered: false };
+      return { allowed: true, alreadyRegistered: !!row.usedAt, name: row.name };
+    }),
+
+  // ── Public: Self-register as a revenue partner (allowlist-gated) ─────────
+  selfRegisterPartner: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      name: z.string().min(1).max(255),
+      origin: z.string().url().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const normalizedEmail = input.email.toLowerCase().trim();
+      // Check allowlist
+      const [allowed] = await db
+        .select()
+        .from(partnerAllowlist)
+        .where(eq(partnerAllowlist.email, normalizedEmail))
+        .limit(1);
+      if (!allowed) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Your email is not on the partner allowlist. Please contact admin@allaboutultrasound.com to enable your partner account.",
+        });
+      }
+      // Check if partner already exists (may be resuming an incomplete onboarding)
+      const [existing] = await db
+        .select({ id: revenueSharePartners.id, stripeAccountId: revenueSharePartners.stripeAccountId, onboardingStatus: revenueSharePartners.onboardingStatus })
+        .from(revenueSharePartners)
+        .where(eq(revenueSharePartners.email, normalizedEmail))
+        .limit(1);
+      // Block only if fully active — allow retry if still onboarding/pending
+      if (allowed.usedAt && existing?.onboardingStatus === "active") {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Your partner account is already active. Log in to your Stripe Express dashboard to manage payouts, or contact admin@allaboutultrasound.com for assistance.",
+        });
+      }
+      let partnerId: number;
+      let onboardingUrl: string | null = null;
+      if (existing) {
+        partnerId = existing.id;
+        // Generate a new onboarding link if not yet active
+        if (existing.stripeAccountId) {
+          try {
+            const origin = input.origin || "https://learn.allaboutultrasound.com";
+            onboardingUrl = await createOnboardingLink(existing.stripeAccountId, `${origin}/partner-signup?status=complete`, `${origin}/partner-signup?status=refresh`);
+          } catch {}
+        }
+      } else {
+        // Create Stripe Express account
+        let stripeAccountId: string | null = null;
+        try {
+          stripeAccountId = await createStripeConnectAccount({ email: normalizedEmail, name: input.name });
+        } catch (err: any) {
+          console.error("[PartnerSignup] Stripe account creation failed:", err?.message);
+        }
+        const now = Date.now();
+        const [result] = await db.insert(revenueSharePartners).values({
+          name: input.name,
+          email: normalizedEmail,
+          stripeAccountId,
+          onboardingStatus: stripeAccountId ? "onboarding" : "pending",
+          payoutSchedule: "immediate",
+          notes: "Self-registered via partner sign-up page",
+          createdAt: now,
+          updatedAt: now,
+        }).$returningId();
+        partnerId = result.id;
+        if (stripeAccountId) {
+          try {
+            const origin = input.origin || "https://learn.allaboutultrasound.com";
+            onboardingUrl = await createOnboardingLink(stripeAccountId, `${origin}/partner-signup?status=complete`, `${origin}/partner-signup?status=refresh`);
+          } catch {}
+        }
+      }
+      // Mark allowlist entry as used
+      await db.update(partnerAllowlist)
+        .set({ usedAt: new Date() })
+        .where(eq(partnerAllowlist.email, normalizedEmail));
+      return { success: true, partnerId, onboardingUrl };
+    }),
+
+  // ── Admin: List allowlist entries ─────────────────────────────────────────
+  listAllowlist: protectedProcedure.query(async ({ ctx }) => {
+    assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(partnerAllowlist).orderBy(partnerAllowlist.createdAt);
+  }),
+
+  // ── Admin: Add email to allowlist ─────────────────────────────────────────
+  addToAllowlist: protectedProcedure
+    .input(z.object({ email: z.string().email(), name: z.string().optional(), notes: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(partnerAllowlist).values({
+        email: input.email.toLowerCase().trim(),
+        name: input.name || null,
+        notes: input.notes || null,
+        invitedBy: ctx.user.id,
+      });
+      return { success: true };
+    }),
+
+  // ── Admin: Remove email from allowlist ────────────────────────────────────
+  removeFromAllowlist: protectedProcedure
+    .input(z.object({ id: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(partnerAllowlist).where(eq(partnerAllowlist.id, input.id));
+      return { success: true };
+    }),
 });

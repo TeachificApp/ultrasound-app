@@ -157,7 +157,8 @@ function QuizAttemptsTable({ lessonId, lessonTitle }: { lessonId: number; lesson
             </TableHeader>
             <TableBody>
               {attempts.map(a => {
-                const name = a.userName ?? `${a.userFirstName ?? ""} ${a.userLastName ?? ""}`.trim() || a.userEmail ?? `User #${a.userId}`;
+                const _raw = a.userName ?? `${a.userFirstName ?? ""} ${a.userLastName ?? ""}`.trim();
+                const name = _raw || a.userEmail || `User #${a.userId}`;
                 return (
                   <TableRow key={a.id}>
                     <TableCell>

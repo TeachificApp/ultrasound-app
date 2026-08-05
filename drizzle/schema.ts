@@ -4005,6 +4005,18 @@ export const lmsQuizAttempts = mysqlTable("lms_quiz_attempts", {
 export type LmsQuizAttempt = typeof lmsQuizAttempts.$inferSelect;
 export type InsertLmsQuizAttempt = typeof lmsQuizAttempts.$inferInsert;
 
+// ─── Partner Allowlist (pre-approved emails for revenue partner sign-up) ─────
+export const partnerAllowlist = mysqlTable("partner_allowlist", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  name: varchar("name", { length: 255 }),
+  notes: text("notes"),
+  invitedBy: int("invited_by"),
+  usedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type PartnerAllowlist = typeof partnerAllowlist.$inferSelect;
+
 // ─── Per-question answer records for quiz/survey attempts ────────────────────
 export const lmsQuizAttemptAnswers = mysqlTable("lms_quiz_attempt_answers", {
   id: int("id").autoincrement().primaryKey(),
