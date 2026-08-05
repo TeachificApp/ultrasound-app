@@ -1501,7 +1501,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
 
         {/* Settings Tab */}
         <TabsContent value="settings" className="mt-4 space-y-4">
-          <CourseSettingsForm course={course} onSave={handleSaveCourseSettings} saving={updateCourse.isPending} onTypeChangedToWorkshop={onTypeChangedToWorkshop} />
+          <CourseSettingsForm course={course} onSave={handleSaveCourseSettings} saving={updateCourse.isPending} onTypeChangedToWorkshop={onTypeChangedToWorkshop} onCmeDirtyChange={setCmeDirty} />
           <AffiliateCoursePanel courseId={courseId} />
         </TabsContent>
 
@@ -1907,7 +1907,7 @@ function CertTemplateSelector({ value, onChange }: { value: number | null; onCha
   );
 }
 
-function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }: { course: any; onSave: (data: any) => void; saving: boolean; onTypeChangedToWorkshop?: (newWorkshopId: number) => void }) {
+function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, onCmeDirtyChange }: { course: any; onSave: (data: any) => void; saving: boolean; onTypeChangedToWorkshop?: (newWorkshopId: number) => void; onCmeDirtyChange?: (dirty: boolean) => void }) {
   const [reformatDialogOpen, setReformatDialogOpen] = useState(false);
   const [reformatNewName, setReformatNewName] = useState("");
   const [reformatStep, setReformatStep] = useState<"idle" | "running" | "done">("idle");
@@ -2407,7 +2407,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
             courseId={course.id}
             courseTitle={course.title ?? title}
             creditHours={creditHours || null}
-            onDirtyChange={setCmeDirty}
+            onDirtyChange={onCmeDirtyChange}
           />
         </div>
       )}

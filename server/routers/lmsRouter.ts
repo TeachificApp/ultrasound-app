@@ -1187,10 +1187,14 @@ export const lmsPublicRouter = router({
           id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type,
           position: lmsLessons.position, isPreview: lmsLessons.isPreview,
           previewMode: lmsLessons.previewMode, durationMinutes: lmsLessons.durationMinutes,
-        }).from(lmsLessons).where(eq(lmsLessons.sectionId, s.id)).orderBy(asc(lmsLessons.position));
+        }).from(lmsLessons).where(
+          and(eq(lmsLessons.sectionId, s.id), eq(lmsLessons.lessonStatus, "published"))
+        ).orderBy(asc(lmsLessons.position));
         return { ...s, lessons };
       }));
-      return { id: course.id, title: course.title, slug: course.slug, sections: sectionsWithLessons };
+      // Filter out sections that have no published lessons
+      const publishedSections = sectionsWithLessons.filter(s => s.lessons.length > 0);
+      return { id: course.id, title: course.title, slug: course.slug, sections: publishedSections };
     }),
 
   /** Resolve a course/download ID to its slug (used for opt-out link redirect) */
@@ -1536,10 +1540,8 @@ export const lmsLearnerRouter = router({
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
         }).from(lmsLessons).where(
-          // Admins (in preview mode) see all lessons; enrolled learners only see published lessons
-          isAdminPreview
-            ? eq(lmsLessons.courseId, course.id)
-            : and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
+          // Always filter out draft lessons — draft lessons are never shown in the course player sidebar
+          and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
         ).orderBy(asc(lmsLessons.position)),
       ]);
       // Group lessons by sectionId in JS — no extra round-trips
@@ -2877,10 +2879,8 @@ export const lmsLearnerRouter = router({
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
         }).from(lmsLessons).where(
-          // Admins in preview mode see all lessons; enrolled learners only see published lessons
-          isAdminPreview
-            ? eq(lmsLessons.courseId, course.id)
-            : and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
+          // Always filter out draft lessons — never shown to students regardless of admin status
+          and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
         ).orderBy(asc(lmsLessons.position)),
       ]);
       const lessonsBySectionId = new Map<number, typeof allLessons>();

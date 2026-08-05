@@ -212,21 +212,28 @@ export default function WorkshopCheckout() {
                   className="mt-0.5"
                   style={termsAccepted ? { backgroundColor: primary, borderColor: primary } : {}}
                 />
-                <Label htmlFor="terms" className="text-sm text-gray-700 leading-relaxed cursor-pointer">
-                  {sessionMeta.checkoutTermsText}{" "}
-                  {sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url && (
-                    <a href={sessionMeta.checkoutTermsLink1Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }}>
-                      {sessionMeta.checkoutTermsLink1Text}
-                    </a>
-                  )}
-                  {sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url && (
-                    <>{" "}and{" "}
-                    <a href={sessionMeta.checkoutTermsLink2Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }}>
-                      {sessionMeta.checkoutTermsLink2Text}
-                    </a></>
-                  )}
-                  .
-                </Label>
+                <label htmlFor="terms" className="text-sm text-gray-700 leading-relaxed cursor-pointer flex-1">
+                  <span className="block [&_p]:mb-1 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic">
+                    {sessionMeta.checkoutTermsText && /^\s*</.test(sessionMeta.checkoutTermsText)
+                      ? <span dangerouslySetInnerHTML={{ __html: sessionMeta.checkoutTermsText }} />
+                      : <>{sessionMeta.checkoutTermsText}</>}
+                  </span>
+                  {(sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url) || (sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url) ? (
+                    <span className="block mt-2">
+                      {sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url && (
+                        <a href={sessionMeta.checkoutTermsLink1Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }} onClick={e => e.stopPropagation()}>
+                          {sessionMeta.checkoutTermsLink1Text}
+                        </a>
+                      )}
+                      {sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url && (
+                        <>{" "}and{" "}
+                        <a href={sessionMeta.checkoutTermsLink2Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }} onClick={e => e.stopPropagation()}>
+                          {sessionMeta.checkoutTermsLink2Text}
+                        </a></>
+                      )}
+                    </span>
+                  ) : null}
+                </label>
               </div>
               {!termsAccepted && (
                 <p className="text-xs pt-1 text-gray-400">

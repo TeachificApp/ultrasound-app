@@ -616,12 +616,18 @@ function CheckoutFormInner({ data, funnelId, pageId, funnelSlug }: CheckoutFormB
             onChange={(e) => setTermsAccepted(e.target.checked)}
             className="mt-1 w-4 h-4 rounded accent-teal-600"
           />
-          <span className="text-sm text-gray-700">
-            {d.termsText}{" "}
+          <span className="text-sm text-gray-700 flex-1">
+            <span className="block [&_p]:mb-1 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic">
+              {d.termsText && /^\s*</.test(d.termsText)
+                ? <span dangerouslySetInnerHTML={{ __html: d.termsText }} />
+                : <>{d.termsText}</>}
+            </span>
             {d.termsLinkUrl && (
-              <a href={d.termsLinkUrl} target="_blank" rel="noopener noreferrer" className="font-bold underline" style={{ color: accent }}>
-                {d.termsLinkText || "TERMS OF SERVICE"}
-              </a>
+              <span className="block mt-2">
+                <a href={d.termsLinkUrl} target="_blank" rel="noopener noreferrer" className="font-bold underline" style={{ color: accent }} onClick={e => e.stopPropagation()}>
+                  {d.termsLinkText || "TERMS OF SERVICE"}
+                </a>
+              </span>
             )}
           </span>
         </label>
