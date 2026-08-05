@@ -4032,12 +4032,7 @@ export default function AdminUserDetailPage() {
         <div className="max-w-5xl mx-auto px-4 sm:px-8 py-8">
           {/* Tab Navigation */}
           <div className="flex gap-1 bg-white rounded-xl border border-gray-100 shadow-sm p-1 mb-8 overflow-x-auto">
-            {TABS.filter(t => {
-                // Hide the CME tab for standard user-role accounts — SDMS CME completions
-                // are only relevant for instructors and admin users.
-                if (t.key === "cme" && data.user.role === "user") return false;
-                return true;
-              }).map(t => (
+            {TABS.map(t => (
               <button
                 key={t.key}
                 onClick={() => handleTabChange(t.key)}
