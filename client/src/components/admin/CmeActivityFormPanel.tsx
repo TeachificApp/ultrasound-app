@@ -1305,7 +1305,6 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      </Section>
 
       {/* ── Section 7: Content Readiness ── */}
       <Section number={7} title="Content Readiness">
