@@ -2351,9 +2351,9 @@ function RevenuePartnerTab() {
     return true;
   });
 
-  const filteredPaid    = filtered.filter((e: any) => e.status === "paid").reduce((s: number, e: any) => s + e.shareAmount, 0);
-  const filteredPending = filtered.filter((e: any) => e.status === "pending" || e.status === "processing").reduce((s: number, e: any) => s + e.shareAmount, 0);
-  const filteredTotal   = filtered.reduce((s: number, e: any) => s + e.shareAmount, 0);
+  const filteredPaid    = filtered.filter((e: any) => e.status === "paid").reduce((s: number, e: any) => s + (e.payoutAmount ?? e.shareAmount ?? 0), 0);
+  const filteredPending = filtered.filter((e: any) => e.status === "pending" || e.status === "processing").reduce((s: number, e: any) => s + (e.payoutAmount ?? e.shareAmount ?? 0), 0);
+  const filteredTotal   = filtered.reduce((s: number, e: any) => s + (e.payoutAmount ?? e.shareAmount ?? 0), 0);
 
   return (
     <div className="space-y-5">
@@ -2470,7 +2470,7 @@ function RevenuePartnerTab() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-gray-800">
-                        {fmt(e.shareAmount)}
+                        {fmt(e.payoutAmount ?? e.shareAmount ?? 0)}
                       </td>
                     </tr>
                   );

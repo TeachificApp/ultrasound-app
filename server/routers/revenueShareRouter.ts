@@ -405,12 +405,12 @@ export const revenueShareRouter = router({
     const totalEarned = ledger.filter(e => e.status === "paid").reduce((s, e) => s + e.shareAmount, 0);
     const totalPending = ledger.filter(e => e.status === "pending" || e.status === "processing").reduce((s, e) => s + e.shareAmount, 0);
 
-    // Strip sensitive fields — partners should only see course/date/amount/status,
-    // not student emails, payment intent IDs, or other internal identifiers.
+    // Strip sensitive fields — partners see only their payout amount, course, date, and status.
+    // Gross sale amount, percentage, student details, and payment IDs are never exposed.
     const safeLedger = ledger.map(e => ({
       id: e.id,
       courseTitle: e.courseTitle,
-      shareAmount: e.shareAmount,
+      payoutAmount: e.shareAmount,   // renamed to avoid implying it's a percentage of anything
       currency: e.currency,
       status: e.status,
       createdAt: e.createdAt,
