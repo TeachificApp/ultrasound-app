@@ -24,6 +24,7 @@ import {
   Loader2, Sparkles, Download, Save, ChevronDown, ChevronUp,
   FileText, RefreshCw, Calendar, CheckSquare, Square,
   PenLine, Trash2, FileDown, Send, Mail, ChevronsUpDown,
+  X, Plus, UserPlus,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -404,6 +405,18 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
   const [courseSlug, setCourseSlug] = useState<string | null>(null);
   const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // ── Send recipients state ───────────────────────────────────────────────
+  const DEFAULT_CME_RECIPIENTS = [
+    { label: "To" as const, email: "don@cardioserv.net", name: "Don Gerig" },
+    { label: "CC" as const, email: "j.buckland@cardioserv.net", name: "Judith Buckland" },
+    { label: "CC" as const, email: "admin@allaboutultrasound.com", name: "All About Ultrasound Admin" },
+  ];
+  const [sendRecipients, setSendRecipients] = useState(DEFAULT_CME_RECIPIENTS);
+  const [newRecipientEmail, setNewRecipientEmail] = useState("");
+  const [newRecipientName, setNewRecipientName] = useState("");
+  const [newRecipientLabel, setNewRecipientLabel] = useState<"To" | "CC">("CC");
+  const [editingRecipientIdx, setEditingRecipientIdx] = useState<number | null>(null);
+  const [editRecipientData, setEditRecipientData] = useState<{ label: "To" | "CC"; email: string; name: string } | null>(null);
   const sendMutation = trpc.lmsAdmin.sendCmeFormToCardioServ.useMutation();
   const { data: sendHistory, refetch: refetchHistory } = trpc.lmsAdmin.getCmeSendHistory.useQuery(
     { courseId },
@@ -411,6 +424,8 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Pro
   );
   const { data: instructorsList } = trpc.lmsAdmin.getInstructorsForCme.useQuery();
   const [openInstructorPopover, setOpenInstructorPopover] = useState<number | null>(null);
+  const createInstructorMutation = trpc.lmsAdmin.createInstructor.useMutation();
+  const [creatingInstructorIdx, setCreatingInstructorIdx] = useState<number | null>(null);
 
   const landingPageUrl = courseSlug
     ? `https://learn.allaboutultrasound.com/courses/${courseSlug}`
@@ -440,21 +455,25 @@ All About Ultrasound, Inc. dba iHeartEcho`;
 
   const openSendDialog = () => {
     if (lastSentAt) {
-      // Show resubmit confirmation first
       setResubmitConfirmOpen(true);
       return;
     }
     const { subject, body } = buildEmailContent();
     setSendSubject(subject);
     setSendBody(body);
+    setSendRecipients(DEFAULT_CME_RECIPIENTS);
+    setNewRecipientEmail("");
+    setNewRecipientName("");
     setSendDialogOpen(true);
   };
-
   const proceedToSendDialog = () => {
     setResubmitConfirmOpen(false);
     const { subject, body } = buildEmailContent();
     setSendSubject(subject);
     setSendBody(body);
+    setSendRecipients(DEFAULT_CME_RECIPIENTS);
+    setNewRecipientEmail("");
+    setNewRecipientName("");
     setSendDialogOpen(true);
   };
 
@@ -475,7 +494,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           signatureDataUrl: form.signatureDataUrl,
         },
       });
-      const result = await sendMutation.mutateAsync({ courseId, subject: sendSubject, body: sendBody });
+      const result = await sendMutation.mutateAsync({ courseId, subject: sendSubject, body: sendBody, recipients: sendRecipients });
       if (result.lastSentAt) setLastSentAt(result.lastSentAt);
       toast.success("Email sent to CardioServ with PDF attached.");
       setSendDialogOpen(false);
@@ -496,7 +515,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
   );
 
   useEffect(() => {
-    if (data && !loaded) {
+    if (data) {
       const f = data.form as any;
       setForm({
         activityTitle: f.activityTitle ?? courseTitle ?? "",
@@ -540,7 +559,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
       setLoaded(true);
       refetchHistory();
     }
-  }, [data, loaded, courseTitle, creditHours]);
+  }, [data, courseTitle, creditHours]);
 
   const set = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -581,6 +600,17 @@ All About Ultrasound, Inc. dba iHeartEcho`;
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Auto-create any faculty members not yet in the instructor list
+      const existingNames = new Set((instructorsList ?? []).map(i => i.name.toLowerCase()));
+      const newFaculty = form.facultyJson.filter(f => f.name.trim() && !existingNames.has(f.name.trim().toLowerCase()));
+      for (const f of newFaculty) {
+        try {
+          await createInstructorMutation.mutateAsync({ name: f.name.trim(), title: f.credentials.trim() || undefined });
+        } catch {
+          // Non-fatal: instructor may already exist or creation failed
+        }
+      }
+      if (newFaculty.length > 0) utils.lmsAdmin.getInstructorsForCme.invalidate();
       await saveMutation.mutateAsync({
         courseId,
         data: {
@@ -909,6 +939,36 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                           </CommandItem>
                         ))}
                       </CommandGroup>
+                      {f.name.trim() && !(instructorsList ?? []).some(inst => inst.name.toLowerCase() === f.name.trim().toLowerCase()) && (
+                        <CommandGroup heading="Create New">
+                          <CommandItem
+                            value={`__create__${f.name}`}
+                            onSelect={async () => {
+                              setCreatingInstructorIdx(i);
+                              try {
+                                await createInstructorMutation.mutateAsync({
+                                  name: f.name.trim(),
+                                  title: f.credentials.trim() || undefined,
+                                });
+                                utils.lmsAdmin.getInstructorsForCme.invalidate();
+                                toast.success(`"${f.name.trim()}" added as a new instructor`);
+                              } catch (e: any) {
+                                toast.error("Failed to create instructor: " + (e?.message ?? "Unknown error"));
+                              } finally {
+                                setCreatingInstructorIdx(null);
+                                setOpenInstructorPopover(null);
+                              }
+                            }}
+                            className="text-xs text-[#189aa1]"
+                            disabled={creatingInstructorIdx === i}
+                          >
+                            {creatingInstructorIdx === i
+                              ? <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                              : <UserPlus className="w-3 h-3 mr-1.5" />}
+                            Add "{f.name.trim()}" as new instructor
+                          </CommandItem>
+                        </CommandGroup>
+                      )}
                     </CommandList>
                   </Command>
                 </PopoverContent>
@@ -1102,19 +1162,145 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {/* Recipients */}
-            <div className="rounded-lg bg-teal-50 border border-teal-200 p-3 text-xs space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-[#189aa1] w-8">To:</span>
-                <span className="text-gray-700">Don Gerig &lt;don@cardioserv.net&gt;</span>
+            {/* Editable Recipients */}
+            <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-700">Recipients</span>
+                <span className="text-[10px] text-gray-400">Click chip to edit · × to remove · Add below</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-[#189aa1] w-8">CC:</span>
-                <span className="text-gray-700">Judith Buckland &lt;j.buckland@cardioserv.net&gt;, admin@allaboutultrasound.com</span>
+              {/* Recipient tags — click to edit inline */}
+              <div className="flex flex-wrap gap-1.5">
+                {sendRecipients.map((r, ri) => (
+                  editingRecipientIdx === ri && editRecipientData ? (
+                    // Inline edit row
+                    <div key={ri} className="flex items-center gap-1 border border-teal-400 rounded-lg px-2 py-1 bg-white shadow-sm">
+                      <select
+                        value={editRecipientData.label}
+                        onChange={e => setEditRecipientData(prev => prev ? { ...prev, label: e.target.value as "To" | "CC" } : prev)}
+                        className="h-6 text-[11px] border border-gray-200 rounded px-1 bg-white"
+                      >
+                        <option value="To">To</option>
+                        <option value="CC">CC</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={editRecipientData.name}
+                        onChange={e => setEditRecipientData(prev => prev ? { ...prev, name: e.target.value } : prev)}
+                        placeholder="Name"
+                        className="h-6 text-[11px] border border-gray-200 rounded px-1.5 w-24 focus:outline-none focus:ring-1 focus:ring-teal-300"
+                      />
+                      <input
+                        type="email"
+                        value={editRecipientData.email}
+                        onChange={e => setEditRecipientData(prev => prev ? { ...prev, email: e.target.value } : prev)}
+                        placeholder="email@example.com"
+                        className="h-6 text-[11px] border border-gray-200 rounded px-1.5 w-36 focus:outline-none focus:ring-1 focus:ring-teal-300"
+                        onKeyDown={e => {
+                          if (e.key === "Enter" && editRecipientData.email.includes("@")) {
+                            setSendRecipients(prev => prev.map((x, j) => j === ri ? editRecipientData! : x));
+                            setEditingRecipientIdx(null);
+                            setEditRecipientData(null);
+                          } else if (e.key === "Escape") {
+                            setEditingRecipientIdx(null);
+                            setEditRecipientData(null);
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (editRecipientData.email.includes("@")) {
+                            setSendRecipients(prev => prev.map((x, j) => j === ri ? editRecipientData! : x));
+                          }
+                          setEditingRecipientIdx(null);
+                          setEditRecipientData(null);
+                        }}
+                        className="text-teal-600 hover:text-teal-800 text-[10px] font-semibold px-1"
+                      >Save</button>
+                      <button
+                        type="button"
+                        onClick={() => { setEditingRecipientIdx(null); setEditRecipientData(null); }}
+                        className="text-gray-400 hover:text-gray-600"
+                      ><X className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    // Display chip
+                    <div
+                      key={ri}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border cursor-pointer hover:opacity-80 transition-opacity ${
+                        r.label === "To"
+                          ? "bg-teal-50 border-teal-300 text-teal-800"
+                          : "bg-gray-50 border-gray-300 text-gray-700"
+                      }`}
+                      onClick={() => { setEditingRecipientIdx(ri); setEditRecipientData({ ...r }); }}
+                      title="Click to edit"
+                    >
+                      <span className="font-semibold">{r.label}:</span>
+                      <span>{r.name ? `${r.name} <${r.email}>` : r.email}</span>
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setSendRecipients(prev => prev.filter((_, j) => j !== ri)); }}
+                        className="ml-0.5 text-gray-400 hover:text-red-500 transition-colors"
+                        title="Remove"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )
+                ))}
+                {sendRecipients.length === 0 && (
+                  <span className="text-xs text-red-500 italic">⚠ At least one To: recipient required</span>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-[#189aa1] w-8">📎</span>
-                <span className="text-gray-500 italic">CME Activity Planning & Proposal Form (PDF) — generated from current saved form</span>
+              {/* Add recipient row */}
+              <div className="flex gap-1.5 items-center">
+                <select
+                  value={newRecipientLabel}
+                  onChange={e => setNewRecipientLabel(e.target.value as "To" | "CC")}
+                  className="h-7 text-xs border border-gray-300 rounded px-1.5 bg-white"
+                >
+                  <option value="To">To</option>
+                  <option value="CC">CC</option>
+                </select>
+                <input
+                  type="text"
+                  value={newRecipientName}
+                  onChange={e => setNewRecipientName(e.target.value)}
+                  placeholder="Name (optional)"
+                  className="h-7 text-xs border border-gray-300 rounded px-2 w-28 focus:outline-none focus:ring-1 focus:ring-teal-300"
+                />
+                <input
+                  type="email"
+                  value={newRecipientEmail}
+                  onChange={e => setNewRecipientEmail(e.target.value)}
+                  placeholder="email@example.com"
+                  className="h-7 text-xs border border-gray-300 rounded px-2 flex-1 focus:outline-none focus:ring-1 focus:ring-teal-300"
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && newRecipientEmail.includes("@")) {
+                      setSendRecipients(prev => [...prev, { label: newRecipientLabel, email: newRecipientEmail.trim(), name: newRecipientName.trim() }]);
+                      setNewRecipientEmail("");
+                      setNewRecipientName("");
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newRecipientEmail.includes("@")) return;
+                    setSendRecipients(prev => [...prev, { label: newRecipientLabel, email: newRecipientEmail.trim(), name: newRecipientName.trim() }]);
+                    setNewRecipientEmail("");
+                    setNewRecipientName("");
+                  }}
+                  disabled={!newRecipientEmail.includes("@")}
+                  className="h-7 px-2 text-xs rounded border border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 disabled:opacity-40 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> Add
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-gray-400 pt-0.5">
+                <span>📎</span>
+                <span className="italic">CME Activity Planning &amp; Proposal Form (PDF) — generated from current saved form</span>
               </div>
             </div>
 
@@ -1149,7 +1335,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
               type="button"
               size="sm"
               onClick={handleSendToCardioServ}
-              disabled={sending || !sendSubject.trim() || !sendBody.trim()}
+              disabled={sending || !sendSubject.trim() || !sendBody.trim() || !sendRecipients.some(r => r.label === "To")}
               className="bg-[#189aa1] hover:bg-[#147f85] text-white"
             >
               {sending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Send className="w-3 h-3 mr-1" />}
@@ -1195,4 +1381,5 @@ All About Ultrasound, Inc. dba iHeartEcho`;
     </div>
   );
 }
+
 

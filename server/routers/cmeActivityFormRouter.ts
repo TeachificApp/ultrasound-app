@@ -449,6 +449,12 @@ export const cmeActivityFormRouter = router({
       subject: z.string().min(1).max(512),
       /** Editable email body (plain text, will be wrapped in HTML) */
       body: z.string().min(1),
+      /** Optional editable recipient list; falls back to CardioServ defaults */
+      recipients: z.array(z.object({
+        label: z.enum(["To", "CC"]),
+        email: z.string().email(),
+        name: z.string(),
+      })).min(1).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -528,13 +534,21 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
 
       const senderEmail = process.env.SENDGRID_FROM_EMAIL || "admin@allaboutultrasound.com";
 
+      // Build To/CC from input or fall back to CardioServ defaults
+      const defaultRecipients = [
+        { label: "To" as const, email: "don@cardioserv.net", name: "Don Gerig" },
+        { label: "CC" as const, email: "j.buckland@cardioserv.net", name: "Judith Buckland" },
+        { label: "CC" as const, email: "admin@allaboutultrasound.com", name: "All About Ultrasound Admin" },
+      ];
+      const recipientList = (input.recipients && input.recipients.length > 0) ? input.recipients : defaultRecipients;
+      const toRecipients = recipientList.filter(r => r.label === "To").map(r => ({ name: r.name, email: r.email }));
+      const ccRecipients = recipientList.filter(r => r.label === "CC").map(r => ({ name: r.name, email: r.email }));
+      if (toRecipients.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "At least one To: recipient is required" });
+
       const payload = {
         personalizations: [{
-          to: [{ name: "Don Gerig", email: "don@cardioserv.net" }],
-          cc: [
-            { name: "Judith Buckland", email: "j.buckland@cardioserv.net" },
-            { name: "All About Ultrasound Admin", email: "admin@allaboutultrasound.com" },
-          ],
+          to: toRecipients,
+          ...(ccRecipients.length > 0 ? { cc: ccRecipients } : {}),
           subject: input.subject,
         }],
         from: { name: "All About Ultrasound", email: senderEmail },
