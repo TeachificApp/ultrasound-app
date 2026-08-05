@@ -22,7 +22,7 @@
  */
 
 import { useEditor, EditorContent, Node, mergeAttributes } from "@tiptap/react";
-import { DOMParser as PmDOMParser } from "prosemirror-model";
+import { DOMParser as PmDOMParser } from "@tiptap/pm/model";
 import { Mathematics } from "@tiptap/extension-mathematics";
 import katex from "katex";
 import "katex/dist/katex.min.css";

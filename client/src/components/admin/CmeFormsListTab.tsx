@@ -435,10 +435,11 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="text-xs text-muted-foreground font-mono">ID: {row.id}</span>
                           {row.productType && row.productType !== "course" && (
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${
                               row.productType === "cohort" ? "bg-blue-50 text-blue-600 border-blue-200" :
                               row.productType === "workshop" ? "bg-purple-50 text-purple-600 border-purple-200" :
                               row.productType === "quiz" ? "bg-orange-50 text-orange-600 border-orange-200" :
+                              row.productType === "webinar" ? "bg-teal-50 text-teal-600 border-teal-200" :
                               row.productType === "download" ? "bg-gray-100 text-gray-500 border-gray-200" :
                               "bg-teal-50 text-teal-600 border-teal-200"
                             }`}>

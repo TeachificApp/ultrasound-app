@@ -2408,7 +2408,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, o
         defaultTitle={title}
       />
 
-      {hasCertificate && (
+      {(hasCertificate || (creditHours && creditHours.trim())) && (
         <div className="mt-2 border rounded-lg p-4 bg-white">
           <CmeActivityFormPanel
             courseId={course.id}

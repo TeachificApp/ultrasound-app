@@ -5112,6 +5112,9 @@ export const webinars = mysqlTable("webinars", {
   // Stripe product/price IDs — auto-synced on save
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
+  // CME fields
+  creditHours: varchar("credit_hours", { length: 32 }),
+  hasCertificate: boolean("has_certificate").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

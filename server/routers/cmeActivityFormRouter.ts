@@ -9,11 +9,11 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { eq, leftJoin } from "drizzle-orm";
+import { eq, leftJoin, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { assertAdmin } from "./lmsHelpers";
-import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures } from "../../drizzle/schema";
+import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures, webinars } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
@@ -157,7 +157,36 @@ export const cmeActivityFormRouter = router({
         )
         .orderBy(lmsCourses.title);
 
-      if (courses.length === 0) return [];
+      // Also get CME-eligible webinars
+      const cmeWebinars = await db
+        .select({
+          id: webinars.id,
+          title: webinars.title,
+          slug: webinars.slug,
+          status: webinars.status,
+          creditHours: webinars.creditHours,
+          hasCertificate: webinars.hasCertificate,
+          type: sql<string>`'webinar'`,
+        })
+        .from(webinars)
+        .where(
+          or(
+            eq(webinars.hasCertificate, true),
+            and(
+              isNotNull(webinars.creditHours),
+              ne(webinars.creditHours, ""),
+            ),
+          )
+        )
+        .orderBy(webinars.title);
+
+      // Merge courses + webinars into one list with a source tag
+      const allItems = [
+        ...courses.map(c => ({ ...c, source: 'course' as const })),
+        ...cmeWebinars.map(w => ({ ...w, source: 'webinar' as const })),
+      ].sort((a, b) => a.title.localeCompare(b.title));
+
+      if (allItems.length === 0) return [];
 
       // Get all existing CME forms
       const forms = await db
@@ -179,7 +208,7 @@ export const cmeActivityFormRouter = router({
       const now = Date.now();
       const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 
-      return courses.map(course => {
+      return allItems.map(course => {
         const form = formsByCourseId.get(course.id);
         // Determine completeness: form exists + key sections filled
         const isComplete = !!(form &&
