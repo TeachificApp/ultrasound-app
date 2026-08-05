@@ -834,6 +834,10 @@ function LMSRouter() {
       </Route>
       <Route path="/downloads/:slug/files" component={DownloadFiles} />
       {/* CME Disclosure form — public, no auth, no layout */}
+      {/* Generic route MUST come before :token to avoid "generic" being treated as a token */}
+      <Route path="/cme-disclosure/generic">
+        <Suspense fallback={pageFallback}><CmeDisclosureFormGeneric /></Suspense>
+      </Route>
       <Route path="/cme-disclosure/:token">
         <Suspense fallback={pageFallback}><CmeDisclosureForm /></Suspense>
       </Route>
