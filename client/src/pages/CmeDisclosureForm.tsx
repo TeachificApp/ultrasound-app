@@ -259,61 +259,66 @@ export default function CmeDisclosureForm() {
               </div>
             </div>
 
-            {/* Relationship rows */}
+            {/* Entry rows — always shown unless "no relationships" is checked */}
             {hasRelationships !== "no" && (
-              <div className="space-y-3 mb-4">
-                {relationships.map((rel, idx) => (
-                  <div key={idx} className="border border-[#c0e8ec] rounded-lg overflow-hidden">
-                    <div className="grid grid-cols-[1fr_1fr_auto_auto] gap-0 divide-x divide-[#c0e8ec]">
-                      <div className="p-3">
-                        <Label className="text-xs text-gray-500 block mb-1">Company / Organization *</Label>
+              <div className="mb-4">
+                {/* Column header row for the entry table */}
+                <div className="grid grid-cols-[1fr_1fr_80px_36px] border border-gray-300 rounded-t-lg overflow-hidden">
+                  <div className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 border-r border-gray-300">Company / Ineligible Entity</div>
+                  <div className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 border-r border-gray-300">Nature of Financial Relationship</div>
+                  <div className="bg-gray-100 px-3 py-2 text-xs font-bold text-gray-700 text-center border-r border-gray-300">Ended?</div>
+                  <div className="bg-gray-100 px-3 py-2"></div>
+                </div>
+                {/* Data entry rows */}
+                <div className="border-x border-b border-gray-300 rounded-b-lg overflow-hidden divide-y divide-gray-200">
+                  {relationships.map((rel, idx) => (
+                    <div key={idx} className={`grid grid-cols-[1fr_1fr_80px_36px] ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                      <div className="px-2 py-1.5 border-r border-gray-200">
                         <Input
                           value={rel.company}
                           onChange={e => updateRelationship(idx, "company", e.target.value)}
                           placeholder="e.g. Acme Medical Inc."
-                          className="h-8 text-sm border-[#c0e8ec] focus:border-[#189aa1]"
+                          className="h-7 text-sm border-0 bg-transparent focus:ring-0 focus:outline-none px-0 placeholder:text-gray-300"
                         />
                       </div>
-                      <div className="p-3">
-                        <Label className="text-xs text-gray-500 block mb-1">Nature of Relationship *</Label>
+                      <div className="px-2 py-1.5 border-r border-gray-200">
                         <Input
                           value={rel.relationship}
                           onChange={e => updateRelationship(idx, "relationship", e.target.value)}
-                          placeholder="e.g. Consultant, Speaker, Employee…"
-                          className="h-8 text-sm border-[#c0e8ec] focus:border-[#189aa1]"
+                          placeholder="e.g. Consultant, Speaker…"
+                          className="h-7 text-sm border-0 bg-transparent focus:ring-0 focus:outline-none px-0 placeholder:text-gray-300"
                         />
                       </div>
-                      <div className="p-3 flex flex-col items-center justify-center gap-1 min-w-[72px]">
-                        <Label className="text-xs text-gray-500 text-center">Ended?</Label>
+                      <div className="px-2 py-1.5 flex items-center justify-center border-r border-gray-200">
                         <Checkbox
                           checked={rel.ended}
                           onCheckedChange={v => updateRelationship(idx, "ended", !!v)}
-                          className="border-[#189aa1] data-[state=checked]:bg-[#189aa1] data-[state=checked]:border-[#189aa1] w-5 h-5"
+                          className="border-gray-400 data-[state=checked]:bg-[#189aa1] data-[state=checked]:border-[#189aa1] w-4 h-4"
                         />
                       </div>
-                      <div className="p-3 flex items-center justify-center min-w-[44px]">
+                      <div className="flex items-center justify-center">
                         {relationships.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeRelationship(idx)}
-                            className="text-red-300 hover:text-red-500 transition-colors"
+                            className="text-red-300 hover:text-red-500 transition-colors p-1"
                             title="Remove row"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         )}
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={addRelationship}
-                  className="border-dashed border-[#189aa1] text-[#189aa1] hover:bg-[#f0fafa] text-xs"
+                  className="mt-2 border-dashed border-[#189aa1] text-[#189aa1] hover:bg-[#f0fafa] text-xs"
                 >
-                  <Plus className="w-3 h-3 mr-1" /> Add Another Relationship
+                  <Plus className="w-3 h-3 mr-1" /> Add Another Row
                 </Button>
               </div>
             )}
