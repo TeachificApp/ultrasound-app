@@ -24,7 +24,7 @@ import {
   Loader2, Sparkles, Download, Save, ChevronDown, ChevronUp,
   FileText, RefreshCw, Calendar, CheckSquare, Square,
   PenLine, Trash2, FileDown, Send, Mail, ChevronsUpDown,
-  X, Plus, UserPlus,
+  X, Plus, UserPlus, AlertTriangle, CheckCircle2,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -216,20 +216,20 @@ function YellowField({ label, value, onChange, type = "text", placeholder }: {
 }
 
 /** Green field — AI-generated, editable textarea */
-function GreenField({ label, value, onChange, rows = 4, hint }: {
-  label: string; value: string; onChange: (v: string) => void; rows?: number; hint?: string;
+function GreenField({ label, value, onChange, rows = 4, hint, hasError }: {
+  label: string; value: string; onChange: (v: string) => void; rows?: number; hint?: string; hasError?: boolean;
 }) {
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-2">
-        <Label className="text-xs font-medium text-gray-700">{label}</Label>
-        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-green-400 text-green-700 bg-green-50">AI Generated</Badge>
+        <Label className={cn("text-xs font-medium", hasError ? "text-red-600" : "text-gray-700")}>{label}</Label>
+        <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", hasError ? "border-red-400 text-red-700 bg-red-50" : "border-green-400 text-green-700 bg-green-50")}>AI Generated</Badge>
       </div>
       <Textarea
         value={value}
         onChange={e => onChange(e.target.value)}
         rows={rows}
-        className="text-sm border-green-400 bg-green-50 focus:border-green-500 focus:ring-green-200 resize-y"
+        className={cn("text-sm resize-y", hasError ? "border-red-400 bg-red-50 focus:border-red-500" : "border-green-400 bg-green-50 focus:border-green-500 focus:ring-green-200")}
       />
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
@@ -386,11 +386,15 @@ interface Props {
   courseId: number;
   courseTitle: string;
   creditHours?: string | null;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
-export function CmeActivityFormPanel({ courseId, courseTitle, creditHours }: Props) {
+export function CmeActivityFormPanel({ courseId, courseTitle, creditHours, onDirtyChange }: Props) {
   const [form, setForm] = useState<FormData>({ ...DEFAULT_FORM, activityTitle: courseTitle, activityLengthHours: creditHours ?? "", cmeCreditsRequested: creditHours ?? "" });
   const [loaded, setLoaded] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
+  const [showValidation, setShowValidation] = useState(false);
   // Increment on every mount so the hydration useEffect re-runs even when data reference is unchanged (tRPC cache)
   const [mountId, setMountId] = useState(0);
   useEffect(() => { setMountId(n => n + 1); }, []);
@@ -456,7 +460,53 @@ All About Ultrasound, Inc. dba iHeartEcho`;
     return { subject, body };
   };
 
+  // ── Validation ─────────────────────────────────────────────────────────
+  const REQUIRED_FIELDS: Array<{ key: keyof FormData; label: string }> = [
+    { key: "activityTitle", label: "Activity Title" },
+    { key: "proposedDate", label: "Proposed Date(s)" },
+    { key: "activityLengthHours", label: "Activity Length (Hours)" },
+    { key: "cmeCreditsRequested", label: "CME Credits Requested" },
+    { key: "practiceGapDescription", label: "Practice Gap Description" },
+    { key: "learningObjectives", label: "Learning Objectives" },
+    { key: "attestationName", label: "Attestation Name" },
+  ];
+  const validate = (): { valid: boolean; errors: Set<string>; missingLabels: string[] } => {
+    const errors = new Set<string>();
+    const missingLabels: string[] = [];
+    for (const { key, label } of REQUIRED_FIELDS) {
+      const val = form[key];
+      const isEmpty = !val || (typeof val === "string" && val.trim() === "") || (Array.isArray(val) && val.length === 0);
+      if (isEmpty) { errors.add(key as string); missingLabels.push(label); }
+    }
+    // Faculty: at least one entry with a name
+    if (!form.facultyJson.some(f => f.name.trim())) {
+      errors.add("facultyJson");
+      missingLabels.push("Faculty (at least one)");
+    }
+    return { valid: errors.size === 0, errors, missingLabels };
+  };
+
   const openSendDialog = () => {
+    // Run validation first
+    const { valid, errors, missingLabels } = validate();
+    if (!valid) {
+      setValidationErrors(errors);
+      setShowValidation(true);
+      toast.error(
+        <div className="space-y-1">
+          <p className="font-medium text-sm">Please complete required fields before sending:</p>
+          <ul className="text-xs list-disc pl-4 space-y-0.5">
+            {missingLabels.map(l => <li key={l}>{l}</li>)}
+          </ul>
+        </div>
+      );
+      // Scroll to first error field
+      setTimeout(() => {
+        const el = document.querySelector('[data-validation-error="true"]');
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+      return;
+    }
     if (lastSentAt) {
       setResubmitConfirmOpen(true);
       return;
@@ -565,8 +615,16 @@ All About Ultrasound, Inc. dba iHeartEcho`;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, mountId]); // Re-hydrate when data changes OR on every fresh mount
 
+  // Notify parent when dirty state changes
+  const onDirtyChangeRef = useRef(onDirtyChange);
+  useEffect(() => { onDirtyChangeRef.current = onDirtyChange; }, [onDirtyChange]);
+  useEffect(() => { onDirtyChangeRef.current?.(isDirty); }, [isDirty]);
+
   const set = useCallback(<K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm(prev => ({ ...prev, [key]: value }));
+    setIsDirty(true);
+    // Clear validation error for this field when user edits it
+    setValidationErrors(prev => { const next = new Set(prev); next.delete(key as string); return next; });
   }, []);
 
   // ── AI generate green fields ────────────────────────────────────────────
@@ -629,6 +687,9 @@ All About Ultrasound, Inc. dba iHeartEcho`;
         },
       });
       toast.success("CME Activity Form saved.");
+      setIsDirty(false);
+      setShowValidation(false);
+      setValidationErrors(new Set());
       utils.lmsAdmin.getCmeActivityForm.invalidate({ courseId });
     } catch (e: any) {
       toast.error("Save failed: " + (e?.message ?? "Unknown error"));
@@ -716,6 +777,31 @@ All About Ultrasound, Inc. dba iHeartEcho`;
     }
   };
 
+  // ── Regenerate PDF from saved DB state ────────────────────────────────
+  const [regenPdf, setRegenPdf] = useState(false);
+  const handleRegenPdf = async () => {
+    setRegenPdf(true);
+    try {
+      const result = await downloadPdfMutation.mutateAsync({ courseId });
+      const resp = await fetch(result.url);
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      const safeTitle = (courseTitle ?? "cme-form").replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
+      a.download = `cme-activity-form-${safeTitle}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      toast.success("PDF regenerated from saved data.");
+    } catch (e: any) {
+      toast.error("Regenerate PDF failed: " + (e?.message ?? "Unknown error"));
+    } finally {
+      setRegenPdf(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -747,17 +833,21 @@ All About Ultrasound, Inc. dba iHeartEcho`;
             {aiGenerating ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
             {aiGenerating ? "Generating…" : "AI Generate Content"}
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={handleSave} disabled={saving} className="text-xs">
+          <Button type="button" variant="outline" size="sm" onClick={handleSave} disabled={saving} className={cn("text-xs", isDirty && "border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100")}>
             {saving ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
-            Save
+            {isDirty ? "Save*" : "Save"}
           </Button>
           <Button type="button" size="sm" onClick={handleDownload} disabled={downloading} className="text-xs bg-[#189aa1] hover:bg-[#147f85] text-white">
             {downloading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
             DOCX
           </Button>
-          <Button type="button" size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf} className="text-xs bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white">
+          <Button type="button" size="sm" onClick={handleDownloadPdf} disabled={downloadingPdf} className="text-xs bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white" title="Save current form then generate PDF">
             {downloadingPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileDown className="w-3 h-3 mr-1" />}
             PDF
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={handleRegenPdf} disabled={regenPdf} className="text-xs" title="Regenerate PDF from last saved data (does not save current edits)">
+            {regenPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
+            Regen PDF
           </Button>
           <div className="flex flex-col items-end gap-0.5">
             <Button type="button" size="sm" onClick={openSendDialog} className="text-xs bg-[#189aa1] hover:bg-[#147f85] text-white">
@@ -785,31 +875,56 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           <CheckSquare className="w-3 h-3" /> Blue = Select from list
         </span>
       </div>
+      {/* Unsaved changes banner */}
+      {isDirty && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-50 border border-amber-300 text-amber-800 text-xs">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>You have unsaved changes. Click <strong>Save*</strong> to preserve them before switching tabs.</span>
+        </div>
+      )}
+      {/* Validation error summary */}
+      {showValidation && validationErrors.size > 0 && (
+        <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-red-50 border border-red-300 text-red-800 text-xs">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>Required fields are highlighted below. Complete them before sending to CardioServ.</span>
+        </div>
+      )}
 
       {/* ── Section 1: Activity Overview ── */}
       <Section number={1} title="Activity Overview">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <Label className="text-xs font-medium text-gray-700">1. Activity Title</Label>
+          <div className="sm:col-span-2" data-validation-error={showValidation && validationErrors.has("activityTitle") ? "true" : undefined}>
+            <Label className={cn("text-xs font-medium", showValidation && validationErrors.has("activityTitle") ? "text-red-600" : "text-gray-700")}>
+              1. Activity Title {showValidation && validationErrors.has("activityTitle") && <span className="text-red-500 ml-1">*required</span>}
+            </Label>
             <Input
               value={form.activityTitle}
               onChange={e => set("activityTitle", e.target.value)}
-              className="mt-1 h-8 text-sm border-green-400 bg-green-50"
+              className={cn("mt-1 h-8 text-sm", showValidation && validationErrors.has("activityTitle") ? "border-red-400 bg-red-50 focus:border-red-500" : "border-green-400 bg-green-50")}
               placeholder="Course title (auto-filled)"
             />
           </div>
           <RadioGroup label="2. Activity Type" options={ACTIVITY_TYPE_OPTS} value={form.activityType} onChange={v => set("activityType", v)} />
-          <YellowField label="3. Proposed Date(s) or Launch Date" value={form.proposedDate} onChange={v => set("proposedDate", v)} placeholder="e.g. ASAP or 2026-09-01" />
+          <div data-validation-error={showValidation && validationErrors.has("proposedDate") ? "true" : undefined}>
+            <Label className={cn("text-xs font-medium", showValidation && validationErrors.has("proposedDate") ? "text-red-600" : "text-gray-700")}>
+              3. Proposed Date(s) or Launch Date {showValidation && validationErrors.has("proposedDate") && <span className="text-red-500 ml-1">*required</span>}
+            </Label>
+            <Input value={form.proposedDate} onChange={e => set("proposedDate", e.target.value)} placeholder="e.g. ASAP or 2026-09-01" className={cn("mt-1 h-8 text-sm", showValidation && validationErrors.has("proposedDate") ? "border-red-400 bg-red-50" : "border-yellow-400 bg-yellow-50")} />
+          </div>
           <YellowField label="Original Release Date" value={form.originalReleaseDate} onChange={v => set("originalReleaseDate", v)} placeholder="e.g. 2024-01-15" />
           <YellowField label="Most Recent Review Date" value={form.mostRecentReviewDate} onChange={v => set("mostRecentReviewDate", v)} placeholder="e.g. 2025-06-01" />
           <YellowField label="Expiration Date" value={form.expirationDate} onChange={v => set("expirationDate", v)} placeholder="e.g. 2027-01-15" />
-          <div>
-            <Label className="text-xs font-medium text-gray-700">4. Estimated Activity Length (hours)</Label>
-            <Input value={form.activityLengthHours} onChange={e => set("activityLengthHours", e.target.value)} className="mt-1 h-8 text-sm border-green-400 bg-green-50" placeholder="e.g. 3" />
+          <div data-validation-error={showValidation && validationErrors.has("activityLengthHours") ? "true" : undefined}>
+            <Label className={cn("text-xs font-medium", showValidation && validationErrors.has("activityLengthHours") ? "text-red-600" : "text-gray-700")}>
+              4. Estimated Activity Length (hours) {showValidation && validationErrors.has("activityLengthHours") && <span className="text-red-500 ml-1">*required</span>}
+            </Label>
+            <Input value={form.activityLengthHours} onChange={e => set("activityLengthHours", e.target.value)} className={cn("mt-1 h-8 text-sm", showValidation && validationErrors.has("activityLengthHours") ? "border-red-400 bg-red-50" : "border-green-400 bg-green-50")} placeholder="e.g. 3" />
           </div>
-          <div>
-            <Label className="text-xs font-medium text-gray-700">5. Estimated CME Credit Hours</Label>
-            <Input value={form.cmeCreditsRequested} onChange={e => set("cmeCreditsRequested", e.target.value)} className="mt-1 h-8 text-sm border-green-400 bg-green-50" placeholder="e.g. 3" />
+          <div data-validation-error={showValidation && validationErrors.has("cmeCreditsRequested") ? "true" : undefined}>
+            <Label className={cn("text-xs font-medium", showValidation && validationErrors.has("cmeCreditsRequested") ? "text-red-600" : "text-gray-700")}>
+              5. Estimated CME Credit Hours {showValidation && validationErrors.has("cmeCreditsRequested") && <span className="text-red-500 ml-1">*required</span>}
+            </Label>
+            <Input value={form.cmeCreditsRequested} onChange={e => set("cmeCreditsRequested", e.target.value)} className={cn("mt-1 h-8 text-sm", showValidation && validationErrors.has("cmeCreditsRequested") ? "border-red-400 bg-red-50" : "border-green-400 bg-green-50")} placeholder="e.g. 3" />
           </div>
         </div>
         <RadioGroup label="6. Offer MOC Credit?" options={YES_NO_OPTS} value={form.offerMocCredit} onChange={v => set("offerMocCredit", v)} />
@@ -821,13 +936,16 @@ All About Ultrasound, Inc. dba iHeartEcho`;
 
       {/* ── Section 2: Professional Practice Gap ── */}
       <Section number={2} title="Professional Practice Gap">
-        <GreenField
-          label="1. Describe the specific practice-based problem or challenge you're trying to solve"
-          value={form.practiceGapDescription}
-          onChange={v => set("practiceGapDescription", v)}
-          rows={5}
-          hint="Click 'AI Generate Content' above to auto-fill based on the course title."
-        />
+        <div data-validation-error={showValidation && validationErrors.has("practiceGapDescription") ? "true" : undefined}>
+          <GreenField
+            label={showValidation && validationErrors.has("practiceGapDescription") ? "1. Describe the specific practice-based problem or challenge you're trying to solve *required" : "1. Describe the specific practice-based problem or challenge you're trying to solve"}
+            value={form.practiceGapDescription}
+            onChange={v => set("practiceGapDescription", v)}
+            rows={5}
+            hint="Click 'AI Generate Content' above to auto-fill based on the course title."
+            hasError={showValidation && validationErrors.has("practiceGapDescription")}
+          />
+        </div>
         <GreenField
           label="2. What are the primary reasons contributing to this problem?"
           value={form.practiceGapReasons}
@@ -868,13 +986,16 @@ All About Ultrasound, Inc. dba iHeartEcho`;
 
       {/* ── Section 4: Learning Objectives ── */}
       <Section number={4} title="Learning Objectives">
-        <GreenField
-          label="Learning Objectives (bullet points)"
-          value={form.learningObjectives}
-          onChange={v => set("learningObjectives", v)}
-          rows={6}
-          hint="Use • bullet points, one per line. Start each with an action verb (Describe, Demonstrate, Apply, Interpret)."
-        />
+        <div data-validation-error={showValidation && validationErrors.has("learningObjectives") ? "true" : undefined}>
+          <GreenField
+            label="Learning Objectives (bullet points)"
+            value={form.learningObjectives}
+            onChange={v => set("learningObjectives", v)}
+            rows={6}
+            hint="Use • bullet points, one per line. Start each with an action verb (Describe, Demonstrate, Apply, Interpret)."
+            hasError={showValidation && validationErrors.has("learningObjectives")}
+          />
+        </div>
       </Section>
 
       {/* ── Section 5: Educational Format ── */}
@@ -895,6 +1016,12 @@ All About Ultrasound, Inc. dba iHeartEcho`;
       {/* ── Section 6: Faculty ── */}
       <Section number={6} title="Faculty and Planning Team">
         <p className="text-xs text-muted-foreground">List all individuals involved in planning, reviewing, presenting, or influencing educational content.</p>
+        {showValidation && validationErrors.has("facultyJson") && (
+          <div data-validation-error="true" className="flex items-center gap-2 px-3 py-2 rounded-md bg-red-50 border border-red-300 text-red-700 text-xs">
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+            At least one faculty member with a name is required.
+          </div>
+        )}
         {form.facultyJson.map((f, i) => (
           <div key={i} className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 border rounded bg-yellow-50 border-yellow-300">
             <div>
@@ -1067,9 +1194,11 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           ))}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <Label className="text-xs font-medium text-gray-700">Name</Label>
-            <Input value={form.attestationName} onChange={e => set("attestationName", e.target.value)} className="mt-1 h-8 text-sm border-green-400 bg-green-50" />
+          <div data-validation-error={showValidation && validationErrors.has("attestationName") ? "true" : undefined}>
+            <Label className={cn("text-xs font-medium", showValidation && validationErrors.has("attestationName") ? "text-red-600" : "text-gray-700")}>
+              Name {showValidation && validationErrors.has("attestationName") && <span className="text-red-500 ml-1">*required</span>}
+            </Label>
+            <Input value={form.attestationName} onChange={e => set("attestationName", e.target.value)} className={cn("mt-1 h-8 text-sm", showValidation && validationErrors.has("attestationName") ? "border-red-400 bg-red-50" : "border-green-400 bg-green-50")} />
           </div>
           <div>
             <Label className="text-xs font-medium text-gray-700">Title / Credentials</Label>

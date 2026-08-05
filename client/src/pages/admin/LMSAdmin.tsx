@@ -1169,7 +1169,16 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
   const [activeTab, setActiveTab] = useState(initialTab);
   // Track which tabs have been visited to lazy-mount heavy editors
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set([initialTab]));
+  // CME form unsaved-changes warning
+  const [cmeDirty, setCmeDirty] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [unsavedWarningOpen, setUnsavedWarningOpen] = useState(false);
   const handleTabChange = (tab: string) => {
+    if (cmeDirty && activeTab === "settings" && tab !== "settings") {
+      setPendingTab(tab);
+      setUnsavedWarningOpen(true);
+      return;
+    }
     setActiveTab(tab);
     setVisitedTabs(prev => { const next = new Set(prev); next.add(tab); return next; });
   };
@@ -1441,6 +1450,31 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
         </Button>
       </div>
 
+      {/* Unsaved CME form changes warning dialog */}
+      <Dialog open={unsavedWarningOpen} onOpenChange={setUnsavedWarningOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="w-4 h-4" /> Unsaved CME Form Changes
+            </DialogTitle>
+            <DialogDescription>
+              You have unsaved changes in the CME Activity Form. If you switch tabs now, your changes will be lost.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setUnsavedWarningOpen(false)}>Stay &amp; Save</Button>
+            <Button variant="destructive" size="sm" onClick={() => {
+              setUnsavedWarningOpen(false);
+              setCmeDirty(false);
+              if (pendingTab) {
+                setActiveTab(pendingTab);
+                setVisitedTabs(prev => { const next = new Set(prev); next.add(pendingTab); return next; });
+                setPendingTab(null);
+              }
+            }}>Discard &amp; Switch</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="bg-gray-100">
           <TabsTrigger value="settings" className="text-xs">Settings</TabsTrigger>
@@ -2373,6 +2407,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop }:
             courseId={course.id}
             courseTitle={course.title ?? title}
             creditHours={creditHours || null}
+            onDirtyChange={setCmeDirty}
           />
         </div>
       )}
@@ -13637,4 +13672,5 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
     </div>
   );
 }
+
 
