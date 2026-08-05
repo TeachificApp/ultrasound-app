@@ -497,8 +497,9 @@ export const revenueShareRouter = router({
         .where(eq(revenueSharePartners.id, input.partnerId))
         .limit(1);
       if (!partner) throw new TRPCError({ code: "NOT_FOUND", message: "Partner not found" });
-      // Generate onboarding link
-      const baseUrl = process.env.CANONICAL_ROOT_DOMAIN ?? "https://app.allaboutultrasound.com";
+      // Generate onboarding link — Stripe requires HTTPS URLs
+      const rawDomain = process.env.CANONICAL_ROOT_DOMAIN ?? "learn.allaboutultrasound.com";
+      const baseUrl = rawDomain.startsWith("http") ? rawDomain : `https://${rawDomain}`;
       const onboardingUrl = await createOnboardingLink(
         partner.stripeAccountId!,
         `${baseUrl}/partner-portal`,

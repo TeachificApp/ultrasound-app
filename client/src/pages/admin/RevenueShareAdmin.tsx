@@ -240,7 +240,7 @@ function PartnersTab() {
                       {p.onboardingStatus !== "active" && (
                         <Button
                           size="sm" variant="outline"
-                          onClick={() => onboardingMutation.mutate({ partnerId: p.id })}
+                          onClick={() => onboardingMutation.mutate({ partnerId: p.id, origin: window.location.origin })}
                           disabled={onboardingMutation.isPending}
                           className="gap-1 text-xs"
                         >
