@@ -1200,6 +1200,24 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                       {sendingDisclosureIdx === i ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Mail className="w-3 h-3 mr-1" />}
                       {disc?.status === 'sent' || disc?.status === 'submitted' ? 'Resend Disclosure' : 'Send Disclosure'}
                     </Button>
+                    {disc?.token && (
+                      <Button
+                        type="button" size="sm" variant="outline"
+                        className="h-6 text-[10px] px-2 text-gray-500 border-gray-300 hover:bg-gray-50"
+                        title="Copy direct disclosure link to clipboard"
+                        onClick={() => {
+                          const link = `${window.location.origin}/cme-disclosure/${disc.token}`;
+                          navigator.clipboard.writeText(link).then(() => {
+                            toast.success('Link copied!');
+                          }).catch(() => {
+                            toast.error('Copy failed. Link: ' + link);
+                          });
+                        }}
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        Copy Link
+                      </Button>
+                    )}
                   </div>
                 </div>
               );

@@ -827,6 +827,14 @@ function LMSRouter() {
         </Suspense>
       </Route>
       <Route path="/downloads/:slug/files" component={DownloadFiles} />
+      {/* CME Disclosure form — public, no auth, no layout */}
+      <Route path="/cme-disclosure/:token">
+        <Suspense fallback={pageFallback}><CmeDisclosureForm /></Suspense>
+      </Route>
+      {/* Partner signup — public, no auth, no layout */}
+      <Route path="/partner-signup">
+        <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>
+      </Route>
       {/* Hosted checkout pages — outside LMSLayout (full-screen, no nav) */}
       <Route path="/checkout/complete">
         <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
@@ -1237,6 +1245,7 @@ const RESERVED_FUNNEL_SLUGS = new Set([
   "educator-assist", "educator-admin", "student-dashboard", "image-quality-review",
   "accreditation-manager", "accreditation-navigator", "diy-accreditation-plans",
   "memberships", "my-memberships", "404", "terms", "privacy", "contact",
+  "cme-disclosure", "partner-signup",
 ]);
 
 /** Guards /:slug/:pageSlug — never treat reserved or /admin paths as funnels. */
