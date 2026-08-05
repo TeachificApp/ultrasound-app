@@ -13,19 +13,25 @@ interface State {
 }
 
 /**
- * Returns true if the error is a Vite/webpack chunk load failure caused by a
- * stale deployment cache (e.g. "Failed to fetch dynamically imported module").
- * In that case we automatically reload the page once to pick up the new chunks.
+ * Returns true if the error indicates a stale cached JS bundle that should be
+ * resolved by reloading the page to pick up the latest deployment.
+ * Covers: Vite/webpack chunk load failures AND ReferenceErrors from renamed/removed
+ * identifiers in a newer build (e.g. "setCmeDirty is not defined").
  */
 function isChunkLoadError(error: Error): boolean {
   const msg = error?.message ?? "";
-  return (
+  // Standard chunk load failures
+  if (
     msg.includes("Failed to fetch dynamically imported module") ||
     msg.includes("Importing a module script failed") ||
     msg.includes("Loading chunk") ||
     msg.includes("Loading CSS chunk") ||
     /ChunkLoadError/.test(msg)
-  );
+  ) return true;
+  // ReferenceErrors where an identifier "is not defined" — these indicate a stale
+  // cached JS bundle referencing a variable that was renamed or removed in a newer build.
+  if (error instanceof ReferenceError && msg.includes("is not defined")) return true;
+  return false;
 }
 
 const CHUNK_RELOAD_KEY = "chunk_reload_attempted";
