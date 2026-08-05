@@ -1529,6 +1529,9 @@ export const lmsDisclosurePublicRouter = router({
           noRelationships: parsed.hasRelationships === "no" ? 1 : 0,
           attestationName: input.attestationName,
           attestationDate: now.toISOString().split("T")[0],
+          // Auto-mark as received: electronic submission = form received
+          receivedAt: now,
+          receivedNotes: "Received electronically via online submission form",
         })
         .where(eq(cmeFinancialDisclosures.token, input.token));
 

@@ -810,7 +810,48 @@ export default function RichTextEditor({
         return merged.join('\n');
       },
       handlePaste: (view, event) => {
-        const pastedHtml = event.clipboardData?.getData("text/html");
+        const pastedHtml = event.clipboardData?.getData("text/html") ?? "";
+        const pastedText = event.clipboardData?.getData("text/plain") ?? "";
+
+        // ── Emoji inline paste fix ────────────────────────────────────────────
+        // When content is pasted from ChatGPT, Slack, iMessage, etc., emojis
+        // often arrive as separate <p> blocks in the HTML. We detect this by
+        // checking whether the plain-text version has emojis that appear to be
+        // on their own lines, and if so we use the plain text as the source of
+        // truth (which preserves the inline layout) instead of the HTML.
+        //
+        // We only do this when there is NO image in the HTML (images need the
+        // HTML path) and when the plain text actually contains emojis.
+        const hasEmoji = /\p{Emoji}/u.test(pastedText);
+        const hasImage = pastedHtml.includes("data:image") || pastedHtml.includes("<img");
+
+        if (hasEmoji && !hasImage && pastedText.trim()) {
+          // Check if the HTML has emojis on separate block elements
+          // (a sign that the source broke them into paragraphs)
+          const emojiOnlyBlockRe = /^<p[^>]*>\s*(?:[\p{Emoji_Presentation}\u200D\uFE0F\u20E3\s]+)\s*<\/p>/mu;
+          const htmlHasEmojiBlocks = emojiOnlyBlockRe.test(pastedHtml);
+
+          if (htmlHasEmojiBlocks || !pastedHtml.trim()) {
+            // Use plain text — it preserves the original inline layout
+            event.preventDefault();
+            // Convert plain text to HTML: preserve line breaks as <br> within
+            // the same paragraph, and double newlines as paragraph breaks.
+            const paragraphs = pastedText.split(/\n{2,}/);
+            const htmlContent = paragraphs
+              .map(para => {
+                const lines = para.split(/\n/);
+                const inner = lines
+                  .map(l => l.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"))
+                  .join("<br>");
+                return `<p>${inner}</p>`;
+              })
+              .join("");
+            // Insert directly without the placeholder dispatch
+            editorRef.current?.chain().focus().insertContent(htmlContent).run();
+            return true;
+          }
+        }
+
         if (pastedHtml?.includes("data:image")) {
           event.preventDefault();
           toast.info("Uploading pasted images...");
