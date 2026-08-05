@@ -706,6 +706,21 @@ All About Ultrasound, Inc. dba iHeartEcho`;
 function GenericDisclosuresSection() {
   const [search, setSearch] = useState("");
   const [viewRow, setViewRow] = useState<any>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const downloadPdfMutation = trpc.lmsAdmin.downloadGenericDisclosurePdf.useMutation();
+
+  const handleDownloadPdf = async (row: any) => {
+    setDownloadingPdf(true);
+    try {
+      const result = await downloadPdfMutation.mutateAsync({ id: row.id });
+      window.open(result.url, "_blank");
+    } catch {
+      toast.error("Failed to generate PDF");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   const { data, isLoading, refetch } = trpc.lmsAdmin.listGenericDisclosures.useQuery(
     { search: search || undefined },
@@ -833,6 +848,19 @@ function GenericDisclosuresSection() {
               )}
             </div>
             <DialogFooter>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={downloadingPdf}
+                onClick={() => handleDownloadPdf(viewRow)}
+                className="gap-1.5"
+              >
+                {downloadingPdf ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                ) : (
+                  <><FileDown className="w-3.5 h-3.5" /> Download PDF</>
+                )}
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setViewRow(null)}>Close</Button>
             </DialogFooter>
           </DialogContent>
