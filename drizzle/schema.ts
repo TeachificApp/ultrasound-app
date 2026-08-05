@@ -8177,3 +8177,33 @@ export const revenueShareLedger = mysqlTable("revenue_share_ledger", {
 });
 export type RevenueShareLedgerEntry = typeof revenueShareLedger.$inferSelect;
 export type InsertRevenueShareLedgerEntry = typeof revenueShareLedger.$inferInsert;
+
+// ─── CME Financial Disclosures ────────────────────────────────────────────────
+export const cmeFinancialDisclosures = mysqlTable("cme_financial_disclosures", {
+  id: int("id").autoincrement().primaryKey(),
+  courseId: int("course_id").notNull(),
+  cmeFormId: int("cme_form_id"),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  facultyName: varchar("faculty_name", { length: 255 }).notNull(),
+  facultyEmail: varchar("faculty_email", { length: 320 }).notNull(),
+  courseTitle: varchar("course_title", { length: 500 }),
+  educationDate: varchar("education_date", { length: 255 }),
+  sentAt: timestamp("sent_at"),
+  submittedAt: timestamp("submitted_at"),
+  status: mysqlEnum("status", ["pending", "sent", "submitted", "expired"]).notNull().default("pending"),
+  rolesJson: text("roles_json"),
+  rolesOther: varchar("roles_other", { length: 255 }),
+  relationshipsJson: text("relationships_json"),
+  noRelationships: int("no_relationships").notNull().default(0),
+  attestationName: varchar("attestation_name", { length: 255 }),
+  attestationDate: varchar("attestation_date", { length: 32 }),
+  pdfUrl: text("pdf_url"),
+  emailSentAt: timestamp("email_sent_at"),
+  receivedAt: timestamp("received_at"),
+  receivedNotes: text("received_notes"),
+  createdBy: int("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type CmeFinancialDisclosure = typeof cmeFinancialDisclosures.$inferSelect;
+export type InsertCmeFinancialDisclosure = typeof cmeFinancialDisclosures.$inferInsert;

@@ -136,7 +136,7 @@ interface FormData {
   deliveryDescription: string;
   activityIncludes: string[];
   assessmentMethods: string[];
-  facultyJson: Array<{ name: string; credentials: string; role: string }>;
+  facultyJson: Array<{ name: string; credentials: string; role: string; email?: string }>;
   contentStatus: string;
   contentAvailableDate: string;
   marketingChannels: string[];
@@ -433,6 +433,23 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours, onDir
   const [openInstructorPopover, setOpenInstructorPopover] = useState<number | null>(null);
   const createInstructorMutation = trpc.lmsAdmin.createInstructor.useMutation();
   const [creatingInstructorIdx, setCreatingInstructorIdx] = useState<number | null>(null);
+  // ── Financial Disclosure ──────────────────────────────────────────────────
+  const [sendingDisclosureIdx, setSendingDisclosureIdx] = useState<number | null>(null);
+  const [markReceivedDialogId, setMarkReceivedDialogId] = useState<number | null>(null);
+  const [markReceivedNotes, setMarkReceivedNotes] = useState("");
+  const [disclosureEmailDialog, setDisclosureEmailDialog] = useState<{ idx: number; name: string; email: string } | null>(null);
+  const { data: disclosureStatuses, refetch: refetchDisclosures } = trpc.lmsAdmin.getFinancialDisclosureStatus.useQuery(
+    { courseId },
+    { enabled: !!courseId }
+  );
+  const sendDisclosureMutation = trpc.lmsAdmin.sendFinancialDisclosure.useMutation({
+    onSuccess: () => { refetchDisclosures(); },
+    onError: (e: any) => toast.error("Failed to send disclosure: " + e.message),
+  });
+  const markReceivedMutation = trpc.lmsAdmin.markDisclosureReceived.useMutation({
+    onSuccess: () => { refetchDisclosures(); setMarkReceivedDialogId(null); setMarkReceivedNotes(""); },
+    onError: (e: any) => toast.error("Failed to mark received: " + e.message),
+  });
 
   const landingPageUrl = courseSlug
     ? `https://learn.allaboutultrasound.com/courses/${courseSlug}`
@@ -1142,6 +1159,51 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                 )}
               </div>
             </div>
+            {/* Financial Disclosure row */}
+            {(() => {
+              const disc = (disclosureStatuses ?? []).find(
+                (d: any) => f.email
+                  ? d.facultyEmail?.toLowerCase() === f.email.toLowerCase()
+                  : d.facultyName?.toLowerCase() === f.name?.trim().toLowerCase()
+              );
+              return (
+                <div className="flex items-center gap-2 pt-1 border-t border-dashed border-gray-200 mt-1">
+                  <span className="text-[10px] text-gray-500 font-medium">Financial Disclosure:</span>
+                  {disc?.status === 'submitted' ? (
+                    <Badge className="text-[10px] bg-green-100 text-green-700 border-green-300 px-1.5 py-0">✓ Submitted</Badge>
+                  ) : disc?.receivedAt ? (
+                    <Badge className="text-[10px] bg-teal-100 text-teal-700 border-teal-300 px-1.5 py-0">✓ Received {new Date(disc.receivedAt).toLocaleDateString()}</Badge>
+                  ) : disc?.status === 'sent' ? (
+                    <Badge className="text-[10px] bg-blue-100 text-blue-700 border-blue-300 px-1.5 py-0">Sent {disc.sentAt ? new Date(disc.sentAt).toLocaleDateString() : ''}</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-gray-500 px-1.5 py-0">Not sent</Badge>
+                  )}
+                  <div className="flex gap-1 ml-auto">
+                    {disc && !disc.receivedAt && (
+                      <Button
+                        type="button" size="sm" variant="outline"
+                        className="h-6 text-[10px] px-2 text-teal-700 border-teal-300 hover:bg-teal-50"
+                        onClick={() => { setMarkReceivedDialogId(disc.id); setMarkReceivedNotes(''); }}
+                      >Mark Received</Button>
+                    )}
+                    <Button
+                      type="button" size="sm" variant="outline"
+                      className="h-6 text-[10px] px-2 text-[#189aa1] border-[#189aa1] hover:bg-teal-50"
+                      disabled={sendingDisclosureIdx === i || !f.name.trim()}
+                      onClick={() => {
+                        if (!f.name.trim()) { toast.error('Enter a faculty name first'); return; }
+                        // Pre-fill email from faculty row or existing disclosure record
+                        const existingEmail = f.email || disc?.facultyEmail || '';
+                        setDisclosureEmailDialog({ idx: i, name: f.name.trim(), email: existingEmail });
+                      }}
+                    >
+                      {sendingDisclosureIdx === i ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Mail className="w-3 h-3 mr-1" />}
+                      {disc?.status === 'sent' || disc?.status === 'submitted' ? 'Resend Disclosure' : 'Send Disclosure'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         ))}
         <Button
@@ -1153,7 +1215,96 @@ All About Ultrasound, Inc. dba iHeartEcho`;
         >
           + Add Faculty Member
         </Button>
-        <p className="text-xs text-muted-foreground italic">Note: All listed individuals must complete CardioServ Financial Disclosure Forms before participating in planning or delivery.</p>
+        <p className="text-xs text-muted-foreground italic">Note: All listed individuals must complete a Financial Disclosure Form before participating in planning or delivery.</p>
+      </Section>
+
+      {/* Send Financial Disclosure Email Dialog */}
+      <Dialog open={disclosureEmailDialog !== null} onOpenChange={open => { if (!open) setDisclosureEmailDialog(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Send Financial Disclosure</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Send the Financial Disclosure form to <strong>{disclosureEmailDialog?.name}</strong>.
+            </p>
+            <div>
+              <Label className="text-xs">Faculty email address</Label>
+              <Input
+                type="email"
+                value={disclosureEmailDialog?.email || ''}
+                onChange={e => setDisclosureEmailDialog(d => d ? { ...d, email: e.target.value } : null)}
+                placeholder="faculty@example.com"
+                className="mt-1 h-8 text-sm"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setDisclosureEmailDialog(null)}>Cancel</Button>
+            <Button
+              size="sm"
+              className="bg-[#189aa1] hover:bg-[#147a80] text-white"
+              disabled={sendDisclosureMutation.isPending || !disclosureEmailDialog?.email?.includes('@')}
+              onClick={async () => {
+                if (!disclosureEmailDialog) return;
+                setSendingDisclosureIdx(disclosureEmailDialog.idx);
+                try {
+                  await sendDisclosureMutation.mutateAsync({
+                    courseId,
+                    facultyName: disclosureEmailDialog.name,
+                    facultyEmail: disclosureEmailDialog.email.trim(),
+                    origin: window.location.origin,
+                  });
+                  // Save email back to the faculty row for stable future lookups
+                  const updatedFaculty = [...form.facultyJson];
+                  if (updatedFaculty[disclosureEmailDialog.idx]) {
+                    updatedFaculty[disclosureEmailDialog.idx] = { ...updatedFaculty[disclosureEmailDialog.idx], email: disclosureEmailDialog.email.trim() };
+                    set('facultyJson', updatedFaculty);
+                  }
+                  toast.success(`Financial Disclosure sent to ${disclosureEmailDialog.name}`);
+                  setDisclosureEmailDialog(null);
+                } finally {
+                  setSendingDisclosureIdx(null);
+                }
+              }}
+            >
+              {sendDisclosureMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Mail className="w-3 h-3 mr-1" />}
+              Send Disclosure
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark Received Dialog */}
+      <Dialog open={markReceivedDialogId !== null} onOpenChange={open => { if (!open) setMarkReceivedDialogId(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Mark Disclosure as Received</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">Confirm that you have received the completed Financial Disclosure form from this faculty member.</p>
+            <div>
+              <Label className="text-xs">Internal notes (optional)</Label>
+              <Textarea
+                value={markReceivedNotes}
+                onChange={e => setMarkReceivedNotes(e.target.value)}
+                placeholder="e.g. Received via email on Aug 5, 2026"
+                rows={3}
+                className="mt-1 text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setMarkReceivedDialogId(null)}>Cancel</Button>
+            <Button
+              size="sm"
+              className="bg-[#189aa1] hover:bg-[#147a80] text-white"
+              disabled={markReceivedMutation.isPending}
+              onClick={() => markReceivedMutation.mutate({ disclosureId: markReceivedDialogId!, receivedNotes: markReceivedNotes || undefined })}
+            >
+              {markReceivedMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <CheckCircle2 className="w-3 h-3 mr-1" />}
+              Confirm Received
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </Section>
 
       {/* ── Section 7: Content Readiness ── */}

@@ -13,7 +13,8 @@ import { eq, leftJoin } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { assertAdmin } from "./lmsHelpers";
-import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors } from "../../drizzle/schema";
+import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures } from "../../drizzle/schema";
+import { sendEmail } from "../_core/email";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
 import { generateCmeActivityDocx } from "../lib/cmeActivityDocx";
@@ -647,6 +648,126 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       await db.update(cmeActivityForms)
         .set({ approvedAt: input.approvedAt } as any)
         .where(eq(cmeActivityForms.courseId, input.courseId));
+      return { success: true };
+    }),
+
+  // ── Financial Disclosure: Send to faculty member ───────────────────────────
+  sendFinancialDisclosure: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      facultyName: z.string().min(1),
+      facultyEmail: z.string().email(),
+      origin: z.string().url().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Get course info for the form
+      const [course] = await db.select({ title: lmsCourses.title })
+        .from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      // Get CME form for education date
+      const [cmeForm] = await db.select({ proposedDate: cmeActivityForms.proposedDate })
+        .from(cmeActivityForms).where(eq(cmeActivityForms.courseId, input.courseId)).limit(1);
+      // Generate a secure unique token
+      const crypto = await import("crypto");
+      const token = crypto.randomBytes(32).toString("hex");
+      // Check if a disclosure already exists for this faculty+course
+      const [existing] = await db.select()
+        .from(cmeFinancialDisclosures)
+        .where(eq(cmeFinancialDisclosures.courseId, input.courseId))
+        .limit(100);
+      // Upsert: if pending/sent record exists for this faculty email, update it; otherwise insert
+      const existingForFaculty = await db.select()
+        .from(cmeFinancialDisclosures)
+        .where(eq(cmeFinancialDisclosures.courseId, input.courseId))
+        .then(rows => rows.find(r => r.facultyEmail.toLowerCase() === input.facultyEmail.toLowerCase() && r.status !== 'submitted'));
+      const baseUrl = input.origin || `https://${process.env.CANONICAL_ROOT_DOMAIN || 'learn.allaboutultrasound.com'}`;
+      const formUrl = `${baseUrl}/cme-disclosure/${existingForFaculty?.token || token}`;
+      const now = new Date();
+      if (existingForFaculty) {
+        // Re-send: update sentAt
+        await db.update(cmeFinancialDisclosures)
+          .set({ sentAt: now, status: 'sent', updatedAt: now })
+          .where(eq(cmeFinancialDisclosures.id, existingForFaculty.id));
+      } else {
+        // New disclosure request
+        await db.insert(cmeFinancialDisclosures).values({
+          courseId: input.courseId,
+          token,
+          facultyName: input.facultyName,
+          facultyEmail: input.facultyEmail,
+          courseTitle: course?.title || '',
+          educationDate: cmeForm?.proposedDate || '',
+          sentAt: now,
+          status: 'sent',
+          createdBy: ctx.user.id,
+        });
+      }
+      // Send email to faculty — only mark as sent if email delivery succeeds
+      const disclosureFormUrl = existingForFaculty ? `${baseUrl}/cme-disclosure/${existingForFaculty.token}` : formUrl;
+      const emailSent = await sendEmail({
+        to: { name: input.facultyName, email: input.facultyEmail },
+        subject: `Financial Disclosure Form — ${course?.title || 'CME Activity'}`,
+        htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
+          <div style="background:#189aa1;padding:20px 24px;border-radius:8px 8px 0 0;">
+            <h2 style="color:#fff;margin:0;font-size:20px;">Disclosure of Financial Relationships</h2>
+            <p style="color:#e8f7f8;margin:6px 0 0;font-size:13px;">All About Ultrasound™ CME Accreditation Program</p>
+          </div>
+          <div style="border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
+            <p>Dear ${input.facultyName},</p>
+            <p>As a faculty member or planner for <strong>${course?.title || 'this CME activity'}</strong>, you are required to complete a Financial Disclosure form in accordance with ACCME Standards for Integrity and Independence.</p>
+            <p>Please click the button below to complete your disclosure electronically. This should take less than 5 minutes.</p>
+            <p style="margin:24px 0;text-align:center;">
+              <a href="${disclosureFormUrl}" style="background:#189aa1;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;">Complete Financial Disclosure</a>
+            </p>
+            <p style="color:#6b7280;font-size:13px;">If the button above doesn't work, copy and paste this link into your browser:<br/><a href="${disclosureFormUrl}" style="color:#189aa1;">${disclosureFormUrl}</a></p>
+            <p style="color:#6b7280;font-size:12px;border-top:1px solid #e5e7eb;margin-top:20px;padding-top:16px;">Questions? Contact <a href="mailto:don@cardioserv.net" style="color:#189aa1;">don@cardioserv.net</a> or <a href="mailto:j.buckland@cardioserv.net" style="color:#189aa1;">j.buckland@cardioserv.net</a></p>
+          </div>
+        </div>`,
+      });
+      if (!emailSent) {
+        // Roll back status to pending if email failed
+        const targetId = existingForFaculty?.id;
+        if (targetId) {
+          await db.update(cmeFinancialDisclosures)
+            .set({ status: 'pending', sentAt: null, updatedAt: new Date() })
+            .where(eq(cmeFinancialDisclosures.id, targetId));
+        } else {
+          // Delete the newly inserted record
+          await db.delete(cmeFinancialDisclosures)
+            .where(eq(cmeFinancialDisclosures.token, token));
+        }
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Email delivery failed. Please check SendGrid configuration and try again.' });
+      }
+      return { success: true, token: existingForFaculty?.token || token };
+    }),
+
+  // ── Financial Disclosure: Get status for a course ─────────────────────────
+  getFinancialDisclosureStatus: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) return [];
+      return db.select().from(cmeFinancialDisclosures)
+        .where(eq(cmeFinancialDisclosures.courseId, input.courseId))
+        .orderBy(cmeFinancialDisclosures.createdAt);
+    }),
+
+  // ── Financial Disclosure: Mark as received (internal tracking) ───────────
+  markDisclosureReceived: protectedProcedure
+    .input(z.object({
+      disclosureId: z.number().int().positive(),
+      receivedNotes: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(cmeFinancialDisclosures)
+        .set({ receivedAt: new Date(), receivedNotes: input.receivedNotes || null, updatedAt: new Date() })
+        .where(eq(cmeFinancialDisclosures.id, input.disclosureId));
       return { success: true };
     }),
 
