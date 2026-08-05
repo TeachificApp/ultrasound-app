@@ -2549,21 +2549,45 @@ function CmeManagementHub() {
   const [disclosureSubTab, setDisclosureSubTab] = useState<"course_linked" | "generic">("course_linked");
   const [genericSearch, setGenericSearch] = useState("");
   const [genericRelFilter, setGenericRelFilter] = useState<"all" | "none" | "disclosed">("all");
+  const [genericDateFrom, setGenericDateFrom] = useState("");
+  const [genericDateTo, setGenericDateTo] = useState("");
   const [courseDiscSearch, setCourseDiscSearch] = useState("");
   const [courseDiscStatus, setCourseDiscStatus] = useState<"all" | "sent" | "submitted" | "received">("all");
+  const [courseDiscDateFrom, setCourseDiscDateFrom] = useState("");
+  const [courseDiscDateTo, setCourseDiscDateTo] = useState("");
+  const [selectedDiscIds, setSelectedDiscIds] = useState<Set<number>>(new Set());
   const [viewDisclosure, setViewDisclosure] = useState<any>(null);
 
   const { data: genericData, isLoading: genericLoading, refetch: refetchGeneric } = trpc.lmsAdmin.listGenericDisclosures.useQuery(
-    { search: genericSearch || undefined, relationships: genericRelFilter === "all" ? undefined : genericRelFilter },
-    { enabled: activeTab === "disclosures" && disclosureSubTab === "generic" }
+    {
+      search: genericSearch || undefined,
+      relationships: genericRelFilter === "all" ? undefined : genericRelFilter,
+      dateFrom: genericDateFrom ? new Date(genericDateFrom).getTime() : undefined,
+      dateTo: genericDateTo ? new Date(genericDateTo + "T23:59:59").getTime() : undefined,
+    },
+    { enabled: activeTab === "disclosures" }
   );
   const genericRows: any[] = (genericData as any)?.rows ?? [];
 
   const { data: courseDiscData, isLoading: courseDiscLoading, refetch: refetchCourseDisc } = trpc.lmsAdmin.listAllCourseDisclosures.useQuery(
-    { search: courseDiscSearch || undefined, status: courseDiscStatus },
-    { enabled: activeTab === "disclosures" && disclosureSubTab === "course_linked" }
+    {
+      search: courseDiscSearch || undefined,
+      status: courseDiscStatus,
+      dateFrom: courseDiscDateFrom ? new Date(courseDiscDateFrom).getTime() : undefined,
+      dateTo: courseDiscDateTo ? new Date(courseDiscDateTo + "T23:59:59").getTime() : undefined,
+    },
+    { enabled: activeTab === "disclosures" }
   );
   const courseDiscRows: any[] = (courseDiscData as any)?.rows ?? [];
+
+  const bulkMarkReceived = trpc.lmsAdmin.bulkMarkDisclosuresReceived.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.updated} disclosure(s) marked as received.`);
+      setSelectedDiscIds(new Set());
+      refetchCourseDisc();
+    },
+    onError: (e) => toast.error("Failed to mark received: " + e.message),
+  });
 
   const pageFallback = (
     <div className="flex items-center justify-center h-32">
@@ -2643,12 +2667,13 @@ function CmeManagementHub() {
 
             {disclosureSubTab === "course_linked" && (
               <div className="space-y-3">
+                {/* Filter row 1: search + status + date range */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <Input
                     placeholder="Search by faculty, email, or course…"
                     value={courseDiscSearch}
                     onChange={e => setCourseDiscSearch(e.target.value)}
-                    className="text-sm max-w-sm"
+                    className="text-sm max-w-xs"
                   />
                   <Select value={courseDiscStatus} onValueChange={v => setCourseDiscStatus(v as any)}>
                     <SelectTrigger className="h-8 text-xs w-36"><SelectValue /></SelectTrigger>
@@ -2659,17 +2684,45 @@ function CmeManagementHub() {
                       <SelectItem value="received">Received</SelectItem>
                     </SelectContent>
                   </Select>
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <span>From</span>
+                    <input type="date" value={courseDiscDateFrom} onChange={e => setCourseDiscDateFrom(e.target.value)}
+                      className="h-8 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                    <span>To</span>
+                    <input type="date" value={courseDiscDateTo} onChange={e => setCourseDiscDateTo(e.target.value)}
+                      className="h-8 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                    {(courseDiscDateFrom || courseDiscDateTo) && (
+                      <button onClick={() => { setCourseDiscDateFrom(""); setCourseDiscDateTo(""); }} className="text-gray-400 hover:text-gray-600">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                   <Button size="sm" variant="outline" onClick={() => refetchCourseDisc()}>
                     <RefreshCw className="w-3.5 h-3.5" />
                   </Button>
+                </div>
+                {/* Action row: bulk mark received + export buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {selectedDiscIds.size > 0 && (
+                    <Button
+                      size="sm"
+                      className="h-7 text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 text-white"
+                      disabled={bulkMarkReceived.isPending}
+                      onClick={() => bulkMarkReceived.mutate({ ids: Array.from(selectedDiscIds) })}
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Mark {selectedDiscIds.size} Received
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
-                    className="ml-auto gap-1.5 text-xs text-teal-700 border-teal-200 hover:bg-teal-50"
+                    className="gap-1.5 text-xs text-teal-700 border-teal-200 hover:bg-teal-50"
                     disabled={courseDiscRows.length === 0}
                     onClick={() => {
                       exportToCsv(`cme-course-disclosures-${new Date().toISOString().slice(0,10)}.csv`,
                         courseDiscRows.map((r: any) => ({
+                          Type: "Course-Linked",
                           ID: r.id,
                           "Course ID": r.courseId,
                           Course: r.courseTitle ?? "",
@@ -2687,6 +2740,41 @@ function CmeManagementHub() {
                   >
                     <Download className="w-3.5 h-3.5" /> Export CSV
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 text-xs text-[#189aa1] border-[#189aa1]/30 hover:bg-teal-50"
+                    disabled={courseDiscRows.length === 0 && genericRows.length === 0}
+                    onClick={() => {
+                      const courseRows = courseDiscRows.map((r: any) => ({
+                        Type: "Course-Linked",
+                        ID: r.id,
+                        Course: r.courseTitle ?? "",
+                        Faculty: r.facultyName,
+                        Email: r.facultyEmail,
+                        Status: r.status,
+                        "Submitted At": r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : "",
+                        "Received At": r.receivedAt ? new Date(r.receivedAt).toLocaleDateString() : "",
+                        "Attestation Name": r.attestationName ?? "",
+                        "No Relationships": r.noRelationships ? "Yes" : "No",
+                      }));
+                      const genRows = genericRows.map((r: any) => ({
+                        Type: "Generic",
+                        ID: r.id,
+                        Course: r.activityTitle ?? "",
+                        Faculty: r.facultyName,
+                        Email: r.facultyEmail,
+                        Status: "submitted",
+                        "Submitted At": r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : "",
+                        "Received At": "",
+                        "Attestation Name": r.attestationName ?? "",
+                        "No Relationships": r.noRelationships ? "Yes" : "No",
+                      }));
+                      exportToCsv(`cme-all-disclosures-${new Date().toISOString().slice(0,10)}.csv`, [...courseRows, ...genRows]);
+                    }}
+                  >
+                    <Download className="w-3.5 h-3.5" /> Export All Disclosures
+                  </Button>
                 </div>
                 {courseDiscLoading ? pageFallback : courseDiscRows.length === 0 ? (
                   <div className="text-center py-8 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">
@@ -2697,6 +2785,15 @@ function CmeManagementHub() {
                     <table className="w-full text-xs min-w-[700px]">
                       <thead className="bg-gray-50">
                         <tr>
+                          <th className="px-3 py-2 w-8">
+                            <input type="checkbox" className="rounded"
+                              checked={courseDiscRows.length > 0 && courseDiscRows.every((r: any) => selectedDiscIds.has(r.id))}
+                              onChange={e => {
+                                if (e.target.checked) setSelectedDiscIds(new Set(courseDiscRows.map((r: any) => r.id)));
+                                else setSelectedDiscIds(new Set());
+                              }}
+                            />
+                          </th>
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Faculty</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Email</th>
                           <th className="text-left px-3 py-2 font-medium text-gray-600">Course</th>
@@ -2708,7 +2805,17 @@ function CmeManagementHub() {
                       </thead>
                       <tbody className="divide-y divide-gray-100">
                         {courseDiscRows.map((row: any) => (
-                          <tr key={row.id} className="hover:bg-gray-50">
+                          <tr key={row.id} className={`hover:bg-gray-50 ${selectedDiscIds.has(row.id) ? "bg-teal-50/40" : ""}`}>
+                            <td className="px-3 py-2">
+                              <input type="checkbox" className="rounded"
+                                checked={selectedDiscIds.has(row.id)}
+                                onChange={e => {
+                                  const next = new Set(selectedDiscIds);
+                                  if (e.target.checked) next.add(row.id); else next.delete(row.id);
+                                  setSelectedDiscIds(next);
+                                }}
+                              />
+                            </td>
                             <td className="px-3 py-2 font-medium text-gray-800">{row.facultyName}</td>
                             <td className="px-3 py-2 text-gray-600">{row.facultyEmail}</td>
                             <td className="px-3 py-2 text-gray-600 max-w-[160px] truncate" title={row.courseTitle ?? ""}>{row.courseTitle ?? "—"}</td>
@@ -2747,7 +2854,7 @@ function CmeManagementHub() {
                     placeholder="Search by name, email, or activity…"
                     value={genericSearch}
                     onChange={e => setGenericSearch(e.target.value)}
-                    className="text-sm max-w-sm"
+                    className="text-sm max-w-xs"
                   />
                   <Select value={genericRelFilter} onValueChange={v => setGenericRelFilter(v as any)}>
                     <SelectTrigger className="h-8 text-xs w-36"><SelectValue /></SelectTrigger>
@@ -2757,6 +2864,19 @@ function CmeManagementHub() {
                       <SelectItem value="disclosed">Disclosed</SelectItem>
                     </SelectContent>
                   </Select>
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <span>From</span>
+                    <input type="date" value={genericDateFrom} onChange={e => setGenericDateFrom(e.target.value)}
+                      className="h-8 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                    <span>To</span>
+                    <input type="date" value={genericDateTo} onChange={e => setGenericDateTo(e.target.value)}
+                      className="h-8 px-2 text-xs border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-teal-400" />
+                    {(genericDateFrom || genericDateTo) && (
+                      <button onClick={() => { setGenericDateFrom(""); setGenericDateTo(""); }} className="text-gray-400 hover:text-gray-600">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                   <Button size="sm" variant="outline" onClick={() => refetchGeneric()}>
                     <RefreshCw className="w-3.5 h-3.5" />
                   </Button>

@@ -934,6 +934,8 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
     .input(z.object({
       search: z.string().optional(),
       relationships: z.enum(["all", "none", "disclosed"]).optional(),
+      dateFrom: z.number().optional(),
+      dateTo: z.number().optional(),
       limit: z.number().int().min(1).max(500).optional().default(200),
       offset: z.number().int().min(0).optional().default(0),
     }).optional())
@@ -942,7 +944,7 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       const db = await getDb();
       if (!db) return { rows: [] };
       const { cmeGenericDisclosures } = await import("../../drizzle/schema").then(m => m);
-      const { desc: descOrd, like, or, eq: eqOp, and: andOp, ne } = await import("drizzle-orm");
+      const { desc: descOrd, like, or, eq: eqOp, and: andOp, ne, gte, lte } = await import("drizzle-orm");
       const searchTerm = input?.search?.trim();
       const conditions = [];
       if (searchTerm) {
@@ -956,6 +958,12 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         conditions.push(eqOp(cmeGenericDisclosures.noRelationships, 1));
       } else if (input?.relationships === "disclosed") {
         conditions.push(eqOp(cmeGenericDisclosures.noRelationships, 0));
+      }
+      if (input?.dateFrom) {
+        conditions.push(gte(cmeGenericDisclosures.submittedAt, new Date(input.dateFrom)));
+      }
+      if (input?.dateTo) {
+        conditions.push(lte(cmeGenericDisclosures.submittedAt, new Date(input.dateTo)));
       }
       const whereClause = conditions.length > 0 ? andOp(...conditions) : undefined;
       const rows = await db
@@ -1003,17 +1011,34 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       return { success: true };
     }),
 
+  // ── Bulk mark course-linked disclosures as received ────────────────────────────────
+  bulkMarkDisclosuresReceived: protectedProcedure
+    .input(z.object({ ids: z.array(z.number().int().positive()).min(1).max(100) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { inArray } = await import("drizzle-orm");
+      await db
+        .update(cmeFinancialDisclosures)
+        .set({ status: "received", receivedAt: new Date(), receivedNotes: "Marked received in bulk via CME Management Hub" })
+        .where(inArray(cmeFinancialDisclosures.id, input.ids));
+      return { updated: input.ids.length };
+    }),
+
   // ── List ALL course-linked disclosures for CME Management Hub ───────────────────
   listAllCourseDisclosures: protectedProcedure
     .input(z.object({
       search: z.string().optional(),
       status: z.enum(["all", "sent", "submitted", "received"]).optional(),
+      dateFrom: z.number().optional(),
+      dateTo: z.number().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) return { rows: [] };
-      const { or, like, eq: eqOp, desc: descOp } = await import("drizzle-orm");
+      const { or, like, eq: eqOp, desc: descOp, gte, lte, and: andOp } = await import("drizzle-orm");
       let query = db
         .select({
           id: cmeFinancialDisclosures.id,
@@ -1045,8 +1070,13 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       if (input?.status && input.status !== "all") {
         conditions.push(eqOp(cmeFinancialDisclosures.status, input.status));
       }
+      if (input?.dateFrom) {
+        conditions.push(gte(cmeFinancialDisclosures.createdAt, new Date(input.dateFrom)));
+      }
+      if (input?.dateTo) {
+        conditions.push(lte(cmeFinancialDisclosures.createdAt, new Date(input.dateTo)));
+      }
       if (conditions.length > 0) {
-        const { and: andOp } = await import("drizzle-orm");
         query = query.where(andOp(...conditions) as any);
       }
       const rows = await query.orderBy(descOp(cmeFinancialDisclosures.createdAt)).limit(500);
