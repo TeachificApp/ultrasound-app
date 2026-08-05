@@ -52,7 +52,7 @@ export default function CmeDisclosureForm() {
   const token = params?.token ?? "";
 
   // ── Query: load disclosure record ──
-  const { data, isLoading, error } = trpc.lms.getDisclosureByToken.useQuery(
+  const { data, isLoading, error } = trpc.lmsDisclosure.getDisclosureByToken.useQuery(
     { token },
     { enabled: !!token, retry: false }
   );
@@ -66,7 +66,7 @@ export default function CmeDisclosureForm() {
   const [attestationName, setAttestationName] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  const submitMutation = trpc.lms.submitDisclosure.useMutation({
+  const submitMutation = trpc.lmsDisclosure.submitDisclosure.useMutation({
     onSuccess: () => setSubmitted(true),
     onError: (err) => toast.error(err.message || "Submission failed. Please try again."),
   });

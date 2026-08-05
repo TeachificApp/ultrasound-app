@@ -2116,7 +2116,8 @@ export const appRouter = router({
 
   // ─── LMS LMS Management ────────────────────────────────────────────────────
   blockTemplates: blockTemplatesRouter,
-  lms: router({ ...lmsPublicRouter._def.procedures, ...lmsDisclosurePublicRouter._def.procedures }),
+  lms: lmsPublicRouter,
+  lmsDisclosure: lmsDisclosurePublicRouter,
   lmsLearner: lmsLearnerRouter,
   lmsAdmin: lmsAdminRouter,
   revenueShare: revenueShareRouter,
