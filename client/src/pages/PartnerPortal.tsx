@@ -68,7 +68,17 @@ export default function PartnerPortal() {
 function PartnerEarningsView({ userId }: { userId: number }) {
   const { data, isLoading } = trpc.revenueShare.getMyEarnings.useQuery();
   const dashboardMutation = trpc.revenueShare.getExpressDashboardLink.useMutation({
-    onSuccess: (d: any) => { if (d?.url) window.open(d.url, "_blank"); },
+    onSuccess: (d: any) => {
+      if (!d?.url) return;
+      if (d.needsOnboarding) {
+        // Account hasn't completed Stripe KYC — open the onboarding link so they can finish setup
+        if (window.confirm("Your Stripe account setup is not yet complete. Click OK to continue setting up your account so you can receive payouts.")) {
+          window.open(d.url, "_blank");
+        }
+      } else {
+        window.open(d.url, "_blank");
+      }
+    },
   });
 
   if (isLoading) {

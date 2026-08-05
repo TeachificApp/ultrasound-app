@@ -82,22 +82,22 @@ export async function generateDisclosurePdf(data: DisclosurePdfData): Promise<Bu
     ensureSpace(60);
     doc.fillColor(DARK).fontSize(8.5).font("Helvetica")
       .text(
-        "As a prospective planner or faculty member, we would like to ask for your help in protecting our learning environment from industry influence. Please complete the form below and return it to: don@cardioserv.net",
+        "As a prospective planner or faculty member, we would like to ask for your help in protecting our learning environment from industry influence. Please complete the form below.",
         50, y, { width: pageW, lineGap: 1.5 }
       );
     y += doc.heightOfString(
-      "As a prospective planner or faculty member, we would like to ask for your help in protecting our learning environment from industry influence. Please complete the form below and return it to: don@cardioserv.net",
+      "As a prospective planner or faculty member, we would like to ask for your help in protecting our learning environment from industry influence. Please complete the form below.",
       { width: pageW, fontSize: 8.5 }
     ) + 6;
 
     ensureSpace(55);
     doc.fillColor(DARK).fontSize(8.5).font("Helvetica")
       .text(
-        "The ACCME Standards for Integrity and Independence require that individuals who refuse to disclose relevant financial relationships be disqualified from involvement in the planning and implementation of accredited continuing education. Thank you for your diligence and cooperation. If you have questions, please contact: j.buckland@cardioserv.net or don@cardioserv.net",
+        "The ACCME Standards for Integrity and Independence require that individuals who refuse to disclose relevant financial relationships be disqualified from involvement in the planning and implementation of accredited continuing education. Thank you for your diligence and cooperation. If you have questions, please contact: admin@allaboutultrasound.com",
         50, y, { width: pageW, lineGap: 1.5 }
       );
     y += doc.heightOfString(
-      "The ACCME Standards for Integrity and Independence require that individuals who refuse to disclose relevant financial relationships be disqualified from involvement in the planning and implementation of accredited continuing education. Thank you for your diligence and cooperation. If you have questions, please contact: j.buckland@cardioserv.net or don@cardioserv.net",
+      "The ACCME Standards for Integrity and Independence require that individuals who refuse to disclose relevant financial relationships be disqualified from involvement in the planning and implementation of accredited continuing education. Thank you for your diligence and cooperation. If you have questions, please contact: admin@allaboutultrasound.com",
       { width: pageW, fontSize: 8.5 }
     ) + 8;
 

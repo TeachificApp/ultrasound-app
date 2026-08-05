@@ -8138,6 +8138,8 @@ export const revenueSharePartners = mysqlTable("revenue_share_partners", {
   onboardingStatus: mysqlEnum("onboarding_status", ["pending", "onboarding", "active", "restricted", "disabled"]).notNull().default("pending"),
   payoutSchedule: mysqlEnum("payout_schedule", ["immediate", "daily", "weekly", "monthly", "manual"]).notNull().default("immediate"),
   notes: text("notes"),
+  /** One-time token for public Stripe onboarding redirect (no site login required) */
+  onboardingToken: varchar("onboarding_token", { length: 128 }),
   createdAt: bigint("created_at", { mode: "number" }).notNull().default(0),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull().default(0),
 });

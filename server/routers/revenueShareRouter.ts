@@ -421,8 +421,23 @@ export const revenueShareRouter = router({
       throw new TRPCError({ code: "NOT_FOUND", message: "No Stripe account found for your profile" });
     }
 
+    // Check if the connected account has completed Stripe KYC onboarding.
+    // If not, createLoginLink will silently redirect to the setup flow —
+    // instead, return an onboarding link so the user knows what to do.
+    const status = await getStripeAccountStatus(partner.stripeAccountId);
+    if (!status.detailsSubmitted) {
+      // Generate a fresh onboarding link so they can complete KYC
+      const origin = ctx.req.headers.origin as string ?? "https://app.allaboutultrasound.com";
+      const onboardingUrl = await createOnboardingLink(
+        partner.stripeAccountId,
+        `${origin}/partner-portal?onboarding=complete`,
+        `${origin}/partner-portal?onboarding=refresh`,
+      );
+      return { url: onboardingUrl, needsOnboarding: true };
+    }
+
     const url = await createExpressDashboardLink(partner.stripeAccountId);
-    return { url };
+    return { url, needsOnboarding: false };
   }),
 
   // ── Admin: Get Express dashboard link for a specific partner ─────────────
@@ -497,13 +512,22 @@ export const revenueShareRouter = router({
         .where(eq(revenueSharePartners.id, input.partnerId))
         .limit(1);
       if (!partner) throw new TRPCError({ code: "NOT_FOUND", message: "Partner not found" });
-      // Generate onboarding link — Stripe requires HTTPS URLs
+      // Generate a secure random token so the partner can access their Stripe
+      // onboarding link directly from email without needing to log into the site.
+      const { randomBytes } = await import("crypto");
+      const token = randomBytes(32).toString("hex");
+      await db.update(revenueSharePartners)
+        .set({ onboardingToken: token })
+        .where(eq(revenueSharePartners.id, input.partnerId));
+      // The public redirect URL — no site login required
       const rawDomain = process.env.CANONICAL_ROOT_DOMAIN ?? "learn.allaboutultrasound.com";
       const baseUrl = rawDomain.startsWith("http") ? rawDomain : `https://${rawDomain}`;
+      const publicRedirectUrl = `${baseUrl}/stripe-onboarding/${token}`;
+      // Also pre-generate the Stripe onboarding link for the return/refresh URLs
       const onboardingUrl = await createOnboardingLink(
         partner.stripeAccountId!,
         `${baseUrl}/partner-portal`,
-        `${baseUrl}/partner-portal?refresh=1`,
+        `${baseUrl}/stripe-onboarding/${token}`,
       );
       // Send email via SendGrid
       const sgMail = await import("@sendgrid/mail");
@@ -517,9 +541,9 @@ export const revenueShareRouter = router({
           <p>Hi ${partner.name},</p>
           <p>You have been added as a revenue share partner. To receive your payouts, please complete your Stripe account setup by clicking the button below.</p>
           <p style="margin:24px 0;">
-            <a href="${onboardingUrl}" style="background:#189aa1;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Set Up Payout Account</a>
+            <a href="${publicRedirectUrl}" style="background:#189aa1;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:600;">Set Up Payout Account</a>
           </p>
-          <p style="color:#666;font-size:13px;">This link is valid for 24 hours. If you have any questions, please contact us.</p>
+          <p style="color:#666;font-size:13px;">No account login is required — just click the button above to go directly to Stripe. If you have any questions, please contact <a href="mailto:admin@allaboutultrasound.com" style="color:#189aa1;">admin@allaboutultrasound.com</a>.</p>
         </div>`,
       });
       // Update partner status to onboarding
@@ -692,5 +716,32 @@ export const revenueShareRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(partnerAllowlist).where(eq(partnerAllowlist.id, input.id));
       return { success: true };
+    }),
+
+  // ── Public: Resolve onboarding token → redirect to Stripe (no login required) ─────
+  // Partners receive this URL in their email. It generates a fresh Stripe onboarding
+  // link server-side and returns it so the frontend can redirect — no site auth needed.
+  getOnboardingLinkByToken: publicProcedure
+    .input(z.object({ token: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [partner] = await db
+        .select()
+        .from(revenueSharePartners)
+        .where(eq(revenueSharePartners.onboardingToken, input.token))
+        .limit(1);
+      if (!partner?.stripeAccountId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Invalid or expired onboarding link." });
+      }
+      const rawDomain = process.env.CANONICAL_ROOT_DOMAIN ?? "learn.allaboutultrasound.com";
+      const baseUrl = rawDomain.startsWith("http") ? rawDomain : `https://${rawDomain}`;
+      // Generate a fresh Stripe onboarding link (they expire after 24h)
+      const url = await createOnboardingLink(
+        partner.stripeAccountId,
+        `${baseUrl}/partner-portal`,
+        `${baseUrl}/stripe-onboarding/${input.token}`,
+      );
+      return { url, partnerName: partner.name };
     }),
 });

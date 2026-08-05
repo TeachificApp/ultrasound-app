@@ -162,21 +162,18 @@ export default function CmeDisclosureForm() {
             </div>
           </div>
 
-          {/* Intro paragraph — CardioServ text */}
+          {/* Intro paragraph */}
           <div className="text-sm text-gray-700 leading-relaxed space-y-3">
             <p>
               As a prospective planner or faculty member, we would like to ask for your help in protecting our
-              learning environment from industry influence. Please complete the form below and return it to:{" "}
-              <a href="mailto:don@cardioserv.net" className="text-[#189aa1] underline">don@cardioserv.net</a>
+              learning environment from industry influence. Please complete the form below.
             </p>
             <p>
               The ACCME Standards for Integrity and Independence require that individuals who refuse to disclose
               relevant financial relationships be disqualified from involvement in the planning and implementation
               of accredited continuing education. Thank you for your diligence and cooperation. If you have
               questions, please contact:{" "}
-              <a href="mailto:j.buckland@cardioserv.net" className="text-[#189aa1] underline">j.buckland@cardioserv.net</a>
-              {" "}or{" "}
-              <a href="mailto:don@cardioserv.net" className="text-[#189aa1] underline">don@cardioserv.net</a>
+              <a href="mailto:admin@allaboutultrasound.com" className="text-[#189aa1] underline">admin@allaboutultrasound.com</a>
             </p>
           </div>
 

@@ -727,7 +727,6 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;">
           <div style="background:#189aa1;padding:20px 24px;border-radius:8px 8px 0 0;">
             <h2 style="color:#fff;margin:0;font-size:20px;">Disclosure of Financial Relationships</h2>
-            <p style="color:#e8f7f8;margin:6px 0 0;font-size:13px;">All About Ultrasound™ CME Accreditation Program</p>
           </div>
           <div style="border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;">
             <p>Dear ${input.facultyName},</p>
