@@ -279,6 +279,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
   onOpenGroupDetail?: (groupId: number) => void;
   onSoldOutOverride?: (overrideUrl: string) => void;
   isDraft?: boolean;
+  onDraftNotify?: () => void;
 }) {
   const d = block.data;
   // When ctaText has been overridden (e.g., "Join Waitlist"), apply it to enroll/checkout action buttons
@@ -712,7 +713,12 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
           <button onClick={isDraft ? undefined : resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={isDraft || enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {isDraft ? "Enrollment Closed" : enrolling ? "Processing…" : (isCtaOverridden ? ctaText : (d.ctaText ?? ctaText))}
           </button>
-          {isDraft && <p className="text-sm text-gray-500 mt-2">Check back soon for enrollment updates.</p>}
+          {isDraft && (
+            <div className="mt-2 space-y-1 text-center">
+              <button onClick={onDraftNotify} className="text-sm font-medium text-teal-600 hover:text-teal-700 underline underline-offset-2">Notify me when enrollment opens</button>
+              <p className="text-xs text-gray-500">Check back soon for enrollment updates.</p>
+            </div>
+          )}
           {/* Price below button */}
           {d.showPrice && d.priceSource !== "none" && (d.pricePosition ?? "above") === "below" && (
             <div className="mt-6">
@@ -737,7 +743,12 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {isDraft ? "Enrollment Closed" : isCtaOverridden ? ctaText : (d.ctaText ?? ctaText)}
           </button>
-          {isDraft && <p className="text-sm text-gray-500 mt-2">Check back soon for enrollment updates.</p>}
+          {isDraft && (
+            <div className="mt-2 space-y-1 text-center">
+              <button onClick={onDraftNotify} className="text-sm font-medium text-teal-600 hover:text-teal-700 underline underline-offset-2">Notify me when enrollment opens</button>
+              <p className="text-xs text-gray-500">Check back soon for enrollment updates.</p>
+            </div>
+          )}
           <ButtonSubtext d={d} />
           </CC>
         </div>
@@ -1622,6 +1633,18 @@ export default function CourseLanding() {
   const [cwPhone, setCwPhone] = useState("");
   const [cwMessage, setCwMessage] = useState("");
   const [cwSubmitted, setCwSubmitted] = useState(false);
+  // Draft "Notify Me When Open" modal state
+  const [draftNotifyOpen, setDraftNotifyOpen] = useState(false);
+  const [dnName, setDnName] = useState("");
+  const [dnEmail, setDnEmail] = useState("");
+  const [dnSubmitted, setDnSubmitted] = useState(false);
+  const submitDraftNotify = trpc.lms.submitDraftNotify.useMutation({
+    onSuccess: (data) => {
+      if (data.duplicate) { toast.success("You're already on the list — we'll notify you when enrollment opens!"); }
+      else { setDnSubmitted(true); }
+    },
+    onError: (e) => toast.error(`Could not save: ${e.message}`),
+  });
   const { data: course, isLoading } = trpc.lms.getCourse.useQuery({ slug: slug!, preview: isPreview || undefined }, { enabled: !!slug });
   const { data: myCourses } = trpc.lmsLearner.getMyCourses.useQuery(undefined, { enabled: !!user });
   const enrollment = myCourses?.find((e: any) => e.courseId === course?.id);
@@ -2076,10 +2099,10 @@ export default function CourseLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
                 <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} />
+                  <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} onDraftNotify={() => { setDnName(user?.name ?? ""); setDnEmail((user as any)?.email ?? ""); setDnSubmitted(false); setDraftNotifyOpen(true); }} />
                 </div>
               ) : (
-                <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} />
+                <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} onDraftNotify={() => { setDnName(user?.name ?? ""); setDnEmail((user as any)?.email ?? ""); setDnSubmitted(false); setDraftNotifyOpen(true); }} />
               )}
             </div>
           );
@@ -2122,6 +2145,29 @@ export default function CourseLanding() {
         onClose={() => setSelectedCohortGroupId(null)}
         onEnroll={() => { setSelectedCohortGroupId(null); handleGoToCheckoutPage(); }}
       />
+      {/* Draft Notify Modal */}
+      <Dialog open={draftNotifyOpen} onOpenChange={setDraftNotifyOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-teal-700">Notify Me When Enrollment Opens</DialogTitle>
+            <DialogDescription>Enter your name and email and we'll let you know as soon as enrollment opens for <strong>{course?.title}</strong>.</DialogDescription>
+          </DialogHeader>
+          {dnSubmitted ? (
+            <div className="py-6 text-center space-y-3">
+              <div className="text-4xl">✅</div>
+              <p className="font-semibold text-gray-800">You're on the list!</p>
+              <p className="text-sm text-gray-500">We'll email you at <strong>{dnEmail}</strong> when enrollment opens.</p>
+              <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setDraftNotifyOpen(false)}>Close</Button>
+            </div>
+          ) : (
+            <form onSubmit={(e) => { e.preventDefault(); if (!dnName.trim() || !dnEmail.trim()) return; submitDraftNotify.mutate({ productType: "course", productId: course!.id, productTitle: course?.title ?? undefined, name: dnName.trim(), email: dnEmail.trim() }); }} className="space-y-4 mt-2">
+              <div className="space-y-1"><Label htmlFor="dn-name2">Full Name <span className="text-red-500">*</span></Label><Input id="dn-name2" value={dnName} onChange={e => setDnName(e.target.value)} placeholder="Jane Smith" required /></div>
+              <div className="space-y-1"><Label htmlFor="dn-email2">Email Address <span className="text-red-500">*</span></Label><Input id="dn-email2" type="email" value={dnEmail} onChange={e => setDnEmail(e.target.value)} placeholder="jane@example.com" required /></div>
+              <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={submitDraftNotify.isPending}>{submitDraftNotify.isPending ? "Saving..." : "Notify Me"}</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
     );
   }
@@ -2381,9 +2427,15 @@ export default function CourseLanding() {
             )}
 
             {isDraft ? (
-              <Button className="w-full font-semibold" size="lg" disabled variant="outline">
-                Enrollment Closed
-              </Button>
+              <div className="space-y-2">
+                <Button className="w-full font-semibold" size="lg" disabled variant="outline">
+                  Enrollment Closed
+                </Button>
+                <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={() => { setDnName(user?.name ?? ""); setDnEmail((user as any)?.email ?? ""); setDnSubmitted(false); setDraftNotifyOpen(true); }}>
+                  <Bell className="w-4 h-4 mr-2" />Notify Me When Open
+                </Button>
+                <p className="text-xs text-center text-gray-500">Check back soon for enrollment updates.</p>
+              </div>
             ) : isWaitlistMode ? (
               <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleWaitlistCta}>
                 <Bell className="w-4 h-4 mr-2" />{waitlistCtaLabel}
@@ -2417,6 +2469,39 @@ export default function CourseLanding() {
       submitted={cwSubmitted}
       mutation={joinCohortWaitlistMutation}
     />
+    {/* Draft Notify Modal — "Notify Me When Open" for draft courses */}
+    <Dialog open={draftNotifyOpen} onOpenChange={setDraftNotifyOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-teal-700">Notify Me When Enrollment Opens</DialogTitle>
+          <DialogDescription>
+            Enter your name and email below and we'll let you know as soon as enrollment opens for <strong>{course?.title}</strong>.
+          </DialogDescription>
+        </DialogHeader>
+        {dnSubmitted ? (
+          <div className="py-6 text-center space-y-3">
+            <div className="text-4xl">✅</div>
+            <p className="font-semibold text-gray-800">You're on the list!</p>
+            <p className="text-sm text-gray-500">We'll email you at <strong>{dnEmail}</strong> when enrollment opens.</p>
+            <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white" onClick={() => setDraftNotifyOpen(false)}>Close</Button>
+          </div>
+        ) : (
+          <form onSubmit={(e) => { e.preventDefault(); if (!dnName.trim() || !dnEmail.trim()) return; submitDraftNotify.mutate({ productType: "course", productId: course!.id, productTitle: course?.title ?? undefined, name: dnName.trim(), email: dnEmail.trim() }); }} className="space-y-4 mt-2">
+            <div className="space-y-1">
+              <Label htmlFor="dn-name">Full Name <span className="text-red-500">*</span></Label>
+              <Input id="dn-name" value={dnName} onChange={e => setDnName(e.target.value)} placeholder="Jane Smith" required />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="dn-email">Email Address <span className="text-red-500">*</span></Label>
+              <Input id="dn-email" type="email" value={dnEmail} onChange={e => setDnEmail(e.target.value)} placeholder="jane@example.com" required />
+            </div>
+            <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={submitDraftNotify.isPending}>
+              {submitDraftNotify.isPending ? "Saving..." : "Notify Me"}
+            </Button>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
     {/* Guest Checkout Modal — shown to unauthenticated users who click a CTA — build:v3 */}
     <Dialog open={guestModalOpen} onOpenChange={setGuestModalOpen}>
       <DialogContent className="max-w-md">

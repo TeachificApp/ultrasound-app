@@ -107,6 +107,7 @@ import {
   lmsQuizQuestionGroups,
   lmsQuizGroupQuestions,
   questionBank,
+  draftNotifyEntries,
 } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
 import { generateDisclosurePdf } from "../lib/disclosurePdf";
@@ -1461,6 +1462,35 @@ export const lmsPublicRouter = router({
         groupEndDate: group.endDate,
         sessions,
       };
+    }),
+
+  submitDraftNotify: publicProcedure
+    .input(z.object({
+      productType: z.string().default("course"),
+      productId: z.number().int(),
+      productTitle: z.string().optional(),
+      name: z.string().min(1),
+      email: z.string().email(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      const existing = await db.select({ id: draftNotifyEntries.id })
+        .from(draftNotifyEntries)
+        .where(and(
+          eq(draftNotifyEntries.productType, input.productType),
+          eq(draftNotifyEntries.productId, input.productId),
+          eq(draftNotifyEntries.email, input.email.toLowerCase().trim()),
+        ))
+        .limit(1);
+      if (existing.length > 0) return { success: true, duplicate: true };
+      await db.insert(draftNotifyEntries).values({
+        productType: input.productType,
+        productId: input.productId,
+        productTitle: input.productTitle ?? null,
+        name: input.name.trim(),
+        email: input.email.toLowerCase().trim(),
+      });
+      return { success: true, duplicate: false };
     }),
 });
 

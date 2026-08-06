@@ -77,8 +77,8 @@ function CountdownTimer({ mode, durationMinutes, targetDate, textColor }: { mode
 }
 
 // ─── Block Renderer ───────────────────────────────────────────────────────────
-function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: {
-  block: Block; onBuy: () => void; buying: boolean; price: string; hasPurchased: boolean; slug: string; user?: UserParamSource | null;
+function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user, isDraft }: {
+  block: Block; onBuy: () => void; buying: boolean; price: string; hasPurchased: boolean; slug: string; user?: UserParamSource | null; isDraft?: boolean;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -126,11 +126,11 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
               {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
                 {buttons.map((btn: any, i: number) => (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button onClick={btn.link ? () => { window.location.href = btn.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
-                      disabled={buying}
+                    <button onClick={isDraft ? undefined : (btn.link ? () => { window.location.href = btn.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy)}
+                      disabled={isDraft || buying}
                       className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                      {hasPurchased ? "Access Files" : btn.text}
+                      {isDraft ? "Enrollment Closed" : hasPurchased ? "Access Files" : btn.text}
                     </button>
                     {btn.showStrikethrough && btn.strikethroughPrice && (
                       <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
@@ -277,13 +277,14 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
             </div>
           )}
           <button
-            onClick={hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
-            disabled={buying}
+            onClick={isDraft ? undefined : (hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy)}
+            disabled={isDraft || buying}
             className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
           >
-            {buying ? "Processing…" : hasPurchased ? "Access Your Files" : (d.ctaText ?? `Buy Now — ${d.currentPrice || price}`)}
+            {isDraft ? "Enrollment Closed" : buying ? "Processing…" : hasPurchased ? "Access Your Files" : (d.ctaText ?? `Buy Now — ${d.currentPrice || price}`)}
           </button>
+          {isDraft && <p className="text-sm text-center text-gray-500 mt-2">Check back soon for enrollment updates.</p>}
           {/* Price below button */}
           {d.showPrice && d.priceSource !== "none" && (d.pricePosition ?? "above") === "below" && (
             <div className="mt-6">
@@ -307,12 +308,12 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user }: 
       return (
         <div className="py-8"><CC style={{ textAlign: d.align ?? "center" }}>
           <button
-            onClick={d.link ? () => { window.location.href = d.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy}
-            disabled={buying}
+            onClick={isDraft ? undefined : (d.link ? () => { window.location.href = d.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy)}
+            disabled={isDraft || buying}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.size === "lg" ? "text-lg px-10 py-4" : ""} ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
             style={{ backgroundColor: d.color ?? d.ctaColor ?? "#179ca3", color: d.textColor ?? d.ctaTextColor ?? "#fff" }}
           >
-            {hasPurchased ? "Access Files" : (d.text ?? d.ctaText ?? "Buy Now")}
+            {isDraft ? "Enrollment Closed" : hasPurchased ? "Access Files" : (d.text ?? d.ctaText ?? "Buy Now")}
           </button>
           <ButtonSubtext d={d} />
         </CC></div>
@@ -777,6 +778,7 @@ export default function DownloadLanding() {
 
   const price = product.isFree ? "Free" : `$${Number(product.price).toFixed(2)}`;
   const hasPurchased = purchaseStatus?.purchased || product.isFree;
+  const isDraft = (product as any).status === "draft";
   const features = product.landingFeatures ? product.landingFeatures.split("\n").filter(Boolean) : [];
 
   const handleBuy = () => {
@@ -827,10 +829,10 @@ export default function DownloadLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxDL ? (
                 <div style={{ maxWidth: bwMaxDL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} />
+                  <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} isDraft={isDraft} />
                 </div>
               ) : (
-                <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} />
+                <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} isDraft={isDraft} />
               )}
             </div>
           );

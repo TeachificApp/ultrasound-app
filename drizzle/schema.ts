@@ -6007,6 +6007,18 @@ export const lmsCohortGroupEnrollments = mysqlTable("lms_cohort_group_enrollment
 export type LmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferSelect;
 export type InsertLmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferInsert;
 
+// ─── Draft Notify Entries ("Notify Me When Open" for draft products) ───────────
+export const draftNotifyEntries = mysqlTable("draft_notify_entries", {
+  id: int("id").autoincrement().primaryKey(),
+  productType: varchar("product_type", { length: 50 }).notNull().default("course"),
+  productId: int("product_id").notNull(),
+  productTitle: varchar("product_title", { length: 500 }),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type DraftNotifyEntry = typeof draftNotifyEntries.$inferSelect;
+
 // ─── Cohort Waitlist Entries ──────────────────────────────────────────────────
 export const cohortWaitlistEntries = mysqlTable("cohort_waitlist_entries", {
   id: int("id").autoincrement().primaryKey(),

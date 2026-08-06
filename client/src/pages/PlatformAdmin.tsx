@@ -2545,7 +2545,9 @@ function exportToCsv(filename: string, rows: Record<string, any>[]) {
 
 // ─── CME Management Hub ────────────────────────────────────────────────────────
 function CmeManagementHub() {
-  const [activeTab, setActiveTab] = useState<"certificates" | "activity_forms" | "disclosures" | "sdms_cme">("activity_forms");
+  const [activeTab, setActiveTab] = useState<"certificates" | "activity_forms" | "disclosures" | "sdms_cme" | "notify_signups">("activity_forms");
+  const [notifySearch, setNotifySearch] = useState("");
+  const [notifyTypeFilter, setNotifyTypeFilter] = useState("");
   const [disclosureSubTab, setDisclosureSubTab] = useState<"course_linked" | "generic">("course_linked");
   const [genericSearch, setGenericSearch] = useState("");
   const [genericRelFilter, setGenericRelFilter] = useState<"all" | "none" | "disclosed">("all");
@@ -2614,6 +2616,7 @@ function CmeManagementHub() {
             { id: "disclosures", label: "Financial Disclosures", icon: Shield },
             { id: "certificates", label: "Certificate Templates", icon: Award },
             { id: "sdms_cme", label: "SDMS CME Data", icon: GraduationCap },
+            { id: "notify_signups", label: "Notify Me Signups", icon: Bell },
           ] as const).map(tab => (
             <button
               key={tab.id}
@@ -2959,6 +2962,10 @@ function CmeManagementHub() {
         )}
 
         {/* SDMS CME Data */}
+        {activeTab === "notify_signups" && (
+          <NotifyMeSignupsTab search={notifySearch} setSearch={setNotifySearch} typeFilter={notifyTypeFilter} setTypeFilter={setNotifyTypeFilter} />
+        )}
+
         {activeTab === "sdms_cme" && (
           <div className="space-y-4">
             <p className="text-xs text-gray-500">
@@ -3026,5 +3033,92 @@ function CmeManagementHub() {
         </Dialog>
       )}
     </Card>
+  );
+}
+
+// ─── Notify Me Signups Tab ────────────────────────────────────────────────────
+function NotifyMeSignupsTab({ search, setSearch, typeFilter, setTypeFilter }: {
+  search: string; setSearch: (v: string) => void;
+  typeFilter: string; setTypeFilter: (v: string) => void;
+}) {
+  const { data, isLoading, refetch } = trpc.lmsAdmin.listDraftNotifyEntries.useQuery(
+    { search: search || undefined, productType: typeFilter || undefined },
+    { staleTime: 30_000 }
+  );
+  const rows: any[] = (data as any)?.rows ?? [];
+
+  const handleExportCsv = () => {
+    if (!rows.length) return;
+    const headers = ["ID", "Product Type", "Product Title", "Name", "Email", "Signed Up At"];
+    const csvRows = rows.map((r: any) => [
+      r.id, r.productType, r.productTitle ?? "", r.name, r.email,
+      r.createdAt ? new Date(r.createdAt).toLocaleString() : "",
+    ]);
+    const csv = [headers, ...csvRows].map(row => row.map(String).map(v => `"${v.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "notify_me_signups.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 items-center">
+        <input
+          type="text" placeholder="Search name, email, or product..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-48 border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-teal-400"
+        />
+        <select
+          value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+          className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+        >
+          <option value="">All Types</option>
+          <option value="course">Course</option>
+          <option value="download">Download</option>
+          <option value="workshop">Workshop</option>
+          <option value="webinar">Webinar</option>
+        </select>
+        <button onClick={() => refetch()} className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50">
+          <RefreshCw className="w-3.5 h-3.5 text-gray-500" />
+        </button>
+        <button onClick={handleExportCsv} disabled={!rows.length} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-teal-300 text-teal-700 text-xs font-medium hover:bg-teal-50 disabled:opacity-50">
+          <Download className="w-3.5 h-3.5" /> Export CSV
+        </button>
+      </div>
+      <p className="text-xs text-gray-500">{rows.length} signup{rows.length !== 1 ? "s" : ""} found</p>
+      {isLoading ? (
+        <div className="flex justify-center py-8"><div className="animate-spin h-5 w-5 border-4 border-teal-500 border-t-transparent rounded-full" /></div>
+      ) : rows.length === 0 ? (
+        <div className="text-center py-8 text-gray-400 text-xs">No signups found.</div>
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-gray-100">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
+              <tr>
+                <th className="px-3 py-2 text-left">Name</th>
+                <th className="px-3 py-2 text-left">Email</th>
+                <th className="px-3 py-2 text-left">Product</th>
+                <th className="px-3 py-2 text-left">Type</th>
+                <th className="px-3 py-2 text-left">Signed Up</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {rows.map((r: any) => (
+                <tr key={r.id} className="hover:bg-gray-50/50">
+                  <td className="px-3 py-2 font-medium text-gray-800">{r.name}</td>
+                  <td className="px-3 py-2 text-gray-600">{r.email}</td>
+                  <td className="px-3 py-2 text-gray-700 max-w-[200px] truncate">{r.productTitle ?? `ID: ${r.productId}`}</td>
+                  <td className="px-3 py-2">
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-teal-50 text-teal-700 capitalize">{r.productType}</span>
+                  </td>
+                  <td className="px-3 py-2 text-gray-500">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

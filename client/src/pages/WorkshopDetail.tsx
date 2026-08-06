@@ -25,7 +25,7 @@ function LocationIcon({ type }: { type: string }) {
   return <Building2 className="w-4 h-4 text-teal-600" />;
 }
 
-function InstanceCard({ instance, workshopSlug }: { instance: any; workshopSlug: string }) {
+function InstanceCard({ instance, workshopSlug, isDraft }: { instance: any; workshopSlug: string; isDraft?: boolean }) {
   const price = instance.price != null
     ? `$${(instance.price / 100).toFixed(2)}`
     : null;
@@ -79,16 +79,20 @@ function InstanceCard({ instance, workshopSlug }: { instance: any; workshopSlug:
               )}
             </div>
           )}
-          <Link href={`/checkout/workshop/${workshopSlug}?instance=${instance.id}`}>
-            <Button
-              size="sm"
-              className="bg-teal-600 hover:bg-teal-700 text-white"
-              disabled={spotsLeft === 0}
-            >
-              {spotsLeft === 0 ? "Sold Out" : "Register"}
-              {spotsLeft !== 0 && <ChevronRight className="w-4 h-4 ml-1" />}
-            </Button>
-          </Link>
+          {isDraft ? (
+            <Button className="font-semibold" size="sm" disabled variant="outline">Enrollment Closed</Button>
+          ) : (
+            <Link href={`/checkout/workshop/${workshopSlug}?instance=${instance.id}`}>
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white font-semibold"
+                size="sm"
+                disabled={spotsLeft === 0}
+              >
+                {spotsLeft === 0 ? "Sold Out" : "Register"}
+                {spotsLeft !== 0 && <ChevronRight className="w-4 h-4 ml-1" />}
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </div>
@@ -138,6 +142,7 @@ export default function WorkshopDetail() {
   const compareAt = workshop.compareAtPrice
     ? `$${(workshop.compareAtPrice / 100).toFixed(2)}`
     : null;
+  const isDraft = workshop.status === "draft";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -201,7 +206,7 @@ export default function WorkshopDetail() {
                   </h2>
                   <div className="space-y-3">
                     {availableInstances.map((inst: any) => (
-                      <InstanceCard key={inst.id} instance={inst} workshopSlug={slug ?? ""} />
+                      <InstanceCard key={inst.id} instance={inst} workshopSlug={slug ?? ""} isDraft={isDraft} />
                     ))}
                   </div>
                 </div>

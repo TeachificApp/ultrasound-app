@@ -13,7 +13,7 @@ import { eq, leftJoin, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { assertAdmin } from "./lmsHelpers";
-import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures, webinars } from "../../drizzle/schema";
+import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures, webinars, draftNotifyEntries, cmeGenericDisclosures } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
@@ -1080,6 +1080,33 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         query = query.where(andOp(...conditions) as any);
       }
       const rows = await query.orderBy(descOp(cmeFinancialDisclosures.createdAt)).limit(500);
+      return { rows };
+    }),
+
+  listDraftNotifyEntries: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      productType: z.string().optional(),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { desc: descOp2, like, and: andOp2, eq: eqOp2 } = await import("drizzle-orm");
+      let query = db.select().from(draftNotifyEntries).$dynamic();
+      const conditions: any[] = [];
+      if (input?.search) {
+        const s = `%${input.search}%`;
+        const { or } = await import("drizzle-orm");
+        conditions.push(or(like(draftNotifyEntries.name, s), like(draftNotifyEntries.email, s), like(draftNotifyEntries.productTitle, s)));
+      }
+      if (input?.productType) {
+        conditions.push(eqOp2(draftNotifyEntries.productType, input.productType));
+      }
+      if (conditions.length > 0) {
+        query = query.where(andOp2(...conditions) as any);
+      }
+      const rows = await query.orderBy(descOp2(draftNotifyEntries.createdAt)).limit(500);
       return { rows };
     }),
 });
