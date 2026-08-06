@@ -3559,4 +3559,99 @@ CRITICAL REQUIREMENTS:
 
       return { success: true, alreadyExisted: false, certificateUrl: newCert?.certificateUrl ?? null };
     }),
+  /**
+   * Retroactive fix: find all enrollments where a survey-only quiz lesson was submitted
+   * but never marked complete (due to the score=0 bug), mark those lessons complete,
+   * recalculate progress, and issue certificates where eligible.
+   * Safe to run multiple times — skips lessons already marked complete.
+   */
+  bulkFixSurveyCompletions: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive().optional(),
+      dryRun: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const SURVEY_Q_TYPES = ["likert", "star_rating", "open_text"];
+
+      // 1. Find all quiz lessons whose questions are ALL survey-type
+      const allQuizzes = await db.select({ id: lmsQuizzes.id, lessonId: lmsQuizzes.lessonId }).from(lmsQuizzes);
+      const surveyLessonIds: number[] = [];
+      for (const quiz of allQuizzes) {
+        const questions = await db.select({ questionType: lmsQuizQuestions.questionType })
+          .from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, quiz.id));
+        if (questions.length > 0 && questions.every(q => SURVEY_Q_TYPES.includes(q.questionType ?? "mcq"))) {
+          surveyLessonIds.push(quiz.lessonId);
+        }
+      }
+
+      if (surveyLessonIds.length === 0) {
+        return { fixed: 0, dryRun: input.dryRun, surveyLessons: 0, message: "No survey-only quiz lessons found." };
+      }
+
+      // 2. Find quiz attempts for these lessons where lesson progress is NOT completed
+      const { lmsQuizAttempts: lmsQuizAttemptsTable } = await import("../../drizzle/schema");
+      const attempts = await db.select({
+        userId: lmsQuizAttemptsTable.userId,
+        lessonId: lmsQuizAttemptsTable.lessonId,
+        courseId: lmsQuizAttemptsTable.courseId,
+      })
+        .from(lmsQuizAttemptsTable)
+        .where(inArray(lmsQuizAttemptsTable.lessonId, surveyLessonIds))
+        .groupBy(lmsQuizAttemptsTable.userId, lmsQuizAttemptsTable.lessonId, lmsQuizAttemptsTable.courseId);
+
+      let fixed = 0;
+      const enrollmentsToRecalc = new Set<number>();
+
+      for (const attempt of attempts) {
+        if (input.courseId && attempt.courseId !== input.courseId) continue;
+
+        const [enrollment] = await db.select({ id: lmsEnrollments.id })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, attempt.userId), eq(lmsEnrollments.courseId, attempt.courseId)))
+          .limit(1);
+        if (!enrollment) continue;
+
+        const [progress] = await db.select({ id: lmsLessonProgress.id, completedAt: lmsLessonProgress.completedAt })
+          .from(lmsLessonProgress)
+          .where(and(eq(lmsLessonProgress.enrollmentId, enrollment.id), eq(lmsLessonProgress.lessonId, attempt.lessonId)))
+          .limit(1);
+
+        if (progress?.completedAt) continue; // already complete
+
+        if (!input.dryRun) {
+          if (progress) {
+            await db.update(lmsLessonProgress).set({ completedAt: new Date(), quizScore: 100, quizPassed: true })
+              .where(eq(lmsLessonProgress.id, progress.id));
+          } else {
+            await db.insert(lmsLessonProgress).values({
+              enrollmentId: enrollment.id, lessonId: attempt.lessonId,
+              quizScore: 100, quizPassed: true, completedAt: new Date(), attempts: 1,
+            });
+          }
+          enrollmentsToRecalc.add(enrollment.id);
+        }
+        fixed++;
+      }
+
+      if (!input.dryRun) {
+        for (const enrollmentId of enrollmentsToRecalc) {
+          await recalcProgress(db, enrollmentId);
+        }
+      }
+
+      return {
+        fixed,
+        dryRun: input.dryRun,
+        surveyLessons: surveyLessonIds.length,
+        enrollmentsRecalculated: input.dryRun ? 0 : enrollmentsToRecalc.size,
+        message: input.dryRun
+          ? `Dry run: would fix ${fixed} incomplete survey lesson(s) across ${surveyLessonIds.length} survey quiz lesson(s).`
+          : `Fixed ${fixed} incomplete survey lesson(s), recalculated ${enrollmentsToRecalc.size} enrollment(s).`,
+      };
+    }),
 });
+

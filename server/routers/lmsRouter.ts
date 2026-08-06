@@ -2103,8 +2103,17 @@ export const lmsLearnerRouter = router({
         if (isCorrect) correct++;
         return { questionId: q.id, correct: isCorrect, correctAnswer: quiz.showCorrectAnswers ? q.correctAnswer : undefined, explanation: quiz.showCorrectAnswers ? q.explanation : undefined };
       });
-      const score = questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0;
-      const passed = score >= quiz.passingScore;
+      // Survey-only quizzes (likert / star_rating / open_text) have no correct answers,
+      // so the normal score calculation always returns 0, which blocks lesson
+      // completion and certificate issuance. Auto-pass them as long as the learner
+      // submitted at least one answer.
+      const SURVEY_Q_TYPES_SCORE = ["likert", "star_rating", "open_text"];
+      const allSurveyQuestions = questions.length > 0 && questions.every(q => {
+        const qt = (q as any).questionType ?? (q as any).type ?? "mcq";
+        return SURVEY_Q_TYPES_SCORE.includes(qt);
+      });
+      const score = allSurveyQuestions ? 100 : (questions.length > 0 ? Math.round((correct / questions.length) * 100) : 0);
+      const passed = allSurveyQuestions ? true : (score >= quiz.passingScore);
 
       // Upsert progress
       const [existing] = await db.select().from(lmsLessonProgress)
