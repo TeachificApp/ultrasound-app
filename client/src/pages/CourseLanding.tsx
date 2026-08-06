@@ -269,7 +269,7 @@ function resolveBtnAction(
   return onEnroll;
 }
 
-function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage, onFreeEnroll, onOpenGroupDetail, onSoldOutOverride }: {
+function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage, onFreeEnroll, onOpenGroupDetail, onSoldOutOverride, isDraft }: {
   block: Block; course: any; onEnroll: () => void; onEnrollWithOption?: (pricingOptionId: number | undefined) => void; enrolling: boolean; ctaText: string; price: string;
   selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
   slug?: string; enrollment?: any; user?: UserParamSource | null;
@@ -278,6 +278,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
   onFreeEnroll?: (productType: string, productId: number) => void;
   onOpenGroupDetail?: (groupId: number) => void;
   onSoldOutOverride?: (overrideUrl: string) => void;
+  isDraft?: boolean;
 }) {
   const d = block.data;
   // When ctaText has been overridden (e.g., "Join Waitlist"), apply it to enroll/checkout action buttons
@@ -703,9 +704,10 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               </p>
             </div>
           )}
-          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
-            {enrolling ? "Processing…" : (isCtaOverridden ? ctaText : (d.ctaText ?? ctaText))}
+          <button onClick={isDraft ? undefined : resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={isDraft || enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+            {isDraft ? "Enrollment Closed" : enrolling ? "Processing…" : (isCtaOverridden ? ctaText : (d.ctaText ?? ctaText))}
           </button>
+          {isDraft && <p className="text-sm text-gray-500 mt-2">Check back soon for enrollment updates.</p>}
           {/* Price below button */}
           {d.showPrice && d.priceSource !== "none" && (d.pricePosition ?? "above") === "below" && (
             <div className="mt-6">
@@ -726,10 +728,11 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
           <CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          <button onClick={resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={enrolling}
+          <button onClick={isDraft ? undefined : resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={isDraft || enrolling}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
-            {isCtaOverridden ? ctaText : (d.ctaText ?? ctaText)}
+            {isDraft ? "Enrollment Closed" : isCtaOverridden ? ctaText : (d.ctaText ?? ctaText)}
           </button>
+          {isDraft && <p className="text-sm text-gray-500 mt-2">Check back soon for enrollment updates.</p>}
           <ButtonSubtext d={d} />
           </CC>
         </div>
@@ -2068,10 +2071,10 @@ export default function CourseLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
                 <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} />
+                  <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} />
                 </div>
               ) : (
-                <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} />
+                <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} />
               )}
             </div>
           );
