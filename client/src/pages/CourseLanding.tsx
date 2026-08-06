@@ -1962,7 +1962,7 @@ export default function CourseLanding() {
     course?.pricingType === "subscription" ||
     (course?.pricingOptions as { pricingType?: string }[] | undefined)?.some((o) => o.pricingType === "subscription");
   const enrolledCtaLabel = isSubscriptionCourse ? SUBSCRIPTION_RESUME_LABEL : "Continue Learning";
-  const ctaText = isDraft ? "Not Available For Purchase" : enrollment ? enrolledCtaLabel : showWaitlistCta ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
+  const ctaText = isDraft ? "Enrollment Closed" : enrollment ? enrolledCtaLabel : showWaitlistCta ? waitlistCtaLabel : isEnrollmentClosed ? "Enrollment Closed" : (lp?.ctaText ?? "Enroll Now");
   const checkoutBusy = isDraft || enrolling || enrollFree.isPending || createCheckout.isPending || isGuarded;
   const handleEnrollGuarded = () => runGuarded(() => { void handleEnroll(); });
   const handleEnrollWithOptionGuarded = (pricingOptionId: number | undefined) =>
@@ -2374,7 +2374,7 @@ export default function CourseLanding() {
 
             {isDraft ? (
               <Button className="w-full font-semibold" size="lg" disabled variant="outline">
-                Not Available For Purchase
+                Enrollment Closed
               </Button>
             ) : isWaitlistMode ? (
               <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleWaitlistCta}>
