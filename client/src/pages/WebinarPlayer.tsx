@@ -7,10 +7,10 @@
  * Falls back to a simple video player if no blocks are configured.
  * Access is gated — unregistered users are redirected to the landing page.
  */
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Video, Lock, ArrowLeft } from "lucide-react";
