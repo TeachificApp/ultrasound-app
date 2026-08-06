@@ -31,7 +31,7 @@ import { revenueShareRouter } from "./routers/revenueShareRouter";
 import { bundlePublicRouter, bundleLearnerRouter, bundleAdminRouter } from "./routers/bundleRouter";
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
 import { careerNetworkRouter } from "./routers/careerNetworkRouter";
-import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter } from "./routers/webinarRouter";
+import { webinarPublicRouter, webinarLearnerRouter, webinarAdminRouter, webinarSessionRouter, webinarCheckoutPublicRouter } from "./routers/webinarRouter";
 import { downloadsPublicRouter, downloadsLearnerRouter, downloadsAdminRouter } from "./routers/downloadsRouter";
 import { orderBumpsAdminRouter, orderBumpsPublicRouter } from "./routers/orderBumpsRouter";
 import { socialContentRouter } from "./routers/socialContentRouter";
@@ -2128,6 +2128,7 @@ export const appRouter = router({
   webinarLearner: webinarLearnerRouter,
   webinarAdmin: webinarAdminRouter,
   webinarSession: webinarSessionRouter,
+  webinarCheckout: webinarCheckoutPublicRouter,
   questionBank: questionBankRouter,
   downloads: downloadsPublicRouter,
   downloadsLearner: downloadsLearnerRouter,

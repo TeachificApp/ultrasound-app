@@ -168,7 +168,7 @@ export default function WebinarPlayerPageBuilder() {
 
   const selectedBlock = blocks.find(b => b.id === selectedId) ?? null;
   const backPath = `/admin/lms?tab=webinars&editWebinar=${numericId}`;
-  const previewPath = null;
+  const previewPath = pageInfo?.slug ? `/webinar/${pageInfo.slug}` : null;
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">

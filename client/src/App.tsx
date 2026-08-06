@@ -92,6 +92,8 @@ const CommunityExperiencePageBuilder = lazy(() => import("./pages/admin/Communit
 const BundleLandingPageBuilder = lazy(() => import("./pages/admin/BundleLandingPageBuilder"));
 const WebinarLandingPageBuilder = lazy(() => import("./pages/admin/WebinarLandingPageBuilder"));
 const WebinarPlayerPageBuilder = lazy(() => import("./pages/admin/WebinarPlayerPageBuilder"));
+const WebinarLanding = lazy(() => import("./pages/WebinarLanding"));
+const WebinarPlayer = lazy(() => import("./pages/WebinarPlayer"));
 const WorkshopLandingPageBuilder = lazy(() => import("./pages/admin/WorkshopLandingPageBuilder"));
 const WorkshopInstanceLandingPageBuilder = lazy(() => import("./pages/admin/WorkshopInstanceLandingPageBuilder"));
 const CohortGroupLandingPageBuilder = lazy(() => import("./pages/admin/CohortGroupLandingPageBuilder"));
@@ -772,6 +774,8 @@ function MembersRouter() {
       <Route path="/memberships/:slug">{() => <Suspense fallback={pageFallback}><MembershipPage /></Suspense>}</Route>
       <Route path="/bundles/:slug" component={BundleLanding} />
       <Route path="/workshops/:slug" component={WorkshopLanding} />
+      <Route path="/webinars/:slug" component={WebinarLanding} />
+      <Route path="/webinar/:slug" component={WebinarPlayer} />
       <Route path="/downloads/:slug" component={DownloadLanding} />
       <Route path="/product/:slug" component={ProductLanding} />
       {/* ── Members-only routes (user profile / dashboard hub) ─────────── */}
@@ -860,6 +864,8 @@ function LMSRouter() {
       <Route path="/cohort/:courseId/replay/:recordingId" component={CohortReplayPlayer} />
       <Route path="/cohort/:courseId" component={CohortSchedule} />
       <Route path="/courses/:slug" component={CourseLanding} />
+      <Route path="/webinars/:slug" component={WebinarLanding} />
+      <Route path="/webinar/:slug" component={WebinarPlayer} />
       <Route path="/downloads/:slug" component={DownloadLanding} />
       <Route path="/products">{() => <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductsListing /></Suspense>}</Route>
       <Route path="/product/:slug" component={ProductLanding} />
@@ -905,6 +911,9 @@ function LMSRouter() {
         {/* Workshops */}
         <Route path="/workshops" component={WorkshopsBrowse} />
         <Route path="/workshops/:slug" component={WorkshopLanding} />
+        {/* Webinars */}
+        <Route path="/webinars/:slug" component={WebinarLanding} />
+        <Route path="/webinar/:slug" component={WebinarPlayer} />
         <Route path="/bundles/:slug" component={BundleLanding} />
 
         {/* ── Career Network ─────────────────────────────────────────────── */}
@@ -1198,6 +1207,8 @@ function IHeartEchoRouter() {
         <Route path="/downloads/:slug/files">{(params: { slug: string }) => <SsoRedirect path={`/downloads/${params.slug}/files`} />}</Route>
         <Route path="/downloads/:slug" component={DownloadLanding} />
         <Route path="/downloads" component={DownloadsBrowse} />
+        <Route path="/webinars/:slug" component={WebinarLanding} />
+        <Route path="/webinar/:slug" component={WebinarPlayer} />
         <Route path="/bundles/:slug" component={BundleLanding} />
         <Route path="/checkout/complete">
           <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
