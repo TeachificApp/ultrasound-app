@@ -342,12 +342,15 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 leading-tight break-words animate-fade-slide-up" dangerouslySetInnerHTML={{ __html: `<span style="${d.headlineColor ? `color:${d.headlineColor}` : ''}">${d.headline ?? ''}</span>${d.headline2 ? `<br/><span style="${d.headline2Color ? `color:${d.headline2Color}` : ''}">${d.headline2}</span>` : ''}` }} />
               {d.subheadline && <p className="text-base sm:text-lg md:text-xl opacity-90 mb-6 sm:mb-8 break-words animate-fade-slide-up-delay-1" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
               {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
-                {buttons.map((btn, i) => (
+                {buttons.map((btn, i) => {
+                  const isEnrollBtn = enrollActions.has((btn as any).behavior ?? "");
+                  return (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button onClick={resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined, onCheckoutPage, (btn as any).freeEnrollProductType, (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null, onFreeEnroll)}
-                      className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto transition-opacity hover:opacity-90 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
+                    <button onClick={isDraft && isEnrollBtn ? undefined : resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined, onCheckoutPage, (btn as any).freeEnrollProductType, (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null, onFreeEnroll)}
+                      disabled={isDraft && isEnrollBtn}
+                      className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto transition-opacity hover:opacity-90 disabled:opacity-60 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                      {isCtaOverridden && enrollActions.has((btn as any).behavior ?? "") ? ctaText : btn.text}
+                      {isDraft && isEnrollBtn ? "Enrollment Closed" : isCtaOverridden && isEnrollBtn ? ctaText : btn.text}
                     </button>
                     {btn.showStrikethrough && btn.strikethroughPrice && (
                       <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
@@ -356,7 +359,9 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                       <a href={btn.optOutUrl || "#"} className="text-xs text-white/60 underline hover:text-white/80 cursor-pointer">{btn.optOutText}</a>
                     )}
                   </div>
-                ))}
+                  );
+                })}
+
               </div>}
             </div>
             {hasInlineMedia && (
@@ -1540,8 +1545,8 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                       </li>
                     ))}
                   </ul>
-                  <button {...tierDataAttrs(tier)} disabled={enrolling} className="block w-full text-center py-2.5 rounded-xl font-semibold text-sm cursor-pointer disabled:opacity-60" style={{ backgroundColor: tier.highlighted ? accentColor : "transparent", color: tier.highlighted ? "#fff" : accentColor, border: `2px solid ${accentColor}` }}>
-                    {enrolling ? "Processing…" : (isCtaOverridden && enrollActions.has(tierDataAttrs(tier)["data-action"] ?? "") ? ctaText : (tier.ctaText || "Get Started"))}
+                  <button {...tierDataAttrs(tier)} disabled={isDraft || enrolling} onClick={isDraft ? (e) => e.preventDefault() : undefined} className="block w-full text-center py-2.5 rounded-xl font-semibold text-sm cursor-pointer disabled:opacity-60" style={{ backgroundColor: tier.highlighted ? accentColor : "transparent", color: tier.highlighted ? "#fff" : accentColor, border: `2px solid ${accentColor}` }}>
+                    {isDraft ? "Enrollment Closed" : enrolling ? "Processing…" : (isCtaOverridden && enrollActions.has(tierDataAttrs(tier)["data-action"] ?? "") ? ctaText : (tier.ctaText || "Get Started"))}
                   </button>
                 </div>
               </div>
