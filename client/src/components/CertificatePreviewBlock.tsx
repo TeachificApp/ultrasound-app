@@ -14,7 +14,7 @@
  *   gateQuizLessonId     — number: the lesson whose quiz must be passed
  *   quizNotPassedMessage — message shown when quiz gate is not met
  */
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Award, Download, Lock, ExternalLink, Loader2, ClipboardCheck, Share2 } from "lucide-react";
@@ -297,6 +297,31 @@ function CertificatePreviewLearner({
     );
   }
 
+  // Regenerate the PDF on every download so it always uses the user's current name.
+  const utils = trpc.useUtils();
+  const refreshMutation = trpc.lmsLearner.refreshCertificate.useMutation({
+    onSuccess: (data) => {
+      // Invalidate the cached certificate so the preview iframe also updates
+      utils.lmsLearner.getCourseCertificate.invalidate({ courseSlug: courseSlug ?? "" });
+      // Trigger download of the freshly generated URL
+      const a = document.createElement("a");
+      a.href = data.certificateUrl;
+      a.download = "certificate.pdf";
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    },
+    onError: (err) => {
+      toast.error("Failed to generate certificate. Please try again.");
+    },
+  });
+
+  const handleDownload = useCallback(() => {
+    if (!courseSlug) return;
+    refreshMutation.mutate({ courseSlug });
+  }, [courseSlug, refreshMutation]);
+
   const certUrl = cert.certificateUrl;
 
   return (
@@ -339,11 +364,18 @@ function CertificatePreviewLearner({
 
       {/* Download / open buttons */}
       <div className="flex flex-wrap gap-3 justify-center">
-        <a href={certUrl} download target="_blank" rel="noopener noreferrer">
-          <Button size="sm" className="gap-2 bg-teal-600 hover:bg-teal-700 text-white">
-            <Download size={14} /> Download Certificate
-          </Button>
-        </a>
+        <Button
+          size="sm"
+          className="gap-2 bg-teal-600 hover:bg-teal-700 text-white"
+          onClick={handleDownload}
+          disabled={refreshMutation.isPending}
+        >
+          {refreshMutation.isPending ? (
+            <><Loader2 size={14} className="animate-spin" /> Preparing…</>
+          ) : (
+            <><Download size={14} /> Download Certificate</>
+          )}
+        </Button>
         <a href={certUrl} target="_blank" rel="noopener noreferrer">
           <Button size="sm" variant="outline" className="gap-2">
             <ExternalLink size={14} /> Open in New Tab

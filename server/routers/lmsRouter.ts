@@ -3001,6 +3001,94 @@ export const lmsLearnerRouter = router({
     }),
 
   // ── Quiz Gate ──────────────────────────────────────────────────────────
+
+  /**
+   * Regenerate a certificate PDF using the user's CURRENT display name and credentials.
+   * Called on every download so the certificate always reflects the latest name on the account,
+   * even if the user changed their name after the certificate was originally issued.
+   * Re-uploads the new PDF to S3, updates the DB record, and returns the fresh URL.
+   */
+  refreshCertificate: protectedProcedure
+    .input(z.object({ courseSlug: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Resolve course
+      const [course] = await db.select({
+        id: lmsCourses.id,
+        title: lmsCourses.title,
+        hasCertificate: lmsCourses.hasCertificate,
+        certificateTemplateId: lmsCourses.certificateTemplateId,
+        creditHours: lmsCourses.creditHours,
+        certificateTitleOverride: lmsCourses.certificateTitleOverride,
+      }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // Fetch existing certificate record
+      const [cert] = await db.select().from(lmsCertificates)
+        .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.id))).limit(1);
+      if (!cert) throw new TRPCError({ code: "NOT_FOUND", message: "No certificate found for this course" });
+
+      // Fetch the user's CURRENT name and credentials
+      const [user] = await db.select({
+        name: users.name,
+        displayName: users.displayName,
+        credentials: users.credentials,
+        email: users.email,
+      }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
+      if (!user) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const learnerName = user.displayName || user.name || "Learner";
+
+      // Resolve certificate template
+      let template: any = null;
+      const templateId = cert.templateId ?? course.certificateTemplateId;
+      if (templateId) {
+        const [tmpl] = await db.select().from(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.id, templateId)).limit(1);
+        template = tmpl ?? null;
+      }
+      if (!template) {
+        const [defaultTmpl] = await db.select().from(lmsCertificateTemplates).where(eq(lmsCertificateTemplates.isDefault, true)).limit(1);
+        template = defaultTmpl ?? null;
+      }
+
+      // Regenerate PDF with current learner name
+      const certTitle = (course.certificateTitleOverride?.trim()) ? course.certificateTitleOverride.trim() : course.title;
+      let pdfBuffer: Buffer;
+      if (template?.pdfTemplateUrl) {
+        const res = await fetch(template.pdfTemplateUrl);
+        if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to fetch certificate template" });
+        const rawBuffer = Buffer.from(await res.arrayBuffer());
+        const { overlayLearnerData } = await import("../lib/certificatePdfOverlay");
+        pdfBuffer = await overlayLearnerData(rawBuffer, {
+          learnerName,
+          courseTitle: certTitle,
+          issuedAt: cert.issuedAt,
+          creditHours: course.creditHours ?? null,
+        });
+      } else {
+        pdfBuffer = await generateCertificatePdf({
+          learnerName,
+          courseTitle: certTitle,
+          issuedAt: cert.issuedAt,
+          credentials: user.credentials,
+          creditHours: course.creditHours ?? null,
+          template,
+        });
+      }
+
+      // Upload new PDF to S3
+      const suffix = randomBytes(6).toString("hex");
+      const fileKey = `certificates/cert-${ctx.user.id}-${course.id}-${suffix}.pdf`;
+      const { url: certificateUrl } = await storagePut(fileKey, pdfBuffer, "application/pdf");
+
+      // Update the certificate record with the new URL
+      await db.update(lmsCertificates).set({ certificateUrl }).where(eq(lmsCertificates.id, cert.id));
+
+      return { certificateUrl };
+    }),
+
   /**
    * Returns whether the current user has passed the quiz for a specific lesson.
    * Used by the Certificate Preview block to gate access behind a quiz pass.
