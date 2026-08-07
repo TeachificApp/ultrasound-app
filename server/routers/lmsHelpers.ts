@@ -233,10 +233,13 @@ export async function issueCertificateIfEnabled(
   }
 
   // Get user info
-  const [user] = await db.select({ name: users.name, email: users.email, displayName: users.displayName, credentials: users.credentials }).from(users).where(eq(users.id, userId)).limit(1);
+  const [user] = await db.select({ name: users.name, email: users.email, displayName: users.displayName, credentials: users.credentials, firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, userId)).limit(1);
   if (!user?.email) return;
 
-  const learnerName = user.displayName || user.name || "Learner";
+  // Prefer legal name (firstName + lastName) for certificates so the PDF always shows
+  // a real full name even if the account display name is a username or handle.
+  const legalName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+  const learnerName = legalName || user.displayName || user.name || "Learner";
   const issuedAt = new Date();
 
   // Fetch certificate template if assigned

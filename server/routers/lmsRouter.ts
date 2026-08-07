@@ -3036,10 +3036,14 @@ export const lmsLearnerRouter = router({
         displayName: users.displayName,
         credentials: users.credentials,
         email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
       }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
       if (!user) throw new TRPCError({ code: "NOT_FOUND" });
-
-      const learnerName = user.displayName || user.name || "Learner";
+      // Prefer legal name (firstName + lastName) so the certificate always shows a real full name
+      // even if the account display name is a username or handle.
+      const legalName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+      const learnerName = legalName || user.displayName || user.name || "Learner";
 
       // Resolve certificate template
       let template: any = null;
