@@ -1769,7 +1769,11 @@ export default function CoursePlayer() {
   const requireManualComplete = lessonData?.requireManualComplete === null || lessonData?.requireManualComplete === undefined
     ? courseDefaultMarkComplete  // inherit from course
     : lessonData.requireManualComplete === 1; // explicit lesson override
-  const canMarkComplete = !requireVideoCompletion || videoWatched;
+  // Admin preview bypasses the video-completion gate so the full workflow can be tested
+  // without watching every video in full. The Mark Complete button still needs to be
+  // clicked manually — only the "must watch 100% of video first" requirement is waived.
+  const isAdminPreviewMode = (data?.isAdminPreview ?? false) || adminPreviewStudent;
+  const canMarkComplete = !requireVideoCompletion || videoWatched || isAdminPreviewMode;
 
   // Parse content blocks and learning objectives from lesson data
   const contentBlocks: Block[] = (() => {
@@ -2413,7 +2417,7 @@ export default function CoursePlayer() {
                           onEnded={() => setVideoWatched(true)}
                         />
                       </div>
-                      {requireVideoCompletion && !videoWatched && (
+                      {requireVideoCompletion && !videoWatched && !isAdminPreviewMode && (
                         <p className="text-xs mt-2" style={{ color: primaryColor }}>Watch the full video to mark this lesson complete.</p>
                       )}
                     </div>
