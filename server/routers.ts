@@ -658,8 +658,8 @@ export const appRouter = router({
       .input(z.object({
         email: z.string().email().max(320),
         password: z.string().min(8).max(128),
-        firstName: z.string().min(1).max(100).optional(),
-        lastName: z.string().min(1).max(100).optional(),
+        firstName: z.string().min(1, "First name is required").max(100),
+        lastName: z.string().min(1, "Last name is required").max(100),
       }))
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, getDb } = await import('./db');
@@ -2751,4 +2751,3 @@ export const appRouter = router({
   }),
 });
 export type AppRouter = typeof appRouter;
-

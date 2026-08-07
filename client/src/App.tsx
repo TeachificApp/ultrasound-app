@@ -13,6 +13,7 @@ import { trpc } from "./lib/trpc";
 import ErrorBoundary from "./components/ErrorBoundary";
 import DemoModeBanner from "./components/DemoModeBanner";
 import GetAppBanner from "./components/GetAppBanner";
+import ProfileNameBanner from "./components/ProfileNameBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
@@ -1461,17 +1462,18 @@ function App() {
           {onMarketingStaging ? (
             <MarketingSiteRouter />
           ) : onMembersSubdomain ? (
-            <MembersRouter />
+            <><ProfileNameBanner /><MembersRouter /></>
           ) : onLearnSubdomain ? (
-            <LMSRouter />
+            <><ProfileNameBanner /><LMSRouter /></>
           ) : onAccreditationSubdomain ? (
             <AccreditationDivisionRouter />
           ) : onIHeartEchoSubdomain ? (
-            <IHeartEchoRouter />
+            <><ProfileNameBanner /><IHeartEchoRouter /></>
           ) : (
             <>
               <DemoModeBanner />
               <GetAppBanner />
+              <ProfileNameBanner />
               <Router />
               <UpgradePromptWrapper />
             </>
@@ -1483,4 +1485,3 @@ function App() {
 }
 
 export default App;
-

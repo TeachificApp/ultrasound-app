@@ -182,11 +182,19 @@ export default function Login() {
       toast.error("Password must be at least 8 characters.");
       return;
     }
+    if (!firstName.trim()) {
+      toast.error("First name is required for your CME certificate.");
+      return;
+    }
+    if (!lastName.trim()) {
+      toast.error("Last name is required for your CME certificate.");
+      return;
+    }
     registerMutation.mutate({
       email: trimmed,
       password,
-      firstName: firstName.trim() || undefined,
-      lastName: lastName.trim() || undefined,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
     });
   };
 
@@ -550,7 +558,7 @@ export default function Login() {
               <form onSubmit={handleRegisterSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">First name</Label>
+                    <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">First name <span className="text-red-500">*</span></Label>
                     <Input
                       id="firstName"
                       type="text"
@@ -561,10 +569,11 @@ export default function Login() {
                       onChange={(e) => setFirstName(e.target.value)}
                       className="h-11"
                       disabled={registerMutation.isPending}
+                      required
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">Last name</Label>
+                    <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">Last name <span className="text-red-500">*</span></Label>
                     <Input
                       id="lastName"
                       type="text"
@@ -574,6 +583,7 @@ export default function Login() {
                       onChange={(e) => setLastName(e.target.value)}
                       className="h-11"
                       disabled={registerMutation.isPending}
+                      required
                     />
                   </div>
                 </div>
@@ -623,7 +633,7 @@ export default function Login() {
                 </div>
                 <Button
                   type="submit"
-                  disabled={registerMutation.isPending || !email.trim() || !password || password.length < 8}
+                  disabled={registerMutation.isPending || !email.trim() || !password || password.length < 8 || !firstName.trim() || !lastName.trim()}
                   className="w-full h-11 font-semibold text-white"
                   style={{ background: "linear-gradient(135deg, #189aa1 0%, #0e7a80 100%)" }}
                 >
