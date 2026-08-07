@@ -1034,6 +1034,20 @@ export const lmsCourseBuilderRouter = router({
       if (isPrerequisite !== undefined) updates.isPrerequisite = isPrerequisite;
       if (commentsEnabled !== undefined) updates.commentsEnabled = commentsEnabled ? 1 : 0;
       if (countTowardCompletion !== undefined) updates.countTowardCompletion = countTowardCompletion ? 1 : 0;
+      // Enforce invariant: draft lessons must NEVER count toward completion.
+      // If the lesson is being set to draft, force countTowardCompletion = 0 regardless of input.
+      // If countTowardCompletion is being enabled but the lesson is (or stays) draft, block it.
+      if (updates.lessonStatus === "draft") {
+        updates.countTowardCompletion = 0;
+      } else if (countTowardCompletion === true && updates.lessonStatus !== "published") {
+        // countTowardCompletion is being enabled but lessonStatus is not changing in this call —
+        // check the current DB status to prevent enabling counting on an already-draft lesson.
+        const [currentLesson] = await db.select({ lessonStatus: lmsLessons.lessonStatus })
+          .from(lmsLessons).where(eq(lmsLessons.id, id)).limit(1);
+        if (currentLesson?.lessonStatus === "draft") {
+          updates.countTowardCompletion = 0;
+        }
+      }
       // Convert null dripDays to 0 (no drip)
       if (updates.dripDays === null) updates.dripDays = 0;
       // Keep isPreview in sync with previewMode for backward compat
