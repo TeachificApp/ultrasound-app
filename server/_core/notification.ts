@@ -14,11 +14,6 @@ const trimValue = (value: string): string => value.trim();
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
-const buildEndpointUrl = (baseUrl: string): string => {
-  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  return new URL("webdevtoken.v1.WebDevService/SendNotification", normalizedBase).toString();
-};
-
 const validatePayload = (input: NotificationPayload): NotificationPayload => {
   if (!isNonEmptyString(input.title)) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Notification title is required." });
@@ -40,25 +35,18 @@ const validatePayload = (input: NotificationPayload): NotificationPayload => {
 /**
  * Send a plain-text admin alert email via SendGrid to the platform admin address.
  *
- * This is the PRIMARY admin notification channel. It delivers to PLATFORM_ADMIN_EMAIL
- * (defaults to admin@allaboutultrasound.com) regardless of which Manus account owns
- * the project. This makes the system portable for consulting work where the client
- * should receive admin alerts, not the developer's personal Manus account.
- *
- * Call this directly via sendAdminAlert() for fire-and-forget admin emails.
+ * Admin alerts are delivered to {@link resolvePlatformAdminEmail} (defaults to
+ * admin@allaboutultrasound.com). The legacy Manus project-owner gmail is never used.
  */
-export async function sendAdminAlert(title: string, content: string): Promise<void> {
+export async function sendAdminAlert(title: string, content: string): Promise<boolean> {
   const sendgridKey = process.env.SENDGRID_API_KEY;
-  // Use a "from" address that is different from the "to" address to avoid spam filters
   const fromEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@allaboutultrasound.com";
   const fromName = process.env.SENDGRID_FROM_NAME || "All About Ultrasound";
-  // PLATFORM_ADMIN_EMAIL is the single source of truth for who receives admin alerts.
-  // Set this env var to the client's email address for consulting projects.
-  const adminEmail = ENV.platformAdminEmail || "admin@allaboutultrasound.com";
+  const adminEmail = ENV.platformAdminEmail;
 
   if (!sendgridKey) {
     console.warn("[Notification] SENDGRID_API_KEY not set — admin alert email skipped.");
-    return;
+    return false;
   }
 
   const htmlBody = `
@@ -67,7 +55,7 @@ export async function sendAdminAlert(title: string, content: string): Promise<vo
       <div style="white-space:pre-wrap;color:#333;line-height:1.6">${content.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
       <hr style="margin-top:32px;border:none;border-top:1px solid #eee"/>
       <p style="color:#999;font-size:12px">This is an automated notification from UltrasoundAssist™.<br/>
-      Admin alerts are delivered to: <strong>${adminEmail}</strong> (configured via PLATFORM_ADMIN_EMAIL).</p>
+      Admin alerts are delivered to: <strong>${adminEmail}</strong>.</p>
     </div>
   `;
 
@@ -88,25 +76,24 @@ export async function sendAdminAlert(title: string, content: string): Promise<vo
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
       console.warn(`[Notification] Admin alert email failed (${response.status}): ${detail}`);
-    } else {
-      console.log(`[Notification] Admin alert email sent to ${adminEmail}: ${title}`);
+      return false;
     }
+
+    console.log(`[Notification] Admin alert email sent to ${adminEmail}: ${title}`);
+    return true;
   } catch (err) {
     console.warn("[Notification] Admin alert email error:", err);
+    return false;
   }
 }
 
 /**
- * Dispatches a Manus in-app push notification to the Manus project owner account
- * AND sends a primary admin alert email to PLATFORM_ADMIN_EMAIL via SendGrid.
+ * Sends an admin alert email to the platform admin inbox and logs the event
+ * for the in-app Admin Notifications page.
  *
- * NOTE: The Manus push notification always goes to the Manus account that owns
- * this project (the developer's account). For client-facing admin alerts, the
- * SendGrid email to PLATFORM_ADMIN_EMAIL is the reliable channel.
- *
- * Returns `true` if the Manus notification request was accepted, `false` when
- * the upstream service cannot be reached. Validation errors bubble up as TRPC
- * errors so callers can fix the payload.
+ * Manus project-owner push notifications are intentionally not used here because
+ * they always deliver to the developer's Manus account (larawilliams0501@gmail.com),
+ * not the client's admin inbox. SendGrid to PLATFORM_ADMIN_EMAIL is the sole channel.
  *
  * Pass { skipAdminEmail: true } when the caller is already sending its own
  * detailed admin email to avoid duplicates.
@@ -117,49 +104,12 @@ export async function notifyOwner(
 ): Promise<boolean> {
   const { title, content } = validatePayload(payload);
 
-  // PRIMARY: Send admin alert email to PLATFORM_ADMIN_EMAIL via SendGrid.
-  // This is the reliable channel for client-facing admin notifications.
-  // Fire-and-forget — never blocks the main flow.
+  let delivered = false;
   if (!options?.skipAdminEmail) {
-    sendAdminAlert(title, content).catch(() => {});
+    delivered = await sendAdminAlert(title, content);
   }
 
-  // Log to the in-app admin notifications DB (fire-and-forget, never throws)
   logAdminNotification({ title, content, source: "system" }).catch(() => {});
 
-  // SECONDARY: Send Manus in-app push notification to the project owner account.
-  // This goes to the Manus account owner (developer) — useful for developer awareness
-  // but NOT the primary channel for client admin alerts.
-  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-    // Manus push not configured — that's fine, email is the primary channel
-    return false;
-  }
-
-  const endpoint = buildEndpointUrl(ENV.forgeApiUrl);
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${ENV.forgeApiKey}`,
-        "content-type": "application/json",
-        "connect-protocol-version": "1",
-      },
-      body: JSON.stringify({ title, content }),
-    });
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      console.warn(
-        `[Notification] Manus push failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`
-      );
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.warn("[Notification] Error calling Manus notification service:", error);
-    return false;
-  }
+  return delivered;
 }

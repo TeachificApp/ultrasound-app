@@ -45,6 +45,7 @@ Set these in your Railway service's **Variables** tab:
 | `VITE_OAUTH_PORTAL_URL` | Manus login portal | (from Manus) |
 | `OWNER_OPEN_ID` | Owner's Manus open ID | (from Manus) |
 | `OWNER_NAME` | Owner's display name | (your name) |
+| `PLATFORM_ADMIN_EMAIL` | Inbox for sales/transaction admin alerts | `admin@allaboutultrasound.com` |
 
 ### Manus Forge (Storage, LLM, Notifications)
 | Variable | Description |

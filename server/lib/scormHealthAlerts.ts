@@ -5,7 +5,8 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import { sendEmail } from "../_core/email";
 import { ENV } from "../_core/env";
-import { mediaAssets, mediaVersions, platformSettings, users } from "../../drizzle/schema";
+import { resolvePlatformAdminEmail } from "./platformAdminEmail";
+import { mediaAssets, mediaVersions, platformSettings } from "../../drizzle/schema";
 import {
   needsScormExtraction,
   resolveScormServePlans,
@@ -40,18 +41,7 @@ export async function resolveScormAlertEmail(): Promise<string | null> {
     if (settings?.email?.trim()) return settings.email.trim();
   }
 
-  const ownerOpenId = process.env.OWNER_OPEN_ID?.trim();
-  if (ownerOpenId && db) {
-    const [owner] = await db
-      .select({ email: users.email })
-      .from(users)
-      .where(eq(users.openId, ownerOpenId))
-      .limit(1);
-    if (owner?.email?.trim()) return owner.email.trim();
-  }
-
-  const fallback = process.env.SENDGRID_FROM_EMAIL?.trim();
-  return fallback || null;
+  return resolvePlatformAdminEmail();
 }
 
 /** Load all SCORM/ZIP/LMS assets with health classification (DB-only, fast). */
