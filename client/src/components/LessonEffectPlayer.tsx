@@ -143,13 +143,13 @@ function parseColors(colorsStr: string | null | undefined): string[] {
 
 // ─── Sound presets (must match LessonEffectEditor.tsx) ───────────────────────
 const SOUND_PRESET_URLS: Record<string, string> = {
-  applause: "https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3",
-  cheer: "https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3",
-  ding: "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
-  fanfare: "https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3",
-  success: "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3",
-  levelup: "https://assets.mixkit.co/active_storage/sfx/1997/1997-preview.mp3",
-  notification: "https://assets.mixkit.co/active_storage/sfx/2355/2355-preview.mp3",
+  applause: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/applause_fe9d7da7.mp3",
+  cheer: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/cheer_9a94c0ac.mp3",
+  ding: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/ding_9df3b7b5.mp3",
+  fanfare: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/fanfare_f6655ce4.mp3",
+  success: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/success_3102d6b9.mp3",
+  levelup: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/levelup_0c71ed7d.mp3",
+  notification: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/notification_b7e21d77.mp3",
 };
 
 // ─── Sound player ──────────────────────────────────────────────────────────────
