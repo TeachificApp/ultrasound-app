@@ -163,6 +163,7 @@ import {
   ClipboardPaste,
   RefreshCw,
 } from "lucide-react";
+import { Copy as CopyIcon, LayoutGrid, Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data";
@@ -660,6 +661,13 @@ export default function RichTextEditor({
   const [cellBgColor, setCellBgColor] = useState("#ffffff");
   const [cellBorderColor, setCellBorderColor] = useState("#d1d5db");
   const [mediaStyleOpen, setMediaStyleOpen] = useState(false);
+  const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
+  const [mediaLibraryTab, setMediaLibraryTab] = useState<"image" | "video">("image");
+  const [mediaLibrarySearch, setMediaLibrarySearch] = useState("");
+  const mediaLibraryQuery = trpc.mediaRepo.listAssets.useQuery(
+    { mediaType: mediaLibraryTab, search: mediaLibrarySearch || undefined, pageSize: 48 },
+    { enabled: mediaLibraryOpen, staleTime: 30_000 }
+  );
 
   const editor = useEditor({
     extensions: [
@@ -1287,6 +1295,11 @@ export default function RichTextEditor({
             <ImageIcon className="w-3.5 h-3.5" />
           </ToolbarBtn>
 
+          {/* Media Library */}
+          <ToolbarBtn title="Media Library — browse & insert uploaded images/videos" onClick={() => setMediaLibraryOpen(p => !p)} active={mediaLibraryOpen}>
+            <LayoutGrid className="w-3.5 h-3.5" />
+          </ToolbarBtn>
+
           {/* Replace Image — only shown when an image node is selected */}
           {(() => {
             if (!editor) return null;
@@ -1313,6 +1326,25 @@ export default function RichTextEditor({
                 setImageDialogOpen(true);
               }}>
                 <RefreshCw className="w-3.5 h-3.5" />
+              </ToolbarBtn>
+            );
+          })()}
+
+          {/* Copy Image URL — only shown when an image node is selected */}
+          {(() => {
+            if (!editor) return null;
+            const { state } = editor;
+            const { from } = state.selection;
+            let imageSrc = "";
+            state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node) => {
+              if (node.type.name === "image" || node.type.name === "imageResize") { imageSrc = node.attrs.src ?? ""; return false; }
+            });
+            if (!imageSrc) return null;
+            return (
+              <ToolbarBtn title="Copy image URL to clipboard" onClick={() => {
+                navigator.clipboard.writeText(imageSrc).then(() => toast.success("Image URL copied")).catch(() => toast.error("Copy failed"));
+              }}>
+                <Link2 className="w-3.5 h-3.5" />
               </ToolbarBtn>
             );
           })()}
@@ -2077,9 +2109,92 @@ export default function RichTextEditor({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Media Library Panel ── */}
+      {mediaLibraryOpen && (
+        <div className="border-t border-gray-100 bg-gray-50/80">
+          {/* Header */}
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-white">
+            <LayoutGrid className="w-4 h-4 text-teal-600 flex-shrink-0" />
+            <span className="text-xs font-semibold text-gray-700 flex-1">Media Library</span>
+            {/* Tabs */}
+            <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+              <button onClick={() => setMediaLibraryTab("image")} className={`px-3 py-1 font-medium transition-colors ${mediaLibraryTab === "image" ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>Images</button>
+              <button onClick={() => setMediaLibraryTab("video")} className={`px-3 py-1 font-medium transition-colors ${mediaLibraryTab === "video" ? "bg-teal-600 text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>Videos</button>
+            </div>
+            <input
+              type="text"
+              placeholder="Search…"
+              value={mediaLibrarySearch}
+              onChange={e => setMediaLibrarySearch(e.target.value)}
+              className="border border-gray-200 rounded-lg px-2 py-1 text-xs w-36 focus:outline-none focus:ring-1 focus:ring-teal-400"
+            />
+            <button onClick={() => setMediaLibraryOpen(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {/* Grid */}
+          <div className="overflow-y-auto" style={{ maxHeight: 240 }}>
+            {mediaLibraryQuery.isLoading ? (
+              <div className="flex justify-center py-8"><div className="animate-spin h-5 w-5 border-4 border-teal-500 border-t-transparent rounded-full" /></div>
+            ) : !mediaLibraryQuery.data?.assets?.length ? (
+              <div className="text-center py-8 text-xs text-gray-400">
+                {mediaLibrarySearch ? "No results found." : `No ${mediaLibraryTab}s in the library yet. Upload one to get started.`}
+              </div>
+            ) : (
+              <div className="grid grid-cols-6 gap-1.5 p-2">
+                {mediaLibraryQuery.data.assets.map((asset: any) => {
+                  const url = asset.currentVersion?.s3Url ?? asset.thumbnailUrl ?? "";
+                  const isVideo = asset.mediaType === "video";
+                  return (
+                    <button
+                      key={asset.id}
+                      title={`${asset.title}\nClick to insert`}
+                      onClick={() => {
+                        if (!editor || !url) return;
+                        if (isVideo) {
+                          editor.chain().focus().insertContent({
+                            type: "video",
+                            attrs: { src: url, controls: true, width: "100%" },
+                          }).run();
+                        } else {
+                          editor.chain().focus().setImage({ src: url, alt: asset.title }).run();
+                        }
+                        setMediaLibraryOpen(false);
+                        toast.success(`${isVideo ? "Video" : "Image"} inserted`);
+                      }}
+                      className="group relative aspect-square rounded-lg overflow-hidden border border-gray-200 hover:border-teal-400 hover:ring-2 hover:ring-teal-300 transition-all bg-gray-100"
+                    >
+                      {isVideo ? (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                          {asset.thumbnailUrl
+                            ? <img src={asset.thumbnailUrl} alt={asset.title} className="w-full h-full object-cover opacity-70" />
+                            : <svg className="w-6 h-6 text-white opacity-60" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                          }
+                          <div className="absolute inset-0 flex items-center justify-center"><svg className="w-5 h-5 text-white drop-shadow" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+                        </div>
+                      ) : (
+                        <img src={url} alt={asset.title} className="w-full h-full object-cover" loading="lazy" />
+                      )}
+                      <div className="absolute inset-0 bg-teal-600/0 group-hover:bg-teal-600/10 transition-colors" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="px-3 py-1.5 border-t border-gray-100 text-[10px] text-gray-400 text-right">
+            {mediaLibraryQuery.data?.assets?.length ?? 0} asset{(mediaLibraryQuery.data?.assets?.length ?? 0) !== 1 ? "s" : ""} · Click any item to insert
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
+
+// ─── Media Library Panel ──────────────────────────────────────────────────────
 
 // ─── Read-only display ────────────────────────────────────────────────────────
 

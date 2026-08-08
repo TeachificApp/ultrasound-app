@@ -13,6 +13,8 @@ import multer from "multer";
 import { randomBytes } from "crypto";
 import { storagePut } from "../storage";
 import { sdk } from "../_core/sdk";
+import { getDb } from "../db";
+import { mediaAssets, mediaVersions } from "../../drizzle/schema";
 
 const router = Router();
 
@@ -48,6 +50,41 @@ router.post(
       const suffix = randomBytes(6).toString("hex");
       const fileKey = `lms-images/${suffix}.${ext}`;
       const { url } = await storagePut(fileKey, buffer, mimetype);
+      // Save to Media Library (mediaAssets + mediaVersions) so it appears in the picker
+      try {
+        const db = await getDb();
+        if (db) {
+          const title = originalname.replace(/\.[^.]+$/, "").replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+          const slug = `lms-img-${suffix}`;
+          const [inserted] = await db.insert(mediaAssets).values({
+            slug,
+            title,
+            mediaType: "image",
+            mimeType: mimetype,
+            access: "public",
+            thumbnailUrl: url,
+            folder: "LMS Uploads",
+            brand: "aaus",
+            createdByUserId: user.id,
+          });
+          const assetId = (inserted as any).insertId;
+          if (assetId) {
+            await db.insert(mediaVersions).values({
+              assetId,
+              versionNumber: 1,
+              s3Key: fileKey,
+              s3Url: url,
+              fileName: originalname,
+              fileSize: buffer.length,
+              mimeType: mimetype,
+              uploadedByUserId: user.id,
+            });
+          }
+        }
+      } catch (libErr: any) {
+        // Non-fatal: log but don't fail the upload
+        console.warn("[upload-course-image] Media Library save failed:", libErr?.message);
+      }
       res.json({ url, fileKey });
     } catch (err: any) {
       console.error("[upload-course-image]", err);
