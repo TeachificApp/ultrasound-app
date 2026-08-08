@@ -118,7 +118,7 @@ const EMPTY_QUESTION: QuizQuestion = {
 
 // ─── Hotspot Editor ────────────────────────────────────────────────────────────
 
-function HotspotEditor({
+export function HotspotEditor({
   imageUrl,
   markers,
   onImageUpload,
@@ -240,7 +240,7 @@ function HotspotEditor({
 
 // ─── Matching Editor ───────────────────────────────────────────────────────────
 
-function MatchingEditor({
+export function MatchingEditor({
   pairs,
   onChange,
 }: {

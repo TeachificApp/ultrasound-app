@@ -183,7 +183,7 @@ export const lmsQuizLandingRouter = router({
   updateQuestion: protectedProcedure
     .input(z.object({
       id: z.number(), question: z.string().min(1).optional(),
-      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text"]).optional(),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text", "image_comparison", "drag_sort", "branching", "fill_blank", "annotation", "flashcard"]).optional(),
       options: z.array(z.string()).optional(),
       correctAnswer: z.string().nullable().optional(),
       correctAnswers: z.array(z.number().int()).nullable().optional(),
@@ -198,6 +198,18 @@ export const lmsQuizLandingRouter = router({
       likertLabelsJson: z.string().nullable().optional(),
       starMax: z.number().int().nullable().optional(),
       surveyRequired: z.boolean().optional(),
+      comparisonImageA: z.string().nullable().optional(),
+      comparisonImageB: z.string().nullable().optional(),
+      comparisonLabelA: z.string().nullable().optional(),
+      comparisonLabelB: z.string().nullable().optional(),
+      dragItems: z.string().nullable().optional(),
+      branchingConfig: z.string().nullable().optional(),
+      fillBlankTemplate: z.string().nullable().optional(),
+      fillBlankAnswers: z.string().nullable().optional(),
+      annotationImageUrl: z.string().nullable().optional(),
+      annotationTargetZones: z.string().nullable().optional(),
+      flashcardFront: z.string().nullable().optional(),
+      flashcardBack: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

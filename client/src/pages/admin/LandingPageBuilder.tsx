@@ -71,6 +71,7 @@ export { BlockPreview };
 import UserParamTagsHelper from "@/components/UserParamTagsHelper";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { AutoSaveIndicator } from "@/components/AutoSaveIndicator";
+import { InteractiveQuestionEditorPanel } from "@/components/InteractiveQuestionEditorPanel";
 
 export function uid() { return Math.random().toString(36).slice(2, 10); }
 
@@ -447,6 +448,13 @@ export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion
 BLOCK_CATALOG.push(
   { type: "lesson_quiz", label: "Lesson Quiz", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, category: "Content", defaultData: { title: "Knowledge Check", questions: [], showExplanations: true, passingScore: 70, shuffleQuestions: false } },
   { type: "lesson_flashcard", label: "Flashcard Deck", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, category: "Content", defaultData: { title: "Review Flashcards", cards: [], shuffleCards: true, showHints: true } },
+  { type: "lesson_image_comparison", label: "Image Comparison", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>, category: "Content", defaultData: { title: "Compare Images", comparisonImageA: null, comparisonImageB: null, comparisonLabelA: "Before", comparisonLabelB: "After" } },
+  { type: "lesson_drag_sort", label: "Drag to Order", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>, category: "Content", defaultData: { title: "Put in Order", prompt: "Drag the items into the correct sequence.", items: [] } },
+  { type: "lesson_branching", label: "Clinical Scenario", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, category: "Content", defaultData: { title: "Clinical Decision", scenario: "", choices: [] } },
+  { type: "lesson_fill_blank", label: "Fill in the Blank", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>, category: "Content", defaultData: { title: "Complete the Sentence", template: "", answers: [] } },
+  { type: "lesson_annotation", label: "Image Annotation", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>, category: "Content", defaultData: { title: "Identify the Structure", imageUrl: null, targetZones: [] } },
+  { type: "lesson_hotspot", label: "Hotspot Image", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>, category: "Content", defaultData: { title: "Click the Structure", imageUrl: null, markers: [] } },
+  { type: "lesson_matching", label: "Matching Pairs", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>, category: "Content", defaultData: { title: "Match the Terms", pairs: [] } },
   { type: "lesson_certificate", label: "Certificate Preview", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>, category: "Content", defaultData: { heading: "Your Certificate of Completion", subtext: "Download and share your achievement.", lockedMessage: "Complete all required lessons to unlock your certificate.", bgColor: "#f0fafa", requireQuizPass: false, gateQuizLessonId: null, quizNotPassedMessage: "You must pass the required quiz before accessing your certificate." } },
   { type: "quiz_embed", label: "Quiz Embed", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, category: "Content", defaultData: { quizId: null, showHeader: true } },
   { type: "scorm_embed", label: "SCORM / HTML Package", icon: <Package size={14} />, category: "Content",
@@ -5903,6 +5911,68 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
       );
     case "lesson_certificate": {
       return <LessonCertificateBlockEditor d={d} set={set} courseId={courseId} />;
+    }
+    case "lesson_image_comparison":
+    case "lesson_drag_sort":
+    case "lesson_branching":
+    case "lesson_fill_blank":
+    case "lesson_annotation":
+    case "lesson_hotspot":
+    case "lesson_matching": {
+      const blockType = block.type.replace("lesson_", "") as any;
+      const fakeQ = {
+        type: blockType,
+        comparisonImageA: d.comparisonImageA,
+        comparisonImageB: d.comparisonImageB,
+        comparisonLabelA: d.comparisonLabelA,
+        comparisonLabelB: d.comparisonLabelB,
+        dragItems: d.items ? JSON.stringify(d.items) : null,
+        branchingConfig: d.choices ? JSON.stringify({ scenario: d.scenario ?? "", choices: d.choices }) : null,
+        fillBlankTemplate: d.template,
+        fillBlankAnswers: d.answers ? JSON.stringify(d.answers) : null,
+        annotationImageUrl: d.imageUrl,
+        annotationTargetZones: d.targetZones ? JSON.stringify(d.targetZones) : null,
+        hotspotImageUrl: d.imageUrl,
+        hotspotMarkers: d.markers ? JSON.stringify(d.markers) : null,
+        matchingPairs: d.pairs ? JSON.stringify(d.pairs) : null,
+      };
+      return (
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-600 block mb-1">Title</label>
+            <input className="w-full border rounded px-2 py-1 text-xs" value={d.title ?? ""} onChange={e => set({ title: e.target.value })} placeholder="Block title" />
+          </div>
+          <InteractiveQuestionEditorPanel
+            question={fakeQ}
+            onChange={(updates) => {
+              const mapped: Record<string, any> = {};
+              if (updates.comparisonImageA !== undefined) mapped.comparisonImageA = updates.comparisonImageA;
+              if (updates.comparisonImageB !== undefined) mapped.comparisonImageB = updates.comparisonImageB;
+              if (updates.comparisonLabelA !== undefined) mapped.comparisonLabelA = updates.comparisonLabelA;
+              if (updates.comparisonLabelB !== undefined) mapped.comparisonLabelB = updates.comparisonLabelB;
+              if (updates.dragItems !== undefined) mapped.items = JSON.parse(updates.dragItems || "[]");
+              if (updates.branchingConfig !== undefined) { const bc = JSON.parse(updates.branchingConfig || "{}"); mapped.scenario = bc.scenario; mapped.choices = bc.choices; }
+              if (updates.fillBlankTemplate !== undefined) mapped.template = updates.fillBlankTemplate;
+              if (updates.fillBlankAnswers !== undefined) mapped.answers = JSON.parse(updates.fillBlankAnswers || "[]");
+              if (updates.annotationImageUrl !== undefined) mapped.imageUrl = updates.annotationImageUrl;
+              if (updates.annotationTargetZones !== undefined) mapped.targetZones = JSON.parse(updates.annotationTargetZones || "[]");
+              if (updates.hotspotImageUrl !== undefined) mapped.imageUrl = updates.hotspotImageUrl;
+              if (updates.hotspotMarkers !== undefined) mapped.markers = JSON.parse(updates.hotspotMarkers || "[]");
+              if (updates.matchingPairs !== undefined) mapped.pairs = JSON.parse(updates.matchingPairs || "[]");
+              set(mapped);
+            }}
+            onUploadImage={async (file) => {
+              if (file.size > 40 * 1024 * 1024) { toast.error("File must be under 40 MB"); return null; }
+              try {
+                const reader = new FileReader();
+                const dataUri = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(file); });
+                const result = await uploadMedia.mutateAsync({ dataUri, mimeType: file.type, fileName: file.name, context: "lesson-interactive" });
+                return result.url;
+              } catch { return null; }
+            }}
+          />
+        </div>
+      );
     }
     case "remaining_seats": {
       const rsItems = rsSourceType === "workshop_instance" ? rsWorkshopInstances : rsCohortGroups;

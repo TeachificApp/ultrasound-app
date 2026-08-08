@@ -2670,6 +2670,32 @@ export default function CoursePlayer() {
                           <InlineLessonFlashcardDeck key={block.id} data={block.data as any} />
                         ) : block.type === "lesson_certificate" ? (
                           <CertificatePreviewBlock key={block.id} data={block.data as any} courseSlug={slug!} isAdmin={adminBypass} hasRealEnrollment={!!(data?.enrollment && data.enrollment.id !== -1)} />
+                        ) : ["lesson_image_comparison","lesson_drag_sort","lesson_branching","lesson_fill_blank","lesson_annotation","lesson_hotspot","lesson_matching"].includes(block.type) ? (
+                          <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-lg p-4">
+                            {(block.data as any).title && <h3 className="text-base font-semibold text-gray-800 mb-3">{(block.data as any).title}</h3>}
+                            <InteractiveQuestionPlayer
+                              question={{
+                                type: block.type.replace("lesson_", "") as any,
+                                question: (block.data as any).title ?? "",
+                                comparisonImageA: (block.data as any).comparisonImageA,
+                                comparisonImageB: (block.data as any).comparisonImageB,
+                                comparisonLabelA: (block.data as any).comparisonLabelA,
+                                comparisonLabelB: (block.data as any).comparisonLabelB,
+                                dragItems: (block.data as any).items ? JSON.stringify((block.data as any).items) : null,
+                                branchingConfig: (block.data as any).choices ? JSON.stringify({ scenario: (block.data as any).scenario ?? "", choices: (block.data as any).choices }) : null,
+                                fillBlankTemplate: (block.data as any).template,
+                                fillBlankAnswers: (block.data as any).answers ? JSON.stringify((block.data as any).answers) : null,
+                                annotationImageUrl: (block.data as any).imageUrl,
+                                annotationTargetZones: (block.data as any).targetZones ? JSON.stringify((block.data as any).targetZones) : null,
+                                hotspotImageUrl: (block.data as any).imageUrl,
+                                hotspotMarkers: (block.data as any).markers ? JSON.stringify((block.data as any).markers) : null,
+                                matchingPairs: (block.data as any).pairs ? JSON.stringify((block.data as any).pairs) : null,
+                              }}
+                              submitted={false}
+                              onAnswer={() => {}}
+                              answer={null}
+                            />
+                          </div>
                         ) : block.type === "live_session" ? (
                           <InlineLiveSession key={block.id} data={block.data as any} />
                         ) : block.type === "sdms_cme_module" ? (

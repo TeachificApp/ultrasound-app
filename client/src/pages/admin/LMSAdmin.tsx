@@ -77,6 +77,7 @@ import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
 import TeachAdminPanel from "@/pages/admin/TeachAdminPanel";
 import { QuizQuestionGroups } from "@/components/QuizQuestionGroups";
 import { QuizResultsAdmin } from "./QuizResultsAdmin";
+import { InteractiveQuestionEditorPanel, isInteractiveType } from "@/components/InteractiveQuestionEditorPanel";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -5538,6 +5539,7 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
     onError: e => toast.error(`Error: ${e.message}`),
   });
   const deleteQuestion = trpc.lmsAdmin.deleteQuestion.useMutation({ onSuccess: () => refetch() });
+  const updateQuestion = trpc.lmsAdmin.updateQuestion.useMutation({ onSuccess: () => refetch() });
   const aiGenerate = trpc.lmsAdmin.aiGenerateQuizQuestions.useMutation({
     onSuccess: (data) => { setAIPreview(data.questions.map(q => ({ ...q, selected: true }))); },
     onError: e => toast.error(`AI error: ${e.message}`),
@@ -5830,6 +5832,15 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
                 </ul>
               )}
               {q.explanation && <p className="text-xs text-gray-400 mt-1 italic">{q.explanation}</p>}
+              {isInteractiveType(q.type) && (
+                <div className="mt-3 border-t border-gray-100 pt-3">
+                  <p className="text-xs font-medium text-teal-700 mb-2">Interactive Settings</p>
+                  <InteractiveQuestionEditorPanel
+                    question={q}
+                    onChange={(updates) => updateQuestion.mutate({ id: q.id, ...updates } as any)}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -5943,6 +5954,7 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
     onError: e => toast.error(`Error: ${e.message}`),
   });
   const deleteQuestion = trpc.lmsAdmin.deleteQuestion.useMutation({ onSuccess: () => refetch() });
+  const updateQuestion = trpc.lmsAdmin.updateQuestion.useMutation({ onSuccess: () => refetch() });
 
   const aiGenerate = trpc.lmsAdmin.aiGenerateQuizQuestions.useMutation({
     onSuccess: (data) => {
@@ -6032,6 +6044,15 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
                       </ul>
                     )}
                     {q.explanation && <p className="text-xs text-gray-400 mt-1 italic">{q.explanation}</p>}
+                    {isInteractiveType(q.type) && (
+                      <div className="mt-3 border-t border-gray-100 pt-3">
+                        <p className="text-xs font-medium text-teal-700 mb-2">Interactive Settings</p>
+                        <InteractiveQuestionEditorPanel
+                          question={q}
+                          onChange={(updates) => updateQuestion.mutate({ id: q.id, ...updates } as any)}
+                        />
+                      </div>
+                    )}
                   </div>
                 );
               })}
