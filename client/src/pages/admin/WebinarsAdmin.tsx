@@ -28,6 +28,21 @@ import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle"
 import { SdmsCmeConfigPanel, resolveWebinarActivityType } from "@/components/admin/SdmsCmeConfigPanel";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
+const CME_STATUS_COLORS: Record<string, string> = {
+  draft: "bg-gray-100 text-gray-500 border border-gray-200",
+  pending_approval: "bg-amber-100 text-amber-700 border border-amber-200",
+  approved: "bg-green-100 text-green-700 border border-green-200",
+  expiring_soon: "bg-yellow-100 text-yellow-700 border border-yellow-200",
+  expired: "bg-red-100 text-red-600 border border-red-200",
+};
+const CME_STATUS_LABELS: Record<string, string> = {
+  draft: "CME: Draft",
+  pending_approval: "CME: Pending",
+  approved: "CME: Approved",
+  expiring_soon: "CME: Expiring",
+  expired: "CME: Expired",
+};
+
 function fmtDate(ts: number | null | undefined) {
   if (!ts) return "—";
   return new Date(ts).toLocaleString();
@@ -159,6 +174,11 @@ function WebinarsList({ onEdit }: { onEdit: (id: number) => void }) {
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(w.status)}`}>
                       {w.status}
                     </span>
+                    {((w as any).hasCertificate || (w as any).creditHours) && (w as any).cmeStatus && (
+                      <Badge className={`ml-1 text-xs ${CME_STATUS_COLORS[(w as any).cmeStatus] ?? CME_STATUS_COLORS.draft}`}>
+                        {CME_STATUS_LABELS[(w as any).cmeStatus] ?? "CME: Draft"}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>

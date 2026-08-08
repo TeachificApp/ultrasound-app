@@ -53,13 +53,14 @@ const STATUS_CONFIG = {
 type FormStatus = keyof typeof STATUS_CONFIG;
 
 // ─── CardioServ Status config ─────────────────────────────────────────────────
-type CmeStatus = "draft" | "pending_approval" | "approved" | "expired";
+type CmeStatus = "draft" | "pending_approval" | "approved" | "expiring_soon" | "expired";
 
 const CME_STATUS_CONFIG: Record<CmeStatus, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-gray-100 text-gray-600 border-gray-200" },
   pending_approval: { label: "Pending Approval", className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
   approved: { label: "Approved", className: "bg-green-100 text-green-700 border-green-200" },
   expired: { label: "Expired", className: "bg-red-100 text-red-600 border-red-200" },
+  expiring_soon: { label: "Expiring Soon", className: "bg-yellow-100 text-yellow-700 border-yellow-200" },
 };
 
 function CmeStatusBadge({ status }: { status: CmeStatus }) {
@@ -314,6 +315,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
     pending_approval: (data ?? []).filter(r => r.cmeStatus === "pending_approval").length,
     approved: (data ?? []).filter(r => r.cmeStatus === "approved").length,
     expired: (data ?? []).filter(r => r.cmeStatus === "expired").length,
+    expiring_soon: (data ?? []).filter(r => r.cmeStatus === "expiring_soon").length,
   };
 
   const counts = {
@@ -381,6 +383,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
             { label: "Pending Approval", value: cmeCounts.pending_approval, color: "bg-yellow-50 border-yellow-200 text-yellow-700", filter: "pending_approval" as const },
             { label: "Approved", value: cmeCounts.approved, color: "bg-green-50 border-green-200 text-green-700", filter: "approved" as const },
             { label: "Expired", value: cmeCounts.expired, color: "bg-red-50 border-red-200 text-red-600", filter: "expired" as const },
+            { label: "Expiring Soon", value: cmeCounts.expiring_soon, color: "bg-yellow-50 border-yellow-200 text-yellow-700", filter: "expiring_soon" as const },
           ].map(card => (
             <button
               key={card.label}
@@ -531,8 +534,11 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                             <SelectItem value="approved">
                               <span className="text-xs text-green-700">Approved</span>
                             </SelectItem>
-                            <SelectItem value="expired">
-                              <span className="text-xs text-red-600">Expired</span>
+                           <SelectItem value="expired">
+                             <span className="text-xs text-red-600">Expired</span>
+                           </SelectItem>
+                            <SelectItem value="expiring_soon">
+                              <span className="text-xs text-yellow-700">Expiring Soon</span>
                             </SelectItem>
                           </SelectContent>
                         </Select>

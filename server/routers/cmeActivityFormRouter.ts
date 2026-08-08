@@ -679,7 +679,7 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
   updateCmeStatus: protectedProcedure
     .input(z.object({
       courseId: z.number().int().positive(),
-      status: z.enum(["draft", "pending_approval", "approved", "expired"]),
+      status: z.enum(["draft", "pending_approval", "approved", "expiring_soon", "expired"]),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

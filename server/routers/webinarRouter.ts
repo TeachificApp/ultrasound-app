@@ -10,7 +10,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
 import {
-  webinars, webinarRegistrations, webinarComments, webinarSessions, webinarFunnelSteps, users,
+  webinars, webinarRegistrations, webinarComments, webinarSessions, webinarFunnelSteps, users, cmeActivityForms,
 } from "../../drizzle/schema";
 import { nanoid } from "nanoid";
 
@@ -154,7 +154,15 @@ export const webinarAdminRouter = router({
       if (input?.brand) conds.push(eq(webinars.brand, input.brand));
       const where = conds.length ? and(...conds) : undefined;
       const [rows, cnt] = await Promise.all([
-        db.select().from(webinars).where(where).orderBy(desc(webinars.createdAt)).limit(limit).offset(offset),
+        db.select({
+          id: webinars.id, slug: webinars.slug, title: webinars.title, brand: webinars.brand,
+          type: webinars.type, status: webinars.status, scheduledAt: webinars.scheduledAt,
+          durationMinutes: webinars.durationMinutes, accessType: webinars.accessType,
+          price: webinars.price, thumbnailUrl: webinars.thumbnailUrl, coverImage: webinars.coverImage,
+          hasCertificate: webinars.hasCertificate, creditHours: webinars.creditHours,
+          createdAt: webinars.createdAt, updatedAt: webinars.updatedAt,
+          cmeStatus: cmeActivityForms.cmeStatus,
+        }).from(webinars).leftJoin(cmeActivityForms, eq(cmeActivityForms.courseId, webinars.id)).where(where).orderBy(desc(webinars.createdAt)).limit(limit).offset(offset),
         db.select({ count: sql<number>`count(*)` }).from(webinars).where(where),
       ]);
       return { webinars: rows, total: cnt[0]?.count ?? 0 };

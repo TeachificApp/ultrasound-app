@@ -93,6 +93,21 @@ const STATUS_COLORS: Record<string, string> = {
   archived: "bg-red-100 text-red-600",
 };
 
+const CME_STATUS_COLORS: Record<string, string> = {
+  draft: "bg-gray-100 text-gray-500 border border-gray-200",
+  pending_approval: "bg-amber-100 text-amber-700 border border-amber-200",
+  approved: "bg-green-100 text-green-700 border border-green-200",
+  expiring_soon: "bg-yellow-100 text-yellow-700 border border-yellow-200",
+  expired: "bg-red-100 text-red-600 border border-red-200",
+};
+const CME_STATUS_LABELS: Record<string, string> = {
+  draft: "CME: Draft",
+  pending_approval: "CME: Pending",
+  approved: "CME: Approved",
+  expiring_soon: "CME: Expiring",
+  expired: "CME: Expired",
+};
+
 const TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-4 h-4" />,
   quiz: <HelpCircle className="w-4 h-4" />,
@@ -143,6 +158,11 @@ function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: 
         <p className="text-xs text-gray-400">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type} · {course.isFree ? "Free" : `$${Number(course.price).toFixed(2)}`} · <span className="font-mono">ID: {course.id}</span></p>
       </div>
       <Badge className={`text-xs ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
+      {((course as any).hasCertificate || (course as any).creditHours) && (course as any).cmeStatus && (
+        <Badge className={`text-xs ${CME_STATUS_COLORS[(course as any).cmeStatus] ?? CME_STATUS_COLORS.draft}`}>
+          {CME_STATUS_LABELS[(course as any).cmeStatus] ?? "CME: Draft"}
+        </Badge>
+      )}
       <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(course.id)}>
         <Edit2 className="w-3 h-3 mr-1" /> Edit
       </Button>
@@ -13818,4 +13838,3 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
     </div>
   );
 }
-

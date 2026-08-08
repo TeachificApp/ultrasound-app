@@ -87,7 +87,7 @@ import {
   workshopEnrollments,
   digitalBundles,
 } from "../../drizzle/schema";
-import { draftNotifyEntries } from "../../drizzle/schema";
+import { draftNotifyEntries, cmeActivityForms } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -121,7 +121,23 @@ export const lmsCourseBuilderRouter = router({
       if (input.status !== "all") conditions.push(eq(lmsCourses.status, input.status as "draft" | "public" | "hidden" | "private"));
       if (input.type !== "all") conditions.push(eq(lmsCourses.type, input.type as "course" | "quiz" | "download" | "cohort"));
       const offset = (input.page - 1) * input.pageSize;
-      const courses = await db.select().from(lmsCourses).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(lmsCourses.updatedAt)).limit(input.pageSize).offset(offset);
+      const courses = await db
+        .select({
+          id: lmsCourses.id, slug: lmsCourses.slug, title: lmsCourses.title,
+          subtitle: lmsCourses.subtitle, status: lmsCourses.status, type: lmsCourses.type,
+          brand: lmsCourses.brand, price: lmsCourses.price, isFree: lmsCourses.isFree,
+          pricingType: lmsCourses.pricingType, hasCertificate: lmsCourses.hasCertificate,
+          creditHours: lmsCourses.creditHours, isFeatured: lmsCourses.isFeatured,
+          publishDomain: lmsCourses.publishDomain, createdAt: lmsCourses.createdAt,
+          updatedAt: lmsCourses.updatedAt, thumbnailUrl: lmsCourses.thumbnailUrl,
+          cmeStatus: cmeActivityForms.cmeStatus,
+        })
+        .from(lmsCourses)
+        .leftJoin(cmeActivityForms, eq(cmeActivityForms.courseId, lmsCourses.id))
+        .where(conditions.length ? and(...conditions) : undefined)
+        .orderBy(desc(lmsCourses.updatedAt))
+        .limit(input.pageSize)
+        .offset(offset);
       const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsCourses).where(conditions.length ? and(...conditions) : undefined);
       return { courses, total: Number(count) };
     }),

@@ -410,6 +410,11 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours, onDir
   const [sending, setSending] = useState(false);
   const [lastSentAt, setLastSentAt] = useState<number | null>(null);
   const [courseSlug, setCourseSlug] = useState<string | null>(null);
+  const [cmeStatus, setCmeStatus] = useState<string>("draft");
+  const updateCmeStatusMutation = trpc.lmsAdmin.updateCmeStatus.useMutation({
+    onSuccess: () => toast.success("CME status updated."),
+    onError: (e) => toast.error("Failed to update CME status: " + e.message),
+  });
   const [resubmitConfirmOpen, setResubmitConfirmOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   // ── Send recipients state ───────────────────────────────────────────────
@@ -626,6 +631,11 @@ All About Ultrasound, Inc. dba iHeartEcho`;
       });
       const result = await sendMutation.mutateAsync({ courseId, subject: sendSubject, body: sendBody, recipients: sendRecipients });
       if (result.lastSentAt) setLastSentAt(result.lastSentAt);
+      // Auto-set CME status to Pending Approval when sent to CardioServ
+      if (cmeStatus === "draft") {
+        setCmeStatus("pending_approval");
+        updateCmeStatusMutation.mutate({ courseId, status: "pending_approval" });
+      }
       const enrolled = result.autoEnrolledNames ?? [];
       if (enrolled.length > 0) {
         toast.success(`Email sent to CardioServ. Auto-enrolled: ${enrolled.join(", ")}.`);
@@ -691,6 +701,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
       // Set lastSentAt and courseSlug from loaded data
       if ((data.form as any).lastSentAt) setLastSentAt((data.form as any).lastSentAt);
       if ((data.course as any).slug) setCourseSlug((data.course as any).slug);
+      if ((data.form as any).cmeStatus) setCmeStatus((data.form as any).cmeStatus);
       setLoaded(true);
       refetchHistory();
     }
@@ -904,6 +915,32 @@ All About Ultrasound, Inc. dba iHeartEcho`;
           <p className="text-xs text-muted-foreground mt-0.5">Required for all jointly provided activities seeking CME credit (CardioServ accreditation).</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {/* CME Status Dropdown */}
+          <div className="flex flex-col items-start gap-0.5">
+            <label className="text-[10px] text-gray-500 font-medium">CME Status</label>
+            <select
+              value={cmeStatus}
+              onChange={e => {
+                const newStatus = e.target.value;
+                setCmeStatus(newStatus);
+                updateCmeStatusMutation.mutate({ courseId, status: newStatus });
+              }}
+              className={cn(
+                "text-xs border rounded px-2 py-1 font-medium focus:outline-none focus:ring-1 focus:ring-[#189aa1]",
+                cmeStatus === "draft" && "bg-gray-100 text-gray-700 border-gray-300",
+                cmeStatus === "pending_approval" && "bg-amber-50 text-amber-700 border-amber-300",
+                cmeStatus === "approved" && "bg-green-50 text-green-700 border-green-300",
+                cmeStatus === "expiring_soon" && "bg-yellow-50 text-yellow-700 border-yellow-300",
+                cmeStatus === "expired" && "bg-red-50 text-red-700 border-red-300",
+              )}
+            >
+              <option value="draft">Draft</option>
+              <option value="pending_approval">Pending Approval</option>
+              <option value="approved">Approved</option>
+              <option value="expiring_soon">Expiring Soon</option>
+              <option value="expired">Expired</option>
+            </select>
+          </div>
           <Button
             type="button"
             variant="outline"
