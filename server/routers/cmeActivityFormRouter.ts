@@ -13,7 +13,7 @@ import { and, eq, leftJoin, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { assertAdmin } from "./lmsHelpers";
-import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures, webinars, draftNotifyEntries, cmeGenericDisclosures, lmsEnrollments, users, webinarRegistrations, workshopEnrollments, workshopInstances } from "../../drizzle/schema";
+import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures, webinars, draftNotifyEntries, cmeGenericDisclosures, lmsEnrollments, users, webinarRegistrations, workshopEnrollments, workshopInstances, platformSettings } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
