@@ -683,7 +683,7 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
             const [existing] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
               .where(and(eq(lmsEnrollments.userId, donUser.id), eq(lmsEnrollments.courseId, productId))).limit(1);
             if (!existing) {
-              await db.insert(lmsEnrollments).values({ userId: donUser.id, courseId: productId, enrollmentType: "complimentary" });
+              await db.insert(lmsEnrollments).values({ userId: donUser.id, courseId: productId, enrollmentType: "full" });
               console.log(`[CME Email] Auto-enrolled Don Gerig (id=${donUser.id}) in ${productType} id=${productId} (${course.title})`);
             } else {
               console.log(`[CME Email] Don Gerig already enrolled in ${productType} id=${productId} — skipping`);
