@@ -161,6 +161,7 @@ import {
   Pipette,
   Loader2,
   ClipboardPaste,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Picker from "@emoji-mart/react";
@@ -609,6 +610,7 @@ export default function RichTextEditor({
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
+  const [imageReplaceMode, setImageReplaceMode] = useState(false);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
   const [videoUploadDialogOpen, setVideoUploadDialogOpen] = useState(false);
@@ -945,9 +947,25 @@ export default function RichTextEditor({
 
   const insertImage = useCallback(() => {
     if (!editor || !imageUrl.trim()) return;
-    editor.chain().focus().setImage({ src: imageUrl.trim(), alt: imageAlt.trim() || undefined }).run();
+    if (imageReplaceMode) {
+      // Replace mode: update the currently selected image node's attrs
+      const { state } = editor;
+      const { from } = state.selection;
+      let replaced = false;
+      state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node) => {
+        if (replaced) return false;
+        if (node.type.name === "image" || node.type.name === "imageResize") {
+          replaced = true;
+          editor.chain().focus().updateAttributes(node.type.name, { src: imageUrl.trim(), alt: imageAlt.trim() || undefined }).run();
+          return false;
+        }
+      });
+    } else {
+      editor.chain().focus().setImage({ src: imageUrl.trim(), alt: imageAlt.trim() || undefined }).run();
+    }
     setImageUrl(""); setImageAlt(""); setImageDialogOpen(false);
-  }, [editor, imageUrl, imageAlt]);
+    setImageReplaceMode(false);
+  }, [editor, imageUrl, imageAlt, imageReplaceMode]);
 
   const insertImageFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1268,6 +1286,36 @@ export default function RichTextEditor({
           <ToolbarBtn title="Insert image" onClick={() => setImageDialogOpen(true)}>
             <ImageIcon className="w-3.5 h-3.5" />
           </ToolbarBtn>
+
+          {/* Replace Image — only shown when an image node is selected */}
+          {(() => {
+            if (!editor) return null;
+            const { state } = editor;
+            const { from } = state.selection;
+            let hasImage = false;
+            state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node) => {
+              if (node.type.name === "image" || node.type.name === "imageResize") { hasImage = true; return false; }
+            });
+            if (!hasImage) return null;
+            return (
+              <ToolbarBtn title="Replace selected image" onClick={() => {
+                // Pre-fill dialog with current image src/alt
+                const { state } = editor;
+                const { from } = state.selection;
+                state.doc.nodesBetween(Math.max(0, from - 1), Math.min(state.doc.content.size, from + 1), (node) => {
+                  if (node.type.name === "image" || node.type.name === "imageResize") {
+                    setImageUrl(node.attrs.src ?? "");
+                    setImageAlt(node.attrs.alt ?? "");
+                    return false;
+                  }
+                });
+                setImageReplaceMode(true);
+                setImageDialogOpen(true);
+              }}>
+                <RefreshCw className="w-3.5 h-3.5" />
+              </ToolbarBtn>
+            );
+          })()}
 
           {/* Image alignment / float — active when image is selected */}
           <ToolbarBtn title="Image: align left (block)" active={getImageClass() === "align-left"} onClick={() => setImageClass("align-left")}>
@@ -1675,11 +1723,11 @@ export default function RichTextEditor({
       {/* ── Dialogs ── */}
 
       {/* Image Dialog */}
-      <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+      <Dialog open={imageDialogOpen} onOpenChange={(open) => { setImageDialogOpen(open); if (!open) { setImageReplaceMode(false); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ImageIcon className="w-5 h-5 text-[#149096]" /> Insert Image
+              <ImageIcon className="w-5 h-5 text-[#149096]" /> {imageReplaceMode ? "Replace Image" : "Insert Image"}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -1712,7 +1760,7 @@ export default function RichTextEditor({
           <DialogFooter>
             <Button variant="outline" onClick={() => setImageDialogOpen(false)}>Cancel</Button>
             <Button onClick={insertImage} disabled={!imageUrl.trim() || imageUploading} style={{ background: "#149096" }} className="text-white">
-              Insert Image
+              {imageReplaceMode ? "Replace Image" : "Insert Image"}
             </Button>
           </DialogFooter>
         </DialogContent>
