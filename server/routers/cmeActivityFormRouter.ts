@@ -1168,4 +1168,48 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
       const rows = await query.orderBy(descOp2(draftNotifyEntries.createdAt)).limit(500);
       return { rows };
     }),
+
+  sendEnrollmentOpenEmails: protectedProcedure
+    .input(z.object({
+      /** IDs of draftNotifyEntries to email */
+      entryIds: z.array(z.number().int().positive()).min(1).max(500),
+      /** Editable subject */
+      subject: z.string().min(1).max(512),
+      /** Editable body (plain text, will be wrapped in HTML) */
+      body: z.string().min(1),
+      /** Product URL to include in the email */
+      productUrl: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { inArray: inArrayOp } = await import("drizzle-orm");
+      const entries = await db.select().from(draftNotifyEntries).where(inArrayOp(draftNotifyEntries.id, input.entryIds));
+      if (!entries.length) throw new TRPCError({ code: "NOT_FOUND", message: "No entries found" });
+      const brandColor = "#189aa1";
+      const productUrl = input.productUrl ?? "";
+      let sent = 0;
+      let failed = 0;
+      for (const entry of entries) {
+        try {
+          const htmlBody = `
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1e293b;">
+  <p style="font-size:15px;line-height:1.6;margin:0 0 16px;">${input.body.replace(/\n/g, "<br>")}</p>
+  ${productUrl ? `<div style="text-align:center;margin:24px 0;"><a href="${productUrl}" style="background:${brandColor};color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:14px;display:inline-block;">Enroll Now</a></div>` : ""}
+  ${productUrl ? `<p style="font-size:12px;color:#94a3b8;text-align:center;margin:8px 0 0;">Or visit: <a href="${productUrl}" style="color:${brandColor};">${productUrl}</a></p>` : ""}
+</div>`;
+          await sendEmail({
+            to: { name: entry.name, email: entry.email },
+            subject: input.subject,
+            htmlBody,
+          });
+          sent++;
+        } catch (e: any) {
+          console.error(`[EnrollmentOpen] Failed to send to ${entry.email}:`, e?.message);
+          failed++;
+        }
+      }
+      return { sent, failed };
+    }),
 });

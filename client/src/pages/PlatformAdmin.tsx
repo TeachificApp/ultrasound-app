@@ -3047,6 +3047,35 @@ function NotifyMeSignupsTab({ search, setSearch, typeFilter, setTypeFilter }: {
   );
   const rows: any[] = (data as any)?.rows ?? [];
 
+  // Selection state
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const toggleRow = (id: number) => setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  const toggleAll = () => setSelected(prev => prev.size === rows.length ? new Set() : new Set(rows.map((r: any) => r.id)));
+
+  // Send Enrollment Open dialog
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendSubject, setSendSubject] = useState("");
+  const [sendBody, setSendBody] = useState("");
+  const [sendUrl, setSendUrl] = useState("");
+  const sendMutation = trpc.lmsAdmin.sendEnrollmentOpenEmails.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Sent to ${res.sent} recipient${res.sent !== 1 ? "s" : ""}${res.failed > 0 ? ` (${res.failed} failed)` : ""}`);
+      setSendOpen(false);
+      setSelected(new Set());
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const openSendDialog = () => {
+    if (!selected.size) { toast.error("Select at least one recipient first"); return; }
+    const firstRow = rows.find((r: any) => selected.has(r.id));
+    const productTitle = firstRow?.productTitle ?? "the course";
+    setSendSubject(`Enrollment is now open — ${productTitle}`);
+    setSendBody(`Hi there,\n\nGreat news! Enrollment for ${productTitle} is now open. We wanted to let you know since you signed up to be notified.\n\nClick the button below to enroll and secure your spot.\n\nThank you,\nAll About Ultrasound Team`);
+    setSendUrl(firstRow?.productType === "course" && firstRow?.productId ? `https://learn.allaboutultrasound.com/courses/${firstRow.productId}` : "");
+    setSendOpen(true);
+  };
+
   const handleExportCsv = () => {
     if (!rows.length) return;
     const headers = ["ID", "Product Type", "Product Title", "Name", "Email", "Signed Up At"];
@@ -3085,6 +3114,11 @@ function NotifyMeSignupsTab({ search, setSearch, typeFilter, setTypeFilter }: {
         <button onClick={handleExportCsv} disabled={!rows.length} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-teal-300 text-teal-700 text-xs font-medium hover:bg-teal-50 disabled:opacity-50">
           <Download className="w-3.5 h-3.5" /> Export CSV
         </button>
+        {selected.size > 0 && (
+          <button onClick={openSendDialog} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-xs font-medium hover:bg-teal-700">
+            <SendHorizonal className="w-3.5 h-3.5" /> Send Enrollment Open ({selected.size})
+          </button>
+        )}
       </div>
       <p className="text-xs text-gray-500">{rows.length} signup{rows.length !== 1 ? "s" : ""} found</p>
       {isLoading ? (
@@ -3096,6 +3130,9 @@ function NotifyMeSignupsTab({ search, setSearch, typeFilter, setTypeFilter }: {
           <table className="w-full text-xs">
             <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] tracking-wide">
               <tr>
+                <th className="px-3 py-2 text-left w-8">
+                  <input type="checkbox" checked={rows.length > 0 && selected.size === rows.length} onChange={toggleAll} className="w-3.5 h-3.5 accent-teal-600" />
+                </th>
                 <th className="px-3 py-2 text-left">Name</th>
                 <th className="px-3 py-2 text-left">Email</th>
                 <th className="px-3 py-2 text-left">Product</th>
@@ -3106,6 +3143,9 @@ function NotifyMeSignupsTab({ search, setSearch, typeFilter, setTypeFilter }: {
             <tbody className="divide-y divide-gray-50">
               {rows.map((r: any) => (
                 <tr key={r.id} className="hover:bg-gray-50/50">
+                  <td className="px-3 py-2">
+                    <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleRow(r.id)} className="w-3.5 h-3.5 accent-teal-600" />
+                  </td>
                   <td className="px-3 py-2 font-medium text-gray-800">{r.name}</td>
                   <td className="px-3 py-2 text-gray-600">{r.email}</td>
                   <td className="px-3 py-2 text-gray-700 max-w-[200px] truncate">{r.productTitle ?? `ID: ${r.productId}`}</td>
@@ -3119,6 +3159,42 @@ function NotifyMeSignupsTab({ search, setSearch, typeFilter, setTypeFilter }: {
           </table>
         </div>
       )}
+
+      {/* Send Enrollment Open Dialog */}
+      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-teal-700">
+              <SendHorizonal className="w-4 h-4" /> Send Enrollment Open Email
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-xs text-gray-500">Sending to <strong>{selected.size}</strong> recipient{selected.size !== 1 ? "s" : ""}. Review and edit before sending.</p>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Subject</label>
+              <input value={sendSubject} onChange={e => setSendSubject(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-teal-400" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Product URL (optional — adds Enroll Now button)</label>
+              <input value={sendUrl} onChange={e => setSendUrl(e.target.value)} placeholder="https://learn.allaboutultrasound.com/courses/..." className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-teal-400" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Message body</label>
+              <Textarea value={sendBody} onChange={e => setSendBody(e.target.value)} rows={7} className="text-xs resize-none" />
+            </div>
+          </div>
+          <DialogFooter>
+            <button onClick={() => setSendOpen(false)} className="px-4 py-2 rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button
+              onClick={() => sendMutation.mutate({ entryIds: Array.from(selected), subject: sendSubject, body: sendBody, productUrl: sendUrl || undefined })}
+              disabled={sendMutation.isPending || !sendSubject.trim() || !sendBody.trim()}
+              className="px-4 py-2 rounded-lg bg-teal-600 text-white text-xs font-semibold hover:bg-teal-700 disabled:opacity-50 flex items-center gap-1.5"
+            >
+              {sendMutation.isPending ? <><div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Sending…</> : <><SendHorizonal className="w-3.5 h-3.5" /> Send {selected.size} Email{selected.size !== 1 ? "s" : ""}</>}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

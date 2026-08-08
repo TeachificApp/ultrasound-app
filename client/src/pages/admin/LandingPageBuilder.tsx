@@ -2969,6 +2969,156 @@ function FormEmbedFormPicker({ d, set }: { d: Record<string, any>; set: (field: 
   );
 }
 
+// ── LessonCertificateBlockEditor ─────────────────────────────────────────────
+// Extracted from switch case to fix React error #310 (hooks in switch case)
+function LessonCertificateBlockEditor({ d, set, courseId }: { d: Record<string, any>; set: (field: string, value: any) => void; courseId?: number }) {
+  const { data: certCurriculumData } = trpc.lmsAdmin.getCurriculumById.useQuery(
+    { courseId: courseId ?? 0 },
+    { enabled: !!courseId }
+  );
+  const certLessons: Array<{ id: number; title: string }> = React.useMemo(() => {
+    if (!certCurriculumData) return [];
+    return (certCurriculumData as any).sections?.flatMap((s: any) => s.lessons ?? []) ?? [];
+  }, [certCurriculumData]);
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Heading</label>
+        <DebouncedInput value={d.heading ?? "Your Certificate of Completion"} onChange={v => set("heading", v)} className="h-8 text-xs" />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Sub-text</label>
+        <DebouncedInput value={d.subtext ?? "Download and share your achievement."} onChange={v => set("subtext", v)} className="h-8 text-xs" />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Locked message (certificate not yet issued)</label>
+        <DebouncedInput value={d.lockedMessage ?? "Complete all required lessons to unlock your certificate."} onChange={v => set("lockedMessage", v)} className="h-8 text-xs" />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-600 block mb-1">Background color</label>
+        <div className="flex items-center gap-2">
+          <input type="color" value={d.bgColor ?? "#f0fafa"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0.5" />
+          <DebouncedInput value={d.bgColor ?? "#f0fafa"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" />
+        </div>
+      </div>
+      <div className="border-t border-gray-100 pt-4">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-semibold text-gray-700">Require quiz pass to view certificate</label>
+          <input type="checkbox" checked={d.requireQuizPass ?? false} onChange={e => set("requireQuizPass", e.target.checked)} className="w-4 h-4 rounded accent-teal-600" />
+        </div>
+        {d.requireQuizPass && (
+          <div className="space-y-3 pl-2 border-l-2 border-teal-200">
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Quiz lesson to pass</label>
+              <Select value={d.gateQuizLessonId != null ? String(d.gateQuizLessonId) : ""} onValueChange={v => set("gateQuizLessonId", v ? Number(v) : null)}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select a lesson…" /></SelectTrigger>
+                <SelectContent>
+                  {certLessons.map((l: any) => (<SelectItem key={l.id} value={String(l.id)}>{l.title}</SelectItem>))}
+                  {certLessons.length === 0 && <SelectItem value="_none" disabled>No lessons found</SelectItem>}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-gray-400 mt-1">Learner must pass the quiz on this lesson before the certificate is shown.</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-600 block mb-1">Quiz not passed message</label>
+              <DebouncedInput value={d.quizNotPassedMessage ?? "You must pass the required quiz before accessing your certificate."} onChange={v => set("quizNotPassedMessage", v)} className="h-8 text-xs" />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── EnrollmentCounterBlockEditor ──────────────────────────────────────────────
+// Extracted from switch case to fix React error #310 (hooks in switch case)
+function EnrollmentCounterBlockEditor({ d, set }: { d: Record<string, any>; set: (field: string, value: any) => void }) {
+  const COUNT_TYPE_OPTIONS = [
+    { value: "site_users", label: "All Site Users" },
+    { value: "all_courses", label: "All Course Enrollments (platform-wide)" },
+    { value: "course", label: "Specific Course Enrollments" },
+    { value: "brand_membership", label: "Active Brand Memberships" },
+    { value: "all_downloads", label: "All Download Purchases (platform-wide)" },
+    { value: "download", label: "Specific Download Purchases" },
+    { value: "all_webinars", label: "All Webinar Registrations (platform-wide)" },
+    { value: "webinar", label: "Specific Webinar Registrations" },
+    { value: "all_bundles", label: "All Bundle Enrollments (platform-wide)" },
+    { value: "bundle", label: "Specific Bundle Enrollments" },
+  ];
+  const needsEntity = ["course", "download", "webinar", "bundle"].includes(d.countType ?? "");
+  const { data: ecCourses } = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", pageSize: 200 }, { enabled: d.countType === "course" });
+  const { data: ecDownloads } = trpc.downloadsAdmin.list.useQuery(undefined, { enabled: d.countType === "download" });
+  const { data: ecBundles } = trpc.downloadsAdmin.listBundles.useQuery(undefined, { enabled: d.countType === "bundle" });
+  const { data: ecWebinars } = trpc.webinarAdmin.list.useQuery({ pageSize: 200 }, { enabled: d.countType === "webinar" });
+  const entityOptions: Array<{ id: number; label: string }> = React.useMemo(() => {
+    if (d.countType === "course") return ((ecCourses as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: `${c.title} (${c.type})` }));
+    if (d.countType === "download") return ((ecDownloads as any) ?? []).map((x: any) => ({ id: x.id, label: x.title ?? x.name ?? `#${x.id}` }));
+    if (d.countType === "bundle") return ((ecBundles as any) ?? []).map((x: any) => ({ id: x.id, label: x.title ?? x.name ?? `#${x.id}` }));
+    if (d.countType === "webinar") return ((ecWebinars as any)?.webinars ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `#${w.id}` }));
+    return [];
+  }, [d.countType, ecCourses, ecDownloads, ecBundles, ecWebinars]);
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Count Type</label>
+        <select value={d.countType ?? "all_courses"} onChange={e => set("countType", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+          {COUNT_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+      {needsEntity && (
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Select {d.countType === "course" ? "Course" : d.countType === "download" ? "Download" : d.countType === "bundle" ? "Bundle" : "Webinar"}</label>
+          <select value={d.entityId ?? ""} onChange={e => set("entityId", e.target.value ? Number(e.target.value) : null)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+            <option value="">— Select —</option>
+            {entityOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </select>
+        </div>
+      )}
+      <div className="border-t border-gray-100 pt-2">
+        <p className="text-[10px] text-gray-400 mb-2 font-medium uppercase tracking-wide">Display Options</p>
+        <BSTextField data={d} onSet={set} label="Label" field="label" placeholder="Students Enrolled" />
+        <BSTextField data={d} onSet={set} label="Subtext (optional)" field="subtext" placeholder="Join our growing community" />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <BSTextField data={d} onSet={set} label="Prefix" field="prefix" placeholder="" />
+        <BSTextField data={d} onSet={set} label="Suffix" field="suffix" placeholder="+" />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Add Offset</label>
+          <input type="number" value={d.countOffset ?? 0} onChange={e => set("countOffset", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
+          <p className="text-[10px] text-gray-400 mt-0.5">Added to real count</p>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Multiplier</label>
+          <input type="number" step="0.1" value={d.countMultiplier ?? 1} onChange={e => set("countMultiplier", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" min={0.1} />
+          <p className="text-[10px] text-gray-400 mt-0.5">Scales real count</p>
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Number Size</label>
+        <select value={d.numberSize ?? "5xl"} onChange={e => set("numberSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+          <option value="3xl">Small</option><option value="4xl">Medium</option><option value="5xl">Large (default)</option>
+          <option value="6xl">X-Large</option><option value="7xl">2X-Large</option><option value="8xl">3X-Large</option>
+        </select>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Alignment</label>
+        <select value={d.align ?? "center"} onChange={e => set("align", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
+          <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
+        </select>
+      </div>
+      <div className="flex items-center gap-2">
+        <input type="checkbox" id="ec-icon" checked={d.showIcon !== false} onChange={e => set("showIcon", e.target.checked)} className="w-3.5 h-3.5" />
+        <label htmlFor="ec-icon" className="text-xs text-gray-600">Show icon</label>
+      </div>
+      <BSColorField data={d} onSet={set} label="Number Color" field="accentColor" />
+      <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
+      <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+    </div>
+  );
+}
+
 // ── AiContentBlockEditor ─────────────────────────────────────────────────────
 // Extracted into its own component so hooks (useState, useMutation) are always
 // called at the top level — never conditionally inside a switch case.
@@ -5748,73 +5898,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
         />
       );
     case "lesson_certificate": {
-      const { data: certCurriculumData } = trpc.lmsAdmin.getCurriculumById.useQuery(
-        { courseId: courseId ?? 0 },
-        { enabled: !!courseId }
-      );
-      const certLessons: Array<{ id: number; title: string }> = useMemo(() => {
-        if (!certCurriculumData) return [];
-        return certCurriculumData.sections?.flatMap((s: any) => s.lessons ?? []) ?? [];
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [certCurriculumData]);
-      return (
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Heading</label>
-            <DebouncedInput value={d.heading ?? "Your Certificate of Completion"} onChange={v => set("heading", v)} className="h-8 text-xs" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Sub-text</label>
-            <DebouncedInput value={d.subtext ?? "Download and share your achievement."} onChange={v => set("subtext", v)} className="h-8 text-xs" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Locked message (certificate not yet issued)</label>
-            <DebouncedInput value={d.lockedMessage ?? "Complete all required lessons to unlock your certificate."} onChange={v => set("lockedMessage", v)} className="h-8 text-xs" />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-600 block mb-1">Background color</label>
-            <div className="flex items-center gap-2">
-              <input type="color" value={d.bgColor ?? "#f0fafa"} onChange={e => set("bgColor", e.target.value)} className="w-8 h-8 rounded border border-gray-200 cursor-pointer p-0.5" />
-              <DebouncedInput value={d.bgColor ?? "#f0fafa"} onChange={v => set("bgColor", v)} className="h-8 text-xs flex-1" />
-            </div>
-          </div>
-          <div className="border-t border-gray-100 pt-4">
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-gray-700">Require quiz pass to view certificate</label>
-              <input
-                type="checkbox"
-                checked={d.requireQuizPass ?? false}
-                onChange={e => set("requireQuizPass", e.target.checked)}
-                className="w-4 h-4 rounded accent-teal-600"
-              />
-            </div>
-            {d.requireQuizPass && (
-              <div className="space-y-3 pl-2 border-l-2 border-teal-200">
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Quiz lesson to pass</label>
-                  <Select
-                    value={d.gateQuizLessonId != null ? String(d.gateQuizLessonId) : ""}
-                    onValueChange={v => set("gateQuizLessonId", v ? Number(v) : null)}
-                  >
-                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select a lesson…" /></SelectTrigger>
-                    <SelectContent>
-                      {certLessons.map((l: any) => (
-                        <SelectItem key={l.id} value={String(l.id)}>{l.title}</SelectItem>
-                      ))}
-                      {certLessons.length === 0 && <SelectItem value="_none" disabled>No lessons found</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-gray-400 mt-1">Learner must pass the quiz on this lesson before the certificate is shown.</p>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Quiz not passed message</label>
-                  <DebouncedInput value={d.quizNotPassedMessage ?? "You must pass the required quiz before accessing your certificate."} onChange={v => set("quizNotPassedMessage", v)} className="h-8 text-xs" />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
+      return <LessonCertificateBlockEditor d={d} set={set} courseId={courseId} />;
     }
     case "remaining_seats": {
       const rsItems = rsSourceType === "workshop_instance" ? rsWorkshopInstances : rsCohortGroups;
@@ -6748,111 +6832,9 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
     }
 
     case "enrollment_counter": {
-      const COUNT_TYPE_OPTIONS = [
-        { value: "site_users", label: "All Site Users" },
-        { value: "all_courses", label: "All Course Enrollments (platform-wide)" },
-        { value: "course", label: "Specific Course Enrollments" },
-        { value: "brand_membership", label: "Active Brand Memberships" },
-        { value: "all_downloads", label: "All Download Purchases (platform-wide)" },
-        { value: "download", label: "Specific Download Purchases" },
-        { value: "all_webinars", label: "All Webinar Registrations (platform-wide)" },
-        { value: "webinar", label: "Specific Webinar Registrations" },
-        { value: "all_bundles", label: "All Bundle Enrollments (platform-wide)" },
-        { value: "bundle", label: "Specific Bundle Enrollments" },
-      ];
-      const needsEntity = ["course", "download", "webinar", "bundle"].includes(d.countType ?? "");
-      // Entity pickers
-      const { data: ecCourses } = trpc.lmsAdmin.listCourses.useQuery(
-        { status: "all", type: "all", pageSize: 200 },
-        { enabled: d.countType === "course" }
-      );
-      const { data: ecDownloads } = trpc.downloadsAdmin.list.useQuery(
-        undefined,
-        { enabled: d.countType === "download" }
-      );
-      const { data: ecBundles } = trpc.downloadsAdmin.listBundles.useQuery(
-        undefined,
-        { enabled: d.countType === "bundle" }
-      );
-      const { data: ecWebinars } = trpc.webinarAdmin.list.useQuery(
-        { pageSize: 200 },
-        { enabled: d.countType === "webinar" }
-      );
-      const entityOptions: Array<{ id: number; label: string }> = React.useMemo(() => {
-        if (d.countType === "course") return ((ecCourses as any)?.courses ?? []).map((c: any) => ({ id: c.id, label: `${c.title} (${c.type})` }));
-        if (d.countType === "download") return ((ecDownloads as any) ?? []).map((x: any) => ({ id: x.id, label: x.title ?? x.name ?? `#${x.id}` }));
-        if (d.countType === "bundle") return ((ecBundles as any) ?? []).map((x: any) => ({ id: x.id, label: x.title ?? x.name ?? `#${x.id}` }));
-        if (d.countType === "webinar") return ((ecWebinars as any)?.webinars ?? []).map((w: any) => ({ id: w.id, label: w.title ?? `#${w.id}` }));
-        return [];
-      }, [d.countType, ecCourses, ecDownloads, ecBundles, ecWebinars]);
-      return (
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">What to Count</label>
-            <select value={d.countType ?? "site_users"} onChange={e => { set("countType", e.target.value); set("entityId", null); }} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
-              {COUNT_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          {needsEntity && (
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Select {d.countType === "course" ? "Course" : d.countType === "download" ? "Download" : d.countType === "bundle" ? "Bundle" : "Webinar"}</label>
-              <select value={d.entityId ?? ""} onChange={e => set("entityId", e.target.value ? Number(e.target.value) : null)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
-                <option value="">— Select —</option>
-                {entityOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
-              </select>
-            </div>
-          )}
-          <div className="border-t border-gray-100 pt-2">
-            <p className="text-[10px] text-gray-400 mb-2 font-medium uppercase tracking-wide">Display Options</p>
-            <BSTextField data={d} onSet={set} label="Label" field="label" placeholder="Students Enrolled" />
-            <BSTextField data={d} onSet={set} label="Subtext (optional)" field="subtext" placeholder="Join our growing community" />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <BSTextField data={d} onSet={set} label="Prefix" field="prefix" placeholder="" />
-            <BSTextField data={d} onSet={set} label="Suffix" field="suffix" placeholder="+" />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Add Offset</label>
-              <input type="number" value={d.countOffset ?? 0} onChange={e => set("countOffset", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" />
-              <p className="text-[10px] text-gray-400 mt-0.5">Added to real count</p>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Multiplier</label>
-              <input type="number" step="0.1" value={d.countMultiplier ?? 1} onChange={e => set("countMultiplier", Number(e.target.value))} className="w-full h-8 text-xs rounded border border-gray-200 px-2" min={0.1} />
-              <p className="text-[10px] text-gray-400 mt-0.5">Scales real count</p>
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Number Size</label>
-            <select value={d.numberSize ?? "5xl"} onChange={e => set("numberSize", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
-              <option value="3xl">Small</option>
-              <option value="4xl">Medium</option>
-              <option value="5xl">Large (default)</option>
-              <option value="6xl">X-Large</option>
-              <option value="7xl">2X-Large</option>
-              <option value="8xl">3X-Large</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs text-gray-500 block mb-1">Alignment</label>
-            <select value={d.align ?? "center"} onChange={e => set("align", e.target.value)} className="w-full h-8 text-xs rounded border border-gray-200 px-2">
-              <option value="left">Left</option>
-              <option value="center">Center</option>
-              <option value="right">Right</option>
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="ec-icon" checked={d.showIcon !== false} onChange={e => set("showIcon", e.target.checked)} className="w-3.5 h-3.5" />
-            <label htmlFor="ec-icon" className="text-xs text-gray-600">Show icon</label>
-          </div>
-          <BSColorField data={d} onSet={set} label="Number Color" field="accentColor" />
-          <BSColorField data={d} onSet={set} label="Text Color" field="textColor" />
-          <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
-        </div>
-      );
+      return <EnrollmentCounterBlockEditor d={d} set={set} />;
     }
-    case "included_items_auto": {
+        case "included_items_auto": {
       const iiItems = iiSourceType === "membership" ? iiMemberships : iiBundles;
       const iiIsLoading = iiSourceType === "membership" ? iiMembershipsLoading : iiBundlesLoading;
       const iiFiltered = iiSearch ? iiItems.filter(i => i.label.toLowerCase().includes(iiSearch.toLowerCase())) : iiItems;
