@@ -637,67 +637,42 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         sentBy: ctx.user?.name ?? ctx.user?.email ?? "Admin",
       });
 
-      // ── Auto-enroll Don Gerig in the CME product ──────────────────────────
-      // When the CardioServ approval email is sent, automatically enroll
-      // Don Gerig (don@cardioserv.net) so he can access and review the content.
-      // Supports: course, cohort, quiz (lms_enrollments), webinar (webinar_registrations),
-      //           workshop (workshop_enrollments).
+      // ── Auto-enroll configured reviewers in the CME product ───────────────
+      // When the CardioServ approval email is sent, automatically enroll all
+      // emails in the cme_auto_enroll_emails platform setting.
+      const autoEnrolledNames: string[] = [];
       try {
-        const [donUser] = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.email, "don@cardioserv.net"))
-          .limit(1);
-        if (donUser) {
-          const productType = (input as any).productType ?? "course";
-          const productId = input.courseId;
-          if (productType === "webinar") {
-            // Webinar: insert into webinar_registrations
-            const [existingReg] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
-              .where(and(eq(webinarRegistrations.userId, donUser.id), eq(webinarRegistrations.webinarId, productId))).limit(1);
-            if (!existingReg) {
-              await db.insert(webinarRegistrations).values({ webinarId: productId, userId: donUser.id, firstName: "Don", lastName: "Gerig", email: "don@cardioserv.net" });
-              console.log(`[CME Email] Auto-registered Don Gerig in webinar id=${productId}`);
-            } else {
-              console.log(`[CME Email] Don Gerig already registered in webinar id=${productId} — skipping`);
-            }
-          } else if (productType === "workshop") {
-            // Workshop: insert into workshop_enrollments
-            const [existingWS] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)
-              .where(and(eq(workshopEnrollments.userId, donUser.id), eq(workshopEnrollments.workshopId, productId))).limit(1);
-            if (!existingWS) {
-              // Get the first active instance for this workshop (instanceId is required)
-              const [firstInstance] = await db.select({ id: workshopInstances.id }).from(workshopInstances)
-                .where(eq(workshopInstances.workshopId, productId)).limit(1);
-              if (firstInstance) {
-                await db.insert(workshopEnrollments).values({ workshopId: productId, instanceId: firstInstance.id, userId: donUser.id });
-                console.log(`[CME Email] Auto-enrolled Don Gerig in workshop id=${productId} instance id=${firstInstance.id}`);
-              } else {
-                console.log(`[CME Email] No instances found for workshop id=${productId} — skipping Don Gerig enrollment`);
+        const [psRow] = await db.select({ cmeAutoEnrollEmails: platformSettings.cmeAutoEnrollEmails }).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+        const autoEmails: string[] = psRow?.cmeAutoEnrollEmails ? JSON.parse(psRow.cmeAutoEnrollEmails) : ["don@cardioserv.net"];
+        const productType = (input as any).productType ?? "course";
+        const productId = input.courseId;
+        for (const email of autoEmails) {
+          try {
+            const [reviewer] = await db.select({ id: users.id, name: users.name, firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.email, email)).limit(1);
+            if (!reviewer) { console.log(`[CME AutoEnroll] ${email} not found in users table — skipping`); continue; }
+            if (productType === "webinar") {
+              const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations).where(and(eq(webinarRegistrations.userId, reviewer.id), eq(webinarRegistrations.webinarId, productId))).limit(1);
+              if (!ex) await db.insert(webinarRegistrations).values({ webinarId: productId, userId: reviewer.id, firstName: reviewer.firstName ?? "", lastName: reviewer.lastName ?? "", email });
+            } else if (productType === "workshop") {
+              const [ex] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments).where(and(eq(workshopEnrollments.userId, reviewer.id), eq(workshopEnrollments.workshopId, productId))).limit(1);
+              if (!ex) {
+                const [inst] = await db.select({ id: workshopInstances.id }).from(workshopInstances).where(eq(workshopInstances.workshopId, productId)).limit(1);
+                if (inst) await db.insert(workshopEnrollments).values({ workshopId: productId, instanceId: inst.id, userId: reviewer.id });
               }
             } else {
-              console.log(`[CME Email] Don Gerig already enrolled in workshop id=${productId} — skipping`);
+              const [ex] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, reviewer.id), eq(lmsEnrollments.courseId, productId))).limit(1);
+              if (!ex) await db.insert(lmsEnrollments).values({ userId: reviewer.id, courseId: productId, enrollmentType: "full" });
             }
-          } else {
-            // course / cohort / quiz — all use lms_enrollments
-            const [existing] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
-              .where(and(eq(lmsEnrollments.userId, donUser.id), eq(lmsEnrollments.courseId, productId))).limit(1);
-            if (!existing) {
-              await db.insert(lmsEnrollments).values({ userId: donUser.id, courseId: productId, enrollmentType: "full" });
-              console.log(`[CME Email] Auto-enrolled Don Gerig (id=${donUser.id}) in ${productType} id=${productId} (${course.title})`);
-            } else {
-              console.log(`[CME Email] Don Gerig already enrolled in ${productType} id=${productId} — skipping`);
-            }
-          }
-        } else {
-          console.log(`[CME Email] Don Gerig (don@cardioserv.net) not found in users table — skipping auto-enroll`);
+            const displayName = reviewer.firstName && reviewer.lastName ? `${reviewer.firstName} ${reviewer.lastName}` : reviewer.name ?? email;
+            autoEnrolledNames.push(displayName);
+            console.log(`[CME AutoEnroll] Enrolled ${email} in ${productType} id=${productId}`);
+          } catch (innerErr: any) { console.error(`[CME AutoEnroll] Failed for ${email}:`, innerErr?.message); }
         }
       } catch (enrollErr: any) {
-        // Non-fatal: log but don't fail the email send
-        console.error(`[CME Email] Auto-enroll Don Gerig failed:`, enrollErr?.message);
+        console.error(`[CME Email] Auto-enroll failed:`, enrollErr?.message);
       }
-      console.log(`[CME Email] Sent "${input.subject}" to don@cardioserv.net for course ${course.title}`);
-      return { success: true, lastSentAt: now };
+            console.log(`[CME Email] Sent "${input.subject}" to don@cardioserv.net for course ${course.title}`);
+      return { success: true, lastSentAt: now, autoEnrolledNames };
     }),
 
   // ── Update CME status ────────────────────────────────────────

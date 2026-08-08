@@ -1036,6 +1036,82 @@ function EnrollmentEmailSettingsPanel() {
   );
 }
 
+// ─── CME Auto-Enroll Settings Panel ─────────────────────────────────────────
+function CmeAutoEnrollSettingsPanel() {
+  const { data, isLoading, refetch } = trpc.siteSettings.getCmeAutoEnrollEmails.useQuery();
+  const [emails, setEmails] = useState<string[]>([]);
+  const [newEmail, setNewEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (data) setEmails(data.emails);
+  }, [data]);
+
+  const updateMutation = trpc.siteSettings.updateCmeAutoEnrollEmails.useMutation({
+    onSuccess: () => { toast.success("CME auto-enroll list saved."); refetch(); setSaving(false); },
+    onError: (e: any) => { toast.error("Save failed: " + e.message); setSaving(false); },
+  });
+
+  const addEmail = () => {
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed || !trimmed.includes("@")) return;
+    if (emails.includes(trimmed)) { toast.error("Email already in list"); return; }
+    setEmails(prev => [...prev, trimmed]);
+    setNewEmail("");
+  };
+
+  const removeEmail = (email: string) => setEmails(prev => prev.filter(e => e !== email));
+
+  const handleSave = () => { setSaving(true); updateMutation.mutate({ emails }); };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <GraduationCap className="h-4 w-4 text-teal-600" />
+          CME Auto-Enroll on CardioServ Send
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          When a CME Activity Planning form is sent to CardioServ, these users are automatically enrolled in the course so they can review it.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? <div className="text-sm text-muted-foreground">Loading…</div> : (
+          <>
+            <div className="space-y-1.5">
+              {emails.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">No emails configured.</p>
+              ) : (
+                emails.map(email => (
+                  <div key={email} className="flex items-center justify-between rounded-md border px-3 py-2 bg-muted/30">
+                    <span className="text-sm font-mono">{email}</span>
+                    <button onClick={() => removeEmail(email)} className="text-gray-400 hover:text-red-500 transition-colors">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Add email address…"
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && addEmail()}
+                className="h-8 text-sm"
+              />
+              <Button size="sm" variant="outline" onClick={addEmail} className="h-8">Add</Button>
+            </div>
+            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-teal-600 hover:bg-teal-700 text-white">
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Send Test Email Panel ───────────────────────────────────────────────────
 function SendTestEmailPanel() {
   const { data: me } = trpc.auth.me.useQuery();
@@ -2447,6 +2523,9 @@ export default function PlatformAdmin() {
 
         {/* Enrollment Email Settings */}
         <EnrollmentEmailSettingsPanel />
+
+        {/* CME Auto-Enroll Settings */}
+        <CmeAutoEnrollSettingsPanel />
 
         {/* Send Test Email */}
         <SendTestEmailPanel />

@@ -4437,6 +4437,10 @@ export const platformSettings = mysqlTable("platform_settings", {
   scormHealthSnapshot: text("scorm_health_snapshot"),
   /** Optional override for SCORM health alert emails (else owner / SCORM_HEALTH_ALERT_EMAIL env) */
   scormHealthAlertEmail: varchar("scorm_health_alert_email", { length: 320 }),
+  /** JSON array of email addresses to auto-enroll when a CME course is sent to CardioServ.
+   *  e.g. ["don@cardioserv.net", "j.buckland@cardioserv.net"]
+   *  Defaults to ["don@cardioserv.net"] if not set. */
+  cmeAutoEnrollEmails: text("cme_auto_enroll_emails"),
   // ── Default brand for ambiguous domains ──
   // When a request hostname doesn't match any known brand domain, use this brand as fallback.
   // Valid values: 'aaus' | 'iheartecho' (defaults to 'aaus' if not set)

@@ -626,7 +626,12 @@ All About Ultrasound, Inc. dba iHeartEcho`;
       });
       const result = await sendMutation.mutateAsync({ courseId, subject: sendSubject, body: sendBody, recipients: sendRecipients });
       if (result.lastSentAt) setLastSentAt(result.lastSentAt);
-      toast.success("Email sent to CardioServ with PDF attached.");
+      const enrolled = result.autoEnrolledNames ?? [];
+      if (enrolled.length > 0) {
+        toast.success(`Email sent to CardioServ. Auto-enrolled: ${enrolled.join(", ")}.`);
+      } else {
+        toast.success("Email sent to CardioServ with PDF attached.");
+      }
       setSendDialogOpen(false);
       refetchHistory();
     } catch (e: any) {

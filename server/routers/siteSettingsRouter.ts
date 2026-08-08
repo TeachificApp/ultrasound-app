@@ -94,6 +94,28 @@ export const siteSettingsRouter = router({
     };
   }),
 
+  /** Admin: get CME auto-enroll email list */
+  getCmeAutoEnrollEmails: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    if (!db) return { emails: ["don@cardioserv.net"] };
+    const [row] = await db.select({ cmeAutoEnrollEmails: platformSettings.cmeAutoEnrollEmails }).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+    const emails: string[] = row?.cmeAutoEnrollEmails ? JSON.parse(row.cmeAutoEnrollEmails) : ["don@cardioserv.net"];
+    return { emails };
+  }),
+
+  /** Admin: update CME auto-enroll email list */
+  updateCmeAutoEnrollEmails: protectedProcedure
+    .input(z.object({ emails: z.array(z.string().email()).min(0) }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.insert(platformSettings).values({ id: 1, cmeAutoEnrollEmails: JSON.stringify(input.emails) })
+        .onDuplicateKeyUpdate({ set: { cmeAutoEnrollEmails: JSON.stringify(input.emails) } });
+      return { success: true };
+    }),
+
   /** Admin: update site-level checkout terms defaults */
   updateCheckoutTerms: protectedProcedure
     .input(
