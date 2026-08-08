@@ -114,6 +114,7 @@ export function CmeFormsListTab() {
   const [sendSubject, setSendSubject] = useState("");
   const [sendBody, setSendBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [resending, setResending] = useState<number | null>(null);
   const [sendCourseSlug, setSendCourseSlug] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = trpc.lmsAdmin.listCmeActivityForms.useQuery(undefined, {
@@ -217,6 +218,30 @@ export function CmeFormsListTab() {
       toast.error("Download failed: " + (e?.message ?? "Unknown error"));
     } finally {
       setDownloading(null);
+    }
+  };
+
+  const handleQuickResend = async (row: any) => {
+    if (resending === row.id) return;
+    setResending(row.id);
+    const credits = row.creditHours ?? "";
+    const slug = row.slug ?? row.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const landingUrl = `https://learn.allaboutultrasound.com/courses/${slug}`;
+    const subject = `CME Activity Planning & Proposal Form — ${row.title}${credits ? ` (${credits} CME)` : ""}`;
+    const body = `Dear Don and Judith,\n\nPlease find attached the CME Activity Planning & Proposal Form for the following enduring activity:\n\nActivity Title: ${row.title}\nCME Credits Requested: ${credits || "—"}\nActivity Structure: Ongoing / Evergreen\n\nCourse Landing Page: ${landingUrl}\n\nPlease let us know if you need any additional information or revisions.\n\nBest regards,\nAll About Ultrasound, Inc. dba iHeartEcho`;
+    try {
+      const result = await sendMutation.mutateAsync({ courseId: row.id, subject, body });
+      const enrolled = (result as any).autoEnrolledNames ?? [];
+      if (enrolled.length > 0) {
+        toast.success(`Resent to CardioServ. Auto-enrolled: ${enrolled.join(", ")}.`);
+      } else {
+        toast.success("Resent to CardioServ successfully.");
+      }
+      refetch();
+    } catch (e: any) {
+      toast.error("Resend failed: " + (e?.message ?? "Unknown error"));
+    } finally {
+      setResending(null);
     }
   };
 
@@ -596,6 +621,21 @@ All About Ultrasound, Inc. dba iHeartEcho`;
                         >
                           <Mail className="w-3 h-3" />
                         </Button>
+                        {row.lastSentAt && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-amber-600 hover:bg-amber-50"
+                            disabled={resending === row.id}
+                            onClick={() => handleQuickResend(row)}
+                            title="Quick resend to CardioServ (re-triggers auto-enrollment)"
+                          >
+                            {resending === row.id
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <RefreshCw className="w-3 h-3" />
+                            }
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
