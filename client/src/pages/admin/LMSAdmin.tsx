@@ -5990,20 +5990,19 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
           </div>
         </div>
       ) : (
-
-        <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
-            <Plus className="w-4 h-4 mr-1" /> Add Question
-          </Button>
-          <Button size="sm" variant="outline" className="border-dashed border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setShowPresetPicker(p => !p)}>
-            ⭐ Add from Presets
-          </Button>
-        </div>
-      {showPresetPicker && quiz && (
-        <PresetQuestionPicker quizId={quiz.id} onClose={() => setShowPresetPicker(false)} onAdded={() => { refetch(); setShowPresetPicker(false); }} />
-      )}
-
-
+        <>
+          <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Add Question
+            </Button>
+            <Button size="sm" variant="outline" className="border-dashed border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setShowPresetPicker(p => !p)}>
+              ⭐ Add from Presets
+            </Button>
+          </div>
+          {showPresetPicker && quiz && (
+            <PresetQuestionPicker quizId={quiz.id} onClose={() => setShowPresetPicker(false)} onAdded={() => { refetch(); setShowPresetPicker(false); }} />
+          )}
+        </>
       ))}
     </div>
   );

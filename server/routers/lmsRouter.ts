@@ -655,6 +655,35 @@ export const lmsAIRouter = router({
       const cleaned = content.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
       return { content: cleaned };
     }),
+  generateTestimonials: protectedProcedure
+    .input(z.object({
+      courseTitle: z.string().min(1),
+      courseDescription: z.string().optional(),
+      count: z.number().int().min(1).max(10).default(3),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `You are a creative copywriter generating realistic student testimonials for an online ultrasound/echocardiography course. Generate ${input.count} short, authentic-sounding testimonials from healthcare professionals (sonographers, nurses, physicians, echo techs). Each testimonial should be 1-3 sentences, mention the course title, and feel genuine. Return ONLY a JSON array with objects: { name: string, credentials: string, text: string, rating: number }. rating should be 4 or 5. credentials should be realistic (e.g. "RDMS, RVT", "RN, RDCS", "MD, FASE"). No markdown, no code fences — raw JSON only.`,
+          },
+          {
+            role: "user",
+            content: `Course: "${input.courseTitle}"${input.courseDescription ? `\nDescription: ${input.courseDescription}` : ""}`,
+          },
+        ],
+      });
+      const raw = (response.choices?.[0]?.message?.content ?? "") as string;
+      const cleaned = raw.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      try {
+        const parsed = JSON.parse(cleaned);
+        return { testimonials: Array.isArray(parsed) ? parsed : [] };
+      } catch {
+        return { testimonials: [] };
+      }
+    }),
 });
 
 export const lmsAdminRouter = router({

@@ -2854,18 +2854,33 @@ function SortableChecklistItem({
 }
 // ─── Sortable Review Item (used inside BlockSettings reviews case) ────────────
 function SortableReviewItem({
-  id, review, index, onUpdate, onRemove,
+  id, review, index, onUpdate, onRemove, handleFileUpload,
 }: {
   id: string;
-  review: { name: string; rating: number; text: string };
+  review: { name: string; rating: number; text: string; avatarUrl?: string };
   index: number;
   onUpdate: (field: string, value: any) => void;
   onRemove: () => void;
+  handleFileUpload?: (file: File, field: string, context: string) => Promise<string | null>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !handleFileUpload) return;
+    setAvatarUploading(true);
+    try {
+      const url = await handleFileUpload(file, "avatarUrl", "review_avatar");
+      if (url) onUpdate("avatarUrl", url);
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
   return (
-    <div ref={setNodeRef} style={style} className="border border-gray-200 rounded p-2 space-y-1 bg-white">
+    <div ref={setNodeRef} style={style} className="border border-gray-200 rounded p-2 space-y-1.5 bg-white">
       <div className="flex justify-between items-center mb-1">
         <div className="flex items-center gap-1">
           <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 p-0.5 rounded" title="Drag to reorder"><GripVertical size={12} /></button>
@@ -2873,7 +2888,34 @@ function SortableReviewItem({
         </div>
         <button onClick={onRemove} className="text-red-400 hover:text-red-600"><X size={10} /></button>
       </div>
-      <DebouncedInput value={review.name} onChange={v => onUpdate("name", v)} className="h-7 text-xs" placeholder="Name" />
+      {/* Avatar upload — optional */}
+      <div className="flex items-center gap-2">
+        {review.avatarUrl ? (
+          <div className="relative flex-shrink-0">
+            <img src={review.avatarUrl} alt="Avatar" className="w-10 h-10 rounded-full object-cover border-2 border-teal-200" />
+            <button
+              onClick={() => onUpdate("avatarUrl", "")}
+              className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600"
+              title="Remove avatar"
+            >
+              <X size={8} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarUploading || !handleFileUpload}
+            className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-teal-400 hover:text-teal-500 transition-colors flex-shrink-0"
+            title="Upload avatar photo (optional)"
+          >
+            {avatarUploading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+          </button>
+        )}
+        <div className="flex-1 min-w-0">
+          <DebouncedInput value={review.name} onChange={v => onUpdate("name", v)} className="h-7 text-xs w-full" placeholder="Name, Credentials" />
+        </div>
+        <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+      </div>
       <Input type="number" value={review.rating} onChange={e => onUpdate("rating", Number(e.target.value))} className="h-7 text-xs" min={1} max={5} placeholder="Rating (1-5)" />
       <DebouncedTextarea value={review.text} onChange={v => onUpdate("text", v)} className="text-xs min-h-[60px]" placeholder="Review text" />
     </div>
@@ -4050,17 +4092,50 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
     case "testimonial":
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Quote" field="quote" multiline /><BSTextField data={d} onSet={set} label="Author" field="author" /><BSTextField data={d} onSet={set} label="Avatar URL" field="avatarUrl" /><div><label className="text-xs text-gray-500 block mb-1">Star Rating</label><div className="flex items-center gap-1">{[0,1,2,3,4,5].map(n => (<button key={n} type="button" onClick={() => set("rating", n)} className={`w-8 h-8 rounded text-sm font-medium border ${(d.rating ?? 5) === n ? "bg-yellow-100 border-yellow-400 text-yellow-700" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>{n === 0 ? "\u2715" : "\u2605".repeat(n)}</button>))}</div><p className="text-[10px] text-gray-400 mt-1">{(d.rating ?? 5) === 0 ? "Stars hidden" : `${d.rating ?? 5} star${(d.rating ?? 5) > 1 ? "s" : ""} shown`}</p></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /></div>);
     case "reviews": {
-      const reviews: Array<{ name: string; rating: number; text: string }> = d.reviews ?? [];
+      const reviews: Array<{ name: string; rating: number; text: string; avatarUrl?: string }> = d.reviews ?? [];
       const reviewIds = reviews.map((_, i) => `review-${i}`);
+      const generateTestimonials = trpc.lmsAdmin.generateTestimonials.useMutation({
+        onSuccess: (data) => {
+          if (data.testimonials.length > 0) {
+            const newReviews = data.testimonials.map((t: any) => ({
+              name: `${t.name}${t.credentials ? ", " + t.credentials : ""}`,
+              rating: t.rating ?? 5,
+              text: t.text,
+              avatarUrl: "",
+            }));
+            set("reviews", newReviews);
+            toast.success(`Generated ${newReviews.length} testimonials`);
+          } else {
+            toast.error("AI did not return valid testimonials — try again");
+          }
+        },
+        onError: () => toast.error("Failed to generate testimonials"),
+      });
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Card Background" field="cardBgColor" />
+          {/* AI Generate button */}
+          <div className="border border-teal-200 rounded-lg p-3 bg-teal-50 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-teal-800 flex items-center gap-1"><Sparkles size={12} /> AI Testimonials</span>
+              <Button
+                size="sm"
+                disabled={!courseTitle || generateTestimonials.isPending}
+                onClick={() => generateTestimonials.mutate({ courseTitle: courseTitle ?? "this course", count: 3 })}
+                className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1"
+              >
+                {generateTestimonials.isPending ? <><Loader2 size={11} className="animate-spin" /> Generating...</> : reviews.length > 0 ? <><RefreshCw size={11} /> Regenerate</> : <><Sparkles size={11} /> Generate</>}
+              </Button>
+            </div>
+            {!courseTitle && <p className="text-[10px] text-teal-600">Open a course landing page to enable AI generation.</p>}
+            <p className="text-[10px] text-teal-600">Generates 3 realistic testimonials based on the course title. You can edit them after generation.</p>
+          </div>
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">Reviews</label>
-              <button onClick={() => set("reviews", [...reviews, { name: "Student Name", rating: 5, text: "Great course!" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+              <button onClick={() => set("reviews", [...reviews, { name: "Student Name", rating: 5, text: "Great course!", avatarUrl: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
             </div>
             <DndContext
               sensors={reviewSensors}
@@ -4083,6 +4158,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
                       index={i}
                       onUpdate={(field, value) => { const next = reviews.map((rv, j) => j === i ? { ...rv, [field]: value } : rv); set("reviews", next); }}
                       onRemove={() => set("reviews", reviews.filter((_, j) => j !== i))}
+                      handleFileUpload={handleFileUpload}
                     />
                   ))}
                 </div>
