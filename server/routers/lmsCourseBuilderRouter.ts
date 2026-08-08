@@ -87,6 +87,7 @@ import {
   workshopEnrollments,
   digitalBundles,
 } from "../../drizzle/schema";
+import { draftNotifyEntries } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -256,6 +257,34 @@ export const lmsCourseBuilderRouter = router({
       if (filtered.thumbnailUrl && !filtered.coverImageUrl) filtered.coverImageUrl = filtered.thumbnailUrl;
       if (Object.keys(filtered).length > 0) {
         await db.update(lmsCourses).set(filtered).where(eq(lmsCourses.id, id));
+      }
+
+      // Notify Me waitlist: when status changes to public, alert admin to send enrollment-open emails
+      if (filtered.status === "public") {
+        void (async () => {
+          try {
+            const waitlist = await db
+              .select()
+              .from(draftNotifyEntries)
+              .where(and(eq(draftNotifyEntries.productId, id), eq(draftNotifyEntries.productType, "course")));
+            if (waitlist.length > 0) {
+              const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, id)).limit(1);
+              const courseTitle = course?.title ?? `Course #${id}`;
+              const courseUrl = course?.slug ? `https://learn.allaboutultrasound.com/courses/${course.slug}` : "";
+              await sendEmail({
+                to: { name: "Admin", email: process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com" },
+                subject: `[Action Required] ${waitlist.length} waitlisted visitor${waitlist.length !== 1 ? "s" : ""} for "${courseTitle}" — course is now live`,
+                htmlBody: `<p>The course <strong>${courseTitle}</strong> has been published.</p>
+<p><strong>${waitlist.length} visitor${waitlist.length !== 1 ? "s" : ""}</strong> signed up to be notified when enrollment opens:</p>
+<ul>${waitlist.map((e: any) => `<li>${e.name} &lt;${e.email}&gt;</li>`).join("")}</ul>
+<p>Review and send enrollment-open emails from the <a href="https://learn.allaboutultrasound.com/platform-admin">Platform Admin → CME Management Hub → Notify Me Signups</a> tab.</p>
+${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}`,
+              });
+            }
+          } catch (e) {
+            console.error("[NotifyMe] Failed to notify admin of waitlist:", e);
+          }
+        })();
       }
 
       // Auto-reissue certificates when cert-related fields change

@@ -46,11 +46,23 @@ function emailWrapper(content: string): string {
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
           <tr>
             <td style="background:linear-gradient(135deg,#0e4a50 0%,#0e4a50 60%,${brandColor} 100%);padding:28px 32px;text-align:center;">
-              <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"
-                alt="All About Ultrasound™" width="80" height="80"
-                style="border-radius:50%;display:block;margin:0 auto 12px;" />
-              <div style="font-size:22px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">All About Ultrasound™</div>
-              <div style="font-size:12px;color:#4ad9e0;margin-top:4px;">General &amp; Vascular Ultrasound Clinical Intelligence</div>
+              <table cellpadding="0" cellspacing="0" style="margin:0 auto 12px;">
+                <tr>
+                  <td style="vertical-align:middle;padding-right:12px;">
+                    <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"
+                      alt="All About Ultrasound™" width="64" height="64"
+                      style="border-radius:50%;display:block;" />
+                  </td>
+                  <td style="vertical-align:middle;padding:0 12px;color:rgba(255,255,255,0.4);font-size:28px;font-weight:200;">|</td>
+                  <td style="vertical-align:middle;padding-left:12px;">
+                    <img src="https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/iheartecho-logo_f9d91cd4.webp"
+                      alt="iHeartEcho" width="64" height="64"
+                      style="border-radius:50%;display:block;" />
+                  </td>
+                </tr>
+              </table>
+              <div style="font-size:20px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">All About Ultrasound™ <span style="color:#4ad9e0;">|</span> iHeartEcho</div>
+              <div style="font-size:11px;color:#4ad9e0;margin-top:4px;letter-spacing:0.5px;">learn.allaboutultrasound.com</div>
             </td>
           </tr>
           <tr>
@@ -61,7 +73,7 @@ function emailWrapper(content: string): string {
           <tr>
             <td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
-                © All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:${brandColor};text-decoration:none;">www.allaboutultrasound.com</a>
+                © All About Ultrasound, Inc. dba iHeartEcho · <a href="https://www.allaboutultrasound.com" style="color:${brandColor};text-decoration:none;">www.allaboutultrasound.com</a> · <a href="https://www.iheartecho.com" style="color:${brandColor};text-decoration:none;">www.iheartecho.com</a>
               </p>
               <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
                 All sales are final. · <a href="https://app.allaboutultrasound.com/terms" style="color:${brandColor};text-decoration:underline;">Terms of Service</a>
