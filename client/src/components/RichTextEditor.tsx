@@ -608,6 +608,7 @@ export default function RichTextEditor({
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
   const [videoDialogOpen, setVideoDialogOpen] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
   const [videoUploadDialogOpen, setVideoUploadDialogOpen] = useState(false);
@@ -671,7 +672,7 @@ export default function RichTextEditor({
       TextStyle,
       Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
-      ImageResize.configure({ inline: false, allowBase64: true }),
+      ImageResize.configure({ inline: false, allowBase64: true, resizeLimits: { minWidth: 50 } }),
       VideoNode,
       CtaButtonNode,
       Link.configure({
@@ -952,23 +953,27 @@ export default function RichTextEditor({
     const file = e.target.files?.[0];
     if (!file || !editor) return;
     e.target.value = "";
-    // Upload to S3 instead of embedding base64 (which freezes the editor for large images)
+    // Upload to S3 and populate the URL field — do NOT auto-insert (user must click Insert Image)
     const fd = new FormData();
     fd.append("file", file);
     try {
-      toast.info("Uploading image...");
+      setImageUploading(true);
+      toast.info("Uploading image\u2026");
       const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Upload failed");
       }
       const { url } = await res.json();
-      editor.chain().focus().setImage({ src: url, alt: file.name }).run();
-      toast.success("Image uploaded");
+      setImageUrl(url);
+      if (!imageAlt.trim()) setImageAlt(file.name.replace(/\.[^.]+$/, ""));
+      toast.success("Image ready \u2014 click Insert Image to add it");
     } catch (err: any) {
       toast.error(`Image upload failed: ${err.message}`);
+    } finally {
+      setImageUploading(false);
     }
-  }, [editor]);
+  }, [editor, imageAlt]);
 
   const insertVideo = useCallback(() => {
     if (!editor || !videoUrl.trim()) return;
@@ -1633,6 +1638,13 @@ export default function RichTextEditor({
         /* Resize handle styles from tiptap-extension-resize-image */
         .rte-content .tiptap .image-resizer { display: inline-block; position: relative; }
         .rte-content .tiptap .image-resizer .resize-trigger { position: absolute; right: -5px; bottom: -5px; width: 12px; height: 12px; background: #149096; border-radius: 2px; cursor: se-resize; }
+        /* Fix resize jump: img inside resizer should fill the container width, not be capped by max-width */
+        .rte-content .tiptap .image-resizer img { max-width: unset; width: 100%; height: auto; margin: 0; border-radius: 8px; }
+        /* Prevent text selection while dragging resize handles */
+        .rte-content .tiptap .image-resizer[data-resizing] { user-select: none; }
+        /* Resize dots from tiptap-extension-resize-image v1.4+ */
+        .rte-content .tiptap [data-resize-image-ui="resize-handle"] { width: 12px !important; height: 12px !important; background: #149096 !important; border-radius: 3px !important; opacity: 0.9; }
+        .rte-content .tiptap [data-resize-image-ui="resize-handle"]:hover { opacity: 1; transform: scale(1.2); }
         /* Clearfix after floated images */
         .rte-content .tiptap p:has(img.float-left), .rte-content .tiptap p:has(img.float-right) { overflow: hidden; }
         .rte-content .tiptap iframe { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
@@ -1682,8 +1694,16 @@ export default function RichTextEditor({
               <div className="flex-1 h-px bg-gray-100" />
             </div>
             <Button variant="outline" className="w-full gap-2 text-sm" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="w-4 h-4" /> Upload from device (base64 preview)
+              {imageUploading
+                ? <><div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" /> Uploading&hellip;</>
+                : <><Upload className="w-4 h-4" /> Upload from device</>}
             </Button>
+            {imageUrl && imageUrl.startsWith("http") && (
+              <div className="rounded-lg border border-teal-100 bg-teal-50 p-2 flex items-center gap-2">
+                <img src={imageUrl} alt="preview" className="w-12 h-12 object-cover rounded border border-teal-200 flex-shrink-0" />
+                <span className="text-xs text-teal-700 truncate flex-1">{imageUrl.split("/").pop()}</span>
+              </div>
+            )}
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1.5">Alt text (optional)</label>
               <Input placeholder="Describe the image for accessibility" value={imageAlt} onChange={e => setImageAlt(e.target.value)} />
@@ -1691,7 +1711,7 @@ export default function RichTextEditor({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setImageDialogOpen(false)}>Cancel</Button>
-            <Button onClick={insertImage} disabled={!imageUrl.trim()} style={{ background: "#149096" }} className="text-white">
+            <Button onClick={insertImage} disabled={!imageUrl.trim() || imageUploading} style={{ background: "#149096" }} className="text-white">
               Insert Image
             </Button>
           </DialogFooter>
@@ -2094,6 +2114,3 @@ export function RichTextDisplay({
     />
   );
 }
-
-
-
