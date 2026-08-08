@@ -20,18 +20,18 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Sparkles, Volume2, Megaphone, Save, Play, Clock, CheckCircle2, Wind, Zap } from "lucide-react";
+import { Sparkles, Volume2, Megaphone, Save, Play, Clock, CheckCircle2, Wind, Zap, Upload, X as XIcon } from "lucide-react";
 
 // ─── Built-in sound presets ────────────────────────────────────────────────────
 export const SOUND_PRESETS: { value: string; label: string; url: string }[] = [
   { value: "none", label: "No sound", url: "" },
-  { value: "applause", label: "Applause", url: "https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3" },
-  { value: "cheer", label: "Crowd Cheer", url: "https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3" },
-  { value: "ding", label: "Ding / Bell", url: "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" },
-  { value: "fanfare", label: "Fanfare", url: "https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3" },
-  { value: "success", label: "Success Chime", url: "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3" },
-  { value: "levelup", label: "Level Up", url: "https://assets.mixkit.co/active_storage/sfx/1997/1997-preview.mp3" },
-  { value: "notification", label: "Notification", url: "https://assets.mixkit.co/active_storage/sfx/2355/2355-preview.mp3" },
+  { value: "applause", label: "Applause", url: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/applause_fe9d7da7.mp3" },
+  { value: "cheer", label: "Crowd Cheer", url: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/cheer_9a94c0ac.mp3" },
+  { value: "ding", label: "Ding / Bell", url: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/ding_9df3b7b5.mp3" },
+  { value: "fanfare", label: "Fanfare", url: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/fanfare_f6655ce4.mp3" },
+  { value: "success", label: "Success Chime", url: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/success_3102d6b9.mp3" },
+  { value: "levelup", label: "Level Up", url: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/levelup_0c71ed7d.mp3" },
+  { value: "notification", label: "Notification", url: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/notification_b7e21d77.mp3" },
   { value: "custom", label: "Custom MP3 URL…", url: "" },
 ];
 
@@ -96,6 +96,8 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
   const [bannerDuration, setBannerDuration] = useState(initialData?.effectBannerDuration ?? 5);
   const [soundPreset, setSoundPreset] = useState(initialData?.effectSound ?? "none");
   const [customSoundUrl, setCustomSoundUrl] = useState(initialData?.effectSoundUrl ?? "");
+  const [soundUploading, setSoundUploading] = useState(false);
+  const soundFileInputRef = useRef<HTMLInputElement>(null);
   const [confetti, setConfetti] = useState(initialData?.effectConfetti ?? false);
   const [confettiMode, setConfettiMode] = useState<"fall" | "cannon">((initialData?.effectConfettiMode as "fall" | "cannon") ?? "fall");
   const [confettiTheme, setConfettiTheme] = useState("rainbow");
@@ -350,12 +352,50 @@ export default function LessonEffectEditor({ lessonId, initialData, onSaved }: L
               )}
             </div>
             {soundPreset === "custom" && (
-              <Input
-                placeholder="https://example.com/sound.mp3"
-                value={customSoundUrl}
-                onChange={(e) => setCustomSoundUrl(e.target.value)}
-                className="text-sm"
-              />
+              <div className="space-y-2">
+                <input
+                  ref={soundFileInputRef}
+                  type="file"
+                  accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/m4a,.mp3,.wav,.ogg,.m4a"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setSoundUploading(true);
+                    try {
+                      const initRes = await fetch("/api/upload-media-repo/init", {
+                        method: "POST", credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ fileName: file.name, mimeType: file.type || "audio/mpeg", totalChunks: 1, fileSize: file.size, title: file.name.replace(/\.[^.]+$/, ""), access: "public", mediaType: "audio", notes: "Lesson effect sound" }),
+                      });
+                      if (!initRes.ok) throw new Error("Upload init failed");
+                      const { uploadId } = await initRes.json();
+                      const fd = new FormData();
+                      fd.append("chunk", file, file.name);
+                      fd.append("uploadId", uploadId); fd.append("chunkIndex", "0"); fd.append("totalChunks", "1");
+                      fd.append("fileName", file.name); fd.append("mimeType", file.type || "audio/mpeg");
+                      fd.append("fileSize", String(file.size)); fd.append("title", file.name.replace(/\.[^.]+$/, ""));
+                      fd.append("access", "public"); fd.append("mediaType", "audio"); fd.append("notes", "Lesson effect sound");
+                      const upRes = await fetch("/api/upload-media-repo/chunk", { method: "POST", credentials: "include", body: fd });
+                      if (!upRes.ok) throw new Error("Upload failed");
+                      const result = await upRes.json();
+                      const url = result.s3Url ?? result.url ?? "";
+                      if (!url) throw new Error("No URL returned");
+                      setCustomSoundUrl(url);
+                      toast.success("Sound uploaded");
+                    } catch (err: any) { toast.error(err?.message ?? "Upload failed"); }
+                    finally { setSoundUploading(false); if (soundFileInputRef.current) soundFileInputRef.current.value = ""; }
+                  }}
+                />
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="outline" className="h-9 gap-1.5 flex-1" disabled={soundUploading} onClick={() => soundFileInputRef.current?.click()}>
+                    {soundUploading ? <><div className="h-3 w-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" /> Uploading…</> : <><Upload className="h-3.5 w-3.5" /> Upload MP3</>}
+                  </Button>
+                  {customSoundUrl && <Button type="button" size="sm" variant="ghost" className="h-9 px-2 text-gray-400 hover:text-red-500" onClick={() => setCustomSoundUrl("")}><XIcon className="h-3.5 w-3.5" /></Button>}
+                </div>
+                <Input placeholder="Or paste a direct MP3 URL…" value={customSoundUrl} onChange={(e) => setCustomSoundUrl(e.target.value)} className="text-xs h-8" />
+                {customSoundUrl && <p className="text-[10px] text-teal-600 truncate">✓ {customSoundUrl.split("/").pop()}</p>}
+              </div>
             )}
           </div>
 
