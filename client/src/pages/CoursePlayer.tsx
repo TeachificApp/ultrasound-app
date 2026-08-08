@@ -29,6 +29,7 @@ import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 
 import LessonCommentSection from "@/components/LessonCommentSection";
 import CertificatePreviewBlock from "@/components/CertificatePreviewBlock";
+import { InteractiveQuestionPlayer, scoreInteractiveAnswer, isInteractiveSurveyType } from "@/components/InteractiveQuizQuestions";
 
 // Lazy-load the heavy editor so it doesn't bloat the initial bundle
 const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));
@@ -151,7 +152,7 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
 }
 
 // ─── Inline Lesson Quiz (for lesson_quiz content blocks) ────────────────────
-function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean } }) {
+function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string } }) {
   const rawQuestions = data.questions ?? [];
   // Stabilize shuffle with useMemo so re-renders don't re-shuffle
   const shuffledQuestions = useMemo(() => {
@@ -181,6 +182,22 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
   const [matchingAnswers, setMatchingAnswers] = useState<Record<number, Record<string, string>>>({});
   // Survey responses: { [questionIndex]: string | number }
   const [surveyAnswers, setSurveyAnswers] = useState<Record<number, string | number>>({});
+  // Interactive question type answers: { [questionIndex]: any }
+  const [interactiveAnswers, setInteractiveAnswers] = useState<Record<number, any>>({});
+  const INTERACTIVE_TYPES = ["image_comparison","drag_sort","branching","fill_blank","annotation","flashcard"];
+  // Mock exam mode
+  const isMockExam = !!(data as any).isMockExam;
+  const timeLimitMinutes = (data as any).timeLimitMinutes ?? null;
+  const [timeLeft, setTimeLeft] = useState<number | null>(timeLimitMinutes ? timeLimitMinutes * 60 : null);
+  const [examStarted, setExamStarted] = useState(!isMockExam); // mock exam shows instructions first
+  const [examExpired, setExamExpired] = useState(false);
+  // Timer effect for mock exam
+  React.useEffect(() => {
+    if (!isMockExam || !examStarted || submitted || timeLeft === null) return;
+    if (timeLeft <= 0) { setExamExpired(true); setSubmitted(true); return; }
+    const t = setTimeout(() => setTimeLeft(prev => (prev !== null ? prev - 1 : null)), 1000);
+    return () => clearTimeout(t);
+  }, [isMockExam, examStarted, submitted, timeLeft]);
   const hotspotContainerRef = useRef<HTMLDivElement | null>(null);
 
   if (rawQuestions.length === 0) return null;
@@ -217,8 +234,12 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
         if (allCorrect && pairs.length > 0) correct++;
       }
       // Survey types (likert, star_rating, open_text) don't count toward score
+      // Interactive types
+      if (INTERACTIVE_TYPES.includes(qt)) {
+        if (scoreInteractiveAnswer(question as any, interactiveAnswers[i])) correct++;
+      }
     });
-    const scorableCount = shuffledQuestions.filter((q: any) => !["likert", "star_rating", "open_text"].includes(q.type ?? "mcq")).length;
+    const scorableCount = shuffledQuestions.filter((q: any) => !["likert", "star_rating", "open_text"].includes(q.type ?? "mcq") && !isInteractiveSurveyType(q.type ?? "mcq")).length;
     if (scorableCount === 0) return 100;
     return Math.round((correct / scorableCount) * 100);
   };
@@ -237,6 +258,7 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
     }
     if (qType === "likert" || qType === "star_rating") return surveyAnswers[currentIndex] !== undefined;
     if (qType === "open_text") return true; // always considered answered (optional free text)
+    if (INTERACTIVE_TYPES.includes(qType)) return interactiveAnswers[currentIndex] !== undefined;
     return false;
   };
 
@@ -252,6 +274,7 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
     }
     if (qt === "likert" || qt === "star_rating") return surveyAnswers[i] !== undefined;
     if (qt === "open_text") return true;
+    if (INTERACTIVE_TYPES.includes(qt)) return interactiveAnswers[i] !== undefined;
     return false;
   });
 
@@ -261,6 +284,7 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
     setHotspotClick({});
     setMatchingAnswers({});
     setSurveyAnswers({});
+    setInteractiveAnswers({});
     setCurrentIndex(0);
   };
 
@@ -274,6 +298,12 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
 
   const progressPct = total > 0 ? ((currentIndex + 1) / total) * 100 : 0;
   const answeredCount = Object.keys(selected).length + Object.keys(hotspotClick).length + Object.keys(matchingAnswers).length;
+  // Format time for display
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
 
   // Determine if current answer is correct (for post-submit feedback)
   const isCurrentCorrect = () => {
@@ -298,8 +328,63 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
     return false;
   };
 
+  // Mock exam: suppress per-question feedback
+  const showFeedback = !isMockExam;
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden">
+      {/* Mock Exam: Instructions screen */}
+      {isMockExam && !examStarted && (
+        <div className="p-6 space-y-4 bg-amber-50 border-b-2 border-amber-200">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">📋</span>
+            <h3 className="text-lg font-bold text-amber-800">Mock Exam</h3>
+            {timeLimitMinutes && (
+              <span className="ml-auto text-sm font-semibold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
+                ⏱ {timeLimitMinutes} min
+              </span>
+            )}
+          </div>
+          {(data as any).mockExamInstructions ? (
+            <p className="text-sm text-amber-800 leading-relaxed">{(data as any).mockExamInstructions}</p>
+          ) : (
+            <ul className="text-sm text-amber-800 space-y-1 list-disc list-inside">
+              <li>Answer all questions before submitting</li>
+              <li>No feedback is shown during the exam</li>
+              <li>Results are revealed only after submission</li>
+              {timeLimitMinutes && <li>You have {timeLimitMinutes} minutes to complete the exam</li>}
+            </ul>
+          )}
+          <button
+            className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-semibold text-sm transition-colors"
+            onClick={() => setExamStarted(true)}
+          >
+            Begin Exam
+          </button>
+        </div>
+      )}
+      {/* Mock Exam: Timer bar */}
+      {isMockExam && examStarted && !submitted && timeLeft !== null && (
+        <div className="px-5 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2">
+          <span className={`text-sm font-mono font-bold ${timeLeft < 60 ? "text-red-600" : "text-amber-700"}`}>
+            ⏱ {formatTime(timeLeft)}
+          </span>
+          <div className="flex-1 h-1.5 bg-amber-100 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${timeLeft < 60 ? "bg-red-500" : "bg-amber-500"}`}
+              style={{ width: `${(timeLeft / (timeLimitMinutes! * 60)) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+      {/* Mock Exam: Time expired banner */}
+      {isMockExam && examExpired && (
+        <div className="px-5 py-2 bg-red-50 border-b border-red-200 text-sm text-red-700 font-medium text-center">
+          ⏰ Time expired — exam submitted automatically
+        </div>
+      )}
+      {/* Hide quiz body until exam starts */}
+      {(!isMockExam || examStarted) && <>
       {/* Header */}
       <div className="px-5 py-3 bg-gradient-to-r from-teal-700 to-teal-500 flex items-center gap-3">
         <svg className="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
@@ -335,16 +420,16 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
         <div className="flex items-center gap-2 mb-3">
           <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-teal-600 text-white text-xs font-bold shrink-0">{currentIndex + 1}</span>
           <span className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-            {qType === "mcq" ? "Multiple Choice" : qType === "truefalse" ? "True / False" : qType === "multiselect" ? "Select All That Apply" : qType === "hotspot" ? "Hotspot" : qType === "matching" ? "Matching" : qType === "likert" ? "Opinion Poll" : qType === "star_rating" ? "Star Rating" : "Open Response"}
+            {qType === "mcq" ? "Multiple Choice" : qType === "truefalse" ? "True / False" : qType === "multiselect" ? "Select All That Apply" : qType === "hotspot" ? "Hotspot" : qType === "matching" ? "Matching" : qType === "likert" ? "Opinion Poll" : qType === "star_rating" ? "Star Rating" : qType === "image_comparison" ? "Image Comparison" : qType === "drag_sort" ? "Ordering" : qType === "branching" ? "Clinical Scenario" : qType === "fill_blank" ? "Fill in the Blank" : qType === "annotation" ? "Image Annotation" : qType === "flashcard" ? "Flashcard" : "Open Response"}
           </span>
-          {submitted && !(qType === "likert" || qType === "star_rating" || qType === "open_text") && (
+          {submitted && showFeedback && !(qType === "likert" || qType === "star_rating" || qType === "open_text") && (
             <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full ${
               isCurrentCorrect() ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
             }`}>
               {isCurrentCorrect() ? "✓ Correct" : "✗ Incorrect"}
             </span>
           )}
-          {submitted && (qType === "likert" || qType === "star_rating" || qType === "open_text") && (
+          {submitted && showFeedback && (qType === "likert" || qType === "star_rating" || qType === "open_text") && (
             <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">✓ Recorded</span>
           )}
         </div>
@@ -641,8 +726,18 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
           </div>
         )}
 
-        {/* Explanation + feedback media (shown after submit) */}
-        {submitted && data.showExplanations && (q.explanation || q.feedbackImageUrl || q.feedbackVideoUrl) && (
+        {/* Interactive question types */}
+        {INTERACTIVE_TYPES.includes(qType) && (
+          <InteractiveQuestionPlayer
+            question={q as any}
+            submitted={submitted}
+            onAnswer={(val: any) => setInteractiveAnswers(prev => ({ ...prev, [currentIndex]: val }))}
+            answer={interactiveAnswers[currentIndex]}
+          />
+        )}
+
+        {/* Explanation + feedback media (shown after submit, not in mock exam) */}
+        {submitted && showFeedback && data.showExplanations && (q.explanation || q.feedbackImageUrl || q.feedbackVideoUrl) && (
           <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
             {q.explanation && <p className="text-sm text-gray-600 italic">{q.explanation}</p>}
             {q.feedbackImageUrl && (
@@ -719,6 +814,7 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
           )}
         </div>
       </div>
+      </>}
     </div>
   );
 }

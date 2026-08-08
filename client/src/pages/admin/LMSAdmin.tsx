@@ -5494,7 +5494,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
 function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: number }) {
   const { data: quiz, isLoading: quizLoading, refetch } = trpc.lmsAdmin.getQuiz.useQuery({ lessonId: lesson.id });
   const [addingQuestion, setAddingQuestion] = useState(false);
-  const [newQ, setNewQ] = useState({ question: "", type: "mcq" as "mcq" | "truefalse", options: ["", "", "", ""], correctAnswer: "", explanation: "" });
+  const [newQ, setNewQ] = useState({ question: "", type: "mcq" as string, options: ["", "", "", ""], correctAnswer: "", explanation: "", interactiveData: {} as Record<string, any> });
 
   // AI Generate state
   const [showAIPanel, setShowAIPanel] = useState(false);
@@ -5577,6 +5577,23 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
         <div className="flex items-center gap-2">
           <Switch defaultChecked={!!(quiz as any).showOnlyPercentage} onCheckedChange={v => updateQuiz.mutate({ lessonId: lesson.id, showOnlyPercentage: v })} id="inline-pct-only" />
           <Label htmlFor="inline-pct-only" className="text-sm">Show percentage only</Label>
+        </div>
+        {/* Mock Exam mode */}
+        <div className="w-full border-t border-gray-200 pt-3 mt-1 flex flex-wrap gap-4 items-center">
+          <div className="flex items-center gap-2">
+            <Switch defaultChecked={!!(quiz as any).isMockExam} onCheckedChange={v => updateQuiz.mutate({ lessonId: lesson.id, isMockExam: v })} id="inline-mock-exam" />
+            <Label htmlFor="inline-mock-exam" className="text-sm font-semibold text-amber-700">Mock Exam Mode</Label>
+            <span className="text-xs text-gray-400">(no feedback during exam, results only at end)</span>
+          </div>
+          {!!(quiz as any).isMockExam && (
+            <div className="flex items-center gap-2">
+              <Label className="text-sm whitespace-nowrap">Time limit:</Label>
+              <Input type="number" min="1" max="480" defaultValue={(quiz as any).timeLimitMinutes ?? ""} placeholder="None"
+                className="w-20 h-7 text-sm text-center"
+                onBlur={e => updateQuiz.mutate({ lessonId: lesson.id, timeLimitMinutes: e.target.value ? parseInt(e.target.value) : null })} />
+              <span className="text-sm text-gray-500">min</span>
+            </div>
+          )}
         </div>
         <div className="ml-auto">
           <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-50 gap-1.5" onClick={() => { setAIPreview(null); setShowAIPanel(p => !p); }}>
@@ -5813,6 +5830,18 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
               <SelectContent>
                 <SelectItem value="mcq">Multiple Choice</SelectItem>
                 <SelectItem value="truefalse">True / False</SelectItem>
+                <SelectItem value="multiselect">Select All That Apply</SelectItem>
+                <SelectItem value="hotspot">Hotspot Image</SelectItem>
+                <SelectItem value="matching">Matching Pairs</SelectItem>
+                <SelectItem value="image_comparison">Image Comparison</SelectItem>
+                <SelectItem value="drag_sort">Drag to Order</SelectItem>
+                <SelectItem value="branching">Clinical Scenario</SelectItem>
+                <SelectItem value="fill_blank">Fill in the Blank</SelectItem>
+                <SelectItem value="annotation">Image Annotation</SelectItem>
+                <SelectItem value="flashcard">Flashcard</SelectItem>
+                <SelectItem value="likert">Opinion Poll (Likert)</SelectItem>
+                <SelectItem value="star_rating">Star Rating</SelectItem>
+                <SelectItem value="open_text">Open Response</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -5870,7 +5899,7 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
   const courseId: number | undefined = lesson.courseId ?? undefined;
   const { data: quiz, refetch } = trpc.lmsAdmin.getQuiz.useQuery({ lessonId: lesson.id });
   const [addingQuestion, setAddingQuestion] = useState(false);
-  const [newQ, setNewQ] = useState({ question: "", type: "mcq" as "mcq" | "truefalse", options: ["", "", "", ""], correctAnswer: "", explanation: "" });
+  const [newQ, setNewQ] = useState({ question: "", type: "mcq" as string, options: ["", "", "", ""], correctAnswer: "", explanation: "", interactiveData: {} as Record<string, any> });
 
   // AI Generate state
   const [showAIDialog, setShowAIDialog] = useState(false);
@@ -13789,5 +13818,4 @@ function AfterPurchaseTab({ courseId }: { courseId: number }) {
     </div>
   );
 }
-
 

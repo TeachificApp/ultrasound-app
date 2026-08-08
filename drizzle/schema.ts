@@ -3212,6 +3212,9 @@ export const lmsQuizzes = mysqlTable("lms_quizzes", {
   showGroupNames: boolean("show_group_names").default(true).notNull(),
   showPerQuestionResult: boolean("show_per_question_result").default(true).notNull(),
   showOnlyPercentage: boolean("show_only_percentage").default(false).notNull(),
+  isMockExam: boolean("is_mock_exam").default(false).notNull(),
+  timeLimitMinutes: int("time_limit_minutes"),
+  mockExamInstructions: text("mock_exam_instructions"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type LmsQuiz = typeof lmsQuizzes.$inferSelect;
@@ -3220,7 +3223,7 @@ export const lmsQuizQuestions = mysqlTable("lms_quiz_questions", {
   id: int("id").autoincrement().primaryKey(),
   quizId: int("quiz_id").notNull(),
   question: text("question").notNull(),
-  type: mysqlEnum("type", ["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text"]).default("mcq").notNull(),
+  type: mysqlEnum("type", ["mcq","truefalse","multiselect","hotspot","matching","likert","star_rating","open_text","image_comparison","drag_sort","branching","fill_blank","annotation","flashcard"]).default("mcq").notNull(),
   options: text("options"), // JSON array of strings or {text,imageUrl?,videoUrl?} objects
   correctAnswer: varchar("correct_answer", { length: 255 }).notNull(),
   /** For multiselect: JSON array of correct answer indices. For hotspot: JSON {x,y,radius}. */
@@ -3241,6 +3244,19 @@ export const lmsQuizQuestions = mysqlTable("lms_quiz_questions", {
   starMax: int("star_max").default(5),
   /** Whether this survey question is required */
   surveyRequired: boolean("survey_required").default(false).notNull(),
+  // ── New interactive question type fields ──
+  comparisonImageA: text("comparison_image_a"),
+  comparisonImageB: text("comparison_image_b"),
+  comparisonLabelA: varchar("comparison_label_a", { length: 255 }),
+  comparisonLabelB: varchar("comparison_label_b", { length: 255 }),
+  dragItems: text("drag_items"),
+  branchingConfig: text("branching_config"),
+  fillBlankTemplate: text("fill_blank_template"),
+  fillBlankAnswers: text("fill_blank_answers"),
+  annotationImageUrl: text("annotation_image_url"),
+  annotationTargetZones: text("annotation_target_zones"),
+  flashcardFront: text("flashcard_front"),
+  flashcardBack: text("flashcard_back"),
 });
 export type LmsQuizQuestion = typeof lmsQuizQuestions.$inferSelect;
 

@@ -119,6 +119,9 @@ export const lmsQuizLandingRouter = router({
       showGroupNames: z.boolean().optional(),
       showPerQuestionResult: z.boolean().optional(),
       showOnlyPercentage: z.boolean().optional(),
+      isMockExam: z.boolean().optional(),
+      timeLimitMinutes: z.number().int().min(1).max(480).nullable().optional(),
+      mockExamInstructions: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -133,7 +136,7 @@ export const lmsQuizLandingRouter = router({
   addQuestion: protectedProcedure
     .input(z.object({
       quizId: z.number(), question: z.string().min(1),
-      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text"]).default("mcq"),
+      type: z.enum(["mcq","truefalse","multiselect","hotspot","matching","likert","star_rating","open_text","image_comparison","drag_sort","branching","fill_blank","annotation","flashcard"]).default("mcq"),
       options: z.array(z.string()).optional(),
       correctAnswer: z.string().optional(),
       correctAnswers: z.array(z.number().int()).optional(),
@@ -148,6 +151,19 @@ export const lmsQuizLandingRouter = router({
       likertLabelsJson: z.string().optional(),
       starMax: z.number().int().optional(),
       surveyRequired: z.boolean().optional(),
+      // New interactive question type fields
+      comparisonImageA: z.string().optional(),
+      comparisonImageB: z.string().optional(),
+      comparisonLabelA: z.string().optional(),
+      comparisonLabelB: z.string().optional(),
+      dragItems: z.string().optional(),
+      branchingConfig: z.string().optional(),
+      fillBlankTemplate: z.string().optional(),
+      fillBlankAnswers: z.string().optional(),
+      annotationImageUrl: z.string().optional(),
+      annotationTargetZones: z.string().optional(),
+      flashcardFront: z.string().optional(),
+      flashcardBack: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
