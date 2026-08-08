@@ -440,6 +440,7 @@ export function CmeActivityFormPanel({ courseId, courseTitle, creditHours, onDir
   const [disclosureEmailDialog, setDisclosureEmailDialog] = useState<{ idx: number; name: string; email: string } | null>(null);
   const [viewSubmissionDisclosure, setViewSubmissionDisclosure] = useState<{ id: number; facultyName: string; rolesJson: string | null; relationshipsJson: string | null; attestationName: string | null; submittedAt: Date | null } | null>(null);
   const [bulkSendingDisclosures, setBulkSendingDisclosures] = useState(false);
+  const [bulkSendConfirmOpen, setBulkSendConfirmOpen] = useState(false);
   const { data: disclosureStatuses, refetch: refetchDisclosures } = trpc.lmsAdmin.getFinancialDisclosureStatus.useQuery(
     { courseId },
     { enabled: !!courseId }
@@ -1326,7 +1327,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
               size="sm"
               className="text-xs text-[#189aa1] border-[#189aa1] hover:bg-teal-50"
               disabled={bulkSendingDisclosures}
-              onClick={handleBulkSendDisclosures}
+              onClick={() => setBulkSendConfirmOpen(true)}
             >
               {bulkSendingDisclosures ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Mail className="w-3 h-3 mr-1" />}
               Bulk Send Disclosures
@@ -1446,6 +1447,42 @@ All About Ultrasound, Inc. dba iHeartEcho`;
             >
               {sendDisclosureMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Mail className="w-3 h-3 mr-1" />}
               Send Disclosure
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Send Disclosures Confirmation Dialog */}
+      <Dialog open={bulkSendConfirmOpen} onOpenChange={setBulkSendConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Bulk Send Disclosures</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              This will send a Financial Disclosure form email to{" "}
+              <strong>{form.facultyJson.filter(f => f.name.trim() && f.email?.trim()).length} faculty member{form.facultyJson.filter(f => f.name.trim() && f.email?.trim()).length !== 1 ? "s" : ""}</strong>:
+            </p>
+            <ul className="text-sm space-y-1 max-h-40 overflow-y-auto">
+              {form.facultyJson.filter(f => f.name.trim() && f.email?.trim()).map((f, i) => (
+                <li key={i} className="flex items-center gap-2 text-gray-700">
+                  <Mail className="w-3 h-3 text-teal-500 flex-shrink-0" />
+                  <span>{f.name} — {f.email}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded p-2">
+              Each recipient will receive an email with a unique link to complete their financial disclosure form.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setBulkSendConfirmOpen(false)}>Cancel</Button>
+            <Button
+              size="sm"
+              className="bg-[#189aa1] hover:bg-[#147a80] text-white"
+              disabled={bulkSendingDisclosures}
+              onClick={() => { setBulkSendConfirmOpen(false); handleBulkSendDisclosures(); }}
+            >
+              {bulkSendingDisclosures ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Mail className="w-3 h-3 mr-1" />}
+              Send to All Faculty
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1932,5 +1969,3 @@ All About Ultrasound, Inc. dba iHeartEcho`;
     </div>
   );
 }
-
-

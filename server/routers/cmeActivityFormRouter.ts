@@ -9,11 +9,11 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { eq, leftJoin, sql } from "drizzle-orm";
+import { and, eq, leftJoin, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { assertAdmin } from "./lmsHelpers";
-import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures, webinars, draftNotifyEntries, cmeGenericDisclosures } from "../../drizzle/schema";
+import { cmeActivityForms, cmeSendHistory, lmsCourses, lmsInstructors, cmeFinancialDisclosures, webinars, draftNotifyEntries, cmeGenericDisclosures, lmsEnrollments, users } from "../../drizzle/schema";
 import { sendEmail } from "../_core/email";
 import { storagePut } from "../storage";
 import { invokeLLM } from "../_core/llm";
@@ -637,6 +637,42 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
         sentBy: ctx.user?.name ?? ctx.user?.email ?? "Admin",
       });
 
+      // ── Auto-enroll Don Gerig in the CME course ──────────────────────────
+      // When the CardioServ approval email is sent, automatically enroll
+      // Don Gerig (don@cardioserv.net) so he can access and review the course.
+      try {
+        const [donUser] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, "don@cardioserv.net"))
+          .limit(1);
+        if (donUser) {
+          // Check if already enrolled
+          const [existing] = await db
+            .select({ id: lmsEnrollments.id })
+            .from(lmsEnrollments)
+            .where(and(
+              eq(lmsEnrollments.userId, donUser.id),
+              eq(lmsEnrollments.courseId, input.courseId)
+            ))
+            .limit(1);
+          if (!existing) {
+            await db.insert(lmsEnrollments).values({
+              userId: donUser.id,
+              courseId: input.courseId,
+              enrollmentType: "complimentary",
+            });
+            console.log(`[CME Email] Auto-enrolled Don Gerig (id=${donUser.id}) in course ${course.title} (id=${input.courseId})`);
+          } else {
+            console.log(`[CME Email] Don Gerig already enrolled in course ${course.title} — skipping auto-enroll`);
+          }
+        } else {
+          console.log(`[CME Email] Don Gerig (don@cardioserv.net) not found in users table — skipping auto-enroll`);
+        }
+      } catch (enrollErr: any) {
+        // Non-fatal: log but don't fail the email send
+        console.error(`[CME Email] Auto-enroll Don Gerig failed:`, enrollErr?.message);
+      }
       console.log(`[CME Email] Sent "${input.subject}" to don@cardioserv.net for course ${course.title}`);
       return { success: true, lastSentAt: now };
     }),

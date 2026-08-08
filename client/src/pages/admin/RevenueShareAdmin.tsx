@@ -118,6 +118,8 @@ function PartnersTab() {
   const [selectedUser, setSelectedUser] = useState<{ id: number; name: string | null; email: string | null; roles: string[] } | null>(null);
   const [newForm, setNewForm] = useState({ name: "", email: "", payoutSchedule: "weekly" });
   const [payoutSchedule, setPayoutSchedule] = useState("weekly");
+  const [pendingPartnerData, setPendingPartnerData] = useState<{ name: string; email: string } | null>(null);
+  const [showEmailConfirm, setShowEmailConfirm] = useState(false);
   const utils = trpc.useUtils();
 
   const { data: partners = [], isLoading } = trpc.revenueShare.listPartners.useQuery();
@@ -128,16 +130,16 @@ function PartnersTab() {
 
   const inviteMutation = trpc.revenueShare.createPartner.useMutation({
     onSuccess: (data) => {
-      toast.success("Partner added — sending onboarding email…");
+      toast.success("Partner added successfully.");
       utils.revenueShare.listPartners.invalidate();
-      // Auto-send onboarding email
-      if (data?.id) {
-        sendEmailMutation.mutate({ partnerId: data.id });
-      }
       setShowInvite(false);
       setSelectedUser(null);
       setSearchQuery("");
       setNewForm({ name: "", email: "", payoutSchedule: "weekly" });
+      // Show email confirmation dialog instead of auto-sending
+      if (data?.id && pendingPartnerData) {
+        setShowEmailConfirm(true);
+      }
     },
     onError: (e) => toast.error(e.message),
   });
@@ -180,12 +182,14 @@ function PartnersTab() {
 
   function handleAddPartner() {
     if (inviteTab === "existing" && selectedUser) {
+      setPendingPartnerData({ name: selectedUser.name ?? "", email: selectedUser.email ?? "" });
       inviteMutation.mutate({
         name: selectedUser.name ?? "",
         email: selectedUser.email ?? "",
         payoutSchedule,
       });
     } else if (inviteTab === "new") {
+      setPendingPartnerData({ name: newForm.name, email: newForm.email });
       inviteMutation.mutate(newForm);
     }
   }
@@ -436,6 +440,35 @@ function PartnersTab() {
               className="bg-[#189aa1] hover:bg-[#147a80]"
             >
               {inviteMutation.isPending ? "Adding…" : "Add Partner"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Onboarding Email Confirmation Dialog */}
+      <Dialog open={showEmailConfirm} onOpenChange={(open) => { if (!open) { setShowEmailConfirm(false); setPendingPartnerData(null); } }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Send Onboarding Email?</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Partner <strong>{pendingPartnerData?.name}</strong> has been added. Would you like to send them a Stripe onboarding email now?
+            </p>
+            <p className="text-xs text-gray-500">The email will contain a link for them to set up their Stripe account for payouts. You can also send this later from the partner's row.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => { setShowEmailConfirm(false); setPendingPartnerData(null); }}>Not Now</Button>
+            <Button
+              size="sm"
+              className="bg-[#189aa1] hover:bg-[#147a80] text-white"
+              disabled={sendEmailMutation.isPending}
+              onClick={() => {
+                const partnerList = utils.revenueShare.listPartners.getData() as any[] | undefined;
+                const partner = partnerList?.find((p: any) => p.email === pendingPartnerData?.email);
+                if (partner?.id) sendEmailMutation.mutate({ partnerId: partner.id });
+                setShowEmailConfirm(false);
+                setPendingPartnerData(null);
+              }}
+            >
+              {sendEmailMutation.isPending ? "Sending…" : "Send Onboarding Email"}
             </Button>
           </DialogFooter>
         </DialogContent>
