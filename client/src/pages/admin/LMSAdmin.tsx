@@ -5512,9 +5512,83 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
 
 // ─── Quiz Builder Inline (embedded in LessonEditorPage Quiz tab) ─────────────
 
+// ─── Preset Question Picker ──────────────────────────────────────────────────
+function PresetQuestionPicker({ quizId, onClose, onAdded }: { quizId: number; onClose: () => void; onAdded: () => void }) {
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const { data: categories } = trpc.questionBank.listPresetCategories.useQuery();
+  const { data: presets, isLoading } = trpc.questionBank.listPresets.useQuery({ search: search || undefined, category: category || undefined });
+  const addQuestion = trpc.lmsAdmin.addQuestion.useMutation({ onSuccess: () => {} });
+  const [adding, setAdding] = useState(false);
+  const handleAdd = async () => {
+    const toAdd = (presets ?? []).filter(p => selectedIds.has(p.id));
+    if (toAdd.length === 0) return;
+    setAdding(true);
+    for (const p of toAdd) {
+      await addQuestion.mutateAsync({
+        quizId,
+        question: p.question,
+        type: p.type as any,
+        options: p.options ? JSON.parse(p.options) : undefined,
+        correctAnswer: p.correctAnswer || undefined,
+        explanation: p.explanation || undefined,
+        questionImageUrl: p.questionImageUrl || undefined,
+        hotspotMarkers: p.hotspotMarkers || undefined,
+        matchingPairs: p.matchingPairs || undefined,
+        position: 9999,
+      });
+    }
+    setAdding(false);
+    onAdded();
+    onClose();
+  };
+  return (
+    <div className="border border-amber-200 rounded-xl p-4 bg-amber-50 space-y-3 mt-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-amber-800">⭐ Add from Preset Library</h4>
+        <button onClick={onClose} className="text-amber-500 hover:text-amber-700"><X className="w-4 h-4" /></button>
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search presets..." className="flex-1 min-w-[160px] h-8 border border-amber-200 rounded px-2 text-xs bg-white" />
+        <select value={category} onChange={e => setCategory(e.target.value)} className="h-8 border border-amber-200 rounded px-2 text-xs bg-white">
+          <option value="">All Categories</option>
+          {(categories ?? []).map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+      {isLoading ? (
+        <p className="text-xs text-amber-600 text-center py-4">Loading presets...</p>
+      ) : !presets?.length ? (
+        <p className="text-xs text-amber-600 text-center py-4">No preset questions found. Mark questions as Preset in the Question Bank.</p>
+      ) : (
+        <div className="max-h-64 overflow-y-auto space-y-1 border border-amber-200 rounded-lg bg-white p-2">
+          {presets.map(p => (
+            <label key={p.id} className="flex items-start gap-2 p-2 rounded hover:bg-amber-50 cursor-pointer">
+              <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => setSelectedIds(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })} className="mt-0.5 rounded accent-amber-500" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-gray-800 line-clamp-2">{p.question}</p>
+                <div className="flex gap-1 mt-0.5 flex-wrap">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">{p.type}</span>
+                  {p.presetCategory && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{p.presetCategory}</span>}
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+      )}
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={onClose}>Cancel</Button>
+        <Button size="sm" className="bg-amber-500 hover:bg-amber-600 text-white" disabled={selectedIds.size === 0 || adding} onClick={handleAdd}>
+          {adding ? "Adding..." : `Add ${selectedIds.size > 0 ? selectedIds.size + " " : ""}Selected`}
+        </Button>
+      </div>
+    </div>
+  );
+}
 function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: number }) {
   const { data: quiz, isLoading: quizLoading, refetch } = trpc.lmsAdmin.getQuiz.useQuery({ lessonId: lesson.id });
   const [addingQuestion, setAddingQuestion] = useState(false);
+  const [showPresetPicker, setShowPresetPicker] = useState(false);
   const [newQ, setNewQ] = useState({ question: "", type: "mcq" as string, options: ["", "", "", ""], correctAnswer: "", explanation: "", interactiveData: {} as Record<string, any> });
 
   // AI Generate state
@@ -5916,9 +5990,20 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
           </div>
         </div>
       ) : (
-        <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
-          <Plus className="w-4 h-4 mr-1" /> Add Question
-        </Button>
+
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Add Question
+          </Button>
+          <Button size="sm" variant="outline" className="border-dashed border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setShowPresetPicker(p => !p)}>
+            ⭐ Add from Presets
+          </Button>
+        </div>
+      {showPresetPicker && quiz && (
+        <PresetQuestionPicker quizId={quiz.id} onClose={() => setShowPresetPicker(false)} onAdded={() => { refetch(); setShowPresetPicker(false); }} />
+      )}
+
+
       ))}
     </div>
   );
@@ -5930,6 +6015,7 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
   const courseId: number | undefined = lesson.courseId ?? undefined;
   const { data: quiz, refetch } = trpc.lmsAdmin.getQuiz.useQuery({ lessonId: lesson.id });
   const [addingQuestion, setAddingQuestion] = useState(false);
+  const [showPresetPickerDialog, setShowPresetPickerDialog] = useState(false);
   const [newQ, setNewQ] = useState({ question: "", type: "mcq" as string, options: ["", "", "", ""], correctAnswer: "", explanation: "", interactiveData: {} as Record<string, any> });
 
   // AI Generate state
@@ -6115,9 +6201,20 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
                 </div>
               </div>
             ) : (
-              <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Add Question
-              </Button>
+
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
+                  <Plus className="w-4 h-4 mr-1" /> Add Question
+                </Button>
+                <Button size="sm" variant="outline" className="border-dashed border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setShowPresetPickerDialog(p => !p)}>
+                  ⭐ Add from Presets
+                </Button>
+              </div>
+              {showPresetPickerDialog && quiz && (
+                <PresetQuestionPicker quizId={quiz.id} onClose={() => setShowPresetPickerDialog(false)} onAdded={() => { refetch(); setShowPresetPickerDialog(false); }} />
+              )}
+
+
             )}
             </>)}
           </div>
@@ -10606,6 +10703,7 @@ function QuestionBankAdmin() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [typeFilter, setTypeFilter] = useState<"" | "mcq" | "truefalse">("");
+  const [presetFilter, setPresetFilter] = useState<boolean | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editingQuestion, setEditingQuestion] = useState<any | null>(null);
@@ -10642,6 +10740,7 @@ function QuestionBankAdmin() {
     search: debouncedSearch || undefined,
     tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
     type: typeFilter || undefined,
+    isPreset: presetFilter,
     page,
     pageSize: 25,
   });
@@ -10933,6 +11032,12 @@ function QuestionBankAdmin() {
           <option value="mcq">Multiple Choice</option>
           <option value="truefalse">True / False</option>
         </select>
+        <button
+          onClick={() => { setPresetFilter(p => p === true ? undefined : true); setPage(1); }}
+          className={cn("h-9 px-3 rounded-md border text-sm font-medium transition-all", presetFilter === true ? "bg-amber-500 text-white border-amber-500" : "bg-white text-amber-700 border-amber-300 hover:bg-amber-50")}
+        >
+          ⭐ Presets Only
+        </button>
         <div className="flex flex-wrap gap-1.5">
           {tags.map(tag => (
             <button key={tag.id} onClick={() => { setSelectedTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id]); setPage(1); }}
@@ -10978,6 +11083,7 @@ function QuestionBankAdmin() {
                   <td className="px-3 py-2.5">
                     <p className="font-medium text-gray-800 line-clamp-2">{q.question}</p>
                     {q.explanation && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">Explanation: {q.explanation}</p>}
+                    {q.isPreset && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200 mt-0.5">⭐ Preset{q.presetCategory ? ` · ${q.presetCategory}` : ""}</span>}
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium", q.type === "mcq" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700")}>
@@ -11047,6 +11153,8 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
   const [qImageUrl, setQImageUrl] = useState(question?.questionImageUrl ?? "");
   const [qVideoUrl, setQVideoUrl] = useState(question?.questionVideoUrl ?? "");
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>(question?.tags?.map((t: any) => t.id) ?? []);
+  const [isPreset, setIsPreset] = useState<boolean>(question?.isPreset ?? false);
+  const [presetCategory, setPresetCategory] = useState<string>(question?.presetCategory ?? "");
 
   const create = trpc.questionBank.createQuestion.useMutation({ onSuccess: onSaved });
   const update = trpc.questionBank.updateQuestion.useMutation({ onSuccess: onSaved });
@@ -11062,6 +11170,8 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
       questionImageUrl: qImageUrl.trim() || undefined,
       questionVideoUrl: qVideoUrl.trim() || undefined,
       tagIds: selectedTagIds,
+      isPreset,
+      presetCategory: presetCategory.trim() || undefined,
     };
     if (isEdit) update.mutate({ id: question.id, ...payload });
     else create.mutate(payload);
@@ -11157,6 +11267,20 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
               ))}
               {tags.length === 0 && <span className="text-xs text-gray-400">No tags yet — create some in the Tags panel.</span>}
             </div>
+          </div>
+          {/* Preset Library */}
+          <div className="border border-amber-200 rounded-lg p-3 bg-amber-50 space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={isPreset} onChange={e => setIsPreset(e.target.checked)} className="rounded w-4 h-4 accent-amber-500" />
+              <span className="text-sm font-medium text-amber-800">Save as Preset Question</span>
+              <span className="text-xs text-amber-600">(available in the Preset picker for all quizzes)</span>
+            </label>
+            {isPreset && (
+              <div>
+                <label className="text-xs font-medium text-amber-700 block mb-1">Category (optional)</label>
+                <input className="w-full border border-amber-200 rounded px-2 py-1 text-xs bg-white" value={presetCategory} onChange={e => setPresetCategory(e.target.value)} placeholder="e.g. Post-Course Survey, CME Evaluation, Learning Check" />
+              </div>
+            )}
           </div>
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-gray-100">

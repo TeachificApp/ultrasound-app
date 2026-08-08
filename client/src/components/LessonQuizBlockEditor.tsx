@@ -956,7 +956,7 @@ function QuestionEditor({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload, lessonId, courseId }: Props) {
-  const [addTab, setAddTab] = useState<"ai" | "manual" | "bank">("manual");
+  const [addTab, setAddTab] = useState<"ai" | "manual" | "bank" | "presets">("manual");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [addingNew, setAddingNew] = useState(false);
   const [aiCount, setAiCount] = useState(5);
@@ -1146,11 +1146,12 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
 
       {/* Add / AI tabs */}
       {!addingNew && editingIndex === null && (
-        <Tabs value={addTab} onValueChange={(v) => setAddTab(v as "ai" | "manual" | "bank")}>
+        <Tabs value={addTab} onValueChange={(v) => setAddTab(v as "ai" | "manual" | "bank" | "presets")}>
           <TabsList className="h-8">
             <TabsTrigger value="manual" className="text-xs h-7">Manual Entry</TabsTrigger>
             <TabsTrigger value="bank" className="text-xs h-7">From Bank</TabsTrigger>
             <TabsTrigger value="ai" className="text-xs h-7">AI Generate</TabsTrigger>
+            <TabsTrigger value="presets" className="text-xs h-7">⭐ Presets</TabsTrigger>
           </TabsList>
 
           {/* From Bank */}
@@ -1207,6 +1208,24 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
               onClick={() => setAddingNew(true)}>
               <Plus size={12} className="mr-1" /> Add Question
             </Button>
+          </TabsContent>
+          {/* Presets */}
+          <TabsContent value="presets" className="mt-2">
+            <LessonQuizPresetPicker questions={questions} onAdd={(q) => {
+              const newQ = {
+                id: `temp_${Date.now()}`,
+                type: q.type,
+                question: q.question,
+                options: q.options ? JSON.parse(q.options) : [],
+                correctAnswer: q.correctAnswer || "",
+                explanation: q.explanation || "",
+                questionImageUrl: q.questionImageUrl || "",
+                hotspotMarkers: q.hotspotMarkers || null,
+                matchingPairs: q.matchingPairs || null,
+                isPreset: false,
+              };
+              onSaveQuestion(newQ, true);
+            }} />
           </TabsContent>
 
           {/* AI Generate */}
@@ -1519,6 +1538,72 @@ function QuestionBankPicker({ onAdd }: { onAdd: (q: any) => void }) {
             <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-2 py-0.5 border border-gray-200 rounded disabled:opacity-40">‹</button>
             <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} className="px-2 py-0.5 border border-gray-200 rounded disabled:opacity-40">›</button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Preset Picker for LessonQuizBlockEditor ─────────────────────────────────
+function LessonQuizPresetPicker({ questions, onAdd }: { questions: any[]; onAdd: (q: any) => void }) {
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
+  const { data: categories } = trpc.questionBank.listPresetCategories.useQuery();
+  const { data: presets, isLoading } = trpc.questionBank.listPresets.useQuery({
+    search: search || undefined,
+    category: category || undefined,
+  });
+  const existingQuestions = new Set(questions.map((q: any) => q.question?.trim().toLowerCase()));
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-1.5 flex-wrap">
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search presets..."
+          className="flex-1 min-w-[120px] h-7 border border-amber-200 rounded px-2 text-xs bg-white"
+        />
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          className="h-7 border border-amber-200 rounded px-2 text-xs bg-white"
+        >
+          <option value="">All Categories</option>
+          {(categories ?? []).map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+      {isLoading ? (
+        <p className="text-xs text-amber-600 text-center py-3">Loading presets...</p>
+      ) : !presets?.length ? (
+        <p className="text-xs text-amber-600 text-center py-3">No preset questions found. Mark questions as Preset in the Question Bank.</p>
+      ) : (
+        <div className="max-h-56 overflow-y-auto space-y-1 border border-amber-200 rounded bg-white p-1.5">
+          {presets.map(p => {
+            const alreadyAdded = existingQuestions.has(p.question?.trim().toLowerCase());
+            return (
+              <div key={p.id} className="flex items-start gap-2 p-1.5 rounded hover:bg-amber-50">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-800 line-clamp-2">{p.question}</p>
+                  <div className="flex gap-1 mt-0.5 flex-wrap">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">{p.type}</span>
+                    {p.presetCategory && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{p.presetCategory}</span>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => !alreadyAdded && onAdd(p)}
+                  disabled={alreadyAdded}
+                  className={cn(
+                    "shrink-0 h-6 px-2 rounded text-[10px] font-medium transition-colors",
+                    alreadyAdded
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : "bg-amber-500 text-white hover:bg-amber-600"
+                  )}
+                >
+                  {alreadyAdded ? "Added" : "Add"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

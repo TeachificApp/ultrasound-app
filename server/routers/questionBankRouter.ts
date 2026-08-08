@@ -59,6 +59,8 @@ const questionInput = z.object({
   feedbackVideoUrl: z.string().optional(),
   folderId: z.number().int().optional(),
   tagIds: z.array(z.number().int()).optional(),
+      isPreset: z.boolean().optional(),
+      presetCategory: z.string().optional(),
 });
 
 export const questionBankRouter = router({
@@ -115,6 +117,8 @@ export const questionBankRouter = router({
     .input(z.object({
       search: z.string().optional(),
       tagIds: z.array(z.number().int()).optional(),
+      isPreset: z.boolean().optional(),
+      presetCategory: z.string().optional(),
       type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).optional(),
       folderId: z.number().int().nullable().optional(),
       page: z.number().int().min(1).default(1),
@@ -134,6 +138,8 @@ export const questionBankRouter = router({
         } else {
           conditions.push(eq(questionBank.folderId, input.folderId));
         }
+      if (input.isPreset !== undefined) conditions.push(eq(questionBank.isPreset, input.isPreset));
+      if (input.presetCategory) conditions.push(eq(questionBank.presetCategory, input.presetCategory));
       }
 
       // Tag filter: get question IDs that have ALL the requested tags
@@ -254,7 +260,11 @@ export const questionBankRouter = router({
       feedbackImageUrl: z.string().nullable().optional(),
       feedbackVideoUrl: z.string().nullable().optional(),
       folderId: z.number().int().nullable().optional(),
+      isPreset: z.boolean().optional(),
+      presetCategory: z.string().max(100).nullable().optional(),
       tagIds: z.array(z.number().int()).optional(),
+      isPreset: z.boolean().optional(),
+      presetCategory: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -307,6 +317,8 @@ export const questionBankRouter = router({
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
       questionType: z.enum(["mcq", "truefalse", "mixed"]).default("mcq"),
       tagIds: z.array(z.number().int()).optional(),
+      isPreset: z.boolean().optional(),
+      presetCategory: z.string().optional(),
       folderId: z.number().int().optional(),
       newFolderName: z.string().max(200).optional(),
     }))
@@ -413,6 +425,8 @@ export const questionBankRouter = router({
       /** Raw CSV/TSV string OR base64-encoded XLSX bytes prefixed with "base64:" */
       data: z.string().min(1),
       tagIds: z.array(z.number().int()).optional(),
+      isPreset: z.boolean().optional(),
+      presetCategory: z.string().optional(),
       folderId: z.number().int().optional(),
       newFolderName: z.string().max(200).optional(),
     }))
@@ -551,6 +565,8 @@ export const questionBankRouter = router({
     .input(z.object({
       quizQuestionId: z.number(),
       tagIds: z.array(z.number().int()).optional(),
+      isPreset: z.boolean().optional(),
+      presetCategory: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -951,6 +967,52 @@ export const questionBankRouter = router({
       }));
       return enriched;
     }),
+  // ─── Preset Questions ─────────────────────────────────────────────────────
+
+  listPresets: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      category: z.string().optional(),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions: any[] = [eq(questionBank.isPreset, true)];
+      if (input.search) conditions.push(like(questionBank.question, `%${input.search}%`));
+      if (input.category) conditions.push(eq(questionBank.presetCategory, input.category));
+      if (input.type) conditions.push(eq(questionBank.type, input.type));
+      const rows = await db.select().from(questionBank)
+        .where(and(...conditions))
+        .orderBy(asc(questionBank.presetCategory), asc(questionBank.question))
+        .limit(500);
+      return rows;
+    }),
+
+  listPresetCategories: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const rows = await db.selectDistinct({ category: questionBank.presetCategory })
+      .from(questionBank)
+      .where(and(eq(questionBank.isPreset, true), sql`${questionBank.presetCategory} IS NOT NULL`))
+      .orderBy(asc(questionBank.presetCategory));
+    return rows.map(r => r.category).filter(Boolean) as string[];
+  }),
+
+  togglePreset: protectedProcedure
+    .input(z.object({ id: z.number(), isPreset: z.boolean(), presetCategory: z.string().max(100).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(questionBank)
+        .set({ isPreset: input.isPreset, presetCategory: input.presetCategory ?? null } as any)
+        .where(eq(questionBank.id, input.id));
+      return { success: true };
+    }),
+
 });
 
 // ─── Download helper ──────────────────────────────────────────────────────────

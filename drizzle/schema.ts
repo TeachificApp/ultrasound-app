@@ -5555,6 +5555,10 @@ export const questionBank = mysqlTable("question_bank", {
   sourceQuizId: int("source_quiz_id"), // FK → lms_quizzes.id (if created via quiz builder)
   sourceQuizQuestionId: int("source_quiz_question_id"), // FK → lms_quiz_questions.id
   folderId: int("folder_id"), // FK → question_bank_folders.id
+  /** Preset library: when true, this question appears in the Preset Questions picker */
+  isPreset: boolean("is_preset").default(false).notNull(),
+  /** Optional category label for grouping presets (e.g. "Post-Course Survey", "CME Evaluation", "Learning Check") */
+  presetCategory: varchar("preset_category", { length: 100 }),
   createdByAdminId: int("created_by_admin_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
