@@ -223,6 +223,7 @@ function WebinarsList({ onEdit }: { onEdit: (id: number) => void }) {
           <p className="text-sm">No webinars yet. Create your first one above.</p>
         </div>
       ) : (
+        <>
         <div className="flex items-center gap-2 mb-2">
           <button
             className={`text-xs px-3 py-1 rounded border ${reorderMode ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}
@@ -251,47 +252,10 @@ function WebinarsList({ onEdit }: { onEdit: (id: number) => void }) {
               ))}
               </SortableContext>
               </DndContext>
-                  <TableCell className="font-medium max-w-[200px] truncate">{w.title}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {w.type === "live" ? <><Radio className="w-3 h-3 mr-1 text-red-500" />Live</> : <><PlayCircle className="w-3 h-3 mr-1 text-blue-500" />Recorded</>}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-600">{fmtDate(w.scheduledAt)}</TableCell>
-                  <TableCell className="text-sm text-gray-600">{fmtDuration(w.durationMinutes)}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {w.accessType === "free" ? <><Globe className="w-3 h-3 mr-1" />Free</> : <><DollarSign className="w-3 h-3 mr-1" />Paid</>}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(w.status)}`}>
-                      {w.status}
-                    </span>
-                    {((w as any).hasCertificate || (w as any).creditHours) && (w as any).cmeStatus && (
-                      <Badge className={`ml-1 text-xs ${CME_STATUS_COLORS[(w as any).cmeStatus] ?? CME_STATUS_COLORS.draft}`}>
-                        {CME_STATUS_LABELS[(w as any).cmeStatus] ?? "CME: Draft"}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
-                      <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(w.id)}>
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-700"
-                        onClick={() => { if (confirm("Delete this webinar?")) deleteMutation.mutate({ id: w.id }); }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
             </TableBody>
           </Table>
         </div>
+        </>
       )}
 
       {/* Pagination */}
