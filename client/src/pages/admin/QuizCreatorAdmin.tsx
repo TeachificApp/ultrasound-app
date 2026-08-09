@@ -1453,7 +1453,7 @@ function QuizList() {
       onCreated={(quizId) => { navigate(`/admin/quiz-creator/${quizId}`); }}
       />
       </div>
-      </div></>
+    </>
     )}
     </div>
   );

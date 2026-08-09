@@ -170,18 +170,32 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
 
     const twoFields = (l1: string, v1: string | null | undefined, l2: string, v2: string | null | undefined) => {
       if (y > doc.page.height - 80) { doc.addPage(); y = 50; }
-      // Use a 4px gap between columns; each column gets exactly half of (pageWidth - gap)
       const gap = 8;
       const half = Math.floor((pageWidth - gap) / 2);
       const col2x = 55 + half + gap;
+      const leftVal = v1?.trim() || "—";
+      const rightVal = v2?.trim() || "—";
+
       // lineBreak:false prevents PDFKit cursor from advancing after each text call
-      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text(l1.toUpperCase(), 55, y, { width: half, lineBreak: false });
-      doc.text(l2.toUpperCase(), col2x, y, { width: half, lineBreak: false });
+      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold")
+        .text(l1.toUpperCase(), 55, y, { width: half, lineBreak: false });
+      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold")
+        .text(l2.toUpperCase(), col2x, y, { width: half, lineBreak: false });
       y += 12;
-      doc.rect(55, y, half, 20).fill(LIGHT_GRAY).stroke(BORDER);
-      doc.fillColor(DARK).fontSize(9).font("Helvetica").text(v1?.trim() || "—", 60, y + 5, { width: half - 10, lineBreak: false });
-      doc.rect(col2x, y, half, 20).fill(LIGHT_GRAY).stroke(BORDER);
-      doc.text(v2?.trim() || "—", col2x + 5, y + 5, { width: half - 10, lineBreak: false });
+
+      // Draw each column box with an explicit fill color, then reset text color.
+      // Without fillColor(DARK) before the right value, PDFKit leaves fill set to
+      // LIGHT_GRAY from rect().fill() and the right column text is invisible.
+      doc.fillColor(LIGHT_GRAY).rect(55, y, half, 20).fill();
+      doc.strokeColor(BORDER).rect(55, y, half, 20).stroke();
+      doc.fillColor(DARK).fontSize(9).font("Helvetica")
+        .text(leftVal, 60, y + 5, { width: half - 10, lineBreak: false });
+
+      doc.fillColor(LIGHT_GRAY).rect(col2x, y, half, 20).fill();
+      doc.strokeColor(BORDER).rect(col2x, y, half, 20).stroke();
+      doc.fillColor(DARK).fontSize(9).font("Helvetica")
+        .text(rightVal, col2x + 5, y + 5, { width: half - 10, lineBreak: false });
+
       y += 26;
     };
 
