@@ -55,6 +55,7 @@ import {
   lmsAffiliates,
   lmsAffiliateConversions,
   lmsLandingPages,
+  testimonialPresets,
   lmsPageTemplates,
   lmsOrders,
   lmsCertificates,
@@ -758,6 +759,56 @@ export const lmsAIRouter = router({
         return { testimonials: [] };
       }
     }),
+
+  // ─── Testimonial Presets ──────────────────────────────────────────────────
+  saveTestimonialPreset: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1),
+      credentials: z.string().optional(),
+      quote: z.string().min(1),
+      rating: z.number().int().min(1).max(5).default(5),
+      avatarUrl: z.string().optional(),
+      category: z.string().optional(),
+      sourceCourseId: z.number().int().positive().optional(),
+      sourceCourseName: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const [result] = await db.insert(testimonialPresets).values({
+        name: input.name,
+        credentials: input.credentials ?? null,
+        quote: input.quote,
+        rating: input.rating,
+        avatarUrl: input.avatarUrl ?? null,
+        category: input.category ?? null,
+        sourceCourseId: input.sourceCourseId ?? null,
+        sourceCourseName: input.sourceCourseName ?? null,
+        createdBy: ctx.user.id,
+      });
+      return { id: (result as any).insertId as number };
+    }),
+
+  listTestimonialPresets: protectedProcedure
+    .input(z.object({ category: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      const rows = await db.select().from(testimonialPresets)
+        .where(input?.category ? eq(testimonialPresets.category, input.category) : undefined)
+        .orderBy(desc(testimonialPresets.createdAt));
+      return rows;
+    }),
+
+  deleteTestimonialPreset: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      await db.delete(testimonialPresets).where(eq(testimonialPresets.id, input.id));
+      return { ok: true };
+    }),
+
 });
 
 export const lmsAdminRouter = router({

@@ -8267,3 +8267,19 @@ export const cmeGenericDisclosures = mysqlTable("cme_generic_disclosures", {
 });
 export type CmeGenericDisclosure = typeof cmeGenericDisclosures.$inferSelect;
 export type InsertCmeGenericDisclosure = typeof cmeGenericDisclosures.$inferInsert;
+
+// ─── Testimonial Presets ──────────────────────────────────────────────────────
+export const testimonialPresets = mysqlTable("testimonial_presets", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  credentials: varchar("credentials", { length: 255 }),
+  quote: text("quote").notNull(),
+  rating: int("rating").default(5).notNull(),
+  avatarUrl: text("avatar_url"),
+  category: varchar("category", { length: 128 }), // e.g. "echo", "vascular", "general"
+  sourceCourseId: int("source_course_id"),          // which course it was generated from
+  sourceCourseName: varchar("source_course_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: int("created_by"),                     // admin user id
+});
+export type TestimonialPreset = typeof testimonialPresets.$inferSelect;

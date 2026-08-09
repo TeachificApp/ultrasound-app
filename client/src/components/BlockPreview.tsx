@@ -462,13 +462,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
               </div>
             )}
             <div className="flex items-center justify-center gap-3">
-              {d.avatarUrl ? (
+              {d.avatarUrl && (
                 <img src={d.avatarUrl} alt={d.author} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
-              ) : d.author ? (
-                <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 font-bold text-base border-2 border-white shadow-sm">
-                  {(d.author ?? "?").charAt(0).toUpperCase()}
-                </div>
-              ) : null}
+              )}
               <span className="font-semibold text-gray-900">{d.author}</span>
             </div>
           </div></CC>
@@ -486,12 +482,8 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                 </div>
                 <p className="text-gray-700 mb-3 italic">"{r.text}"</p>
                 <div className="flex items-center gap-3 mt-3">
-                  {r.avatarUrl ? (
+                  {r.avatarUrl && (
                     <img src={r.avatarUrl} alt={r.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-white shadow-sm" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0 text-teal-600 font-bold text-sm border-2 border-white shadow-sm">
-                      {(r.name ?? "?").charAt(0).toUpperCase()}
-                    </div>
                   )}
                   <p className="text-sm font-semibold text-gray-900">{r.name}</p>
                 </div>

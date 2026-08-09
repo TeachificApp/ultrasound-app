@@ -48,7 +48,7 @@ import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates
 import { BlockPreview } from "@/components/BlockPreview";
 import { resolveRelatedProductsSelectionMode } from "@shared/relatedProductsBlock";
 import {
-  ArrowLeft, ArrowRight, Save, Eye, Plus, Trash2, GripVertical, Type, Image, Video,
+  ArrowLeft, ArrowRight, Save, Eye, Plus, Trash2, GripVertical, Type, Image, ImageIcon, Video,
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
   AlignCenter, AlignRight, HelpCircle, Users, Star, Globe, Timer,
   AlertTriangle, CheckSquare, LayoutGrid, Layers, BookOpen, Tag,
@@ -2853,8 +2853,77 @@ function SortableChecklistItem({
   );
 }
 // ─── Sortable Review Item (used inside BlockSettings reviews case) ────────────
+// ─── Preset Library Panel ─────────────────────────────────────────────────────
+function PresetLibraryPanel({
+  courseId, courseTitle, onInsert,
+}: {
+  courseId?: number;
+  courseTitle?: string;
+  onInsert: (preset: { name: string; credentials?: string | null; quote: string; rating: number; avatarUrl?: string | null }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const { data: presets, refetch } = trpc.lmsAdmin.listTestimonialPresets.useQuery(undefined, { enabled: open, staleTime: 30_000 });
+  const deletePreset = trpc.lmsAdmin.deleteTestimonialPreset.useMutation({
+    onSuccess: () => { toast.success("Preset deleted"); refetch(); },
+  });
+  const filtered = (presets ?? []).filter(p =>
+    !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.quote.toLowerCase().includes(search.toLowerCase())
+  );
+  return (
+    <div className="border border-gray-200 rounded-lg">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg"
+      >
+        <span className="flex items-center gap-1 font-medium"><Bookmark size={11} /> Preset Library {presets ? `(${presets.length})` : ""}</span>
+        <ChevronDown size={11} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="border-t border-gray-100 p-2 space-y-2">
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search presets…"
+            className="w-full h-7 text-xs border border-gray-200 rounded px-2"
+          />
+          {filtered.length === 0 ? (
+            <p className="text-[10px] text-gray-400 text-center py-2">
+              {(presets ?? []).length === 0 ? "No presets saved yet — click Save on any review card." : "No matches."}
+            </p>
+          ) : (
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {filtered.map(p => (
+                <div key={p.id} className="flex items-start gap-2 p-1.5 rounded border border-gray-100 hover:border-teal-200 hover:bg-teal-50 group">
+                  {p.avatarUrl && <img src={p.avatarUrl} alt={p.name} className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-0.5" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-semibold text-gray-700 truncate">{p.name}{p.credentials ? `, ${p.credentials}` : ""}</p>
+                    <p className="text-[10px] text-gray-500 line-clamp-2">{p.quote}</p>
+                    {p.sourceCourseName && <p className="text-[9px] text-gray-400 truncate">From: {p.sourceCourseName}</p>}
+                  </div>
+                  <div className="flex flex-col gap-1 flex-shrink-0">
+                    <button
+                      onClick={() => onInsert(p)}
+                      className="text-[9px] bg-teal-600 text-white rounded px-1.5 py-0.5 hover:bg-teal-700"
+                    >Add</button>
+                    <button
+                      onClick={() => deletePreset.mutate({ id: p.id })}
+                      className="text-[9px] text-red-400 hover:text-red-600 border border-red-200 rounded px-1.5 py-0.5"
+                    >Del</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SortableReviewItem({
-  id, review, index, onUpdate, onRemove, handleFileUpload,
+  id, review, index, onUpdate, onRemove, handleFileUpload, onSaveAsPreset,
 }: {
   id: string;
   review: { name: string; rating: number; text: string; avatarUrl?: string };
@@ -2862,6 +2931,7 @@ function SortableReviewItem({
   onUpdate: (field: string, value: any) => void;
   onRemove: () => void;
   handleFileUpload?: (file: File, field: string, context: string) => Promise<string | null>;
+  onSaveAsPreset?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
@@ -2886,7 +2956,18 @@ function SortableReviewItem({
           <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 p-0.5 rounded" title="Drag to reorder"><GripVertical size={12} /></button>
           <span className="text-xs text-gray-500">Review {index + 1}</span>
         </div>
-        <button onClick={onRemove} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+        <div className="flex items-center gap-1">
+          {onSaveAsPreset && (
+            <button
+              onClick={onSaveAsPreset}
+              className="text-[10px] text-teal-600 hover:text-teal-800 border border-teal-200 hover:border-teal-400 rounded px-1.5 py-0.5 flex items-center gap-0.5"
+              title="Save to Testimonial Preset Library"
+            >
+              <Bookmark size={9} /> Save
+            </button>
+          )}
+          <button onClick={onRemove} className="text-red-400 hover:text-red-600"><X size={10} /></button>
+        </div>
       </div>
       {/* Avatar upload — optional */}
       <div className="flex items-center gap-2">
@@ -2905,10 +2986,10 @@ function SortableReviewItem({
           <button
             onClick={() => avatarInputRef.current?.click()}
             disabled={avatarUploading || !handleFileUpload}
-            className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-teal-400 hover:text-teal-500 transition-colors flex-shrink-0"
+            className="text-[10px] text-gray-400 hover:text-teal-500 underline flex-shrink-0 flex items-center gap-0.5"
             title="Upload avatar photo (optional)"
           >
-            {avatarUploading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+            {avatarUploading ? <Loader2 size={10} className="animate-spin" /> : "+ photo"}
           </button>
         )}
         <div className="flex-1 min-w-0">
@@ -4168,10 +4249,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
                 type="button"
                 onClick={() => singleAvatarRef.current?.click()}
                 disabled={singleAvatarUploading}
-                className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-teal-400 hover:text-teal-500 transition-colors flex-shrink-0"
+                className="text-[10px] text-gray-400 hover:text-teal-500 underline flex-shrink-0 flex items-center gap-0.5"
                 title="Upload avatar photo (optional)"
               >
-                {singleAvatarUploading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+                {singleAvatarUploading ? <Loader2 size={10} className="animate-spin" /> : "+ photo"}
               </button>
             )}
             <div className="flex-1 min-w-0">
@@ -4199,6 +4280,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
     case "reviews": {
       const reviews: Array<{ name: string; rating: number; text: string; avatarUrl?: string }> = d.reviews ?? [];
       const reviewIds = reviews.map((_, i) => `review-${i}`);
+      const savePreset = trpc.lmsAdmin.saveTestimonialPreset.useMutation({
+        onSuccess: () => toast.success("Saved to Testimonial Preset Library"),
+        onError: () => toast.error("Failed to save preset"),
+      });
       const generateTestimonials = trpc.lmsAdmin.generateTestimonials.useMutation({
         onSuccess: (data) => {
           if (data.testimonials.length > 0) {
@@ -4292,12 +4377,39 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
                       onUpdate={(field, value) => { const next = reviews.map((rv, j) => j === i ? { ...rv, [field]: value } : rv); set("reviews", next); }}
                       onRemove={() => set("reviews", reviews.filter((_, j) => j !== i))}
                       handleFileUpload={handleFileUpload}
+                      onSaveAsPreset={() => {
+                        const [namePart, ...credParts] = r.name.split(",");
+                        savePreset.mutate({
+                          name: namePart?.trim() || r.name,
+                          credentials: credParts.join(",").trim() || undefined,
+                          quote: r.text,
+                          rating: r.rating,
+                          avatarUrl: r.avatarUrl || undefined,
+                          sourceCourseId: courseId ?? undefined,
+                          sourceCourseName: courseTitle ?? undefined,
+                        });
+                      }}
                     />
                   ))}
                 </div>
               </SortableContext>
             </DndContext>
           </div>
+          {/* Preset Library */}
+          <PresetLibraryPanel
+            courseId={courseId}
+            courseTitle={courseTitle}
+            onInsert={(preset) => {
+              const newReview = {
+                name: preset.credentials ? `${preset.name}, ${preset.credentials}` : preset.name,
+                rating: preset.rating,
+                text: preset.quote,
+                avatarUrl: preset.avatarUrl ?? "",
+              };
+              set("reviews", [...reviews, newReview]);
+              toast.success(`Added "${preset.name}" from library`);
+            }}
+          />
         </div>
       );
     }

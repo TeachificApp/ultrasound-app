@@ -591,10 +591,13 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
           {d.headline && <h2 className="text-2xl font-bold mb-8 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {(d.reviews ?? []).map((r: any, i: number) => (
-              <div key={i} className="bg-gray-50 rounded-xl p-5 shadow-sm">
+              <div key={i} className="bg-gray-50 rounded-xl p-5 shadow-sm" style={{ backgroundColor: d.cardBgColor ?? undefined }}>
                 <div className="flex items-center gap-1 mb-2">{Array.from({ length: r.rating ?? 5 }).map((_, j) => <span key={j} className="text-yellow-400">★</span>)}</div>
                 <p className="text-gray-700 mb-3 italic">"{r.text}"</p>
-                <p className="text-sm font-semibold text-gray-900">— {r.name}</p>
+                <div className="flex items-center gap-2">
+                  {r.avatarUrl && <img src={r.avatarUrl} alt={r.name} className="w-8 h-8 rounded-full object-cover flex-shrink-0 border border-gray-200" />}
+                  <p className="text-sm font-semibold text-gray-900">— {r.name}</p>
+                </div>
               </div>
             ))}
           </div>
