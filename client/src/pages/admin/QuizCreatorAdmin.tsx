@@ -28,7 +28,7 @@ import {
   Sparkles, Upload, FileSpreadsheet, FolderPlus, Tag, FileUp,
   Database, Radio, TrendingUp, ExternalLink,
 } from "lucide-react";
-import { getAdminUrl } from "@/hooks/useSubdomain";
+import { getAdminUrl, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
