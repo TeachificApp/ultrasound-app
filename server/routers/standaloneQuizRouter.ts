@@ -8,7 +8,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, asc, desc, eq, inArray, like, or, sql, isNull, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, like, lte, or, sql, isNull, isNotNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
@@ -64,6 +64,9 @@ const quizSettingsInput = z.object({
   showGroupNames: z.boolean().default(true).optional(),
   showPerQuestionResult: z.boolean().default(true).optional(),
   showOnlyPercentage: z.boolean().default(false).optional(),
+  // Per-category question draw config
+  categoryConfig: z.string().nullable().optional(), // JSON: [{folderId, folderName, count}]
+  questionsPerAttempt: z.number().int().min(1).nullable().optional(),
 });
 
 // ─── Public Router ────────────────────────────────────────────────────────────
@@ -180,7 +183,27 @@ export const standaloneQuizLearnerRouter = router({
         .where(eq(standaloneQuizQuestions.quizId, quiz.id))
         .orderBy(asc(standaloneQuizQuestions.sortOrder));
 
-      if (quiz.shuffleQuestions) quizQs = shuffle(quizQs);
+      // ── Per-category draw: if categoryConfig is set, draw N questions per folder ──
+      if (quiz.categoryConfig) {
+        try {
+          const cats: { folderId: number | null; folderName: string; count: number }[] = JSON.parse(quiz.categoryConfig);
+          let drawn: typeof quizQs = [];
+          for (const cat of cats) {
+            const pool = quizQs.filter(q =>
+              cat.folderId === null ? q.qb.folderId === null : q.qb.folderId === cat.folderId
+            );
+            const shuffled = shuffle(pool);
+            drawn = drawn.concat(shuffled.slice(0, cat.count));
+          }
+          quizQs = quiz.shuffleQuestions ? shuffle(drawn) : drawn;
+        } catch { /* ignore parse errors, fall through to full set */ }
+      } else if (quiz.shuffleQuestions) {
+        quizQs = shuffle(quizQs);
+      }
+      // ── questionsPerAttempt cap (applies after category draw) ──
+      if (quiz.questionsPerAttempt && quizQs.length > quiz.questionsPerAttempt) {
+        quizQs = shuffle(quizQs).slice(0, quiz.questionsPerAttempt);
+      }
 
       const totalPoints = quizQs.reduce((s, q) => s + q.points, 0);
 
@@ -797,6 +820,60 @@ export const standaloneQuizAdminRouter = router({
         db.select({ total: sql<number>`count(*)` })
           .from(standaloneQuizAttempts)
           .where(and(eq(standaloneQuizAttempts.quizId, input.quizId), isNotNull(standaloneQuizAttempts.completedAt))),
+      ]);
+      return { attempts, total: Number(total), page: input.page, pageSize: input.pageSize };
+    }),
+});
+
+// ─── Extend standaloneQuizAdminRouter with cross-quiz results ─────────────────
+// (appended below the closing brace — merged in lmsRouter.ts)
+export const standaloneQuizResultsAdminRouter = router({
+  /** Cross-quiz results: all attempts across all quizzes, filterable by user/quiz/type/date */
+  listAllAttempts: protectedProcedure
+    .input(z.object({
+      search: z.string().optional(),
+      quizId: z.number().int().optional(),
+      quizType: z.enum(["quiz", "mock_exam"]).optional(),
+      dateFrom: z.string().optional(),
+      dateTo: z.string().optional(),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(25),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions: any[] = [isNotNull(standaloneQuizAttempts.completedAt)];
+      if (input.quizId) conditions.push(eq(standaloneQuizAttempts.quizId, input.quizId));
+      if (input.quizType) conditions.push(eq(standaloneQuizzes.type, input.quizType));
+      if (input.dateFrom) conditions.push(gte(standaloneQuizAttempts.completedAt, new Date(input.dateFrom)));
+      if (input.dateTo) conditions.push(lte(standaloneQuizAttempts.completedAt, new Date(input.dateTo)));
+      if (input.search) {
+        const like = `%${input.search}%`;
+        conditions.push(sql`(${users.name} LIKE ${like} OR ${users.email} LIKE ${like})`);
+      }
+      const offset = (input.page - 1) * input.pageSize;
+      const [attempts, [{ total }]] = await Promise.all([
+        db.select({
+          attempt: standaloneQuizAttempts,
+          userName: users.name,
+          userEmail: users.email,
+          quizTitle: standaloneQuizzes.title,
+          quizType: standaloneQuizzes.type,
+          quizPassingScore: standaloneQuizzes.passingScore,
+        })
+          .from(standaloneQuizAttempts)
+          .innerJoin(users, eq(standaloneQuizAttempts.userId, users.id))
+          .innerJoin(standaloneQuizzes, eq(standaloneQuizAttempts.quizId, standaloneQuizzes.id))
+          .where(and(...conditions))
+          .orderBy(desc(standaloneQuizAttempts.completedAt))
+          .limit(input.pageSize)
+          .offset(offset),
+        db.select({ total: sql<number>`count(*)` })
+          .from(standaloneQuizAttempts)
+          .innerJoin(users, eq(standaloneQuizAttempts.userId, users.id))
+          .innerJoin(standaloneQuizzes, eq(standaloneQuizAttempts.quizId, standaloneQuizzes.id))
+          .where(and(...conditions)),
       ]);
       return { attempts, total: Number(total), page: input.page, pageSize: input.pageSize };
     }),

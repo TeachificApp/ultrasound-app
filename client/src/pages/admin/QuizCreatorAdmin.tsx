@@ -1036,8 +1036,108 @@ function AddQuestionsDialog({
 }
 
 // ─── Quiz List ────────────────────────────────────────────────────────────────
+// ─── All Results View ─────────────────────────────────────────────────────────
+function AllResultsView() {
+  const [search, setSearch] = useState("");
+  const [quizType, setQuizType] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = trpc.standaloneQuizResults.listAllAttempts.useQuery({
+    search: search || undefined,
+    quizType: quizType !== "all" ? (quizType as any) : undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    page,
+    pageSize: 25,
+  });
+  const totalPages = data ? Math.ceil(data.total / 25) : 1;
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input placeholder="Search by user name or email..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="pl-9" />
+        </div>
+        <Select value={quizType} onValueChange={(v) => { setQuizType(v); setPage(1); }}>
+          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            <SelectItem value="quiz">Quiz</SelectItem>
+            <SelectItem value="mock_exam">Mock Exam</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-36" placeholder="From" />
+        <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-36" placeholder="To" />
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        {isLoading ? (
+          <div className="p-6 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        ) : !data?.attempts.length ? (
+          <div className="p-12 text-center text-gray-400">
+            <BarChart2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p className="font-medium">No results yet</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-200">
+              <tr>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">User</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">Quiz</th>
+                <th className="text-center px-4 py-3 font-medium text-gray-600">Type</th>
+                <th className="text-center px-4 py-3 font-medium text-gray-600">Score</th>
+                <th className="text-center px-4 py-3 font-medium text-gray-600">Result</th>
+                <th className="text-center px-4 py-3 font-medium text-gray-600">Questions</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-600">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {data.attempts.map(({ attempt, userName, userEmail, quizTitle, quizType: qt, quizPassingScore }) => (
+                <tr key={attempt.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="font-medium text-gray-900">{userName}</div>
+                    <div className="text-xs text-gray-400">{userEmail}</div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">{quizTitle}</td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${qt === "mock_exam" ? "bg-purple-100 text-purple-700" : "bg-teal-100 text-teal-700"}`}>
+                      {qt === "mock_exam" ? "Mock Exam" : "Quiz"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`font-semibold ${Number(attempt.score) >= quizPassingScore ? "text-green-600" : "text-red-500"}`}>
+                      {fmtScore(attempt.score)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {attempt.passed
+                      ? <span className="inline-flex items-center gap-1 text-green-600 text-xs font-medium"><CheckCircle className="w-3.5 h-3.5" />Pass</span>
+                      : <span className="inline-flex items-center gap-1 text-red-500 text-xs font-medium"><XCircle className="w-3.5 h-3.5" />Fail</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center text-gray-600">{attempt.correctAnswers}/{attempt.totalQuestions}</td>
+                  <td className="px-4 py-3 text-right text-gray-400 text-xs">{attempt.completedAt ? new Date(attempt.completedAt).toLocaleDateString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <span>Page {page} of {totalPages} ({data?.total ?? 0} total)</span>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="w-4 h-4" /></Button>
+            <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="w-4 h-4" /></Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function QuizList() {
   const [, navigate] = useLocation();
+  const [mainView, setMainView] = useState<"quizzes" | "results">("quizzes");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [type, setType] = useState<string>("all");
@@ -1121,6 +1221,25 @@ function QuizList() {
           </a>
         </div>
 
+        {/* Main Tabs */}
+        <div className="flex gap-2 mb-4 border-b border-gray-200">
+          <button
+            onClick={() => setMainView("quizzes")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mainView === "quizzes" ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+          >
+            Quizzes & Mock Exams
+          </button>
+          <button
+            onClick={() => setMainView("results")}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mainView === "results" ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+          >
+            All Results
+          </button>
+        </div>
+        {mainView === "results" ? (
+          <AllResultsView />
+        ) : (
+        <>
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-6">
           <div className="relative flex-1 min-w-[200px]">
@@ -1302,6 +1421,8 @@ function QuizList() {
         onCreated={(quizId) => { navigate(`/admin/quiz-creator/${quizId}`); }}
       />
     </div>
+    </>
+    )}
   );
 }
 
@@ -1510,6 +1631,38 @@ function QuizEditor({ quizId }: { quizId: number }) {
                   </CardContent>
                 </Card>
 
+                {/* Category Draw Config */}
+                <Card className="md:col-span-2 border-teal-200 bg-teal-50/30">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Database className="w-4 h-4 text-teal-600" /> Per-Category Question Draw
+                    </CardTitle>
+                    <p className="text-xs text-gray-500 mt-1">Configure how many questions to draw from each question bank folder per attempt. Leave blank to use all questions.</p>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Total Questions Per Attempt (blank = all)</Label>
+                        <Input
+                          type="number" min={1}
+                          value={settings?.questionsPerAttempt ?? ""}
+                          onChange={(e) => setSettings((s: any) => ({ ...s, questionsPerAttempt: e.target.value ? Number(e.target.value) : null }))}
+                          placeholder="Draw all questions"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="mb-2 block">Category Configuration (JSON)</Label>
+                      <p className="text-xs text-gray-400 mb-2">Format: <code>[{{"folderId": 1, "folderName": "Adult Echo", "count": 20}}, ...]</code> — set folderId to null for uncategorized questions.</p>
+                      <textarea
+                        className="w-full h-28 rounded-md border border-teal-200 bg-white px-3 py-2 text-sm font-mono resize-y"
+                        value={settings?.categoryConfig ?? ""}
+                        onChange={(e) => setSettings((s: any) => ({ ...s, categoryConfig: e.target.value || null }))}
+                        placeholder='[{"folderId": 1, "folderName": "Adult Echo", "count": 20}, {"folderId": 2, "folderName": "Pediatric Echo", "count": 15}]'
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
                 {/* Result Visibility */}
                 <Card className="md:col-span-2 border-blue-200 bg-blue-50/30">
                   <CardHeader className="pb-3">

@@ -860,6 +860,19 @@ All About Ultrasound, Inc. dba iHeartEcho`;
 
   // ── Regenerate PDF from saved DB state ────────────────────────────────
   const [regenPdf, setRegenPdf] = useState(false);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const handlePreviewPdf = async () => {
+    setLoadingPreview(true);
+    try {
+      const result = await downloadPdfMutation.mutateAsync({ courseId });
+      setPreviewPdfUrl(result.url);
+    } catch (e: any) {
+      toast.error("Preview failed: " + (e?.message ?? "Unknown error"));
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
   const handleRegenPdf = async () => {
     setRegenPdf(true);
     try {
@@ -952,6 +965,10 @@ All About Ultrasound, Inc. dba iHeartEcho`;
             {downloadingPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileDown className="w-3 h-3 mr-1" />}
             PDF
           </Button>
+          <Button type="button" size="sm" variant="outline" onClick={handlePreviewPdf} disabled={loadingPreview} className="text-xs border-[#189aa1] text-[#189aa1] hover:bg-teal-50" title="Preview PDF inline without downloading">
+            {loadingPreview ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <FileText className="w-3 h-3 mr-1" />}
+            Preview
+          </Button>
           <Button type="button" size="sm" variant="outline" onClick={handleRegenPdf} disabled={regenPdf} className="text-xs" title="Regenerate PDF from last saved data (does not save current edits)">
             {regenPdf ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
             Regen PDF
@@ -970,6 +987,28 @@ All About Ultrasound, Inc. dba iHeartEcho`;
         </div>
       </div>
 
+      {/* PDF Preview Panel */}
+      {previewPdfUrl && (
+        <div className="border border-teal-200 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-teal-50 border-b border-teal-200">
+            <span className="text-sm font-semibold text-teal-800 flex items-center gap-2">
+              <FileText className="w-4 h-4" /> PDF Preview
+            </span>
+            <div className="flex items-center gap-2">
+              <a href={previewPdfUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-teal-700 underline hover:text-teal-900">Open in new tab</a>
+              <button onClick={() => setPreviewPdfUrl(null)} className="text-gray-400 hover:text-gray-600 ml-2">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <iframe
+            src={previewPdfUrl + "#toolbar=0&navpanes=0"}
+            className="w-full"
+            style={{ height: "800px", border: "none" }}
+            title="CME Activity Form PDF Preview"
+          />
+        </div>
+      )}
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs">
         <span className="flex items-center gap-1.5 px-2 py-1 rounded bg-yellow-50 border border-yellow-300 text-yellow-700">

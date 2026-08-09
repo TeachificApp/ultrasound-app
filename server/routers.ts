@@ -64,7 +64,7 @@ import { workshopPublicRouter, workshopLearnerRouter, workshopAdminRouter, works
 import { printfulAdminRouter, printfulPublicRouter } from "./routers/printfulRouter";
 import { shopifyAdminRouter } from "./routers/shopifyRouter";
 import { printifyAdminRouter } from "./routers/printifyRouter";
-import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuizAdminRouter } from "./routers/standaloneQuizRouter";
+import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuizAdminRouter, standaloneQuizResultsAdminRouter } from "./routers/standaloneQuizRouter";
 import { quizBankRouter } from "./routers/quizBankRouter";
 import { teamRouter } from "./routers/teamRouter";
 import { adminNotificationsRouter } from "./routers/adminNotificationsRouter";
@@ -2715,6 +2715,7 @@ export const appRouter = router({
   standaloneQuiz: standaloneQuizPublicRouter,
   standaloneQuizLearner: standaloneQuizLearnerRouter,
   standaloneQuizAdmin: standaloneQuizAdminRouter,
+  standaloneQuizResults: standaloneQuizResultsAdminRouter,
   // ─── Quiz Bank ───────────────────────────────────────────────────────────────
   quizBank: quizBankRouter,
   team: teamRouter,

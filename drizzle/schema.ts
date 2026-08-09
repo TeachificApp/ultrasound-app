@@ -7392,6 +7392,10 @@ export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
   showGroupNames: boolean("show_group_names").default(true).notNull(),
   showPerQuestionResult: boolean("show_per_question_result").default(true).notNull(),
   showOnlyPercentage: boolean("show_only_percentage").default(false).notNull(),
+  // Per-category question draw config: JSON array of { folderId, folderName, count }
+  categoryConfig: longtext("category_config"),
+  // Total questions to draw per attempt (null = draw all)
+  questionsPerAttempt: int("questions_per_attempt"),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

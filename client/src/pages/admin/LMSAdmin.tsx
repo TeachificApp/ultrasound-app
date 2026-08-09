@@ -10721,6 +10721,7 @@ function QuestionBankAdmin() {
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
   const [aiType, setAIType] = useState<"mcq" | "truefalse" | "mixed">("mcq");
   const [aiTagIds, setAITagIds] = useState<number[]>([]);
+  const [aiFolderId, setAIFolderId] = useState<number | null>(null);
   // SCORM import state
   const [showScormImport, setShowScormImport] = useState(false);
   const [scormSearch, setScormSearch] = useState("");
@@ -10808,6 +10809,32 @@ function QuestionBankAdmin() {
         </div>
       </div>
 
+      {/* Folder Manager */}
+      {showFolderManager && (
+        <div className="border border-purple-200 rounded-xl p-4 bg-purple-50 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-purple-800 text-sm flex items-center gap-2"><FolderOpen className="w-4 h-4" /> Manage Folders</h3>
+            <Button size="sm" variant="ghost" onClick={() => setShowFolderManager(false)}><X className="w-3.5 h-3.5" /></Button>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {folders.length === 0 && <p className="text-xs text-purple-600">No folders yet. Create one below.</p>}
+            {folders.map((f: any) => (
+              <div key={f.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-purple-200">
+                <span className="text-sm text-gray-800 flex items-center gap-2"><FolderOpen className="w-3.5 h-3.5 text-purple-500" />{f.name}</span>
+                <button onClick={() => { if (confirm(\`Delete folder "\${f.name}"? Questions will not be deleted.\`)) deleteFolder.mutate({ id: f.id }); }} className="text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input id="qb-new-folder-name" placeholder="New folder name..." className="h-8 text-sm flex-1 bg-white border-purple-200" />
+            <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
+              const el = document.getElementById("qb-new-folder-name") as HTMLInputElement;
+              const val = el?.value?.trim();
+              if (val) { createFolder.mutate({ name: val }); el.value = ""; }
+            }}>Add Folder</Button>
+          </div>
+        </div>
+      )}
       {/* Tag Manager */}
       {showTagManager && (
         <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-3">
@@ -10880,9 +10907,17 @@ function QuestionBankAdmin() {
               </div>
             </div>
           </div>
+          <div className="md:col-span-2">
+              <Label className="text-xs font-medium text-teal-700 mb-1 block">Add to Folder (optional)</Label>
+              <select value={aiFolderId ?? ""} onChange={e => setAIFolderId(e.target.value ? Number(e.target.value) : null)} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
+                <option value="">— No folder —</option>
+                {folders.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </div>
+          </div>
           <div className="flex justify-end">
             <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={!aiTopic.trim() || aiGenerate.isPending}
-              onClick={() => aiGenerate.mutate({ topic: aiTopic, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined })}>
+              onClick={() => aiGenerate.mutate({ topic: aiTopic, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined })}>
               {aiGenerate.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate & Add to Bank</>}
             </Button>
           </div>
