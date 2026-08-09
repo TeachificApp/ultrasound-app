@@ -660,14 +660,23 @@ export const lmsAIRouter = router({
       courseTitle: z.string().min(1),
       courseDescription: z.string().optional(),
       count: z.number().int().min(1).max(10).default(3),
+      tone: z.enum(["professional", "enthusiastic", "concise", "heartfelt", "clinical"]).default("professional"),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const toneInstructions: Record<string, string> = {
+        professional: "Use a polished, measured tone — like a peer review. Balanced and credible.",
+        enthusiastic: "Use an upbeat, energetic tone — the student is genuinely excited and recommends the course strongly.",
+        concise: "Keep each testimonial to one short sentence. Punchy and direct.",
+        heartfelt: "Use a warm, personal tone — the student shares how the course impacted their clinical practice or confidence.",
+        clinical: "Use technical, clinically-oriented language — the student references specific skills or protocols they learned.",
+      };
+      const toneNote = toneInstructions[input.tone] ?? toneInstructions.professional;
       const response = await invokeLLM({
         messages: [
           {
             role: "system",
-            content: `You are a creative copywriter generating realistic student testimonials for an online ultrasound/echocardiography course. Generate ${input.count} short, authentic-sounding testimonials from healthcare professionals (sonographers, nurses, physicians, echo techs). Each testimonial should be 1-3 sentences, mention the course title, and feel genuine. Return ONLY a JSON array with objects: { name: string, credentials: string, text: string, rating: number }. rating should be 4 or 5. credentials should be realistic (e.g. "RDMS, RVT", "RN, RDCS", "MD, FASE"). No markdown, no code fences — raw JSON only.`,
+            content: `You are a creative copywriter generating realistic student testimonials for an online ultrasound/echocardiography course. Generate ${input.count} short, authentic-sounding testimonials from healthcare professionals (sonographers, nurses, physicians, echo techs). Tone: ${toneNote} Each testimonial should mention the course title and feel genuine. Return ONLY a JSON array with objects: { name: string, credentials: string, text: string, rating: number }. rating should be 4 or 5. credentials should be realistic (e.g. "RDMS, RVT", "RN, RDCS", "MD, FASE"). No markdown, no code fences — raw JSON only.`,
           },
           {
             role: "user",
