@@ -2938,7 +2938,7 @@ export const lmsCourses = mysqlTable("lms_courses", {
   subtitle: varchar("subtitle", { length: 500 }),
   description: longtext("description"),
   coverImageUrl: text("cover_image_url"),
-  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived", "enrollment_closed"]).default("draft").notNull(),
   type: mysqlEnum("type", ["course", "quiz", "download", "cohort", "workshop"]).default("course").notNull(),
   // Cohort-specific: close enrollment after this date (null = always open)
   enrollmentCloseDate: timestamp("enrollment_close_date"),
@@ -5067,7 +5067,7 @@ export const webinars = mysqlTable("webinars", {
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
   type: mysqlEnum("type", ["live", "prerecorded"]).default("live").notNull(),
-  status: mysqlEnum("status", ["draft", "published", "ended"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "ended", "enrollment_closed"]).default("draft").notNull(),
   scheduledAt: bigint("scheduled_at", { mode: "number" }),
   durationMinutes: int("duration_minutes").default(60),
   meetingUrl: text("meeting_url"),
@@ -7109,7 +7109,7 @@ export const workshops = mysqlTable("workshops", {
   thumbnailUrl: text("thumbnail_url"),
 
   // Status / visibility
-  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived", "enrollment_closed"]).default("draft").notNull(),
 
   // Brand
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),

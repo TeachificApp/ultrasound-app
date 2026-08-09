@@ -5007,7 +5007,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       showVideoControls,
       content: (lessonType === "text" || lessonType === "video" || lessonType === "download" || lessonType === "video_text") ? (content || null) : undefined,
       videoContent: lessonType === "video_text" ? (videoContent || null) : undefined,
-      embedUrl: lessonType === "embed" ? (embedUrl || null) : undefined,
+      embedUrl: lessonType === "embed" ? (embedUrl || undefined) : undefined,
       mediaAssetId: selectedAsset?.id ?? undefined,
     }, {
       onSuccess: () => { if (andClose && onSavedAndClose) { onSavedAndClose(); } else { onSaved(); } },

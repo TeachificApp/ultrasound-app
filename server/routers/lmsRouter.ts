@@ -2398,6 +2398,11 @@ export const lmsLearnerRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
       }
 
+      // Block checkout if enrollment is explicitly closed
+      if ((course.status as string) === "enrollment_closed") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this course" });
+      }
+
       // DEBUG: log incoming pricingOptionId
       console.log(`[createCheckout] courseSlug=${input.courseSlug} pricingOptionId=${input.pricingOptionId} (type=${typeof input.pricingOptionId})`);
       // Resolve pricing: secondary option overrides primary course pricing
@@ -2752,6 +2757,9 @@ export const lmsLearnerRouter = router({
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       if (course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date()) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
+      }
+      if ((course.status as string) === "enrollment_closed") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this course" });
       }
 
       let pricingType: string = course.pricingType ?? (course.isFree ? "free" : "one_time");

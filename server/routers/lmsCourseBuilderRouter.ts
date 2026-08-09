@@ -1095,6 +1095,13 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       }
       // Convert null dripDays to 0 (no drip)
       if (updates.dripDays === null) updates.dripDays = 0;
+      // Guard: never clear embedUrl with null/empty unless the admin explicitly blanked it.
+      // The frontend sends embedUrl: undefined (no-op) when the field is untouched, and
+      // embedUrl: "" (empty string) only when the admin deleted the URL. Convert empty string
+      // to undefined so the DB value is preserved; only a non-empty string actually updates it.
+      if (updates.embedUrl === null || updates.embedUrl === "") {
+        delete updates.embedUrl;
+      }
       // Keep isPreview in sync with previewMode for backward compat
       if (updates.previewMode !== undefined) {
         updates.isPreview = updates.previewMode !== "none";
