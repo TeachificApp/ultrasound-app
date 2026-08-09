@@ -26,6 +26,9 @@ import {
   Download, Mail, UserCheck, Loader2, Code2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent, KeyboardSensor } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import RichTextEditor from "@/components/RichTextEditor";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
@@ -57,6 +60,40 @@ function instanceStatusColor(status: string) {
   return "bg-yellow-100 text-yellow-700";
 }
 
+
+// ── SortableWorkshopRow ────────────────────────────────────────────────────────
+function SortableWorkshopRow({ w, reorderMode, onEdit, onDuplicate, onDelete, duplicatePending }: {
+  w: any; reorderMode: boolean; onEdit: (id: number) => void;
+  onDuplicate: (id: number) => void; onDelete: (id: number) => void; duplicatePending: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: w.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <TableRow ref={setNodeRef} style={style} className="hover:bg-gray-50 cursor-pointer" onClick={() => !reorderMode && onEdit(w.id)}>
+      {reorderMode && (
+        <TableCell className="w-8 cursor-grab" {...attributes} {...listeners} onClick={e => e.stopPropagation()}>
+          <GripVertical className="w-4 h-4 text-gray-400" />
+        </TableCell>
+      )}
+      <TableCell>
+        <div className="font-medium text-sm">{w.title}</div>
+        <div className="text-xs text-gray-400 mt-0.5">/{w.slug}</div>
+      </TableCell>
+      <TableCell><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(w.status)}`}>{w.status}</span></TableCell>
+      <TableCell><span className="text-xs text-gray-500 uppercase">{w.brand}</span></TableCell>
+      <TableCell><span className="text-xs text-gray-600">{w.instanceCount ?? 0} instances</span></TableCell>
+      <TableCell><span className="text-xs text-gray-600">{fmtPrice(w.price)}</span></TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onEdit(w.id)} title="Edit"><Edit2 className="w-3.5 h-3.5" /></Button>
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700" title="Duplicate" disabled={duplicatePending} onClick={() => onDuplicate(w.id)}><Copy className="w-3.5 h-3.5" /></Button>
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" onClick={() => onDelete(w.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 // ── WorkshopsList ──────────────────────────────────────────────────────────────
 function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
   const [search, setSearch] = useState("");
@@ -70,6 +107,39 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
     search: search || undefined,
     status: statusFilter !== "all" ? (statusFilter as any) : undefined,
   });
+
+  // Sync local workshops from server data
+  useEffect(() => {
+    if (data?.workshops && data.workshops !== prevDataRef.current) {
+      prevDataRef.current = data.workshops;
+      const sorted = [...data.workshops].sort((a: any, b: any) => {
+        if ((a.libraryOrder ?? 0) !== (b.libraryOrder ?? 0)) return (a.libraryOrder ?? 0) - (b.libraryOrder ?? 0);
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      setLocalWorkshops(sorted);
+    }
+  }, [data?.workshops]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const reorderMutation = trpc.workshopAdmin.reorder.useMutation({
+    onSuccess: () => { toast.success("Order saved"); utils.workshopAdmin.list.invalidate(); },
+    onError: (e) => toast.error(`Failed to save order: ${e.message}`),
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localWorkshops.findIndex((w: any) => w.id === active.id);
+    const newIndex = localWorkshops.findIndex((w: any) => w.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(localWorkshops, oldIndex, newIndex);
+    setLocalWorkshops(reordered);
+    reorderMutation.mutate({ items: reordered.map((w: any, i: number) => ({ id: w.id, libraryOrder: i + 1 })) });
+  };
 
   const createMutation = trpc.workshopAdmin.create.useMutation({
     onSuccess: (res) => {
@@ -141,10 +211,17 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
           <p className="text-sm mt-1">Create your first workshop to get started.</p>
         </div>
       ) : (
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            className={`text-xs px-3 py-1 rounded border ${reorderMode ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}
+            onClick={() => setReorderMode(r => !r)}
+          >{reorderMode ? "Done Reordering" : "Reorder"}</button>
+        </div>
         <div className="rounded-lg border overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
+                {reorderMode && <TableHead className="w-8"></TableHead>}
                 <TableHead>Title</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Brand</TableHead>
@@ -154,57 +231,17 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {workshops.map((w: any) => (
-                <TableRow key={w.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(w.id)}>
-                  <TableCell>
-                    <div className="font-medium text-sm">{w.title}</div>
-                    <div className="text-xs text-gray-400 mt-0.5">/{w.slug}</div>
-                  </TableCell>
-                  <TableCell>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(w.status)}`}>
-                      {w.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs text-gray-500 uppercase">{w.brand}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs text-gray-600">{w.instanceCount ?? 0} instances</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs text-gray-600">{fmtPrice(w.price)}</span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => onEdit(w.id)} title="Edit">
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700"
-                        title="Duplicate"
-                        disabled={duplicateMutation.isPending}
-                        onClick={() => duplicateMutation.mutate({ id: w.id })}
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
-                        onClick={() => {
-                          if (confirm(`Delete "${w.title}"? This cannot be undone.`)) {
-                            deleteMutation.mutate({ id: w.id });
-                          }
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={localWorkshops.map((w: any) => w.id)} strategy={verticalListSortingStrategy}>
+              {localWorkshops.map((w: any) => (
+                <SortableWorkshopRow key={w.id} w={w} reorderMode={reorderMode} onEdit={onEdit}
+                  onDuplicate={(id) => duplicateMutation.mutate({ id })}
+                  onDelete={(id) => { if (confirm(`Delete "${w.title}"? This cannot be undone.`)) deleteMutation.mutate({ id }); }}
+                  duplicatePending={duplicateMutation.isPending}
+                />
               ))}
+              </SortableContext>
+              </DndContext>
             </TableBody>
           </Table>
         </div>

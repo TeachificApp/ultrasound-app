@@ -731,7 +731,7 @@ export const workshopAdminRouter = router({
       const [rows, countRows] = await Promise.all([
         db.select().from(workshops)
           .where(conditions.length ? and(...conditions) : undefined)
-          .orderBy(desc(workshops.createdAt))
+          .orderBy(asc(workshops.libraryOrder), desc(workshops.createdAt))
           .limit(limit)
           .offset(offset),
         db.select({ count: sql<number>`count(*)` }).from(workshops)
@@ -1502,6 +1502,17 @@ export const workshopAdminRouter = router({
     }),
 
   /** List pricing options for a workshop (for CTA action pickers) */
+  reorder: protectedProcedure
+    .input(z.object({ items: z.array(z.object({ id: z.number(), libraryOrder: z.number() })) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(input.items.map(item =>
+        db.update(workshops).set({ libraryOrder: item.libraryOrder }).where(eq(workshops.id, item.id))
+      ));
+      return { success: true };
+    }),
+
   listPricingOptions: protectedProcedure
     .input(z.object({ workshopId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {

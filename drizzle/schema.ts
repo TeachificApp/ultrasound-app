@@ -5137,6 +5137,7 @@ export const webinars = mysqlTable("webinars", {
   hasCertificate: boolean("has_certificate").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  libraryOrder: int("library_order").default(0).notNull(),
 });
 export type Webinar = typeof webinars.$inferSelect;
 export type NewWebinar = typeof webinars.$inferInsert;

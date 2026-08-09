@@ -58,6 +58,51 @@ function statusColor(status: string) {
   return "bg-yellow-100 text-yellow-700";
 }
 
+
+// ── SortableWebinarRow ─────────────────────────────────────────────────────────
+function SortableWebinarRow({ w, reorderMode, onEdit, onDelete }: {
+  w: any; reorderMode: boolean; onEdit: (id: number) => void; onDelete: (id: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: w.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <TableRow ref={setNodeRef} style={style} className="hover:bg-gray-50 cursor-pointer" onClick={() => !reorderMode && onEdit(w.id)}>
+      {reorderMode && (
+        <TableCell className="w-8 cursor-grab" {...attributes} {...listeners} onClick={e => e.stopPropagation()}>
+          <GripVertical className="w-4 h-4 text-gray-400" />
+        </TableCell>
+      )}
+      <TableCell className="font-medium max-w-[200px] truncate">{w.title}</TableCell>
+      <TableCell>
+        <Badge variant="outline" className="text-xs capitalize">
+          {w.type === "live" ? <><Radio className="w-3 h-3 mr-1 text-red-500" />Live</> : <><PlayCircle className="w-3 h-3 mr-1 text-blue-500" />Recorded</>}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-sm text-gray-600">{fmtDate(w.scheduledAt)}</TableCell>
+      <TableCell className="text-sm text-gray-600">{fmtDuration(w.durationMinutes)}</TableCell>
+      <TableCell>
+        <Badge variant="outline" className="text-xs capitalize">
+          {w.accessType === "free" ? <><Globe className="w-3 h-3 mr-1" />Free</> : <><DollarSign className="w-3 h-3 mr-1" />Paid</>}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(w.status)}`}>{w.status}</span>
+        {(w.hasCertificate || w.creditHours) && w.cmeStatus && (
+          <Badge className={`ml-1 text-xs ${CME_STATUS_COLORS[w.cmeStatus] ?? CME_STATUS_COLORS.draft}`}>
+            {CME_STATUS_LABELS[w.cmeStatus] ?? "CME: Draft"}
+          </Badge>
+        )}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex gap-1 justify-end" onClick={e => e.stopPropagation()}>
+          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onEdit(w.id)}><Edit2 className="w-3.5 h-3.5" /></Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => onDelete(w.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 // ── WebinarsList ───────────────────────────────────────────────────────────────
 function WebinarsList({ onEdit }: { onEdit: (id: number) => void }) {
   const [search, setSearch] = useState("");
@@ -65,6 +110,8 @@ function WebinarsList({ onEdit }: { onEdit: (id: number) => void }) {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const utils = trpc.useUtils();
+  const [localWebinars, setLocalWebinars] = useState<any[]>([]);
+  const [reorderMode, setReorderMode] = useState(false);
 
   const { data, isLoading } = trpc.webinarAdmin.list.useQuery({
     page,
@@ -73,6 +120,40 @@ function WebinarsList({ onEdit }: { onEdit: (id: number) => void }) {
     status: statusFilter !== "all" ? (statusFilter as any) : undefined,
     brand: undefined,
   });
+
+  // Sync local webinars from server data
+  const prevDataRef = useRef<any>(null);
+  useEffect(() => {
+    if (data?.webinars && data.webinars !== prevDataRef.current) {
+      prevDataRef.current = data.webinars;
+      const sorted = [...data.webinars].sort((a: any, b: any) => {
+        if ((a.libraryOrder ?? 0) !== (b.libraryOrder ?? 0)) return (a.libraryOrder ?? 0) - (b.libraryOrder ?? 0);
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+      setLocalWebinars(sorted);
+    }
+  }, [data?.webinars]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const reorderMutation = trpc.webinarAdmin.reorder.useMutation({
+    onSuccess: () => { toast.success("Order saved"); utils.webinarAdmin.list.invalidate(); },
+    onError: (e) => toast.error(`Failed to save order: ${e.message}`),
+  });
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localWebinars.findIndex((w: any) => w.id === active.id);
+    const newIndex = localWebinars.findIndex((w: any) => w.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(localWebinars, oldIndex, newIndex);
+    setLocalWebinars(reordered);
+    reorderMutation.mutate({ items: reordered.map((w: any, i: number) => ({ id: w.id, libraryOrder: i + 1 })) });
+  };
 
   const createMutation = trpc.webinarAdmin.create.useMutation({
     onSuccess: (res) => {
@@ -141,10 +222,17 @@ function WebinarsList({ onEdit }: { onEdit: (id: number) => void }) {
           <p className="text-sm">No webinars yet. Create your first one above.</p>
         </div>
       ) : (
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            className={`text-xs px-3 py-1 rounded border ${reorderMode ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}
+            onClick={() => setReorderMode(r => !r)}
+          >{reorderMode ? "Done Reordering" : "Reorder"}</button>
+        </div>
         <div className="rounded-lg border overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
+                {reorderMode && <TableHead className="w-8"></TableHead>}
                 <TableHead>Title</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Scheduled</TableHead>
@@ -155,8 +243,13 @@ function WebinarsList({ onEdit }: { onEdit: (id: number) => void }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {webinars.filter(w => typeFilter === "all" || w.type === typeFilter).map(w => (
-                <TableRow key={w.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => onEdit(w.id)}>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={localWebinars.filter((w: any) => typeFilter === "all" || w.type === typeFilter).map((w: any) => w.id)} strategy={verticalListSortingStrategy}>
+              {localWebinars.filter((w: any) => typeFilter === "all" || w.type === typeFilter).map((w: any) => (
+                <SortableWebinarRow key={w.id} w={w} reorderMode={reorderMode} onEdit={onEdit} onDelete={(id) => { if (confirm("Delete this webinar?")) deleteMutation.mutate({ id }); }} />
+              ))}
+              </SortableContext>
+              </DndContext>
                   <TableCell className="font-medium max-w-[200px] truncate">{w.title}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="text-xs capitalize">

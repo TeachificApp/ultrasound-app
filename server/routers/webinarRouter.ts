@@ -162,10 +162,23 @@ export const webinarAdminRouter = router({
           hasCertificate: webinars.hasCertificate, creditHours: webinars.creditHours,
           createdAt: webinars.createdAt, updatedAt: webinars.updatedAt,
           cmeStatus: cmeActivityForms.cmeStatus,
-        }).from(webinars).leftJoin(cmeActivityForms, eq(cmeActivityForms.courseId, webinars.id)).where(where).orderBy(desc(webinars.createdAt)).limit(limit).offset(offset),
+          libraryOrder: webinars.libraryOrder,
+        }).from(webinars).leftJoin(cmeActivityForms, eq(cmeActivityForms.courseId, webinars.id)).where(where).orderBy(asc(webinars.libraryOrder), desc(webinars.createdAt)).limit(limit).offset(offset),
         db.select({ count: sql<number>`count(*)` }).from(webinars).where(where),
       ]);
       return { webinars: rows, total: cnt[0]?.count ?? 0 };
+    }),
+
+  reorder: protectedProcedure
+    .input(z.object({ items: z.array(z.object({ id: z.number(), libraryOrder: z.number() })) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(input.items.map(item =>
+        db.update(webinars).set({ libraryOrder: item.libraryOrder }).where(eq(webinars.id, item.id))
+      ));
+      return { success: true };
     }),
 
   getById: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
