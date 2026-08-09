@@ -142,7 +142,7 @@ export default function WorkshopDetail() {
   const compareAt = workshop.compareAtPrice
     ? `$${(workshop.compareAtPrice / 100).toFixed(2)}`
     : null;
-  const isDraft = workshop.status === "draft";
+  const isDraft = workshop.status === "draft" || workshop.status === "enrollment_closed";
 
   return (
     <div className="min-h-screen bg-gray-50">

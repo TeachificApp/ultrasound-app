@@ -828,7 +828,7 @@ export const workshopAdminRouter = router({
         description: z.string().nullish(),
         coverImageUrl: z.string().nullish(),
         thumbnailUrl: z.string().nullish(),
-        status: z.enum(["draft", "public", "hidden", "private", "archived"]).optional(),
+        status: z.enum(["draft", "public", "hidden", "private", "archived", "enrollment_closed"]).optional(),
         brand: z.enum(["aaus", "iheartecho"]).optional(),
         price: z.number().optional(),
         compareAtPrice: z.number().nullish(),

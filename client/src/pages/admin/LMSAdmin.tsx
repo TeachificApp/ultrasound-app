@@ -92,6 +92,7 @@ const STATUS_COLORS: Record<string, string> = {
   hidden: "bg-yellow-100 text-yellow-700",
   private: "bg-blue-100 text-blue-700",
   archived: "bg-red-100 text-red-600",
+  enrollment_closed: "bg-orange-100 text-orange-700",
 };
 
 const CME_STATUS_COLORS: Record<string, string> = {
@@ -379,6 +380,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
                 <SelectItem value="hidden">Hidden</SelectItem>
                 <SelectItem value="private">Private</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
+                <SelectItem value="enrollment_closed">Enrollment Closed</SelectItem>
               </SelectContent>
             </Select>
           )}
@@ -2155,6 +2157,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, o
               <SelectItem value="hidden">Hidden</SelectItem>
               <SelectItem value="private">Private (invite only)</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
+              <SelectItem value="enrollment_closed">Enrollment Closed</SelectItem>
             </SelectContent>
           </Select>
         </div>

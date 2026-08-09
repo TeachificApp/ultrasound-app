@@ -1976,7 +1976,7 @@ export default function CourseLanding() {
   }
 
   const lp = course.landingPage;
-  const isDraft = (course as any).status === "draft";
+  const isDraft = (course as any).status === "draft" || (course as any).status === "enrollment_closed";
   const price = formatPrice(course);
   const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
   const isEnrollmentClosed = !enrollment && course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date();
@@ -2429,7 +2429,14 @@ export default function CourseLanding() {
               <p className="text-xs text-gray-500">{course.trialDays ?? 7}-day free trial, then billed {course.subscriptionInterval ?? "monthly"}</p>
             )}
 
-            {isDraft ? (
+            {(course as any).status === "enrollment_closed" ? (
+              <div className="space-y-2">
+                <Button className="w-full font-semibold" size="lg" disabled variant="outline">
+                  Enrollment Closed
+                </Button>
+                <p className="text-xs text-center text-gray-500">Enrollment for this course is currently closed.</p>
+              </div>
+            ) : isDraft ? (
               <div className="space-y-2">
                 <Button className="w-full font-semibold" size="lg" disabled variant="outline">
                   Enrollment Closed

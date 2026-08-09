@@ -55,6 +55,7 @@ function fmtDuration(mins: number | null | undefined) {
 function statusColor(status: string) {
   if (status === "published") return "bg-green-100 text-green-700";
   if (status === "ended") return "bg-gray-100 text-gray-600";
+  if (status === "enrollment_closed") return "bg-orange-100 text-orange-700";
   return "bg-yellow-100 text-yellow-700";
 }
 
@@ -567,6 +568,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="published">Published</SelectItem>
                       <SelectItem value="ended">Ended</SelectItem>
+                      <SelectItem value="enrollment_closed">Enrollment Closed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -341,7 +341,7 @@ export default function WebinarLanding() {
     );
   }
 
-  const isDraft = webinar.status === "draft";
+  const isDraft = webinar.status === "draft" || webinar.status === "enrollment_closed";
   const price = formatPrice(webinar);
   const isFree = webinar.accessType === "free" || webinar.isFree;
 

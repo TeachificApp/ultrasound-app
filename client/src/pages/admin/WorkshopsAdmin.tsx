@@ -52,6 +52,7 @@ function statusColor(status: string) {
   if (status === "public" || status === "published") return "bg-green-100 text-green-700";
   if (status === "archived" || status === "cancelled" || status === "completed") return "bg-gray-100 text-gray-600";
   return "bg-yellow-100 text-yellow-700";
+  if (status === "enrollment_closed") return "bg-orange-100 text-orange-700";
 }
 function instanceStatusColor(status: string) {
   if (status === "published") return "bg-green-100 text-green-700";
@@ -211,6 +212,7 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
           <p className="text-sm mt-1">Create your first workshop to get started.</p>
         </div>
       ) : (
+        <>
         <div className="flex items-center gap-2 mb-2">
           <button
             className={`text-xs px-3 py-1 rounded border ${reorderMode ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}`}
@@ -245,6 +247,7 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
             </TableBody>
           </Table>
         </div>
+        </>
       )}
 
       {/* Pagination */}

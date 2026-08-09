@@ -108,7 +108,7 @@ export const lmsCourseBuilderRouter = router({
   // ── Courses ──
   listCourses: protectedProcedure
     .input(z.object({
-      status: z.enum(["draft", "public", "hidden", "private", "archived", "all"]).default("all"),
+      status: z.enum(["draft", "public", "hidden", "private", "archived", "enrollment_closed", "all"]).default("all"),
       type: z.enum(["course", "quiz", "download", "cohort", "all"]).default("all"),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(500).default(20),
@@ -192,7 +192,7 @@ export const lmsCourseBuilderRouter = router({
       subtitle: z.string().max(500).optional(),
       description: z.string().optional(),
       coverImageUrl: z.string().optional(),
-      status: z.enum(["draft", "public", "hidden", "private", "archived"]).optional(),
+      status: z.enum(["draft", "public", "hidden", "private", "archived", "enrollment_closed"]).optional(),
       type: z.enum(["course", "quiz", "download", "cohort", "workshop"]).optional(),
       enrollmentCloseDate: z.string().nullable().optional(), // ISO date string or null
       // Course-level waitlist settings
