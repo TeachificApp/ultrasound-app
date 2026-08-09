@@ -154,7 +154,10 @@ export async function runChallengeCron() {
 
       // Step A: pick one queued/scheduled challenge per category
       for (const category of categories) {
-        const [next] = await db
+        let next: typeof quickfireChallenges.$inferSelect | undefined;
+
+        // First: try queued or scheduled
+        const [queued] = await db
           .select()
           .from(quickfireChallenges)
           .where(
@@ -172,6 +175,30 @@ export async function runChallengeCron() {
           )
           .orderBy(asc(quickfireChallenges.queuePosition), asc(quickfireChallenges.createdAt))
           .limit(1);
+
+        if (queued) {
+          next = queued;
+        } else {
+          // Fallback: recycle the oldest archived challenge for this category
+          // (cycles through the archive in order so questions rotate rather than repeat immediately)
+          const [archived] = await db
+            .select()
+            .from(quickfireChallenges)
+            .where(
+              and(
+                eq(quickfireChallenges.status, "archived"),
+                eq(quickfireChallenges.category, category as any),
+                eq(quickfireChallenges.brand, brand)
+              )
+            )
+            .orderBy(asc(quickfireChallenges.publishedAt), asc(quickfireChallenges.createdAt))
+            .limit(1);
+          if (archived) {
+            next = archived;
+            console.log(`[ChallengeCron][${brand}] Recycling archived challenge #${archived.id} "${archived.title}" for category "${category}"`);
+          }
+        }
+
         if (next) {
           // Guard: never publish a challenge with no questions
           const qIds: number[] = JSON.parse(next.questionIds || "[]");

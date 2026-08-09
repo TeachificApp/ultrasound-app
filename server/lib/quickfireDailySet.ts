@@ -147,6 +147,35 @@ export async function ensureTodaySet(
   }
 
   const fallbackLiveNeeded: { cat: string; questionId: number }[] = [];
+
+  // ── Step 2.5: Recycle oldest archived challenge for categories still empty ──
+  // Before falling back to raw question bank, try to reuse archived challenges
+  // (cycles through them oldest-first so questions rotate rather than repeat immediately)
+  for (const cat of categories) {
+    const key = catKey[cat];
+    if (questionMap[key] !== null) continue;
+    const [oldestArchived] = await db
+      .select()
+      .from(quickfireChallenges)
+      .where(
+        and(
+          eq(quickfireChallenges.status, "archived"),
+          eq(quickfireChallenges.category, cat as never),
+          eq(quickfireChallenges.brand, brand),
+        )
+      )
+      .orderBy(quickfireChallenges.publishedAt, quickfireChallenges.createdAt)
+      .limit(1);
+    if (oldestArchived) {
+      const ids: number[] = JSON.parse(oldestArchived.questionIds || "[]");
+      if (ids.length > 0) {
+        questionMap[key] = ids[0];
+        fallbackLiveNeeded.push({ cat, questionId: ids[0] });
+        console.log(`[ensureTodaySet][${brand}] Recycling archived challenge #${oldestArchived.id} for category "${cat}"`);
+      }
+    }
+  }
+
   // Brand filter: always include cross-brand categories (Fetal Echo, Physics) regardless of which brand created them
   const brandFilter = or(
     eq(quickfireQuestions.brand, brand),
