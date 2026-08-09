@@ -10821,7 +10821,7 @@ function QuestionBankAdmin() {
             {folders.map((f: any) => (
               <div key={f.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-purple-200">
                 <span className="text-sm text-gray-800 flex items-center gap-2"><FolderOpen className="w-3.5 h-3.5 text-purple-500" />{f.name}</span>
-                <button onClick={() => { if (confirm(\`Delete folder "\${f.name}"? Questions will not be deleted.\`)) deleteFolder.mutate({ id: f.id }); }} className="text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+                <button onClick={() => { if (confirm(`Delete folder "\${f.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: f.id }); }} className="text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
               </div>
             ))}
           </div>
