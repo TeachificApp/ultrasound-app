@@ -1272,7 +1272,7 @@ function QuizList() {
         </div>
         {mainView === "results" ? (
           <AllResultsView />
-        ) : (
+        ) : (<>
         <div className="quiz-list-content">
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-6">
@@ -1453,6 +1453,7 @@ function QuizList() {
       onCreated={(quizId) => { navigate(`/admin/quiz-creator/${quizId}`); }}
       />
       </div>
+      </div></>
     )}
     </div>
   );
@@ -1697,15 +1698,40 @@ function QuizEditor({ quizId }: { quizId: number }) {
                         const updateRows = (newRows: typeof rows) => {
                           setSettings((s: any) => ({ ...s, categoryConfig: newRows.length ? JSON.stringify(newRows) : null }));
                         };
+                        const folderCountMap = Object.fromEntries(
+                          (folders as any[]).map((f: any) => [f.id, f.questionCount ?? 0])
+                        );
+                        const moveRow = (from: number, to: number) => {
+                          const newRows = [...rows];
+                          const [moved] = newRows.splice(from, 1);
+                          newRows.splice(to, 0, moved);
+                          updateRows(newRows);
+                        };
                         return (
                           <div className="space-y-2">
                             {rows.map((row, idx) => (
-                              <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-teal-200">
-                                <div className="flex-1 text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                                  <Database className="w-3.5 h-3.5 text-teal-500" />
-                                  {row.folderName || "Uncategorized"}
+                              <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-teal-200 group">
+                                {/* Drag handle */}
+                                <div className="flex flex-col gap-0.5 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 shrink-0">
+                                  <button
+                                    disabled={idx === 0}
+                                    onClick={() => moveRow(idx, idx - 1)}
+                                    className="disabled:opacity-20 hover:text-teal-600 transition-colors"
+                                    title="Move up"
+                                  >
+                                    <GripVertical className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                                    <Database className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+                                    <span className="truncate">{row.folderName || "Uncategorized"}</span>
+                                    {row.folderId !== null && folderCountMap[row.folderId] !== undefined && (
+                                      <span className="text-xs text-gray-400 shrink-0">({folderCountMap[row.folderId]} available)</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
                                   <span className="text-xs text-gray-400">Draw</span>
                                   <Input
                                     type="number" min={1} max={9999}
@@ -1719,12 +1745,22 @@ function QuizEditor({ quizId }: { quizId: number }) {
                                   />
                                   <span className="text-xs text-gray-400">questions</span>
                                 </div>
-                                <button
-                                  onClick={() => updateRows(rows.filter((_, i) => i !== idx))}
-                                  className="text-red-400 hover:text-red-600 ml-1"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    disabled={idx === rows.length - 1}
+                                    onClick={() => moveRow(idx, idx + 1)}
+                                    className="disabled:opacity-20 text-gray-300 hover:text-teal-600 transition-colors"
+                                    title="Move down"
+                                  >
+                                    <GripVertical className="w-3.5 h-3.5 rotate-180" />
+                                  </button>
+                                  <button
+                                    onClick={() => updateRows(rows.filter((_, i) => i !== idx))}
+                                    className="text-red-400 hover:text-red-600"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             ))}
                             {/* Add row */}
@@ -1753,7 +1789,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                                     <SelectItem value="__uncategorized__">Uncategorized questions</SelectItem>
                                   )}
                                   {availableFolders.map((f: any) => (
-                                    <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>
+                                    <SelectItem key={f.id} value={String(f.id)}>{f.name} ({f.questionCount ?? 0} questions)</SelectItem>
                                   ))}
                                   {availableFolders.length === 0 && usedIds.has(null) && (
                                     <SelectItem value="" disabled>All folders added</SelectItem>
