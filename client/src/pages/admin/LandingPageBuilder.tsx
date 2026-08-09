@@ -4104,6 +4104,20 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
         },
         onError: () => toast.error("Failed to generate testimonial"),
       });
+      const singleAvatarRef = useRef<HTMLInputElement>(null);
+      const [singleAvatarUploading, setSingleAvatarUploading] = useState(false);
+      const handleSingleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setSingleAvatarUploading(true);
+        try {
+          const url = await handleFileUpload(file, "avatarUrl", "testimonial_avatar");
+          if (url) set("avatarUrl", url);
+        } finally {
+          setSingleAvatarUploading(false);
+          if (singleAvatarRef.current) singleAvatarRef.current.value = "";
+        }
+      };
       return (
         <div className="space-y-3">
           {/* AI Generate panel */}
@@ -4126,8 +4140,33 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
             {!courseTitle && <p className="text-[10px] text-teal-600">Open a course landing page to enable AI generation.</p>}
           </div>
           <BSTextField data={d} onSet={set} label="Quote" field="quote" multiline />
-          <BSTextField data={d} onSet={set} label="Author" field="author" />
-          <BSTextField data={d} onSet={set} label="Avatar URL" field="avatarUrl" />
+          {/* Author + Avatar row */}
+          <div className="flex items-center gap-2">
+            {d.avatarUrl ? (
+              <div className="relative flex-shrink-0">
+                <img src={d.avatarUrl} alt="Avatar" className="w-10 h-10 rounded-full object-cover border-2 border-teal-200" />
+                <button
+                  onClick={() => set("avatarUrl", "")}
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600"
+                  title="Remove avatar"
+                ><X size={8} /></button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => singleAvatarRef.current?.click()}
+                disabled={singleAvatarUploading}
+                className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-teal-400 hover:text-teal-500 transition-colors flex-shrink-0"
+                title="Upload avatar photo (optional)"
+              >
+                {singleAvatarUploading ? <Loader2 size={12} className="animate-spin" /> : <ImageIcon size={12} />}
+              </button>
+            )}
+            <div className="flex-1 min-w-0">
+              <BSTextField data={d} onSet={set} label="Author" field="author" />
+            </div>
+            <input ref={singleAvatarRef} type="file" accept="image/*" className="hidden" onChange={handleSingleAvatarUpload} />
+          </div>
           <div>
             <label className="text-xs text-gray-500 block mb-1">Star Rating</label>
             <div className="flex items-center gap-1">
@@ -4165,26 +4204,41 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
         },
         onError: () => toast.error("Failed to generate testimonials"),
       });
+      const [aiCount, setAiCount] = useState(3);
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Card Background" field="cardBgColor" />
-          {/* AI Generate button */}
+          {/* AI Generate panel */}
           <div className="border border-teal-200 rounded-lg p-3 bg-teal-50 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-teal-800 flex items-center gap-1"><Sparkles size={12} /> AI Testimonials</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-teal-800 flex items-center gap-1 shrink-0"><Sparkles size={12} /> AI Testimonials</span>
+              {/* Count stepper */}
+              <div className="flex items-center gap-1 ml-auto mr-2">
+                <button
+                  type="button"
+                  onClick={() => setAiCount(c => Math.max(1, c - 1))}
+                  className="w-6 h-6 rounded border border-teal-300 text-teal-700 hover:bg-teal-100 flex items-center justify-center text-xs font-bold"
+                >−</button>
+                <span className="w-5 text-center text-xs font-semibold text-teal-800">{aiCount}</span>
+                <button
+                  type="button"
+                  onClick={() => setAiCount(c => Math.min(6, c + 1))}
+                  className="w-6 h-6 rounded border border-teal-300 text-teal-700 hover:bg-teal-100 flex items-center justify-center text-xs font-bold"
+                >+</button>
+              </div>
               <Button
                 size="sm"
                 disabled={!courseTitle || generateTestimonials.isPending}
-                onClick={() => generateTestimonials.mutate({ courseTitle: courseTitle ?? "this course", count: 3 })}
-                className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1"
+                onClick={() => generateTestimonials.mutate({ courseTitle: courseTitle ?? "this course", count: aiCount })}
+                className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1 shrink-0"
               >
                 {generateTestimonials.isPending ? <><Loader2 size={11} className="animate-spin" /> Generating...</> : reviews.length > 0 ? <><RefreshCw size={11} /> Regenerate</> : <><Sparkles size={11} /> Generate</>}
               </Button>
             </div>
             {!courseTitle && <p className="text-[10px] text-teal-600">Open a course landing page to enable AI generation.</p>}
-            <p className="text-[10px] text-teal-600">Generates 3 realistic testimonials based on the course title. You can edit them after generation.</p>
+            <p className="text-[10px] text-teal-600">Generates {aiCount} realistic testimonial{aiCount > 1 ? "s" : ""} based on the course title. You can edit them after generation.</p>
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">

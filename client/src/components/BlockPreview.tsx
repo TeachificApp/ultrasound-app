@@ -462,7 +462,13 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
               </div>
             )}
             <div className="flex items-center justify-center gap-3">
-              {d.avatarUrl && <img src={d.avatarUrl} alt={d.author} className="w-10 h-10 rounded-full object-cover" />}
+              {d.avatarUrl ? (
+                <img src={d.avatarUrl} alt={d.author} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+              ) : d.author ? (
+                <div className="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 font-bold text-base border-2 border-white shadow-sm">
+                  {(d.author ?? "?").charAt(0).toUpperCase()}
+                </div>
+              ) : null}
               <span className="font-semibold text-gray-900">{d.author}</span>
             </div>
           </div></CC>
