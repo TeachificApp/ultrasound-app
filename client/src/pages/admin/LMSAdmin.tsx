@@ -242,6 +242,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
   const typeLabelPlural = typeFilter === "quiz" ? "quizzes" : typeFilter === "download" ? "downloads" : typeFilter === "cohort" ? "cohorts" : "courses";
 
   const { data, isLoading, error, refetch } = trpc.lmsAdmin.listCourses.useQuery({ status: statusFilter as any, type: typeFilter, page, pageSize: 200 });
+  const utils = trpc.useUtils();
 
   // Sync local courses from server data
   const prevDataRef = useRef<any>(null);
@@ -263,7 +264,10 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
   );
 
   const reorderCourses = trpc.lmsAdmin.reorderCourses.useMutation({
-    onSuccess: () => toast.success("Library order saved"),
+    onSuccess: () => {
+      toast.success("Library order saved");
+      utils.lmsAdmin.listCourses.invalidate();
+    },
     onError: e => toast.error(`Failed to save order: ${e.message}`),
   });
 

@@ -131,11 +131,12 @@ export const lmsCourseBuilderRouter = router({
           publishDomain: lmsCourses.publishDomain, createdAt: lmsCourses.createdAt,
           updatedAt: lmsCourses.updatedAt, thumbnailUrl: lmsCourses.thumbnailUrl,
           cmeStatus: cmeActivityForms.cmeStatus,
+          libraryOrder: lmsCourses.libraryOrder,
         })
         .from(lmsCourses)
         .leftJoin(cmeActivityForms, eq(cmeActivityForms.courseId, lmsCourses.id))
         .where(conditions.length ? and(...conditions) : undefined)
-        .orderBy(desc(lmsCourses.updatedAt))
+        .orderBy(asc(lmsCourses.libraryOrder), desc(lmsCourses.updatedAt))
         .limit(input.pageSize)
         .offset(offset);
       const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsCourses).where(conditions.length ? and(...conditions) : undefined);
