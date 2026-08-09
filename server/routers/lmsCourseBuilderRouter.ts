@@ -130,17 +130,29 @@ export const lmsCourseBuilderRouter = router({
           creditHours: lmsCourses.creditHours, isFeatured: lmsCourses.isFeatured,
           publishDomain: lmsCourses.publishDomain, createdAt: lmsCourses.createdAt,
           updatedAt: lmsCourses.updatedAt, thumbnailUrl: lmsCourses.thumbnailUrl,
-          cmeStatus: cmeActivityForms.cmeStatus,
           libraryOrder: lmsCourses.libraryOrder,
         })
         .from(lmsCourses)
-        .leftJoin(cmeActivityForms, eq(cmeActivityForms.courseId, lmsCourses.id))
         .where(conditions.length ? and(...conditions) : undefined)
         .orderBy(asc(lmsCourses.libraryOrder), desc(lmsCourses.updatedAt))
         .limit(input.pageSize)
         .offset(offset);
       const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(lmsCourses).where(conditions.length ? and(...conditions) : undefined);
-      return { courses, total: Number(count) };
+      // Fetch cmeStatus separately to avoid duplicate rows from leftJoin
+      // (a course can have multiple cmeActivityForms records which would inflate results)
+      const courseIds = courses.map(c => c.id);
+      const cmeStatusMap = new Map<number, string | null>();
+      if (courseIds.length > 0) {
+        const cmeRows = await db
+          .select({ courseId: cmeActivityForms.courseId, cmeStatus: cmeActivityForms.cmeStatus })
+          .from(cmeActivityForms)
+          .where(inArray(cmeActivityForms.courseId, courseIds));
+        for (const row of cmeRows) {
+          if (row.courseId) cmeStatusMap.set(row.courseId, row.cmeStatus ?? null);
+        }
+      }
+      const coursesWithCme = courses.map(c => ({ ...c, cmeStatus: cmeStatusMap.get(c.id) ?? null }));
+      return { courses: coursesWithCme, total: Number(count) };
     }),
 
   createCourse: protectedProcedure

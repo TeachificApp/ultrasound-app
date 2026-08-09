@@ -21,6 +21,59 @@ import { generateCmeActivityDocx } from "../lib/cmeActivityDocx";
 import { generateCmeActivityPdf } from "../lib/cmeActivityPdf";
 import { generateDisclosurePdf } from "../lib/disclosurePdf";
 
+// ── Merge DB form row with defaults (handles NULL fields from old records) ──
+function mergeFormDefaults(form: any | null, course: { title?: string | null; creditHours?: string | null }): any {
+  const titleCreditMatch = course.title?.match(/(\d+(?:\.\d+)?)\s*(?:CME|CE|credit)/i);
+  const derivedCredits = course.creditHours ?? (titleCreditMatch ? titleCreditMatch[1] : "");
+  const defaults = {
+    activityTitle: course.title ?? "",
+    activityType: "enduring",
+    proposedDate: "",
+    originalReleaseDate: "",
+    mostRecentReviewDate: "",
+    expirationDate: "",
+    activityLengthHours: derivedCredits,
+    cmeCreditsRequested: derivedCredits,
+    offerMocCredit: "no",
+    offeredMoreThanOnce: "not_yet_determined",
+    activityStructure: "ongoing",
+    targetAudience: "sonographers",
+    estimatedLearners: "",
+    practiceGapDescription: "",
+    practiceGapReasons: "",
+    improvementTypes: JSON.stringify(["knowledge", "competence", "performance"]),
+    improvementKnowledgeText: "",
+    improvementCompetenceText: "",
+    improvementPerformanceText: "",
+    learnerOutcomes: "",
+    learningObjectives: "",
+    deliveryDescription: "Recorded video presentation with written content and quiz module.",
+    activityIncludes: JSON.stringify(["knowledge_check"]),
+    assessmentMethods: JSON.stringify(["post_test", "learner_evaluation"]),
+    facultyJson: JSON.stringify([]),
+    contentStatus: "fully_developed",
+    contentAvailableDate: "Available now",
+    marketingChannels: JSON.stringify(["email", "website", "social_media"]),
+    marketingMentionsCme: "yes",
+    registrationFee: "yes",
+    attestationName: "",
+    attestationDate: "",
+    attestationTitle: "",
+    signatureDataUrl: null,
+  };
+  if (!form) return defaults;
+  // Merge: use DB value when non-null/non-empty, otherwise fall back to default
+  const merged: any = { ...defaults };
+  for (const key of Object.keys(form)) {
+    const val = form[key];
+    if (val !== null && val !== undefined && val !== "") {
+      merged[key] = val;
+    }
+  }
+  return merged;
+}
+
+
 // ─── Zod schema for the form data ────────────────────────────────────────────
 const cmeFormDataSchema = z.object({
   activityTitle: z.string().max(512).optional().nullable(),
@@ -387,42 +440,7 @@ export const cmeActivityFormRouter = router({
       const titleCreditMatchDocx = course.title?.match(/(\d+(?:\.\d+)?)\s*(?:CME|CE|credit)/i);
       const derivedCreditsDocx = course.creditHours ?? (titleCreditMatchDocx ? titleCreditMatchDocx[1] : "");
 
-      const formData = form ?? {
-        courseId: input.courseId,
-        activityTitle: course.title,
-        activityType: "enduring",
-        proposedDate: "",
-        originalReleaseDate: "",
-        mostRecentReviewDate: "",
-        expirationDate: "",
-        activityLengthHours: derivedCreditsDocx,
-        cmeCreditsRequested: derivedCreditsDocx,
-        offerMocCredit: "no",
-        offeredMoreThanOnce: "not_yet_determined",
-        activityStructure: "ongoing",
-        targetAudience: "sonographers",
-        estimatedLearners: "",
-        practiceGapDescription: "",
-        practiceGapReasons: "",
-        improvementTypes: JSON.stringify(["knowledge", "competence", "performance"]),
-        improvementKnowledgeText: "",
-        improvementCompetenceText: "",
-        improvementPerformanceText: "",
-        learnerOutcomes: "",
-        learningObjectives: "",
-        deliveryDescription: "Recorded video presentation with written content and quiz module.",
-        activityIncludes: JSON.stringify(["knowledge_check"]),
-        assessmentMethods: JSON.stringify(["post_test", "learner_evaluation"]),
-        facultyJson: JSON.stringify([{ name: "Lara Williams", credentials: "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE", role: "Planner, Presenter" }]),
-        contentStatus: "fully_developed",
-        contentAvailableDate: "Available now",
-        marketingChannels: JSON.stringify(["email", "website", "social_media"]),
-        marketingMentionsCme: "yes",
-        registrationFee: "yes",
-        attestationName: "Lara Williams",
-        attestationDate: "",
-      };
-
+      const formData = mergeFormDefaults(form ?? null, course);
       const docxBuffer = await generateCmeActivityDocx(formData as any);
 
       const safeTitle = (course.title ?? "cme-form").replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
@@ -457,23 +475,7 @@ export const cmeActivityFormRouter = router({
         .where(eq(cmeActivityForms.courseId, input.courseId))
         .limit(1);
 
-      const titleCreditMatchPdf = course.title?.match(/(\d+(?:\.\d+)?)\s*(?:CME|CE|credit)/i);
-      const derivedCreditsPdf = course.creditHours ?? (titleCreditMatchPdf ? titleCreditMatchPdf[1] : "");
-
-      const formData = existing ?? {
-        activityTitle: course.title,
-        activityType: "enduring",
-        activityStructure: "ongoing",
-        originalReleaseDate: "",
-        mostRecentReviewDate: "",
-        expirationDate: "",
-        activityLengthHours: derivedCreditsPdf,
-        cmeCreditsRequested: derivedCreditsPdf,
-        offerMocCredit: "no",
-        offeredMoreThanOnce: "not_yet_determined",
-        targetAudience: "sonographers",
-      };
-
+      const formData = mergeFormDefaults(existing ?? null, course);
       const pdfBuffer = await generateCmeActivityPdf(formData as any);
 
       const safeTitle = (course.title ?? "cme-form").replace(/[^a-z0-9]/gi, "-").toLowerCase().slice(0, 60);
@@ -515,47 +517,7 @@ export const cmeActivityFormRouter = router({
         .where(eq(lmsCourses.id, input.courseId))
         .limit(1);
 
-      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
-
-      const formData = form ?? {
-        courseId: input.courseId,
-        activityTitle: course.title,
-        activityType: "enduring",
-        proposedDate: "",
-        originalReleaseDate: "",
-        mostRecentReviewDate: "",
-        expirationDate: "",
-        activityLengthHours: course.creditHours ?? "",
-        cmeCreditsRequested: course.creditHours ?? "",
-        offerMocCredit: "no",
-        offeredMoreThanOnce: "not_yet_determined",
-        activityStructure: "ongoing",
-        targetAudience: "sonographers",
-        estimatedLearners: "",
-        practiceGapDescription: "",
-        practiceGapReasons: "",
-        improvementTypes: JSON.stringify(["knowledge", "competence", "performance"]),
-        improvementKnowledgeText: "",
-        improvementCompetenceText: "",
-        improvementPerformanceText: "",
-        learnerOutcomes: "",
-        learningObjectives: "",
-        deliveryDescription: "Recorded video presentation with written content and quiz module.",
-        activityIncludes: JSON.stringify(["knowledge_check"]),
-        assessmentMethods: JSON.stringify(["post_test", "learner_evaluation"]),
-        facultyJson: JSON.stringify([{ name: "Lara Williams", credentials: "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE", role: "Planner, Presenter" }]),
-        contentStatus: "fully_developed",
-        contentAvailableDate: "Available now",
-        marketingChannels: JSON.stringify(["email", "website", "social_media"]),
-        marketingMentionsCme: "yes",
-        registrationFee: "yes",
-        attestationName: "Lara Williams",
-        attestationDate: "",
-        attestationTitle: "BS, ACS, RCCS, RDCS (AE, PE, FE), RVT, RDMS, FASE",
-        signatureDataUrl: null,
-        createdAt: null,
-        updatedAt: null,
-      };
+      const formData = mergeFormDefaults(form ?? null, course);
 
       // Generate PDF
       const pdfBuffer = await generateCmeActivityPdf(formData as any);
