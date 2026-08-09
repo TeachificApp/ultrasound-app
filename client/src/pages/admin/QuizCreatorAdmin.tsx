@@ -27,6 +27,7 @@ import {
   Eye, EyeOff, Copy, Loader2, AlertTriangle, GripVertical, X,
   Sparkles, Upload, FileSpreadsheet, FolderPlus, Tag, FileUp,
   Database, Radio, TrendingUp, ExternalLink,
+  Download,
 } from "lucide-react";
 import { getAdminUrl, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 
@@ -1043,6 +1044,7 @@ function AllResultsView() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
   const { data, isLoading } = trpc.standaloneQuizResults.listAllAttempts.useQuery({
     search: search || undefined,
     quizType: quizType !== "all" ? (quizType as any) : undefined,
@@ -1052,6 +1054,29 @@ function AllResultsView() {
     pageSize: 25,
   });
   const totalPages = data ? Math.ceil(data.total / 25) : 1;
+  const handleExportCsv = async () => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (quizType !== "all") params.set("quizType", quizType);
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      const res = await fetch(`/api/quiz-results/export-csv?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `quiz-results-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setExporting(false);
+    }
+  };
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
@@ -1069,6 +1094,15 @@ function AllResultsView() {
         </Select>
         <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} className="w-36" placeholder="From" />
         <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} className="w-36" placeholder="To" />
+        <Button
+          variant="outline"
+          onClick={handleExportCsv}
+          disabled={exporting || !data?.attempts.length}
+          className="flex items-center gap-2 border-teal-300 text-teal-700 hover:bg-teal-50"
+        >
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          Export CSV
+        </Button>
       </div>
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {isLoading ? (
@@ -1363,8 +1397,6 @@ function QuizList() {
             </div>
           </div>
         )}
-      </div>
-
       {/* Create Dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent>
@@ -1420,7 +1452,7 @@ function QuizList() {
         onClose={() => setShowImport(false)}
         onCreated={(quizId) => { navigate(`/admin/quiz-creator/${quizId}`); }}
       />
-    </div>
+      </div>
     </div>
     )}
   );

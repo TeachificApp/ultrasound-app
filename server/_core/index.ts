@@ -289,6 +289,56 @@ async function startServer() {
   app.post("/api/scheduled/cme-expiry-check", cmeExpiryCheckHandler);
 
   app.post("/api/scheduled/stripe-subscription-sync", stripeSubscriptionSyncHandler);
+  // Admin REST API: GET /api/quiz-results/export-csv
+  app.get("/api/quiz-results/export-csv", async (req: any, res: any) => {
+    try {
+      const { getSessionUser } = await import("../auth");
+      const user = await getSessionUser(req);
+      if (!user || user.role !== "admin") return res.status(403).json({ error: "Forbidden" });
+      const db = await getDb();
+      if (!db) return res.status(500).json({ error: "DB unavailable" });
+      const { standaloneQuizAttempts, standaloneQuizzes, users } = await import("../../drizzle/schema");
+      const { eq, and, gte, lte } = await import("drizzle-orm");
+      const { search, quizType, dateFrom, dateTo } = req.query as Record<string, string>;
+      const conditions: any[] = [];
+      if (quizType) conditions.push(eq(standaloneQuizzes.type, quizType as any));
+      if (dateFrom) conditions.push(gte(standaloneQuizAttempts.completedAt, new Date(dateFrom)));
+      if (dateTo) conditions.push(lte(standaloneQuizAttempts.completedAt, new Date(dateTo + "T23:59:59")));
+      const rows = await db
+        .select({
+          attemptId: standaloneQuizAttempts.id,
+          userName: users.displayName,
+          userEmail: users.email,
+          quizTitle: standaloneQuizzes.title,
+          quizType: standaloneQuizzes.type,
+          score: standaloneQuizAttempts.score,
+          passed: standaloneQuizAttempts.passed,
+          correctAnswers: standaloneQuizAttempts.correctAnswers,
+          totalQuestions: standaloneQuizAttempts.totalQuestions,
+          completedAt: standaloneQuizAttempts.completedAt,
+        })
+        .from(standaloneQuizAttempts)
+        .innerJoin(standaloneQuizzes, eq(standaloneQuizAttempts.quizId, standaloneQuizzes.id))
+        .innerJoin(users, eq(standaloneQuizAttempts.userId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(standaloneQuizAttempts.completedAt);
+      const filtered = search
+        ? rows.filter(r => (r.userName ?? "").toLowerCase().includes(search.toLowerCase()) || (r.userEmail ?? "").toLowerCase().includes(search.toLowerCase()))
+        : rows;
+      const header = "Attempt ID,User Name,User Email,Quiz Title,Type,Score (%),Passed,Correct,Total Questions,Completed At\n";
+      const csvRows = filtered.map(r =>
+        [r.attemptId, `"${(r.userName ?? "").replace(/"/g, '""')}"`, `"${(r.userEmail ?? "").replace(/"/g, '""')}"`,
+         `"${(r.quizTitle ?? "").replace(/"/g, '""')}"`, r.quizType,
+         r.score ?? "", r.passed ? "Yes" : "No", r.correctAnswers ?? "", r.totalQuestions ?? "",
+         r.completedAt ? new Date(r.completedAt).toISOString() : ""].join(",")
+      ).join("\n");
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="quiz-results-${new Date().toISOString().slice(0, 10)}.csv"`);
+      res.send(header + csvRows);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
   // Public REST API: GET /api/forms/:formId/submissions (auth via Bearer apiToken)
   app.get("/api/forms/:formId/submissions", async (req: any, res: any) => {
     try {

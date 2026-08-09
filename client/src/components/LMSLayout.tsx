@@ -242,6 +242,13 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                       >
                         <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
                       </a>
+                      <a
+                        href="/my-quizzes"
+                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        onClick={() => setAccountOpen(false)}
+                      >
+                        <GraduationCap className="w-3.5 h-3.5 text-teal-600" /> My Quiz Results
+                      </a>
                       <SiteNavProfileLinks
                         items={profileNavItems}
                         location={location}
