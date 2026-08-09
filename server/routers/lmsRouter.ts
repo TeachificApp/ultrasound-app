@@ -4840,6 +4840,11 @@ export const lmsGroupRouter = router({
       termsUrl: z.string().max(2048).nullable().optional(),
       privacyUrl: z.string().max(2048).nullable().optional(),
       defaultBrand: z.enum(["aaus", "iheartecho"]).optional(),
+      cmeDriveClientId: z.string().max(500).nullable().optional(),
+      cmeDriveClientSecret: z.string().max(500).nullable().optional(),
+      cmeDriveFolderId: z.string().max(255).nullable().optional(),
+      cmeDriveFolderName: z.string().max(255).nullable().optional(),
+      cmeDriveEnabled: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -4857,6 +4862,29 @@ export const lmsGroupRouter = router({
       }
       return { success: true };
     }),
+
+  /** Get Google Drive CME integration status (admin) */
+  getCmeDriveSettings: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const [s] = await db.select({
+      cmeDriveClientId: platformSettings.cmeDriveClientId,
+      cmeDriveEnabled: platformSettings.cmeDriveEnabled,
+      cmeDriveFolderId: platformSettings.cmeDriveFolderId,
+      cmeDriveFolderName: platformSettings.cmeDriveFolderName,
+      cmeDriveConnectedEmail: platformSettings.cmeDriveConnectedEmail,
+      cmeDriveTokenExpiresAt: platformSettings.cmeDriveTokenExpiresAt,
+    }).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+    return s ?? { cmeDriveEnabled: false, cmeDriveClientId: null, cmeDriveFolderId: null, cmeDriveFolderName: null, cmeDriveConnectedEmail: null, cmeDriveTokenExpiresAt: null };
+  }),
+
+  /** List CME PDFs saved in Google Drive (admin) */
+  listCmeDriveFiles: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const { listCmeDriveFiles } = await import("../lib/googleDriveCme");
+    return listCmeDriveFiles();
+  }),
 
   /** Send a test email to verify SendGrid delivery (admin only) */
   sendTestEmail: protectedProcedure

@@ -119,6 +119,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   text: <FileText className="w-4 h-4" />,
   embed: <Monitor className="w-4 h-4" />,
   video_text: <Video className="w-4 h-4" />,
+  standalone_quiz: <Database className="w-4 h-4" />,
 };
 
 const LESSON_TYPE_LABELS: Record<string, string> = {
@@ -128,6 +129,7 @@ const LESSON_TYPE_LABELS: Record<string, string> = {
   embed: "Multimedia Embed",
   quiz: "Quiz",
   download: "Download / File",
+  standalone_quiz: "Standalone Quiz / Mock Exam",
 };
 
 // ─── Direct landing page link button for course list ─────────────────────────
@@ -4495,9 +4497,8 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   onClose: () => void;
   onCreated: (lesson: any) => void;
 }) {
-  type LessonType = "text" | "video" | "video_text" | "embed" | "quiz" | "download";
+  type LessonType = "text" | "video" | "video_text" | "embed" | "quiz" | "download" | "standalone_quiz";
   const [mode, setMode] = useState<"new" | "copy">("new");
-
   // ── New Lesson state ──
   const [title, setTitle] = useState("");
   const [type, setType] = useState<LessonType>("text");
@@ -4510,6 +4511,12 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
   const [requireManualComplete, setRequireManualComplete] = useState<boolean | null>(null);
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
+  const [standaloneQuizId, setStandaloneQuizId] = useState<number | null>(null);
+  const { data: standaloneQuizzesData } = trpc.standaloneQuizAdmin.listQuizzes.useQuery(
+    { status: "published", pageSize: 100 },
+    { enabled: type === "standalone_quiz" }
+  );
+  const publishedQuizzes = standaloneQuizzesData?.quizzes ?? [];
 
   // ── Copy Lesson state ──
   const [copySourceCourseId, setCopySourceCourseId] = useState<number | null>(null);
@@ -4573,10 +4580,13 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
       durationMinutes: durationMinutes ? parseInt(durationMinutes) : undefined,
       requireVideoCompletion,
       requireManualComplete: requireManualComplete ?? false,
+      standaloneQuizId: type === "standalone_quiz" ? (standaloneQuizId ?? undefined) : undefined,
     });
   };
 
-  const canSubmit = mode === "new" ? !!title.trim() : !!copySourceLessonId;
+  const canSubmit = mode === "new"
+    ? (!!title.trim() && (type !== "standalone_quiz" || !!standaloneQuizId))
+    : !!copySourceLessonId;
   const isPending = create.isPending || copyLesson.isPending;
 
   return (
@@ -4607,6 +4617,51 @@ function AddLessonDialog({ courseId, sectionId, onClose, onCreated }: {
               <Label className="text-sm">Title *</Label>
               <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="Lesson title" className="mt-1" />
             </div>
+            {/* Lesson type selector */}
+            <div>
+              <Label className="text-sm">Lesson Type</Label>
+              <div className="mt-1 grid grid-cols-3 gap-1.5">
+                {([
+                  { v: "text", label: "Text" },
+                  { v: "video", label: "Video" },
+                  { v: "video_text", label: "Video + Text" },
+                  { v: "embed", label: "Embed" },
+                  { v: "quiz", label: "Quiz" },
+                  { v: "download", label: "Download" },
+                  { v: "standalone_quiz", label: "Standalone Quiz" },
+                ] as const).map(({ v, label }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setType(v as any)}
+                    className={`px-2 py-1.5 text-xs rounded-md border font-medium transition-colors ${
+                      type === v ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:border-teal-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Standalone quiz picker */}
+            {type === "standalone_quiz" && (
+              <div>
+                <Label className="text-sm">Select Quiz / Mock Exam *</Label>
+                <select
+                  value={standaloneQuizId ?? ""}
+                  onChange={e => setStandaloneQuizId(e.target.value ? Number(e.target.value) : null)}
+                  className="mt-1 w-full h-9 rounded-md border border-teal-300 bg-white px-3 text-sm"
+                >
+                  <option value="">— Choose a published quiz —</option>
+                  {publishedQuizzes.map((q: any) => (
+                    <option key={q.quiz.id} value={q.quiz.id}>
+                      {q.quiz.title} ({q.quiz.type === "mock_exam" ? "Mock Exam" : "Quiz"} · {Number(q.questionCount)} Qs)
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">Only published quizzes are shown. The quiz will render inline for enrolled students.</p>
+              </div>
+            )}
             <div>
               <Label className="text-sm">Duration (min)</Label>
               <Input value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} type="number" min="0" className="mt-1" />
@@ -4874,7 +4929,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     }
   };
   const [title, setTitle] = useState(lesson.title);
-  const [lessonType, setLessonType] = useState<"video" | "text" | "quiz" | "download" | "embed" | "video_text">(lesson.type ?? "text");
+  const [lessonType, setLessonType] = useState<"video" | "text" | "quiz" | "download" | "embed" | "video_text" | "standalone_quiz">(lesson.type ?? "text");
   const [content, setContent] = useState(lesson.content ?? "");
   const [videoContent, setVideoContent] = useState(lesson.videoContent ?? "");
   const [embedUrl, setEmbedUrl] = useState(lesson.embedUrl ?? "");
@@ -4900,6 +4955,12 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [selectedAsset, setSelectedAsset] = useState<{ id: number; title: string; s3Url: string; mediaType: string } | null>(null);
   const [lessonStatus, setLessonStatus] = useState<"published" | "draft">((lesson as any).lessonStatus ?? "published");
   const [showVideoControls, setShowVideoControls] = useState<boolean>((lesson as any).showVideoControls ?? true);
+  const [standaloneQuizId, setStandaloneQuizId] = useState<number | null>((lesson as any).standaloneQuizId ?? null);
+  const { data: standaloneQuizzesData } = trpc.standaloneQuizAdmin.listQuizzes.useQuery(
+    { status: 'published', pageSize: 100 },
+    { enabled: lessonType === 'standalone_quiz', staleTime: 30_000 }
+  );
+  const publishedQuizzes = standaloneQuizzesData?.quizzes ?? [];
 
   // Reset all lesson state when navigating to a different lesson
   useEffect(() => {
@@ -4925,6 +4986,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setLiveEndAt((lessonShallow as any).liveEndAt ? new Date((lessonShallow as any).liveEndAt).toISOString().slice(0, 16) : "");
     setLessonStatus((lessonShallow as any).lessonStatus ?? "published");
     setShowVideoControls((lessonShallow as any).showVideoControls ?? true);
+    setStandaloneQuizId((lessonShallow as any).standaloneQuizId ?? null);
   }, [lessonShallow.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync state when full lesson data arrives (content/videoContent/embedUrl may be empty until then,
@@ -5016,6 +5078,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       videoContent: lessonType === "video_text" ? (videoContent || null) : undefined,
       embedUrl: lessonType === "embed" ? (embedUrl || undefined) : undefined,
       mediaAssetId: selectedAsset?.id ?? undefined,
+      standaloneQuizId: lessonType === 'standalone_quiz' ? (standaloneQuizId ?? null) : null,
     }, {
       onSuccess: () => { if (andClose && onSavedAndClose) { onSavedAndClose(); } else { onSaved(); } },
     });
@@ -5170,6 +5233,30 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             <Input value={durationMinutes} onChange={e => { setDurationMinutes(e.target.value); setIsDirty(true); }} type="number" min="0" className="mt-1" />
           </div>
 
+          {/* Standalone Quiz picker — shown only for standalone_quiz lesson type */}
+          {lessonType === "standalone_quiz" && (
+            <div className="border border-teal-200 rounded-lg p-4 space-y-3 bg-teal-50">
+              <Label className="text-sm font-semibold text-teal-800 flex items-center gap-1.5">
+                <Database className="w-4 h-4 text-teal-600" /> Linked Standalone Quiz / Mock Exam
+              </Label>
+              <p className="text-xs text-teal-700">Select the quiz that will be embedded in this lesson. Students will take it inline without leaving the course.</p>
+              <select
+                value={standaloneQuizId ?? ""}
+                onChange={e => { setStandaloneQuizId(e.target.value ? Number(e.target.value) : null); setIsDirty(true); }}
+                className="w-full h-9 rounded-md border border-teal-300 bg-white px-3 text-sm"
+              >
+                <option value="">— Select a published quiz —</option>
+                {publishedQuizzes.map((q: any) => (
+                  <option key={q.quiz.id} value={q.quiz.id}>
+                    {q.quiz.title} ({q.quiz.type === "mock_exam" ? "Mock Exam" : "Quiz"} · {Number(q.questionCount)} Qs)
+                  </option>
+                ))}
+              </select>
+              {standaloneQuizId && (
+                <p className="text-xs text-teal-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Quiz linked — students will see the full interactive quiz inline.</p>
+              )}
+            </div>
+          )}
           {/* Preview mode selector */}
           <div className="border border-teal-100 rounded-lg p-4 space-y-3 bg-teal-50/30">
             <Label className="text-sm font-semibold text-teal-800">Free Preview Setting</Label>

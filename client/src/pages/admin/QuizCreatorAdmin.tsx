@@ -1210,6 +1210,13 @@ function QuizList() {
     onError: (e) => toast.error(`Duplicate failed: ${e.message}`),
   });
 
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameMutation = trpc.standaloneQuizAdmin.updateQuiz.useMutation({
+    onSuccess: () => { toast.success("Quiz renamed"); refetch(); setRenamingId(null); },
+    onError: (e) => toast.error(`Rename failed: ${e.message}`),
+  });
+
   const [newQuiz, setNewQuiz] = useState({ title: "", type: "quiz" as "quiz" | "mock_exam", brand: "aaus" as "aaus" | "iheartecho" });
 
   const totalPages = data ? Math.ceil(data.total / 20) : 1;
@@ -1339,13 +1346,52 @@ function QuizList() {
                 {data.quizzes.map(({ quiz, questionCount, attemptCount }) => (
                   <tr key={quiz.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => navigate(`/admin/quiz-creator/${quiz.id}`)}
-                        className="font-medium text-gray-900 hover:text-teal-700 text-left"
-                      >
-                        {quiz.title}
-                      </button>
-                      <div className="text-xs text-gray-400 mt-0.5">{quiz.brand === "aaus" ? "All About Ultrasound" : "iHeartEcho"}</div>
+                      {renamingId === quiz.id ? (
+                        <form
+                          className="flex items-center gap-1.5"
+                          onSubmit={(e) => { e.preventDefault(); if (renameValue.trim()) renameMutation.mutate({ id: quiz.id, title: renameValue.trim() }); }}
+                        >
+                          <Input
+                            autoFocus
+                            value={renameValue}
+                            onChange={e => setRenameValue(e.target.value)}
+                            className="h-7 text-sm py-0 border-teal-300 focus:ring-teal-400"
+                            onKeyDown={e => { if (e.key === "Escape") setRenamingId(null); }}
+                          />
+                          <Button type="submit" size="sm" className="h-7 px-2 bg-teal-600 hover:bg-teal-700 text-white" disabled={renameMutation.isPending}>
+                            {renameMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : "Save"}
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost" className="h-7 px-2" onClick={() => setRenamingId(null)}>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </form>
+                      ) : (
+                        <button
+                          onClick={() => navigate(`/admin/quiz-creator/${quiz.id}`)}
+                          className="font-medium text-gray-900 hover:text-teal-700 text-left"
+                        >
+                          {quiz.title}
+                        </button>
+                      )}
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-xs text-gray-400">{quiz.brand === "aaus" ? "All About Ultrasound" : "iHeartEcho"}</span>
+                        {quiz.categoryConfig && (() => {
+                          try {
+                            const cats: { folderName: string; count: number }[] = JSON.parse(quiz.categoryConfig);
+                            const total = cats.reduce((s, c) => s + c.count, 0);
+                            return (
+                              <span className="text-xs text-teal-600 bg-teal-50 border border-teal-100 rounded px-1.5 py-0.5">
+                                {cats.length} {cats.length === 1 ? "category" : "categories"} · {total} q/attempt
+                              </span>
+                            );
+                          } catch { return null; }
+                        })()}
+                        {quiz.questionsPerAttempt && !quiz.categoryConfig && (
+                          <span className="text-xs text-teal-600 bg-teal-50 border border-teal-100 rounded px-1.5 py-0.5">
+                            {quiz.questionsPerAttempt} q/attempt
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className="capitalize text-gray-700">{quiz.type === "mock_exam" ? "Mock Exam" : "Quiz"}</span>
@@ -1370,6 +1416,15 @@ function QuizList() {
                         </Button>
                         <Button size="sm" variant="ghost" title="Edit Quiz" onClick={() => navigate(`/admin/quiz-creator/${quiz.id}`)}>
                           <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Rename Quiz"
+                          className="text-gray-500 hover:text-gray-700"
+                          onClick={() => { setRenamingId(quiz.id); setRenameValue(quiz.title); }}
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
                         </Button>
                         <Button
                           size="sm"

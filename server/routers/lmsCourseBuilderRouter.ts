@@ -978,7 +978,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       courseId: z.number(),
       sectionId: z.number().optional(), // optional — top-level lessons have no section
       title: z.string().min(1),
-      type: z.enum(["video", "text", "quiz", "download", "embed", "video_text"]).default("text"),
+      type: z.enum(["video", "text", "quiz", "download", "embed", "video_text", "standalone_quiz"]).default("text"),
       position: z.number().int().default(0),
       content: z.string().optional(),
       videoContent: z.string().optional(),
@@ -989,6 +989,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       durationMinutes: z.number().int().optional(),
       requireVideoCompletion: z.boolean().default(false),
       requireManualComplete: z.boolean().default(false),
+      standaloneQuizId: z.number().int().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -1033,12 +1034,13 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         videoContent: input.videoContent ?? null,
         embedUrl: input.embedUrl ?? null,
         mediaAssetId: input.mediaAssetId ?? null,
-        isPreview: input.isPreview,
-        dripDays: input.dripDays,
-        durationMinutes: input.durationMinutes ?? null,
-        requireVideoCompletion: input.requireVideoCompletion ? 1 : 0,
-        requireManualComplete: input.requireManualComplete ? 1 : 0,
-        contentBlocks: defaultHeroBlock,
+      isPreview: input.isPreview,
+      dripDays: input.dripDays,
+      durationMinutes: input.durationMinutes ?? null,
+      requireVideoCompletion: input.requireVideoCompletion ? 1 : 0,
+      requireManualComplete: input.requireManualComplete ? 1 : 0,
+      contentBlocks: defaultHeroBlock,
+      standaloneQuizId: input.standaloneQuizId ?? null,
       }).$returningId();
       // Auto-create quiz if type is quiz
       if (input.type === "quiz") {
@@ -1051,13 +1053,14 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
     .input(z.object({
       id: z.number(),
       title: z.string().min(1).optional(),
-      type: z.enum(["video", "text", "quiz", "download", "embed", "video_text"]).optional(),
+      type: z.enum(["video", "text", "quiz", "download", "embed", "video_text", "standalone_quiz"]).optional(),
       content: z.string().nullable().optional(),
       videoContent: z.string().nullable().optional(),
       embedUrl: z.string().max(500).nullable().optional(),
       mediaAssetId: z.number().nullable().optional(),
       position: z.number().int().optional(),
       isPreview: z.boolean().optional(),
+      standaloneQuizId: z.number().int().nullable().optional(),
       previewMode: z.enum(["none", "preview", "preview_hide_after_purchase"]).optional(),
       dripDays: z.number().int().nullable().optional(),
       dripOutDays: z.number().int().min(1).nullable().optional(),

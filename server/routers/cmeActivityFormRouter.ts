@@ -21,6 +21,7 @@ import { generateCmeActivityDocx } from "../lib/cmeActivityDocx";
 import { generateCmeActivityPdf } from "../lib/cmeActivityPdf";
 import { generateDisclosurePdf } from "../lib/disclosurePdf";
 
+import { uploadCmePdfToDrive } from "../lib/googleDriveCme";
 // ── Merge DB form row with defaults (handles NULL fields from old records) ──
 function mergeFormDefaults(form: any | null, course: { title?: string | null; creditHours?: string | null }): any {
   const titleCreditMatch = course.title?.match(/(\d+(?:\.\d+)?)\s*(?:CME|CE|credit)/i);
@@ -482,7 +483,15 @@ export const cmeActivityFormRouter = router({
       const key = `cme-forms/${safeTitle}-${Date.now()}.pdf`;
       const { url } = await storagePut(key, pdfBuffer, "application/pdf");
 
-      return { url };
+      // Also save to Google Drive if configured
+      let driveLink: string | null = null;
+      try {
+        const driveResult = await uploadCmePdfToDrive(pdfBuffer, `${safeTitle}-${new Date().toISOString().slice(0, 10)}.pdf`);
+        if (driveResult) driveLink = driveResult.webViewLink;
+      } catch (driveErr: any) {
+        console.warn("[CME Drive] Upload failed (non-fatal):", driveErr.message);
+      }
+      return { url, driveLink };
     }),
 
   // ── Send form PDF to CardioServ via email ─────────────────────────────────

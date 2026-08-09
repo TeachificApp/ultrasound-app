@@ -31,7 +31,7 @@ import { registerSsoAutoRoute } from "../routes/ssoAuto";
 import { registerFunnelOgMetaRoutes } from "../routes/funnelOgMeta";
 import { registerSitemapRoute } from "../routes/sitemap";
 import { registerAutoLoginRoute } from "../routes/autoLogin";
-import { registerGoogleOAuthRoutes } from "../routes/googleOAuth";
+import { registerGoogleOAuthRoutes, registerGoogleDriveCmeOAuthRoutes } from "../routes/googleOAuth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -669,3 +669,4 @@ async function startServer() {
 }
 
 startServer().catch(console.error);
+  registerGoogleDriveCmeOAuthRoutes(app);

@@ -3097,11 +3097,12 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   courseId: int("course_id"), // direct course reference (sectionId optional for top-level lessons)
   sectionId: int("section_id"), // nullable — top-level lessons have no section
   title: varchar("title", { length: 255 }).notNull(),
-  type: mysqlEnum("type", ["video", "text", "quiz", "download", "embed", "video_text"]).default("text").notNull(),
+  type: mysqlEnum("type", ["video", "text", "quiz", "download", "embed", "video_text", "standalone_quiz"]).default("text").notNull(),
   content: longtext("content"), // rich text HTML or markdown
   videoContent: longtext("video_content"), // rich text below the video for video_text lessons
   embedUrl: varchar("embed_url", { length: 500 }), // iframe src for embed lessons
   mediaAssetId: int("media_asset_id"), // FK to mediaAssets
+  standaloneQuizId: int("standalone_quiz_id"), // FK to standalone_quizzes — used when type = 'standalone_quiz'
   position: int("position").default(0).notNull(),
   isPreview: boolean("is_preview").default(false).notNull(), // kept for backward compat; derived from previewMode
   // Three-state preview mode:
@@ -4461,6 +4462,17 @@ export const platformSettings = mysqlTable("platform_settings", {
   // When a request hostname doesn't match any known brand domain, use this brand as fallback.
   // Valid values: 'aaus' | 'iheartecho' (defaults to 'aaus' if not set)
   defaultBrand: varchar("default_brand", { length: 32 }).default("aaus"),
+  // ── Google Drive CME integration ──
+  // OAuth credentials for saving CME PDFs to a shared Google Drive folder
+  cmeDriveClientId: varchar("cme_drive_client_id", { length: 500 }),
+  cmeDriveClientSecret: varchar("cme_drive_client_secret", { length: 500 }),
+  cmeDriveRefreshToken: text("cme_drive_refresh_token"),
+  cmeDriveAccessToken: text("cme_drive_access_token"),
+  cmeDriveTokenExpiresAt: bigint("cme_drive_token_expires_at", { mode: "number" }),
+  cmeDriveFolderId: varchar("cme_drive_folder_id", { length: 255 }), // Google Drive folder ID to save PDFs into
+  cmeDriveFolderName: varchar("cme_drive_folder_name", { length: 255 }), // Display name for the folder
+  cmeDriveConnectedEmail: varchar("cme_drive_connected_email", { length: 320 }),
+  cmeDriveEnabled: boolean("cme_drive_enabled").default(false),
   // ── Future platform-wide toggles go here ──
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

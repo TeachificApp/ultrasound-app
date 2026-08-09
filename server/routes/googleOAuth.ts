@@ -3,7 +3,7 @@
  */
 import type { Express } from "express";
 import { getDb } from "../db";
-import { googleFormIntegrations } from "../../drizzle/schema";
+import { googleFormIntegrations, platformSettings } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
 function buildAuthUrl(clientId: string, redirectUri: string, state: string): string {
@@ -148,6 +148,86 @@ export function registerGoogleOAuthRoutes(app: Express) {
     } catch (err: any) {
       console.error("[Google OAuth] Token exchange error:", err.message);
       return res.redirect(`/admin/general-forms/${formId}?tab=integrations&google=error&reason=token_exchange`);
+    }
+  });
+}
+
+// ─── Google Drive OAuth for CME PDF saving ───────────────────────────────────
+export function registerGoogleDriveCmeOAuthRoutes(app: Express) {
+  // Step 1: Initiate OAuth consent for CME Drive
+  app.get("/api/cme-drive/auth", async (req, res) => {
+    const origin = (req.query.origin as string) || `${req.protocol}://${req.headers.host}`;
+    const db = await getDb();
+    if (!db) return res.status(500).json({ error: "DB unavailable" });
+    const [settings] = await db.select({ cmeDriveClientId: platformSettings.cmeDriveClientId }).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+    if (!settings?.cmeDriveClientId) {
+      return res.status(400).json({ error: "Google Client ID not configured. Add it in Platform Admin → CME → Google Drive." });
+    }
+    const redirectUri = `${origin}/api/cme-drive/callback`;
+    const state = Buffer.from(JSON.stringify({ origin })).toString("base64url");
+    const params = new URLSearchParams({
+      client_id: settings.cmeDriveClientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: ["https://www.googleapis.com/auth/drive.file", "email", "profile"].join(" "),
+      access_type: "offline",
+      prompt: "consent",
+      state,
+    });
+    return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+  });
+
+  // Step 2: Handle OAuth callback for CME Drive
+  app.get("/api/cme-drive/callback", async (req, res) => {
+    const code = req.query.code as string;
+    const state = req.query.state as string;
+    const error = req.query.error as string;
+    if (error) return res.redirect(`/admin/lms?tab=cme&google=error&reason=${encodeURIComponent(error)}`);
+    if (!code || !state) return res.redirect("/admin/lms?tab=cme&google=error&reason=missing_params");
+    let origin: string;
+    try {
+      const decoded = JSON.parse(Buffer.from(state, "base64url").toString());
+      origin = decoded.origin || `${req.protocol}://${req.headers.host}`;
+    } catch {
+      return res.redirect("/admin/lms?tab=cme&google=error&reason=invalid_state");
+    }
+    const db = await getDb();
+    if (!db) return res.redirect("/admin/lms?tab=cme&google=error&reason=db");
+    const [settings] = await db.select({
+      cmeDriveClientId: platformSettings.cmeDriveClientId,
+      cmeDriveClientSecret: platformSettings.cmeDriveClientSecret,
+    }).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+    if (!settings?.cmeDriveClientId || !settings?.cmeDriveClientSecret) {
+      return res.redirect("/admin/lms?tab=cme&google=error&reason=no_credentials");
+    }
+    const redirectUri = `${origin}/api/cme-drive/callback`;
+    try {
+      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: settings.cmeDriveClientId,
+          client_secret: settings.cmeDriveClientSecret,
+          code,
+          grant_type: "authorization_code",
+          redirect_uri: redirectUri,
+        }).toString(),
+      });
+      if (!tokenRes.ok) throw new Error(await tokenRes.text());
+      const tokens: any = await tokenRes.json();
+      const emailRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", { headers: { Authorization: `Bearer ${tokens.access_token}` } });
+      const userInfo: any = emailRes.ok ? await emailRes.json() : {};
+      await db.update(platformSettings).set({
+        cmeDriveAccessToken: tokens.access_token,
+        cmeDriveRefreshToken: tokens.refresh_token ?? null,
+        cmeDriveTokenExpiresAt: Date.now() + (tokens.expires_in ?? 3600) * 1000,
+        cmeDriveConnectedEmail: userInfo.email ?? null,
+        cmeDriveEnabled: true,
+      }).where(eq(platformSettings.id, 1));
+      return res.redirect("/admin/lms?tab=cme&google=drive_connected");
+    } catch (err: any) {
+      console.error("[CME Drive OAuth] Error:", err.message);
+      return res.redirect(`/admin/lms?tab=cme&google=error&reason=token_exchange`);
     }
   });
 }
