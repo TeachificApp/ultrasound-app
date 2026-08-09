@@ -836,19 +836,7 @@ All About Ultrasound, Inc. dba iHeartEcho`;
   const handleDownloadPdf = async () => {
     setDownloadingPdf(true);
     try {
-      await saveMutation.mutateAsync({
-        courseId,
-        data: {
-          ...form,
-          improvementTypes: JSON.stringify(form.improvementTypes),
-          activityIncludes: JSON.stringify(form.activityIncludes),
-          assessmentMethods: JSON.stringify(form.assessmentMethods),
-          facultyJson: JSON.stringify(form.facultyJson),
-          marketingChannels: JSON.stringify(form.marketingChannels),
-          attestationTitle: form.attestationTitle,
-          signatureDataUrl: form.signatureDataUrl,
-        },
-      });
+      // PDF reads directly from DB — click Save first if you have unsaved edits
       const result = await downloadPdfMutation.mutateAsync({ courseId });
       // Fetch as blob to force download regardless of Content-Disposition header
       const resp = await fetch(result.url);
