@@ -136,9 +136,9 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
     // ── Header ────────────────────────────────────────────────────────────────
     doc.rect(50, y, pageWidth, 60).fill(TEAL);
     doc.fillColor("white").fontSize(16).font("Helvetica-Bold")
-      .text("CME Activity Planning and Proposal Form", 60, y + 10, { width: pageWidth - 20 });
+      .text("CME Activity Planning and Proposal Form", 60, y + 10, { width: pageWidth - 20, lineBreak: false });
     doc.fontSize(10).font("Helvetica")
-      .text("All About Ultrasound — CardioServ Joint Provider Submission", 60, y + 32, { width: pageWidth - 20 });
+      .text("All About Ultrasound — CardioServ Joint Provider Submission", 60, y + 32, { width: pageWidth - 20, lineBreak: false });
     y += 75;
 
     // ── Helper functions ──────────────────────────────────────────────────────
@@ -146,24 +146,24 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
       if (y > doc.page.height - 120) { doc.addPage(); y = 50; }
       doc.rect(50, y, pageWidth, 22).fill(TEAL);
       doc.fillColor("white").fontSize(10).font("Helvetica-Bold")
-        .text(`Section ${num}: ${title}`, 58, y + 6, { width: pageWidth - 16 });
+        .text(`Section ${num}: ${title}`, 58, y + 6, { width: pageWidth - 16, lineBreak: false });
       y += 28;
     };
 
     const field = (labelText: string, value: string | null | undefined, opts?: { multiline?: boolean }) => {
       if (y > doc.page.height - 80) { doc.addPage(); y = 50; }
       const val = value?.trim() || "—";
-      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text(labelText.toUpperCase(), 55, y);
+      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text(labelText.toUpperCase(), 55, y, { lineBreak: false });
       y += 12;
       if (opts?.multiline) {
         const textHeight = doc.heightOfString(val, { width: pageWidth - 10, fontSize: 9 });
         const boxH = Math.max(textHeight + 10, 30);
         doc.rect(55, y, pageWidth - 10, boxH).fill(LIGHT_GRAY).stroke(BORDER);
-        doc.fillColor(DARK).fontSize(9).font("Helvetica").text(val, 60, y + 5, { width: pageWidth - 20 });
+        doc.fillColor(DARK).fontSize(9).font("Helvetica").text(val, 60, y + 5, { width: pageWidth - 20, lineBreak: false });
         y += boxH + 8;
       } else {
         doc.rect(55, y, pageWidth - 10, 20).fill(LIGHT_GRAY).stroke(BORDER);
-        doc.fillColor(DARK).fontSize(9).font("Helvetica").text(val, 60, y + 5, { width: pageWidth - 20 });
+        doc.fillColor(DARK).fontSize(9).font("Helvetica").text(val, 60, y + 5, { width: pageWidth - 20, lineBreak: false });
         y += 26;
       }
     };
@@ -174,25 +174,26 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
       const gap = 8;
       const half = Math.floor((pageWidth - gap) / 2);
       const col2x = 55 + half + gap;
-      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text(l1.toUpperCase(), 55, y, { width: half });
-      doc.text(l2.toUpperCase(), col2x, y, { width: half });
+      // lineBreak:false prevents PDFKit cursor from advancing after each text call
+      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text(l1.toUpperCase(), 55, y, { width: half, lineBreak: false });
+      doc.text(l2.toUpperCase(), col2x, y, { width: half, lineBreak: false });
       y += 12;
       doc.rect(55, y, half, 20).fill(LIGHT_GRAY).stroke(BORDER);
-      doc.fillColor(DARK).fontSize(9).font("Helvetica").text(v1?.trim() || "—", 60, y + 5, { width: half - 10 });
+      doc.fillColor(DARK).fontSize(9).font("Helvetica").text(v1?.trim() || "—", 60, y + 5, { width: half - 10, lineBreak: false });
       doc.rect(col2x, y, half, 20).fill(LIGHT_GRAY).stroke(BORDER);
-      doc.text(v2?.trim() || "—", col2x + 5, y + 5, { width: half - 10 });
+      doc.text(v2?.trim() || "—", col2x + 5, y + 5, { width: half - 10, lineBreak: false });
       y += 26;
     };
 
     const listField = (labelText: string, items: string[]) => {
       if (y > doc.page.height - 80) { doc.addPage(); y = 50; }
-      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text(labelText.toUpperCase(), 55, y);
+      doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text(labelText.toUpperCase(), 55, y, { lineBreak: false });
       y += 12;
       const text = items.length ? items.map(i => `• ${label(i)}`).join("\n") : "—";
       const textHeight = doc.heightOfString(text, { width: pageWidth - 20, fontSize: 9 });
       const boxH = Math.max(textHeight + 10, 24);
       doc.rect(55, y, pageWidth - 10, boxH).fill(LIGHT_GRAY).stroke(BORDER);
-      doc.fillColor(DARK).fontSize(9).font("Helvetica").text(text, 60, y + 5, { width: pageWidth - 20 });
+      doc.fillColor(DARK).fontSize(9).font("Helvetica").text(text, 60, y + 5, { width: pageWidth - 20, lineBreak: false });
       y += boxH + 8;
     };
 
@@ -262,11 +263,11 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
     } else {
       faculty.forEach((f, i) => {
         if (y > doc.page.height - 80) { doc.addPage(); y = 50; }
-        doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text(`FACULTY ${i + 1}`, 55, y);
+        doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text(`FACULTY ${i + 1}`, 55, y, { lineBreak: false });
         y += 12;
         doc.rect(55, y, pageWidth - 10, 36).fill(LIGHT_GRAY).stroke(BORDER);
-        doc.fillColor(DARK).fontSize(9).font("Helvetica-Bold").text(f.name || "—", 60, y + 5, { width: pageWidth - 20 });
-        doc.fillColor(GRAY).fontSize(8).font("Helvetica").text(`${f.credentials || ""} — ${f.role || ""}`, 60, y + 18, { width: pageWidth - 20 });
+        doc.fillColor(DARK).fontSize(9).font("Helvetica-Bold").text(f.name || "—", 60, y + 5, { width: pageWidth - 20 , lineBreak: false });
+        doc.fillColor(GRAY).fontSize(8).font("Helvetica").text(`${f.credentials || ""} — ${f.role || ""}`, 60, y + 18, { width: pageWidth - 20 , lineBreak: false });
         y += 42;
       });
     }
@@ -318,10 +319,10 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
     const stmtText = "I confirm that:\n" + statements.map(s => `  • ${s}`).join("\n");
     const stmtH = doc.heightOfString(stmtText, { width: pageWidth - 20, fontSize: 9 }) + 14;
     doc.rect(55, y, pageWidth - 10, stmtH).fill(LIGHT_GRAY).stroke(BORDER);
-    doc.fillColor(DARK).fontSize(9).font("Helvetica-Bold").text("I confirm that:", 60, y + 6, { width: pageWidth - 20 });
+    doc.fillColor(DARK).fontSize(9).font("Helvetica-Bold").text("I confirm that:", 60, y + 6, { width: pageWidth - 20 , lineBreak: false });
     const stmtY = y + 18;
     statements.forEach((s, i) => {
-      doc.fillColor(DARK).fontSize(9).font("Helvetica").text(`• ${s}`, 65, stmtY + i * 13, { width: pageWidth - 30 });
+      doc.fillColor(DARK).fontSize(9).font("Helvetica").text(`• ${s}`, 65, stmtY + i * 13, { width: pageWidth - 30 , lineBreak: false });
     });
     y += stmtH + 10;
 
@@ -331,7 +332,7 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
 
     // Signature
     if (y > doc.page.height - 120) { doc.addPage(); y = 50; }
-    doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text("SIGNATURE", 55, y);
+    doc.fillColor(GRAY).fontSize(8).font("Helvetica-Bold").text("SIGNATURE", 55, y, { lineBreak: false });
     y += 12;
 
     if (data.signatureDataUrl && data.signatureDataUrl.startsWith("data:image")) {
@@ -349,7 +350,7 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
           const svgText = Buffer.from(base64, "base64").toString("utf8");
           const nameMatch = svgText.match(/>([^<]+)<\/text>/);
           const sigText = nameMatch?.[1] ?? data.attestationName ?? "";
-          doc.fillColor(DARK).fontSize(28).font("Helvetica-Oblique").text(sigText, 60, y + 18, { width: pageWidth - 20 });
+          doc.fillColor(DARK).fontSize(28).font("Helvetica-Oblique").text(sigText, 60, y + 18, { width: pageWidth - 20 , lineBreak: false });
         } else {
           doc.image(imgBuffer, 60, y + 5, { height: 60, fit: [pageWidth - 20, 60] });
         }
@@ -357,19 +358,19 @@ export async function generateCmeActivityPdf(data: CmeFormDataForPdf): Promise<B
       } catch {
         // Fallback: blank signature box
         doc.rect(55, y, pageWidth - 10, 70).fill("white").stroke(BORDER);
-        doc.fillColor(GRAY).fontSize(9).font("Helvetica-Oblique").text("Signature", 60, y + 28, { width: pageWidth - 20 });
+        doc.fillColor(GRAY).fontSize(9).font("Helvetica-Oblique").text("Signature", 60, y + 28, { width: pageWidth - 20 , lineBreak: false });
         y += 76;
       }
     } else {
       // Blank signature box
       doc.rect(55, y, pageWidth - 10, 70).fill("white").stroke(BORDER);
-      doc.fillColor(GRAY).fontSize(9).font("Helvetica-Oblique").text("Signature", 60, y + 28, { width: pageWidth - 20 });
+      doc.fillColor(GRAY).fontSize(9).font("Helvetica-Oblique").text("Signature", 60, y + 28, { width: pageWidth - 20 , lineBreak: false });
       y += 76;
     }
 
     // ── Footer (last page only) ───────────────────────────────────────────────
     doc.fillColor(GRAY).fontSize(7).font("Helvetica")
-      .text("© All About Ultrasound — CardioServ CME Joint Provider Form", 50, doc.page.height - 30, { width: pageWidth, align: "center" });
+      .text("© All About Ultrasound — CardioServ CME Joint Provider Form", 50, doc.page.height - 30, { width: pageWidth, align: "center" , lineBreak: false });
 
     doc.end();
   });
