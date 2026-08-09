@@ -4139,7 +4139,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
               <Button
                 size="sm"
                 disabled={!courseTitle || genSingle.isPending}
-                onClick={() => genSingle.mutate({ courseTitle: courseTitle ?? "this course", count: 1, tone: singleTone })}
+                onClick={() => genSingle.mutate({ courseTitle: courseTitle ?? "this course", courseId: courseId ?? undefined, count: 1, tone: singleTone })}
                 className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1 shrink-0"
               >
                 {genSingle.isPending
@@ -4256,7 +4256,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
               <Button
                 size="sm"
                 disabled={!courseTitle || generateTestimonials.isPending}
-                onClick={() => generateTestimonials.mutate({ courseTitle: courseTitle ?? "this course", count: aiCount, tone: aiTone })}
+                onClick={() => generateTestimonials.mutate({ courseTitle: courseTitle ?? "this course", courseId: courseId ?? undefined, count: aiCount, tone: aiTone })}
                 className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1 shrink-0"
               >
                 {generateTestimonials.isPending ? <><Loader2 size={11} className="animate-spin" /> Generating...</> : reviews.length > 0 ? <><RefreshCw size={11} /> Regenerate</> : <><Sparkles size={11} /> Generate</>}
@@ -8472,7 +8472,7 @@ export default function LandingPageBuilder() {
                 <button onClick={() => setSelectedId(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
               </div>
               <div className="pl-4 pr-3 py-3">
-                <BlockSettings block={selectedBlock} onChange={(data) => updateBlock(selectedBlock.id, data)} courseId={numericCourseId} />
+                <BlockSettings block={selectedBlock} onChange={(data) => updateBlock(selectedBlock.id, data)} courseId={numericCourseId} courseTitle={courseInfo?.title} />
               </div>
             </>
           ) : (

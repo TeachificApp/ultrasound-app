@@ -658,7 +658,7 @@ export const lmsAIRouter = router({
   generateTestimonials: protectedProcedure
     .input(z.object({
       courseTitle: z.string().min(1),
-      courseDescription: z.string().optional(),
+      courseId: z.number().int().positive().optional(),
       count: z.number().int().min(1).max(10).default(3),
       tone: z.enum(["professional", "enthusiastic", "concise", "heartfelt", "clinical"]).default("professional"),
     }))
@@ -672,15 +672,80 @@ export const lmsAIRouter = router({
         clinical: "Use technical, clinically-oriented language — the student references specific skills or protocols they learned.",
       };
       const toneNote = toneInstructions[input.tone] ?? toneInstructions.professional;
+
+      // Fetch course content and landing page to ground the AI in real details
+      let courseContext = `Course: "${input.courseTitle}"`;
+      if (input.courseId) {
+        try {
+          const db = await getDb();
+          if (db) {
+            // Fetch course description and lesson titles
+            const [course] = await db.select({
+              description: lmsCourses.description,
+              metaDescription: lmsCourses.metaDescription,
+            }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+
+            // Fetch landing page blocks and what-you-learn content
+            const [lp] = await db.select({
+              heroTitle: lmsLandingPages.heroTitle,
+              heroSubtitle: lmsLandingPages.heroSubtitle,
+              whatYouLearn: lmsLandingPages.whatYouLearn,
+              bodyContent: lmsLandingPages.bodyContent,
+              blocks: lmsLandingPages.blocks,
+            }).from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
+
+            // Fetch published lesson titles for context
+            const lessons = await db.select({ title: lmsLessons.title })
+              .from(lmsLessons)
+              .where(and(eq(lmsLessons.courseId, input.courseId), eq(lmsLessons.lessonStatus, "published")))
+              .limit(20);
+
+            const parts: string[] = [`Course: "${input.courseTitle}"`];
+            if (course?.description) {
+              // Strip HTML tags for clean text
+              const descText = course.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 800);
+              if (descText) parts.push(`Description: ${descText}`);
+            }
+            if (lp?.whatYouLearn) {
+              const wylText = lp.whatYouLearn.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
+              if (wylText) parts.push(`What students learn: ${wylText}`);
+            }
+            if (lp?.heroSubtitle) {
+              const sub = lp.heroSubtitle.replace(/<[^>]+>/g, " ").trim().slice(0, 300);
+              if (sub) parts.push(`Course tagline: ${sub}`);
+            }
+            // Extract text from landing page blocks (hero, text, feature blocks)
+            if (lp?.blocks) {
+              try {
+                const blockArr = JSON.parse(lp.blocks) as Array<{ type: string; data: Record<string, any> }>;
+                const blockTexts: string[] = [];
+                for (const b of blockArr) {
+                  if (["text", "hero", "features", "outcomes"].includes(b.type)) {
+                    const raw = JSON.stringify(b.data).replace(/<[^>]+>/g, " ").replace(/[{}"\[\]]/g, " ").replace(/\s+/g, " ").trim();
+                    if (raw.length > 20) blockTexts.push(raw.slice(0, 300));
+                  }
+                  if (blockTexts.length >= 4) break;
+                }
+                if (blockTexts.length > 0) parts.push(`Landing page highlights: ${blockTexts.join(" | ")}`);
+              } catch { /* ignore parse errors */ }
+            }
+            if (lessons.length > 0) {
+              parts.push(`Lesson topics: ${lessons.map(l => l.title).join(", ")}`);
+            }
+            courseContext = parts.join("\n");
+          }
+        } catch { /* fall back to title only */ }
+      }
+
       const response = await invokeLLM({
         messages: [
           {
             role: "system",
-            content: `You are a creative copywriter generating realistic student testimonials for an online ultrasound/echocardiography course. Generate ${input.count} short, authentic-sounding testimonials from healthcare professionals (sonographers, nurses, physicians, echo techs). Tone: ${toneNote} Each testimonial should mention the course title and feel genuine. Return ONLY a JSON array with objects: { name: string, credentials: string, text: string, rating: number }. rating should be 4 or 5. credentials should be realistic (e.g. "RDMS, RVT", "RN, RDCS", "MD, FASE"). No markdown, no code fences — raw JSON only.`,
+            content: `You are a creative copywriter generating realistic student testimonials for an online medical education course. Generate ${input.count} short, authentic-sounding testimonials from healthcare professionals (sonographers, nurses, physicians, echo techs, cardiologists). Tone: ${toneNote} Each testimonial must reference specific details from the course content provided — mention actual topics, skills, or outcomes from the course, not generic praise. Return ONLY a JSON array with objects: { name: string, credentials: string, text: string, rating: number }. rating should be 4 or 5. credentials should match the course specialty (e.g. "RDMS, RVT", "RN, RDCS", "MD, FASE", "RDCS, RVT"). No markdown, no code fences — raw JSON only.`,
           },
           {
             role: "user",
-            content: `Course: "${input.courseTitle}"${input.courseDescription ? `\nDescription: ${input.courseDescription}` : ""}`,
+            content: courseContext,
           },
         ],
       });
