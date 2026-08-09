@@ -10914,7 +10914,6 @@ function QuestionBankAdmin() {
                 {folders.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             </div>
-          </div>
           <div className="flex justify-end">
             <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={!aiTopic.trim() || aiGenerate.isPending}
               onClick={() => aiGenerate.mutate({ topic: aiTopic, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined })}>
