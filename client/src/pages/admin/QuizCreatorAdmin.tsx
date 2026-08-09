@@ -1239,7 +1239,7 @@ function QuizList() {
         {mainView === "results" ? (
           <AllResultsView />
         ) : (
-        <>
+        <div className="quiz-list-content">
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-6">
           <div className="relative flex-1 min-w-[200px]">
@@ -1421,7 +1421,7 @@ function QuizList() {
         onCreated={(quizId) => { navigate(`/admin/quiz-creator/${quizId}`); }}
       />
     </div>
-    </>
+    </div>
     )}
   );
 }
