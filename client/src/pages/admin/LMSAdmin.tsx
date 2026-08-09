@@ -6200,20 +6200,19 @@ function QuizBuilderDialog({ lesson, onClose }: { lesson: any; onClose: () => vo
                 </div>
               </div>
             ) : (
-
-              <div className="flex gap-2 flex-wrap">
-                <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
-                  <Plus className="w-4 h-4 mr-1" /> Add Question
-                </Button>
-                <Button size="sm" variant="outline" className="border-dashed border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setShowPresetPickerDialog(p => !p)}>
-                  ⭐ Add from Presets
-                </Button>
-              </div>
-              {showPresetPickerDialog && quiz && (
-                <PresetQuestionPicker quizId={quiz.id} onClose={() => setShowPresetPickerDialog(false)} onAdded={() => { refetch(); setShowPresetPickerDialog(false); }} />
-              )}
-
-
+              <>
+                <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" variant="outline" className="border-dashed border-teal-300 text-teal-600 hover:bg-teal-50" onClick={() => setAddingQuestion(true)}>
+                    <Plus className="w-4 h-4 mr-1" /> Add Question
+                  </Button>
+                  <Button size="sm" variant="outline" className="border-dashed border-amber-300 text-amber-700 hover:bg-amber-50" onClick={() => setShowPresetPickerDialog(p => !p)}>
+                    ⭐ Add from Presets
+                  </Button>
+                </div>
+                {showPresetPickerDialog && quiz && (
+                  <PresetQuestionPicker quizId={quiz.id} onClose={() => setShowPresetPickerDialog(false)} onAdded={() => { refetch(); setShowPresetPickerDialog(false); }} />
+                )}
+              </>
             )}
             </>)}
           </div>

@@ -4089,8 +4089,62 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
       const items: Array<{ icon: string; title: string; text: string }> = d.items ?? [];
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><div><label className="text-xs text-gray-500 block mb-1">Columns</label><Input type="number" value={d.columns ?? 3} onChange={e => set("columns", Number(e.target.value))} className="h-8 text-sm" min={1} max={6} /></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, { icon: "⭐", title: "Feature", text: "Description" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Item {i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={item.icon} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, icon: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Emoji or icon" /><DebouncedInput value={item.title} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, title: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Title" /><DebouncedInput value={item.text} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, text: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Description" /></div>))}</div></div></div>);
     }
-    case "testimonial":
-      return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Quote" field="quote" multiline /><BSTextField data={d} onSet={set} label="Author" field="author" /><BSTextField data={d} onSet={set} label="Avatar URL" field="avatarUrl" /><div><label className="text-xs text-gray-500 block mb-1">Star Rating</label><div className="flex items-center gap-1">{[0,1,2,3,4,5].map(n => (<button key={n} type="button" onClick={() => set("rating", n)} className={`w-8 h-8 rounded text-sm font-medium border ${(d.rating ?? 5) === n ? "bg-yellow-100 border-yellow-400 text-yellow-700" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>{n === 0 ? "\u2715" : "\u2605".repeat(n)}</button>))}</div><p className="text-[10px] text-gray-400 mt-1">{(d.rating ?? 5) === 0 ? "Stars hidden" : `${d.rating ?? 5} star${(d.rating ?? 5) > 1 ? "s" : ""} shown`}</p></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" /></div>);
+    case "testimonial": {
+      const genSingle = trpc.lmsAdmin.generateTestimonials.useMutation({
+        onSuccess: (data) => {
+          if (data.testimonials.length > 0) {
+            const t = data.testimonials[0];
+            set("quote", t.text);
+            set("author", `${t.name}${t.credentials ? ", " + t.credentials : ""}`);
+            set("rating", t.rating ?? 5);
+            toast.success("Testimonial generated");
+          } else {
+            toast.error("AI did not return a testimonial — try again");
+          }
+        },
+        onError: () => toast.error("Failed to generate testimonial"),
+      });
+      return (
+        <div className="space-y-3">
+          {/* AI Generate panel */}
+          <div className="border border-teal-200 rounded-lg p-3 bg-teal-50 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-teal-800 flex items-center gap-1"><Sparkles size={12} /> AI Testimonial</span>
+              <Button
+                size="sm"
+                disabled={!courseTitle || genSingle.isPending}
+                onClick={() => genSingle.mutate({ courseTitle: courseTitle ?? "this course", count: 1 })}
+                className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1"
+              >
+                {genSingle.isPending
+                  ? <><Loader2 size={11} className="animate-spin" /> Generating...</>
+                  : d.quote
+                    ? <><RefreshCw size={11} /> Regenerate</>
+                    : <><Sparkles size={11} /> Generate</>}
+              </Button>
+            </div>
+            {!courseTitle && <p className="text-[10px] text-teal-600">Open a course landing page to enable AI generation.</p>}
+          </div>
+          <BSTextField data={d} onSet={set} label="Quote" field="quote" multiline />
+          <BSTextField data={d} onSet={set} label="Author" field="author" />
+          <BSTextField data={d} onSet={set} label="Avatar URL" field="avatarUrl" />
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Star Rating</label>
+            <div className="flex items-center gap-1">
+              {[0,1,2,3,4,5].map(n => (
+                <button key={n} type="button" onClick={() => set("rating", n)}
+                  className={`w-8 h-8 rounded text-sm font-medium border ${(d.rating ?? 5) === n ? "bg-yellow-100 border-yellow-400 text-yellow-700" : "border-gray-200 text-gray-500 hover:border-gray-300"}`}>
+                  {n === 0 ? "✕" : "★".repeat(n)}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">{(d.rating ?? 5) === 0 ? "Stars hidden" : `${d.rating ?? 5} star${(d.rating ?? 5) > 1 ? "s" : ""} shown`}</p>
+          </div>
+          <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+          <BSColorField data={d} onSet={set} label="Accent Color" field="accentColor" />
+        </div>
+      );
+    }
     case "reviews": {
       const reviews: Array<{ name: string; rating: number; text: string; avatarUrl?: string }> = d.reviews ?? [];
       const reviewIds = reviews.map((_, i) => `review-${i}`);
