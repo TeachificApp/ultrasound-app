@@ -1456,6 +1456,7 @@ function QuizList() {
     </>
     )}
     </div>
+  </div>
   );
 }
 
