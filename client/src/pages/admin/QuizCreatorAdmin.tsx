@@ -1450,11 +1450,11 @@ function QuizList() {
       <ImportQuizDialog
         open={showImport}
         onClose={() => setShowImport(false)}
-        onCreated={(quizId) => { navigate(`/admin/quiz-creator/${quizId}`); }}
+      onCreated={(quizId) => { navigate(`/admin/quiz-creator/${quizId}`); }}
       />
       </div>
-    </div>
     )}
+    </div>
   );
 }
 
