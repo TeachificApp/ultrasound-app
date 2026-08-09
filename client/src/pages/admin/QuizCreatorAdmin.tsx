@@ -1201,6 +1201,15 @@ function QuizList() {
     onError: (e) => toast.error(e.message),
   });
 
+  const duplicateMutation = trpc.standaloneQuizAdmin.duplicateQuiz.useMutation({
+    onSuccess: (res) => {
+      toast.success("Quiz duplicated — opening copy…");
+      refetch();
+      navigate(`/admin/quiz-creator/${res.id}`);
+    },
+    onError: (e) => toast.error(`Duplicate failed: ${e.message}`),
+  });
+
   const [newQuiz, setNewQuiz] = useState({ title: "", type: "quiz" as "quiz" | "mock_exam", brand: "aaus" as "aaus" | "iheartecho" });
 
   const totalPages = data ? Math.ceil(data.total / 20) : 1;
@@ -1361,6 +1370,16 @@ function QuizList() {
                         </Button>
                         <Button size="sm" variant="ghost" title="Edit Quiz" onClick={() => navigate(`/admin/quiz-creator/${quiz.id}`)}>
                           <Edit2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Duplicate Quiz"
+                          className="text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                          disabled={duplicateMutation.isPending}
+                          onClick={() => duplicateMutation.mutate({ id: quiz.id })}
+                        >
+                          <Copy className="w-4 h-4" />
                         </Button>
                         <Button
                           size="sm"

@@ -823,10 +823,50 @@ export const standaloneQuizAdminRouter = router({
       ]);
       return { attempts, total: Number(total), page: input.page, pageSize: input.pageSize };
     }),
+
+  /** Duplicate a quiz — clones all settings, category config, and question links */
+  duplicateQuiz: protectedProcedure
+    .input(z.object({ id: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      // Fetch original quiz
+      const [original] = await db
+        .select()
+        .from(standaloneQuizzes)
+        .where(eq(standaloneQuizzes.id, input.id))
+        .limit(1);
+      if (!original) throw new TRPCError({ code: "NOT_FOUND", message: "Quiz not found" });
+      // Insert clone: title gets "(Copy)", status reset to draft
+      const { id: _id, createdAt: _ca, updatedAt: _ua, ...rest } = original as any;
+      const [result] = await db.insert(standaloneQuizzes).values({
+        ...rest,
+        title: `${original.title} (Copy)`,
+        status: "draft",
+        createdByUserId: ctx.user.id,
+      });
+      const newQuizId = (result as any).insertId as number;
+      // Clone question links
+      const questions = await db
+        .select()
+        .from(standaloneQuizQuestions)
+        .where(eq(standaloneQuizQuestions.quizId, input.id))
+        .orderBy(asc(standaloneQuizQuestions.sortOrder));
+      if (questions.length > 0) {
+        await db.insert(standaloneQuizQuestions).values(
+          questions.map(({ id: _qid, quizId: _qzid, ...q }) => ({
+            ...q,
+            quizId: newQuizId,
+          }))
+        );
+      }
+      return { id: newQuizId };
+    }),
 });
 
 // ─── Extend standaloneQuizAdminRouter with cross-quiz results ─────────────────
-// (appended below the closing brace — merged in lmsRouter.ts)
+// (appended below the closing brace of standaloneQuizAdminRouter — merged in lmsRouter.ts)
 export const standaloneQuizResultsAdminRouter = router({
   /** Cross-quiz results: all attempts across all quizzes, filterable by user/quiz/type/date */
   listAllAttempts: protectedProcedure
