@@ -277,6 +277,7 @@ async function startServer() {
   });
   // Google OAuth2 routes for per-form Google Sheets integration
   registerGoogleOAuthRoutes(app);
+  registerGoogleDriveCmeOAuthRoutes(app);
   // Heartbeat: SCORM extraction job (every 60s) — processes pending SCORM ZIP packages
   app.post("/api/scheduled/scorm-extract", scormExtractHeartbeatHandler);
   // Heartbeat: SCORM health-check (every 10 min) — audits done versions and re-queues broken ones
@@ -669,4 +670,3 @@ async function startServer() {
 }
 
 startServer().catch(console.error);
-  registerGoogleDriveCmeOAuthRoutes(app);
