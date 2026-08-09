@@ -2696,12 +2696,12 @@ function CmeManagementHub() {
             { id: "certificates", label: "Certificate Templates", icon: Award },
             { id: "sdms_cme", label: "SDMS CME Data", icon: GraduationCap },
             { id: "notify_signups", label: "Notify Me Signups", icon: Bell },
+            { id: "google_drive", label: "Google Drive", icon: HardDrive },
           ] as const).map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            { id: "google_drive", label: "Google Drive", icon: HardDrive },
                 activeTab === tab.id
                   ? "bg-[#189aa1] text-white"
                   : "text-gray-600 hover:bg-gray-100"
@@ -3122,12 +3122,12 @@ function CmeManagementHub() {
 // ─── Notify Me Signups Tab ────────────────────────────────────────────────────
 // ─── CME Google Drive Settings Panel ─────────────────────────────────────────
 function CmeDriveSettingsPanel() {
-  const { data: settings, refetch } = trpc.lms.getCmeDriveSettings.useQuery();
-  const updateSettings = trpc.lms.updatePlatformSettings.useMutation({
+  const { data: settings, refetch } = trpc.lmsGroup.getCmeDriveSettings.useQuery();
+  const updateSettings = trpc.lmsGroup.updatePlatformSettings.useMutation({
     onSuccess: () => { toast.success("Google Drive settings saved"); refetch(); },
     onError: (e) => toast.error("Save failed: " + e.message),
   });
-  const { data: driveFiles, isLoading: filesLoading, refetch: refetchFiles } = trpc.lms.listCmeDriveFiles.useQuery(
+  const { data: driveFiles, isLoading: filesLoading, refetch: refetchFiles } = trpc.lmsGroup.listCmeDriveFiles.useQuery(
     undefined,
     { enabled: !!(settings as any)?.cmeDriveEnabled }
   );
