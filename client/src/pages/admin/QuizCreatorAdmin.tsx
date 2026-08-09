@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { getAdminUrl, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// --- Helpers ---
 const statusColor: Record<string, string> = {
   draft: "bg-yellow-100 text-yellow-800",
   published: "bg-green-100 text-green-800",
@@ -50,7 +50,7 @@ function fmtTime(secs: number | null | undefined) {
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
-// ─── Folder/Tag Save Picker ───────────────────────────────────────────────────
+// --- Folder/Tag Save Picker ---
 function FolderTagPicker({
   folders,
   tags,
@@ -131,7 +131,7 @@ function FolderTagPicker({
   );
 }
 
-// ─── File upload helpers ──────────────────────────────────────────────────────
+// --- File upload helpers ---
 async function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -160,7 +160,7 @@ async function parseUploadQuizFileResponse(res: Response) {
   return json;
 }
 
-// ─── Import Quiz Dialog (SCORM or CSV — creates a new quiz) ───────────────────
+// --- Import Quiz Dialog (SCORM or CSV — creates a new quiz) ---
 function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (quizId: number) => void }) {
   const [importTab, setImportTab] = useState<"scorm" | "csv">("scorm");
   const [file, setFile] = useState<File | null>(null);
@@ -490,7 +490,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
   );
 }
 
-// ─── Add Questions Dialog (tabbed: From Bank | AI Generate | Import SCORM | Import CSV) ──
+// --- Add Questions Dialog (tabbed: From Bank | AI Generate | Import SCORM | Import CSV) ---
 function AddQuestionsDialog({
   open,
   onClose,
@@ -506,14 +506,14 @@ function AddQuestionsDialog({
 }) {
   const [tab, setTab] = useState("bank");
 
-  // ── From Bank ──
+// --- From Bank ---
   const [qSearch, setQSearch] = useState("");
   const [qPage, setQPage] = useState(1);
   const [selectedBankIds, setSelectedBankIds] = useState<Set<number>>(new Set());
   const [bankFolderId, setBankFolderId] = useState<string>("");
   const [bankTagId, setBankTagId] = useState<string>("");
 
-  // ── AI Generate ──
+// --- AI Generate ---
   const [aiTopic, setAITopic] = useState("");
   const [aiCount, setAICount] = useState(10);
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
@@ -524,7 +524,7 @@ function AddQuestionsDialog({
   const [aiGenerated, setAIGenerated] = useState<any[] | null>(null);
   const [aiSelectedIds, setAISelectedIds] = useState<Set<number>>(new Set());
 
-  // ── SCORM Import ──
+// --- SCORM Import ---
   const [scormFile, setScormFile] = useState<File | null>(null);
   const [scormUploading, setScormUploading] = useState(false);
   const [scormPreview, setScormPreview] = useState<any>(null);
@@ -535,7 +535,7 @@ function AddQuestionsDialog({
   const [scormTagIds, setScormTagIds] = useState<number[]>([]);
   const scormFileRef = useRef<HTMLInputElement>(null);
 
-  // ── CSV Import ──
+// --- CSV Import ---
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvPreview, setCsvPreview] = useState<any>(null);
@@ -543,7 +543,7 @@ function AddQuestionsDialog({
   const [csvNewFolderName, setCsvNewFolderName] = useState("");
   const [csvTagIds, setCsvTagIds] = useState<number[]>([]);
   const csvFileRef = useRef<HTMLInputElement>(null);
-  // ── From Media Library ──
+// --- From Media Library ---
   const [mlSearch, setMlSearch] = useState("");
   const [mlSelectedAssetId, setMlSelectedAssetId] = useState<number | null>(null);
   const [mlPreview, setMlPreview] = useState<any>(null);
@@ -699,7 +699,7 @@ function AddQuestionsDialog({
             <TabsTrigger value="csv"><FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />Import CSV</TabsTrigger>
           </TabsList>
 
-          {/* ── From Bank ── */}
+// --- {/*  From Bank  */} ---
           <TabsContent value="bank" className="flex-1 flex flex-col min-h-0 mt-3 space-y-3">
             <div className="flex gap-2 flex-shrink-0">
               <div className="relative flex-1">
@@ -765,7 +765,7 @@ function AddQuestionsDialog({
             </div>
           </TabsContent>
 
-          {/* ── AI Generate ── */}
+// --- {/*  AI Generate  */} ---
           <TabsContent value="ai" className="flex-1 flex flex-col min-h-0 mt-3">
             <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
               {!aiGenerated ? (
@@ -873,7 +873,7 @@ function AddQuestionsDialog({
             )}
           </TabsContent>
 
-          {/* ── Import SCORM ── */}
+// --- {/*  Import SCORM  */} ---
           <TabsContent value="scorm" className="flex-1 flex flex-col min-h-0 mt-3">
             <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
               {!scormPreview ? (
@@ -951,7 +951,7 @@ function AddQuestionsDialog({
             )}
           </TabsContent>
 
-          {/* ── Import CSV ── */}
+// --- {/*  Import CSV  */} ---
           <TabsContent value="csv" className="flex-1 flex flex-col min-h-0 mt-3">
             <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
               {!csvPreview ? (
@@ -1036,8 +1036,8 @@ function AddQuestionsDialog({
   );
 }
 
-// ─── Quiz List ────────────────────────────────────────────────────────────────
-// ─── All Results View ─────────────────────────────────────────────────────────
+// --- Quiz List ---
+// --- All Results View ---
 function AllResultsView() {
   const [search, setSearch] = useState("");
   const [quizType, setQuizType] = useState<string>("all");
@@ -1458,7 +1458,7 @@ function QuizList() {
   );
 }
 
-// ─── Quiz Editor ──────────────────────────────────────────────────────────────
+// --- Quiz Editor ---
 function QuizEditor({ quizId }: { quizId: number }) {
   const [, navigate] = useLocation();
   const initialTab = (() => { try { return new URLSearchParams(window.location.search).get("tab") ?? "settings"; } catch { return "settings"; } })();
@@ -1466,6 +1466,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
 
   const { data, isLoading, refetch } = trpc.standaloneQuizAdmin.getQuiz.useQuery({ id: quizId });
   const { data: analytics } = trpc.standaloneQuizAdmin.getAnalytics.useQuery({ quizId }, { enabled: activeTab === "analytics" });
+  const { data: foldersData } = trpc.questionBank.listFolders.useQuery();
 
   const updateMutation = trpc.standaloneQuizAdmin.updateQuiz.useMutation({
     onSuccess: () => { toast.success("Saved"); refetch(); },
@@ -1546,7 +1547,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
             <TabsTrigger value="analytics"><BarChart2 className="w-4 h-4 mr-1" />Analytics</TabsTrigger>
           </TabsList>
 
-          {/* ── Settings Tab ── */}
+// --- {/*  Settings Tab  */} ---
           <TabsContent value="settings">
             {settings && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1684,14 +1685,98 @@ function QuizEditor({ quizId }: { quizId: number }) {
                       </div>
                     </div>
                     <div>
-                      <Label className="mb-2 block">Category Configuration (JSON)</Label>
-                      <p className="text-xs text-gray-400 mb-2">Format: <code>[{{"folderId": 1, "folderName": "Adult Echo", "count": 20}}, ...]</code> — set folderId to null for uncategorized questions.</p>
-                      <textarea
-                        className="w-full h-28 rounded-md border border-teal-200 bg-white px-3 py-2 text-sm font-mono resize-y"
-                        value={settings?.categoryConfig ?? ""}
-                        onChange={(e) => setSettings((s: any) => ({ ...s, categoryConfig: e.target.value || null }))}
-                        placeholder='[{"folderId": 1, "folderName": "Adult Echo", "count": 20}, {"folderId": 2, "folderName": "Pediatric Echo", "count": 15}]'
-                      />
+                      <Label className="mb-2 block">Category Question Draw</Label>
+                      <p className="text-xs text-gray-400 mb-3">Add folders and set how many questions to draw from each per attempt. Leave empty to draw all questions from all folders.</p>
+                      {/* Visual folder-picker rows */}
+                      {(() => {
+                        let rows: Array<{folderId: number|null, folderName: string, count: number}> = [];
+                        try { rows = JSON.parse(settings?.categoryConfig || "[]"); } catch {}
+                        const folders = foldersData?.folders ?? [];
+                        const usedIds = new Set(rows.map(r => r.folderId));
+                        const availableFolders = folders.filter((f: any) => !usedIds.has(f.id));
+                        const updateRows = (newRows: typeof rows) => {
+                          setSettings((s: any) => ({ ...s, categoryConfig: newRows.length ? JSON.stringify(newRows) : null }));
+                        };
+                        return (
+                          <div className="space-y-2">
+                            {rows.map((row, idx) => (
+                              <div key={idx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-teal-200">
+                                <div className="flex-1 text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                                  <Database className="w-3.5 h-3.5 text-teal-500" />
+                                  {row.folderName || "Uncategorized"}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-gray-400">Draw</span>
+                                  <Input
+                                    type="number" min={1} max={9999}
+                                    className="w-20 h-7 text-sm"
+                                    value={row.count}
+                                    onChange={(e) => {
+                                      const newRows = [...rows];
+                                      newRows[idx] = { ...row, count: Number(e.target.value) || 1 };
+                                      updateRows(newRows);
+                                    }}
+                                  />
+                                  <span className="text-xs text-gray-400">questions</span>
+                                </div>
+                                <button
+                                  onClick={() => updateRows(rows.filter((_, i) => i !== idx))}
+                                  className="text-red-400 hover:text-red-600 ml-1"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                            {/* Add row */}
+                            <div className="flex items-center gap-2 mt-2">
+                              <Select
+                                value=""
+                                onValueChange={(val) => {
+                                  if (!val) return;
+                                  if (val === "__uncategorized__") {
+                                    if (!usedIds.has(null)) {
+                                      updateRows([...rows, { folderId: null, folderName: "Uncategorized", count: 10 }]);
+                                    }
+                                    return;
+                                  }
+                                  const f = folders.find((x: any) => String(x.id) === val);
+                                  if (f && !usedIds.has(f.id)) {
+                                    updateRows([...rows, { folderId: f.id, folderName: f.name, count: 10 }]);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="flex-1 h-8 text-sm border-dashed border-teal-300 text-teal-600">
+                                  <SelectValue placeholder="+ Add folder category..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {!usedIds.has(null) && (
+                                    <SelectItem value="__uncategorized__">Uncategorized questions</SelectItem>
+                                  )}
+                                  {availableFolders.map((f: any) => (
+                                    <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>
+                                  ))}
+                                  {availableFolders.length === 0 && usedIds.has(null) && (
+                                    <SelectItem value="" disabled>All folders added</SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              {rows.length > 0 && (
+                                <button
+                                  onClick={() => updateRows([])}
+                                  className="text-xs text-red-400 hover:text-red-600 whitespace-nowrap"
+                                >
+                                  Clear all
+                                </button>
+                              )}
+                            </div>
+                            {rows.length > 0 && (
+                              <p className="text-xs text-teal-600 mt-1">
+                                Total: {rows.reduce((sum, r) => sum + (r.count || 0), 0)} questions drawn per attempt
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
@@ -1778,7 +1863,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
             )}
           </TabsContent>
 
-          {/* ── Questions Tab ── */}
+// --- {/*  Questions Tab  */} ---
           <TabsContent value="questions">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -1843,7 +1928,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
             />
           </TabsContent>
 
-          {/* ── Analytics Tab ── */}
+// --- {/*  Analytics Tab  */} ---
           <TabsContent value="analytics">
             {!analytics ? (
               <div className="flex items-center justify-center h-40"><Loader2 className="w-6 h-6 animate-spin text-teal-600" /></div>
@@ -1968,7 +2053,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
   );
 }
 
-// ─── Root export ──────────────────────────────────────────────────────────────
+// --- Root export ---
 export default function QuizCreatorAdmin() {
   const params = useParams<{ quizId?: string }>();
   const quizId = params.quizId ? parseInt(params.quizId, 10) : null;
