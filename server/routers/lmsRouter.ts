@@ -121,6 +121,7 @@ import { lmsCourseBuilderRouter } from "./lmsCourseBuilderRouter";
 import { lmsQuizLandingRouter } from "./lmsQuizLandingRouter";
 import { lmsEnrollmentAdminRouter } from "./lmsEnrollmentAdminRouter";
 import { lmsCohortAdminRouter } from "./lmsCohortAdminRouter";
+import { generateImage } from "../_core/imageGeneration";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
 // ─── Certificate Template Router (admin) ─────────────────────────────────────
@@ -821,6 +822,33 @@ export const lmsAIRouter = router({
       } catch {
         return { testimonials: [] };
       }
+    }),
+
+  // ─── AI Image Generator ──────────────────────────────────────────────────
+  generateAiImage: protectedProcedure
+    .input(z.object({
+      prompt: z.string().min(1).max(1000),
+      style: z.enum(["realistic", "illustration", "diagram", "infographic", "medical", "professional"]).default("professional"),
+      aspectRatio: z.enum(["landscape", "portrait", "square"]).default("landscape"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const styleGuide: Record<string, string> = {
+        realistic: "photorealistic, high quality photography",
+        illustration: "clean vector illustration, modern flat design",
+        diagram: "clean educational diagram, labeled, medical textbook style",
+        infographic: "modern infographic, data visualization, clean layout",
+        medical: "medical illustration, anatomical accuracy, clinical style",
+        professional: "professional medical education, clean modern design, teal and white color palette",
+      };
+      const aspectGuide: Record<string, string> = {
+        landscape: "wide landscape format 16:9",
+        portrait: "portrait format 3:4",
+        square: "square format 1:1",
+      };
+      const fullPrompt = `${input.prompt}. Style: ${styleGuide[input.style] ?? styleGuide.professional}. Format: ${aspectGuide[input.aspectRatio] ?? aspectGuide.landscape}. No text overlay unless specifically requested. High quality, suitable for medical education content.`;
+      const { url } = await generateImage({ prompt: fullPrompt });
+      return { url };
     }),
 
   // ─── Testimonial Presets ──────────────────────────────────────────────────

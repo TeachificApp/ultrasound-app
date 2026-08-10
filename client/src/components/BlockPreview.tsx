@@ -97,7 +97,8 @@ export type BlockType =
   | "quiz_embed"
   | "remaining_seats"
   | "included_items_auto"
-  | "ai_content";
+  | "ai_content"
+  | "ai_image";
 
 export interface Block {
   id: string;
@@ -255,6 +256,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           </CC>
         </div>
       );
+    case "ai_image":
     case "image": {
       const imgAlign = d.align ?? "center";
       const imgJustify = imgAlign === "left" ? "flex-start" : imgAlign === "right" ? "flex-end" : "center";

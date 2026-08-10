@@ -110,6 +110,8 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     defaultData: { html: "", prompt: "", contentType: "lesson", align: "left", bgColor: "#ffffff", textColor: "#1a1a1a" } },
   { type: "image", label: "Image", icon: <Image size={14} />, category: "Content",
     defaultData: { url: "", alt: "", caption: "", align: "center", maxWidth: "50%", linkUrl: "", openInNewTab: true, showShadow: true, noBorder: false } },
+  { type: "ai_image", label: "AI Image Generator", icon: <Sparkles size={14} />, category: "Content",
+    defaultData: { url: "", alt: "", caption: "", align: "center", maxWidth: "100%", showShadow: true, noBorder: false, aiPrompt: "", aiStyle: "professional", aiAspectRatio: "landscape" } },
   { type: "video", label: "Video Embed", icon: <Video size={14} />, category: "Content",
     defaultData: { embedUrl: "", caption: "", autoplay: false, muted: true, loop: false, controls: true, trimStart: 0, trimEnd: 0, accentColor: "#189aa1" } },
   { type: "audio", label: "Audio Player", icon: <Music size={14} />, category: "Content",
@@ -3324,6 +3326,124 @@ function TextBlockEditor({ d, set, lessonTitle, courseTitle }: { d: Record<strin
   );
 }
 
+function AiImageBlockSettings({ d, set, setMany, uploading, bgImageRef, handleFileUpload, productCatalog, orderBumpsList, funnelList }: {
+  d: Record<string, any>;
+  set: (field: string, value: any) => void;
+  setMany: (patch: Record<string, any>) => void;
+  uploading: string | null;
+  bgImageRef: React.RefObject<HTMLInputElement | null>;
+  handleFileUpload: (file: File, field: string, folder: string) => void;
+  productCatalog?: any[];
+  orderBumpsList?: any[];
+  funnelList?: any[];
+}) {
+  const utils = trpc.useUtils();
+  const [generating, setGenerating] = React.useState(false);
+  const generateMutation = trpc.lmsGroup.generateAiImage.useMutation({
+    onSuccess: (res) => {
+      set("url", res.url);
+      setGenerating(false);
+    },
+    onError: () => setGenerating(false),
+  });
+
+  const handleGenerate = () => {
+    if (!d.aiPrompt) return;
+    setGenerating(true);
+    generateMutation.mutate({
+      prompt: d.aiPrompt as string,
+      style: (d.aiStyle as any) ?? "professional",
+      aspectRatio: (d.aiAspectRatio as any) ?? "landscape",
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* AI Generation Panel */}
+      <div className="border border-teal-200 rounded-lg p-3 space-y-2 bg-teal-50">
+        <p className="text-xs font-semibold text-teal-700 flex items-center gap-1"><Sparkles size={12} /> AI Image Generator</p>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Image Description *</label>
+          <DebouncedTextarea value={d.aiPrompt ?? ""} onChange={v => set("aiPrompt", v)} className="text-sm min-h-[64px]" placeholder="e.g. Cardiac ultrasound probe on a patient's chest, clinical setting, teal lighting" />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Style</label>
+            <select value={d.aiStyle ?? "professional"} onChange={e => set("aiStyle", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2 bg-white">
+              <option value="professional">Professional</option>
+              <option value="medical">Medical Illustration</option>
+              <option value="realistic">Realistic Photo</option>
+              <option value="illustration">Illustration</option>
+              <option value="diagram">Diagram</option>
+              <option value="infographic">Infographic</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Aspect Ratio</label>
+            <select value={d.aiAspectRatio ?? "landscape"} onChange={e => set("aiAspectRatio", e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded px-2 bg-white">
+              <option value="landscape">Landscape (16:9)</option>
+              <option value="square">Square (1:1)</option>
+              <option value="portrait">Portrait (3:4)</option>
+            </select>
+          </div>
+        </div>
+        <button
+          onClick={handleGenerate}
+          disabled={!d.aiPrompt || generating}
+          className="w-full py-2 text-sm font-semibold rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {generating ? <><Loader2 size={14} className="animate-spin" /> Generating…</> : <><Sparkles size={14} /> Generate Image</>}
+        </button>
+        {d.url && (
+          <button onClick={() => handleGenerate()} disabled={generating} className="w-full py-1.5 text-xs font-medium rounded border border-teal-300 text-teal-700 hover:bg-teal-100 disabled:opacity-50 flex items-center justify-center gap-1">
+            <RotateCcw size={11} /> Regenerate
+          </button>
+        )}
+      </div>
+      {/* Divider */}
+      <div className="border-t border-gray-100 pt-2">
+        <p className="text-xs text-gray-400 mb-2">— or set image manually —</p>
+      </div>
+      {/* Image URL (same as regular image block) */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Image URL</label>
+        <div className="flex items-center gap-2">
+          <DebouncedInput value={d.url ?? ""} onChange={v => set("url", v)} className="h-8 text-sm flex-1" placeholder="Image URL or upload" />
+          <button onClick={() => bgImageRef.current?.click()} className="px-2 py-1.5 text-xs bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100 flex items-center gap-1" disabled={uploading === "url"}>{uploading === "url" ? "..." : <><Upload size={12} /> Upload</>}</button>
+          <input ref={bgImageRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, "url", "ai-image-block"); e.target.value = ""; }} />
+        </div>
+        {d.url && <img src={d.url} className="w-full h-16 object-cover rounded border mt-1" style={{ borderRadius: d.borderRadius ? `${d.borderRadius}px` : undefined }} />}
+      </div>
+      <BSTextField data={d} onSet={set} label="Alt Text" field="alt" />
+      <BSTextField data={d} onSet={set} label="Caption" field="caption" />
+      {/* Alignment */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Alignment</label>
+        <div className="flex gap-1">{(["left","center","right"] as const).map(a => <button key={a} onClick={() => set("align", a)} className={`flex-1 py-1 text-xs rounded border capitalize ${(d.align ?? "center") === a ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{a}</button>)}</div>
+      </div>
+      {/* Width */}
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">Image Width</label>
+        <div className="flex flex-wrap gap-1 mb-1">{(["auto","25%","33%","50%","75%","100%"] as const).map(w => <button key={w} onClick={() => set("maxWidth", w)} className={`px-2 py-0.5 text-xs rounded border ${(d.maxWidth ?? "100%") === w ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600"}`}>{w}</button>)}</div>
+        <DebouncedInput value={d.maxWidth ?? "100%"} onChange={v => set("maxWidth", v)} className="h-8 text-sm" placeholder="auto, 100%, 600px, etc." />
+      </div>
+      <div><label className="text-xs text-gray-500 block mb-1">Height</label><DebouncedInput value={d.height ?? ""} onChange={v => set("height", v)} className="h-8 text-sm" placeholder="auto, 300px, etc." /></div>
+      {/* Appearance */}
+      <div className="border border-gray-100 rounded p-2 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Appearance</p>
+        <BSColorField data={d} onSet={set} label="Background Color" field="bgColor" />
+        <div className="flex items-center gap-2"><input type="checkbox" checked={d.showShadow ?? true} onChange={e => set("showShadow", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">Drop shadow</label></div>
+        <div className="flex items-center gap-2"><input type="checkbox" checked={d.noBorder ?? false} onChange={e => set("noBorder", e.target.checked)} className="rounded" /><label className="text-xs text-gray-600">No border</label></div>
+        <div><label className="text-xs text-gray-500 block mb-1">Border Radius (px)</label><Input type="number" value={d.borderRadius ?? 0} onChange={e => set("borderRadius", Number(e.target.value))} className="h-8 text-sm" min={0} max={999} /></div>
+        {!d.noBorder && <>
+          <div><label className="text-xs text-gray-500 block mb-1">Border Width (px)</label><Input type="number" value={d.borderWidth ?? 0} onChange={e => set("borderWidth", Number(e.target.value))} className="h-8 text-sm" min={0} max={20} /></div>
+          <BSColorField data={d} onSet={set} label="Border Color" field="borderColor" />
+        </>}
+      </div>
+    </div>
+  );
+}
+
 function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string, any>; set: (field: string, value: any) => void; setMany: (patch: Record<string, any>) => void; emailMode?: boolean }) {
   const [aiPrompt, setAiPrompt] = React.useState<string>(d.prompt ?? "");
   const [aiContentType, setAiContentType] = React.useState<string>(d.contentType ?? (emailMode ? "announcement" : "lesson"));
@@ -4023,6 +4143,10 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
     case "text": {
       return <TextBlockEditor d={d} set={set} lessonTitle={lessonTitle} courseTitle={courseTitle} />;
     }
+      case "ai_image":
+        return (
+          <AiImageBlockSettings d={d} set={set} setMany={setMany} uploading={uploading} bgImageRef={bgImageRef} handleFileUpload={handleFileUpload} productCatalog={productCatalog} orderBumpsList={orderBumpsList} funnelList={funnelList} />
+        );
       case "image":
         return (
           <div className="space-y-3">

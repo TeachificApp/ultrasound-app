@@ -103,6 +103,7 @@ const EMAIL_SAFE_TYPES: BlockType[] = [
   "divider",
   "text",
   "image",
+  "ai_image",
   "video",       // renders as thumbnail + Watch Video link (email-safe)
   "audio",       // renders as Listen link (email-safe)
   "gallery",
@@ -162,6 +163,7 @@ export function emailBlockToHtml(block: Block): string {
       const imgHtml = aiImg ? `<div style="margin-bottom:12px;"><img src="${aiImg}" alt="" style="max-width:100%;width:100%;display:block;border-radius:8px;" /></div>` : "";
       return `<div style="${bgStyle}padding:8px 0;color:${color};font-size:15px;line-height:1.7;text-align:${align};">${imgHtml}${html}</div>`;
     }
+    case "ai_image":
     case "image": {
       const url = (d.url as string) ?? "";
       if (!url) return "";
@@ -250,7 +252,11 @@ export function emailBlockToHtml(block: Block): string {
       const ctaTextColor = (d.ctaTextColor as string) ?? "#ffffff";
       const bg = (d.bgColor as string) ?? "#f0fafa";
       const textAlign = (d.align as string) ?? "center";
-      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;margin:16px 0;"><tr><td style="padding:32px;text-align:${textAlign};">${headline ? `<h2 style="color:#0e1e2e;font-size:22px;font-weight:700;margin:0 0 8px;">${headline}</h2>` : ""}${subtext ? `<p style="color:#4a6070;font-size:15px;margin:0 0 20px;">${subtext}</p>` : ""}<a href="${ctaLink}" style="display:inline-block;background:${ctaColor};color:${ctaTextColor};text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:16px;">${ctaText}</a></td></tr></table>`;
+      const displayPrice = (d.displayPrice as string) ?? "";
+      const strikethroughPrice = (d.strikethroughPrice as string) ?? "";
+      const showStrikethrough = !!(d.showStrikethrough) && !!strikethroughPrice;
+      const priceHtml = displayPrice ? `${showStrikethrough ? `<p style="margin:0 0 4px;font-size:16px;color:#9ca3af;text-decoration:line-through;">${strikethroughPrice}</p>` : ""}<p style="margin:0 0 16px;font-size:28px;font-weight:800;color:${ctaColor};">${displayPrice}</p>` : "";
+      return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;margin:16px 0;"><tr><td style="padding:32px;text-align:${textAlign};">${headline ? `<h2 style="color:#0e1e2e;font-size:22px;font-weight:700;margin:0 0 8px;">${headline}</h2>` : ""}${subtext ? `<p style="color:#4a6070;font-size:15px;margin:0 0 20px;">${subtext}</p>` : ""}${priceHtml}<a href="${ctaLink}" style="display:inline-block;background:${ctaColor};color:${ctaTextColor};text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:16px;">${ctaText}</a></td></tr></table>`;
     }
     case "lead_capture": {
       const headline = (d.headline as string) ?? "Stay in the loop";

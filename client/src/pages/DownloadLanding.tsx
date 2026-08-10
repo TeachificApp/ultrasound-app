@@ -307,6 +307,10 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user, is
     case "cta_standalone":
       return (
         <div className="py-8"><CC style={{ textAlign: d.align ?? "center" }}>
+          {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+          {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
+          {(d.showStrikethrough && d.strikethroughPrice) && <p className="text-lg text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>}
+          {d.displayPrice && <p className="text-3xl font-bold mb-4" style={{ color: d.ctaColor ?? "#179ca3" }}>{d.displayPrice}</p>}
           <button
             onClick={isDraft ? undefined : (d.link ? () => { window.location.href = d.link; } : hasPurchased ? () => { window.location.href = `/downloads/${slug}/files`; } : onBuy)}
             disabled={isDraft || buying}

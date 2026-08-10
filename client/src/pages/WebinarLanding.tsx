@@ -123,6 +123,8 @@ function RenderBlock({
           <div className="max-w-3xl mx-auto px-4 text-center">
             {d.headline && <h2 className="text-3xl font-bold mb-3" style={{ color: d.textColor ?? "#111827" }}>{d.headline}</h2>}
             {d.subheadline && <p className="text-gray-500 mb-6">{d.subheadline}</p>}
+            {(d.showStrikethrough && d.strikethroughPrice) && <p className="text-lg text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>}
+            {d.displayPrice && <p className="text-3xl font-bold mb-4" style={{ color: d.ctaColor ?? "#189aa1" }}>{d.displayPrice}</p>}
             <button
               onClick={isDraft ? undefined : onRegister}
               disabled={isDraft || registering}
