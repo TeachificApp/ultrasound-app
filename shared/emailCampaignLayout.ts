@@ -60,7 +60,7 @@ export function wrapInBrandedCampaignEmail(
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>All About Ultrasound™</title>
   <style>
-    a { color: #189aa1 !important; text-decoration: underline; }
+    a { color: #189aa1; text-decoration: underline; }
     a:hover { color: #147f86 !important; }
   </style>
 </head>
