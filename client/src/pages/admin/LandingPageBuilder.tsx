@@ -55,7 +55,7 @@ import {
   ChevronDown, ChevronUp, Copy, FolderOpen, BookMarked, Upload, Code,
   ShoppingCart, Package, Link, Mail, Phone, MapPin, Bookmark, BookmarkPlus, Music, UserPlus, Search,
   SlidersHorizontal, Radio, Clock, Loader2, ArrowLeftRight, PlayCircle,
-  Table2, LayoutList, FileText, Download, Sparkles, Wand2, RefreshCw,
+  Table2, LayoutList, FileText, Download, Sparkles, Wand2, RefreshCw, RotateCcw,
 } from "lucide-react";
 import AudioBlockEditor from "@/components/AudioBlockEditor";
 import CarouselBlock from "@/components/CarouselBlock";
