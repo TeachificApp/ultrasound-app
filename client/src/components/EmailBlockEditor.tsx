@@ -149,6 +149,13 @@ const EMAIL_CATALOG_CATEGORIES = [
 
 // ─── Block → Email HTML renderer ─────────────────────────────────────────────
 // Converts the shared {id, type, data} block format to inline-CSS email HTML.
+/** Ensure a product/CTA link is absolute — prepend the LMS domain for relative paths */
+function toAbsoluteUrl(link: string | undefined): string {
+  if (!link || link === "#") return "#";
+  if (link.startsWith("http://") || link.startsWith("https://") || link.startsWith("mailto:")) return link;
+  return `https://learn.allaboutultrasound.com${link.startsWith("/") ? "" : "/"}${link}`;
+}
+
 export function emailBlockToHtml(block: Block): string {
   const d = block.data ?? {};
   const align = (d.align as string) ?? "left";
@@ -190,7 +197,7 @@ export function emailBlockToHtml(block: Block): string {
         const btnText = (btn.text as string) ?? "";
         // Skip empty or default placeholder text that should not appear in email
         if (!btnText || btnText === "Enroll Now" || btnText === "Get Started") return "";
-        return `<a href="${btn.link || "#"}" style="display:inline-block;background:${btn.color || "#ffffff"};color:${btn.textColor || "#179ca3"};text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:15px;margin:4px;">${btnText}</a>`;
+        return `<a href="${toAbsoluteUrl(btn.link)}" style="display:inline-block;background:${btn.color || "#ffffff"};color:${btn.textColor || "#179ca3"};text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:15px;margin:4px;">${btnText}</a>`;
       }).join("");
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bgColor};border-radius:8px;margin:0 0 16px;"><tr><td style="padding:32px;text-align:${align};"><h1 style="color:${textColor};font-size:28px;font-weight:900;margin:0 0 12px;line-height:1.2;">${headline}</h1>${subheadline ? `<p style="color:${textColor};font-size:16px;margin:0 0 20px;opacity:0.9;">${subheadline}</p>` : ""}${btnHtml ? `<div style="margin-top:16px;">${btnHtml}</div>` : ""}</td></tr></table>`;
     }
@@ -464,17 +471,17 @@ export function emailBlockToHtml(block: Block): string {
       if (sourceMode === "database" && resolvedBundles.length > 0) {
         if (viewMode === "card") {
           const cardsHtml = resolvedBundles.map((b) =>
-            `<td style="width:50%;vertical-align:top;padding:8px;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5eaec;border-radius:8px;overflow:hidden;"><tr><td>${b.imageUrl ? `<img src="${b.imageUrl}" alt="${b.title}" style="width:100%;height:120px;object-fit:cover;display:block;" />` : ""}</td></tr><tr><td style="padding:14px;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${b.title}</strong>${b.description ? `<p style="color:#4a6070;font-size:12px;margin:4px 0;">${b.description}</p>` : ""}<span style="color:${accent};font-size:13px;font-weight:600;">$${Number(b.price ?? 0) % 1 === 0 ? Number(b.price ?? 0).toLocaleString("en-US") : Number(b.price ?? 0).toFixed(2)}</span><br/><a href="${b.link || '#'}" style="display:inline-block;margin-top:8px;background:${accent};color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td>`
+            `<td style="width:50%;vertical-align:top;padding:8px;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5eaec;border-radius:8px;overflow:hidden;"><tr><td>${b.imageUrl ? `<img src="${b.imageUrl}" alt="${b.title}" style="width:100%;height:120px;object-fit:cover;display:block;" />` : ""}</td></tr><tr><td style="padding:14px;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${b.title}</strong>${b.description ? `<p style="color:#4a6070;font-size:12px;margin:4px 0;">${b.description}</p>` : ""}<span style="color:${accent};font-size:13px;font-weight:600;">$${Number(b.price ?? 0) % 1 === 0 ? Number(b.price ?? 0).toLocaleString("en-US") : Number(b.price ?? 0).toFixed(2)}</span><br/><a href="${toAbsoluteUrl(b.link)}" style="display:inline-block;margin-top:8px;background:${accent};color:#fff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td>`
           ).join("");
           productsHtml = `<tr>${cardsHtml}</tr>`;
         } else {
           productsHtml = resolvedBundles.map((b) =>
-            `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><table cellpadding="0" cellspacing="0" width="100%"><tr>${b.imageUrl ? `<td style="width:64px;vertical-align:top;padding-right:12px;"><img src="${b.imageUrl}" alt="${b.title}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;display:block;" /></td>` : ""}<td style="vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${b.title}</strong>${b.description ? `<p style="color:#4a6070;font-size:13px;margin:2px 0;">${b.description}</p>` : ""}<span style="color:${accent};font-size:13px;font-weight:600;">$${Number(b.price ?? 0) % 1 === 0 ? Number(b.price ?? 0).toLocaleString("en-US") : Number(b.price ?? 0).toFixed(2)}</span></td><td style="vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${b.link || '#'}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td></tr>`
+            `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><table cellpadding="0" cellspacing="0" width="100%"><tr>${b.imageUrl ? `<td style="width:64px;vertical-align:top;padding-right:12px;"><img src="${b.imageUrl}" alt="${b.title}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;display:block;" /></td>` : ""}<td style="vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${b.title}</strong>${b.description ? `<p style="color:#4a6070;font-size:13px;margin:2px 0;">${b.description}</p>` : ""}<span style="color:${accent};font-size:13px;font-weight:600;">$${Number(b.price ?? 0) % 1 === 0 ? Number(b.price ?? 0).toLocaleString("en-US") : Number(b.price ?? 0).toFixed(2)}</span></td><td style="vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${toAbsoluteUrl(b.link)}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td></tr>`
           ).join("");
         }
       } else {
         productsHtml = manualProducts.map((p) =>
-          `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><table cellpadding="0" cellspacing="0" width="100%"><tr>${p.imageUrl ? `<td style="width:64px;vertical-align:top;padding-right:12px;"><img src="${p.imageUrl}" alt="${p.title}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;display:block;" /></td>` : ""}<td style="vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${p.title}</strong>${p.description ? `<p style="color:#4a6070;font-size:13px;margin:2px 0;">${p.description}</p>` : ""}${p.price ? `<span style="color:${accent};font-size:13px;font-weight:600;">${p.price}</span>` : ""}</td><td style="vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${p.link || '#'}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td></tr>`
+          `<tr><td style="padding:10px 0;border-bottom:1px solid #e5eaec;"><table cellpadding="0" cellspacing="0" width="100%"><tr>${p.imageUrl ? `<td style="width:64px;vertical-align:top;padding-right:12px;"><img src="${p.imageUrl}" alt="${p.title}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;display:block;" /></td>` : ""}<td style="vertical-align:top;"><strong style="color:#0e1e2e;font-size:14px;display:block;">${p.title}</strong>${p.description ? `<p style="color:#4a6070;font-size:13px;margin:2px 0;">${p.description}</p>` : ""}${p.price ? `<span style="color:${accent};font-size:13px;font-weight:600;">${p.price}</span>` : ""}</td><td style="vertical-align:middle;text-align:right;white-space:nowrap;"><a href="${toAbsoluteUrl(p.link)}" style="display:inline-block;background:${accent};color:#ffffff;text-decoration:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;">${ctaText}</a></td></tr></table></td></tr>`
         ).join("");
       }
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border-radius:8px;padding:24px;margin:12px 0;"><tr><td>${headline ? `<h3 style="color:#0e1e2e;font-size:20px;font-weight:700;margin:0 0 ${subtext ? '4px' : '16px'};">` + headline + `</h3>` : ""}${subtext ? `<p style="color:#4a6070;font-size:14px;margin:0 0 16px;">` + subtext + `</p>` : ""}<table width="100%" cellpadding="0" cellspacing="0">${productsHtml}</table></td></tr></table>`;
@@ -648,12 +655,12 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
   const selectedIds = (d.selectedIds as number[]) ?? [];
   // Build a flat list of all available products from blockOptions for rendering resolution
   const allAvailableProducts = useMemo(() => [
-    ...(blockOptions?.courses ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price, imageUrl: p.coverImageUrl ?? "", link: `/courses/${p.slug}`, description: "" })),
-    ...(blockOptions?.webinars ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price, imageUrl: p.coverImageUrl ?? "", link: `/webinars/${p.slug}`, description: "" })),
-    ...(blockOptions?.workshopInstances ?? []).map((p: any) => ({ id: p.id + 100000, title: p.workshopTitle ?? p.title, price: p.price ?? 0, imageUrl: p.workshopCoverImageUrl ?? "", link: `/workshops/${p.workshopSlug}`, description: "" })),
-    ...(blockOptions?.bundles ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price ?? 0, imageUrl: p.coverImage ?? "", link: `/bundles/${p.slug}`, description: "" })),
-    ...(blockOptions?.downloads ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price ?? 0, imageUrl: p.coverImageUrl ?? "", link: `/downloads/${p.slug}`, description: "" })),
-    ...(blockOptions?.quizzes ?? []).map((p: any) => ({ id: p.id, title: p.title, price: 0, imageUrl: "", link: `/quizzes/${p.id}`, description: "" })),
+    ...(blockOptions?.courses ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price, imageUrl: p.coverImageUrl ?? "", link: `https://learn.allaboutultrasound.com/courses/${p.slug}`, description: "" })),
+    ...(blockOptions?.webinars ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price, imageUrl: p.coverImageUrl ?? "", link: `https://learn.allaboutultrasound.com/webinars/${p.slug}`, description: "" })),
+    ...(blockOptions?.workshopInstances ?? []).map((p: any) => ({ id: p.id + 100000, title: p.workshopTitle ?? p.title, price: p.price ?? 0, imageUrl: p.workshopCoverImageUrl ?? "", link: `https://learn.allaboutultrasound.com/workshops/${p.workshopSlug}`, description: "" })),
+    ...(blockOptions?.bundles ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price ?? 0, imageUrl: p.coverImage ?? "", link: `https://learn.allaboutultrasound.com/bundles/${p.slug}`, description: "" })),
+    ...(blockOptions?.downloads ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price ?? 0, imageUrl: p.coverImageUrl ?? "", link: `https://learn.allaboutultrasound.com/downloads/${p.slug}`, description: "" })),
+    ...(blockOptions?.quizzes ?? []).map((p: any) => ({ id: p.id, title: p.title, price: 0, imageUrl: "", link: `https://learn.allaboutultrasound.com/quizzes/${p.id}`, description: "" })),
   ], [blockOptions]);
 
   // Auto-resolve: when blockOptions loads and selectedIds exist but resolvedItems is empty, populate resolvedItems
