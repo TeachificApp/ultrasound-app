@@ -1781,7 +1781,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
           status: (src.status === "public" || src.status === "hidden" || src.status === "archived" ? src.status : "draft") as any,
           type: newType as any,
           brand: (src.brand ?? "aaus") as any,
-          price: Math.round((src.price ?? 0) / 100), // workshops stores cents, lms_courses stores dollars
+          price: Number(src.price ?? 0), // workshops now stores dollars (same as lms_courses)
           isFree: src.isFree ?? false,
           currency: src.currency ?? "usd",
           pricingType: (src.pricingType ?? "one_time") as any,

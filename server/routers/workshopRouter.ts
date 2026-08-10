@@ -541,7 +541,7 @@ export const workshopLearnerRouter = router({
       }
 
       // Determine price (instance override or workshop default)
-      // Both instance.price and workshop.price are stored in cents (int)
+      // Both instance.price and workshop.price are stored in dollars (matching all other product types)
       const priceInCents =
         instance.price != null
           ? Math.round(Number(instance.price))
@@ -636,7 +636,7 @@ export const workshopLearnerRouter = router({
         primaryColor: workshop.primaryColor ?? "#179ca3",
         accentColor: workshop.accentColor ?? "#0d9488",
         productName: `${workshop.title} — ${instanceTitle}`,
-        displayPrice: Math.round(priceInCents / 100),
+        displayPrice: Math.round(priceInCents),
         currency: workshop.currency,
         ...workshopTerms,
       };
@@ -1458,7 +1458,7 @@ export const workshopAdminRouter = router({
         const session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: entry.email,
-          line_items: [{ price_data: { currency: "usd", product_data: { name: workshop.title }, unit_amount: priceInCents }, quantity: 1 }],
+          line_items: [{ price_data: { currency: "usd", product_data: { name: workshop.title }, unit_amount: Math.round(priceInCents * 100) }, quantity: 1 }],
           success_url: `${input.origin}/workshops/${workshop.slug}?enrolled=1`,
           cancel_url: `${input.origin}/workshops/${workshop.slug}`,
           metadata: { workshopId: String(input.workshopId), waitlistEntryId: String(input.entryId), grantedByAdminId: String(ctx.user.id) },
@@ -1469,7 +1469,7 @@ export const workshopAdminRouter = router({
         await sendEmail({
           to: { name: entry.name, email: entry.email },
           subject: `Your spot in ${workshop.title} — Complete your enrollment`,
-          htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px"><h2 style="color:#189aa1">You've been granted access to ${workshop.title}</h2><p>Hi ${entry.name},</p><p>Great news! You've been selected from the waitlist for <strong>${workshop.title}</strong>.</p><p>Please complete your enrollment:</p><p style="text-align:center;margin:30px 0"><a href="${session.url}" style="background:#189aa1;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">Complete Enrollment — $${(priceInCents / 100).toFixed(2)}</a></p></div>`,
+          htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px"><h2 style="color:#189aa1">You've been granted access to ${workshop.title}</h2><p>Hi ${entry.name},</p><p>Great news! You've been selected from the waitlist for <strong>${workshop.title}</strong>.</p><p>Please complete your enrollment:</p><p style="text-align:center;margin:30px 0"><a href="${session.url}" style="background:#189aa1;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">Complete Enrollment — $${Number(priceInCents).toFixed(2)}</a></p></div>`,
         });
         return { success: true, type: "paid", checkoutUrl: session.url, message: `Checkout link sent to ${entry.email}` };
       }

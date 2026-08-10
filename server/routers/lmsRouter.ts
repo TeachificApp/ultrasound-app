@@ -690,7 +690,7 @@ export const lmsAIRouter = router({
         } else if (input.productType === "workshop") {
           const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, price: workshops.price, isFree: workshops.isFree }).from(workshops).where(eq(workshops.id, input.productId)).limit(1);
           if (workshop) {
-            const priceStr = workshop.isFree ? "Free" : workshop.price ? `$${(Number(workshop.price) / 100).toFixed(2)}` : "Paid";
+            const priceStr = workshop.isFree ? "Free" : workshop.price ? `$${Number(workshop.price).toFixed(2)}` : "Paid";
             productDetails = `Product: "${workshop.title}" (Workshop)\nPrice: ${priceStr}`;
             if (!landingPageUrl && workshop.slug) landingPageUrl = `https://learn.allaboutultrasound.com/workshops/${workshop.slug}`;
           }

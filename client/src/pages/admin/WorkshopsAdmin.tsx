@@ -350,7 +350,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setDescription(w.description ?? "");
     setStatus((w.status as any) ?? "draft");
     setBrand((w.brand as any) ?? "aaus");
-    setPrice((w.price ?? 0) / 100);
+    setPrice(w.price ?? 0);
     setCompareAtPrice(w.compareAtPrice != null ? w.compareAtPrice / 100 : "");
     setIsFree(w.isFree ?? false);
     setCurriculumEnabled(w.curriculumEnabled ?? true);
@@ -425,7 +425,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     updateMutation.mutate({
       id: workshopId,
       title, slug, subtitle: subtitle || null, description: description || null,
-      status, brand, price: Math.round(price * 100),
+      status, brand, price: Number(price),
       compareAtPrice: compareAtPrice !== "" ? Math.round(Number(compareAtPrice) * 100) : null,
       isFree, curriculumEnabled, showInLibrary, isFeatured,
       publishDomain: publishDomain || null,
@@ -460,7 +460,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setInstVenueCity(inst.venueCity ?? "");
     setInstVenueState(inst.venueState ?? "");
     setInstCapacity(inst.capacity ?? "");
-    setInstPrice(inst.price != null ? inst.price / 100 : "");
+    setInstPrice(inst.price != null ? inst.price : "");
     setInstAvailableForPurchase(inst.availableForPurchase ?? false);
     setInstSalesCloseDate(inst.salesCloseDate ? new Date(inst.salesCloseDate).toISOString().slice(0, 16) : "");
     setInstSalesOpenDate(inst.salesOpenDate ? new Date(inst.salesOpenDate).toISOString().slice(0, 16) : "");
@@ -483,7 +483,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
       venueCity: instVenueCity || undefined,
       venueState: instVenueState || undefined,
       capacity: instCapacity !== "" ? Number(instCapacity) : null,
-      price: instPrice !== "" ? Math.round(Number(instPrice) * 100) : null,
+      price: instPrice !== "" ? Number(instPrice) : null,
       availableForPurchase: instAvailableForPurchase,
       salesCloseDate: instSalesCloseDate || null,
       salesOpenDate: instSalesOpenDate || null,

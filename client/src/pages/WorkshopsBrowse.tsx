@@ -15,7 +15,7 @@ function WorkshopCard({ workshop }: { workshop: any }) {
   const price =
     workshop.isFree || workshop.price === 0
       ? "Free"
-      : `$${(workshop.price / 100).toFixed(2)}`;
+      : `$${Number(workshop.price).toFixed(2)}`;
 
   return (
     <Link href={`/workshops/${workshop.slug}`}>

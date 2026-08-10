@@ -140,7 +140,7 @@ export default function WorkshopDetail() {
   const { workshop, availableInstances, pricingOptions } = data;
   const defaultPrice = formatPrice(workshop.price, workshop.isFree);
   const compareAt = workshop.compareAtPrice
-    ? `$${(workshop.compareAtPrice / 100).toFixed(2)}`
+    ? `$${Number(workshop.compareAtPrice).toFixed(2)}`
     : null;
   const isDraft = workshop.status === "draft" || workshop.status === "enrollment_closed";
 

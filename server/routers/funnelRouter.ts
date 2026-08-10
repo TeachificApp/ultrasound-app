@@ -76,7 +76,7 @@ export const funnelRouter = router({
       ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, price: Number(p.price ?? 0), imageUrl: p.thumbnailUrl ?? "" })),
       ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, price: Number(w.price ?? 0), imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
       ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, price: 0, imageUrl: c.coverImage ?? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp", isFree: c.accessType === "free" })),
-      ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: Number(w.price ?? 0) / 100, imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
+      ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: Number(w.price ?? 0), imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
       ...APP_PRODUCTS, // App products already in dollars (9.97, 12.99, etc.)
     ];
   }),
@@ -209,7 +209,7 @@ export const funnelRouter = router({
       for (const c of communityRows as any[]) map.set(`community-${c.id}`, { ...c, type: "community", isFree: c.accessType === "free", price: 0, href: `/community/${c.slug}`, imageUrl: c.imageUrl ?? COMMUNITY_FALLBACK_IMG });
       for (const w of workshopRows as any[]) {
         const nextInstance = workshopInstanceMap.get(w.id) ?? null;
-        map.set(`workshop-${w.id}`, { ...w, type: "workshop", isFree: w.isFree ?? false, price: (w.price ?? 0) / 100, href: `/workshops/${w.slug}`, nextInstance });
+        map.set(`workshop-${w.id}`, { ...w, type: "workshop", isFree: w.isFree ?? false, price: Number(w.price ?? 0), href: `/workshops/${w.slug}`, nextInstance });
       }
       for (const appId of appIds) {
         const app = APP_REGISTRY[appId];

@@ -33,7 +33,7 @@ function CourseCard({ course, enrolledCourseIds, purchasedProductSlugs }: { cour
     : course.pricingType === "payment_plan" ? " (plan)"
     : "";
   // Workshops store price in cents; all other types store in dollars
-  const rawPrice = (course._itemType === "workshop" || course._source === "workshop") ? Number(course.price) / 100 : Number(course.price);
+  const rawPrice = Number(course.price);
   const price = (course.isFree || course.price === 0) ? "Free" : `$${rawPrice.toFixed(2)}${subscriptionSuffix}`;
   const isOwned = course._source === "digital_product"
     ? purchasedProductSlugs.has(course.slug)
