@@ -77,6 +77,8 @@ import {
   ChevronDown,
   Pencil,
   Activity,
+  BookOpen,
+  CheckCircle2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -940,6 +942,11 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   const [slugInitialized, setSlugInitialized] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState("");
+  const [extractOpen, setExtractOpen] = useState(false);
+  const [extractFolderMode, setExtractFolderMode] = useState<"new" | "existing">("new");
+  const [extractNewFolderName, setExtractNewFolderName] = useState("");
+  const [extractFolderId, setExtractFolderId] = useState<number | null>(null);
+  const [extractResult, setExtractResult] = useState<{ totalInserted: number; results: { groupName: string; inserted: number }[] } | null>(null);
 
   const { data, refetch } = trpc.mediaRepo.getAsset.useQuery(
     { id: assetId! },
@@ -1001,6 +1008,17 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   const revokeMutation = trpc.mediaRepo.revokeGrant.useMutation({
     onSuccess: () => { toast.success("Grant revoked"); refetch(); },
   });
+  const previewExtractMutation = trpc.questionBank.previewScormImport.useMutation({
+    onError: (e) => toast.error(`Preview failed: ${e.message}`),
+  });
+  const confirmExtractMutation = trpc.questionBank.confirmScormImport.useMutation({
+    onSuccess: (res) => {
+      setExtractResult(res as any);
+      toast.success(`Extracted ${(res as any).totalInserted} questions to Question Bank!`);
+    },
+    onError: (e) => toast.error(`Extraction failed: ${e.message}`),
+  });
+  const { data: bankFolders } = trpc.questionBank.listFolders.useQuery();
   const reExtractMutation = trpc.mediaRepo.reExtractScorm.useMutation({
     onSuccess: () => toast.success("Re-extraction started — runs in the background, may take a minute."),
     onError: (e) => toast.error(`Re-extraction failed: ${e.message}`),
@@ -1096,6 +1114,16 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
               <Button size="sm" variant="outline" onClick={() => setReuploadOpen(true)}>
                 <Upload className="w-3 h-3 mr-1" />Upload New Version
               </Button>
+              {(asset.mediaType === "scorm" || asset.mediaType === "zip" || asset.mediaType === "lms" || asset.mimeType?.includes("zip") || asset.title?.toLowerCase().endsWith(".quiz")) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                  onClick={() => { setExtractOpen(true); setExtractResult(null); setExtractNewFolderName(asset.title ?? ""); }}
+                >
+                  <BookOpen className="w-3 h-3 mr-1" />Extract to Question Bank
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="destructive"
@@ -1426,6 +1454,104 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
           existingAssetId={asset.id}
           existingTitle={asset.title}
         />
+      )}
+      {/* ── Extract to Question Bank Dialog ── */}
+      {extractOpen && (
+        <Dialog open={extractOpen} onOpenChange={(v) => { if (!v) { setExtractOpen(false); setExtractResult(null); } }}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-sm">
+                <BookOpen className="w-4 h-4 text-teal-600" />
+                Extract to Question Bank
+              </DialogTitle>
+            </DialogHeader>
+            {extractResult ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <p className="text-sm font-medium">{extractResult.totalInserted} question{extractResult.totalInserted !== 1 ? "s" : ""} extracted successfully!</p>
+                </div>
+                <div className="space-y-1">
+                  {extractResult.results.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-gray-100 last:border-0">
+                      <span className="text-gray-700 font-medium">{r.groupName}</span>
+                      <span className="text-teal-600">{r.inserted} question{r.inserted !== 1 ? "s" : ""}</span>
+                    </div>
+                  ))}
+                </div>
+                <DialogFooter>
+                  <Button size="sm" onClick={() => { setExtractOpen(false); setExtractResult(null); }}>Done</Button>
+                </DialogFooter>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-xs text-gray-500">
+                  All questions in this file will be extracted with their associated media (images, audio) and saved as native question bank questions.
+                </p>
+                {/* Folder selection */}
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-700">Save to Folder</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setExtractFolderMode("new")}
+                      className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-medium transition-colors ${extractFolderMode === "new" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                    >
+                      Create New Folder
+                    </button>
+                    <button
+                      onClick={() => setExtractFolderMode("existing")}
+                      className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-medium transition-colors ${extractFolderMode === "existing" ? "bg-teal-600 text-white border-teal-600" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                    >
+                      Use Existing Folder
+                    </button>
+                  </div>
+                  {extractFolderMode === "new" ? (
+                    <input
+                      type="text"
+                      value={extractNewFolderName}
+                      onChange={e => setExtractNewFolderName(e.target.value)}
+                      placeholder="Folder name (auto-filled from file title)"
+                      className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm"
+                    />
+                  ) : (
+                    <select
+                      value={extractFolderId ?? ""}
+                      onChange={e => setExtractFolderId(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white"
+                    >
+                      <option value="">— No folder (uncategorized) —</option>
+                      {((bankFolders as any[]) ?? []).map((f: any) => (
+                        <option key={f.id} value={f.id}>{f.name}{f.questionCount != null ? ` (${f.questionCount} questions)` : ""}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setExtractOpen(false)}>Cancel</Button>
+                  <Button
+                    size="sm"
+                    className="bg-teal-600 hover:bg-teal-700 text-white"
+                    disabled={confirmExtractMutation.isPending || (extractFolderMode === "new" && !extractNewFolderName.trim())}
+                    onClick={() => {
+                      confirmExtractMutation.mutate({
+                        mediaAssetId: asset.id,
+                        ...(extractFolderMode === "new" && extractNewFolderName.trim()
+                          ? { newFolderName: extractNewFolderName.trim() }
+                          : { folderId: extractFolderId ?? undefined }),
+                      });
+                    }}
+                  >
+                    {confirmExtractMutation.isPending ? (
+                      <><RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />Extracting…</>
+                    ) : (
+                      <><BookOpen className="w-3 h-3 mr-1.5" />Extract Questions</>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
