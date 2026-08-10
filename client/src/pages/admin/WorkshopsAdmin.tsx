@@ -5,7 +5,7 @@
  *
  * Tabs: Settings | Instances | Resources | Curriculum | Landing Page | Enrollments
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +100,9 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
+  const [reorderMode, setReorderMode] = useState(false);
+  const [localWorkshops, setLocalWorkshops] = useState<any[]>([]);
+  const prevDataRef = useRef<any>(null);
   const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.workshopAdmin.list.useQuery({
