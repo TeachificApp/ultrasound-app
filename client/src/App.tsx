@@ -255,6 +255,7 @@ const SonoQuizPlay = lazy(() => import("./pages/SonoQuizPlay"));
 const ImageQualityReview = lazy(() => import("./pages/ImageQualityReview"));
 // ── Standalone Quiz Creator ───────────────────────────────────────────────────
 const QuizCreatorAdmin = lazy(() => import("./pages/admin/QuizCreatorAdmin"));
+const QuizVisualBuilder = lazy(() => import("./pages/admin/QuizVisualBuilder"));
 const QuestionBankPage = lazy(() => import("./pages/QuestionBankPage"));
 const QuestionBankImportPage = lazy(() => import("./pages/QuestionBankImportPage"));
 const StandaloneQuizPlayer = lazy(() => import("./pages/StandaloneQuizPlayer"));
@@ -632,6 +633,8 @@ function Router() {
         <Route path="/quiz/:joinCode">{() => <SonoQuizPlay />}</Route>
         <Route path="/image-quality-review">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ImageQualityReview /></RoleGuard>}</Route>
         {/* ── Standalone Quiz Creator ────────────────────────────────────────────────── */}
+        <Route path="/admin/quiz-creator/builder/new">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizVisualBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/quiz-creator/:quizId/builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizVisualBuilder /></RoleGuard>}</Route>
         <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
         <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
         {/* ── Question Bank ─────────────────────────────────────────────────────────────────────────────────────── */}
@@ -739,6 +742,8 @@ function MembersRouter() {
       <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/sonoquiz/host/:sessionId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SonoQuizHost /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/sonoquiz">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SonoQuizCreator /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/quiz-creator/builder/new">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><QuizVisualBuilder /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/quiz-creator/:quizId/builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><QuizVisualBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
       <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
       <Route path="/question-bank/import">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankImportPage /></RoleGuard>}</Route>

@@ -109,7 +109,7 @@ function SortableQuestionItem({ question, isActive, onClick, groupColor }: { que
   );
 }
 
-export function QuestionList() {
+export function QuestionList({ compact = false }: { compact?: boolean }) {
   const { quiz, activeQuestionId, setActiveQuestion, addQuestion, reorderQuestions } = useQuizStore();
   const [showTypePicker, setShowTypePicker] = useState(false);
 
@@ -129,8 +129,9 @@ export function QuestionList() {
   const totalPoints = quiz.questions.reduce((sum, q) => sum + q.points, 0);
 
   return (
-    <div className="w-72 shrink-0 border-r border-gray-100 flex flex-col h-full bg-white">
+    <div className={`${compact ? "w-full" : "w-72 shrink-0 border-r border-gray-100"} flex flex-col h-full bg-white`}>
       {/* Header */}
+      {!compact && (
       <div className="px-4 py-3 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <span className="text-sm font-semibold text-gray-700">
@@ -139,6 +140,7 @@ export function QuestionList() {
           <span className="text-xs text-gray-400">{totalPoints} pts total</span>
         </div>
       </div>
+      )}
 
       {/* Question list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">

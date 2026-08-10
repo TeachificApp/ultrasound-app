@@ -13,6 +13,12 @@ import { Progress } from "@/components/ui/progress";
 import { Loader2, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, AlertTriangle, BookOpen } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import {
+  BuilderIntroScreen,
+  BuilderQuestionFrame,
+  FeedbackPopup,
+  getFeedbackMessage,
+} from "@/components/quiz/BuilderQuizPlayer";
 
 // ─── Timer hook ───────────────────────────────────────────────────────────────
 function useTimer(limitSeconds: number | null, onExpire: () => void) {
@@ -84,6 +90,11 @@ export default function StandaloneQuizPlayer() {
   const [questionTimes, setQuestionTimes] = useState<Record<number, number>>({});
   const [qStartTime, setQStartTime] = useState(Date.now());
   const [quizData, setQuizData] = useState<any>(null);
+  const [feedbackPopup, setFeedbackPopup] = useState<{ type: "correct" | "incorrect" | "partial"; message: string } | null>(null);
+
+  const builderMeta = (quizInfo as any)?.builderConfig ?? quizData?.builderMeta ?? null;
+  const branding = builderMeta?.branding ?? null;
+  const isBuilderMode = !!(quizData?.builderMode || builderMeta);
 
   const limitSeconds = quizInfo?.timeLimitMinutes ? quizInfo.timeLimitMinutes * 60 : null;
 
@@ -180,6 +191,21 @@ export default function StandaloneQuizPlayer() {
 
   // ── Intro screen ──
   if (phase === "idle") {
+    if (builderMeta) {
+      return (
+        <BuilderIntroScreen
+          intro={builderMeta.introSlide}
+          branding={branding}
+          quizTitle={quizInfo.title}
+          questionCount={quizInfo.questionCount}
+          timeLimitMinutes={quizInfo.timeLimitMinutes}
+          passingScore={quizInfo.passingScore}
+          onStart={handleStart}
+          disabled={!quizInfo.canAttempt}
+          loading={startMutation.isPending}
+        />
+      );
+    }
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 max-w-lg w-full p-8">
@@ -242,6 +268,94 @@ export default function StandaloneQuizPlayer() {
 
   const progress = ((currentIdx + 1) / questions.length) * 100;
   const answeredCount = Object.keys(answers).length;
+
+  // ── Builder mode (iSpring-style themed player) ──
+  if (isBuilderMode && (q.type === "mcq" || q.type === "image_choice" || q.type === "tf")) {
+    const mcqData = q.data as { choices?: { id: string; text: string; correct: boolean }[]; correct?: boolean } | undefined;
+    const choices = q.type === "tf"
+      ? [{ id: "true", text: "TRUE", correct: mcqData?.correct === true }, { id: "false", text: "FALSE", correct: mcqData?.correct === false }]
+      : (mcqData?.choices ?? []);
+    const selectedIds: string[] = givenAnswer ? (() => { try { return JSON.parse(givenAnswer); } catch { return [givenAnswer]; } })() : [];
+    const primary = branding?.primaryColor ?? "#24abbc";
+
+    const handleBuilderSubmit = () => {
+      if (givenAnswer === undefined) return;
+      if (isQuizMode) {
+        const fb = getFeedbackMessage(q, givenAnswer);
+        setFeedbackPopup(fb);
+        handleReveal(q.questionBankId);
+      }
+    };
+
+    return (
+      <>
+        {feedbackPopup && (
+          <FeedbackPopup type={feedbackPopup.type} message={feedbackPopup.message} onClose={() => setFeedbackPopup(null)} />
+        )}
+        <BuilderQuestionFrame branding={branding} question={q} footer={
+          <div className="flex items-center gap-3 w-full justify-between pt-4">
+            <Button variant="outline" onClick={handlePrev} disabled={currentIdx === 0} className="border-white/30 text-white bg-transparent hover:bg-white/10">
+              <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+            </Button>
+            {timerDisplay && <span className="text-sm font-mono text-white/70"><Clock className="w-4 h-4 inline mr-1" />{timerDisplay}</span>}
+            {currentIdx < questions.length - 1 ? (
+              <button
+                type="button"
+                onClick={() => { if (isQuizMode && !isRevealed) handleBuilderSubmit(); else handleNext(); }}
+                disabled={givenAnswer === undefined || (isQuizMode && !isRevealed && givenAnswer === undefined)}
+                className="px-6 py-2 border-2 border-white text-white font-semibold rounded hover:bg-white/10 disabled:opacity-40"
+              >
+                {isQuizMode && !isRevealed ? "Submit" : "Next"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { if (isQuizMode && !isRevealed) handleBuilderSubmit(); else handleSubmit(); }}
+                className="px-6 py-2 font-semibold text-white rounded"
+                style={{ background: primary }}
+              >
+                Finish
+              </button>
+            )}
+          </div>
+        }>
+          <div className="flex items-center justify-between text-xs opacity-60 mb-4">
+            <span>Question {currentIdx + 1} of {questions.length}</span>
+            <span>{answeredCount} answered</span>
+          </div>
+          <p className="text-lg font-medium mb-6 leading-relaxed">{q.question}</p>
+          <div className="flex gap-8">
+            <div className="flex-1 space-y-3">
+              {choices.map((c) => {
+                const isSelected = selectedIds.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={isQuizMode && !!isRevealed}
+                    onClick={() => recordAnswer(q.questionBankId, JSON.stringify([c.id]))}
+                    className="flex items-center gap-3 w-full text-left disabled:opacity-60"
+                  >
+                    <span className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center ${isSelected ? "border-white bg-white" : "border-white/60"}`}>
+                      {isSelected && <span className="w-2.5 h-2.5 rounded-full bg-gray-900" />}
+                    </span>
+                    <span className="text-sm">{c.text}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {(q.questionImageUrl || q.questionVideoUrl) && (
+              <div className="w-1/2 flex items-center justify-center">
+                {q.questionVideoUrl
+                  ? <video src={q.questionVideoUrl} controls className="max-h-64 w-full rounded-lg" />
+                  : <img src={q.questionImageUrl} alt="" className="max-h-64 rounded-lg object-contain" />}
+              </div>
+            )}
+          </div>
+        </BuilderQuestionFrame>
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

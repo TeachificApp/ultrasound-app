@@ -26,7 +26,7 @@ import {
   Users, CheckCircle, XCircle, Clock, Search, ChevronLeft, ChevronRight,
   Eye, EyeOff, Copy, Loader2, AlertTriangle, GripVertical, X,
   Sparkles, Upload, FileSpreadsheet, FolderPlus, Tag, FileUp,
-  Database, Radio, TrendingUp, ExternalLink,
+  Database, Radio, TrendingUp, ExternalLink, FileQuestion,
   Download,
 } from "lucide-react";
 import { getAdminUrl, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
@@ -1237,6 +1237,9 @@ function QuizList() {
             <p className="text-sm text-gray-500 mt-1">Create and manage standalone quizzes and mock exams</p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/admin/quiz-creator/builder/new")} className="border-teal-300 text-teal-700 hover:bg-teal-50">
+              <FileQuestion className="w-4 h-4 mr-2" /> Visual Builder
+            </Button>
             <Button variant="outline" onClick={() => setShowImport(true)} className="border-orange-300 text-orange-700 hover:bg-orange-50">
               <Upload className="w-4 h-4 mr-2" /> Import Quiz
             </Button>
@@ -1607,6 +1610,13 @@ function QuizEditor({ quizId }: { quizId: number }) {
               <span className="text-xs text-gray-400">{questions.length} questions</span>
             </div>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/admin/quiz-creator/${quiz.id}/builder`)}
+          >
+            <FileQuestion className="w-4 h-4 mr-1" /> Visual Builder
+          </Button>
           <Button
             variant="outline"
             size="sm"
