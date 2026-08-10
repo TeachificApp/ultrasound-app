@@ -327,7 +327,7 @@ export function exportQuizToExcel(quizTitle: string, questions: ExportQuestion[]
   // ── Questions sheet ──────────────────────────────────────────────────────
   const HEADER = [
     "Question Type", "Question Text", "Image", "Video", "Audio",
-    "Answer 1", "Answer 2", "Answer 3", "Answer 4", "Answer 5",
+    "Answer 1 - CORRECT ANSWER", "Answer 2", "Answer 3", "Answer 4", "Answer 5",
     "Answer 6", "Answer 7", "Answer 8", "Answer 9", "Answer 10",
     "Correct Feedback", "Incorrect Feedback", "Points",
   ];

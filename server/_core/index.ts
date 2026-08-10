@@ -21,6 +21,7 @@ import { registerProcessRichTextHtmlRoute } from "../routes/processRichTextHtml"
 import { registerReconstructMathRoute } from "../routes/reconstructMath";
 import { registerUploadQuizBankFileRoute } from "../routes/uploadQuizBankFile";
 import quizImportRouter from "../quizImportRoutes";
+import questionBankExportRouter from "../routes/questionBankExport";
 import { registerUploadDigitalFileRoute } from "../routes/uploadDigitalFile";
 import { registerUploadCohortMediaRoute } from "../routes/uploadCohortMedia";
 import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResource";
@@ -245,6 +246,7 @@ async function startServer() {
   registerUploadQuizBankFileRoute(app);
   // Quiz bank import REST routes (preview, confirm-native, csv-template, xlsx template)
   app.use("/api/quiz", quizImportRouter);
+  app.use("/api/quiz/question-bank", questionBankExportRouter);
   // Digital download file upload (multipart, bypasses JSON body limit)
   registerUploadDigitalFileRoute(app);
   // Cohort group discussion media upload (images + videos, admin only)
