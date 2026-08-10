@@ -416,32 +416,47 @@ async function startServer() {
 
   app.get("/api/email/track/click/:campaignId/:recipientKey", async (req: any, res: any) => {
     const url = req.query.url as string;
-    const destination = url && typeof url === "string" ? url : "/";
+    const rawDest = url && typeof url === "string" ? url.trim() : "";
+    // Ensure we always redirect to an absolute URL — relative paths cause ERR_INVALID_REDIRECT
+    const { getEmailCampaignAppUrl } = await import("../lib/emailCampaignTracking");
+    const appUrl = getEmailCampaignAppUrl();
+    let destination: string;
+    if (!rawDest) {
+      destination = appUrl;
+    } else if (rawDest.startsWith("http://") || rawDest.startsWith("https://")) {
+      destination = rawDest;
+    } else if (rawDest.startsWith("/")) {
+      destination = `${appUrl}${rawDest}`;
+    } else {
+      destination = appUrl;
+    }
+    // Redirect immediately — record the click event asynchronously so the user isn't delayed
+    res.redirect(302, destination);
     const campaignId = parseInt(req.params.campaignId, 10);
     const key = String(req.params.recipientKey ?? "");
     const variant = typeof req.query.v === "string" ? req.query.v : undefined;
-
-    try {
-      if (!Number.isNaN(campaignId) && key) {
-        const { getDb } = await import("../db");
-        const db = await getDb();
-        if (db) {
-          const { ensureEmailCampaignEventsTable } = await import("../lib/campaignUnsubscribe");
-          await ensureEmailCampaignEventsTable(db);
-          const { recordEmailCampaignEvent } = await import("../lib/emailCampaignTracking");
-          await recordEmailCampaignEvent(db, {
-            campaignId,
-            recipientKey: key,
-            eventType: "click",
-            metadata: { url: destination, ...(variant ? { variant } : {}) },
-          });
+    // Record click event in background (non-blocking)
+    setImmediate(async () => {
+      try {
+        if (!Number.isNaN(campaignId) && key) {
+          const { getDb } = await import("../db");
+          const db = await getDb();
+          if (db) {
+            const { ensureEmailCampaignEventsTable } = await import("../lib/campaignUnsubscribe");
+            await ensureEmailCampaignEventsTable(db);
+            const { recordEmailCampaignEvent } = await import("../lib/emailCampaignTracking");
+            await recordEmailCampaignEvent(db, {
+              campaignId,
+              recipientKey: key,
+              eventType: "click",
+              metadata: { url: destination, ...(variant ? { variant } : {}) },
+            });
+          }
         }
+      } catch (err) {
+        console.error("[EmailTrack] Failed to record click:", err);
       }
-    } catch (err) {
-      console.error("[EmailTrack] Failed to record click:", err);
-    }
-
-    res.redirect(302, destination);
+    });
   });
 
   // RFC 8058 one-click unsubscribe (List-Unsubscribe-Post from Gmail/Yahoo)
