@@ -275,6 +275,7 @@ Rules:
       instruction: z.string().min(3).max(1000),
       tone: z.enum(["professional", "enthusiastic", "educational", "urgent", "friendly"]).default("professional"),
       emailContext: z.string().optional(), // brief summary of the overall email for context
+      generateBlockImage: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx.user.id);
@@ -334,7 +335,26 @@ Rules:
       try { parsed = JSON.parse(raw); } catch {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
       }
-      return { html: parsed.html ?? "", blockId: input.blockId ?? null };
+      // Optionally generate an image for this block
+      let blockImageUrl: string | null = null;
+      if (input.generateBlockImage) {
+        try {
+          const imgPrompt = `Professional medical education email block image. ${input.instruction}. Clean, modern design. Teal and white color palette. No text overlay. High quality, suitable for email.`;
+          const { url: genUrl } = await generateImage({ prompt: imgPrompt });
+          const imgRes = await fetch(genUrl);
+          if (imgRes.ok) {
+            const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+            const key = `email-campaigns/ai-block-images/${Date.now()}-block.png`;
+            const { url: s3Url } = await storagePut(key, imgBuf, "image/png");
+            blockImageUrl = s3Url;
+          } else {
+            blockImageUrl = genUrl;
+          }
+        } catch (e) {
+          console.error("[AI Email Block] Image generation failed:", e);
+        }
+      }
+      return { html: parsed.html ?? "", blockId: input.blockId ?? null, imageUrl: blockImageUrl };
     }),
 
 });

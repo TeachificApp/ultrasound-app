@@ -156,7 +156,9 @@ export function emailBlockToHtml(block: Block): string {
       const bg = (d.bgColor as string) ?? "";
       const color = (d.textColor as string) ?? "#1a2e3b";
       const bgStyle = bg && bg !== "#ffffff" ? `background:${bg};` : "";
-      return `<div style="${bgStyle}padding:8px 0;color:${color};font-size:15px;line-height:1.7;text-align:${align};">${html}</div>`;
+      const aiImg = (d.aiImageUrl as string) ?? "";
+      const imgHtml = aiImg ? `<div style="margin-bottom:12px;"><img src="${aiImg}" alt="" style="max-width:100%;width:100%;display:block;border-radius:8px;" /></div>` : "";
+      return `<div style="${bgStyle}padding:8px 0;color:${color};font-size:15px;line-height:1.7;text-align:${align};">${imgHtml}${html}</div>`;
     }
     case "image": {
       const url = (d.url as string) ?? "";
@@ -934,6 +936,7 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
   const [aiBlockId, setAiBlockId] = useState<string | null>(null);
   const [aiBlockInstruction, setAiBlockInstruction] = useState("");
   const [aiBlockTone, setAiBlockTone] = useState<"professional" | "enthusiastic" | "educational" | "urgent" | "friendly">("professional");
+  const [aiBlockGenerateImage, setAiBlockGenerateImage] = useState(false);
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(EMAIL_CATALOG_CATEGORIES));
   const [rightPanelWidth, setRightPanelWidth] = useState(300);
   const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -1001,14 +1004,20 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
       const blockId = (res as any).blockId ?? vars.blockId;
       const block = blocks.find(b => b.id === blockId);
       if (!block) return;
+      const updates: Record<string, any> = {};
       if (block.type === "button") {
-        updateBlock(blockId, { text: res.html });
+        updates.text = res.html;
       } else {
-        updateBlock(blockId, { html: res.html });
+        updates.html = res.html;
       }
+      if ((res as any).imageUrl) {
+        updates.aiImageUrl = (res as any).imageUrl;
+      }
+      updateBlock(blockId, updates);
       setAiBlockId(null);
       setAiBlockInstruction("");
-      toast.success("Block regenerated!");
+      setAiBlockGenerateImage(false);
+      toast.success("Block regenerated!" + ((res as any).imageUrl ? " Image added." : ""));
     },
     onError: (e) => toast.error("AI failed: " + e.message),
   });
@@ -1189,6 +1198,21 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
                     >
                       <Wand2 size={12} />
                     </button>
+                  )}
+                  {/* AI-generated image preview with independent remove button */}
+                  {block.data?.aiImageUrl && (
+                    <div className="relative mt-1 mx-2 mb-2 rounded-lg overflow-hidden border border-teal-200 group/aiimg">
+                      <img src={block.data.aiImageUrl as string} alt="AI generated" className="w-full max-h-48 object-cover block" />
+                      <div className="absolute inset-0 bg-black/0 group-hover/aiimg:bg-black/20 transition-colors" />
+                      <button
+                        onClick={e => { e.stopPropagation(); updateBlock(block.id, { aiImageUrl: null }); }}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover/aiimg:opacity-100 transition-opacity shadow-md"
+                        title="Remove AI image (text content is preserved)"
+                      >
+                        <span className="text-xs font-bold leading-none">×</span>
+                      </button>
+                      <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-teal-600/90 text-white px-1.5 py-0.5 rounded opacity-0 group-hover/aiimg:opacity-100 transition-opacity">AI Image — hover to remove</span>
+                    </div>
                   )}
                 </div>
               ))}
