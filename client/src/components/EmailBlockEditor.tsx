@@ -937,6 +937,7 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
   const [aiBlockInstruction, setAiBlockInstruction] = useState("");
   const [aiBlockTone, setAiBlockTone] = useState<"professional" | "enthusiastic" | "educational" | "urgent" | "friendly">("professional");
   const [aiBlockGenerateImage, setAiBlockGenerateImage] = useState(false);
+  const [aiBlockIncludeEmoji, setAiBlockIncludeEmoji] = useState(false);
   // Replace image state
   const [replaceImageBlockId, setReplaceImageBlockId] = useState<string | null>(null);
   const [replaceImagePrompt, setReplaceImagePrompt] = useState("");
@@ -1021,6 +1022,7 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
       setAiBlockId(null);
       setAiBlockInstruction("");
       setAiBlockGenerateImage(false);
+      setAiBlockIncludeEmoji(false);
       toast.success("Block regenerated!" + ((res as any).imageUrl ? " Image added." : ""));
     },
     onError: (e) => toast.error("AI failed: " + e.message),
@@ -1412,11 +1414,20 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
                   </label>
                 </div>
               )}
+              {["text", "heading"].includes(block.type) && (
+                <div className="flex items-center gap-2 p-2.5 border border-gray-200 rounded-lg">
+                  <input type="checkbox" id="ai-block-emoji" checked={aiBlockIncludeEmoji} onChange={e => setAiBlockIncludeEmoji(e.target.checked)} className="rounded" />
+                  <label htmlFor="ai-block-emoji" className="flex-1 text-xs text-gray-700 cursor-pointer">
+                    <span className="font-medium flex items-center gap-1">😊 Include emojis</span>
+                    <span className="text-[10px] text-gray-400 block">AI adds 1-2 emojis inline within the text</span>
+                  </label>
+                </div>
+              )}
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setAiBlockId(null)} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
                 <button
                   disabled={!aiBlockInstruction.trim() || aiBlockMutation.isPending}
-                  onClick={() => aiBlockMutation.mutate({ blockId: aiBlockId, blockType: block.type as any, currentHtml: currentContent || undefined, instruction: aiBlockInstruction, tone: aiBlockTone, generateBlockImage: aiBlockGenerateImage })}
+                  onClick={() => aiBlockMutation.mutate({ blockId: aiBlockId, blockType: block.type as any, currentHtml: currentContent || undefined, instruction: aiBlockInstruction, tone: aiBlockTone, generateBlockImage: aiBlockGenerateImage, includeEmoji: aiBlockIncludeEmoji })}
                   className="px-3 py-1.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {aiBlockMutation.isPending ? <><RefreshCw className="w-3 h-3 animate-spin" />Generating...</> : <><Sparkles className="w-3 h-3" />Regenerate</>}

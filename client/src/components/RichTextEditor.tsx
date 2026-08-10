@@ -1728,6 +1728,10 @@ export default function RichTextEditor({
         /* Clearfix after floated images */
         .rte-content .tiptap p:has(img.float-left), .rte-content .tiptap p:has(img.float-right) { overflow: hidden; }
         .rte-content .tiptap iframe { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
+        /* Emoji inline rendering — ensure emoji characters display as colored glyphs inline with text */
+        .rte-content .tiptap { font-family: 'Open Sans', "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+        /* Prevent emoji from being wrapped in block elements or having extra spacing */
+        .rte-content .tiptap p, .rte-content .tiptap h1, .rte-content .tiptap h2, .rte-content .tiptap h3, .rte-content .tiptap li { font-family: inherit; }
         .rte-content .tiptap .youtube-embed { max-width: 100%; }
         .rte-content .tiptap video { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
         /* Table styles */

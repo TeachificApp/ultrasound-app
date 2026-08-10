@@ -514,6 +514,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [aiCtaText, setAiCtaText] = useState("");
   const [aiCtaUrl, setAiCtaUrl] = useState("");
   const [aiGenerateImage, setAiGenerateImage] = useState(false);
+  const [aiIncludeEmoji, setAiIncludeEmoji] = useState(false);
   const [aiGeneratedImageUrl, setAiGeneratedImageUrl] = useState<string | null>(null);
   const [draftId, setDraftId] = useState<number | undefined>(campaignId);
   const [isSaving, setIsSaving] = useState(false);
@@ -1114,6 +1115,20 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
               </div>
             </div>
 
+            {/* Emoji toggle */}
+            <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="ai-gen-emoji"
+                checked={aiIncludeEmoji}
+                onChange={e => setAiIncludeEmoji(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="ai-gen-emoji" className="flex-1 text-sm text-gray-700 cursor-pointer">
+                <span className="font-medium flex items-center gap-1.5">😊 Include emojis</span>
+                <span className="text-xs text-gray-400 block">AI adds relevant emojis inline within the text (1-3 per block)</span>
+              </label>
+            </div>
             {/* Image generation toggle */}
             <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
               <input
@@ -1150,6 +1165,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
                 ctaText: aiCtaText || undefined,
                 ctaUrl: aiCtaUrl || undefined,
                 generateBannerImage: aiGenerateImage,
+                includeEmoji: aiIncludeEmoji,
               })}
               className="px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2"
             >

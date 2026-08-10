@@ -134,7 +134,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Open Sans', sans-serif;
+    font-family: 'Open Sans', "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
     line-height: 1.65;         /* comfortable reading line-height */
   }
   h1, h2, h3 {

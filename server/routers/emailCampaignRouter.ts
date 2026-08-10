@@ -138,6 +138,7 @@ const InterestPrefsSchema = z.object({
       ctaText: z.string().optional(),
       ctaUrl: z.string().optional(),
       generateBannerImage: z.boolean().default(false),
+      includeEmoji: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx.user.id);
@@ -160,11 +161,15 @@ const InterestPrefsSchema = z.object({
       const ctaSection = input.ctaText
         ? `Include a clear call-to-action button labeled "${input.ctaText}"${input.ctaUrl ? ` linking to ${input.ctaUrl}` : ""}.`
         : "";
+      const emojiInstruction = input.includeEmoji
+        ? "Use relevant emojis inline within the text (1-3 per block, placed naturally within sentences, not just at the start)."
+        : "Do NOT include any emojis in the generated content.";
       const systemPrompt = `You are an expert email copywriter for ${brand}, a medical ultrasound education platform. Write compelling, professional email campaigns for healthcare professionals (sonographers, physicians, nurses, radiologists). Use US English spelling. Return ONLY a valid JSON object.`;
       const userPrompt = `Write a ${typeMap[input.emailType]} email with a ${toneMap[input.tone]} tone.
 
 Brief / key content: ${input.brief}
 ${ctaSection}
+Emoji style: ${emojiInstruction}
 
 Return a JSON object with exactly these fields:
 {
@@ -276,6 +281,7 @@ Rules:
       tone: z.enum(["professional", "enthusiastic", "educational", "urgent", "friendly"]).default("professional"),
       emailContext: z.string().optional(), // brief summary of the overall email for context
       generateBlockImage: z.boolean().default(false),
+      includeEmoji: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx.user.id);
@@ -294,11 +300,14 @@ Rules:
       };
       const contextSection = input.emailContext ? `\nEmail context: ${input.emailContext}` : "";
       const currentSection = input.currentHtml ? `\nCurrent content:\n${input.currentHtml}` : "";
+      const emojiBlockInstruction = input.includeEmoji
+        ? "\nEmoji: Include 1-2 relevant emojis placed naturally inline within the text."
+        : "\nEmoji: Do NOT include any emojis.";
       const systemPrompt = `You are an expert email copywriter for All About Ultrasound, a medical ultrasound education platform. Write compelling content for healthcare professionals. Use US English spelling. Return ONLY a valid JSON object.`;
       const userPrompt = `Rewrite or generate a ${input.blockType} block for a medical education email.
 Tone: ${toneMap[input.tone]}
 Block type: ${blockGuide[input.blockType]}
-Instruction: ${input.instruction}${contextSection}${currentSection}
+Instruction: ${input.instruction}${contextSection}${currentSection}${emojiBlockInstruction}
 
 Return a JSON object with exactly one field:
 { "html": "the generated HTML content" }
