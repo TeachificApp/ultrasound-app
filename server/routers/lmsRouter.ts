@@ -675,29 +675,30 @@ export const lmsAIRouter = router({
         if (input.productType === "course" || input.productType === "cohort" || input.productType === "quiz") {
           const [course] = await db.select({ title: lmsCourses.title, subtitle: lmsCourses.subtitle, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, type: lmsCourses.type }).from(lmsCourses).where(eq(lmsCourses.id, input.productId)).limit(1);
           if (course) {
-            const priceStr = course.isFree ? "Free" : course.price ? `$${(Number(course.price) / 100).toFixed(2)}` : "Paid";
-            productDetails = `Product: "${course.title}" (${course.type ?? input.productType})\nDescription: ${course.subtitle ?? ""}\nPrice: ${priceStr}`;
+            const priceStr = course.isFree ? "Free" : course.price ? `$${Number(course.price).toFixed(2)}` : "Paid";
+            const typeLabel = input.productType === "cohort" ? "Cohort" : input.productType === "quiz" ? "Quiz" : "Course";
+            productDetails = `Product: "${course.title}" (${typeLabel})\nDescription: ${course.subtitle ?? ""}\nPrice: ${priceStr}`;
             if (!landingPageUrl && course.slug) landingPageUrl = `https://learn.allaboutultrasound.com/courses/${course.slug}`;
           }
         } else if (input.productType === "webinar") {
           const [webinar] = await db.select({ title: webinars.title, slug: webinars.slug, price: webinars.price, accessType: webinars.accessType }).from(webinars).where(eq(webinars.id, input.productId)).limit(1);
           if (webinar) {
-            const priceStr = webinar.accessType === "free" ? "Free" : webinar.price ? `$${(Number(webinar.price) / 100).toFixed(2)}` : "Paid";
-            productDetails = `Product: "${webinar.title}" (webinar)\nPrice: ${priceStr}`;
+            const priceStr = webinar.accessType === "free" ? "Free" : webinar.price ? `$${Number(webinar.price).toFixed(2)}` : "Paid";
+            productDetails = `Product: "${webinar.title}" (Webinar)\nPrice: ${priceStr}`;
             if (!landingPageUrl && webinar.slug) landingPageUrl = `https://learn.allaboutultrasound.com/webinars/${webinar.slug}`;
           }
         } else if (input.productType === "workshop") {
           const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, price: workshops.price, isFree: workshops.isFree }).from(workshops).where(eq(workshops.id, input.productId)).limit(1);
           if (workshop) {
-            const priceStr = workshop.isFree ? "Free" : workshop.price ? `$${(Number(workshop.price) / 100).toFixed(2)}` : "Paid";
-            productDetails = `Product: "${workshop.title}" (workshop)\nPrice: ${priceStr}`;
+            const priceStr = workshop.isFree ? "Free" : workshop.price ? `$${Number(workshop.price).toFixed(2)}` : "Paid";
+            productDetails = `Product: "${workshop.title}" (Workshop)\nPrice: ${priceStr}`;
             if (!landingPageUrl && workshop.slug) landingPageUrl = `https://learn.allaboutultrasound.com/workshops/${workshop.slug}`;
           }
         } else if (input.productType === "download") {
           const [dl] = await db.select({ title: digitalProducts.title, price: digitalProducts.price, description: digitalProducts.description }).from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
           if (dl) {
-            const priceStr = dl.price ? `$${(Number(dl.price) / 100).toFixed(2)}` : "Free";
-            productDetails = `Product: "${dl.title}" (download)\nDescription: ${dl.description ?? ""}\nPrice: ${priceStr}`;
+            const priceStr = dl.price ? `$${Number(dl.price).toFixed(2)}` : "Free";
+            productDetails = `Product: "${dl.title}" (Download)\nDescription: ${dl.description ?? ""}\nPrice: ${priceStr}`;
           }
         }
       } catch (_) {}
@@ -710,8 +711,8 @@ export const lmsAIRouter = router({
       };
       const response = await invokeLLM({
         messages: [
-          { role: "system", content: "You are an expert marketing copywriter for All About Ultrasound™ and iHeartEcho™, medical ultrasound education platforms. Write compelling, professional promotional content for healthcare professionals (sonographers, physicians, nurses). Use US English spelling. Return only the HTML fragment." },
-          { role: "user", content: `Write promotional content for this product:\n${productDetails}${urlSection}${promptSection}\n\nFormat: ${formatInstructions[input.format]}` },
+          { role: "system", content: "You are an expert marketing copywriter for All About Ultrasound™ and iHeartEcho™, medical ultrasound education platforms. Write compelling, professional promotional content for healthcare professionals (sonographers, physicians, nurses). Use US English spelling. Return only the HTML fragment. CRITICAL: Always use the EXACT price provided in the product details — never modify, round, or reformat it. If the price is $2297.00, write $2297.00 exactly." },
+          { role: "user", content: `Write promotional content for this product:\n${productDetails}${urlSection}${promptSection}\n\nIMPORTANT: Use the exact price shown above. Do not modify or reformat the price.\n\nFormat: ${formatInstructions[input.format]}` },
         ],
       });
       const rawContent = (response.choices?.[0]?.message?.content ?? "") as string;
