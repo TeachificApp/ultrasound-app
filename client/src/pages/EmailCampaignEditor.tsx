@@ -510,7 +510,10 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [aiBrief, setAiBrief] = useState("");
   const [aiTone, setAiTone] = useState<"professional" | "enthusiastic" | "educational" | "urgent" | "friendly">("professional");
-  const [aiEmailType, setAiEmailType] = useState<"announcement" | "promotion" | "newsletter" | "course_launch" | "event" | "follow_up">("announcement");
+  const [aiEmailType, setAiEmailType] = useState<"announcement" | "promotion" | "newsletter" | "course_promo" | "event" | "follow_up">("announcement");
+  const [aiPromoProductId, setAiPromoProductId] = useState<number | null>(null);
+  const [aiPromoProductType, setAiPromoProductType] = useState<string>("course");
+  const allProductsForPromo = trpc.funnel.listAllProducts.useQuery(undefined, { enabled: aiEmailType === "course_promo" });
   const [aiCtaText, setAiCtaText] = useState("");
   const [aiCtaUrl, setAiCtaUrl] = useState("");
   const [aiGenerateImage, setAiGenerateImage] = useState(false);
@@ -1068,13 +1071,33 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
                   className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white"
                 >
                   <option value="announcement">Announcement</option>
-                  <option value="course_launch">Course Launch</option>
+                  <option value="course_promo">Course / Product Promo</option>
                   <option value="promotion">Promotion / Sale</option>
                   <option value="newsletter">Newsletter</option>
                   <option value="event">Event / Webinar</option>
                   <option value="follow_up">Follow-up / Re-engagement</option>
                 </select>
               </div>
+              {aiEmailType === "course_promo" && (
+                <div className="space-y-2 p-3 bg-teal-50 border border-teal-200 rounded-lg">
+                  <p className="text-xs font-semibold text-teal-800">Product to Promote</p>
+                  <select value={aiPromoProductType} onChange={e => { setAiPromoProductType(e.target.value); setAiPromoProductId(null); }} className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white">
+                    <option value="course">Course</option>
+                    <option value="cohort">Cohort</option>
+                    <option value="quiz">Quiz</option>
+                    <option value="webinar">Webinar</option>
+                    <option value="workshop">Workshop</option>
+                    <option value="download">Download</option>
+                    <option value="bundle">Bundle</option>
+                  </select>
+                  <select value={aiPromoProductId ?? ""} onChange={e => setAiPromoProductId(e.target.value ? Number(e.target.value) : null)} className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white">
+                    <option value="">— Select a product —</option>
+                    {(allProductsForPromo.data ?? []).filter(p => p.type === aiPromoProductType).map(p => (
+                      <option key={p.id} value={p.id}>{p.name}{p.price > 0 ? ` ($${p.price.toFixed(2)})` : " (Free)"}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="text-xs font-semibold text-gray-700 block mb-1">Tone</label>
                 <select
@@ -1166,6 +1189,11 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
                 ctaUrl: aiCtaUrl || undefined,
                 generateBannerImage: aiGenerateImage,
                 includeEmoji: aiIncludeEmoji,
+                ...(aiEmailType === "course_promo" && aiPromoProductId ? {
+                  brief: aiBrief + (allProductsForPromo.data?.find(p => p.id === aiPromoProductId && p.type === aiPromoProductType)
+                    ? `\n\nProduct to promote: "${allProductsForPromo.data?.find(p => p.id === aiPromoProductId && p.type === aiPromoProductType)?.name}" (${aiPromoProductType}). Price: ${allProductsForPromo.data?.find(p => p.id === aiPromoProductId && p.type === aiPromoProductType)?.price > 0 ? "$" + allProductsForPromo.data?.find(p => p.id === aiPromoProductId && p.type === aiPromoProductType)?.price.toFixed(2) : "Free"}. Landing page: https://learn.allaboutultrasound.com/${aiPromoProductType === "webinar" ? "webinars" : aiPromoProductType === "workshop" ? "workshops" : "courses"}/${aiPromoProductType}`
+                    : ""),
+                } : {}),
               })}
               className="px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2"
             >

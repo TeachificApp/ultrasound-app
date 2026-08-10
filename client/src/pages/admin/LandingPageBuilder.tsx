@@ -3329,6 +3329,10 @@ function AiContentBlockEditor({ d, set, setMany }: { d: Record<string, any>; set
   const [aiContentType, setAiContentType] = React.useState<string>(d.contentType ?? "lesson");
   const [aiMode, setAiMode] = React.useState<"prompt" | "edit">(d.html ? "edit" : "prompt");
   const [isAiGenerating, setIsAiGenerating] = React.useState(false);
+  const [promoProductId, setPromoProductId] = React.useState<number | null>(d.promoProductId ?? null);
+  const [promoProductType, setPromoProductType] = React.useState<string>(d.promoProductType ?? "course");
+  const [promoFormat, setPromoFormat] = React.useState<string>(d.promoFormat ?? "promo_block");
+  const allProducts = trpc.funnel.listAllProducts.useQuery(undefined, { enabled: aiContentType === "course_promo" });
   const generateAiContent = trpc.lmsAdmin.generateLessonContent.useMutation({
     onSuccess: (result) => {
       setMany({ html: result.content, prompt: aiPrompt, contentType: aiContentType });
@@ -3341,14 +3345,40 @@ function AiContentBlockEditor({ d, set, setMany }: { d: Record<string, any>; set
       setIsAiGenerating(false);
     },
   });
+  const generatePromoContent = trpc.lmsAdmin.generatePromoContent.useMutation({
+    onSuccess: (result) => {
+      setMany({ html: result.content, prompt: aiPrompt, contentType: aiContentType, promoProductId, promoProductType, promoFormat, promoLandingUrl: result.landingPageUrl });
+      setAiMode("edit");
+      setIsAiGenerating(false);
+      toast.success("Promo content generated — review and edit as needed.");
+    },
+    onError: (e) => {
+      toast.error(`AI generation failed: ${e.message}`);
+      setIsAiGenerating(false);
+    },
+  });
   const handleAiGenerate = () => {
+    if (aiContentType === "course_promo") {
+      if (!promoProductId) { toast.error("Please select a product."); return; }
+      const selectedProduct = allProducts.data?.find(p => p.id === promoProductId && p.type === promoProductType);
+      if (!selectedProduct) { toast.error("Product not found."); return; }
+      setIsAiGenerating(true);
+      generatePromoContent.mutate({
+        productType: promoProductType as any,
+        productId: promoProductId,
+        productName: selectedProduct.name,
+        prompt: aiPrompt || undefined,
+        format: promoFormat as any,
+      });
+      return;
+    }
     if (!aiPrompt.trim()) { toast.error("Please enter a prompt."); return; }
     setIsAiGenerating(true);
     const formatMap: Record<string, "text" | "outline" | "summary" | "quiz_questions"> = {
       lesson: "text", explanation: "text", summary: "summary", outline: "outline",
       exercise: "text", section: "text", quiz_questions: "quiz_questions",
     };
-    generateAiContent.mutate({ topic: aiPrompt, format: formatMap[aiContentType] ?? "text" });
+    generateAiContent.mutate({ lessonTitle: aiPrompt, format: formatMap[aiContentType] ?? "text" });
   };
   return (
     <div className="space-y-4">
@@ -3365,6 +3395,7 @@ function AiContentBlockEditor({ d, set, setMany }: { d: Record<string, any>; set
           <div>
             <label className="text-xs text-gray-500 block mb-1">Content Type</label>
             <select value={aiContentType} onChange={e => setAiContentType(e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded-md px-2 focus:outline-none focus:ring-2 focus:ring-teal-400">
+              <option value="course_promo">Course / Product Promo</option>
               <option value="lesson">Full Lesson</option>
               <option value="explanation">Explanation</option>
               <option value="summary">Summary</option>
@@ -3374,9 +3405,42 @@ function AiContentBlockEditor({ d, set, setMany }: { d: Record<string, any>; set
               <option value="quiz_questions">Quiz Questions &amp; Answers</option>
             </select>
           </div>
+          {aiContentType === "course_promo" && (
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Product Type</label>
+                <select value={promoProductType} onChange={e => { setPromoProductType(e.target.value); setPromoProductId(null); }} className="w-full h-8 text-xs border border-gray-200 rounded-md px-2 focus:outline-none focus:ring-2 focus:ring-teal-400">
+                  <option value="course">Course</option>
+                  <option value="cohort">Cohort</option>
+                  <option value="quiz">Quiz</option>
+                  <option value="webinar">Webinar</option>
+                  <option value="workshop">Workshop</option>
+                  <option value="download">Download</option>
+                  <option value="bundle">Bundle</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Select Product *</label>
+                <select value={promoProductId ?? ""} onChange={e => setPromoProductId(e.target.value ? Number(e.target.value) : null)} className="w-full h-8 text-xs border border-gray-200 rounded-md px-2 focus:outline-none focus:ring-2 focus:ring-teal-400">
+                  <option value="">— Select a product —</option>
+                  {(allProducts.data ?? []).filter(p => p.type === promoProductType).map(p => (
+                    <option key={p.id} value={p.id}>{p.name}{p.price > 0 ? ` ($${p.price.toFixed(2)})` : " (Free)"}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Content Format</label>
+                <select value={promoFormat} onChange={e => setPromoFormat(e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded-md px-2 focus:outline-none focus:ring-2 focus:ring-teal-400">
+                  <option value="promo_block">Promo Block (headline + paragraphs + CTA)</option>
+                  <option value="announcement">Short Announcement</option>
+                  <option value="feature_list">Feature / Benefit List</option>
+                </select>
+              </div>
+            </div>
+          )}
           <div>
-            <label className="text-xs text-gray-500 block mb-1">Prompt *</label>
-            <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} placeholder="Describe what content to generate, e.g. 'Explain the fundamentals of cardiac anatomy for beginner sonographers'" className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-xs resize-none h-24 focus:outline-none focus:ring-2 focus:ring-teal-400" />
+            <label className="text-xs text-gray-500 block mb-1">{aiContentType === "course_promo" ? "Additional Instructions (optional)" : "Prompt *"}</label>
+            <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} placeholder={aiContentType === "course_promo" ? "Any specific angles, offers, or details to highlight..." : "Describe what content to generate, e.g. 'Explain the fundamentals of cardiac anatomy for beginner sonographers'"} className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-xs resize-none h-20 focus:outline-none focus:ring-2 focus:ring-teal-400" />
           </div>
           {d.html && <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-xs text-amber-700">\u26a0 Generating new content will replace the existing content in this block.</div>}
           <button onClick={handleAiGenerate} disabled={isAiGenerating || !aiPrompt.trim()} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gradient-to-r from-[#189aa1] to-[#17a2b8] hover:from-[#147f86] hover:to-[#138496] text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all">

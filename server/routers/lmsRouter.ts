@@ -656,6 +656,68 @@ export const lmsAIRouter = router({
       const cleaned = content.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
       return { content: cleaned };
     }),
+  generatePromoContent: protectedProcedure
+    .input(z.object({
+      productType: z.enum(["course", "cohort", "quiz", "webinar", "workshop", "download", "bundle", "community"]),
+      productId: z.number().int().positive(),
+      productName: z.string().min(1),
+      productUrl: z.string().optional(),
+      prompt: z.string().optional(),
+      format: z.enum(["promo_block", "announcement", "feature_list"]).default("promo_block"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      let productDetails = `Product: "${input.productName}" (${input.productType})`;
+      let landingPageUrl = input.productUrl ?? "";
+      try {
+        if (input.productType === "course" || input.productType === "cohort" || input.productType === "quiz") {
+          const [course] = await db.select({ title: lmsCourses.title, subtitle: lmsCourses.subtitle, slug: lmsCourses.slug, price: lmsCourses.price, isFree: lmsCourses.isFree, type: lmsCourses.type }).from(lmsCourses).where(eq(lmsCourses.id, input.productId)).limit(1);
+          if (course) {
+            const priceStr = course.isFree ? "Free" : course.price ? `$${(Number(course.price) / 100).toFixed(2)}` : "Paid";
+            productDetails = `Product: "${course.title}" (${course.type ?? input.productType})\nDescription: ${course.subtitle ?? ""}\nPrice: ${priceStr}`;
+            if (!landingPageUrl && course.slug) landingPageUrl = `https://learn.allaboutultrasound.com/courses/${course.slug}`;
+          }
+        } else if (input.productType === "webinar") {
+          const [webinar] = await db.select({ title: webinars.title, slug: webinars.slug, price: webinars.price, accessType: webinars.accessType }).from(webinars).where(eq(webinars.id, input.productId)).limit(1);
+          if (webinar) {
+            const priceStr = webinar.accessType === "free" ? "Free" : webinar.price ? `$${(Number(webinar.price) / 100).toFixed(2)}` : "Paid";
+            productDetails = `Product: "${webinar.title}" (webinar)\nPrice: ${priceStr}`;
+            if (!landingPageUrl && webinar.slug) landingPageUrl = `https://learn.allaboutultrasound.com/webinars/${webinar.slug}`;
+          }
+        } else if (input.productType === "workshop") {
+          const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, price: workshops.price, isFree: workshops.isFree }).from(workshops).where(eq(workshops.id, input.productId)).limit(1);
+          if (workshop) {
+            const priceStr = workshop.isFree ? "Free" : workshop.price ? `$${(Number(workshop.price) / 100).toFixed(2)}` : "Paid";
+            productDetails = `Product: "${workshop.title}" (workshop)\nPrice: ${priceStr}`;
+            if (!landingPageUrl && workshop.slug) landingPageUrl = `https://learn.allaboutultrasound.com/workshops/${workshop.slug}`;
+          }
+        } else if (input.productType === "download") {
+          const [dl] = await db.select({ title: digitalProducts.title, price: digitalProducts.price, description: digitalProducts.description }).from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
+          if (dl) {
+            const priceStr = dl.price ? `$${(Number(dl.price) / 100).toFixed(2)}` : "Free";
+            productDetails = `Product: "${dl.title}" (download)\nDescription: ${dl.description ?? ""}\nPrice: ${priceStr}`;
+          }
+        }
+      } catch (_) {}
+      const urlSection = landingPageUrl ? `\nLanding Page URL: ${landingPageUrl}` : "";
+      const promptSection = input.prompt ? `\nAdditional instructions: ${input.prompt}` : "";
+      const formatInstructions: Record<string, string> = {
+        promo_block: "Write a compelling promotional content block in HTML format. Include an engaging headline (<h2>), 2-3 benefit-focused paragraphs (<p>), and a clear call-to-action sentence with a hyperlink to the landing page URL. Use <strong> for emphasis. No markdown, no surrounding tags.",
+        announcement: "Write a brief announcement paragraph in HTML format (1-2 <p> tags) suitable for a newsletter or social post. Include the product name, key benefit, and a hyperlink to the landing page URL. No markdown, no surrounding tags.",
+        feature_list: "Write a feature/benefit list in HTML format. Use a short intro <p>, then a <ul> with 4-6 <li> items highlighting key features and benefits. Include a call-to-action hyperlink to the landing page URL at the end. No markdown, no surrounding tags.",
+      };
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: "You are an expert marketing copywriter for All About Ultrasound™ and iHeartEcho™, medical ultrasound education platforms. Write compelling, professional promotional content for healthcare professionals (sonographers, physicians, nurses). Use US English spelling. Return only the HTML fragment." },
+          { role: "user", content: `Write promotional content for this product:\n${productDetails}${urlSection}${promptSection}\n\nFormat: ${formatInstructions[input.format]}` },
+        ],
+      });
+      const rawContent = (response.choices?.[0]?.message?.content ?? "") as string;
+      const cleanedContent = rawContent.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      return { content: cleanedContent, landingPageUrl };
+    }),
   generateTestimonials: protectedProcedure
     .input(z.object({
       courseTitle: z.string().min(1),
