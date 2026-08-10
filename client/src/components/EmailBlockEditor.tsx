@@ -30,7 +30,7 @@ import {
   type Block,
   type BlockType,
 } from "@/pages/admin/LandingPageBuilder";
-import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search, RefreshCw, Sparkles, Wand2, ImageOff, RotateCcw, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
@@ -937,6 +937,10 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
   const [aiBlockInstruction, setAiBlockInstruction] = useState("");
   const [aiBlockTone, setAiBlockTone] = useState<"professional" | "enthusiastic" | "educational" | "urgent" | "friendly">("professional");
   const [aiBlockGenerateImage, setAiBlockGenerateImage] = useState(false);
+  // Replace image state
+  const [replaceImageBlockId, setReplaceImageBlockId] = useState<string | null>(null);
+  const [replaceImagePrompt, setReplaceImagePrompt] = useState("");
+  const [replaceImageTone, setReplaceImageTone] = useState<"professional" | "enthusiastic" | "educational" | "urgent" | "friendly">("professional");
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(EMAIL_CATALOG_CATEGORIES));
   const [rightPanelWidth, setRightPanelWidth] = useState(300);
   const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -1020,6 +1024,20 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
       toast.success("Block regenerated!" + ((res as any).imageUrl ? " Image added." : ""));
     },
     onError: (e) => toast.error("AI failed: " + e.message),
+  });
+  const replaceImageMutation = trpc.emailCampaign.generateEmailBlock.useMutation({
+    onSuccess: (res) => {
+      const blockId = (res as any).blockId ?? replaceImageBlockId;
+      if (blockId && (res as any).imageUrl) {
+        updateBlock(blockId, { aiImageUrl: (res as any).imageUrl });
+        toast.success("Image replaced!");
+      } else if (blockId) {
+        toast.error("No image was generated. Try a more descriptive prompt.");
+      }
+      setReplaceImageBlockId(null);
+      setReplaceImagePrompt("");
+    },
+    onError: (e) => toast.error("Image generation failed: " + e.message),
   });
   const deleteBlock = (id: string) => {
     setBlocks((prev) => prev.filter((b) => b.id !== id));
@@ -1204,14 +1222,23 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
                     <div className="relative mt-1 mx-2 mb-2 rounded-lg overflow-hidden border border-teal-200 group/aiimg">
                       <img src={block.data.aiImageUrl as string} alt="AI generated" className="w-full max-h-48 object-cover block" />
                       <div className="absolute inset-0 bg-black/0 group-hover/aiimg:bg-black/20 transition-colors" />
-                      <button
-                        onClick={e => { e.stopPropagation(); updateBlock(block.id, { aiImageUrl: null }); }}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover/aiimg:opacity-100 transition-opacity shadow-md"
-                        title="Remove AI image (text content is preserved)"
-                      >
-                        <span className="text-xs font-bold leading-none">×</span>
-                      </button>
-                      <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-teal-600/90 text-white px-1.5 py-0.5 rounded opacity-0 group-hover/aiimg:opacity-100 transition-opacity">AI Image — hover to remove</span>
+                      <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover/aiimg:opacity-100 transition-opacity">
+                        <button
+                          onClick={e => { e.stopPropagation(); setReplaceImageBlockId(block.id); setReplaceImagePrompt(""); }}
+                          className="w-6 h-6 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center shadow-md"
+                          title="Replace AI image with a new one (text preserved)"
+                        >
+                          <RotateCcw size={10} />
+                        </button>
+                        <button
+                          onClick={e => { e.stopPropagation(); updateBlock(block.id, { aiImageUrl: null }); }}
+                          className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md"
+                          title="Remove AI image (text content is preserved)"
+                        >
+                          <ImageOff size={10} />
+                        </button>
+                      </div>
+                      <span className="absolute bottom-1.5 left-1.5 text-[10px] bg-black/60 text-white px-1.5 py-0.5 rounded opacity-0 group-hover/aiimg:opacity-100 transition-opacity">AI Image</span>
                     </div>
                   )}
                 </div>
@@ -1270,12 +1297,136 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
                 <BlockSettings
                   block={selectedBlock}
                   onChange={(data) => updateBlock(selectedBlock.id, data)}
-                />
+              />
+            )}
+          </div>
+        </div>
+      </>
+    )}
+
+      {/* Replace Image Panel */}
+      {replaceImageBlockId && (() => {
+        const block = blocks.find(b => b.id === replaceImageBlockId);
+        if (!block) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setReplaceImageBlockId(null)}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4 text-teal-600" />
+                  Replace Block Image
+                </h3>
+                <button onClick={() => setReplaceImageBlockId(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              </div>
+              {block.data?.aiImageUrl && (
+                <div className="rounded-lg overflow-hidden border border-gray-200">
+                  <img src={block.data.aiImageUrl as string} alt="Current" className="w-full max-h-24 object-cover block" />
+                  <p className="text-[10px] text-gray-400 text-center py-1">Current image</p>
+                </div>
               )}
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Image Description <span className="text-red-400">*</span></label>
+                <textarea
+                  autoFocus
+                  value={replaceImagePrompt}
+                  onChange={e => setReplaceImagePrompt(e.target.value)}
+                  placeholder="Describe the image you want, e.g. a cardiac sonographer performing an echocardiogram in a modern hospital, teal color palette"
+                  rows={3}
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Style Tone</label>
+                <select value={replaceImageTone} onChange={e => setReplaceImageTone(e.target.value as any)} className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white">
+                  <option value="professional">Professional / Clinical</option>
+                  <option value="educational">Educational / Informative</option>
+                  <option value="enthusiastic">Modern / Dynamic</option>
+                  <option value="friendly">Warm / Approachable</option>
+                </select>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setReplaceImageBlockId(null)} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button
+                  disabled={!replaceImagePrompt.trim() || replaceImageMutation.isPending}
+                  onClick={() => replaceImageMutation.mutate({ blockId: replaceImageBlockId, blockType: block.type as any, instruction: replaceImagePrompt, tone: replaceImageTone, generateBlockImage: true })}
+                  className="px-3 py-1.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {replaceImageMutation.isPending ? <><RefreshCw className="w-3 h-3 animate-spin" />Generating...</> : <><RotateCcw className="w-3 h-3" />Replace Image</>}
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-400 text-right">Text content is never affected.</p>
             </div>
           </div>
-        </>
-      )}
+        );
+      })()}
+
+      {/* AI Block Regeneration Panel */}
+      {aiBlockId && (() => {
+        const block = blocks.find(b => b.id === aiBlockId);
+        if (!block) return null;
+        const blockTypeLabel: Record<string, string> = { heading: "Heading", text: "Text", button: "Button", quote: "Quote" };
+        const currentContent = block.type === "button" ? (block.data?.text ?? "") : (block.data?.html ?? "");
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setAiBlockId(null)}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Wand2 className="w-4 h-4 text-teal-600" />
+                  AI Regenerate — {blockTypeLabel[block.type] ?? block.type} Block
+                </h3>
+                <button onClick={() => setAiBlockId(null)} className="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              </div>
+              {currentContent && (
+                <div className="bg-gray-50 rounded-lg p-2 text-xs text-gray-500 max-h-20 overflow-y-auto">
+                  <span className="font-medium text-gray-600">Current: </span>
+                  <span dangerouslySetInnerHTML={{ __html: currentContent }} />
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Instruction <span className="text-red-400">*</span></label>
+                <textarea
+                  autoFocus
+                  value={aiBlockInstruction}
+                  onChange={e => setAiBlockInstruction(e.target.value)}
+                  placeholder={block.type === "heading" ? "e.g. Make it more compelling, focus on CME credits" : block.type === "button" ? "e.g. More urgent CTA for course enrollment" : "e.g. Rewrite to emphasize the clinical benefits, add bullet points"}
+                  rows={3}
+                  className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Tone</label>
+                <select value={aiBlockTone} onChange={e => setAiBlockTone(e.target.value as any)} className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white">
+                  <option value="professional">Professional</option>
+                  <option value="educational">Educational</option>
+                  <option value="enthusiastic">Enthusiastic</option>
+                  <option value="friendly">Friendly</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              {["text", "heading"].includes(block.type) && (
+                <div className="flex items-center gap-3 p-2.5 border border-gray-200 rounded-lg">
+                  <input type="checkbox" id="ai-block-gen-image" checked={aiBlockGenerateImage} onChange={e => setAiBlockGenerateImage(e.target.checked)} className="rounded" />
+                  <label htmlFor="ai-block-gen-image" className="flex-1 text-xs text-gray-700 cursor-pointer">
+                    <span className="font-medium flex items-center gap-1.5"><ImageIcon className="w-3 h-3 text-teal-600" /> Also generate a block image</span>
+                    <span className="text-[10px] text-gray-400 block">AI creates a relevant image saved separately — remove anytime without affecting text</span>
+                  </label>
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setAiBlockId(null)} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button
+                  disabled={!aiBlockInstruction.trim() || aiBlockMutation.isPending}
+                  onClick={() => aiBlockMutation.mutate({ blockId: aiBlockId, blockType: block.type as any, currentHtml: currentContent || undefined, instruction: aiBlockInstruction, tone: aiBlockTone, generateBlockImage: aiBlockGenerateImage })}
+                  className="px-3 py-1.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {aiBlockMutation.isPending ? <><RefreshCw className="w-3 h-3 animate-spin" />Generating...</> : <><Sparkles className="w-3 h-3" />Regenerate</>}
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-400 text-right">Tip: Cmd+Enter to generate</p>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
