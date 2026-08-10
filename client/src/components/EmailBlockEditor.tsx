@@ -6,7 +6,7 @@
  *
  * Converts blocks to email-safe inline-CSS HTML via emailBlockToHtml().
  */
-import { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   DndContext,
   closestCenter,
@@ -646,10 +646,23 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
   const viewMode = (d.viewMode as string) ?? "list";
   // Selected IDs (for database mode)
   const selectedIds = (d.selectedIds as number[]) ?? [];
+  // Build a flat list of all available products from blockOptions for rendering resolution
+  const allAvailableProducts = useMemo(() => [
+    ...(blockOptions?.courses ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price, imageUrl: p.coverImageUrl ?? "", link: `/courses/${p.slug}`, description: "" })),
+    ...(blockOptions?.webinars ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price, imageUrl: p.coverImageUrl ?? "", link: `/webinars/${p.slug}`, description: "" })),
+    ...(blockOptions?.workshopInstances ?? []).map((p: any) => ({ id: p.id + 100000, title: p.workshopTitle ?? p.title, price: p.price ?? 0, imageUrl: p.workshopCoverImageUrl ?? "", link: `/workshops/${p.workshopSlug}`, description: "" })),
+    ...(blockOptions?.bundles ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price ?? 0, imageUrl: p.coverImage ?? "", link: `/bundles/${p.slug}`, description: "" })),
+    ...(blockOptions?.downloads ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price ?? 0, imageUrl: p.coverImageUrl ?? "", link: `/downloads/${p.slug}`, description: "" })),
+    ...(blockOptions?.quizzes ?? []).map((p: any) => ({ id: p.id, title: p.title, price: 0, imageUrl: "", link: `/quizzes/${p.id}`, description: "" })),
+  ], [blockOptions]);
 
   const toggleId = (id: number) => {
     const next = selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
+    // Resolve and save full product details so the renderer can display cards without an extra fetch
+    const resolved = allAvailableProducts.filter((p: any) => next.includes(p.id));
     set("selectedIds", next);
+    set("resolvedItems", resolved);
+    set("sourceMode", "database");
   };
 
   // Shared color pickers
