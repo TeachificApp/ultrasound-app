@@ -59,6 +59,10 @@ export function wrapInBrandedCampaignEmail(
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>All About Ultrasound™</title>
+  <style>
+    a { color: #189aa1 !important; text-decoration: underline; }
+    a:hover { color: #147f86 !important; }
+  </style>
 </head>
 <body style="margin:0;padding:0;background:#f4f7f8;font-family:'Open Sans',Arial,sans-serif;">
 ${preview}
@@ -125,5 +129,13 @@ export function normalizeCampaignEmailHtml(html: string): string {
     .replace(/\bwidth=["']600["']/gi, `width="${w}"`);
 
   out = out.replace(/<img\b([^>]*)>/gi, (_match, attrs: string) => normalizeImgTag(attrs));
+  // Ensure anchor tags use teal brand color when no inline color is set
+  out = out.replace(/<a\b([^>]*?)>/gi, (_m: string, attrs: string) => {
+    if (/color\s*:/i.test(attrs)) return `<a${attrs}>`;
+    if (/\bstyle=/i.test(attrs)) {
+      return `<a${attrs.replace(/\bstyle=["'](.*?)["']/i, (_s: string, style: string) => `style="${style};color:#189aa1"`)}>` ;
+    }
+    return `<a${attrs} style="color:#189aa1">`;
+  });
   return out;
 }
