@@ -1310,7 +1310,25 @@ function CTAActionPicker({
             <label className="text-xs text-gray-500 block mb-0.5">Product</label>
             <select
               value={checkoutProductIdValue ? `${checkoutProductTypeValue}:${checkoutProductIdValue}` : ""}
-              onChange={e => { const [type, id] = e.target.value.split(":"); onCheckoutProductChange?.(type || "", id ? Number(id) : null); }}
+              onChange={e => {
+                const [type, id] = e.target.value.split(":");
+                onCheckoutProductChange?.(type || "", id ? Number(id) : null);
+                // Also store the checkout URL in ctaLink so email renderer can use it
+                const prod = (productCatalog ?? []).find((p: any) => p.type === type && p.id === Number(id));
+                if (prod && (prod as any).slug) {
+                  const slug = (prod as any).slug as string;
+                  const checkoutUrl = type === "workshop"
+                    ? `https://learn.allaboutultrasound.com/checkout/workshop/${slug}`
+                    : type === "webinar"
+                    ? `https://learn.allaboutultrasound.com/checkout/${slug}?type=webinar`
+                    : type === "download"
+                    ? `https://learn.allaboutultrasound.com/checkout/${slug}?type=download`
+                    : type === "bundle"
+                    ? `https://learn.allaboutultrasound.com/checkout/${slug}?type=bundle`
+                    : `https://learn.allaboutultrasound.com/checkout/${slug}`;
+                  onLinkChange?.(checkoutUrl);
+                }
+              }}
               className="w-full h-7 text-xs rounded border border-gray-200 px-2"
             >
               <option value="">-- Select product --</option>

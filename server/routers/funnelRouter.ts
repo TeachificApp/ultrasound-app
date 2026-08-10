@@ -49,9 +49,9 @@ export const funnelRouter = router({
   listAllProducts: publicProcedure.query(async () => {
     const db = await getDb();
     const [courses, downloads, bundles, physical, webinarList, communityList, workshopList, membershipList, quizList] = await Promise.all([
-      db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl, courseType: lmsCourses.type }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
-      db.select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, thumbnailUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
-      db.select({ id: digitalBundles.id, title: digitalBundles.title, price: digitalBundles.discountPrice, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
+      db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl, courseType: lmsCourses.type }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
+      db.select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, price: digitalProducts.price, thumbnailUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
+      db.select({ id: digitalBundles.id, title: digitalBundles.title, slug: digitalBundles.slug, price: digitalBundles.discountPrice, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
       db.select({ id: physicalProducts.id, title: physicalProducts.title, price: physicalProducts.price, thumbnailUrl: physicalProducts.thumbnailUrl }).from(physicalProducts).orderBy(asc(physicalProducts.title)),
       db.select({ id: webinars.id, title: webinars.title, slug: webinars.slug, price: webinars.price, coverImage: webinars.coverImage, accessType: webinars.accessType }).from(webinars).where(eq(webinars.status, "published")).orderBy(asc(webinars.title)),
       db.select({ id: communities.id, title: communities.title, slug: communities.slug, coverImage: communities.coverImage, accessType: communities.accessType }).from(communities).where(eq(communities.status, "published")).orderBy(asc(communities.title)),
@@ -72,15 +72,15 @@ export const funnelRouter = router({
     ];
     return [
       // All prices returned in DOLLARS (DB stores prices in dollars already)
-      ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, price: Number(c.price ?? 0), imageUrl: c.thumbnailUrl ?? "" })),
-      ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, price: Number(d.price ?? 0), imageUrl: d.thumbnailUrl ?? "" })),
-      ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, price: Number(b.price ?? 0), imageUrl: b.thumbnailUrl ?? "" })),
-      ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, price: Number(p.price ?? 0), imageUrl: p.thumbnailUrl ?? "" })),
-      ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, price: Number(w.price ?? 0), imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
-      ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, price: 0, imageUrl: c.coverImage ?? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp", isFree: c.accessType === "free" })),
-      ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: Number(w.price ?? 0), imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
-      ...membershipList.map((m: any) => ({ id: m.id, type: "membership" as const, name: m.title, price: Number(m.price ?? 0), imageUrl: "", priceLabel: m.billingInterval ? `$${Number(m.price ?? 0).toFixed(2)}/${m.billingInterval}` : undefined })),
-      ...quizList.map((q: any) => ({ id: q.id, type: "quiz" as const, name: q.title, price: 0, imageUrl: "" })),
+      ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, slug: c.slug ?? "", price: Number(c.price ?? 0), imageUrl: c.thumbnailUrl ?? "" })),
+      ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, slug: d.slug ?? "", price: Number(d.price ?? 0), imageUrl: d.thumbnailUrl ?? "" })),
+      ...bundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, slug: b.slug ?? "", price: Number(b.price ?? 0), imageUrl: b.thumbnailUrl ?? "" })),
+      ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, slug: "", price: Number(p.price ?? 0), imageUrl: p.thumbnailUrl ?? "" })),
+      ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, slug: w.slug ?? "", price: Number(w.price ?? 0), imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
+      ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, slug: c.slug ?? "", price: 0, imageUrl: c.coverImage ?? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp", isFree: c.accessType === "free" })),
+      ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, slug: w.slug ?? "", price: Number(w.price ?? 0), imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
+      ...membershipList.map((m: any) => ({ id: m.id, type: "membership" as const, name: m.title, slug: m.slug ?? "", price: Number(m.price ?? 0), imageUrl: "", priceLabel: m.billingInterval ? `$${Number(m.price ?? 0).toFixed(2)}/${m.billingInterval}` : undefined })),
+      ...quizList.map((q: any) => ({ id: q.id, type: "quiz" as const, name: q.title, slug: String(q.id), price: 0, imageUrl: "" })),
       ...APP_PRODUCTS, // App products already in dollars (9.97, 12.99, etc.)
     ];
   }),
