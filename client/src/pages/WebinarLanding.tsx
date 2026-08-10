@@ -30,7 +30,7 @@ import type { UserParamSource } from "@/lib/userUrlParams";
 function formatPrice(webinar: any): string {
   if (webinar.accessType === "free" || webinar.isFree) return "Free";
   const opts: any[] = webinar.pricingOptions ? JSON.parse(webinar.pricingOptions) : [];
-  if (opts.length > 0 && opts[0].price) return `$${Number(opts[0].price).toFixed(2)}`;
+  if (opts.length > 0 && opts[0].price) return `$${opts[0].price % 1 === 0 ? Number(opts[0].price).toLocaleString("en-US") : Number(opts[0].price).toFixed(2)}`;
   if (webinar.price) return `$${(webinar.price / 100).toFixed(2)}`;
   return "Free";
 }

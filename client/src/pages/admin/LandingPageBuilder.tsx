@@ -1315,7 +1315,7 @@ function CTAActionPicker({
             >
               <option value="">-- Select product --</option>
               {(productCatalog ?? []).map(p => (
-                <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — {(p as any).priceLabel ?? `$${Number(p.price).toFixed(2)}`}</option>
+                <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — {(p as any).priceLabel ?? `$${p.price % 1 === 0 ? Number(p.price).toLocaleString("en-US") : Number(p.price).toFixed(2)}`}</option>
               ))}
             </select>
           </div>
@@ -1673,7 +1673,7 @@ function PricingCtaSettings({ d, set, setMany }: { d: Record<string, any>; set: 
     // Format price for display (price is in dollars)
   const formatItemPrice = (item: typeof allItems[0]) => {
     if (item.isFree) return "Free";
-    const priceStr = `$${Number(item.price).toFixed(2)}`;
+    const priceStr = `$${item.price % 1 === 0 ? Number(item.price).toLocaleString("en-US") : Number(item.price).toFixed(2)}`;
     if (item.pricingType === "subscription" && item.subscriptionInterval) {
       const intervalLabel: Record<string, string> = { monthly: "/ mo", quarterly: "/ qtr", annual: "/ yr" };
       return `${priceStr} ${intervalLabel[item.subscriptionInterval] ?? "/ period"}`;
@@ -3562,7 +3562,7 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
                 <select value={promoProductId ?? ""} onChange={e => setPromoProductId(e.target.value ? Number(e.target.value) : null)} className="w-full h-8 text-xs border border-gray-200 rounded-md px-2 focus:outline-none focus:ring-2 focus:ring-teal-400">
                   <option value="">— Select a product —</option>
                   {(allProducts.data ?? []).filter(p => p.type === promoProductType).map(p => (
-                    <option key={p.id} value={p.id}>{p.name}{p.price > 0 ? ` ($${p.price.toFixed(2)})` : " (Free)"}</option>
+                    <option key={p.id} value={p.id}>{p.name}{p.price > 0 ? ` ($${p.price % 1 === 0 ? p.price.toLocaleString('en-US') : p.price.toFixed(2)})` : " (Free)"}</option>
                   ))}
                 </select>
               </div>

@@ -780,7 +780,7 @@ export default function DownloadLanding() {
     );
   }
 
-  const price = product.isFree ? "Free" : `$${Number(product.price).toFixed(2)}`;
+  const price = product.isFree ? "Free" : `$${product.price % 1 === 0 ? Number(product.price).toLocaleString("en-US") : Number(product.price).toFixed(2)}`;
   const hasPurchased = purchaseStatus?.purchased || product.isFree;
   const isDraft = (product as any).status === "draft" || (product as any).status === "enrollment_closed";
   const features = product.landingFeatures ? product.landingFeatures.split("\n").filter(Boolean) : [];

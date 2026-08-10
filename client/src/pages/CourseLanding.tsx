@@ -136,20 +136,20 @@ function formatPrice(c: any): string {
   if (pt === "trial_then_subscription") {
     const trialDays = c.trialDays ?? 7;
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `${trialDays}-day free trial, then $${Number(c.price).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `${trialDays}-day free trial, then $${c.price % 1 === 0 ? Number(c.price).toLocaleString("en-US") : Number(c.price).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "subscription") {
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `$${Number(c.price).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `$${c.price % 1 === 0 ? Number(c.price).toLocaleString("en-US") : Number(c.price).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "payment_plan") {
-    const dp = c.downPayment ? `$${Number(c.downPayment).toFixed(2)} down` : "";
+    const dp = c.downPayment ? `$${c.downPayment % 1 === 0 ? Number(c.downPayment).toLocaleString("en-US") : Number(c.downPayment).toFixed(2)} down` : "";
     const inst = c.installmentCount && c.installmentAmount
-      ? ` + ${c.installmentCount}×$${Number(c.installmentAmount).toFixed(2)}`
+      ? ` + ${c.installmentCount}×$${c.installmentAmount % 1 === 0 ? Number(c.installmentAmount).toLocaleString("en-US") : Number(c.installmentAmount).toFixed(2)}`
       : "";
-    return dp + inst || `$${Number(c.price).toFixed(2)}`;
+    return dp + inst || `$${c.price % 1 === 0 ? Number(c.price).toLocaleString("en-US") : Number(c.price).toFixed(2)}`;
   }
-  return `$${Number(c.price).toFixed(2)}`;
+  return `$${c.price % 1 === 0 ? Number(c.price).toLocaleString("en-US") : Number(c.price).toFixed(2)}`;
 }
 
 function formatPricingOption(opt: any): string {
