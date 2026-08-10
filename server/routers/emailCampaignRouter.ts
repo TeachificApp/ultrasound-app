@@ -1167,7 +1167,7 @@ Rules:
       db
         .select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, coverImageUrl: lmsCourses.coverImageUrl, slug: lmsCourses.slug, brand: lmsCourses.brand })
         .from(lmsCourses)
-        .where(eq(lmsCourses.status, "published"))
+        .where(sql`${lmsCourses.status} IN ('public', 'published', 'enrollment_closed')`)
         .orderBy(lmsCourses.title)
         .limit(200),
       db
