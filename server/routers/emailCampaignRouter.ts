@@ -1027,7 +1027,7 @@ Rules:
         db.execute(sql`SELECT id, title FROM physical_products WHERE status != 'archived' ORDER BY title LIMIT 200`),
       ),
       safeAudienceSqlRows<{ id: number; subject: string; sentAt: Date | null }>("sentCampaigns", () =>
-        db.execute(sql`SELECT id, subject, sent_at as sentAt FROM emailCampaigns WHERE status = 'sent' ORDER BY sentAt DESC LIMIT 200`),
+        db.execute(sql`SELECT id, subject, sentAt FROM emailCampaigns WHERE status = 'sent' ORDER BY sentAt DESC LIMIT 200`),
       ),
     ]);
 
