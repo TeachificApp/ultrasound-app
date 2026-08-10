@@ -502,6 +502,8 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [scheduledAt, setScheduledAt] = useState("");
+  const [testEmailDialogOpen, setTestEmailDialogOpen] = useState(false);
+  const [testEmailAddress, setTestEmailAddress] = useState("");
   const [saveTemplateDialogOpen, setSaveTemplateDialogOpen] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [loadTemplateDialogOpen, setLoadTemplateDialogOpen] = useState(false);
@@ -638,6 +640,10 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     onError: (e) => toast.error(e.message),
   });
 
+  const sendTestMutation = trpc.emailCampaign.sendTestEmail.useMutation({
+    onSuccess: () => { toast.success("Test email sent!"); setTestEmailDialogOpen(false); },
+    onError: (e) => toast.error(e.message),
+  });
   const scheduleMutation = trpc.emailCampaign.scheduleCampaign.useMutation({
     onSuccess: (r) => {
       toast.success(`Scheduled for ${new Date(r.scheduledAt).toLocaleString()}`);
@@ -772,6 +778,9 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
           ) : null}
           <Button variant="outline" size="sm" onClick={handleSaveDraft} disabled={isSaving}>
             <Save className="w-4 h-4 mr-1.5" /> {isSaving ? "Saving…" : "Save Draft"}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setTestEmailDialogOpen(true)}>
+            <Send className="w-4 h-4 mr-1.5" /> Send Test
           </Button>
           <Button variant="outline" size="sm" onClick={() => setScheduleDialogOpen(true)}>
             <Clock className="w-4 h-4 mr-1.5" /> Schedule
@@ -983,6 +992,35 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
         </DialogContent>
       </Dialog>
 
+      {/* Test email dialog */}
+      <Dialog open={testEmailDialogOpen} onOpenChange={setTestEmailDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Send Test Email</DialogTitle></DialogHeader>
+          <p className="text-sm text-gray-500">Send the current campaign to a single address to preview it in a real inbox.</p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Send to</label>
+              <Input
+                type="email"
+                placeholder="your@email.com"
+                value={testEmailAddress}
+                onChange={(e) => setTestEmailAddress(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setTestEmailDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => sendTestMutation.mutate({ toEmail: testEmailAddress, subject, htmlBody: wrappedHtml, previewText, headerTitle, headerSubtext, headerColor, headerEnabled })}
+              disabled={!testEmailAddress || sendTestMutation.isPending}
+              style={{ background: "#189aa1" }} className="text-white hover:opacity-90"
+            >
+              {sendTestMutation.isPending ? "Sending…" : "Send Test"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* Schedule dialog */}
       <Dialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
         <DialogContent>

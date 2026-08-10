@@ -2070,4 +2070,29 @@ Rules:
       return { campaignId, recipientCount: recipients.length };
     }),
 
+  // ── Admin: send a test email to a single address ─────────────────────────
+  sendTestEmail: protectedProcedure
+    .input(z.object({
+      toEmail: z.string().email(),
+      subject: z.string().min(1).max(500),
+      htmlBody: z.string().min(1),
+      previewText: z.string().max(300).optional(),
+      headerTitle: z.string().max(300).optional(),
+      headerSubtext: z.string().max(500).optional(),
+      headerColor: z.string().max(20).optional(),
+      headerEnabled: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const html = normalizeCampaignEmailHtml(input.htmlBody);
+      const ok = await sendEmail({
+        to: { email: input.toEmail },
+        subject: `[TEST] ${input.subject}`,
+        htmlBody: html,
+        previewText: input.previewText ?? undefined,
+      });
+      if (!ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to send test email." });
+      return { ok: true };
+    }),
+
 });
