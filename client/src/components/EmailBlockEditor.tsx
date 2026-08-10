@@ -127,6 +127,7 @@ const EMAIL_SAFE_TYPES: BlockType[] = [
   "two_column",
   "three_column",
   "divided_columns",
+  "ai_content",  // AI Generate Content block — renders as rich text in email
 ];
 
 // Filter catalog to email-safe blocks only, then append email-auto blocks
@@ -572,6 +573,14 @@ export function emailBlockToHtml(block: Block): string {
         } catch { deadlineText = ""; }
       }
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border:2px solid ${accent};border-radius:8px;margin:16px 0;"><tr><td style="padding:24px;text-align:center;"><p style="color:${accent};font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 6px;">⏰ Time-Sensitive</p><h3 style="color:${textColor};font-size:20px;font-weight:700;margin:0 0 8px;">${headline}</h3>${subtext ? `<p style="color:${textColor};font-size:14px;margin:0 0 8px;opacity:0.85;">${subtext}</p>` : ""}${deadlineText ? `<p style="color:${accent};font-size:14px;font-weight:600;margin:0;">${deadlineText}</p>` : ""}</td></tr></table>`;
+    }
+    case "ai_content": {
+      const html = (d.html as string) ?? "";
+      if (!html) return "";
+      const bg = (d.bgColor as string) ?? "";
+      const color = (d.textColor as string) ?? "#1a2e3b";
+      const bgStyle = bg && bg !== "#ffffff" ? `background:${bg};` : "";
+      return `<div style="${bgStyle}padding:8px 0;color:${color};font-size:15px;line-height:1.7;text-align:${align};">${html}</div>`;
     }
     default:
       return "";
