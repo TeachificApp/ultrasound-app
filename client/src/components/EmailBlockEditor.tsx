@@ -262,16 +262,18 @@ export function emailBlockToHtml(block: Block): string {
       const checkoutType = (d.checkoutProductType as string) ?? "";
       const checkoutId = d.checkoutProductId ? Number(d.checkoutProductId) : null;
       const checkoutSlug = (d.checkoutProductSlug as string) ?? "";
-      function buildCtaCheckoutUrl(): string {
-        if (!checkoutType || !checkoutId) return "#";
-        // Use stored slug if available, otherwise fall back to id-based URL for quizzes
-        const slug = checkoutSlug || String(checkoutId);
-        if (checkoutType === "workshop") return `https://learn.allaboutultrasound.com/checkout/workshop/${slug}`;
-        if (checkoutType === "webinar") return `https://learn.allaboutultrasound.com/checkout/${slug}?type=webinar`;
-        if (checkoutType === "download") return `https://learn.allaboutultrasound.com/checkout/${slug}?type=download`;
-        if (checkoutType === "bundle") return `https://learn.allaboutultrasound.com/checkout/${slug}?type=bundle`;
-        return `https://learn.allaboutultrasound.com/checkout/${slug}`;
-      }
+        function buildCtaCheckoutUrl(): string {
+          if (!checkoutType || !checkoutId) return "#";
+          // Use stored slug if available, otherwise fall back to id-based URL for quizzes
+          const slug = checkoutSlug || String(checkoutId);
+          // Workshops require an instance ID — send to the workshop landing page instead;
+          // the server-side resolver in getCampaign will write the correct /checkout/workshop/{slug}?instance={id} URL
+          if (checkoutType === "workshop") return `https://learn.allaboutultrasound.com/workshops/${slug}`;
+          if (checkoutType === "webinar") return `https://learn.allaboutultrasound.com/checkout/${slug}?type=webinar`;
+          if (checkoutType === "download") return `https://learn.allaboutultrasound.com/checkout/${slug}?type=download`;
+          if (checkoutType === "bundle") return `https://learn.allaboutultrasound.com/checkout/${slug}?type=bundle`;
+          return `https://learn.allaboutultrasound.com/checkout/${slug}`;
+        }
       const isStubLink = !rawCtaLink || rawCtaLink === "#" || rawCtaLink === "https://" || rawCtaLink === "http://";
       const ctaLink = isStubLink && checkoutType ? buildCtaCheckoutUrl() : toAbsoluteUrl(rawCtaLink);
       const ctaColor = (d.ctaColor as string) ?? "#179ca3";

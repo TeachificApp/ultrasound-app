@@ -1318,7 +1318,9 @@ function CTAActionPicker({
                 if (prod && (prod as any).slug) {
                   const slug = (prod as any).slug as string;
                   const checkoutUrl = type === "workshop"
-                    ? `https://learn.allaboutultrasound.com/checkout/workshop/${slug}`
+                    // Workshops need an instance ID — use landing page as placeholder;
+                    // getCampaign server resolver will upgrade to /checkout/workshop/{slug}?instance={id}
+                    ? `https://learn.allaboutultrasound.com/workshops/${slug}`
                     : type === "webinar"
                     ? `https://learn.allaboutultrasound.com/checkout/${slug}?type=webinar`
                     : type === "download"

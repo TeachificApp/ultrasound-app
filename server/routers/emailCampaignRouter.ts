@@ -1253,6 +1253,21 @@ Rules:
             if (pType === "workshop") {
               const [row] = await db.select({ slug: workshops.slug }).from(workshops).where(eq(workshops.id, pId)).limit(1);
               slug = row?.slug ?? "";
+              // Also look up the first available instance to include ?instance= in the URL
+              const [instRow] = await db.select({ id: workshopInstances.id })
+                .from(workshopInstances)
+                .where(
+                  sql`${workshopInstances.workshopId} = ${pId} AND ${workshopInstances.status} = 'published' AND ${workshopInstances.availableForPurchase} = 1`
+                )
+                .orderBy(workshopInstances.startDate)
+                .limit(1);
+              if (instRow && slug) {
+                const BASE2 = "https://learn.allaboutultrasound.com";
+                const resolvedWorkshopUrl = `${BASE2}/checkout/workshop/${slug}?instance=${instRow.id}`;
+                block.data = { ...d, ctaLink: resolvedWorkshopUrl, checkoutProductSlug: slug };
+                changed = true;
+                continue;
+              }
             } else if (pType === "webinar") {
               const [row] = await db.select({ slug: webinars.slug }).from(webinars).where(eq(webinars.id, pId)).limit(1);
               slug = row?.slug ?? "";
