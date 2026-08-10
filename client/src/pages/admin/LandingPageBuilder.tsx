@@ -3339,7 +3339,7 @@ function AiImageBlockSettings({ d, set, setMany, uploading, bgImageRef, handleFi
 }) {
   const utils = trpc.useUtils();
   const [generating, setGenerating] = React.useState(false);
-  const generateMutation = trpc.lmsGroup.generateAiImage.useMutation({
+  const generateMutation = trpc.lmsAdmin.generateAiImage.useMutation({
     onSuccess: (res) => {
       set("url", res.url);
       setGenerating(false);
