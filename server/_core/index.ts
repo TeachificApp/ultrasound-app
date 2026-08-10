@@ -431,7 +431,24 @@ async function startServer() {
       destination = appUrl;
     }
     // Redirect immediately — record the click event asynchronously so the user isn't delayed
-    res.redirect(302, destination);
+    // Use an HTML meta-refresh page instead of a bare 302 — Gmail's in-app browser
+    // sometimes rejects bare redirects with ERR_INVALID_REDIRECT. An HTML page with
+    // meta-refresh + JS window.location works in all email clients.
+    const safeDestination = destination.replace(/"/g, "&quot;");
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.status(200).send(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0;url=${safeDestination}">
+<title>Redirecting...</title>
+<script>window.location.replace(${JSON.stringify(destination)});</script>
+</head>
+<body style="font-family:sans-serif;text-align:center;padding:40px;">
+<p>Redirecting you now...</p>
+<p><a href="${safeDestination}" style="color:#189aa1;font-size:18px;">Click here if not redirected</a></p>
+</body>
+</html>`);
     const campaignId = parseInt(req.params.campaignId, 10);
     const key = String(req.params.recipientKey ?? "");
     const variant = typeof req.query.v === "string" ? req.query.v : undefined;
