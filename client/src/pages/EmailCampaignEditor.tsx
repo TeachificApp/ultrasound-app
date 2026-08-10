@@ -930,26 +930,28 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
                   // Scale the 900px email down to fit the preview pane
                   <div className="p-4">
                     <div style={{ position: "relative", width: "100%", paddingBottom: `${140 / previewScale}%` }}>
-                      <iframe
-                        srcDoc={wrappedHtml}
+                      <div
+                        dangerouslySetInnerHTML={{ __html: wrappedHtml }}
                         style={{
                           position: "absolute", top: 0, left: 0,
-                          width: "900px", height: `${900 / previewScale}px`,
+                          width: "900px",
                           border: "none", borderRadius: "6px",
                           transformOrigin: "top left",
                           transform: `scale(${previewScale})`,
+                          userSelect: "text",
+                          cursor: "text",
+                          background: "#fff",
+                          overflow: "hidden",
                         }}
-                        title="Email preview"
                       />
                     </div>
                   </div>
                 ) : (
                   <div className="mx-auto max-w-sm p-4">
-                    <iframe
-                      srcDoc={wrappedHtml}
-                      className="w-full border-0 rounded"
-                      style={{ height: "700px" }}
-                      title="Email preview mobile"
+                    <div
+                      dangerouslySetInnerHTML={{ __html: wrappedHtml }}
+                      className="w-full rounded"
+                      style={{ minHeight: "700px", userSelect: "text", cursor: "text", background: "#fff", overflow: "hidden" }}
                     />
                   </div>
                 )}
