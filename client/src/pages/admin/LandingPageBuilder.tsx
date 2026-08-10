@@ -3324,7 +3324,7 @@ function TextBlockEditor({ d, set, lessonTitle, courseTitle }: { d: Record<strin
   );
 }
 
-function AiContentBlockEditor({ d, set, setMany }: { d: Record<string, any>; set: (field: string, value: any) => void; setMany: (patch: Record<string, any>) => void }) {
+function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string, any>; set: (field: string, value: any) => void; setMany: (patch: Record<string, any>) => void; emailMode?: boolean }) {
   const [aiPrompt, setAiPrompt] = React.useState<string>(d.prompt ?? "");
   const [aiContentType, setAiContentType] = React.useState<string>(d.contentType ?? "lesson");
   const [aiMode, setAiMode] = React.useState<"prompt" | "edit">(d.html ? "edit" : "prompt");
@@ -3377,8 +3377,11 @@ function AiContentBlockEditor({ d, set, setMany }: { d: Record<string, any>; set
     const formatMap: Record<string, "text" | "outline" | "summary" | "quiz_questions"> = {
       lesson: "text", explanation: "text", summary: "summary", outline: "outline",
       exercise: "text", section: "text", quiz_questions: "quiz_questions",
+      announcement: "text", newsletter_section: "text", promo_copy: "text",
+      event_recap: "text", follow_up: "text", intro_paragraph: "text", closing_paragraph: "text",
     };
-    generateAiContent.mutate({ lessonTitle: aiPrompt, format: formatMap[aiContentType] ?? "text" });
+    const emailTypeContext = emailMode ? ` (email content type: ${aiContentType.replace(/_/g, " ")})` : "";
+    generateAiContent.mutate({ lessonTitle: aiPrompt + emailTypeContext, format: formatMap[aiContentType] ?? "text" });
   };
   return (
     <div className="space-y-4">
@@ -3396,13 +3399,27 @@ function AiContentBlockEditor({ d, set, setMany }: { d: Record<string, any>; set
             <label className="text-xs text-gray-500 block mb-1">Content Type</label>
             <select value={aiContentType} onChange={e => setAiContentType(e.target.value)} className="w-full h-8 text-xs border border-gray-200 rounded-md px-2 focus:outline-none focus:ring-2 focus:ring-teal-400">
               <option value="course_promo">Course / Product Promo</option>
-              <option value="lesson">Full Lesson</option>
-              <option value="explanation">Explanation</option>
-              <option value="summary">Summary</option>
-              <option value="outline">Outline</option>
-              <option value="exercise">Exercise / Activity</option>
-              <option value="section">Module Overview</option>
-              <option value="quiz_questions">Quiz Questions &amp; Answers</option>
+              {emailMode ? (
+                <>
+                  <option value="announcement">Announcement</option>
+                  <option value="newsletter_section">Newsletter Section</option>
+                  <option value="promo_copy">Promotional Copy</option>
+                  <option value="event_recap">Event / Webinar Recap</option>
+                  <option value="follow_up">Follow-up / Re-engagement</option>
+                  <option value="intro_paragraph">Intro Paragraph</option>
+                  <option value="closing_paragraph">Closing Paragraph</option>
+                </>
+              ) : (
+                <>
+                  <option value="lesson">Full Lesson</option>
+                  <option value="explanation">Explanation</option>
+                  <option value="summary">Summary</option>
+                  <option value="outline">Outline</option>
+                  <option value="exercise">Exercise / Activity</option>
+                  <option value="section">Module Overview</option>
+                  <option value="quiz_questions">Quiz Questions &amp; Answers</option>
+                </>
+              )}
             </select>
           </div>
           {aiContentType === "course_promo" && (
@@ -3468,7 +3485,7 @@ function AiContentBlockEditor({ d, set, setMany }: { d: Record<string, any>; set
   );
 }
 
-export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle, courseTitle }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number; courseId?: number; lessonTitle?: string; courseTitle?: string }) {
+export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle, courseTitle, emailMode }: { block: Block; onChange: (data: Record<string, any>) => void; lessonId?: number; courseId?: number; lessonTitle?: string; courseTitle?: string; emailMode?: boolean }) {
   const d = block.data ?? {};
   // Use refs to avoid stale closures with debounced inputs
   const dataRef = useRef(block.data ?? {});
@@ -4000,7 +4017,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
       );
     }
     case "ai_content": {
-      return <AiContentBlockEditor d={d} set={set} setMany={setMany} />;
+      return <AiContentBlockEditor d={d} set={set} setMany={setMany} emailMode={emailMode} />;
     }
     case "text": {
       return <TextBlockEditor d={d} set={set} lessonTitle={lessonTitle} courseTitle={courseTitle} />;

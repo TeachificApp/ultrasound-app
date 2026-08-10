@@ -1308,6 +1308,7 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
                 <BlockSettings
                   block={selectedBlock}
                   onChange={(data) => updateBlock(selectedBlock.id, data)}
+                  emailMode={selectedBlock.type === "ai_content"}
               />
             )}
           </div>
