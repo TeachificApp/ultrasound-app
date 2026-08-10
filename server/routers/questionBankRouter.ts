@@ -20,9 +20,8 @@ import {
   mediaAssets,
   mediaVersions,
 } from "../../drizzle/schema";
-import { parseISpringQuizFromBuffer } from "../lib/iSpringQuizParser";
-import { rewriteStorageRefs, uploadISpringImagesFromZip } from "../lib/iSpringImageImporter";
-import { loadLatestMediaVersionBuffer } from "../lib/loadMediaVersionBuffer";
+import { rewriteStorageRefs, uploadISpringImagesFromZip, uploadISpringImagesFromExtractedPrefix } from "../lib/iSpringImageImporter";
+import { loadScormImportFromMediaAsset, loadScormImportFromBase64 } from "../lib/scormQuestionBankImport";
 import * as XLSX from "xlsx";
 import fs from "fs";
 import path from "path";
@@ -637,15 +636,7 @@ export const questionBankRouter = router({
         .limit(1);
       if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
 
-      const zipBuffer = await loadLatestMediaVersionBuffer(input.mediaAssetId);
-
-      // Parse the iSpring quiz
-      let parsed;
-      try {
-        parsed = await parseISpringQuizFromBuffer(zipBuffer);
-      } catch (e: any) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
-      }
+      const { parsed } = await loadScormImportFromMediaAsset(input.mediaAssetId);
 
       return {
         assetTitle: asset.title,
@@ -695,17 +686,14 @@ export const questionBankRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      const zipBuffer = await resolveScormZipBuffer(input);
-      let parsed;
-      try {
-        parsed = await parseISpringQuizFromBuffer(zipBuffer);
-      } catch (e: any) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
-      }
+      const source = input.mediaAssetId
+        ? await loadScormImportFromMediaAsset(input.mediaAssetId)
+        : await loadScormImportFromBase64(input.bufferBase64!);
+      const parsed = source.parsed;
 
-      const AdmZip = (await import("adm-zip")).default;
-      const zipEntries = new AdmZip(zipBuffer).getEntries();
-      const imageMap = await uploadISpringImagesFromZip(zipEntries, parsed.allImageRefs);
+      const imageMap = source.extractedPrefix
+        ? await uploadISpringImagesFromExtractedPrefix(source.extractedPrefix, parsed.allImageRefs)
+        : await uploadISpringImagesFromZip(source.zipEntries, parsed.allImageRefs);
 
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {
@@ -1004,23 +992,3 @@ export const questionBankRouter = router({
 
 });
 
-// ─── Download helper ──────────────────────────────────────────────────────────
-
-async function resolveScormZipBuffer(input: {
-  mediaAssetId?: number;
-  bufferBase64?: string;
-}): Promise<Buffer> {
-  if (input.bufferBase64) {
-    const buf = Buffer.from(input.bufferBase64, "base64");
-    if (!buf.length) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "SCORM file data is empty" });
-    }
-    return buf;
-  }
-
-  if (!input.mediaAssetId) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "No SCORM source provided" });
-  }
-
-  return loadLatestMediaVersionBuffer(input.mediaAssetId);
-}

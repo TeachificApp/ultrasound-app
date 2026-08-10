@@ -1041,6 +1041,12 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   const { asset, versions, grants } = data;
   const currentVersion = versions[0];
   const isPublic = asset.access === "public";
+  const scormExtractStatus = (currentVersion as { scormExtractionStatus?: string | null })?.scormExtractionStatus ?? null;
+  const scormFileSize = Number((currentVersion as { fileSize?: number | null })?.fileSize ?? 0);
+  const SCORM_LARGE_BYTES = 50 * 1024 * 1024;
+  const isLargeScormPackage = scormFileSize > SCORM_LARGE_BYTES;
+  const scormExtractionReady = !isLargeScormPackage || scormExtractStatus === "done";
+  const scormExtractionBlocked = isLargeScormPackage && scormExtractStatus !== "done";
 
   return (
     <>
@@ -1485,6 +1491,30 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
               </div>
             ) : (
               <div className="space-y-4">
+                {scormExtractionBlocked && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
+                    <p className="font-medium">
+                      Large package ({(scormFileSize / 1024 / 1024).toFixed(0)} MB) — SCORM extraction must finish before importing questions.
+                    </p>
+                    <p className="text-amber-800">
+                      Status: <strong>{scormExtractStatus ?? "pending"}</strong>
+                      {scormExtractStatus === "processing" && " — extraction can take 30+ minutes for large files."}
+                      {scormExtractStatus === "failed" && (currentVersion as { scormExtractionError?: string })?.scormExtractionError
+                        ? ` — ${(currentVersion as { scormExtractionError?: string }).scormExtractionError}`
+                        : null}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-amber-300 text-amber-800 hover:bg-amber-100"
+                      disabled={reExtractMutation.isPending}
+                      onClick={() => reExtractMutation.mutate({ assetId: asset.id })}
+                    >
+                      <RefreshCw className={`w-3 h-3 mr-1.5 ${reExtractMutation.isPending ? "animate-spin" : ""}`} />
+                      {reExtractMutation.isPending ? "Starting re-extract…" : "Re-extract SCORM package"}
+                    </Button>
+                  </div>
+                )}
                 <p className="text-xs text-gray-500">
                   All questions in this file will be extracted with their associated media (images, audio) and saved as native question bank questions.
                 </p>
@@ -1531,7 +1561,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                   <Button
                     size="sm"
                     className="bg-teal-600 hover:bg-teal-700 text-white"
-                    disabled={confirmExtractMutation.isPending || (extractFolderMode === "new" && !extractNewFolderName.trim())}
+                    disabled={confirmExtractMutation.isPending || !scormExtractionReady || (extractFolderMode === "new" && !extractNewFolderName.trim())}
                     onClick={() => {
                       confirmExtractMutation.mutate({
                         mediaAssetId: asset.id,
