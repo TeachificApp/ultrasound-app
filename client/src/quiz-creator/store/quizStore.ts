@@ -149,6 +149,7 @@ function defaultMeta(): QuizMeta {
     maxAttempts: 3,
     allowBackNavigation: true,
     showProgressBar: true,
+    editorViewMode: "form",
   };
 }
 
@@ -156,6 +157,7 @@ interface QuizStore {
   // Quiz data
   quiz: QuizFile;
   activeQuestionId: string | null;
+  activeSlide: "intro" | "pass" | "fail" | null;
   isDirty: boolean;
   savedFilename: string | null;
 
@@ -176,6 +178,8 @@ interface QuizStore {
   updateQuestion: (id: string, updates: Partial<QuizQuestion>) => void;
   reorderQuestions: (fromIndex: number, toIndex: number) => void;
   markSaved: (filename: string) => void;
+  setEditorViewMode: (mode: "form" | "slide") => void;
+  setActiveSlide: (slide: "intro" | "pass" | "fail" | string | null) => void;
 
   // License actions
   setLicense: (license: Partial<LicenseState>) => void;
@@ -193,6 +197,7 @@ const defaultLicense: LicenseState = {
 export const useQuizStore = create<QuizStore>((set, get) => ({
   quiz: { meta: defaultMeta(), questions: [] },
   activeQuestionId: null,
+  activeSlide: null,
   isDirty: false,
   savedFilename: null,
   license: (() => {
@@ -216,6 +221,7 @@ export const useQuizStore = create<QuizStore>((set, get) => ({
     set({
       quiz: { meta: defaultMeta(), questions: [] },
       activeQuestionId: null,
+      activeSlide: null,
       isDirty: false,
       savedFilename: null,
     }),
@@ -224,6 +230,7 @@ export const useQuizStore = create<QuizStore>((set, get) => ({
     set({
       quiz,
       activeQuestionId: quiz.questions[0]?.id ?? null,
+      activeSlide: null,
       isDirty: false,
       savedFilename: filename ?? null,
     }),
@@ -280,7 +287,19 @@ export const useQuizStore = create<QuizStore>((set, get) => ({
       return { quiz: { ...s.quiz, questions }, activeQuestionId, isDirty: true };
     }),
 
-  setActiveQuestion: (id) => set({ activeQuestionId: id }),
+  setActiveQuestion: (id) => set({ activeQuestionId: id, activeSlide: null }),
+
+  setEditorViewMode: (mode) =>
+    set((s) => ({
+      quiz: { ...s.quiz, meta: { ...s.quiz.meta, editorViewMode: mode } },
+      isDirty: true,
+    })),
+
+  setActiveSlide: (slide) =>
+    set({
+      activeSlide: slide === null ? null : (slide as "intro" | "pass" | "fail"),
+      activeQuestionId: slide && !["intro", "pass", "fail"].includes(slide) ? slide : null,
+    }),
 
   updateQuestion: (id, updates) =>
     set((s) => ({

@@ -2,7 +2,6 @@ import { useState } from "react";
 import { X, Copy, Check, Globe, GlobeLock, Code, Link2, ExternalLink } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useQuizStore } from "../store/quizStore";
-import { getOrgSubdomainUrl } from "@/hooks/useSubdomain";
 
 interface Props {
   open: boolean;
@@ -31,15 +30,9 @@ export function ShareDialog({ open, onClose, quizId }: Props) {
   const orgSlug = publishStatus?.orgSlug ?? null;
 
   // Build the share URL using the org's subdomain
-  const buildShareUrl = (token: string, slug: string | null) => {
-    if (slug) {
-      return getOrgSubdomainUrl(slug, `/quiz/${token}`);
-    }
-    // Fallback: use current origin (for dev/preview environments)
-    return `${window.location.origin}/quiz/${token}`;
-  };
+  const buildShareUrl = (token: string) => `${window.location.origin}/quizzes/${token}`;
 
-  const shareUrl = shareToken ? buildShareUrl(shareToken, orgSlug) : "";
+  const shareUrl = shareToken ? buildShareUrl(shareToken) : "";
   const embedCode = shareToken
     ? `<iframe src="${shareUrl}" width="100%" height="600" frameborder="0" style="border:none;border-radius:12px;" allow="fullscreen"></iframe>`
     : "";

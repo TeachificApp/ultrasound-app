@@ -240,7 +240,7 @@ export function parseISpringDataBlob(jsonStr: string): ParsedQuiz {
   };
 }
 
-function parseQuizFromHtml(html: string): ParsedQuiz {
+export function parseQuizFromHtml(html: string): ParsedQuiz {
   if (!html.includes("iSpring") && !html.includes("QuizPlayer")) {
     throw new Error("Not an iSpring SCORM package");
   }

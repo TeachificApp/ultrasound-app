@@ -319,6 +319,8 @@ export interface QuizMeta {
   // Question Groups / Pools
   groups?: QuestionGroup[];
   drawConfig?: DrawConfig;
+  // Editor UI
+  editorViewMode?: "form" | "slide";
 }
 
 export interface QuizFile {

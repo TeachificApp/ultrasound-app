@@ -6,7 +6,7 @@ import {
   FileText, Plus, CloudUpload, Cloud, Globe, FileArchive,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { ScormImportDialog } from "./ScormImportDialog";
 import type { QuizFile } from "../types/quiz";
 

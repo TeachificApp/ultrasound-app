@@ -22,6 +22,8 @@ import {
   questionBankTagMap,
   users,
 } from "../../drizzle/schema";
+import { drawQuestionsFromBuilder, parseBuilderConfig } from "../lib/quizBuilderConfig";
+import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
@@ -107,10 +109,16 @@ export const standaloneQuizLearnerRouter = router({
         .where(and(eq(standaloneQuizzes.id, input.quizId), eq(standaloneQuizzes.status, "published")))
         .limit(1);
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
+      const builderConfig = parseBuilderConfig(quiz.builderConfig);
       const [{ count }] = await db
         .select({ count: sql<number>`count(*)` })
         .from(standaloneQuizQuestions)
         .where(eq(standaloneQuizQuestions.quizId, quiz.id));
+      const questionCount = builderConfig
+        ? (builderConfig.meta.drawConfig?.enabled
+            ? builderConfig.meta.drawConfig.totalQuestions
+            : builderConfig.questions.length)
+        : Number(count);
       // Check attempt limits
       let attemptCount = 0;
       if (!quiz.allowRetakes || quiz.maxAttempts) {
@@ -128,7 +136,7 @@ export const standaloneQuizLearnerRouter = router({
         quiz.allowRetakes
           ? quiz.maxAttempts === null || attemptCount < quiz.maxAttempts
           : attemptCount === 0;
-      return { ...quiz, questionCount: Number(count), attemptCount, canAttempt };
+      return { ...quiz, questionCount, attemptCount, canAttempt, builderConfig: builderConfig?.meta ?? null };
     }),
 
   /** Start a new attempt — returns attempt ID and the ordered questions */
@@ -143,6 +151,8 @@ export const standaloneQuizLearnerRouter = router({
         .where(and(eq(standaloneQuizzes.id, input.quizId), eq(standaloneQuizzes.status, "published")))
         .limit(1);
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const builderConfig = parseBuilderConfig(quiz.builderConfig);
 
       // Check attempt limits
       if (!quiz.allowRetakes || quiz.maxAttempts) {
@@ -169,6 +179,29 @@ export const standaloneQuizLearnerRouter = router({
         .from(standaloneQuizAttempts)
         .where(and(eq(standaloneQuizAttempts.quizId, quiz.id), eq(standaloneQuizAttempts.userId, ctx.user.id)));
       const attemptNumber = Number(prevCnt) + 1;
+
+      // ── Visual builder mode: questions from builderConfig JSON ──
+      if (builderConfig && builderConfig.questions.length > 0) {
+        const drawn = drawQuestionsFromBuilder(builderConfig) as typeof builderConfig.questions;
+        const totalPoints = drawn.reduce((s, q) => s + ((q as { points?: number }).points ?? 1), 0);
+        const [result] = await db.insert(standaloneQuizAttempts).values({
+          quizId: quiz.id,
+          userId: ctx.user.id,
+          totalQuestions: drawn.length,
+          totalPoints,
+          attemptNumber,
+        });
+        const attemptId = (result as { insertId: number }).insertId;
+        const showAnswers = quiz.type === "quiz";
+        const questions = drawn.map((q) =>
+          builderQuestionToPlayerPayload(q as Parameters<typeof builderQuestionToPlayerPayload>[0], showAnswers)
+        );
+        return {
+          attemptId,
+          questions,
+          quiz: { ...quiz, totalPoints, builderMode: true, builderMeta: builderConfig.meta },
+        };
+      }
 
       // Fetch questions with their bank data
       let quizQs = await db
@@ -279,58 +312,83 @@ export const standaloneQuizLearnerRouter = router({
         .limit(1);
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Fetch quiz questions with correct answers
-      const quizQs = await db
-        .select({
-          sqq: standaloneQuizQuestions,
-          qb: questionBank,
-        })
-        .from(standaloneQuizQuestions)
-        .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
-        .where(eq(standaloneQuizQuestions.quizId, quiz.id));
-
-      const qMap = new Map(quizQs.map((q) => [q.qb.id, q]));
+      const builderConfig = parseBuilderConfig(quiz.builderConfig);
+      const isBuilderMode = !!(builderConfig && builderConfig.questions.length > 0);
 
       let earnedPoints = 0;
       let correctAnswers = 0;
       const answerRows: typeof standaloneQuizAttemptAnswers.$inferInsert[] = [];
 
-      for (const ans of input.answers) {
-        const q = qMap.get(ans.questionBankId);
-        if (!q) continue;
-        let isCorrect = false;
-        try {
-          const given = JSON.parse(ans.givenAnswer);
-          if (q.qb.type === "mcq" || q.qb.type === "truefalse") {
-            isCorrect = String(given) === String(q.qb.correctAnswer);
-          } else if (q.qb.type === "multiselect") {
-            const correct: number[] = JSON.parse(q.qb.correctAnswers ?? "[]");
-            const givenArr: number[] = Array.isArray(given) ? given : [];
-            isCorrect =
-              givenArr.length === correct.length &&
-              givenArr.every((v) => correct.includes(v));
-          } else if (q.qb.type === "hotspot") {
-            // given = { markerId: string }; correct = correctAnswer (marker id)
-            isCorrect = String(given?.markerId ?? given) === String(q.qb.correctAnswer);
-          } else if (q.qb.type === "matching") {
-            // given = array of { id, right }; correct = matchingPairs
-            const pairs: { id: string; left: string; right: string }[] = JSON.parse(q.qb.matchingPairs ?? "[]");
-            const givenPairs: { id: string; right: string }[] = Array.isArray(given) ? given : [];
-            isCorrect = pairs.every((p) => givenPairs.find((g) => g.id === p.id)?.right === p.right);
+      if (isBuilderMode) {
+        const qMap = new Map(
+          builderConfig!.questions.map((q) => {
+            const qq = q as { id: string; points: number };
+            return [stableBuilderQuestionId(qq.id), qq];
+          })
+        );
+        for (const ans of input.answers) {
+          const q = qMap.get(ans.questionBankId) as { id: string; points: number; type: string; data: unknown } | undefined;
+          if (!q) continue;
+          const isCorrect = gradeBuilderAnswer(q, ans.givenAnswer);
+          if (isCorrect) {
+            earnedPoints += q.points;
+            correctAnswers++;
           }
-        } catch { /* ignore parse errors */ }
-
-        if (isCorrect) {
-          earnedPoints += q.sqq.points;
-          correctAnswers++;
+          answerRows.push({
+            attemptId: input.attemptId,
+            questionId: ans.questionBankId,
+            givenAnswer: ans.givenAnswer,
+            isCorrect,
+            timeSpentSeconds: ans.timeSpentSeconds ?? null,
+          });
         }
-        answerRows.push({
-          attemptId: input.attemptId,
-          questionId: ans.questionBankId,
-          givenAnswer: ans.givenAnswer,
-          isCorrect,
-          timeSpentSeconds: ans.timeSpentSeconds ?? null,
-        });
+      } else {
+        const quizQs = await db
+          .select({
+            sqq: standaloneQuizQuestions,
+            qb: questionBank,
+          })
+          .from(standaloneQuizQuestions)
+          .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
+          .where(eq(standaloneQuizQuestions.quizId, quiz.id));
+
+        const qMap = new Map(quizQs.map((q) => [q.qb.id, q]));
+
+        for (const ans of input.answers) {
+          const q = qMap.get(ans.questionBankId);
+          if (!q) continue;
+          let isCorrect = false;
+          try {
+            const given = JSON.parse(ans.givenAnswer);
+            if (q.qb.type === "mcq" || q.qb.type === "truefalse") {
+              isCorrect = String(given) === String(q.qb.correctAnswer);
+            } else if (q.qb.type === "multiselect") {
+              const correct: number[] = JSON.parse(q.qb.correctAnswers ?? "[]");
+              const givenArr: number[] = Array.isArray(given) ? given : [];
+              isCorrect =
+                givenArr.length === correct.length &&
+                givenArr.every((v) => correct.includes(v));
+            } else if (q.qb.type === "hotspot") {
+              isCorrect = String(given?.markerId ?? given) === String(q.qb.correctAnswer);
+            } else if (q.qb.type === "matching") {
+              const pairs: { id: string; left: string; right: string }[] = JSON.parse(q.qb.matchingPairs ?? "[]");
+              const givenPairs: { id: string; right: string }[] = Array.isArray(given) ? given : [];
+              isCorrect = pairs.every((p) => givenPairs.find((g) => g.id === p.id)?.right === p.right);
+            }
+          } catch { /* ignore parse errors */ }
+
+          if (isCorrect) {
+            earnedPoints += q.sqq.points;
+            correctAnswers++;
+          }
+          answerRows.push({
+            attemptId: input.attemptId,
+            questionId: ans.questionBankId,
+            givenAnswer: ans.givenAnswer,
+            isCorrect,
+            timeSpentSeconds: ans.timeSpentSeconds ?? null,
+          });
+        }
       }
 
       // Bulk insert answers

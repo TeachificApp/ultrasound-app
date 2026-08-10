@@ -1,6 +1,4 @@
-/**
- * Upload iSpring SCORM package images (storage:// refs) to platform storage.
- */
+import { downloadStorageObject } from "./downloadStorageObject";
 import { storagePut } from "../storage";
 
 type ZipEntry = { entryName: string; getData: () => Buffer };
@@ -72,4 +70,40 @@ export function rewriteStorageRefs(text: string, urlMap: Map<string, string>): s
     out = out.split(ref).join(url);
   }
   return out;
+}
+
+/** Upload iSpring images from an already-extracted SCORM R2 prefix. */
+export async function uploadISpringImagesFromExtractedPrefix(
+  prefix: string,
+  imageRefs: string[],
+): Promise<Map<string, string>> {
+  const urlMap = new Map<string, string>();
+  const uniqueRefs = [...new Set(imageRefs)];
+
+  for (const ref of uniqueRefs) {
+    const withoutScheme = ref.replace(/^storage:\/\//, "");
+    const keys = [
+      `${prefix}/data/${withoutScheme}`,
+      `${prefix}/${withoutScheme}`,
+      `${prefix}/data/storage/${withoutScheme}`,
+    ];
+
+    let buf: Buffer | null = null;
+    for (const key of keys) {
+      try {
+        buf = await downloadStorageObject(key);
+        if (buf.length > 0) break;
+      } catch {
+        buf = null;
+      }
+    }
+    if (!buf?.length) continue;
+
+    const fileName = withoutScheme.split("/").pop() ?? "image.png";
+    const storageKey = `question-bank/ispring/${Date.now()}-${Math.random().toString(36).slice(2)}-${fileName}`;
+    const { url } = await storagePut(storageKey, buf, mimeFromPath(fileName));
+    urlMap.set(ref, url);
+  }
+
+  return urlMap;
 }

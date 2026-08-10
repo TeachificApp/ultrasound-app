@@ -7408,6 +7408,8 @@ export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
   categoryConfig: longtext("category_config"),
   // Total questions to draw per attempt (null = draw all)
   questionsPerAttempt: int("questions_per_attempt"),
+  // iSpring-style visual builder config (QuizFile JSON: meta, questions, groups, branching, slides)
+  builderConfig: longtext("builder_config"),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),

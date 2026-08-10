@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Cloud, Trash2, Clock } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useQuizStore } from "../store/quizStore";
+import type { QuizFile } from "../types/quiz";
 
 interface Props {
   onClose: () => void;
@@ -14,38 +15,16 @@ export function CloudQuizBrowser({ onClose }: Props) {
   const { loadQuiz } = useQuizStore();
   const [opening, setOpening] = useState<number | null>(null);
 
-  const handleOpen = async (quiz: any) => {
-    setOpening(quiz.id);
+  const handleOpen = async (quizRow: { id: number; title: string }) => {
+    setOpening(quizRow.id);
     try {
-      // The questions are stored as JSON in the instructions field
-      const questionsJson = quiz.instructions || "[]";
-      const questions = JSON.parse(questionsJson);
-      const quizFile = {
-        meta: {
-          id: crypto.randomUUID(),
-          title: quiz.title,
-          description: quiz.description || "",
-          author: "",
-          authorEmail: "",
-          createdAt: quiz.createdAt?.toISOString?.() || new Date().toISOString(),
-          updatedAt: quiz.updatedAt?.toISOString?.() || new Date().toISOString(),
-          version: 1,
-          licenseKey: null,
-          teachificOrgId: null,
-          tags: [],
-          passingScore: quiz.passingScore || 70,
-          timeLimit: quiz.timeLimit || null,
-          shuffleQuestions: quiz.shuffleQuestions || false,
-          shuffleAnswers: quiz.shuffleAnswers || false,
-          showFeedback: "immediate" as const,
-          allowRetry: true,
-          maxAttempts: quiz.maxAttempts || 0,
-          cloudId: quiz.id,
-        },
-        questions,
-      };
-      loadQuiz(quizFile as any, quiz.title + " (cloud)");
-      onClose();
+      const full = await utils.quizMaker.getQuiz.fetch({ quizId: quizRow.id });
+      if (full?.builderConfig) {
+        loadQuiz(full.builderConfig as QuizFile, quizRow.title + " (cloud)");
+        onClose();
+      } else {
+        alert("This quiz has no visual builder config.");
+      }
     } catch (err) {
       alert("Failed to open quiz: " + (err as Error).message);
     } finally {
@@ -67,7 +46,6 @@ export function CloudQuizBrowser({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "#e0f7f9" }}>
@@ -83,7 +61,6 @@ export function CloudQuizBrowser({ onClose }: Props) {
           </button>
         </div>
 
-        {/* Body */}
         <div className="p-4 max-h-96 overflow-y-auto">
           {isLoading ? (
             <div className="text-center py-12 text-gray-400">Loading...</div>
@@ -95,7 +72,7 @@ export function CloudQuizBrowser({ onClose }: Props) {
             </div>
           ) : (
             <div className="space-y-2">
-              {quizzes.map((q: any) => (
+              {quizzes.map((q) => (
                 <button
                   key={q.id}
                   onClick={() => handleOpen(q)}
@@ -112,9 +89,6 @@ export function CloudQuizBrowser({ onClose }: Props) {
                       <span className="text-xs text-gray-400">
                         {new Date(q.updatedAt).toLocaleDateString()}
                       </span>
-                      {q.description && (
-                        <span className="text-xs text-gray-400 truncate">— {q.description}</span>
-                      )}
                     </div>
                   </div>
                   <button
