@@ -871,25 +871,35 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
         {sourceMode === "database" ? (
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-medium text-gray-600">Select Bundles</label>
+              <label className="text-xs font-medium text-gray-600">Select Products</label>
               <button onClick={() => refetch()} className="text-gray-400 hover:text-teal-600" title="Refresh"><RefreshCw size={11} /></button>
             </div>
             {optionsLoading ? (
-              <p className="text-xs text-gray-400">Loading bundles…</p>
-            ) : !blockOptions?.bundles?.length ? (
-              <p className="text-xs text-gray-400">No published bundles found.</p>
+              <p className="text-xs text-gray-400">Loading products…</p>
             ) : (
-              <div className="space-y-1 max-h-48 overflow-y-auto border rounded p-2 bg-gray-50">
-                {blockOptions.bundles.map((b) => (
-                  <label key={b.id} className="flex items-start gap-2 cursor-pointer hover:bg-white rounded p-1">
-                    <input type="checkbox" className="mt-0.5" checked={selectedIds.includes(b.id)} onChange={() => toggleId(b.id)} />
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-gray-800 leading-tight">{b.title}</p>
-                      {b.subtitle && <p className="text-[10px] text-gray-400 truncate">{b.subtitle}</p>}
-                      <p className="text-[10px] text-gray-400">${((b.price ?? 0) / 100).toFixed(0)}</p>
+              <div className="space-y-1 max-h-64 overflow-y-auto border rounded p-2 bg-gray-50">
+                {[
+                  ...(blockOptions?.courses ?? []).map((p: any) => ({ ...p, _type: "Course" })),
+                  ...(blockOptions?.webinars ?? []).map((p: any) => ({ ...p, _type: "Webinar" })),
+                  ...(blockOptions?.workshopInstances ?? []).map((p: any) => ({ ...p, title: p.workshopTitle ?? p.title, _type: "Workshop" })),
+                  ...(blockOptions?.bundles ?? []).map((p: any) => ({ ...p, _type: "Bundle" })),
+                  ...(blockOptions?.downloads ?? []).map((p: any) => ({ ...p, _type: "Download" })),
+                  ...(blockOptions?.quizzes ?? []).map((p: any) => ({ ...p, _type: "Quiz" })),
+                ].map((p: any) => (
+                  <label key={`${p._type}-${p.id}`} className="flex items-start gap-2 cursor-pointer hover:bg-white rounded p-1">
+                    <input type="checkbox" className="mt-0.5" checked={selectedIds.includes(p.id)} onChange={() => toggleId(p.id)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-teal-100 text-teal-700 uppercase">{p._type}</span>
+                        <p className="text-xs font-medium text-gray-800 leading-tight truncate">{p.title}</p>
+                      </div>
+                      {p.price != null && p.price > 0 && <p className="text-[10px] text-gray-400">${Number(p.price).toFixed(2)}</p>}
                     </div>
                   </label>
                 ))}
+                {!blockOptions?.courses?.length && !blockOptions?.webinars?.length && !blockOptions?.bundles?.length && (
+                  <p className="text-xs text-gray-400">No published products found.</p>
+                )}
               </div>
             )}
             <ViewModeToggle />
