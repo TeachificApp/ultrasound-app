@@ -7969,7 +7969,7 @@ export default function LandingPageBuilder() {
   // Track whether blocks have been loaded from the server (to avoid marking dirty on initial load)
   const blocksLoadedRef = useRef(false);
   // Right panel resizable width
-  const [rightPanelWidth, setRightPanelWidth] = useState(380);
+  const [rightPanelWidth, setRightPanelWidth] = useState(typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.65) : 650);
   const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const handleRightPanelMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -7977,7 +7977,7 @@ export default function LandingPageBuilder() {
     const onMove = (ev: MouseEvent) => {
       if (!rightPanelDragRef.current) return;
       const delta = rightPanelDragRef.current.startX - ev.clientX;
-      const newWidth = Math.min(700, Math.max(240, rightPanelDragRef.current.startWidth + delta));
+      const newWidth = Math.min(Math.round(window.innerWidth * 0.92), Math.max(300, rightPanelDragRef.current.startWidth + delta));
       setRightPanelWidth(newWidth);
     };
     const onUp = () => {
