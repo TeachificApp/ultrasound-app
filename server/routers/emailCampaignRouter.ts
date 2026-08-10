@@ -17,6 +17,9 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { invokeLLM } from "../_core/llm";
+import { generateImage } from "../_core/imageGeneration";
+import { storagePut } from "../storage";
 import { eq, and, desc, lte, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -125,6 +128,144 @@ const InterestPrefsSchema = z.object({
   pediatricEcho: z.boolean().default(false),
   fetalEcho: z.boolean().default(false),
   pocus: z.boolean().default(false),
+  // ─── AI Email Copy Generator ───────────────────────────────────────────────
+  generateEmailCopy: protectedProcedure
+    .input(z.object({
+      brief: z.string().min(5).max(2000),
+      tone: z.enum(["professional", "enthusiastic", "educational", "urgent", "friendly"]).default("professional"),
+      emailType: z.enum(["announcement", "promotion", "newsletter", "course_launch", "event", "follow_up"]).default("announcement"),
+      brandName: z.string().optional(),
+      ctaText: z.string().optional(),
+      ctaUrl: z.string().optional(),
+      generateBannerImage: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const brand = input.brandName || "All About Ultrasound";
+      const toneMap: Record<string, string> = {
+        professional: "professional and authoritative",
+        enthusiastic: "enthusiastic and energetic",
+        educational: "educational and informative",
+        urgent: "urgent and action-oriented",
+        friendly: "warm and conversational",
+      };
+      const typeMap: Record<string, string> = {
+        announcement: "general announcement",
+        promotion: "promotional/sales email",
+        newsletter: "educational newsletter",
+        course_launch: "new course launch",
+        event: "event/webinar invitation",
+        follow_up: "follow-up/re-engagement",
+      };
+      const ctaSection = input.ctaText
+        ? `Include a clear call-to-action button labeled "${input.ctaText}"${input.ctaUrl ? ` linking to ${input.ctaUrl}` : ""}.`
+        : "";
+      const systemPrompt = `You are an expert email copywriter for ${brand}, a medical ultrasound education platform. Write compelling, professional email campaigns for healthcare professionals (sonographers, physicians, nurses, radiologists). Use US English spelling. Return ONLY a valid JSON object.`;
+      const userPrompt = `Write a ${typeMap[input.emailType]} email with a ${toneMap[input.tone]} tone.
+
+Brief / key content: ${input.brief}
+${ctaSection}
+
+Return a JSON object with exactly these fields:
+{
+  "subject": "email subject line (compelling, under 60 chars)",
+  "previewText": "preview/preheader text (under 90 chars)",
+  "headerTitle": "short header title (3-6 words)",
+  "headerSubtext": "header subtext (1 sentence)",
+  "blocks": [
+    { "type": "heading", "data": { "html": "<h2>...</h2>", "align": "left", "bgColor": "#ffffff", "textColor": "#1a2e3b" } },
+    { "type": "text", "data": { "html": "<p>...</p>", "align": "left", "bgColor": "#ffffff", "textColor": "#1a2e3b" } }
+  ],
+  "imagePrompt": "detailed image generation prompt for a professional medical education email banner (empty string if not needed)"
+}
+
+Rules:
+- blocks: 3-6 blocks with at least one heading, 2-3 text paragraphs, and optionally a button block if CTA was requested
+- Button block: { "type": "button", "data": { "text": "CTA text", "url": "url or #", "align": "center", "bgColor": "#189aa1", "textColor": "#ffffff" } }
+- Use proper HTML tags inside html fields (h2, p, ul, li, strong, em)
+- Keep content focused, scannable, relevant to ultrasound/medical education professionals
+- imagePrompt: describe a clean, professional banner image for a medical education email (no text in image)`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "email_copy",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                subject: { type: "string" },
+                previewText: { type: "string" },
+                headerTitle: { type: "string" },
+                headerSubtext: { type: "string" },
+                blocks: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      type: { type: "string" },
+                      data: { type: "object", additionalProperties: true },
+                    },
+                    required: ["type", "data"],
+                    additionalProperties: false,
+                  },
+                },
+                imagePrompt: { type: "string" },
+              },
+              required: ["subject", "previewText", "headerTitle", "headerSubtext", "blocks", "imagePrompt"],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
+
+      const raw = response.choices[0]?.message?.content ?? "{}";
+      let parsed: any;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
+      }
+
+      // Add unique IDs to blocks
+      const { nanoid } = await import("nanoid");
+      const blocks = (parsed.blocks ?? []).map((b: any) => ({ ...b, id: nanoid() }));
+
+      // Optionally generate banner image
+      let imageUrl: string | null = null;
+      if (input.generateBannerImage && parsed.imagePrompt) {
+        try {
+          const imgPrompt = `Professional medical education email banner. ${parsed.imagePrompt}. Clean, modern design. Teal and white color palette. No text overlay. High quality.`;
+          const { url: genUrl } = await generateImage({ prompt: imgPrompt });
+          const imgRes = await fetch(genUrl);
+          if (imgRes.ok) {
+            const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+            const key = `email-campaigns/ai-banners/${Date.now()}-banner.png`;
+            const { url: s3Url } = await storagePut(key, imgBuf, "image/png");
+            imageUrl = s3Url;
+          } else {
+            imageUrl = genUrl;
+          }
+        } catch (e) {
+          console.error("[AI Email] Image generation failed:", e);
+        }
+      }
+
+      return {
+        subject: parsed.subject ?? "",
+        previewText: parsed.previewText ?? "",
+        headerTitle: parsed.headerTitle ?? "",
+        headerSubtext: parsed.headerSubtext ?? "",
+        blocks,
+        imageUrl,
+      };
+    }),
+
 });
 
 // ─── Unsubscribe token helper ─────────────────────────────────────────────────

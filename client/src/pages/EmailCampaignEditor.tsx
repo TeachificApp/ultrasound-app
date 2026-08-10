@@ -16,6 +16,8 @@ import {
   ArrowLeft, Eye, EyeOff, Send, Save, Clock, Users, Mail,
   Monitor, Smartphone, ChevronDown, ChevronUp, Check, RefreshCw,
   LayoutTemplate,
+  Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 import EmailBlockEditor, { emailBlocksToHtml } from "@/components/EmailBlockEditor";
 import type { Block } from "@/pages/admin/LandingPageBuilder";
@@ -89,6 +91,138 @@ function MultiSelect({ label, options, selected, onChange, hint }: {
           ))}
         </div>
       )}
+
+      {/* ── AI Generate Email Dialog ── */}
+      <Dialog open={aiPanelOpen} onOpenChange={(v) => { if (!v) setAiPanelOpen(false); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-teal-600" />
+              AI Email Generator
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-xs text-teal-800">
+              Describe your email content and the AI will generate a complete email — subject line, preview text, header, and formatted body blocks. Optionally generate a professional banner image.
+            </div>
+
+            {/* Brief */}
+            <div>
+              <label className="text-xs font-semibold text-gray-700 block mb-1">Content Brief <span className="text-red-400">*</span></label>
+              <textarea
+                value={aiBrief}
+                onChange={e => setAiBrief(e.target.value)}
+                placeholder="Describe the email content, key messages, target audience, and any specific details to include. E.g. 'Announcing our new LV Diastology CME course launching next week, targeting cardiac sonographers, 1.5 SDMS CME credits, early bird pricing ends Friday.'"
+                rows={4}
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+
+            {/* Email Type + Tone */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Email Type</label>
+                <select
+                  value={aiEmailType}
+                  onChange={e => setAiEmailType(e.target.value as any)}
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white"
+                >
+                  <option value="announcement">Announcement</option>
+                  <option value="course_launch">Course Launch</option>
+                  <option value="promotion">Promotion / Sale</option>
+                  <option value="newsletter">Newsletter</option>
+                  <option value="event">Event / Webinar</option>
+                  <option value="follow_up">Follow-up / Re-engagement</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Tone</label>
+                <select
+                  value={aiTone}
+                  onChange={e => setAiTone(e.target.value as any)}
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white"
+                >
+                  <option value="professional">Professional</option>
+                  <option value="educational">Educational</option>
+                  <option value="enthusiastic">Enthusiastic</option>
+                  <option value="friendly">Friendly</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">CTA Button Text (optional)</label>
+                <input
+                  type="text"
+                  value={aiCtaText}
+                  onChange={e => setAiCtaText(e.target.value)}
+                  placeholder="e.g. Enroll Now"
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">CTA URL (optional)</label>
+                <input
+                  type="text"
+                  value={aiCtaUrl}
+                  onChange={e => setAiCtaUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Image generation toggle */}
+            <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="ai-gen-image"
+                checked={aiGenerateImage}
+                onChange={e => setAiGenerateImage(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="ai-gen-image" className="flex-1 text-sm text-gray-700 cursor-pointer">
+                <span className="font-medium flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5 text-teal-600" /> Generate banner image</span>
+                <span className="text-xs text-gray-400 block">AI creates a professional teal/white medical education banner (adds ~15-30 seconds)</span>
+              </label>
+            </div>
+
+            {/* Generated image preview */}
+            {aiGeneratedImageUrl && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-600">Generated Banner</p>
+                <img src={aiGeneratedImageUrl} alt="AI generated banner" className="w-full rounded-lg border border-gray-200 object-cover max-h-40" />
+                <p className="text-xs text-gray-400">Add this image to your email by inserting an Image block and pasting the URL above.</p>
+                <input type="text" value={aiGeneratedImageUrl} readOnly className="w-full h-8 rounded border border-gray-200 px-2 text-xs font-mono bg-gray-50" onClick={e => (e.target as HTMLInputElement).select()} />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 mt-2">
+            <button onClick={() => setAiPanelOpen(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button
+              disabled={!aiBrief.trim() || aiGenerateMutation.isPending}
+              onClick={() => aiGenerateMutation.mutate({
+                brief: aiBrief,
+                tone: aiTone,
+                emailType: aiEmailType,
+                ctaText: aiCtaText || undefined,
+                ctaUrl: aiCtaUrl || undefined,
+                generateBannerImage: aiGenerateImage,
+              })}
+              className="px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2"
+            >
+              {aiGenerateMutation.isPending ? (
+                <><RefreshCw className="w-3.5 h-3.5 animate-spin" />{aiGenerateImage ? "Generating copy + image…" : "Generating…"}</>
+              ) : (
+                <><Sparkles className="w-3.5 h-3.5" />Generate Email</>
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -120,6 +254,138 @@ function StringMultiSelect({ label, options, selected, onChange }: {
           ))}
         </div>
       )}
+
+      {/* ── AI Generate Email Dialog ── */}
+      <Dialog open={aiPanelOpen} onOpenChange={(v) => { if (!v) setAiPanelOpen(false); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-teal-600" />
+              AI Email Generator
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-xs text-teal-800">
+              Describe your email content and the AI will generate a complete email — subject line, preview text, header, and formatted body blocks. Optionally generate a professional banner image.
+            </div>
+
+            {/* Brief */}
+            <div>
+              <label className="text-xs font-semibold text-gray-700 block mb-1">Content Brief <span className="text-red-400">*</span></label>
+              <textarea
+                value={aiBrief}
+                onChange={e => setAiBrief(e.target.value)}
+                placeholder="Describe the email content, key messages, target audience, and any specific details to include. E.g. 'Announcing our new LV Diastology CME course launching next week, targeting cardiac sonographers, 1.5 SDMS CME credits, early bird pricing ends Friday.'"
+                rows={4}
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+
+            {/* Email Type + Tone */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Email Type</label>
+                <select
+                  value={aiEmailType}
+                  onChange={e => setAiEmailType(e.target.value as any)}
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white"
+                >
+                  <option value="announcement">Announcement</option>
+                  <option value="course_launch">Course Launch</option>
+                  <option value="promotion">Promotion / Sale</option>
+                  <option value="newsletter">Newsletter</option>
+                  <option value="event">Event / Webinar</option>
+                  <option value="follow_up">Follow-up / Re-engagement</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Tone</label>
+                <select
+                  value={aiTone}
+                  onChange={e => setAiTone(e.target.value as any)}
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white"
+                >
+                  <option value="professional">Professional</option>
+                  <option value="educational">Educational</option>
+                  <option value="enthusiastic">Enthusiastic</option>
+                  <option value="friendly">Friendly</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">CTA Button Text (optional)</label>
+                <input
+                  type="text"
+                  value={aiCtaText}
+                  onChange={e => setAiCtaText(e.target.value)}
+                  placeholder="e.g. Enroll Now"
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">CTA URL (optional)</label>
+                <input
+                  type="text"
+                  value={aiCtaUrl}
+                  onChange={e => setAiCtaUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Image generation toggle */}
+            <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="ai-gen-image"
+                checked={aiGenerateImage}
+                onChange={e => setAiGenerateImage(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="ai-gen-image" className="flex-1 text-sm text-gray-700 cursor-pointer">
+                <span className="font-medium flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5 text-teal-600" /> Generate banner image</span>
+                <span className="text-xs text-gray-400 block">AI creates a professional teal/white medical education banner (adds ~15-30 seconds)</span>
+              </label>
+            </div>
+
+            {/* Generated image preview */}
+            {aiGeneratedImageUrl && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-600">Generated Banner</p>
+                <img src={aiGeneratedImageUrl} alt="AI generated banner" className="w-full rounded-lg border border-gray-200 object-cover max-h-40" />
+                <p className="text-xs text-gray-400">Add this image to your email by inserting an Image block and pasting the URL above.</p>
+                <input type="text" value={aiGeneratedImageUrl} readOnly className="w-full h-8 rounded border border-gray-200 px-2 text-xs font-mono bg-gray-50" onClick={e => (e.target as HTMLInputElement).select()} />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 mt-2">
+            <button onClick={() => setAiPanelOpen(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button
+              disabled={!aiBrief.trim() || aiGenerateMutation.isPending}
+              onClick={() => aiGenerateMutation.mutate({
+                brief: aiBrief,
+                tone: aiTone,
+                emailType: aiEmailType,
+                ctaText: aiCtaText || undefined,
+                ctaUrl: aiCtaUrl || undefined,
+                generateBannerImage: aiGenerateImage,
+              })}
+              className="px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2"
+            >
+              {aiGenerateMutation.isPending ? (
+                <><RefreshCw className="w-3.5 h-3.5 animate-spin" />{aiGenerateImage ? "Generating copy + image…" : "Generating…"}</>
+              ) : (
+                <><Sparkles className="w-3.5 h-3.5" />Generate Email</>
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -504,6 +770,15 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [templateName, setTemplateName] = useState("");
   const [loadTemplateDialogOpen, setLoadTemplateDialogOpen] = useState(false);
   const [templateLoadKey, setTemplateLoadKey] = useState(0);
+  // AI Generate state
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [aiBrief, setAiBrief] = useState("");
+  const [aiTone, setAiTone] = useState<"professional" | "enthusiastic" | "educational" | "urgent" | "friendly">("professional");
+  const [aiEmailType, setAiEmailType] = useState<"announcement" | "promotion" | "newsletter" | "course_launch" | "event" | "follow_up">("announcement");
+  const [aiCtaText, setAiCtaText] = useState("");
+  const [aiCtaUrl, setAiCtaUrl] = useState("");
+  const [aiGenerateImage, setAiGenerateImage] = useState(false);
+  const [aiGeneratedImageUrl, setAiGeneratedImageUrl] = useState<string | null>(null);
   const [draftId, setDraftId] = useState<number | undefined>(campaignId);
   const [isSaving, setIsSaving] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(!campaignId);
@@ -568,6 +843,19 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   }, [blocks, subject, previewText, headerTitle, headerSubtext, headerColor, headerEnabled, filter, senderProfileId, draftLoaded, LS_KEY]);
 
   // ── Auto-save to server every 30 seconds ─────────────────────────────────────
+  const aiGenerateMutation = trpc.emailCampaign.generateEmailCopy.useMutation({
+    onSuccess: (res) => {
+      if (res.subject) setSubject(res.subject);
+      if (res.previewText) setPreviewText(res.previewText);
+      if (res.headerTitle) setHeaderTitle(res.headerTitle);
+      if (res.headerSubtext) setHeaderSubtext(res.headerSubtext);
+      if (res.blocks && res.blocks.length > 0) setBlocks(res.blocks as any);
+      if (res.imageUrl) setAiGeneratedImageUrl(res.imageUrl);
+      setAiPanelOpen(false);
+      toast.success(`AI generated ${res.blocks.length} content blocks${res.imageUrl ? " + banner image" : ""}!`);
+    },
+    onError: (e) => toast.error("AI generation failed: " + e.message),
+  });
   const autoSaveDraftMutation = trpc.emailCampaign.saveDraft.useMutation({
     onSuccess: (r) => { setDraftId(r.id); setLastAutoSave(new Date()); },
     onError: () => { /* silent — don't toast on auto-save errors */ },
@@ -716,6 +1004,14 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAiPanelOpen(true)}
+            className="border-teal-300 text-teal-700 hover:bg-teal-50"
+          >
+            <Sparkles className="w-4 h-4 mr-1.5" /> AI Generate
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setLoadTemplateDialogOpen(true)}>
             <LayoutTemplate className="w-4 h-4 mr-1.5" /> Templates
           </Button>
@@ -996,6 +1292,138 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
               </div>
             ))}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── AI Generate Email Dialog ── */}
+      <Dialog open={aiPanelOpen} onOpenChange={(v) => { if (!v) setAiPanelOpen(false); }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-teal-600" />
+              AI Email Generator
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 text-xs text-teal-800">
+              Describe your email content and the AI will generate a complete email — subject line, preview text, header, and formatted body blocks. Optionally generate a professional banner image.
+            </div>
+
+            {/* Brief */}
+            <div>
+              <label className="text-xs font-semibold text-gray-700 block mb-1">Content Brief <span className="text-red-400">*</span></label>
+              <textarea
+                value={aiBrief}
+                onChange={e => setAiBrief(e.target.value)}
+                placeholder="Describe the email content, key messages, target audience, and any specific details to include. E.g. 'Announcing our new LV Diastology CME course launching next week, targeting cardiac sonographers, 1.5 SDMS CME credits, early bird pricing ends Friday.'"
+                rows={4}
+                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+
+            {/* Email Type + Tone */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Email Type</label>
+                <select
+                  value={aiEmailType}
+                  onChange={e => setAiEmailType(e.target.value as any)}
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white"
+                >
+                  <option value="announcement">Announcement</option>
+                  <option value="course_launch">Course Launch</option>
+                  <option value="promotion">Promotion / Sale</option>
+                  <option value="newsletter">Newsletter</option>
+                  <option value="event">Event / Webinar</option>
+                  <option value="follow_up">Follow-up / Re-engagement</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Tone</label>
+                <select
+                  value={aiTone}
+                  onChange={e => setAiTone(e.target.value as any)}
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm bg-white"
+                >
+                  <option value="professional">Professional</option>
+                  <option value="educational">Educational</option>
+                  <option value="enthusiastic">Enthusiastic</option>
+                  <option value="friendly">Friendly</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">CTA Button Text (optional)</label>
+                <input
+                  type="text"
+                  value={aiCtaText}
+                  onChange={e => setAiCtaText(e.target.value)}
+                  placeholder="e.g. Enroll Now"
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">CTA URL (optional)</label>
+                <input
+                  type="text"
+                  value={aiCtaUrl}
+                  onChange={e => setAiCtaUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full h-9 rounded-md border border-gray-200 px-3 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Image generation toggle */}
+            <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="ai-gen-image"
+                checked={aiGenerateImage}
+                onChange={e => setAiGenerateImage(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="ai-gen-image" className="flex-1 text-sm text-gray-700 cursor-pointer">
+                <span className="font-medium flex items-center gap-1.5"><ImageIcon className="w-3.5 h-3.5 text-teal-600" /> Generate banner image</span>
+                <span className="text-xs text-gray-400 block">AI creates a professional teal/white medical education banner (adds ~15-30 seconds)</span>
+              </label>
+            </div>
+
+            {/* Generated image preview */}
+            {aiGeneratedImageUrl && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-600">Generated Banner</p>
+                <img src={aiGeneratedImageUrl} alt="AI generated banner" className="w-full rounded-lg border border-gray-200 object-cover max-h-40" />
+                <p className="text-xs text-gray-400">Add this image to your email by inserting an Image block and pasting the URL above.</p>
+                <input type="text" value={aiGeneratedImageUrl} readOnly className="w-full h-8 rounded border border-gray-200 px-2 text-xs font-mono bg-gray-50" onClick={e => (e.target as HTMLInputElement).select()} />
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 mt-2">
+            <button onClick={() => setAiPanelOpen(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button
+              disabled={!aiBrief.trim() || aiGenerateMutation.isPending}
+              onClick={() => aiGenerateMutation.mutate({
+                brief: aiBrief,
+                tone: aiTone,
+                emailType: aiEmailType,
+                ctaText: aiCtaText || undefined,
+                ctaUrl: aiCtaUrl || undefined,
+                generateBannerImage: aiGenerateImage,
+              })}
+              className="px-4 py-2 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-2"
+            >
+              {aiGenerateMutation.isPending ? (
+                <><RefreshCw className="w-3.5 h-3.5 animate-spin" />{aiGenerateImage ? "Generating copy + image…" : "Generating…"}</>
+              ) : (
+                <><Sparkles className="w-3.5 h-3.5" />Generate Email</>
+              )}
+            </button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
