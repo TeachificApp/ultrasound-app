@@ -656,6 +656,19 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
     ...(blockOptions?.quizzes ?? []).map((p: any) => ({ id: p.id, title: p.title, price: 0, imageUrl: "", link: `/quizzes/${p.id}`, description: "" })),
   ], [blockOptions]);
 
+  // Auto-resolve: when blockOptions loads and selectedIds exist but resolvedItems is empty, populate resolvedItems
+  useEffect(() => {
+    if (!blockOptions || allAvailableProducts.length === 0) return;
+    const currentResolved = (d.resolvedItems as any[]) ?? [];
+    if (selectedIds.length > 0 && currentResolved.length === 0) {
+      const resolved = allAvailableProducts.filter((p: any) => selectedIds.includes(p.id));
+      if (resolved.length > 0) {
+        setMany({ resolvedItems: resolved, sourceMode: "database" });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blockOptions, allAvailableProducts]);
+
   const toggleId = (id: number) => {
     const next = selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
     // Resolve and save full product details so the renderer can display cards without an extra fetch
