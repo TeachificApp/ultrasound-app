@@ -7969,7 +7969,7 @@ export default function LandingPageBuilder() {
   // Track whether blocks have been loaded from the server (to avoid marking dirty on initial load)
   const blocksLoadedRef = useRef(false);
   // Right panel resizable width
-  const [rightPanelWidth, setRightPanelWidth] = useState(288);
+  const [rightPanelWidth, setRightPanelWidth] = useState(380);
   const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const handleRightPanelMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
