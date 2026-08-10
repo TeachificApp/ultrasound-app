@@ -4,7 +4,10 @@
  *   Import Template/Ispring Quiz Import Template.xlsx
  *   Import Template/media/<files>
  */
-import archiver from "archiver";
+import { createRequire } from "module";
+const _require = createRequire(import.meta.url);
+// archiver is CJS-only; use createRequire so the ESM production build can load it
+const archiver = _require("archiver") as (format: string, opts?: object) => import("archiver").Archiver;
 import crypto from "crypto";
 import https from "https";
 import http from "http";
