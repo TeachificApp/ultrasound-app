@@ -3326,7 +3326,7 @@ function TextBlockEditor({ d, set, lessonTitle, courseTitle }: { d: Record<strin
 
 function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string, any>; set: (field: string, value: any) => void; setMany: (patch: Record<string, any>) => void; emailMode?: boolean }) {
   const [aiPrompt, setAiPrompt] = React.useState<string>(d.prompt ?? "");
-  const [aiContentType, setAiContentType] = React.useState<string>(d.contentType ?? "lesson");
+  const [aiContentType, setAiContentType] = React.useState<string>(d.contentType ?? (emailMode ? "announcement" : "lesson"));
   const [aiMode, setAiMode] = React.useState<"prompt" | "edit">(d.html ? "edit" : "prompt");
   const [isAiGenerating, setIsAiGenerating] = React.useState(false);
   const [promoProductId, setPromoProductId] = React.useState<number | null>(d.promoProductId ?? null);
@@ -3460,7 +3460,7 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
             <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} placeholder={aiContentType === "course_promo" ? "Any specific angles, offers, or details to highlight..." : "Describe what content to generate, e.g. 'Explain the fundamentals of cardiac anatomy for beginner sonographers'"} className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-xs resize-none h-20 focus:outline-none focus:ring-2 focus:ring-teal-400" />
           </div>
           {d.html && <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-xs text-amber-700">\u26a0 Generating new content will replace the existing content in this block.</div>}
-          <button onClick={handleAiGenerate} disabled={isAiGenerating || !aiPrompt.trim()} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gradient-to-r from-[#189aa1] to-[#17a2b8] hover:from-[#147f86] hover:to-[#138496] text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+          <button onClick={handleAiGenerate} disabled={isAiGenerating || (aiContentType === "course_promo" ? !promoProductId : !aiPrompt.trim())} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gradient-to-r from-[#189aa1] to-[#17a2b8] hover:from-[#147f86] hover:to-[#138496] text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all">
             {isAiGenerating ? <><Loader2 size={13} className="animate-spin" /> Generating...</> : <><Sparkles size={13} /> Generate Content</>}
           </button>
           {d.html && <button onClick={() => setAiMode("edit")} className="w-full text-xs text-gray-500 hover:text-gray-700 underline">View / edit existing content instead</button>}
