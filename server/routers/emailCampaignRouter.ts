@@ -1171,13 +1171,13 @@ Rules:
         .orderBy(lmsCourses.title)
         .limit(200),
       db
-        .select({ id: webinars.id, title: webinars.title, price: webinars.price, coverImageUrl: webinars.coverImageUrl, slug: webinars.slug, brand: webinars.brand })
+        .select({ id: webinars.id, title: webinars.title, price: webinars.price, coverImageUrl: webinars.coverImage, slug: webinars.slug, brand: webinars.brand })
         .from(webinars)
         .where(eq(webinars.status, "published"))
         .orderBy(webinars.title)
         .limit(100),
       db
-        .select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, coverImageUrl: digitalProducts.coverImageUrl, slug: digitalProducts.slug, brand: digitalProducts.brand })
+        .select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, coverImageUrl: digitalProducts.thumbnailUrl, slug: digitalProducts.slug })
         .from(digitalProducts)
         .where(eq(digitalProducts.status, "published"))
         .orderBy(digitalProducts.title)

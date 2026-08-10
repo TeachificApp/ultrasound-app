@@ -7,7 +7,7 @@ import { z } from "zod";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb, getOrCreateUserByEmail } from "../db";
-import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users, webinarRegistrations, bundleEnrollments, webinars, communities, workshops, workshopInstances, lmsCohortGroups } from "../../drizzle/schema";
+import { funnels, funnelPages, funnelLeads, funnelTemplates, lmsCourses, lmsLandingPages, digitalProducts, digitalBundles, funnelBranchRules, funnelBranchConditions, emailCampaigns, funnelPurchases, lmsEnrollments, digitalPurchases, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProducts, lmsOrders, users, webinarRegistrations, bundleEnrollments, webinars, communities, workshops, workshopInstances, lmsCohortGroups, membershipPlans, standaloneQuizzes } from "../../drizzle/schema";
 import { eq, and, asc, desc, sql, inArray, or, like, isNotNull, gte } from "drizzle-orm";
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 import { computeFunnelCheckoutTotalCents } from "../lib/checkoutPricing";
@@ -48,7 +48,7 @@ export const funnelRouter = router({
   /** List all products (courses, downloads, bundles) for order bump picker */
   listAllProducts: publicProcedure.query(async () => {
     const db = await getDb();
-    const [courses, downloads, bundles, physical, webinarList, communityList, workshopList] = await Promise.all([
+    const [courses, downloads, bundles, physical, webinarList, communityList, workshopList, membershipList, quizList] = await Promise.all([
       db.select({ id: lmsCourses.id, title: lmsCourses.title, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl, courseType: lmsCourses.type }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, thumbnailUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
       db.select({ id: digitalBundles.id, title: digitalBundles.title, price: digitalBundles.discountPrice, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
@@ -56,6 +56,8 @@ export const funnelRouter = router({
       db.select({ id: webinars.id, title: webinars.title, slug: webinars.slug, price: webinars.price, coverImage: webinars.coverImage, accessType: webinars.accessType }).from(webinars).where(eq(webinars.status, "published")).orderBy(asc(webinars.title)),
       db.select({ id: communities.id, title: communities.title, slug: communities.slug, coverImage: communities.coverImage, accessType: communities.accessType }).from(communities).where(eq(communities.status, "published")).orderBy(asc(communities.title)),
       db.select({ id: workshops.id, title: workshops.title, slug: workshops.slug, price: workshops.price, thumbnailUrl: workshops.thumbnailUrl, isFree: workshops.isFree, status: workshops.status }).from(workshops).orderBy(asc(workshops.title)),
+      db.select({ id: membershipPlans.id, title: membershipPlans.title, price: membershipPlans.price, billingInterval: membershipPlans.billingInterval, slug: membershipPlans.slug }).from(membershipPlans).where(eq(membershipPlans.status, "published")).orderBy(asc(membershipPlans.title)),
+      db.select({ id: standaloneQuizzes.id, title: standaloneQuizzes.title }).from(standaloneQuizzes).where(eq(standaloneQuizzes.status, "published")).orderBy(asc(standaloneQuizzes.title)),
     ]);
     // Hardcoded app products (UltrasoundAssist + EchoAssist, Free + Premium)
     // Use hero banner images (teal probe / teal heart) for product cards
@@ -77,6 +79,8 @@ export const funnelRouter = router({
       ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, price: Number(w.price ?? 0), imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
       ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, price: 0, imageUrl: c.coverImage ?? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp", isFree: c.accessType === "free" })),
       ...workshopList.map(w => ({ id: w.id, type: "workshop" as const, name: w.title, price: Number(w.price ?? 0), imageUrl: w.thumbnailUrl ?? "", isFree: w.isFree })),
+      ...membershipList.map((m: any) => ({ id: m.id, type: "membership" as const, name: m.title, price: Number(m.price ?? 0), imageUrl: "", priceLabel: m.billingInterval ? `$${Number(m.price ?? 0).toFixed(2)}/${m.billingInterval}` : undefined })),
+      ...quizList.map((q: any) => ({ id: q.id, type: "quiz" as const, name: q.title, price: 0, imageUrl: "" })),
       ...APP_PRODUCTS, // App products already in dollars (9.97, 12.99, etc.)
     ];
   }),
