@@ -607,6 +607,26 @@ export default function RichTextEditor({
   courseId,
 }: RichTextEditorProps) {
   const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+  const [editorHeight, setEditorHeight] = React.useState<number | null>(null);
+  const heightDragRef = React.useRef<{ startY: number; startHeight: number } | null>(null);
+  const handleHeightDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const currentHeight = editorHeight ?? minHeight;
+    heightDragRef.current = { startY: e.clientY, startHeight: currentHeight };
+    const onMove = (ev: MouseEvent) => {
+      if (!heightDragRef.current) return;
+      const delta = ev.clientY - heightDragRef.current.startY;
+      const newH = Math.max(minHeight, Math.min(window.innerHeight * 0.85, heightDragRef.current.startHeight + delta));
+      setEditorHeight(newH);
+    };
+    const onUp = () => {
+      heightDragRef.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
@@ -1141,7 +1161,7 @@ export default function RichTextEditor({
   return (
     <div
       className={cn(
-        "rich-text-editor border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#149096]/30 focus-within:border-[#149096] transition-all",
+        "rich-text-editor border border-gray-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-[#149096]/30 focus-within:border-[#149096] transition-all sticky top-0 z-10 bg-white",
         disabled && "opacity-60 pointer-events-none bg-gray-50",
         className,
       )}
@@ -1669,9 +1689,19 @@ export default function RichTextEditor({
       <EditorContent
         editor={editor}
         className="rte-content px-4 py-3 text-sm text-gray-800 focus:outline-none"
-        style={{ minHeight, maxHeight, overflowY: "auto" }}
+        style={{ minHeight: editorHeight ?? minHeight, maxHeight: editorHeight ?? maxHeight, height: editorHeight ?? undefined, overflowY: "auto" }}
       />
 
+      {/* Vertical resize handle */}
+      {!disabled && (
+        <div
+          onMouseDown={handleHeightDragStart}
+          className="flex items-center justify-center h-2.5 cursor-ns-resize bg-gray-50 hover:bg-teal-50 border-t border-gray-200 transition-colors group"
+          title="Drag to resize editor"
+        >
+          <div className="w-8 h-0.5 rounded-full bg-gray-300 group-hover:bg-teal-400 transition-colors" />
+        </div>
+      )}
       {/* Hidden file inputs */}
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={insertImageFile} />
       <input ref={videoFileInputRef} type="file" accept="video/*" className="hidden" onChange={handleVideoFileSelect} />
