@@ -30,7 +30,8 @@ import {
   type Block,
   type BlockType,
 } from "@/pages/admin/LandingPageBuilder";
-import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search, RefreshCw } from "lucide-react";
+import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import {
   BlockTemplateLibraryProvider,
@@ -929,6 +930,10 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
+  // AI block regeneration state
+  const [aiBlockId, setAiBlockId] = useState<string | null>(null);
+  const [aiBlockInstruction, setAiBlockInstruction] = useState("");
+  const [aiBlockTone, setAiBlockTone] = useState<"professional" | "enthusiastic" | "educational" | "urgent" | "friendly">("professional");
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(EMAIL_CATALOG_CATEGORIES));
   const [rightPanelWidth, setRightPanelWidth] = useState(300);
   const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -991,6 +996,22 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
     );
   }, []);
 
+  const aiBlockMutation = trpc.emailCampaign.generateEmailBlock.useMutation({
+    onSuccess: (res, vars) => {
+      const blockId = (res as any).blockId ?? vars.blockId;
+      const block = blocks.find(b => b.id === blockId);
+      if (!block) return;
+      if (block.type === "button") {
+        updateBlock(blockId, { text: res.html });
+      } else {
+        updateBlock(blockId, { html: res.html });
+      }
+      setAiBlockId(null);
+      setAiBlockInstruction("");
+      toast.success("Block regenerated!");
+    },
+    onError: (e) => toast.error("AI failed: " + e.message),
+  });
   const deleteBlock = (id: string) => {
     setBlocks((prev) => prev.filter((b) => b.id !== id));
     if (selectedId === id) setSelectedId(null);
@@ -1142,24 +1163,34 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
               {blocks.map((block, idx) => (
-                <SortableBlock
-                  key={block.id}
-                  block={block}
-                  isSelected={selectedId === block.id}
-                  onSelect={() => setSelectedId(block.id)}
-                  onDelete={() => deleteBlock(block.id)}
-                  onDuplicate={() => duplicateBlock(block.id)}
-                  onMoveUp={idx > 0 ? () => moveBlock(block.id, "up") : undefined}
-                  onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, "down") : undefined}
-                  onSaveAsTemplate={(b) => saveAsTemplate(b)}
-                  activeDragId={null}
-                  activeColumnTarget={null}
-                  onMoveBlockOutOfColumn={() => {}}
-                  onAddBlockToColumn={() => {}}
-                  onMoveChildToOtherColumn={() => {}}
-                  onDeleteChildFromColumn={() => {}}
-                  onReorderChildInColumn={() => {}}
-                />
+                <div key={block.id} className="relative group/aiblock">
+                  <SortableBlock
+                    block={block}
+                    isSelected={selectedId === block.id}
+                    onSelect={() => setSelectedId(block.id)}
+                    onDelete={() => deleteBlock(block.id)}
+                    onDuplicate={() => duplicateBlock(block.id)}
+                    onMoveUp={idx > 0 ? () => moveBlock(block.id, "up") : undefined}
+                    onMoveDown={idx < blocks.length - 1 ? () => moveBlock(block.id, "down") : undefined}
+                    onSaveAsTemplate={(b) => saveAsTemplate(b)}
+                    activeDragId={null}
+                    activeColumnTarget={null}
+                    onMoveBlockOutOfColumn={() => {}}
+                    onAddBlockToColumn={() => {}}
+                    onMoveChildToOtherColumn={() => {}}
+                    onDeleteChildFromColumn={() => {}}
+                    onReorderChildInColumn={() => {}}
+                  />
+                  {["heading", "text", "button", "quote"].includes(block.type) && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setAiBlockId(block.id); setAiBlockInstruction(""); }}
+                      className="absolute bottom-2 right-2 z-20 w-7 h-7 bg-teal-600 hover:bg-teal-700 text-white rounded-full shadow-md flex items-center justify-center opacity-0 group-hover/aiblock:opacity-100 transition-opacity"
+                      title="AI Regenerate this block"
+                    >
+                      <Wand2 size={12} />
+                    </button>
+                  )}
+                </div>
               ))}
             </SortableContext>
           </DndContext>

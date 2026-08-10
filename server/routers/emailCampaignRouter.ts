@@ -266,6 +266,77 @@ Rules:
       };
     }),
 
+  // ─── AI Single-Block Regenerator ──────────────────────────────────────────
+  generateEmailBlock: protectedProcedure
+    .input(z.object({
+      blockId: z.string().optional(), // client-side only, echoed back for block lookup
+      blockType: z.enum(["heading", "text", "button", "quote"]),
+      currentHtml: z.string().optional(),
+      instruction: z.string().min(3).max(1000),
+      tone: z.enum(["professional", "enthusiastic", "educational", "urgent", "friendly"]).default("professional"),
+      emailContext: z.string().optional(), // brief summary of the overall email for context
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const toneMap: Record<string, string> = {
+        professional: "professional and authoritative",
+        enthusiastic: "enthusiastic and energetic",
+        educational: "educational and informative",
+        urgent: "urgent and action-oriented",
+        friendly: "warm and conversational",
+      };
+      const blockGuide: Record<string, string> = {
+        heading: "a short, compelling heading (h2 tag, 5-10 words)",
+        text: "one or two focused paragraphs (p tags, can include strong/em/ul/li)",
+        button: "a short, action-oriented button label (3-5 words, no HTML tags needed — just the text)",
+        quote: "a short, impactful pull-quote or testimonial (blockquote tag, 1-2 sentences)",
+      };
+      const contextSection = input.emailContext ? `\nEmail context: ${input.emailContext}` : "";
+      const currentSection = input.currentHtml ? `\nCurrent content:\n${input.currentHtml}` : "";
+      const systemPrompt = `You are an expert email copywriter for All About Ultrasound, a medical ultrasound education platform. Write compelling content for healthcare professionals. Use US English spelling. Return ONLY a valid JSON object.`;
+      const userPrompt = `Rewrite or generate a ${input.blockType} block for a medical education email.
+Tone: ${toneMap[input.tone]}
+Block type: ${blockGuide[input.blockType]}
+Instruction: ${input.instruction}${contextSection}${currentSection}
+
+Return a JSON object with exactly one field:
+{ "html": "the generated HTML content" }
+
+Rules:
+- For heading: use <h2> tag
+- For text: use <p> tags, may include <strong>, <em>, <ul>, <li>
+- For button: return just the button label text (no HTML tags)
+- For quote: use <blockquote> tag
+- Keep it concise and relevant to ultrasound/medical education`;
+
+      const response = await invokeLLM({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "block_content",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: { html: { type: "string" } },
+              required: ["html"],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
+
+      const raw = response.choices[0]?.message?.content ?? "{}";
+      let parsed: any;
+      try { parsed = JSON.parse(raw); } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned invalid JSON. Please try again." });
+      }
+      return { html: parsed.html ?? "", blockId: input.blockId ?? null };
+    }),
+
 });
 
 // ─── Unsubscribe token helper ─────────────────────────────────────────────────
