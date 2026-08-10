@@ -953,7 +953,7 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
   const [replaceImagePrompt, setReplaceImagePrompt] = useState("");
   const [replaceImageTone, setReplaceImageTone] = useState<"professional" | "enthusiastic" | "educational" | "urgent" | "friendly">("professional");
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set(EMAIL_CATALOG_CATEGORIES));
-  const [rightPanelWidth, setRightPanelWidth] = useState(480);
+  const [rightPanelWidth, setRightPanelWidth] = useState(typeof window !== 'undefined' ? Math.round(window.innerWidth * 0.65) : 650);
   const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
 
@@ -1084,7 +1084,7 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
     const onMove = (ev: MouseEvent) => {
       if (!rightPanelDragRef.current) return;
       const delta = rightPanelDragRef.current.startX - ev.clientX;
-      const newWidth = Math.min(800, Math.max(300, rightPanelDragRef.current.startWidth + delta));
+      const newWidth = Math.min(Math.round(window.innerWidth * 0.92), Math.max(300, rightPanelDragRef.current.startWidth + delta));
       setRightPanelWidth(newWidth);
     };
     const onUp = () => {
