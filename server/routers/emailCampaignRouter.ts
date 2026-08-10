@@ -1564,12 +1564,17 @@ Rules:
         sentByUserId: ctx.user.id,
         subject: `Copy of ${orig.subject}`,
         htmlBody: orig.htmlBody,
+        blocksJson: orig.blocksJson ?? null,
         previewText: orig.previewText,
         audienceFilter: orig.audienceFilter,
         status: "draft",
         senderProfileId: orig.senderProfileId,
         fromName: orig.fromName,
         fromEmail: orig.fromEmail,
+        headerTitle: orig.headerTitle ?? null,
+        headerSubtext: orig.headerSubtext ?? null,
+        headerColor: orig.headerColor ?? null,
+        headerEnabled: orig.headerEnabled ?? true,
       });
       return { id: (r as any).insertId as number };
     }),

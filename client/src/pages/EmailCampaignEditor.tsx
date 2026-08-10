@@ -860,7 +860,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
                     <Input
                       value={headerSubtext}
                       onChange={(e) => setHeaderSubtext(e.target.value)}
-                      placeholder="ECHOCARDIOGRAPHY CLINICAL COMPANION (default)"
+                      placeholder="Ultrasound Education Simplified (default)"
                     />
                   </div>
                   <div>
