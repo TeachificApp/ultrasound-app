@@ -10819,6 +10819,36 @@ function QuestionBankAdmin() {
   const [scormGroupPrefix, setScormGroupPrefix] = useState("");
   const [scormFolderId, setScormFolderId] = useState<number | null>(null);
   const [scormNewFolderName, setScormNewFolderName] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
+
+  async function handleExportZip() {
+    setExportLoading(true);
+    try {
+      const params = new URLSearchParams({ format: "zip" });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+      if (selectedTagIds.length > 0) params.set("tagIds", selectedTagIds.join(","));
+      if (selectedIds.size > 0) params.set("ids", [...selectedIds].join(","));
+      const res = await fetch(`/api/quiz/question-bank/export?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `question-bank-export-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Question bank exported with media");
+    } catch (e: any) {
+      toast.error(e.message ?? "Export failed");
+    } finally {
+      setExportLoading(false);
+    }
+  }
 
   // Debounce search
   useEffect(() => {
@@ -10890,6 +10920,10 @@ function QuestionBankAdmin() {
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setShowTagManager(p => !p)} className="gap-1.5"><Tag className="w-3.5 h-3.5" /> Tags</Button>
           <Button size="sm" variant="outline" onClick={() => setShowFolderManager(p => !p)} className="gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"><FolderOpen className="w-3.5 h-3.5" /> Folders</Button>
+          <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50 gap-1.5" onClick={handleExportZip} disabled={exportLoading || total === 0}>
+            {exportLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            Export ZIP
+          </Button>
           <Button size="sm" variant="outline" className="border-orange-300 text-orange-700 hover:bg-orange-50 gap-1.5" onClick={() => { setShowScormImport(p => !p); setShowAIPanel(false); setScormPreview(null); }}><Upload className="w-3.5 h-3.5" /> Import from SCORM</Button>
           <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-50 gap-1.5" onClick={() => setShowAIPanel(p => !p)}><Sparkles className="w-3.5 h-3.5" /> AI Generate</Button>
           <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" onClick={() => setShowCreate(true)}><Plus className="w-3.5 h-3.5" /> Add Question</Button>

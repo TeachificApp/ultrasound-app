@@ -23,6 +23,7 @@ import { sdk } from "./_core/sdk";
 import { authenticateRequest } from "./authHelper";
 import { parseISpringQuizFromBuffer, type ParsedQuiz } from "./lib/iSpringQuizParser";
 import { uploadISpringImagesFromZip, rewriteStorageRefs } from "./lib/iSpringImageImporter";
+import { buildExportZipFromQuestions } from "./lib/questionBankExport";
 
 // CDN URLs for the pre-built Teachific templates
 const TEMPLATE_ZIP_URL =
@@ -958,6 +959,13 @@ router.get("/bank-export", async (req: Request, res: Response) => {
         });
     const exportQuestions = sourceQuestions.map(bankItemToExportQuestion);
     const filenameBase = `question-bank-${new Date().toISOString().slice(0, 10)}`;
+
+    if (format === "zip") {
+      const zipBuffer = await buildExportZipFromQuestions(exportQuestions, "Question Bank Export");
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", `attachment; filename="${filenameBase}.zip"`);
+      return res.send(zipBuffer);
+    }
 
     if (format === "csv") {
       const csv = exportBankQuestionsToCsv(exportQuestions);

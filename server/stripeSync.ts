@@ -65,9 +65,10 @@ const INTERVAL_MAP: Record<string, { interval: "month" | "year"; interval_count:
  * Lazily import Stripe so the module doesn't fail when STRIPE_SECRET_KEY is absent.
  */
 async function getStripe(): Promise<Stripe | null> {
-  if (!process.env.STRIPE_SECRET_KEY) return null;
+  const key = process.env.STRIPE_LIVE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
+  if (!key) return null;
   const { default: StripeClass } = await import("stripe");
-  return new StripeClass(process.env.STRIPE_SECRET_KEY, { apiVersion: "2024-12-18.acacia" as any });
+  return new StripeClass(key, { apiVersion: "2024-12-18.acacia" as any });
 }
 
 export async function syncStripeProduct(
