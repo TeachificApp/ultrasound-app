@@ -904,6 +904,10 @@ export default function EmailCampaignDashboard() {
   const { data: leadCaptureWidgets, refetch: refetchWidgets } = trpc.emailCampaign.listLeadCaptureWidgets.useQuery(undefined, { enabled: !!user });
 
   // ── Mutations ───────────────────────────────────────────────────────────────
+  const resendMutation = trpc.emailCampaign.resendCampaign.useMutation({
+    onSuccess: (data) => { toast.success(`Campaign resent to ${data.recipientCount} recipients`); refetchCampaigns(); },
+    onError: (e) => toast.error(e.message),
+  });
   const duplicateMutation = trpc.emailCampaign.duplicateCampaign.useMutation({
     onSuccess: () => { toast.success("Campaign duplicated"); refetchCampaigns(); },
     onError: (e) => toast.error(e.message),
@@ -1107,6 +1111,16 @@ export default function EmailCampaignDashboard() {
                             <button onClick={() => duplicateMutation.mutate({ id: c.id })} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#189aa1]" title="Duplicate">
                               <Copy className="w-4 h-4" />
                             </button>
+                            {(c.status === "sent" || c.status === "failed") && (
+                              <button
+                                onClick={() => { if (window.confirm(`Resend "${c.subject}" to all matching recipients?`)) resendMutation.mutate({ id: c.id }); }}
+                                className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#189aa1]"
+                                title="Resend Campaign"
+                                disabled={resendMutation.isPending}
+                              >
+                                <RefreshCw className="w-4 h-4" />
+                              </button>
+                            )}
                             <button onClick={() => setDeleteConfirmId(c.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" title="Delete">
                               <Trash2 className="w-4 h-4" />
                             </button>

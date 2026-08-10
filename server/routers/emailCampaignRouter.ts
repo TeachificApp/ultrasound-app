@@ -2024,4 +2024,45 @@ Rules:
       }
       return { ok: true };
     }),
+  // ── Admin: resend an existing campaign ───────────────────────────────────
+  resendCampaign: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [original] = await db
+        .select()
+        .from(emailCampaigns)
+        .where(eq(emailCampaigns.id, input.id))
+        .limit(1);
+      if (!original) throw new TRPCError({ code: "NOT_FOUND", message: "Campaign not found" });
+      const audienceFilter = original.audienceFilter
+        ? JSON.parse(original.audienceFilter as string)
+        : { type: "all" };
+      const recipients = await resolveRecipients(audienceFilter);
+      if (recipients.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No recipients match the audience filter." });
+      }
+      const [result] = await db.insert(emailCampaigns).values({
+        sentByUserId: ctx.user.id,
+        subject: original.subject,
+        htmlBody: original.htmlBody,
+        blocksJson: original.blocksJson ?? null,
+        previewText: original.previewText ?? null,
+        audienceFilter: original.audienceFilter ?? null,
+        recipientCount: recipients.length,
+        status: "sending",
+        headerTitle: original.headerTitle ?? null,
+        headerSubtext: original.headerSubtext ?? null,
+        headerColor: original.headerColor ?? null,
+        headerEnabled: original.headerEnabled ?? true,
+      });
+      const campaignId = (result as any).insertId as number;
+      executeCampaignSend(campaignId).catch((err) =>
+        console.error(`[EmailCampaign] Resend error for campaign #${campaignId}:`, err),
+      );
+      return { campaignId, recipientCount: recipients.length };
+    }),
+
 });
