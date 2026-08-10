@@ -12,7 +12,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import {
-  Mail, Plus, BarChart2, Users, Send, Clock, CheckCircle, XCircle,
+  Mail, Plus, BarChart2, Users, Send, Clock, CheckCircle, XCircle, StopCircle,
   RefreshCw, Trash2, Copy, Eye, TrendingUp, MousePointer, UserMinus,
   Shield, ChevronRight, ChevronLeft, Settings, UserCircle, Edit, Star, StarOff,
   AlertTriangle, Download, Zap, Code, List, Globe, MapPin, UserCheck, Link2,
@@ -56,6 +56,7 @@ function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string }> = {
     sent: { label: "Sent", className: "bg-green-100 text-green-700" },
     sending: { label: "Sending", className: "bg-blue-100 text-blue-700" },
+    stopped: { label: "Stopped", className: "bg-orange-100 text-orange-700" },
     scheduled: { label: "Scheduled", className: "bg-yellow-100 text-yellow-700" },
     draft: { label: "Draft", className: "bg-gray-100 text-gray-600" },
     failed: { label: "Failed", className: "bg-red-100 text-red-700" },
@@ -908,6 +909,10 @@ export default function EmailCampaignDashboard() {
     onSuccess: (data) => { toast.success(`Campaign resent to ${data.recipientCount} recipients`); refetchCampaigns(); },
     onError: (e) => toast.error(e.message),
   });
+  const stopMutation = trpc.emailCampaign.stopCampaign.useMutation({
+    onSuccess: () => { toast.success("Campaign stopped — no further emails will be sent."); refetchCampaigns(); },
+    onError: (e) => toast.error(e.message),
+  });
   const duplicateMutation = trpc.emailCampaign.duplicateCampaign.useMutation({
     onSuccess: () => { toast.success("Campaign duplicated"); refetchCampaigns(); },
     onError: (e) => toast.error(e.message),
@@ -1101,6 +1106,16 @@ export default function EmailCampaignDashboard() {
                             {c.status === "sent" && (
                               <button onClick={() => { setAnalyticsId(c.id); setAnalyticsSubject(c.subject); }} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#189aa1]" title="Analytics">
                                 <BarChart2 className="w-4 h-4" />
+                              </button>
+                            )}
+                            {c.status === "sending" && (
+                              <button
+                                onClick={() => { if (window.confirm("Stop this campaign? Emails already sent will not be recalled.")) stopMutation.mutate({ id: c.id }); }}
+                                className="p-1.5 rounded hover:bg-red-50 text-orange-500 hover:text-red-600"
+                                title="Stop Sending"
+                                disabled={stopMutation.isPending}
+                              >
+                                <StopCircle className="w-4 h-4" />
                               </button>
                             )}
                             {(c.status === "draft" || c.status === "scheduled") && (

@@ -247,6 +247,24 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
   let failed = 0;
 
   for (const recipient of recipients) {
+    // Check whether an admin has requested a stop before each send
+    const [fresh] = await db
+      .select({ status: emailCampaigns.status })
+      .from(emailCampaigns)
+      .where(eq(emailCampaigns.id, campaignId))
+      .limit(1);
+    if (fresh?.status === "stopped") {
+      console.log(`[EmailCampaign] Campaign #${campaignId} stopped by admin after ${sent} sent.`);
+      await db
+        .update(emailCampaigns)
+        .set({
+          recipientCount: sent + failed,
+          errorMessage: `Stopped by admin after sending to ${sent} recipient${sent !== 1 ? "s" : ""}.`,
+        })
+        .where(eq(emailCampaigns.id, campaignId));
+      return;
+    }
+
     const variant = pickAbVariant(recipient.email, filter.abTest, campaignId);
     const subject = variant?.subject?.trim() || campaign.subject;
     let html = normalizeCampaignEmailHtml(variant?.htmlBody?.trim() || campaign.htmlBody);
@@ -2070,8 +2088,32 @@ Rules:
       return { campaignId, recipientCount: recipients.length };
     }),
 
+  // ── Admin: stop an in-progress campaign ─────────────────────────────────
+  stopCampaign: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [campaign] = await db
+        .select({ status: emailCampaigns.status })
+        .from(emailCampaigns)
+        .where(eq(emailCampaigns.id, input.id))
+        .limit(1);
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND", message: "Campaign not found" });
+      if (campaign.status !== "sending") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Campaign is not currently sending." });
+      }
+      await db
+        .update(emailCampaigns)
+        .set({ status: "stopped", errorMessage: "Stopped by admin." })
+        .where(eq(emailCampaigns.id, input.id));
+      return { ok: true };
+    }),
+
   // ── Admin: send a test email to a single address ─────────────────────────
   sendTestEmail: protectedProcedure
+
     .input(z.object({
       toEmail: z.string().email(),
       subject: z.string().min(1).max(500),

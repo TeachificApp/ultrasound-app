@@ -2166,7 +2166,7 @@ export const emailCampaigns = mysqlTable("emailCampaigns", {
   // Resolved recipient count at send time
   recipientCount: int("recipientCount").default(0).notNull(),
   // Status: draft | scheduled | sending | sent | failed
-  status: mysqlEnum("status", ["draft", "scheduled", "sending", "sent", "failed"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "scheduled", "sending", "sent", "failed", "stopped"]).default("draft").notNull(),
   sentAt: timestamp("sentAt"),
   // If set, the campaign will be sent at this time by the scheduler cron job
   scheduledAt: timestamp("scheduledAt"),
