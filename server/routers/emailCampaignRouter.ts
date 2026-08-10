@@ -1233,6 +1233,58 @@ Rules:
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const [campaign] = await db.select().from(emailCampaigns).where(eq(emailCampaigns.id, input.id)).limit(1);
       if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
+      // Resolve checkout URLs for cta_standalone blocks that have checkoutProductType+Id
+      // but a missing or stub ctaLink (e.g. "https://") — happens for blocks created before the fix
+      if (campaign.blocksJson) {
+        try {
+          const blocks = JSON.parse(campaign.blocksJson as string) as any[];
+          let changed = false;
+          for (const block of blocks) {
+            if (block.type !== "cta_standalone") continue;
+            const d = block.data ?? {};
+            const ctaLink: string = d.ctaLink ?? "";
+            const isStub = !ctaLink || ctaLink === "#" || ctaLink === "https://" || ctaLink === "http://";
+            if (!isStub) continue;
+            const pType: string = d.checkoutProductType ?? "";
+            const pId: number | null = d.checkoutProductId ? Number(d.checkoutProductId) : null;
+            if (!pType || !pId) continue;
+            // Look up slug from DB
+            let slug = "";
+            if (pType === "workshop") {
+              const [row] = await db.select({ slug: workshops.slug }).from(workshops).where(eq(workshops.id, pId)).limit(1);
+              slug = row?.slug ?? "";
+            } else if (pType === "webinar") {
+              const [row] = await db.select({ slug: webinars.slug }).from(webinars).where(eq(webinars.id, pId)).limit(1);
+              slug = row?.slug ?? "";
+            } else if (pType === "bundle") {
+              const [row] = await db.select({ slug: bundles.slug }).from(bundles).where(eq(bundles.id, pId)).limit(1);
+              slug = row?.slug ?? "";
+            } else if (pType === "download") {
+              const [row] = await db.select({ slug: digitalProducts.slug }).from(digitalProducts).where(eq(digitalProducts.id, pId)).limit(1);
+              slug = row?.slug ?? "";
+            } else if (pType === "course" || pType === "cohort" || pType === "quiz") {
+              const [row] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, pId)).limit(1);
+              slug = row?.slug ?? "";
+            }
+            if (!slug) continue;
+            const BASE = "https://learn.allaboutultrasound.com";
+            const resolvedUrl = pType === "workshop" ? `${BASE}/checkout/workshop/${slug}`
+              : pType === "webinar" ? `${BASE}/checkout/${slug}?type=webinar`
+              : pType === "download" ? `${BASE}/checkout/${slug}?type=download`
+              : pType === "bundle" ? `${BASE}/checkout/${slug}?type=bundle`
+              : `${BASE}/checkout/${slug}`;
+            block.data = { ...d, ctaLink: resolvedUrl, checkoutProductSlug: slug };
+            changed = true;
+          }
+          if (changed) {
+            // Persist the resolved links back to the DB so future loads are instant
+            await db.update(emailCampaigns)
+              .set({ blocksJson: JSON.stringify(blocks) })
+              .where(eq(emailCampaigns.id, input.id));
+            return { ...campaign, blocksJson: JSON.stringify(blocks) };
+          }
+        } catch { /* ignore parse errors */ }
+      }
       return campaign;
     }),
 
