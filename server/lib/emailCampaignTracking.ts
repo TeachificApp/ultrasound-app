@@ -45,6 +45,11 @@ function shouldSkipLinkWrap(url: string): boolean {
     || lower.startsWith("#")
     || lower.includes("/api/email/track/")
     || lower.includes("/unsubscribe")
+    // Skip Stripe checkout and external payment URLs — Gmail's WebView blocks
+    // cross-origin JS/meta redirects, so these must go directly to the destination
+    || lower.includes("checkout.stripe.com")
+    || lower.includes("/checkout")
+    || lower.includes("stripe.com")
   );
 }
 
