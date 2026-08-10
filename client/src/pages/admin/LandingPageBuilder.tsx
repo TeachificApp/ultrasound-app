@@ -3402,6 +3402,7 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
               {emailMode ? (
                 <>
                   <option value="announcement">Announcement</option>
+                  <option value="course_promo">Course / Product Promo</option>
                   <option value="newsletter_section">Newsletter Section</option>
                   <option value="promo_copy">Promotional Copy</option>
                   <option value="event_recap">Event / Webinar Recap</option>
