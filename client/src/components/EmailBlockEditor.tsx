@@ -663,11 +663,12 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
     ...(blockOptions?.quizzes ?? []).map((p: any) => ({ id: p.id, title: p.title, price: 0, imageUrl: "", link: `https://learn.allaboutultrasound.com/quizzes/${p.id}`, description: "" })),
   ], [blockOptions]);
 
-  // Auto-resolve: when blockOptions loads and selectedIds exist but resolvedItems is empty, populate resolvedItems
+  // Auto-resolve: when blockOptions loads and selectedIds exist but resolvedItems is empty OR has relative links, refresh them
   useEffect(() => {
     if (!blockOptions || allAvailableProducts.length === 0) return;
     const currentResolved = (d.resolvedItems as any[]) ?? [];
-    if (selectedIds.length > 0 && currentResolved.length === 0) {
+    const hasRelativeLinks = currentResolved.some((r: any) => r.link && !r.link.startsWith("http"));
+    if (selectedIds.length > 0 && (currentResolved.length === 0 || hasRelativeLinks)) {
       const resolved = allAvailableProducts.filter((p: any) => selectedIds.includes(p.id));
       if (resolved.length > 0) {
         setMany({ resolvedItems: resolved, sourceMode: "database" });
