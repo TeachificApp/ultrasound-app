@@ -38,6 +38,7 @@ import {
 import { initialScormExtractionStatus, needsScormExtraction, queueScormExtractionIfNeeded, pickScormPlaybackMode } from "../lib/scormPackage";
 import { extractAndUploadScormVersion } from "../routes/scormExtractor";
 import { buildMediaAuthQuery, signMediaViewerToken } from "../lib/mediaEmbedAccess";
+import { summarizeScormExtractionStatuses } from "../../shared/scormExtractionWorkflow";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1370,6 +1371,52 @@ export const mediaRepoRouter = router({
       if (!version) throw new TRPCError({ code: "NOT_FOUND", message: "No version found" });
       return version;
     }),
+
+  /** Latest-version extraction counts for the Media Repository backfill dashboard. */
+  getScormBackfillSummary: protectedProcedure.query(async ({ ctx }) => {
+    await assertPlatformAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+    const latestVersions = db
+      .select({
+        assetId: mediaVersions.assetId,
+        versionNumber: sql<number>`MAX(${mediaVersions.versionNumber})`.as("latest_version_number"),
+      })
+      .from(mediaVersions)
+      .groupBy(mediaVersions.assetId)
+      .as("latest_scorm_versions");
+
+    const statusRows = await db
+      .select({
+        status: sql<string>`COALESCE(${mediaVersions.scormExtractionStatus}, 'pending')`,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(mediaVersions)
+      .innerJoin(mediaAssets, eq(mediaAssets.id, mediaVersions.assetId))
+      .innerJoin(
+        latestVersions,
+        and(
+          eq(latestVersions.assetId, mediaVersions.assetId),
+          eq(latestVersions.versionNumber, mediaVersions.versionNumber),
+        ),
+      )
+      .where(
+        and(
+          isNull(mediaAssets.deletedAt),
+          or(
+            inArray(mediaAssets.mediaType, ["scorm", "zip", "lms"] as any),
+            sql`LOWER(COALESCE(${mediaVersions.fileName}, '')) REGEXP '\\.(zip|quiz)$'`,
+            sql`LOWER(COALESCE(${mediaVersions.mimeType}, '')) LIKE '%zip%'`,
+          ),
+        ),
+      )
+      .groupBy(sql`COALESCE(${mediaVersions.scormExtractionStatus}, 'pending')`);
+
+    const expandedStatuses = statusRows.flatMap((row) => Array.from({ length: Number(row.count) }, () => row.status));
+    const counts = summarizeScormExtractionStatuses(expandedStatuses);
+    return { counts, total: Object.values(counts).reduce((sum, value) => sum + value, 0) };
+  }),
 
   /** SCORM health dashboard rows (admin). */
   listScormHealth: protectedProcedure.query(async ({ ctx }) => {

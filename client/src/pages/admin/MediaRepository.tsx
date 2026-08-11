@@ -39,6 +39,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { resolveScormExtractionStage } from "@shared/scormExtractionWorkflow";
 import {
   Upload,
   Search,
@@ -752,6 +753,13 @@ function ScormHealthDialog({
   const { data: meta, refetch: refetchMeta } = trpc.mediaRepo.getScormHealthMeta.useQuery(undefined, {
     enabled: open,
   });
+  const { data: backfillSummary } = trpc.mediaRepo.getScormBackfillSummary.useQuery(undefined, {
+    enabled: open,
+    refetchInterval: (query) => {
+      const counts = (query.state.data as any)?.counts;
+      return counts?.pending > 0 || counts?.processing > 0 ? 15000 : false;
+    },
+  });
   const scanMutation = trpc.mediaRepo.runScormHealthScanNow.useMutation({
     onSuccess: (result) => {
       refetch();
@@ -822,6 +830,14 @@ function ScormHealthDialog({
           <p className="text-sm text-muted-foreground">
             {rows.length} package{rows.length === 1 ? "" : "s"} tracked · {unhealthy.length} unhealthy · {preparing.length} preparing
           </p>
+          {backfillSummary && (
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              <Badge variant="secondary">Queued: {backfillSummary.counts.pending}</Badge>
+              <Badge className="bg-amber-500 hover:bg-amber-500">Extracting: {backfillSummary.counts.processing}</Badge>
+              <Badge className="bg-teal-600 hover:bg-teal-600">Ready to save: {backfillSummary.counts.done}</Badge>
+              {backfillSummary.counts.failed > 0 && <Badge variant="destructive">Failed: {backfillSummary.counts.failed}</Badge>}
+            </div>
+          )}
           {meta?.lastAlertAt && (
             <p className="text-xs text-muted-foreground mt-1">
               Last alert: {new Date(meta.lastAlertAt).toLocaleString()}
@@ -1056,9 +1072,13 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   const isPublic = asset.access === "public";
   const scormExtractStatus = (currentVersion as { scormExtractionStatus?: string | null })?.scormExtractionStatus ?? null;
   const scormFileSize = Number((currentVersion as { fileSize?: number | null })?.fileSize ?? 0);
-  const isScormPackage = ["scorm", "zip", "lms"].includes(asset.mediaType) || /\.(zip|quiz)$/i.test((currentVersion as { fileName?: string | null })?.fileName ?? "");
-  const scormExtractionReady = !isScormPackage || scormExtractStatus === "done";
-  const scormExtractionBlocked = isScormPackage && scormExtractStatus !== "done";
+  const scormStage = resolveScormExtractionStage({
+    mediaType: asset.mediaType,
+    fileName: (currentVersion as { fileName?: string | null })?.fileName,
+    extractionStatus: scormExtractStatus,
+  });
+  const scormExtractionReady = scormStage === "not_required" || scormStage === "ready";
+  const scormExtractionBlocked = !scormExtractionReady;
 
   return (
     <>
@@ -1576,7 +1596,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                     </Button>
                   </div>
                 )}
-                {isScormPackage && scormExtractStatus === "done" && (
+                {scormStage === "ready" && (
                   <div className="flex items-start gap-2.5 rounded-xl border border-teal-200 bg-teal-50 p-3">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />
                     <div className="space-y-0.5">

@@ -44,6 +44,15 @@ export function canStartQueuedScormExtraction(activeProcessingCount: number): bo
   return activeProcessingCount === 0;
 }
 
+type QueuedScormJob = {
+  versionId: number;
+  s3Url: string | null;
+  slug: string;
+  assetId: number;
+};
+
+let activeScormExtractionDrain: Promise<void> | null = null;
+
 // ─── Download helper ──────────────────────────────────────────────────────────
 
 /**
@@ -516,8 +525,78 @@ export async function scormHealthCheckHandler(req: Request, res: Response): Prom
 }
 
 // ─── Heartbeat handler: POST /api/scheduled/scorm-extract ────────────────────
-// Fires every 60s. Picks up ONE pending SCORM version and processes it.
-// Idempotent: if already processing and not stalled, skips gracefully.
+// Claims the next package, then the Always On worker drains queued packages
+// sequentially. The Heartbeat remains the reliable trigger after restarts.
+
+async function claimNextPendingScormJob(db: NonNullable<Awaited<ReturnType<typeof getDb>>>): Promise<QueuedScormJob | null> {
+  while (true) {
+    const pending = await db
+      .select({
+        versionId: mediaVersions.id,
+        s3Url: mediaVersions.s3Url,
+        slug: mediaAssets.slug,
+        assetId: mediaVersions.assetId,
+      })
+      .from(mediaVersions)
+      .innerJoin(mediaAssets, eq(mediaAssets.id, mediaVersions.assetId))
+      .where(
+        and(
+          eq(mediaVersions.scormExtractionStatus as any, "pending"),
+          inArray(mediaAssets.mediaType, [...SCORM_PACKAGE_MEDIA_TYPES])
+        )
+      )
+      .limit(1);
+
+    if (pending.length === 0) return null;
+    const job = pending[0] as QueuedScormJob;
+
+    if (!job.s3Url) {
+      await db.update(mediaVersions)
+        .set({ scormExtractionStatus: "failed", scormExtractionError: "No S3 URL available" })
+        .where(eq(mediaVersions.id, job.versionId));
+      continue;
+    }
+
+    const urlLower = job.s3Url.toLowerCase().split("?")[0];
+    if (urlLower.endsWith(".html") || urlLower.endsWith(".htm")) {
+      const launchFile = job.s3Url.substring(job.s3Url.lastIndexOf("/") + 1);
+      await db.update(mediaVersions).set({
+        scormExtractionStatus: "done",
+        scormExtractedPrefix: `__direct_html__:${job.s3Url}`,
+        scormLaunchFile: launchFile,
+        scormExtractionError: null,
+      }).where(eq(mediaVersions.id, job.versionId));
+      console.log(`[ScormExtractor] Marked pre-extracted HTML version ${job.versionId} ready`);
+      continue;
+    }
+
+    await db.update(mediaVersions)
+      .set({ scormExtractionStatus: "processing", scormExtractionStartedAt: new Date(), scormExtractionError: null })
+      .where(and(eq(mediaVersions.id, job.versionId), eq(mediaVersions.scormExtractionStatus as any, "pending")));
+    return job;
+  }
+}
+
+async function drainScormExtractionQueue(initialJob: QueuedScormJob): Promise<void> {
+  let job: QueuedScormJob | null = initialJob;
+  while (job) {
+    try {
+      await extractAndUploadScormVersion(job.versionId, job.s3Url!, job.slug);
+    } catch (err: any) {
+      console.error(`[ScormExtractor] Queue item ${job.versionId} failed:`, err.message);
+    }
+
+    const db = await getDb();
+    job = db ? await claimNextPendingScormJob(db) : null;
+  }
+  console.log("[ScormExtractor] Queue drain complete — no pending packages remain");
+}
+
+function startScormExtractionDrain(job: QueuedScormJob): void {
+  activeScormExtractionDrain = drainScormExtractionQueue(job)
+    .catch((err) => console.error("[ScormExtractor] Queue drain stopped unexpectedly:", err))
+    .finally(() => { activeScormExtractionDrain = null; });
+}
 
 export async function scormExtractHeartbeatHandler(req: Request, res: Response): Promise<void> {
   try {
@@ -564,83 +643,17 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
       return;
     }
 
-    // Find one pending SCORM version to process
-    // Join with mediaAssets to confirm it's actually a SCORM/zip type
-    const pending = await db
-      .select({
-        versionId: mediaVersions.id,
-        s3Url: mediaVersions.s3Url,
-        slug: mediaAssets.slug,
-        assetId: mediaVersions.assetId,
-      })
-      .from(mediaVersions)
-      .innerJoin(mediaAssets, eq(mediaAssets.id, mediaVersions.assetId))
-      .where(
-        and(
-          eq(mediaVersions.scormExtractionStatus as any, "pending"),
-          inArray(mediaAssets.mediaType, [...SCORM_PACKAGE_MEDIA_TYPES])
-        )
-      )
-      .limit(1);
-
-    if (pending.length === 0) {
+    const job = await claimNextPendingScormJob(db);
+    if (!job) {
       res.json({ ok: true, skipped: "no-pending" });
       return;
     }
-
-    const job = pending[0];
-    if (!job.s3Url) {
-      // No file URL — mark as failed
-      await db
-        .update(mediaVersions)
-        .set({ scormExtractionStatus: "failed", scormExtractionError: "No S3 URL available" })
-        .where(eq(mediaVersions.id, job.versionId));
-      res.json({ ok: true, skipped: "no-url", versionId: job.versionId });
-      return;
-    }
-
-    // ── Detect pre-extracted HTML URLs (old-style iHeartEcho content) ──────────
-    // These are SCORM packages where the ZIP was already extracted on the old server
-    // and the stored URL points directly to an HTML file (e.g. .../FolderName/index.html).
-    // We cannot re-extract these — instead, mark them as done with a special prefix
-    // so the embed route can serve the content directly via iframe.
-    const urlLower = job.s3Url.toLowerCase().split("?")[0]; // strip query params
-    const isPreExtractedHtml = urlLower.endsWith(".html") || urlLower.endsWith(".htm");
-    if (isPreExtractedHtml) {
-      const lastSlash = job.s3Url.lastIndexOf("/");
-      const launchFile = job.s3Url.substring(lastSlash + 1); // e.g. "index.html"
-      const directHtmlPrefix = `__direct_html__:${job.s3Url}`;
-      await db
-        .update(mediaVersions)
-        .set({
-          scormExtractionStatus: "done",
-          scormExtractedPrefix: directHtmlPrefix,
-          scormLaunchFile: launchFile,
-          scormExtractionError: null,
-        })
-        .where(eq(mediaVersions.id, job.versionId));
-      console.log(`[ScormExtractor][Heartbeat] Pre-extracted HTML detected for version ${job.versionId}: ${job.s3Url}`);
-      res.json({ ok: true, processed: { versionId: job.versionId, slug: job.slug, type: "pre-extracted-html" } });
-      return;
-    }
-
-    // Mark as processing
-    await db
-      .update(mediaVersions)
-      .set({ scormExtractionStatus: "processing", scormExtractionStartedAt: now })
-      .where(eq(mediaVersions.id, job.versionId));
-
     console.log(`[ScormExtractor][Heartbeat] Processing version ${job.versionId}, slug=${job.slug}`);
 
-    // ── Respond immediately so Cloud Run doesn't kill us on the 180s timeout ──
-    // Large ZIPs (200MB+) take 3-10 minutes to download + extract + upload to R2.
-    // We fire extraction in the background and return 202 Accepted right away.
+    // Respond immediately; Always On keeps the sequential queue drain alive after
+    // this Heartbeat request completes.
     res.status(202).json({ ok: true, accepted: { versionId: job.versionId, slug: job.slug } });
-
-    // Run extraction in background (detached from HTTP request lifecycle)
-    extractAndUploadScormVersion(job.versionId, job.s3Url, job.slug).catch((err) => {
-      console.error(`[ScormExtractor][Heartbeat] Background extraction failed for version ${job.versionId}:`, err.message);
-    });
+    startScormExtractionDrain(job);
   } catch (err: any) {
     console.error(`[ScormExtractor][Heartbeat] Error:`, err.message);
     res.status(500).json({
