@@ -32,8 +32,9 @@ import type { Request, Response } from "express";
 import { findScormLaunchFile, SCORM_PACKAGE_MEDIA_TYPES } from "../lib/scormPackage";
 
 const SCORM_EXTRACT_DIR = path.join(os.tmpdir(), "scorm-extract-job");
-// If a job has been "processing" for more than 60 minutes, consider it stalled and retry
-const STALL_THRESHOLD_MS = 60 * 60 * 1000; // 60 min — large ZIPs (200MB+) with 500+ files can take 30-50 min to download + extract + upload to R2
+// Restart interrupted work after 15 minutes. Existing R2 files are skipped on
+// retry, so large packages make forward progress rather than restarting uploads.
+export const SCORM_RESUMABLE_STALL_THRESHOLD_MS = 15 * 60 * 1000;
 
 /** Interrupted work must return to the queue; 'skipped' blocks Question Bank import. */
 export function nextScormStatusAfterInterruption(): "pending" {
@@ -678,7 +679,7 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
     }
 
     const now = new Date();
-    const stallCutoff = new Date(now.getTime() - STALL_THRESHOLD_MS);
+    const stallCutoff = new Date(now.getTime() - SCORM_RESUMABLE_STALL_THRESHOLD_MS);
 
     // Recover an interrupted worker run. Always On hosting keeps the extraction
     // worker alive for large packages, so a stalled version should return to the

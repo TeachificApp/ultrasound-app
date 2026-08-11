@@ -3,6 +3,7 @@ import {
   canStartQueuedScormExtraction,
   nextScormStatusAfterInterruption,
   resolveScormWorkerDatabaseUrl,
+  SCORM_RESUMABLE_STALL_THRESHOLD_MS,
   shouldUploadScormObject,
 } from "./scormExtractor";
 
@@ -26,5 +27,9 @@ describe("SCORM extraction queue policy", () => {
     const existing = new Set(["scorm-extracted/example/index.html"]);
     expect(shouldUploadScormObject("scorm-extracted/example/index.html", existing)).toBe(false);
     expect(shouldUploadScormObject("scorm-extracted/example/data/slide.js", existing)).toBe(true);
+  });
+
+  it("requeues interrupted large packages quickly enough for resumable uploads to make progress", () => {
+    expect(SCORM_RESUMABLE_STALL_THRESHOLD_MS).toBe(15 * 60 * 1000);
   });
 });
