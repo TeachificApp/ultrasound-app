@@ -128,6 +128,11 @@ export function normalizeCampaignEmailHtml(html: string): string {
     .replace(/max-width:\s*600px/gi, `max-width:${w}px`)
     .replace(/\bwidth=["']600["']/gi, `width="${w}"`);
 
+  // Remove stub href values (bare protocol stubs with no destination) — replace with "#"
+  // so buttons don't silently go to an invalid URL in email clients
+  out = out.replace(/href="https?:\/\/"/gi, 'href="#"');
+  out = out.replace(/href='https?:\/\/'/gi, "href='#'");
+
   out = out.replace(/<img\b([^>]*)>/gi, (_match, attrs: string) => normalizeImgTag(attrs));
   // Ensure anchor tags use teal brand color when no inline color is set
   out = out.replace(/<a\b([^>]*?)>/gi, (_m: string, attrs: string) => {

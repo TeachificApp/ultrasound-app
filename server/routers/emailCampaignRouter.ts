@@ -1292,11 +1292,23 @@ Rules:
             changed = true;
           }
           if (changed) {
+            // Also fix htmlBody: replace stub href="https://" with the resolved URLs
+            // by re-building the href from each fixed block's ctaLink
+            let fixedHtmlBody = campaign.htmlBody as string ?? "";
+            for (const block of blocks) {
+              if (block.type !== "cta_standalone") continue;
+              const newLink: string = block.data?.ctaLink ?? "";
+              if (!newLink || newLink === "#" || newLink === "https://") continue;
+              // Replace the stub href in the htmlBody
+              fixedHtmlBody = fixedHtmlBody
+                .replace(/href="https:\/\/"/g, `href="${newLink}"`)
+                .replace(/href='https:\/\/'/g, `href='${newLink}'`);
+            }
             // Persist the resolved links back to the DB so future loads are instant
             await db.update(emailCampaigns)
-              .set({ blocksJson: JSON.stringify(blocks) })
+              .set({ blocksJson: JSON.stringify(blocks), htmlBody: fixedHtmlBody })
               .where(eq(emailCampaigns.id, input.id));
-            return { ...campaign, blocksJson: JSON.stringify(blocks) };
+            return { ...campaign, blocksJson: JSON.stringify(blocks), htmlBody: fixedHtmlBody };
           }
         } catch { /* ignore parse errors */ }
       }
