@@ -6,17 +6,15 @@
  *   2. GET /media/:slug/scorm/data/browsersupport.js → must return 200 (if iSpring)
  *
  * On any failure, notifies the owner immediately.
- * Also auto-heals stuck processing/pending versions older than 10 minutes.
+ * Also requeues interrupted processing versions without abandoning pending work.
  */
 
 import type { Request, Response } from "express";
 import { getDb } from "../db";
 import { mediaAssets, mediaVersions } from "../../drizzle/schema";
-import { eq, and, inArray, lt } from "drizzle-orm";
+import { eq, and, lt } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
-import { isZipStorageRef } from "../lib/scormPackage";
-
-const STALL_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+const STALL_THRESHOLD_MS = 60 * 60 * 1000; // 60 minutes for large package extraction
 
 // ─── Self-healing: fix stuck versions ────────────────────────────────────────
 
@@ -26,8 +24,8 @@ export async function healStuckScormVersions(): Promise<{ healed: number }> {
 
   const stallCutoff = new Date(Date.now() - STALL_THRESHOLD_MS);
 
-  // Find versions stuck in processing or pending for > 10 minutes
-  // Use scormExtractionStartedAt (for processing) or createdAt (for pending) as the time reference
+  // Only processing versions can be interrupted. Pending is the durable queue and
+  // must never be converted to skipped while it awaits the Always On worker.
   const stuck = await db
     .select({
       id: mediaVersions.id,
@@ -41,23 +39,23 @@ export async function healStuckScormVersions(): Promise<{ healed: number }> {
     .from(mediaVersions)
     .where(
       and(
-        inArray(mediaVersions.scormExtractionStatus, ["processing", "pending"]),
-        lt(mediaVersions.createdAt, stallCutoff)
+        eq(mediaVersions.scormExtractionStatus, "processing"),
+        lt(mediaVersions.scormExtractionStartedAt, stallCutoff)
       )
     );
 
   let healed = 0;
   for (const v of stuck) {
-    if (!isZipStorageRef(v)) continue;
     await db
       .update(mediaVersions)
       .set({
-        scormExtractionStatus: "skipped",
-        scormExtractionError: "Serving via on-demand ZIP streaming (auto-healed from stuck state)",
+        scormExtractionStatus: "pending",
+        scormExtractionStartedAt: null,
+        scormExtractionError: "Extraction was requeued after an interrupted worker run",
       })
       .where(eq(mediaVersions.id, v.id));
     healed++;
-    console.log(`[ScormHealthCheck] Auto-healed stuck version ${v.id} (was ${v.scormExtractionStatus})`);
+    console.log(`[ScormHealthCheck] Requeued interrupted version ${v.id}`);
   }
 
   return { healed };

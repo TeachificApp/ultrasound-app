@@ -696,9 +696,9 @@ async function startServer() {
         console.error('[Startup] deferred_checkout_sessions migration error:', err?.message ?? err);
       }
     }).catch((err) => console.error('[Startup] deferred_checkout_sessions getDb error:', err));
-    // Auto-heal any SCORM versions stuck in processing/pending → serve via zip-stream
+    // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
-      if (healed > 0) console.log(`[Startup] Auto-healed ${healed} stuck SCORM version(s) → zip-stream`);
+      if (healed > 0) console.log(`[Startup] Requeued ${healed} interrupted SCORM version(s)`);
     }).catch((err) => console.error("[Startup] SCORM heal error:", err));
   });
 }
