@@ -43,13 +43,16 @@ export function buildInitialMediaVersionExtractionFields(params: {
   mediaType: string;
   mimeType?: string | null;
   fileName?: string | null;
+  fileSize?: number | null;
 }) {
   const scormExtractionStatus = initialScormExtractionStatus(params);
   return scormExtractionStatus === "pending"
     ? { scormExtractionStatus }
     : {
         scormExtractionStatus,
-        scormExtractionError: "Not a SCORM or iSpring quiz package; extraction is not required",
+        scormExtractionError: params.fileSize === 0
+          ? "Empty archive or file: upload a non-empty replacement before SCORM extraction can run"
+          : "Not a SCORM or iSpring quiz package; extraction is not required",
       };
 }
 
@@ -548,7 +551,7 @@ async function finalizeUpload(
         mimeType,
         notes: notes || null,
         uploadedByUserId: userId,
-        ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType, fileName }),
+        ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType, fileName, fileSize }),
       });
 
       await db
@@ -601,7 +604,7 @@ async function finalizeUpload(
         mimeType,
         notes: notes || null,
         uploadedByUserId: userId,
-        ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType, fileName }),
+        ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType, fileName, fileSize }),
       });
 
       await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
@@ -679,7 +682,7 @@ router.post(
           assetId: existingAssetId, versionNumber: nextVersion, s3Key, s3Url,
           fileName: originalname, fileSize: size, mimeType: mimetype, notes,
           uploadedByUserId: user.id,
-          ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType: mimetype, fileName: originalname }),
+          ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType: mimetype, fileName: originalname, fileSize: size }),
         });
 
         await db.update(mediaAssets)
@@ -716,7 +719,7 @@ router.post(
           assetId, versionNumber: 1, s3Key, s3Url,
           fileName: originalname, fileSize: size, mimeType: mimetype, notes,
           uploadedByUserId: user.id,
-          ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType: mimetype, fileName: originalname }),
+          ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType: mimetype, fileName: originalname, fileSize: size }),
         });
 
         res.json({ assetId, slug, versionNumber: 1, s3Url });

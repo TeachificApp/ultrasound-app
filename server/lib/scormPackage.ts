@@ -29,7 +29,9 @@ export function needsScormExtraction(params: {
   mimeType?: string | null;
   fileName?: string | null;
   s3Url?: string | null;
+  fileSize?: number | null;
 }): boolean {
+  if (params.fileSize === 0) return false;
   if (isScormPackageMediaType(params.mediaType)) return true;
   const mime = (params.mimeType ?? "").toLowerCase();
   if (mime.includes("zip") || mime.includes("scorm")) return true;
@@ -45,6 +47,7 @@ export function initialScormExtractionStatus(params: {
   mediaType: string;
   mimeType?: string | null;
   fileName?: string | null;
+  fileSize?: number | null;
 }): "pending" | "skipped" {
   return needsScormExtraction(params) ? "pending" : "skipped";
 }

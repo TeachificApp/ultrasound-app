@@ -20,4 +20,16 @@ describe("media upload extraction state", () => {
       mimeType: "application/zip",
     })).toEqual({ scormExtractionStatus: "pending" });
   });
+
+  it("marks an empty SCORM-like archive skipped with replacement guidance", () => {
+    expect(buildInitialMediaVersionExtractionFields({
+      mediaType: "zip",
+      fileName: "empty-registry-review.zip",
+      mimeType: "application/zip",
+      fileSize: 0,
+    })).toEqual({
+      scormExtractionStatus: "skipped",
+      scormExtractionError: "Empty archive or file: upload a non-empty replacement before SCORM extraction can run",
+    });
+  });
 });
