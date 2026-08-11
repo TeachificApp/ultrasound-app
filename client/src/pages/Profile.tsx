@@ -8,7 +8,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   User, Mail, Edit3, Save, X, CheckCircle, ExternalLink, Award, Shield, Star,
   ClipboardList, Camera, Lock, MapPin, Globe, Briefcase, FileText, Eye, EyeOff,
-  Clock, AlertCircle, RefreshCw, Bell, Heart,
+  Clock, AlertCircle, AlertTriangle, RefreshCw, Bell, Heart,
 } from "lucide-react";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
@@ -672,6 +672,30 @@ export default function Profile() {
                   </div>
                 )}
               </div>
+              {/* Legacy Thinkific platform notice */}
+              {u.thinkificEnrolledAt && (
+                <div className="mx-5 mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-amber-800 mb-0.5">Legacy Platform Account</p>
+                      <p className="text-xs text-amber-700 leading-relaxed">
+                        Your account was transferred from our legacy platform. Some billing may still occur from that site.
+                        For legacy subscriptions not reflected here, please manage your billing at{" "}
+                        <a
+                          href="https://member.allaboutultrasound.com/account/billing"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold underline hover:text-amber-900"
+                        >
+                          member.allaboutultrasound.com/account/billing
+                        </a>
+                        .
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

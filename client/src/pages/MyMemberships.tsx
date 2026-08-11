@@ -108,6 +108,28 @@ export default function MyMemberships() {
         <h1 className="text-2xl font-bold text-gray-900">My Memberships</h1>
       </div>
 
+      {/* Legacy Thinkific platform notice */}
+      {(user as any)?.thinkificEnrolledAt && (
+        <div className="mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50 flex items-start gap-3">
+          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800 mb-0.5">Legacy Platform Account</p>
+            <p className="text-sm text-amber-700 leading-relaxed">
+              Your account was transferred from our legacy platform. Some billing may still occur from that site.
+              For legacy subscriptions not reflected here, please manage your billing at{" "}
+              <a
+                href="https://member.allaboutultrasound.com/account/billing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold underline hover:text-amber-900"
+              >
+                member.allaboutultrasound.com/account/billing
+              </a>
+              .
+            </p>
+          </div>
+        </div>
+      )}
       {!memberships || memberships.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
           <Award className="w-12 h-12 mx-auto mb-3 opacity-30" />
