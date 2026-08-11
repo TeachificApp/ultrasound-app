@@ -956,11 +956,11 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
     { id: assetId! },
     {
       enabled: !!assetId,
-      // Poll every 15 seconds while SCORM extraction is in progress so the UI
-      // auto-updates when extraction completes without requiring a manual refresh
+      // Poll while a SCORM package is queued or extracting so the dialog advances
+      // to the Save Questions step without requiring a manual refresh.
       refetchInterval: (query) => {
         const status = (query.state.data as any)?.versions?.[0]?.scormExtractionStatus;
-        return status === "processing" ? 15000 : false;
+        return status === "pending" || status === "processing" ? 15000 : false;
       },
     }
   );
@@ -1056,10 +1056,9 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   const isPublic = asset.access === "public";
   const scormExtractStatus = (currentVersion as { scormExtractionStatus?: string | null })?.scormExtractionStatus ?? null;
   const scormFileSize = Number((currentVersion as { fileSize?: number | null })?.fileSize ?? 0);
-  const SCORM_LARGE_BYTES = 50 * 1024 * 1024;
-  const isLargeScormPackage = scormFileSize > SCORM_LARGE_BYTES;
-  const scormExtractionReady = !isLargeScormPackage || scormExtractStatus === "done";
-  const scormExtractionBlocked = isLargeScormPackage && scormExtractStatus !== "done";
+  const isScormPackage = ["scorm", "zip", "lms"].includes(asset.mediaType) || /\.(zip|quiz)$/i.test((currentVersion as { fileName?: string | null })?.fileName ?? "");
+  const scormExtractionReady = !isScormPackage || scormExtractStatus === "done";
+  const scormExtractionBlocked = isScormPackage && scormExtractStatus !== "done";
 
   return (
     <>
@@ -1577,6 +1576,15 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                     </Button>
                   </div>
                 )}
+                {isScormPackage && scormExtractStatus === "done" && (
+                  <div className="flex items-start gap-2.5 rounded-xl border border-teal-200 bg-teal-50 p-3">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-600" />
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-semibold text-teal-900">Package ready to save</p>
+                      <p className="text-xs leading-relaxed text-teal-800">Step 2 of 2: choose a Question Bank folder below, then select <strong>Save Questions</strong>. No re-extraction is required.</p>
+                    </div>
+                  </div>
+                )}
                 {extractError && (
                   <div className={`rounded-xl border p-4 ${/flashcard deck/i.test(extractError) ? "border-amber-200 bg-amber-50" : "border-red-200 bg-red-50"}`}>
                     <div className="flex items-start gap-2.5">
@@ -1660,7 +1668,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                     ) : /flashcard deck/i.test(extractError ?? "") ? (
                       <><BookOpen className="w-3 h-3 mr-1.5" />Flashcard Deck — Not a Quiz</>
                     ) : (
-                      <><BookOpen className="w-3 h-3 mr-1.5" />Extract Questions</>
+                      <><BookOpen className="w-3 h-3 mr-1.5" />Save Questions</>
                     )}
                   </Button>
                 </DialogFooter>
