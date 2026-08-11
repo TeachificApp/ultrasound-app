@@ -730,9 +730,29 @@ function AnalyticsPanel({ assetId }: { assetId: number }) {
 // ─── SCORM Health Panel ─────────────────────────────────────────────────────
 
 function healthStatusBadge(health: "healthy" | "preparing" | "unhealthy") {
-  if (health === "healthy") return <Badge className="bg-emerald-600 hover:bg-emerald-600">Healthy</Badge>;
-  if (health === "preparing") return <Badge variant="secondary">Preparing</Badge>;
-  return <Badge variant="destructive">Unhealthy</Badge>;
+  if (health === "healthy") return <Badge className="bg-emerald-600 hover:bg-emerald-600">Playable</Badge>;
+  if (health === "preparing") return <Badge variant="secondary">Playback preparing</Badge>;
+  return <Badge variant="destructive">Playback issue</Badge>;
+}
+
+function questionImportBadge(row: {
+  extractionStatus: string | null;
+  mediaType: string;
+  extractedPrefix?: string | null;
+  launchFile?: string | null;
+  questionImportStage?: ReturnType<typeof resolveScormExtractionStage>;
+}) {
+  const stage = row.questionImportStage ?? resolveScormExtractionStage({
+    mediaType: row.mediaType,
+    extractionStatus: row.extractionStatus,
+    extractedPrefix: row.extractedPrefix,
+    launchFile: row.launchFile,
+  });
+  if (stage === "ready") return <Badge className="bg-teal-600 hover:bg-teal-600">Questions ready</Badge>;
+  if (stage === "extracting") return <Badge className="bg-amber-500 hover:bg-amber-500">Extracting questions</Badge>;
+  if (stage === "failed") return <Badge variant="destructive">Questions unavailable</Badge>;
+  if (stage === "not_required") return <Badge variant="secondary">Not importable</Badge>;
+  return <Badge variant="outline" className="border-amber-300 text-amber-800">Questions not extracted</Badge>;
 }
 
 function ScormHealthDialog({
@@ -830,6 +850,9 @@ function ScormHealthDialog({
           <p className="text-sm text-muted-foreground">
             {rows.length} package{rows.length === 1 ? "" : "s"} tracked · {unhealthy.length} unhealthy · {preparing.length} preparing
           </p>
+          <p className="text-xs text-muted-foreground">
+            <strong>Playback</strong> confirms learners can open a package. <strong>Question Bank</strong> readiness is separate and requires extracted package files.
+          </p>
           {backfillSummary && (
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               <Badge variant="secondary">Queued: {backfillSummary.counts.pending}</Badge>
@@ -884,7 +907,8 @@ function ScormHealthDialog({
                 <thead className="bg-muted/50 text-xs text-muted-foreground">
                   <tr>
                     <th className="text-left px-3 py-2 font-semibold">Asset</th>
-                    <th className="text-left px-3 py-2 font-semibold hidden sm:table-cell">Status</th>
+                    <th className="text-left px-3 py-2 font-semibold hidden sm:table-cell">Playback</th>
+                    <th className="text-left px-3 py-2 font-semibold hidden md:table-cell">Question Bank</th>
                     <th className="text-left px-3 py-2 font-semibold">Detail</th>
                     <th className="text-right px-3 py-2 font-semibold">Actions</th>
                   </tr>
@@ -903,6 +927,7 @@ function ScormHealthDialog({
                         <p className="text-xs text-muted-foreground font-mono truncate max-w-[200px]">{row.slug}</p>
                       </td>
                       <td className="px-3 py-2 align-top hidden sm:table-cell">{healthStatusBadge(row.health)}</td>
+                      <td className="px-3 py-2 align-top hidden md:table-cell">{questionImportBadge(row)}</td>
                       <td className="px-3 py-2 align-top text-xs text-muted-foreground max-w-[240px]">{row.healthDetail}</td>
                       <td className="px-3 py-2 align-top text-right whitespace-nowrap">
                         {row.health === "unhealthy" && (
@@ -1076,6 +1101,8 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
     mediaType: asset.mediaType,
     fileName: (currentVersion as { fileName?: string | null })?.fileName,
     extractionStatus: scormExtractStatus,
+    extractedPrefix: (currentVersion as { scormExtractedPrefix?: string | null })?.scormExtractedPrefix,
+    launchFile: (currentVersion as { scormLaunchFile?: string | null })?.scormLaunchFile,
   });
   const scormExtractionReady = scormStage === "not_required" || scormStage === "ready";
   const scormExtractionBlocked = !scormExtractionReady;
@@ -1544,7 +1571,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                            <Clock className="w-4 h-4 text-white" />}
                         </div>
                         <span className={`text-[10px] font-medium ${scormExtractStatus === "done" ? "text-teal-700" : scormExtractStatus === "processing" ? "text-amber-700" : scormExtractStatus === "failed" ? "text-red-600" : "text-gray-400"}`}>
-                          {scormExtractStatus === "done" ? "Extracted" : scormExtractStatus === "processing" ? "Extracting…" : scormExtractStatus === "failed" ? "Failed" : "Pending"}
+                          {scormExtractStatus === "done" ? "Questions ready" : scormExtractStatus === "processing" ? "Extracting…" : scormExtractStatus === "failed" ? "Failed" : "Not extracted"}
                         </span>
                       </div>
                       <div className={`flex-1 h-1 mx-1 rounded ${scormExtractStatus === "done" ? "bg-teal-400" : "bg-gray-200"}`} />
@@ -1560,8 +1587,8 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                     {/* Status message */}
                     {scormExtractStatus === "skipped" || !scormExtractStatus ? (
                       <div className="text-xs text-gray-700 space-y-1.5">
-                        <p className="font-semibold text-gray-800">Step 1 of 2: Extract the SCORM package</p>
-                        <p>This is a large file ({(scormFileSize / 1024 / 1024).toFixed(0)} MB). The SCORM content must be extracted to the CDN before questions can be imported. Click the button below to start extraction.</p>
+                        <p className="font-semibold text-gray-800">Step 1 of 2: Extract package files for Question Bank</p>
+                        <p><strong>Playback can be healthy from the original ZIP.</strong> Question Bank import is separate: the package files must first be extracted to R2 so questions and associated media can be read. Click below to start or resume that extraction.</p>
                         <p className="text-gray-500">Extraction runs in the background and typically takes <strong>10–30 minutes</strong> for large files. You can close this dialog and come back.</p>
                       </div>
                     ) : scormExtractStatus === "processing" ? (

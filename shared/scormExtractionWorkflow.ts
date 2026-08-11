@@ -10,9 +10,17 @@ export function resolveScormExtractionStage(params: {
   mediaType: string;
   fileName?: string | null;
   extractionStatus?: string | null;
+  extractedPrefix?: string | null;
+  launchFile?: string | null;
 }): ScormExtractionStage {
   if (!isScormImportPackage(params.mediaType, params.fileName)) return "not_required";
-  if (params.extractionStatus === "done") return "ready";
+  if (
+    params.extractionStatus === "done"
+    && !!params.extractedPrefix
+    && !params.extractedPrefix.startsWith("__direct_html__:")
+  ) {
+    return "ready";
+  }
   if (params.extractionStatus === "processing") return "extracting";
   if (params.extractionStatus === "failed") return "failed";
   return "queued";

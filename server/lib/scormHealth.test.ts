@@ -42,6 +42,32 @@ describe("scormHealth", () => {
       ],
     });
     expect(result.health).toBe("healthy");
+    expect(result.detail).toMatch(/Question Bank import/i);
+  });
+
+  it("distinguishes playable ZIP serving from pending Question Bank extraction", () => {
+    const result = classifyScormHealth({
+      mediaType: "scorm",
+      versions: [
+        {
+          id: 1,
+          s3Url: "https://cdn.example.com/pkg.zip",
+          fileName: "pkg.zip",
+          mimeType: "application/zip",
+          s3Key: "pkg.zip",
+          versionNumber: 1,
+          scormExtractedPrefix: null,
+          scormLaunchFile: null,
+          scormExtractionStatus: "skipped",
+          scormExtractionError: null,
+          scormExtractionStartedAt: null,
+          createdAt: new Date(),
+        },
+      ],
+    });
+    expect(result.health).toBe("healthy");
+    expect(result.detail).toMatch(/original package/i);
+    expect(result.detail).toMatch(/Question Bank extraction is still pending/i);
   });
 
   it("newlyUnhealthyAssetIds only returns ids not in previous snapshot", () => {

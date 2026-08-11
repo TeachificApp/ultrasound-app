@@ -12,6 +12,7 @@ import {
   SCORM_PACKAGE_MEDIA_TYPES,
 } from "./scormPackage";
 import { isR2ScormExtractionPlayable } from "./scormR2Probe";
+import { resolveScormExtractionStage } from "../../shared/scormExtractionWorkflow";
 import {
   buildScormAdminUrls,
   classifyScormHealth,
@@ -120,6 +121,13 @@ export async function listScormHealthRows(): Promise<ScormHealthRow[]> {
     }
 
     const latest = versions[0];
+    const questionImportStage = resolveScormExtractionStage({
+      mediaType: asset.mediaType,
+      fileName: latest?.fileName,
+      extractionStatus: latest?.scormExtractionStatus,
+      extractedPrefix: latest?.scormExtractedPrefix,
+      launchFile: latest?.scormLaunchFile,
+    });
     const urls = buildScormAdminUrls(asset.id, baseUrl);
 
     rows.push({
@@ -132,6 +140,7 @@ export async function listScormHealthRows(): Promise<ScormHealthRow[]> {
       versionNumber: latest?.versionNumber ?? null,
       extractionStatus: latest?.scormExtractionStatus ?? null,
       extractionError: latest?.scormExtractionError ?? null,
+      questionImportStage,
       health,
       healthDetail: detail,
       adminUrl: urls.adminUrl,

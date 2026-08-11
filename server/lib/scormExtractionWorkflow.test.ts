@@ -13,7 +13,12 @@ describe("resolveScormExtractionStage", () => {
     expect(initialStatus).toBe("pending");
     expect(resolveScormExtractionStage({ ...packageInput, extractionStatus: initialStatus })).toBe("queued");
     expect(resolveScormExtractionStage({ ...packageInput, extractionStatus: "processing" })).toBe("extracting");
-    expect(resolveScormExtractionStage({ ...packageInput, extractionStatus: "done" })).toBe("ready");
+    expect(resolveScormExtractionStage({
+      ...packageInput,
+      extractionStatus: "done",
+      extractedPrefix: "scorm-extracted/adult-echo-review",
+      launchFile: "index.html",
+    })).toBe("ready");
   });
 
   it("does not require Question Bank extraction for non-package media", () => {
@@ -26,7 +31,12 @@ describe("resolveScormExtractionStage", () => {
     const states = [
       resolveScormExtractionStage({ ...packageInput, extractionStatus: uploaded }),
       resolveScormExtractionStage({ ...packageInput, extractionStatus: "processing" }),
-      resolveScormExtractionStage({ ...packageInput, extractionStatus: "done" }),
+      resolveScormExtractionStage({
+        ...packageInput,
+        extractionStatus: "done",
+        extractedPrefix: "scorm-extracted/registry-review",
+        launchFile: "index.html",
+      }),
     ];
 
     expect(states).toEqual(["queued", "extracting", "ready"]);
@@ -37,5 +47,24 @@ describe("resolveScormExtractionStage", () => {
       failed: 1,
       skipped: 1,
     });
+  });
+
+  it("matches the importer by accepting a completed prefix without a stored launch file", () => {
+    expect(resolveScormExtractionStage({
+      mediaType: "zip",
+      fileName: "review.zip",
+      extractionStatus: "done",
+      extractedPrefix: "scorm-extracted/review",
+    })).toBe("ready");
+  });
+
+  it("does not treat direct HTML metadata as an extracted Question Bank package", () => {
+    expect(resolveScormExtractionStage({
+      mediaType: "zip",
+      fileName: "review.zip",
+      extractionStatus: "done",
+      extractedPrefix: "__direct_html__:https://example.test/index.html",
+      launchFile: "index.html",
+    })).toBe("queued");
   });
 });

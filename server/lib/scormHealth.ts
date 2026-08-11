@@ -10,6 +10,7 @@ import {
   SCORM_PROCESSING_STALL_MS,
   type MediaVersionZipRef,
 } from "./scormPackage";
+import type { ScormExtractionStage } from "../../shared/scormExtractionWorkflow";
 
 export type ScormHealthStatus =
   | "healthy"
@@ -26,6 +27,7 @@ export type ScormHealthRow = {
   versionNumber: number | null;
   extractionStatus: string | null;
   extractionError: string | null;
+  questionImportStage: ScormExtractionStage;
   health: ScormHealthStatus;
   healthDetail: string;
   adminUrl: string;
@@ -110,8 +112,15 @@ export function classifyScormHealth(params: {
     return { health: "unhealthy", detail: primary.error };
   }
 
-  if (status === "done" || status === "skipped" || primary.kind === "direct_html" || primary.kind === "r2_extracted" || primary.kind === "client_zip") {
-    return { health: "healthy", detail: "Ready to serve" };
+  if (status === "skipped" || primary.kind === "client_zip") {
+    return {
+      health: "healthy",
+      detail: "Playable from the original package — Question Bank extraction is still pending",
+    };
+  }
+
+  if (status === "done" || primary.kind === "direct_html" || primary.kind === "r2_extracted") {
+    return { health: "healthy", detail: "Playable and ready for Question Bank import" };
   }
 
   return { health: "unhealthy", detail: `Unknown extraction status: ${status}` };
