@@ -4,6 +4,7 @@ import {
   nextScormStatusAfterInterruption,
   resolveScormWorkerDatabaseUrl,
   SCORM_RESUMABLE_STALL_THRESHOLD_MS,
+  shouldRequeueStaleScormJob,
   shouldUploadScormObject,
 } from "./scormExtractor";
 
@@ -31,5 +32,12 @@ describe("SCORM extraction queue policy", () => {
 
   it("requeues interrupted large packages quickly enough for resumable uploads to make progress", () => {
     expect(SCORM_RESUMABLE_STALL_THRESHOLD_MS).toBe(15 * 60 * 1000);
+  });
+
+  it("reclaims a stale active package even when the bulk date query would miss it", () => {
+    const now = Date.UTC(2026, 7, 11, 18, 0, 0);
+    expect(shouldRequeueStaleScormJob(new Date(now - SCORM_RESUMABLE_STALL_THRESHOLD_MS), now)).toBe(true);
+    expect(shouldRequeueStaleScormJob(new Date(now - SCORM_RESUMABLE_STALL_THRESHOLD_MS + 1), now)).toBe(false);
+    expect(shouldRequeueStaleScormJob(null, now)).toBe(true);
   });
 });

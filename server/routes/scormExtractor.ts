@@ -36,6 +36,10 @@ const SCORM_EXTRACT_DIR = path.join(os.tmpdir(), "scorm-extract-job");
 // retry, so large packages make forward progress rather than restarting uploads.
 export const SCORM_RESUMABLE_STALL_THRESHOLD_MS = 15 * 60 * 1000;
 
+export function shouldRequeueStaleScormJob(startedAt: Date | null | undefined, now = Date.now()): boolean {
+  return !startedAt || now - startedAt.getTime() >= SCORM_RESUMABLE_STALL_THRESHOLD_MS;
+}
+
 /** Interrupted work must return to the queue; 'skipped' blocks Question Bank import. */
 export function nextScormStatusAfterInterruption(): "pending" {
   return "pending";
@@ -678,39 +682,26 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
       return;
     }
 
-    const now = new Date();
-    const stallCutoff = new Date(now.getTime() - SCORM_RESUMABLE_STALL_THRESHOLD_MS);
-
-    // Recover an interrupted worker run. Always On hosting keeps the extraction
-    // worker alive for large packages, so a stalled version should return to the
-    // queue rather than being abandoned as 'skipped'.
-    const stalledResult = await db
-      .update(mediaVersions)
-      .set({
-        scormExtractionStatus: nextScormStatusAfterInterruption(),
-        scormExtractionStartedAt: null,
-        scormExtractionError: "Extraction was requeued after an interrupted worker run",
-      })
-      .where(
-        and(
-          eq(mediaVersions.scormExtractionStatus as any, "processing"),
-          lt(mediaVersions.scormExtractionStartedAt as any, stallCutoff)
-        )
-      );
-    const stalledCount = (stalledResult as any)?.rowsAffected ?? 0;
-    if (stalledCount > 0) {
-      console.log(`[ScormExtractor][Heartbeat] Requeued ${stalledCount} stalled extraction(s)`);
-    }
-
     // Only one package may extract at a time. The actual extraction continues
     // after this Heartbeat returns, so a second invocation must not start another
     // large ZIP while the first one is still downloading or uploading.
     const activeProcessing = await db
-      .select({ versionId: mediaVersions.id })
+      .select({ versionId: mediaVersions.id, startedAt: mediaVersions.scormExtractionStartedAt })
       .from(mediaVersions)
       .where(eq(mediaVersions.scormExtractionStatus as any, "processing"))
       .limit(1);
-    if (!canStartQueuedScormExtraction(activeProcessing.length)) {
+
+    const activeJob = activeProcessing[0];
+    if (activeJob && shouldRequeueStaleScormJob(activeJob.startedAt)) {
+      await db.update(mediaVersions)
+        .set({
+          scormExtractionStatus: nextScormStatusAfterInterruption(),
+          scormExtractionStartedAt: null,
+          scormExtractionError: "Extraction was requeued after an interrupted worker run",
+        })
+        .where(eq(mediaVersions.id, activeJob.versionId));
+      console.log(`[ScormExtractor][Heartbeat] Requeued stale extraction ${activeJob.versionId}`);
+    } else if (!canStartQueuedScormExtraction(activeProcessing.length)) {
       res.json({ ok: true, skipped: "active-extraction", versionId: activeProcessing[0].versionId });
       return;
     }
