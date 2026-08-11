@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildNoPendingScormDiagnostic,
   canStartQueuedScormExtraction,
+  classifyScormExtractionFailure,
   nextScormStatusAfterInterruption,
   resolveScormWorkerDatabaseUrl,
   SCORM_RESUMABLE_STALL_THRESHOLD_MS,
@@ -46,6 +47,13 @@ describe("SCORM extraction queue policy", () => {
       fileName: "registry-review.quiz",
       mimeType: "application/octet-stream",
     })).toBe(false);
+  });
+
+  it("makes unsupported and damaged archive failures actionable and final", () => {
+    expect(classifyScormExtractionFailure("Launch file 'index.html' not found in extracted files. HTML files found: none"))
+      .toMatchObject({ status: "skipped", error: expect.stringContaining("Unsupported") });
+    expect(classifyScormExtractionFailure("FILE_ENDED"))
+      .toMatchObject({ status: "failed", error: expect.stringContaining("Damaged archive") });
   });
 
   it("resumes a package by skipping R2 objects that were uploaded before interruption", () => {

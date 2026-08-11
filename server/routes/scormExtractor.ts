@@ -90,6 +90,25 @@ export function shouldNormalizeNonScormPendingRecord(params: {
   return !needsScormExtraction(params);
 }
 
+export function classifyScormExtractionFailure(message: string): {
+  status: "failed" | "skipped";
+  error: string;
+} {
+  if (/HTML files found: none/i.test(message)) {
+    return {
+      status: "skipped",
+      error: "Unsupported interactive/reference archive: no HTML launch file is present, so it cannot be imported as a SCORM Question Bank quiz.",
+    };
+  }
+  if (/FILE_ENDED|unexpected end|invalid zip/i.test(message)) {
+    return {
+      status: "failed",
+      error: "Damaged archive: the ZIP ended unexpectedly. Upload a new intact package before retrying extraction.",
+    };
+  }
+  return { status: "failed", error: message || "Unknown extraction error" };
+}
+
 export async function getScormWorkerDb() {
   const railwayUrl = resolveScormWorkerDatabaseUrl();
   if (!railwayUrl) return getDb();
@@ -458,11 +477,12 @@ export async function extractAndUploadScormVersion(
     try {
       const db = await getScormWorkerDb();
       if (db) {
+        const classifiedFailure = classifyScormExtractionFailure(err.message || "Unknown error");
         await db
           .update(mediaVersions)
           .set({
-            scormExtractionStatus: "failed",
-            scormExtractionError: err.message || "Unknown error",
+            scormExtractionStatus: classifiedFailure.status,
+            scormExtractionError: classifiedFailure.error,
           })
           .where(eq(mediaVersions.id, versionId));
       }
