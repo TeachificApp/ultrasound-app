@@ -39,6 +39,20 @@ import { getDb } from "../db";
 import { mediaAssets, mediaVersions, mediaUploadSessions } from "../../drizzle/schema";
 import { detectBrandFromHostname } from "../../shared/brands";
 
+export function buildInitialMediaVersionExtractionFields(params: {
+  mediaType: string;
+  mimeType?: string | null;
+  fileName?: string | null;
+}) {
+  const scormExtractionStatus = initialScormExtractionStatus(params);
+  return scormExtractionStatus === "pending"
+    ? { scormExtractionStatus }
+    : {
+        scormExtractionStatus,
+        scormExtractionError: "Not a SCORM or iSpring quiz package; extraction is not required",
+      };
+}
+
 // ── R2 Client ─────────────────────────────────────────────────────────────────
 
 function getR2Client(): S3Client {
@@ -534,7 +548,7 @@ async function finalizeUpload(
         mimeType,
         notes: notes || null,
         uploadedByUserId: userId,
-        scormExtractionStatus: initialScormExtractionStatus({ mediaType, mimeType, fileName }),
+        ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType, fileName }),
       });
 
       await db
@@ -587,7 +601,7 @@ async function finalizeUpload(
         mimeType,
         notes: notes || null,
         uploadedByUserId: userId,
-        scormExtractionStatus: initialScormExtractionStatus({ mediaType, mimeType, fileName }),
+        ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType, fileName }),
       });
 
       await db.delete(mediaUploadSessions).where(eq(mediaUploadSessions.uploadId, uploadId));
@@ -665,7 +679,7 @@ router.post(
           assetId: existingAssetId, versionNumber: nextVersion, s3Key, s3Url,
           fileName: originalname, fileSize: size, mimeType: mimetype, notes,
           uploadedByUserId: user.id,
-          scormExtractionStatus: initialScormExtractionStatus({ mediaType, mimeType: mimetype, fileName: originalname }),
+          ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType: mimetype, fileName: originalname }),
         });
 
         await db.update(mediaAssets)
@@ -702,7 +716,7 @@ router.post(
           assetId, versionNumber: 1, s3Key, s3Url,
           fileName: originalname, fileSize: size, mimeType: mimetype, notes,
           uploadedByUserId: user.id,
-          scormExtractionStatus: initialScormExtractionStatus({ mediaType, mimeType: mimetype, fileName: originalname }),
+          ...buildInitialMediaVersionExtractionFields({ mediaType, mimeType: mimetype, fileName: originalname }),
         });
 
         res.json({ assetId, slug, versionNumber: 1, s3Url });
