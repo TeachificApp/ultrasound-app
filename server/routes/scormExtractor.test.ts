@@ -3,6 +3,7 @@ import {
   canStartQueuedScormExtraction,
   nextScormStatusAfterInterruption,
   resolveScormWorkerDatabaseUrl,
+  shouldUploadScormObject,
 } from "./scormExtractor";
 
 describe("SCORM extraction queue policy", () => {
@@ -19,5 +20,11 @@ describe("SCORM extraction queue policy", () => {
     expect(resolveScormWorkerDatabaseUrl({ RAILWAY_MYSQL_URL: "mysql://railway.example/database" } as NodeJS.ProcessEnv))
       .toBe("mysql://railway.example/database");
     expect(resolveScormWorkerDatabaseUrl({} as NodeJS.ProcessEnv)).toBeNull();
+  });
+
+  it("resumes a package by skipping R2 objects that were uploaded before interruption", () => {
+    const existing = new Set(["scorm-extracted/example/index.html"]);
+    expect(shouldUploadScormObject("scorm-extracted/example/index.html", existing)).toBe(false);
+    expect(shouldUploadScormObject("scorm-extracted/example/data/slide.js", existing)).toBe(true);
   });
 });

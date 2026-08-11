@@ -75,6 +75,45 @@ export async function getScormWorkerDb() {
   return railwayScormWorkerDb;
 }
 
+/** Existing R2 objects are preserved between interrupted large-package runs. */
+export function shouldUploadScormObject(key: string, existingKeys: ReadonlySet<string>): boolean {
+  return !existingKeys.has(key);
+}
+
+async function listExistingScormR2Keys(prefix: string): Promise<Set<string>> {
+  const accountId = process.env.CF_R2_ACCOUNT_ID;
+  const accessKeyId = process.env.CF_R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.CF_R2_SECRET_ACCESS_KEY;
+  if (!accountId || !accessKeyId || !secretAccessKey) return new Set();
+
+  try {
+    const { S3Client, ListObjectsV2Command } = await import("@aws-sdk/client-s3");
+    const client = new S3Client({
+      region: "auto",
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+    const keys = new Set<string>();
+    let continuationToken: string | undefined;
+    do {
+      const page = await client.send(new ListObjectsV2Command({
+        Bucket: process.env.CF_R2_BUCKET_NAME || "ultrasound-assist",
+        Prefix: `${prefix}/`,
+        ContinuationToken: continuationToken,
+        MaxKeys: 1000,
+      }));
+      for (const object of page.Contents || []) {
+        if (object.Key) keys.add(object.Key);
+      }
+      continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+    } while (continuationToken);
+    return keys;
+  } catch (error: any) {
+    console.warn(`[ScormExtractor] Could not read existing R2 extraction output: ${error?.message || error}`);
+    return new Set();
+  }
+}
+
 // ─── Download helper ──────────────────────────────────────────────────────────
 
 /**
@@ -283,10 +322,15 @@ export async function extractAndUploadScormVersion(
     // ── Step 4: Upload all files to R2 using streams (NO fs.readFileSync) ────
     const allFiles = collectFiles(workDir);
     console.log(`[ScormExtractor] Uploading ${allFiles.length} files to R2 under ${prefix}/`);
+    const existingR2Keys = await listExistingScormR2Keys(prefix);
+    if (existingR2Keys.size > 0) {
+      console.log(`[ScormExtractor] Resuming package upload: ${existingR2Keys.size} file(s) already present in R2`);
+    }
 
     // Upload in batches of 20 to maximize R2 throughput (each upload is ~1-2s on Cloud Run)
     const BATCH_SIZE = 20;
     let uploaded = 0;
+    let skippedExisting = 0;
     for (let i = 0; i < allFiles.length; i += BATCH_SIZE) {
       const batch = allFiles.slice(i, i + BATCH_SIZE);
       await Promise.all(
@@ -294,6 +338,10 @@ export async function extractAndUploadScormVersion(
           const fullPath = path.join(workDir, relPath);
           const mime = guessMime(relPath);
           const key = `${prefix}/${relPath}`;
+          if (!shouldUploadScormObject(key, existingR2Keys)) {
+            skippedExisting++;
+            return;
+          }
           // Read as buffer for storagePut (storagePut accepts Buffer | Uint8Array | string)
           // For very large individual files (videos), stream in chunks
           const stat = fs.statSync(fullPath);
@@ -314,8 +362,9 @@ export async function extractAndUploadScormVersion(
           uploaded++;
         })
       );
-      if (uploaded % 20 === 0 || uploaded === allFiles.length) {
-        console.log(`[ScormExtractor] Uploaded ${uploaded}/${allFiles.length} files`);
+      const completed = uploaded + skippedExisting;
+      if (completed % 20 === 0 || completed === allFiles.length) {
+        console.log(`[ScormExtractor] Uploaded ${uploaded} new / skipped ${skippedExisting} existing / ${allFiles.length} total files`);
       }
     }
 
