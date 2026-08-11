@@ -5,6 +5,7 @@ import {
   resolveScormWorkerDatabaseUrl,
   SCORM_RESUMABLE_STALL_THRESHOLD_MS,
   shouldRequeueStaleScormJob,
+  shouldUseDirectScormR2Upload,
   shouldUploadScormObject,
 } from "./scormExtractor";
 
@@ -39,5 +40,14 @@ describe("SCORM extraction queue policy", () => {
     expect(shouldRequeueStaleScormJob(new Date(now - SCORM_RESUMABLE_STALL_THRESHOLD_MS), now)).toBe(true);
     expect(shouldRequeueStaleScormJob(new Date(now - SCORM_RESUMABLE_STALL_THRESHOLD_MS + 1), now)).toBe(false);
     expect(shouldRequeueStaleScormJob(null, now)).toBe(true);
+  });
+
+  it("uses direct R2 streaming when extraction credentials are available", () => {
+    expect(shouldUseDirectScormR2Upload({} as NodeJS.ProcessEnv)).toBe(false);
+    expect(shouldUseDirectScormR2Upload({
+      CF_R2_ACCOUNT_ID: "account",
+      CF_R2_ACCESS_KEY_ID: "key",
+      CF_R2_SECRET_ACCESS_KEY: "secret",
+    } as NodeJS.ProcessEnv)).toBe(true);
   });
 });

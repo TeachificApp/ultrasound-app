@@ -23,6 +23,7 @@ import https from "https";
 import http from "http";
 import { createHash } from "crypto";
 import unzipper from "unzipper";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { eq, and, lt, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { getDb } from "../db";
@@ -60,6 +61,7 @@ type QueuedScormJob = {
 let activeScormExtractionDrain: Promise<void> | null = null;
 let railwayScormWorkerDb: ReturnType<typeof drizzle> | null = null;
 let railwayScormWorkerUrl: string | null = null;
+let extractionR2Client: S3Client | null = null;
 
 /**
  * Heartbeat callbacks run on the managed deployment, while the public learning
@@ -83,6 +85,40 @@ export async function getScormWorkerDb() {
 /** Existing R2 objects are preserved between interrupted large-package runs. */
 export function shouldUploadScormObject(key: string, existingKeys: ReadonlySet<string>): boolean {
   return !existingKeys.has(key);
+}
+
+export function shouldUseDirectScormR2Upload(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !!(env.CF_R2_ACCOUNT_ID && env.CF_R2_ACCESS_KEY_ID && env.CF_R2_SECRET_ACCESS_KEY);
+}
+
+function getExtractionR2Client(): S3Client | null {
+  if (extractionR2Client) return extractionR2Client;
+  if (!shouldUseDirectScormR2Upload()) return null;
+  extractionR2Client = new S3Client({
+    region: "auto",
+    endpoint: `https://${process.env.CF_R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.CF_R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.CF_R2_SECRET_ACCESS_KEY!,
+    },
+  });
+  return extractionR2Client;
+}
+
+async function uploadScormObjectToR2(key: string, filePath: string, contentType: string): Promise<void> {
+  const client = getExtractionR2Client();
+  if (client) {
+    await client.send(new PutObjectCommand({
+      Bucket: process.env.CF_R2_BUCKET_NAME || "ultrasound-assist",
+      Key: key,
+      Body: fs.createReadStream(filePath),
+      ContentType: contentType,
+    }));
+    return;
+  }
+
+  // Retain the platform storage fallback for environments without direct R2 credentials.
+  await storagePut(key, fs.readFileSync(filePath), contentType);
 }
 
 async function listExistingScormR2Keys(prefix: string): Promise<Set<string>> {
@@ -347,23 +383,7 @@ export async function extractAndUploadScormVersion(
             skippedExisting++;
             return;
           }
-          // Read as buffer for storagePut (storagePut accepts Buffer | Uint8Array | string)
-          // For very large individual files (videos), stream in chunks
-          const stat = fs.statSync(fullPath);
-          if (stat.size > 50 * 1024 * 1024) {
-            // Large file: read in chunks to avoid single large allocation
-            const chunks: Buffer[] = [];
-            await new Promise<void>((resolve, reject) => {
-              const rs = fs.createReadStream(fullPath);
-              rs.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-              rs.on("end", resolve);
-              rs.on("error", reject);
-            });
-            await storagePut(key, Buffer.concat(chunks), mime);
-          } else {
-            const fileBuffer = fs.readFileSync(fullPath);
-            await storagePut(key, fileBuffer, mime);
-          }
+          await uploadScormObjectToR2(key, fullPath, mime);
           uploaded++;
         })
       );
