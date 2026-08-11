@@ -24,13 +24,13 @@ import http from "http";
 import { createHash } from "crypto";
 import unzipper from "unzipper";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { eq, and, lt, inArray } from "drizzle-orm";
+import { eq, and, lt, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { getDb } from "../db";
 import { mediaVersions, mediaAssets } from "../../drizzle/schema";
 import { storagePut, storageGet } from "../storage";
 import type { Request, Response } from "express";
-import { findScormLaunchFile, SCORM_PACKAGE_MEDIA_TYPES } from "../lib/scormPackage";
+import { findScormLaunchFile, needsScormExtraction, SCORM_PACKAGE_MEDIA_TYPES } from "../lib/scormPackage";
 
 const SCORM_EXTRACT_DIR = path.join(os.tmpdir(), "scorm-extract-job");
 // Restart interrupted work after 15 minutes. Existing R2 files are skipped on
@@ -69,6 +69,25 @@ let extractionR2Client: S3Client | null = null;
  */
 export function resolveScormWorkerDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string | null {
   return env.RAILWAY_MYSQL_URL || null;
+}
+
+export function buildNoPendingScormDiagnostic(rawPendingVersions: number, usingRailway: boolean) {
+  return {
+    database: usingRailway ? "railway" : "managed",
+    rawPendingVersions,
+    message: rawPendingVersions > 0
+      ? "Pending versions exist, but none are eligible SCORM/ZIP/LMS packages for this worker"
+      : "No pending SCORM/ZIP/LMS packages remain",
+  };
+}
+
+export function shouldNormalizeNonScormPendingRecord(params: {
+  mediaType: string;
+  mimeType?: string | null;
+  fileName?: string | null;
+  s3Url?: string | null;
+}): boolean {
+  return !needsScormExtraction(params);
 }
 
 export async function getScormWorkerDb() {
@@ -702,6 +721,32 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
       return;
     }
 
+    // Legacy mirrors can leave ordinary images/documents marked pending. Clear
+    // those rows before calculating capacity so the SCORM backlog stays accurate.
+    const pendingRecords = await db
+      .select({
+        versionId: mediaVersions.id,
+        mediaType: mediaAssets.mediaType,
+        mimeType: mediaVersions.mimeType,
+        fileName: mediaVersions.fileName,
+        s3Url: mediaVersions.s3Url,
+      })
+      .from(mediaVersions)
+      .innerJoin(mediaAssets, eq(mediaAssets.id, mediaVersions.assetId))
+      .where(eq(mediaVersions.scormExtractionStatus as any, "pending"))
+      .limit(250);
+    const nonScormVersionIds = pendingRecords
+      .filter((record) => shouldNormalizeNonScormPendingRecord(record))
+      .map((record) => record.versionId);
+    if (nonScormVersionIds.length > 0) {
+      await db.update(mediaVersions).set({
+        scormExtractionStatus: "skipped",
+        scormExtractionError: "Not a SCORM or iSpring quiz package; extraction is not required",
+        scormExtractionStartedAt: null,
+      }).where(inArray(mediaVersions.id, nonScormVersionIds));
+      console.log(`[ScormExtractor][Heartbeat] Normalized ${nonScormVersionIds.length} non-SCORM pending records`);
+    }
+
     // Only one package may extract at a time. The actual extraction continues
     // after this Heartbeat returns, so a second invocation must not start another
     // large ZIP while the first one is still downloading or uploading.
@@ -728,7 +773,18 @@ export async function scormExtractHeartbeatHandler(req: Request, res: Response):
 
     const job = await claimNextPendingScormJob(db);
     if (!job) {
-      res.json({ ok: true, skipped: "no-pending" });
+      const [rawPending] = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.scormExtractionStatus as any, "pending"));
+      res.json({
+        ok: true,
+        skipped: "no-pending",
+        diagnostic: buildNoPendingScormDiagnostic(
+          Number(rawPending?.count ?? 0),
+          !!resolveScormWorkerDatabaseUrl(),
+        ),
+      });
       return;
     }
     console.log(`[ScormExtractor][Heartbeat] Processing version ${job.versionId}, slug=${job.slug}`);

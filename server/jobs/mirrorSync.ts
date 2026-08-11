@@ -18,6 +18,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import https from "https";
 import http from "http";
+import { needsScormExtraction } from "../lib/scormPackage";
 
 const execAsync = promisify(exec);
 
@@ -78,12 +79,25 @@ export function shouldRunLegacyRailwayDatabaseMirror(env: NodeJS.ProcessEnv = pr
   return env.ENABLE_LEGACY_RAILWAY_DB_MIRROR === "true";
 }
 
+export function shouldNormalizeMirroredNonScormRecord(params: {
+  mediaType: string;
+  mimeType?: string | null;
+  fileName?: string | null;
+}): boolean {
+  return !needsScormExtraction(params);
+}
+
 // ── Database Sync ──────────────────────────────────────────────────────────────
 
 async function syncDatabase(): Promise<SyncResult["dbSync"]> {
   const railwayUrl = getRailwayUrl();
   if (!railwayUrl) {
     return { success: false, tablesImported: 0, error: "RAILWAY_MYSQL_URL not configured" };
+  }
+
+  if (!shouldRunLegacyRailwayDatabaseMirror()) {
+    console.log("[MirrorSync] Skipping legacy full Railway database replacement; live Railway data is authoritative");
+    return { success: true, tablesImported: 0 };
   }
 
   // Parse the Manus DATABASE_URL
@@ -217,6 +231,21 @@ async function syncDatabase(): Promise<SyncResult["dbSync"]> {
             destination.scormLaunchFile = source.scormLaunchFile
       `);
       console.log(`[MirrorSync] Restored ${(restored as any).affectedRows ?? 0} live SCORM extraction state record(s)`);
+    }
+
+    if (railwayConnection) {
+      const [normalised] = await railwayConnection.query(`
+        UPDATE mediaVersions version
+        INNER JOIN mediaAssets asset ON asset.id = version.assetId
+        SET version.scormExtractionStatus = 'skipped',
+            version.scormExtractionError = 'Not a SCORM or iSpring quiz package; extraction is not required',
+            version.scormExtractionStartedAt = NULL
+        WHERE version.scormExtractionStatus = 'pending'
+          AND LOWER(COALESCE(version.fileName, '')) NOT REGEXP '\\.(zip|quiz)$'
+          AND LOWER(COALESCE(version.mimeType, '')) NOT LIKE '%zip%'
+          AND asset.mediaType NOT IN ('scorm', 'zip', 'lms')
+      `);
+      console.log(`[MirrorSync] Normalized ${(normalised as any).affectedRows ?? 0} non-SCORM extraction row(s)`);
     }
 
     // ── Step 3.5: Restore community-generated data ────────────────────────────

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { shouldPreserveScormExtractionState, shouldRunLegacyRailwayDatabaseMirror } from "./mirrorSync";
+import {
+  shouldNormalizeMirroredNonScormRecord,
+  shouldPreserveScormExtractionState,
+  shouldRunLegacyRailwayDatabaseMirror,
+} from "./mirrorSync";
 
 describe("Railway SCORM state preservation", () => {
   it("preserves live extraction and completion states through a database mirror", () => {
@@ -17,5 +21,16 @@ describe("Railway SCORM state preservation", () => {
   it("keeps destructive Railway database replacement disabled unless explicitly opted in", () => {
     expect(shouldRunLegacyRailwayDatabaseMirror({} as NodeJS.ProcessEnv)).toBe(false);
     expect(shouldRunLegacyRailwayDatabaseMirror({ ENABLE_LEGACY_RAILWAY_DB_MIRROR: "true" } as NodeJS.ProcessEnv)).toBe(true);
+  });
+
+  it("normalizes ordinary mirrored documents while preserving quiz archives", () => {
+    expect(shouldNormalizeMirroredNonScormRecord({
+      mediaType: "document",
+      fileName: "Echocardiography Exam.pptx",
+    })).toBe(true);
+    expect(shouldNormalizeMirroredNonScormRecord({
+      mediaType: "document",
+      fileName: "registry-review.quiz",
+    })).toBe(false);
   });
 });
