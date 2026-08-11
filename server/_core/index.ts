@@ -698,6 +698,7 @@ async function startServer() {
     }).catch((err) => console.error('[Startup] deferred_checkout_sessions getDb error:', err));
     // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
+      console.log("[Startup] Durable SCORM queue enabled — pending packages will not be skipped");
       if (healed > 0) console.log(`[Startup] Requeued ${healed} interrupted SCORM version(s)`);
     }).catch((err) => console.error("[Startup] SCORM heal error:", err));
   });
