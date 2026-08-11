@@ -24,6 +24,7 @@ import http from "http";
 import { createHash } from "crypto";
 import unzipper from "unzipper";
 import { eq, and, lt, inArray } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/mysql2";
 import { getDb } from "../db";
 import { mediaVersions, mediaAssets } from "../../drizzle/schema";
 import { storagePut, storageGet } from "../storage";
@@ -52,6 +53,27 @@ type QueuedScormJob = {
 };
 
 let activeScormExtractionDrain: Promise<void> | null = null;
+let railwayScormWorkerDb: ReturnType<typeof drizzle> | null = null;
+let railwayScormWorkerUrl: string | null = null;
+
+/**
+ * Heartbeat callbacks run on the managed deployment, while the public learning
+ * site stores media in Railway. Prefer that live database when it is configured.
+ */
+export function resolveScormWorkerDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string | null {
+  return env.RAILWAY_MYSQL_URL || null;
+}
+
+export async function getScormWorkerDb() {
+  const railwayUrl = resolveScormWorkerDatabaseUrl();
+  if (!railwayUrl) return getDb();
+  if (!railwayScormWorkerDb || railwayScormWorkerUrl !== railwayUrl) {
+    railwayScormWorkerDb = drizzle(railwayUrl);
+    railwayScormWorkerUrl = railwayUrl;
+    console.log("[ScormExtractor] Using Railway media database for extraction work");
+  }
+  return railwayScormWorkerDb;
+}
 
 // ─── Download helper ──────────────────────────────────────────────────────────
 
@@ -316,7 +338,7 @@ export async function extractAndUploadScormVersion(
     }
 
     // ── Step 6: Update DB row with prefix + validated launch file + status = done ──
-    const db = await getDb();
+    const db = await getScormWorkerDb();
     if (db) {
       await db
         .update(mediaVersions)
@@ -341,7 +363,7 @@ export async function extractAndUploadScormVersion(
 
     // Mark as failed in DB
     try {
-      const db = await getDb();
+      const db = await getScormWorkerDb();
       if (db) {
         await db
           .update(mediaVersions)
@@ -368,7 +390,7 @@ export async function extractAndUploadScorm(
   slug: string
 ): Promise<void> {
   try {
-    const db = await getDb();
+    const db = await getScormWorkerDb();
     if (!db) return;
     // Reset to pending so the heartbeat picks it up
     await db
@@ -393,7 +415,7 @@ export async function extractAndUploadScorm(
 
 export async function scormHealthCheckHandler(req: Request, res: Response): Promise<void> {
   try {
-    const db = await getDb();
+    const db = await getScormWorkerDb();
     if (!db) { res.json({ ok: true, skipped: "no-db" }); return; }
 
     // Get all 'done' versions that have an extracted prefix (not direct-HTML)
@@ -528,7 +550,7 @@ export async function scormHealthCheckHandler(req: Request, res: Response): Prom
 // Claims the next package, then the Always On worker drains queued packages
 // sequentially. The Heartbeat remains the reliable trigger after restarts.
 
-async function claimNextPendingScormJob(db: NonNullable<Awaited<ReturnType<typeof getDb>>>): Promise<QueuedScormJob | null> {
+async function claimNextPendingScormJob(db: NonNullable<Awaited<ReturnType<typeof getScormWorkerDb>>>): Promise<QueuedScormJob | null> {
   while (true) {
     const pending = await db
       .select({
@@ -586,7 +608,7 @@ async function drainScormExtractionQueue(initialJob: QueuedScormJob): Promise<vo
       console.error(`[ScormExtractor] Queue item ${job.versionId} failed:`, err.message);
     }
 
-    const db = await getDb();
+    const db = await getScormWorkerDb();
     job = db ? await claimNextPendingScormJob(db) : null;
   }
   console.log("[ScormExtractor] Queue drain complete — no pending packages remain");
@@ -600,7 +622,7 @@ function startScormExtractionDrain(job: QueuedScormJob): void {
 
 export async function scormExtractHeartbeatHandler(req: Request, res: Response): Promise<void> {
   try {
-    const db = await getDb();
+    const db = await getScormWorkerDb();
     if (!db) {
       res.json({ ok: true, skipped: "no-db" });
       return;
