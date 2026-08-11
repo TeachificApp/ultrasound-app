@@ -79,6 +79,9 @@ import {
   Activity,
   BookOpen,
   CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Loader2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -950,7 +953,15 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
 
   const { data, refetch } = trpc.mediaRepo.getAsset.useQuery(
     { id: assetId! },
-    { enabled: !!assetId }
+    {
+      enabled: !!assetId,
+      // Poll every 15 seconds while SCORM extraction is in progress so the UI
+      // auto-updates when extraction completes without requiring a manual refresh
+      refetchInterval: (query) => {
+        const status = (query.state.data as any)?.versions?.[0]?.scormExtractionStatus;
+        return status === "processing" ? 15000 : false;
+      },
+    }
   );
   // Initialize slug state when data loads — must be in useEffect to avoid setState-during-render (React error #185)
   useEffect(() => {
@@ -1492,26 +1503,75 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
             ) : (
               <div className="space-y-4">
                 {scormExtractionBlocked && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-2">
-                    <p className="font-medium">
-                      Large package ({(scormFileSize / 1024 / 1024).toFixed(0)} MB) — SCORM extraction must finish before importing questions.
-                    </p>
-                    <p className="text-amber-800">
-                      Status: <strong>{scormExtractStatus ?? "pending"}</strong>
-                      {scormExtractStatus === "processing" && " — extraction can take 30+ minutes for large files."}
-                      {scormExtractStatus === "failed" && (currentVersion as { scormExtractionError?: string })?.scormExtractionError
-                        ? ` — ${(currentVersion as { scormExtractionError?: string }).scormExtractionError}`
-                        : null}
-                    </p>
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                    {/* Step progress indicator */}
+                    <div className="flex items-center gap-0">
+                      {/* Step 1: Upload */}
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center">
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-[10px] font-medium text-teal-700">Uploaded</span>
+                      </div>
+                      <div className={`flex-1 h-1 mx-1 rounded ${scormExtractStatus === "processing" || scormExtractStatus === "done" || scormExtractStatus === "failed" ? "bg-teal-400" : "bg-gray-200"}`} />
+                      {/* Step 2: SCORM Extraction */}
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${scormExtractStatus === "done" ? "bg-teal-600" : scormExtractStatus === "processing" ? "bg-amber-400" : scormExtractStatus === "failed" ? "bg-red-400" : "bg-gray-300"}`}>
+                          {scormExtractStatus === "done" ? <CheckCircle2 className="w-4 h-4 text-white" /> :
+                           scormExtractStatus === "processing" ? <Loader2 className="w-4 h-4 text-white animate-spin" /> :
+                           scormExtractStatus === "failed" ? <AlertTriangle className="w-4 h-4 text-white" /> :
+                           <Clock className="w-4 h-4 text-white" />}
+                        </div>
+                        <span className={`text-[10px] font-medium ${scormExtractStatus === "done" ? "text-teal-700" : scormExtractStatus === "processing" ? "text-amber-700" : scormExtractStatus === "failed" ? "text-red-600" : "text-gray-400"}`}>
+                          {scormExtractStatus === "done" ? "Extracted" : scormExtractStatus === "processing" ? "Extracting…" : scormExtractStatus === "failed" ? "Failed" : "Pending"}
+                        </span>
+                      </div>
+                      <div className={`flex-1 h-1 mx-1 rounded ${scormExtractStatus === "done" ? "bg-teal-400" : "bg-gray-200"}`} />
+                      {/* Step 3: Import Questions */}
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${scormExtractStatus === "done" ? "bg-teal-600" : "bg-gray-300"}`}>
+                          <BookOpen className={`w-4 h-4 ${scormExtractStatus === "done" ? "text-white" : "text-gray-400"}`} />
+                        </div>
+                        <span className={`text-[10px] font-medium ${scormExtractStatus === "done" ? "text-teal-700" : "text-gray-400"}`}>Import</span>
+                      </div>
+                    </div>
+
+                    {/* Status message */}
+                    {scormExtractStatus === "skipped" || !scormExtractStatus ? (
+                      <div className="text-xs text-gray-700 space-y-1.5">
+                        <p className="font-semibold text-gray-800">Step 1 of 2: Extract the SCORM package</p>
+                        <p>This is a large file ({(scormFileSize / 1024 / 1024).toFixed(0)} MB). The SCORM content must be extracted to the CDN before questions can be imported. Click the button below to start extraction.</p>
+                        <p className="text-gray-500">Extraction runs in the background and typically takes <strong>10–30 minutes</strong> for large files. You can close this dialog and come back.</p>
+                      </div>
+                    ) : scormExtractStatus === "processing" ? (
+                      <div className="text-xs text-amber-800 space-y-1.5">
+                        <p className="font-semibold">Extraction in progress…</p>
+                        <p>The SCORM package is being extracted to the CDN. This can take <strong>10–30 minutes</strong> for a {(scormFileSize / 1024 / 1024).toFixed(0)} MB file.</p>
+                        <p>This page will automatically update when extraction is complete. You can safely close this dialog and return later.</p>
+                        {/* Animated progress bar */}
+                        <div className="w-full h-2 bg-amber-100 rounded-full overflow-hidden mt-2">
+                          <div className="h-full bg-amber-400 rounded-full animate-pulse" style={{ width: "60%" }} />
+                        </div>
+                      </div>
+                    ) : scormExtractStatus === "failed" ? (
+                      <div className="text-xs text-red-700 space-y-1.5">
+                        <p className="font-semibold">Extraction failed</p>
+                        {(currentVersion as { scormExtractionError?: string })?.scormExtractionError && (
+                          <p className="text-red-600 bg-red-50 rounded p-2 font-mono text-[10px]">{(currentVersion as { scormExtractionError?: string }).scormExtractionError}</p>
+                        )}
+                        <p>Click the button below to try again. If the error persists, the file may be corrupted or in an unsupported format.</p>
+                      </div>
+                    ) : null}
+
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-amber-300 text-amber-800 hover:bg-amber-100"
-                      disabled={reExtractMutation.isPending}
+                      className={scormExtractStatus === "failed" ? "border-red-300 text-red-700 hover:bg-red-50" : "border-teal-300 text-teal-700 hover:bg-teal-50"}
+                      disabled={reExtractMutation.isPending || scormExtractStatus === "processing"}
                       onClick={() => reExtractMutation.mutate({ assetId: asset.id })}
                     >
                       <RefreshCw className={`w-3 h-3 mr-1.5 ${reExtractMutation.isPending ? "animate-spin" : ""}`} />
-                      {reExtractMutation.isPending ? "Starting re-extract…" : "Re-extract SCORM package"}
+                      {reExtractMutation.isPending ? "Starting extraction…" : scormExtractStatus === "processing" ? "Extraction running…" : scormExtractStatus === "failed" ? "Retry Extraction" : "Start SCORM Extraction"}
                     </Button>
                   </div>
                 )}
