@@ -13,6 +13,7 @@
 import { S3Client, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import mysql from "mysql2/promise";
 import { exec } from "child_process";
 import { promisify } from "util";
 import https from "https";
@@ -67,6 +68,11 @@ export interface SyncResult {
   mediaSync: { success: boolean; uploaded: number; skipped: number; failed: number; error?: string };
 }
 
+/** Active and completed extraction work on Railway must survive a Manus DB mirror. */
+export function shouldPreserveScormExtractionState(status: string | null | undefined): boolean {
+  return status === "pending" || status === "processing" || status === "done" || status === "failed";
+}
+
 // ── Database Sync ──────────────────────────────────────────────────────────────
 
 async function syncDatabase(): Promise<SyncResult["dbSync"]> {
@@ -81,7 +87,23 @@ async function syncDatabase(): Promise<SyncResult["dbSync"]> {
     return { success: false, tablesImported: 0, error: "DATABASE_URL (Manus) not available" };
   }
 
+  let railwayConnection: mysql.Connection | null = null;
+  let scormStateSnapshotReady = false;
+
   try {
+    // Keep live extraction state in a connection-local temporary table. The
+    // subsequent mysqldump import drops Railway's regular tables, but not this
+    // temporary state snapshot, so active package work can be restored safely.
+    railwayConnection = await mysql.createConnection(railwayUrl);
+    await railwayConnection.query(`
+      CREATE TEMPORARY TABLE mirror_scorm_extraction_state AS
+      SELECT id AS versionId, scormExtractionStatus, scormExtractionError,
+             scormExtractionStartedAt, scormExtractedPrefix, scormLaunchFile
+      FROM mediaVersions
+      WHERE scormExtractionStatus IN ('pending', 'processing', 'done', 'failed')
+    `);
+    scormStateSnapshotReady = true;
+
     // Parse Manus TiDB connection
     const manusMatch = manusUrl.match(
       /mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/([^?]+)/
@@ -179,6 +201,19 @@ async function syncDatabase(): Promise<SyncResult["dbSync"]> {
     const importCmd = `mysql -h ${rHost} -P ${rPort} -u ${rUser} -p'${rPass}' ${rDb} < ${dumpFile}`;
     await execAsync(`${importCmd} 2>/dev/null`, { maxBuffer: 100 * 1024 * 1024 });
 
+    if (scormStateSnapshotReady && railwayConnection) {
+      const [restored] = await railwayConnection.query(`
+        UPDATE mediaVersions destination
+        INNER JOIN mirror_scorm_extraction_state source ON source.versionId = destination.id
+        SET destination.scormExtractionStatus = source.scormExtractionStatus,
+            destination.scormExtractionError = source.scormExtractionError,
+            destination.scormExtractionStartedAt = source.scormExtractionStartedAt,
+            destination.scormExtractedPrefix = source.scormExtractedPrefix,
+            destination.scormLaunchFile = source.scormLaunchFile
+      `);
+      console.log(`[MirrorSync] Restored ${(restored as any).affectedRows ?? 0} live SCORM extraction state record(s)`);
+    }
+
     // ── Step 3.5: Restore community-generated data ────────────────────────────
     // Re-import the backed-up community tables, replacing what the Manus dump
     // may have brought in (which could be stale or empty).
@@ -209,6 +244,8 @@ async function syncDatabase(): Promise<SyncResult["dbSync"]> {
   } catch (err: any) {
     console.error("[MirrorSync] DB sync failed:", err.message);
     return { success: false, tablesImported: 0, error: err.message };
+  } finally {
+    await railwayConnection?.end().catch(() => undefined);
   }
 }
 
