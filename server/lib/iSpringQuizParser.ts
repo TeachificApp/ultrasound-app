@@ -40,6 +40,19 @@ export interface ParsedQuiz {
   allImageRefs: string[];
 }
 
+/**
+ * Raised when an iSpring HTML export is a presentation-style flashcard deck,
+ * rather than a QuizMaker package with scored questions and answer keys.
+ */
+export class ISpringFlashcardDeckError extends Error {
+  constructor() {
+    super(
+      "This file is an iSpring flashcard deck, not a graded iSpring quiz. Flashcard decks do not include the answer keys and response options required for Question Bank import. Keep it as an interactive flashcard ZIP, or export the material as an iSpring QuizMaker quiz before importing it."
+    );
+    this.name = "ISpringFlashcardDeckError";
+  }
+}
+
 // ─── HTML helpers ─────────────────────────────────────────────────────────────
 
 function stripHtml(html: string): string {
@@ -244,6 +257,17 @@ export function parseQuizFromHtml(html: string): ParsedQuiz {
   if (!html.includes("iSpring") && !html.includes("QuizPlayer")) {
     throw new Error("Not an iSpring SCORM package");
   }
+
+  // iSpring Presentation flashcard exports contain one JavaScript file per card
+  // and often a misleading base64 blob. They are not QuizMaker packages, so
+  // parsing that blob as question JSON produces an unreadable syntax error.
+  const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "";
+  const isPresentationDeck = /\bispringPresentation\b|\bPresentationPlayer\b/i.test(html)
+    && !/\bQuizPlayer\b/i.test(html);
+  if (/flashcards?/i.test(title) || isPresentationDeck) {
+    throw new ISpringFlashcardDeckError();
+  }
+
   const b64 = extractISpringBase64FromHtml(html);
   if (!b64) throw new Error("Could not find iSpring data blob in index.html");
   return parseISpringDataBlob(decodeISpringBase64(b64));

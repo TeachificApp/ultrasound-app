@@ -950,6 +950,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   const [extractNewFolderName, setExtractNewFolderName] = useState("");
   const [extractFolderId, setExtractFolderId] = useState<number | null>(null);
   const [extractResult, setExtractResult] = useState<{ totalInserted: number; results: { groupName: string; inserted: number }[] } | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
 
   const { data, refetch } = trpc.mediaRepo.getAsset.useQuery(
     { id: assetId! },
@@ -1025,9 +1026,10 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   const confirmExtractMutation = trpc.questionBank.confirmScormImport.useMutation({
     onSuccess: (res) => {
       setExtractResult(res as any);
+      setExtractError(null);
       toast.success(`Extracted ${(res as any).totalInserted} questions to Question Bank!`);
     },
-    onError: (e) => toast.error(`Extraction failed: ${e.message}`),
+    onError: (e) => setExtractError(e.message),
   });
   const { data: bankFolders } = trpc.questionBank.listFolders.useQuery();
   const reExtractMutation = trpc.mediaRepo.reExtractScorm.useMutation({
@@ -1136,7 +1138,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                   size="sm"
                   variant="outline"
                   className="border-teal-300 text-teal-700 hover:bg-teal-50"
-                  onClick={() => { setExtractOpen(true); setExtractResult(null); setExtractNewFolderName(asset.title ?? ""); }}
+                  onClick={() => { setExtractOpen(true); setExtractResult(null); setExtractError(null); setExtractNewFolderName(asset.title ?? ""); }}
                 >
                   <BookOpen className="w-3 h-3 mr-1" />Extract to Question Bank
                 </Button>
@@ -1474,7 +1476,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
       )}
       {/* ── Extract to Question Bank Dialog ── */}
       {extractOpen && (
-        <Dialog open={extractOpen} onOpenChange={(v) => { if (!v) { setExtractOpen(false); setExtractResult(null); } }}>
+        <Dialog open={extractOpen} onOpenChange={(v) => { if (!v) { setExtractOpen(false); setExtractResult(null); setExtractError(null); } }}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-sm">
@@ -1575,6 +1577,28 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                     </Button>
                   </div>
                 )}
+                {extractError && (
+                  <div className={`rounded-xl border p-4 ${/flashcard deck/i.test(extractError) ? "border-amber-200 bg-amber-50" : "border-red-200 bg-red-50"}`}>
+                    <div className="flex items-start gap-2.5">
+                      <AlertTriangle className={`w-4 h-4 mt-0.5 shrink-0 ${/flashcard deck/i.test(extractError) ? "text-amber-600" : "text-red-600"}`} />
+                      <div className="space-y-2">
+                        <p className={`text-sm font-semibold ${/flashcard deck/i.test(extractError) ? "text-amber-900" : "text-red-900"}`}>
+                          {/flashcard deck/i.test(extractError) ? "This ZIP is an interactive flashcard deck" : "Question extraction could not be completed"}
+                        </p>
+                        <p className={`text-xs leading-relaxed ${/flashcard deck/i.test(extractError) ? "text-amber-800" : "text-red-800"}`}>
+                          {/flashcard deck/i.test(extractError)
+                            ? "Flashcard ZIPs use paired presentation slides, not scored questions with answer options. They cannot be added to the Question Bank, which is for graded quiz questions. The deck remains available as interactive media. To use it in a course or landing page, close this dialog and copy the Embed URL from the asset panel."
+                            : extractError}
+                        </p>
+                        {!/flashcard deck/i.test(extractError) && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setExtractError(null)}>
+                            Try Again
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <p className="text-xs text-gray-500">
                   All questions in this file will be extracted with their associated media (images, audio) and saved as native question bank questions.
                 </p>
@@ -1621,7 +1645,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                   <Button
                     size="sm"
                     className="bg-teal-600 hover:bg-teal-700 text-white"
-                    disabled={confirmExtractMutation.isPending || !scormExtractionReady || (extractFolderMode === "new" && !extractNewFolderName.trim())}
+                    disabled={confirmExtractMutation.isPending || !!extractError || !scormExtractionReady || (extractFolderMode === "new" && !extractNewFolderName.trim())}
                     onClick={() => {
                       confirmExtractMutation.mutate({
                         mediaAssetId: asset.id,
@@ -1633,6 +1657,8 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                   >
                     {confirmExtractMutation.isPending ? (
                       <><RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />Extracting…</>
+                    ) : /flashcard deck/i.test(extractError ?? "") ? (
+                      <><BookOpen className="w-3 h-3 mr-1.5" />Flashcard Deck — Not a Quiz</>
                     ) : (
                       <><BookOpen className="w-3 h-3 mr-1.5" />Extract Questions</>
                     )}
@@ -2301,4 +2327,3 @@ export default function MediaRepository() {
     </div>
   );
 }
-

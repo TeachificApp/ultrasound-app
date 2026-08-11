@@ -10,7 +10,7 @@ import { eq, sql } from "drizzle-orm";
 import unzipper from "unzipper";
 import { mediaVersions } from "../../drizzle/schema";
 import { getDb } from "../db";
-import { parseISpringQuizFromBuffer, parseQuizFromHtml, type ParsedQuiz } from "./iSpringQuizParser";
+import { ISpringFlashcardDeckError, parseISpringQuizFromBuffer, parseQuizFromHtml, type ParsedQuiz } from "./iSpringQuizParser";
 import {
   SCORM_BACKGROUND_EXTRACT_BYTES,
   shouldUseBackgroundScormExtraction,
@@ -97,6 +97,9 @@ async function parseFromExtractedPrefix(version: MediaVersionRow): Promise<Scorm
   try {
     parsed = parseQuizFromHtml(html);
   } catch (e: any) {
+    if (e instanceof ISpringFlashcardDeckError) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
+    }
     throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
   }
 
@@ -134,6 +137,9 @@ export async function loadScormImportFromMediaAsset(mediaAssetId: number): Promi
   try {
     parsed = await parseISpringQuizFromBuffer(zipBuffer);
   } catch (e: any) {
+    if (e instanceof ISpringFlashcardDeckError) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
+    }
     throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
   }
 
@@ -193,6 +199,9 @@ export async function loadScormImportFromBase64(bufferBase64: string): Promise<S
   try {
     parsed = await parseISpringQuizFromBuffer(zipBuffer);
   } catch (e: any) {
+    if (e instanceof ISpringFlashcardDeckError) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: e.message });
+    }
     throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
   }
   const AdmZip = (await import("adm-zip")).default;
