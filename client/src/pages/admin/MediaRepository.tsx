@@ -1074,22 +1074,27 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   });
   const { data: bankFolders } = trpc.questionBank.listFolders.useQuery();
   const reExtractMutation = trpc.mediaRepo.reExtractScorm.useMutation({
-    onSuccess: () => toast.success("Re-extraction started — runs in the background, may take a minute."),
+    onSuccess: () => { refetch(); onRefresh(); },
     onError: (e) => toast.error(`Re-extraction failed: ${e.message}`),
   });
-  const autoReExtractDone = useRef(false);
+  const autoQueueVersionId = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!assetId) autoReExtractDone.current = false;
+    if (!assetId) autoQueueVersionId.current = null;
   }, [assetId]);
 
   useEffect(() => {
-    if (!autoReExtract || !data || autoReExtractDone.current) return;
+    if (!data) return;
     const scormTypes = ["scorm", "zip", "lms", "html"];
     if (!scormTypes.includes(data.asset.mediaType)) return;
-    autoReExtractDone.current = true;
+    const version = data.versions[0] as { id?: number; scormExtractionStatus?: string | null; scormExtractionError?: string | null } | undefined;
+    if (!version?.id || autoQueueVersionId.current === version.id) return;
+    const status = version.scormExtractionStatus;
+    const permanentFailure = /no HTML launch file|damaged archive|zero bytes|replacement instruction|unsupported interactive/i.test(version.scormExtractionError ?? "");
+    if (status === "pending" || status === "processing" || status === "done" || permanentFailure) return;
+    autoQueueVersionId.current = version.id;
     reExtractMutation.mutate({ assetId: data.asset.id });
-  }, [autoReExtract, data, assetId]);
+  }, [data, assetId]);
 
   if (!data) return null;
   const { asset, versions, grants } = data;
@@ -1585,7 +1590,13 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                     </div>
 
                     {/* Status message */}
-                    {scormExtractStatus === "pending" ? (
+                    {reExtractMutation.isPending ? (
+                      <div className="text-xs text-amber-800 space-y-1.5">
+                        <p className="font-semibold">Preparing package automatically…</p>
+                        <p>The system is adding this package to the extraction queue. No action is needed from you.</p>
+                        <div className="w-full h-2 bg-amber-100 rounded-full overflow-hidden mt-2"><div className="h-full bg-amber-400 rounded-full animate-pulse" style={{ width: "20%" }} /></div>
+                      </div>
+                    ) : scormExtractStatus === "pending" ? (
                       <div className="text-xs text-amber-800 space-y-1.5">
                         <p className="font-semibold">Extraction queued automatically…</p>
                         <p>This package is waiting for the resumable extraction worker. You do not need to start it again; this dialog will update when processing begins.</p>
@@ -1617,7 +1628,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                       </div>
                     ) : null}
 
-                    {(scormExtractStatus === "skipped" || !scormExtractStatus || scormExtractStatus === "failed") && <Button
+                    {scormExtractStatus === "failed" && <Button
                       size="sm"
                       variant="outline"
                       className={scormExtractStatus === "failed" ? "border-red-300 text-red-700 hover:bg-red-50" : "border-teal-300 text-teal-700 hover:bg-teal-50"}
@@ -1625,7 +1636,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                       onClick={() => reExtractMutation.mutate({ assetId: asset.id })}
                     >
                       <RefreshCw className={`w-3 h-3 mr-1.5 ${reExtractMutation.isPending ? "animate-spin" : ""}`} />
-                      {reExtractMutation.isPending ? "Starting extraction…" : scormExtractStatus === "failed" ? "Retry Extraction" : "Start SCORM Extraction"}
+                      {reExtractMutation.isPending ? "Retrying…" : "Retry Extraction"}
                     </Button>}
                   </div>
                 )}

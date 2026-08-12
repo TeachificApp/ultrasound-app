@@ -216,47 +216,6 @@ export const quizMakerRouter = router({
       return { success: true };
     }),
 
-  publish: protectedProcedure
-    .input(z.object({ quizId: z.number().int() }))
-    .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await getQuizOrThrow(db, input.quizId);
-      await db
-        .update(standaloneQuizzes)
-        .set({ status: "published", accessType: "public" })
-        .where(eq(standaloneQuizzes.id, input.quizId));
-      return { success: true };
-    }),
-
-  unpublish: protectedProcedure
-    .input(z.object({ quizId: z.number().int() }))
-    .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await db
-        .update(standaloneQuizzes)
-        .set({ status: "draft" })
-        .where(eq(standaloneQuizzes.id, input.quizId));
-      return { success: true };
-    }),
-
-  getPublishStatus: protectedProcedure
-    .input(z.object({ quizId: z.number().int() }))
-    .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const quiz = await getQuizOrThrow(db, input.quizId);
-      return {
-        isPublished: quiz.status === "published",
-        shareToken: String(quiz.id),
-        orgSlug: null,
-      };
-    }),
-
   updateBranding: protectedProcedure
     .input(
       z.object({
