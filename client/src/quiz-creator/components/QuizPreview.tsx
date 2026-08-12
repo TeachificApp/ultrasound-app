@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuizStore } from "../store/quizStore";
+import { resolveQuizBackground } from "@shared/quizBackground";
 import { X, ChevronLeft, ChevronRight, CheckCircle2, XCircle, RotateCcw } from "lucide-react";
 import type { QuizQuestion, McqData, TfData, MatchingData, HotspotData, FillBlankData, ShortAnswerData, ImageChoiceData, OrderingData, DragWordsData, DropdownData, NumericData, LikertData, EssayData, DrawConfig } from "../types/quiz";
 import { DndOrdering, DndDragWords } from "./DndQuizInteractions";
@@ -386,13 +387,7 @@ function EssayQuestion({ answer, setAnswer, data }: { answer: Answer; setAnswer:
 export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Props) {
   const { quiz } = useQuizStore();
   const branding = quiz.meta.branding;
-  const previewBackground = branding?.backgroundMode === "gradient" && branding.backgroundGradient
-    ? branding.backgroundGradient
-    : branding?.backgroundMode === "image" && branding.backgroundImageUrl
-      ? `linear-gradient(rgba(0,0,0,0.32), rgba(0,0,0,0.32)), url(${branding.backgroundImageUrl}) center/cover`
-      : branding?.backgroundMode === "solid"
-        ? (branding.backgroundColor || "#f0fdfa")
-        : "rgba(0, 0, 0, 0.4)";
+  const previewBackground = resolveQuizBackground(branding);
 
   // Pool/Draw mode + shuffle
   const questions = useMemo(() => {
@@ -437,6 +432,7 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
 
   const q = questions[currentIdx];
   const totalPoints = questions.reduce((s, q) => s + q.points, 0);
+  const questionPreviewBackground = resolveQuizBackground(branding, q);
 
   const calcScore = () => {
     let earned = 0;
@@ -547,8 +543,9 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
           />
         </div>
 
-        {/* Question */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        {/* Question surface — mirrors the themed learner frame instead of only styling the modal backdrop. */}
+        <div className="flex-1 overflow-y-auto p-6" style={{ background: questionPreviewBackground }}>
+          <div className="rounded-xl bg-white/90 p-6 space-y-5 shadow-sm">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xs font-bold text-white px-2 py-0.5 rounded-full" style={{ background: "#24abbc" }}>
@@ -573,6 +570,7 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
           {q.type === "drag_words" && <DragWordsQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
           {q.type === "likert" && <LikertQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
           {q.type === "essay" && <EssayQuestion answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} data={q.data as EssayData} />}
+          </div>
         </div>
 
         {/* Navigation */}

@@ -2,6 +2,7 @@
  * Builder-mode quiz player enhancements — intro slide, themed layout, feedback popups.
  */
 import React from "react";
+import { resolveQuizBackground } from "@shared/quizBackground";
 
 export interface BuilderBranding {
   primaryColor?: string;
@@ -95,15 +96,7 @@ export function BuilderIntroScreen({
 }) {
   const primary = branding?.primaryColor ?? "#24abbc";
   const bg = branding?.backgroundColor ?? "#0d1f3c";
-  const background = branding?.backgroundMode === "gradient" && branding.backgroundGradient
-    ? branding.backgroundGradient
-    : branding?.backgroundMode === "image" && branding.backgroundImageUrl
-      ? `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${branding.backgroundImageUrl}) center/cover`
-      : branding?.backgroundMode === "solid"
-        ? bg
-        : branding?.backgroundImageUrl
-          ? `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${branding.backgroundImageUrl}) center/cover`
-          : `radial-gradient(ellipse at center, ${bg} 0%, #000 100%)`;
+  const background = resolveQuizBackground({ ...branding, backgroundColor: bg });
   const textColor = branding?.textColor ?? "#ffffff";
 
   if (intro?.enabled === false) {
@@ -154,15 +147,7 @@ export function BuilderQuestionFrame({
   footer?: React.ReactNode;
 }) {
   const bg = question.backgroundColor ?? branding?.backgroundColor ?? "#0d1f3c";
-  const background = question.backgroundImageUrl
-    ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${question.backgroundImageUrl}) center/cover`
-    : branding?.backgroundMode === "gradient" && branding.backgroundGradient
-      ? branding.backgroundGradient
-      : branding?.backgroundMode === "image" && branding.backgroundImageUrl
-        ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${branding.backgroundImageUrl}) center/cover`
-        : branding?.backgroundMode === "solid"
-          ? bg
-          : `radial-gradient(ellipse at center, ${bg} 0%, #000 100%)`;
+  const background = resolveQuizBackground({ ...branding, backgroundColor: bg }, question);
   const textColor = branding?.textColor ?? "#ffffff";
   const primary = branding?.primaryColor ?? "#24abbc";
 
