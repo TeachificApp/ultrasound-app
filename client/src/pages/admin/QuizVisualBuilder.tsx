@@ -15,7 +15,7 @@ import { QuizSettings } from "@/quiz-creator/components/QuizSettings";
 import { CloudQuizBrowser } from "@/quiz-creator/components/CloudQuizBrowser";
 import BrandingPanel from "@/quiz-creator/components/BrandingPanel";
 import QuizAnalyticsPanel from "@/quiz-creator/components/QuizAnalyticsPanel";
-import { Loader2, ArrowLeft, BarChart3, Palette } from "lucide-react";
+import { Loader2, ArrowLeft, BarChart3, Palette, Eye, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { QuizFile } from "@/quiz-creator/types/quiz";
 
@@ -25,8 +25,8 @@ export default function QuizVisualBuilder() {
   const quizId = params.quizId ? parseInt(params.quizId, 10) : null;
   const isNew = !quizId || isNaN(quizId);
 
-  const { quiz, loadQuiz, newQuiz, activeSlide } = useQuizStore();
-  const [showPreview, setShowPreview] = useState(false);
+  const { quiz, loadQuiz, newQuiz, activeSlide, activeQuestionId } = useQuizStore();
+  const [previewMode, setPreviewMode] = useState<"entire" | "current" | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showCloud, setShowCloud] = useState(false);
   const [sidePanel, setSidePanel] = useState<"none" | "branding" | "analytics">("none");
@@ -60,7 +60,7 @@ export default function QuizVisualBuilder() {
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
       <EditorToolbar
-        onPreview={() => setShowPreview(true)}
+        onPreview={() => setPreviewMode("entire")}
         onSettings={() => setShowSettings(true)}
         onCloudOpen={() => setShowCloud(true)}
       />
@@ -70,6 +70,17 @@ export default function QuizVisualBuilder() {
           <ArrowLeft className="w-4 h-4 mr-1" /> Back to Quiz Admin
         </Button>
         <div className="flex-1" />
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={!activeQuestionId}
+          onClick={() => setPreviewMode("current")}
+        >
+          <Eye className="w-4 h-4 mr-1" /> Preview Current
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setPreviewMode("entire")}>
+          <ListChecks className="w-4 h-4 mr-1" /> Preview Entire Quiz
+        </Button>
         <Button
           variant={sidePanel === "branding" ? "secondary" : "ghost"}
           size="sm"
@@ -107,7 +118,7 @@ export default function QuizVisualBuilder() {
         )}
       </div>
 
-      {showPreview && <QuizPreview onClose={() => setShowPreview(false)} />}
+      {previewMode && <QuizPreview mode={previewMode} currentQuestionId={activeQuestionId} onClose={() => setPreviewMode(null)} />}
       {showSettings && <QuizSettings onClose={() => setShowSettings(false)} />}
       {showCloud && <CloudQuizBrowser onClose={() => setShowCloud(false)} />}
     </div>

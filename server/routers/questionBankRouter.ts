@@ -338,7 +338,7 @@ export const questionBankRouter = router({
         messages: [
           {
             role: "system",
-            content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} Return JSON only.`,
+            content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, write a concise explanation of why the correct answer is correct. For every option, write optionFeedback explaining why that specific option is correct or incorrect. Return JSON only.`,
           },
           {
             role: "user",
@@ -363,6 +363,7 @@ export const questionBankRouter = router({
                       options: { type: "array", items: { type: "string" } },
                       correctAnswer: { type: "string" },
                       correctAnswers: { type: "array", items: { type: "integer" } },
+                      optionFeedback: { type: "array", items: { type: "string" } },
                       matchingPairs: {
                         type: "array",
                         items: {
@@ -374,7 +375,7 @@ export const questionBankRouter = router({
                       },
                       explanation: { type: "string" },
                     },
-                    required: ["question", "type", "options", "correctAnswer", "correctAnswers", "matchingPairs", "explanation"],
+                    required: ["question", "type", "options", "correctAnswer", "correctAnswers", "optionFeedback", "matchingPairs", "explanation"],
                     additionalProperties: false,
                   },
                 },
@@ -423,7 +424,7 @@ export const questionBankRouter = router({
         explanation: question.explanation,
       }));
       for (const q of questions) {
-        const opts = Array.isArray(q.options) ? q.options.map((o: string) => ({ text: o })) : [];
+        const opts = Array.isArray(q.options) ? q.options.map((o: string, index: number) => ({ text: o, feedback: q.optionFeedback?.[index] ?? "" })) : [];
         const [result] = await db.insert(questionBank).values({
           question: q.question,
           type: q.type === "truefalse" ? "truefalse" : q.type === "multiselect" ? "multiselect" : q.type === "matching" ? "matching" : q.type === "hotspot" ? "hotspot" : "mcq",

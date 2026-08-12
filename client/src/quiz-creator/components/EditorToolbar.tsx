@@ -162,7 +162,7 @@ export function EditorToolbar({ onPreview, onSettings, onCloudOpen }: Props) {
                   onClick={() => { handleSave(); setFileMenuOpen(false); }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-700"
                 >
-                  <Save className="w-4 h-4 text-gray-400" /> Save as UltrasoundAssist File
+                  <Save className="w-4 h-4 text-gray-400" /> Export Quiz Creator File (.aausquiz)
                 </button>
                 <button
                   onClick={handleISpringExport}
@@ -178,7 +178,7 @@ export function EditorToolbar({ onPreview, onSettings, onCloudOpen }: Props) {
                       disabled={cloudSaving}
                       className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-700 disabled:opacity-50"
                     >
-                      <CloudUpload className="w-4 h-4 text-teal-500" /> {cloudSaving ? "Saving..." : "Save to Cloud"}
+                      <CloudUpload className="w-4 h-4 text-teal-500" /> {cloudSaving ? "Saving..." : "Save to Database"}
                     </button>
                     <button
                       onClick={() => { onCloudOpen?.(); setFileMenuOpen(false); }}
@@ -193,12 +193,12 @@ export function EditorToolbar({ onPreview, onSettings, onCloudOpen }: Props) {
           </div>
 
           <button
-            onClick={handleSave}
-            disabled={saving}
+            onClick={handleCloudSave}
+            disabled={cloudSaving}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 text-sm transition-colors disabled:opacity-50"
           >
-            <Save className="w-3.5 h-3.5" />
-            {saving ? "Saving..." : "Save"}
+            <CloudUpload className="w-3.5 h-3.5" />
+            {cloudSaving ? "Saving..." : "Save to Database"}
           </button>
 
           <div className="w-px h-5 bg-white/20" />

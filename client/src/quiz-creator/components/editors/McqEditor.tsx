@@ -19,6 +19,10 @@ export function McqEditor({ data, onChange }: Props) {
     onChange({ ...data, choices: data.choices.map((c) => (c.id === id ? { ...c, text } : c)) });
   };
 
+  const updateFeedback = (id: string, feedback: string) => {
+    onChange({ ...data, choices: data.choices.map((c) => (c.id === id ? { ...c, feedback } : c)) });
+  };
+
   const addChoice = () => {
     onChange({
       ...data,
@@ -47,29 +51,38 @@ export function McqEditor({ data, onChange }: Props) {
 
       <div className="space-y-2">
         {data.choices.map((choice, i) => (
-          <div key={choice.id} className="flex items-center gap-2 group">
-            <GripVertical className="w-4 h-4 text-gray-300 shrink-0" />
-            <input
-              type={data.multiSelect ? "checkbox" : "radio"}
-              name={`correct-${i}`}
-              checked={choice.correct}
-              onChange={() => toggle(choice.id, "correct")}
-              className="accent-teal-500 shrink-0"
-            />
+          <div key={choice.id} className="rounded-lg border border-gray-100 bg-gray-50/60 p-2.5 space-y-2 group">
+            <div className="flex items-center gap-2">
+              <GripVertical className="w-4 h-4 text-gray-300 shrink-0" />
+              <input
+                type={data.multiSelect ? "checkbox" : "radio"}
+                name={`correct-${i}`}
+                checked={choice.correct}
+                onChange={() => toggle(choice.id, "correct")}
+                className="accent-teal-500 shrink-0"
+              />
+              <input
+                type="text"
+                value={choice.text}
+                onChange={(e) => updateText(choice.id, e.target.value)}
+                placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400"
+              />
+              <button
+                onClick={() => removeChoice(choice.id)}
+                disabled={data.choices.length <= 2}
+                className="p-1.5 text-gray-300 hover:text-red-400 disabled:opacity-30 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <input
               type="text"
-              value={choice.text}
-              onChange={(e) => updateText(choice.id, e.target.value)}
-              placeholder={`Option ${String.fromCharCode(65 + i)}`}
-              className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400/50 focus:border-teal-400"
+              value={choice.feedback ?? ""}
+              onChange={(e) => updateFeedback(choice.id, e.target.value)}
+              placeholder={choice.correct ? "Why this answer is correct" : "Why this answer is incorrect"}
+              className="ml-11 w-[calc(100%-2.75rem)] px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-400/50"
             />
-            <button
-              onClick={() => removeChoice(choice.id)}
-              disabled={data.choices.length <= 2}
-              className="p-1.5 text-gray-300 hover:text-red-400 disabled:opacity-30 transition-colors"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
           </div>
         ))}
       </div>

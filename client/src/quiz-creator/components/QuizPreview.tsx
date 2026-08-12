@@ -6,6 +6,8 @@ import { DndOrdering, DndDragWords } from "./DndQuizInteractions";
 
 interface Props {
   onClose: () => void;
+  mode?: "entire" | "current";
+  currentQuestionId?: string | null;
 }
 
 type Answer = string | boolean | string[] | Record<string, string>;
@@ -381,12 +383,15 @@ function EssayQuestion({ answer, setAnswer, data }: { answer: Answer; setAnswer:
   );
 }
 
-export function QuizPreview({ onClose }: Props) {
+export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Props) {
   const { quiz } = useQuizStore();
 
   // Pool/Draw mode + shuffle
   const questions = useMemo(() => {
-    let qs = [...quiz.questions];
+    let qs = mode === "current" && currentQuestionId
+      ? quiz.questions.filter((question) => question.id === currentQuestionId)
+      : [...quiz.questions];
+    if (mode === "current") return qs;
     const drawConfig = quiz.meta.drawConfig as DrawConfig | undefined;
     if (drawConfig?.enabled) {
       const grouped: Record<string, QuizQuestion[]> = {};
@@ -414,7 +419,7 @@ export function QuizPreview({ onClose }: Props) {
     }
     return qs;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quiz.questions.length, quiz.meta.shuffleQuestions, quiz.meta.drawConfig?.enabled]);
+  }, [quiz.questions, quiz.meta.shuffleQuestions, quiz.meta.drawConfig?.enabled, mode, currentQuestionId]);
 
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});

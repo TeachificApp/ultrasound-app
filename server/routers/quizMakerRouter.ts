@@ -54,9 +54,13 @@ function parseJson<T>(value: string | null, fallback: T): T {
 }
 
 export function standaloneQuestionToBuilderQuestion(row: { sqq: typeof standaloneQuizQuestions.$inferSelect; qb: typeof questionBank.$inferSelect }) {
-  const options = parseJson<{ text?: string; imageUrl?: string; videoUrl?: string }[]>(row.qb.options, []);
+  const options = parseJson<{ text?: string; imageUrl?: string; videoUrl?: string; feedback?: string }[]>(row.qb.options, []);
   const correctAnswer = String(row.qb.correctAnswer ?? "0");
   const correctAnswers = parseJson<number[]>(row.qb.correctAnswers, []);
+  const normalizedCorrectAnswer = correctAnswer.trim().toLocaleLowerCase();
+  const correctChoiceIndex = /^\d+$/.test(correctAnswer)
+    ? Number(correctAnswer)
+    : options.findIndex((option) => (option.text ?? "").trim().toLocaleLowerCase() === normalizedCorrectAnswer);
   const base = {
     id: `bank-${row.qb.id}`,
     order: row.sqq.sortOrder + 1,
@@ -81,8 +85,8 @@ export function standaloneQuestionToBuilderQuestion(row: { sqq: typeof standalon
     data: {
       multiple: row.qb.type === "multiselect",
       choices: options.map((option, index) => ({
-        id: String(index), text: option.text ?? "", imageUrl: option.imageUrl, videoUrl: option.videoUrl,
-        correct: row.qb.type === "multiselect" ? correctAnswers.includes(index) : String(index) === correctAnswer,
+        id: String(index), text: option.text ?? "", imageUrl: option.imageUrl, videoUrl: option.videoUrl, feedback: option.feedback ?? "",
+        correct: row.qb.type === "multiselect" ? correctAnswers.includes(index) : index === correctChoiceIndex,
       })),
     },
   };

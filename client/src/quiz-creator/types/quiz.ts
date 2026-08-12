@@ -17,7 +17,7 @@ export type QuestionType =
   | "essay";
 
 export interface McqData {
-  choices: { id: string; text: string; correct: boolean; imageUrl?: string }[];
+  choices: { id: string; text: string; correct: boolean; imageUrl?: string; feedback?: string }[];
   multiSelect: boolean;
 }
 

@@ -9,8 +9,11 @@ describe("standalone Question Bank hydration for Visual Builder", () => {
         id: 42,
         type: "mcq",
         question: "Which vessel is assessed?",
-        options: JSON.stringify([{ text: "Aorta" }, { text: "Pulmonary artery" }]),
-        correctAnswer: "1",
+        options: JSON.stringify([
+          { text: "Aorta", feedback: "The aorta is not the vessel shown." },
+          { text: "Pulmonary artery", feedback: "Correct: the image shows the pulmonary artery." },
+        ]),
+        correctAnswer: "Pulmonary artery",
         correctAnswers: null,
         explanation: "The image shows the pulmonary artery.",
         questionImageUrl: "https://cdn.example/question.png",
@@ -34,8 +37,8 @@ describe("standalone Question Bank hydration for Visual Builder", () => {
       feedbackVideo: { url: "https://cdn.example/feedback.mp4" },
     });
     expect((result as any).data.choices).toEqual([
-      { id: "0", text: "Aorta", imageUrl: undefined, videoUrl: undefined, correct: false },
-      { id: "1", text: "Pulmonary artery", imageUrl: undefined, videoUrl: undefined, correct: true },
+      { id: "0", text: "Aorta", imageUrl: undefined, videoUrl: undefined, feedback: "The aorta is not the vessel shown.", correct: false },
+      { id: "1", text: "Pulmonary artery", imageUrl: undefined, videoUrl: undefined, feedback: "Correct: the image shows the pulmonary artery.", correct: true },
     ]);
   });
 });
