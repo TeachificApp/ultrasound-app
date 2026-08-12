@@ -53,7 +53,7 @@ function parseJson<T>(value: string | null, fallback: T): T {
   try { return JSON.parse(value) as T; } catch { return fallback; }
 }
 
-function standaloneQuestionToBuilderQuestion(row: { sqq: typeof standaloneQuizQuestions.$inferSelect; qb: typeof questionBank.$inferSelect }) {
+export function standaloneQuestionToBuilderQuestion(row: { sqq: typeof standaloneQuizQuestions.$inferSelect; qb: typeof questionBank.$inferSelect }) {
   const options = parseJson<{ text?: string; imageUrl?: string; videoUrl?: string }[]>(row.qb.options, []);
   const correctAnswer = String(row.qb.correctAnswer ?? "0");
   const correctAnswers = parseJson<number[]>(row.qb.correctAnswers, []);

@@ -1561,17 +1561,17 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                         </div>
                         <span className="text-[10px] font-medium text-teal-700">Uploaded</span>
                       </div>
-                      <div className={`flex-1 h-1 mx-1 rounded ${scormExtractStatus === "processing" || scormExtractStatus === "done" || scormExtractStatus === "failed" ? "bg-teal-400" : "bg-gray-200"}`} />
+                      <div className={`flex-1 h-1 mx-1 rounded ${scormExtractStatus === "pending" || scormExtractStatus === "processing" || scormExtractStatus === "done" || scormExtractStatus === "failed" ? "bg-teal-400" : "bg-gray-200"}`} />
                       {/* Step 2: SCORM Extraction */}
                       <div className="flex flex-col items-center gap-1">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${scormExtractStatus === "done" ? "bg-teal-600" : scormExtractStatus === "processing" ? "bg-amber-400" : scormExtractStatus === "failed" ? "bg-red-400" : "bg-gray-300"}`}>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center ${scormExtractStatus === "done" ? "bg-teal-600" : scormExtractStatus === "pending" || scormExtractStatus === "processing" ? "bg-amber-400" : scormExtractStatus === "failed" ? "bg-red-400" : "bg-gray-300"}`}>
                           {scormExtractStatus === "done" ? <CheckCircle2 className="w-4 h-4 text-white" /> :
                            scormExtractStatus === "processing" ? <Loader2 className="w-4 h-4 text-white animate-spin" /> :
                            scormExtractStatus === "failed" ? <AlertTriangle className="w-4 h-4 text-white" /> :
                            <Clock className="w-4 h-4 text-white" />}
                         </div>
-                        <span className={`text-[10px] font-medium ${scormExtractStatus === "done" ? "text-teal-700" : scormExtractStatus === "processing" ? "text-amber-700" : scormExtractStatus === "failed" ? "text-red-600" : "text-gray-400"}`}>
-                          {scormExtractStatus === "done" ? "Questions ready" : scormExtractStatus === "processing" ? "Extracting…" : scormExtractStatus === "failed" ? "Failed" : "Not extracted"}
+                        <span className={`text-[10px] font-medium ${scormExtractStatus === "done" ? "text-teal-700" : scormExtractStatus === "pending" || scormExtractStatus === "processing" ? "text-amber-700" : scormExtractStatus === "failed" ? "text-red-600" : "text-gray-400"}`}>
+                          {scormExtractStatus === "done" ? "Questions ready" : scormExtractStatus === "pending" ? "Queued…" : scormExtractStatus === "processing" ? "Extracting…" : scormExtractStatus === "failed" ? "Failed" : "Not extracted"}
                         </span>
                       </div>
                       <div className={`flex-1 h-1 mx-1 rounded ${scormExtractStatus === "done" ? "bg-teal-400" : "bg-gray-200"}`} />
@@ -1585,7 +1585,13 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                     </div>
 
                     {/* Status message */}
-                    {scormExtractStatus === "skipped" || !scormExtractStatus ? (
+                    {scormExtractStatus === "pending" ? (
+                      <div className="text-xs text-amber-800 space-y-1.5">
+                        <p className="font-semibold">Extraction queued automatically…</p>
+                        <p>This package is waiting for the resumable extraction worker. You do not need to start it again; this dialog will update when processing begins.</p>
+                        <div className="w-full h-2 bg-amber-100 rounded-full overflow-hidden mt-2"><div className="h-full bg-amber-400 rounded-full animate-pulse" style={{ width: "35%" }} /></div>
+                      </div>
+                    ) : scormExtractStatus === "skipped" || !scormExtractStatus ? (
                       <div className="text-xs text-gray-700 space-y-1.5">
                         <p className="font-semibold text-gray-800">Step 1 of 2: Extract package files for Question Bank</p>
                         <p><strong>Playback can be healthy from the original ZIP.</strong> Question Bank import is separate: the package files must first be extracted to R2 so questions and associated media can be read. Click below to start or resume that extraction.</p>
@@ -1611,16 +1617,16 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                       </div>
                     ) : null}
 
-                    <Button
+                    {(scormExtractStatus === "skipped" || !scormExtractStatus || scormExtractStatus === "failed") && <Button
                       size="sm"
                       variant="outline"
                       className={scormExtractStatus === "failed" ? "border-red-300 text-red-700 hover:bg-red-50" : "border-teal-300 text-teal-700 hover:bg-teal-50"}
-                      disabled={reExtractMutation.isPending || scormExtractStatus === "processing"}
+                      disabled={reExtractMutation.isPending}
                       onClick={() => reExtractMutation.mutate({ assetId: asset.id })}
                     >
                       <RefreshCw className={`w-3 h-3 mr-1.5 ${reExtractMutation.isPending ? "animate-spin" : ""}`} />
-                      {reExtractMutation.isPending ? "Starting extraction…" : scormExtractStatus === "processing" ? "Extraction running…" : scormExtractStatus === "failed" ? "Retry Extraction" : "Start SCORM Extraction"}
-                    </Button>
+                      {reExtractMutation.isPending ? "Starting extraction…" : scormExtractStatus === "failed" ? "Retry Extraction" : "Start SCORM Extraction"}
+                    </Button>}
                   </div>
                 )}
                 {scormStage === "ready" && (
