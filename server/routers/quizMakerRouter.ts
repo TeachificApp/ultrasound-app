@@ -4,7 +4,7 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
@@ -93,6 +93,45 @@ export function standaloneQuestionToBuilderQuestion(row: { sqq: typeof standalon
 }
 
 export const quizMakerRouter = router({
+  addQuestionBankQuestions: protectedProcedure
+    .input(z.object({
+      quizId: z.number().int(),
+      questionBankIds: z.array(z.number().int()).min(1),
+      groupId: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const quiz = await getQuizOrThrow(db, input.quizId);
+      const existing = await db.select({ questionBankId: standaloneQuizQuestions.questionBankId })
+        .from(standaloneQuizQuestions)
+        .where(and(eq(standaloneQuizQuestions.quizId, input.quizId), inArray(standaloneQuizQuestions.questionBankId, input.questionBankIds)));
+      const existingIds = new Set(existing.map((row) => row.questionBankId));
+      const newIds = input.questionBankIds.filter((id) => !existingIds.has(id));
+      if (!newIds.length) return { added: 0 };
+      const [{ maxOrder }] = await db.select({ maxOrder: sql<number>`COALESCE(MAX(${standaloneQuizQuestions.sortOrder}), -1)` })
+        .from(standaloneQuizQuestions).where(eq(standaloneQuizQuestions.quizId, input.quizId));
+      await db.insert(standaloneQuizQuestions).values(newIds.map((questionBankId, index) => ({
+        quizId: input.quizId,
+        questionBankId,
+        sortOrder: Number(maxOrder) + index + 1,
+        points: 1,
+      })));
+
+      const linked = await db.select({ sqq: standaloneQuizQuestions, qb: questionBank })
+        .from(standaloneQuizQuestions)
+        .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
+        .where(and(eq(standaloneQuizQuestions.quizId, input.quizId), inArray(standaloneQuizQuestions.questionBankId, newIds)))
+        .orderBy(asc(standaloneQuizQuestions.sortOrder));
+      const config = builderConfigFromQuizRow(quiz, ctx.user);
+      const additions = linked.map((row) => ({ ...standaloneQuestionToBuilderQuestion(row), groupId: input.groupId }));
+      const alreadyInBuilder = new Set(config.questions.map((question) => question.id));
+      config.questions = [...config.questions, ...additions.filter((question) => !alreadyInBuilder.has(question.id))];
+      await db.update(standaloneQuizzes).set({ builderConfig: serializeBuilderConfig(config) }).where(eq(standaloneQuizzes.id, input.quizId));
+      return { added: newIds.length };
+    }),
+
   listQuizzes: protectedProcedure.query(async ({ ctx }) => {
     await assertAdmin(ctx);
     const db = await getDb();
@@ -226,6 +265,8 @@ export const quizMakerRouter = router({
         quizId: z.number().int(),
         brandPrimaryColor: z.string().nullable().optional(),
         brandBgColor: z.string().nullable().optional(),
+        backgroundMode: z.enum(["solid", "image", "gradient"]).optional(),
+        backgroundGradient: z.string().nullable().optional(),
         brandLogoUrl: z.string().nullable().optional(),
         brandFontFamily: z.string().nullable().optional(),
         completionMessage: z.string().nullable().optional(),
@@ -237,10 +278,18 @@ export const quizMakerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const quiz = await getQuizOrThrow(db, input.quizId);
       const config = builderConfigFromQuizRow(quiz, ctx.user);
+      const backgroundMode = input.backgroundMode ?? config.meta.branding?.backgroundMode ?? (config.meta.branding?.backgroundImageUrl ? "image" : "solid");
       const branding: QuizBranding = {
         ...(config.meta.branding ?? {}),
         primaryColor: input.brandPrimaryColor ?? config.meta.branding?.primaryColor ?? "#24abbc",
-        backgroundColor: input.brandBgColor ?? config.meta.branding?.backgroundColor ?? "#0d1f3c",
+        backgroundColor: backgroundMode === "image"
+          ? (config.meta.branding?.backgroundColor ?? "#0d1f3c")
+          : (input.brandBgColor ?? config.meta.branding?.backgroundColor ?? "#0d1f3c"),
+        backgroundImageUrl: backgroundMode === "image"
+          ? (input.brandBgColor ?? config.meta.branding?.backgroundImageUrl)
+          : config.meta.branding?.backgroundImageUrl,
+        backgroundMode,
+        backgroundGradient: input.backgroundGradient ?? config.meta.branding?.backgroundGradient,
         fontFamily: input.brandFontFamily ?? config.meta.branding?.fontFamily,
         logoUrl: input.brandLogoUrl ?? config.meta.branding?.logoUrl,
       };

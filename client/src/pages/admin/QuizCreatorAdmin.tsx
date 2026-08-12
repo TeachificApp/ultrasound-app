@@ -524,6 +524,7 @@ function AddQuestionsDialog({
   const [aiTagIds, setAITagIds] = useState<number[]>([]);
   const [aiGenerated, setAIGenerated] = useState<any[] | null>(null);
   const [aiSelectedIds, setAISelectedIds] = useState<Set<number>>(new Set());
+  const [aiGroupId, setAIGroupId] = useState("");
 
 // --- SCORM Import ---
   const [scormFile, setScormFile] = useState<File | null>(null);
@@ -563,6 +564,8 @@ function AddQuestionsDialog({
   const { data: tagsData } = trpc.questionBank.listTags.useQuery(undefined, { enabled: open });
   const folders = foldersData ?? [];
   const tags = tagsData ?? [];
+  const { data: visualBuilderQuiz } = trpc.quizMaker.getQuiz.useQuery({ quizId }, { enabled: open });
+  const aiGroups = (visualBuilderQuiz?.builderConfig as any)?.meta?.groups ?? [];
 
   // Media library assets (SCORM/ZIP files)
   const { data: mlAssetsData } = trpc.questionBank.listMediaLibraryQuizFiles.useQuery(
@@ -584,6 +587,11 @@ function AddQuestionsDialog({
 
   const addQMutation = trpc.standaloneQuizAdmin.addQuestions.useMutation({
     onSuccess: (res) => { toast.success(`${res.added} question(s) added`); onAdded(); onClose(); resetAll(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const addAIQuestionsMutation = trpc.quizMaker.addQuestionBankQuestions.useMutation({
+    onSuccess: (res) => { toast.success(`${res.added} AI question(s) added`); onAdded(); onClose(); resetAll(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -624,7 +632,7 @@ function AddQuestionsDialog({
     setTab("bank"); setQSearch(""); setQPage(1); setSelectedBankIds(new Set());
     setBankFolderId(""); setBankTagId("");
     setAITopic(""); setAIGenerated(null); setAISelectedIds(new Set()); setAITagIds([]);
-    setAIFolderId(null); setAINewFolderName("");
+    setAIFolderId(null); setAINewFolderName(""); setAIGroupId("");
     setScormFile(null); setScormPreview(null); setScormSelectedGroups(new Set()); setScormGroupPrefix("");
     setScormFolderId(null); setScormNewFolderName(""); setScormTagIds([]);
     setCsvFile(null); setCsvPreview(null); setCsvFolderId(null); setCsvNewFolderName(""); setCsvTagIds([]);
@@ -664,7 +672,7 @@ function AddQuestionsDialog({
   const handleAddAIGenerated = () => {
     if (!aiGenerated) return;
     const ids = [...aiSelectedIds];
-    addQMutation.mutate({ quizId, questionBankIds: ids });
+    addAIQuestionsMutation.mutate({ quizId, questionBankIds: ids, groupId: aiGroupId || undefined });
   };
 
   const handleScormImport = async () => {
@@ -807,6 +815,15 @@ function AddQuestionsDialog({
                         <option value="mixed">Mixed</option>
                       </select>
                     </div>
+                    {aiGroups.length > 0 && (
+                      <div>
+                        <Label className="text-xs font-medium text-teal-700 mb-1 block">Quiz Group</Label>
+                        <select value={aiGroupId} onChange={e => setAIGroupId(e.target.value)} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
+                          <option value="">No group</option>
+                          {aiGroups.map((group: any) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Tags (optional)</Label>
                       <div className="flex flex-wrap gap-1.5">
@@ -873,9 +890,9 @@ function AddQuestionsDialog({
                 <span className="text-sm text-gray-500">{aiSelectedIds.size} selected</span>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => { onClose(); resetAll(); }}>Cancel</Button>
-                  <Button disabled={aiSelectedIds.size === 0 || addQMutation.isPending} onClick={handleAddAIGenerated} className="bg-teal-600 hover:bg-teal-700">
-                    {addQMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    Add {aiSelectedIds.size} to Quiz
+                  <Button disabled={aiSelectedIds.size === 0 || addAIQuestionsMutation.isPending} onClick={handleAddAIGenerated} className="bg-teal-600 hover:bg-teal-700">
+                    {addAIQuestionsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Add {aiSelectedIds.size} to Quiz{aiGroupId ? " Group" : ""}
                   </Button>
                 </div>
               </div>

@@ -6,6 +6,8 @@ import React from "react";
 export interface BuilderBranding {
   primaryColor?: string;
   backgroundColor?: string;
+  backgroundMode?: "solid" | "image" | "gradient";
+  backgroundGradient?: string;
   textColor?: string;
   fontFamily?: string;
   logoUrl?: string;
@@ -93,6 +95,15 @@ export function BuilderIntroScreen({
 }) {
   const primary = branding?.primaryColor ?? "#24abbc";
   const bg = branding?.backgroundColor ?? "#0d1f3c";
+  const background = branding?.backgroundMode === "gradient" && branding.backgroundGradient
+    ? branding.backgroundGradient
+    : branding?.backgroundMode === "image" && branding.backgroundImageUrl
+      ? `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${branding.backgroundImageUrl}) center/cover`
+      : branding?.backgroundMode === "solid"
+        ? bg
+        : branding?.backgroundImageUrl
+          ? `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${branding.backgroundImageUrl}) center/cover`
+          : `radial-gradient(ellipse at center, ${bg} 0%, #000 100%)`;
   const textColor = branding?.textColor ?? "#ffffff";
 
   if (intro?.enabled === false) {
@@ -103,9 +114,7 @@ export function BuilderIntroScreen({
     <div
       className="min-h-screen flex items-center justify-center px-4"
       style={{
-        background: branding?.backgroundImageUrl
-          ? `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url(${branding.backgroundImageUrl}) center/cover`
-          : `radial-gradient(ellipse at center, ${bg} 0%, #000 100%)`,
+        background,
         color: textColor,
         fontFamily: branding?.fontFamily,
       }}
@@ -145,6 +154,15 @@ export function BuilderQuestionFrame({
   footer?: React.ReactNode;
 }) {
   const bg = question.backgroundColor ?? branding?.backgroundColor ?? "#0d1f3c";
+  const background = question.backgroundImageUrl
+    ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${question.backgroundImageUrl}) center/cover`
+    : branding?.backgroundMode === "gradient" && branding.backgroundGradient
+      ? branding.backgroundGradient
+      : branding?.backgroundMode === "image" && branding.backgroundImageUrl
+        ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${branding.backgroundImageUrl}) center/cover`
+        : branding?.backgroundMode === "solid"
+          ? bg
+          : `radial-gradient(ellipse at center, ${bg} 0%, #000 100%)`;
   const textColor = branding?.textColor ?? "#ffffff";
   const primary = branding?.primaryColor ?? "#24abbc";
 
@@ -154,9 +172,7 @@ export function BuilderQuestionFrame({
         <div
           className="relative rounded-lg overflow-hidden min-h-[70vh] flex flex-col"
           style={{
-            background: question.backgroundImageUrl
-              ? `linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)), url(${question.backgroundImageUrl}) center/cover`
-              : `radial-gradient(ellipse at center, ${bg} 0%, #000 100%)`,
+            background,
             color: textColor,
             fontFamily: branding?.fontFamily,
           }}

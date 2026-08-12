@@ -385,6 +385,14 @@ function EssayQuestion({ answer, setAnswer, data }: { answer: Answer; setAnswer:
 
 export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Props) {
   const { quiz } = useQuizStore();
+  const branding = quiz.meta.branding;
+  const previewBackground = branding?.backgroundMode === "gradient" && branding.backgroundGradient
+    ? branding.backgroundGradient
+    : branding?.backgroundMode === "image" && branding.backgroundImageUrl
+      ? `linear-gradient(rgba(0,0,0,0.32), rgba(0,0,0,0.32)), url(${branding.backgroundImageUrl}) center/cover`
+      : branding?.backgroundMode === "solid"
+        ? (branding.backgroundColor || "#f0fdfa")
+        : "rgba(0, 0, 0, 0.4)";
 
   // Pool/Draw mode + shuffle
   const questions = useMemo(() => {
@@ -513,8 +521,8 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm" style={{ background: previewBackground }}>
+      <div className="bg-white/95 rounded-2xl shadow-2xl w-full max-w-2xl mx-4 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>

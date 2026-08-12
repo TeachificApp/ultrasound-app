@@ -14,6 +14,8 @@ const PRESET_COLORS = [
 export default function BrandingPanel({ quizId }: BrandingPanelProps) {
   const [primaryColor, setPrimaryColor] = useState("#24abbc");
   const [bgColor, setBgColor] = useState("");
+  const [backgroundMode, setBackgroundMode] = useState<"solid" | "image" | "gradient">("solid");
+  const [backgroundGradient, setBackgroundGradient] = useState("linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)");
   const [logoUrl, setLogoUrl] = useState("");
   const [fontFamily, setFontFamily] = useState("");
   const [completionMessage, setCompletionMessage] = useState("");
@@ -31,10 +33,13 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
 
   useEffect(() => {
     if (quiz) {
-      setPrimaryColor((quiz as any).brandPrimaryColor || "#24abbc");
-      setBgColor((quiz as any).brandBgColor || "");
-      setLogoUrl((quiz as any).brandLogoUrl || "");
-      setFontFamily((quiz as any).brandFontFamily || "");
+      const branding = (quiz as any).builderConfig?.meta?.branding ?? {};
+      setPrimaryColor(branding.primaryColor || "#24abbc");
+      setBgColor(branding.backgroundMode === "image" ? (branding.backgroundImageUrl || "") : (branding.backgroundColor || ""));
+      setBackgroundMode(branding.backgroundMode || (branding.backgroundImageUrl ? "image" : "solid"));
+      setBackgroundGradient(branding.backgroundGradient || "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)");
+      setLogoUrl(branding.logoUrl || "");
+      setFontFamily(branding.fontFamily || "");
       setCompletionMessage((quiz as any).completionMessage || "");
     }
   }, [quiz]);
@@ -43,8 +48,10 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
     if (!quizId) return;
     updateBranding.mutate({
       quizId,
-      brandPrimaryColor: primaryColor || null,
-      brandBgColor: bgColor || null,
+        brandPrimaryColor: primaryColor || null,
+        brandBgColor: bgColor || null,
+        backgroundMode,
+        backgroundGradient: backgroundMode === "gradient" ? backgroundGradient : null,
       brandLogoUrl: logoUrl || null,
       brandFontFamily: fontFamily || null,
       completionMessage: completionMessage || null,
@@ -100,10 +107,19 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
         <p className="text-[11px] text-gray-400">Used for buttons, progress bar, and accents in the quiz player.</p>
       </div>
 
-      {/* Background Color */}
+      {/* Background Design */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-gray-600">Background Color</label>
-        <div className="flex items-center gap-2">
+        <label className="text-xs font-medium text-gray-600">Background Design</label>
+        <select
+          value={backgroundMode}
+          onChange={(event) => { setBackgroundMode(event.target.value as "solid" | "image" | "gradient"); setDirty(true); }}
+          className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
+        >
+          <option value="solid">Solid color</option>
+          <option value="gradient">Gradient</option>
+          <option value="image">Background image</option>
+        </select>
+        {backgroundMode === "solid" && <div className="flex items-center gap-2">
           <input
             type="color"
             value={bgColor || "#f0fdfa"}
@@ -122,7 +138,25 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
               Reset
             </button>
           )}
-        </div>
+        </div>}
+        {backgroundMode === "gradient" && (
+          <input
+            type="text"
+            value={backgroundGradient}
+            onChange={(event) => { setBackgroundGradient(event.target.value); setDirty(true); }}
+            placeholder="linear-gradient(135deg, #189aa1, #4ad9e0)"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
+          />
+        )}
+        {backgroundMode === "image" && (
+          <input
+            type="url"
+            value={bgColor}
+            onChange={(event) => { setBgColor(event.target.value); setDirty(true); }}
+            placeholder="https://example.com/quiz-background.jpg"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
+          />
+        )}
       </div>
 
       {/* Logo URL */}
@@ -188,7 +222,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
       {/* Preview */}
       <div className="border-t border-gray-100 pt-4">
         <p className="text-xs font-medium text-gray-600 mb-2">Preview</p>
-        <div className="rounded-xl p-4 text-center" style={{ background: bgColor ? `linear-gradient(135deg, ${bgColor}, ${bgColor}dd)` : "linear-gradient(135deg, #f0fdfa, #e6f7f8)" }}>
+        <div className="rounded-xl p-4 text-center" style={{ background: backgroundMode === "gradient" ? backgroundGradient : backgroundMode === "image" && bgColor ? `url(${bgColor}) center/cover` : (bgColor || "#f0fdfa") }}>
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="h-8 mx-auto mb-2 object-contain" onError={(e) => (e.currentTarget.style.display = "none")} />
           ) : (

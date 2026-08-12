@@ -242,6 +242,8 @@ export interface QuizQuestion {
 export interface QuizBranding {
   primaryColor: string;
   backgroundColor: string;
+  backgroundMode?: "solid" | "image" | "gradient";
+  backgroundGradient?: string;
   textColor?: string;
   fontFamily?: string;
   logoUrl?: string;
