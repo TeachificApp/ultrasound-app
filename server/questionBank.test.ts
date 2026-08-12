@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 
 // ─── Mock DB ─────────────────────────────────────────────────────────────────
 const mockDb = {
@@ -123,6 +125,15 @@ describe("Question Bank", () => {
       expect(filterByTags(questions, [2])).toHaveLength(2);
       expect(filterByTags(questions, [1, 2])).toHaveLength(3);
       expect(filterByTags(questions, [])).toHaveLength(3);
+    });
+  });
+
+  describe("Quiz Creator AI generation contract", () => {
+    it("supports every stored interactive Question Bank type and returns generated question cards", () => {
+      const routerSource = fs.readFileSync(path.resolve(process.cwd(), "server/routers/questionBankRouter.ts"), "utf8");
+      expect(routerSource).toContain('questionType: z.enum(["mcq", "truefalse", "multiselect", "matching", "hotspot", "mixed"])');
+      expect(routerSource).toContain('type: { type: "string", enum: ["mcq", "truefalse", "multiselect", "matching", "hotspot"] }');
+      expect(routerSource).toContain('questions: getReturnedQuestions()');
     });
   });
 

@@ -312,7 +312,7 @@ export const questionBankRouter = router({
       topic: z.string().min(1),
       count: z.number().int().min(1).max(50).default(10),
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
-      questionType: z.enum(["mcq", "truefalse", "mixed"]).default("mcq"),
+      questionType: z.enum(["mcq", "truefalse", "multiselect", "matching", "hotspot", "mixed"]).default("mcq"),
       tagIds: z.array(z.number().int()).optional(),
       isPreset: z.boolean().optional(),
       presetCategory: z.string().optional(),
@@ -328,7 +328,13 @@ export const questionBankRouter = router({
         ? "Mix multiple choice and true/false questions."
         : input.questionType === "truefalse"
           ? "All questions must be true/false."
-          : "All questions must be multiple choice with 4 options.";
+          : input.questionType === "multiselect"
+            ? "All questions must be multiple-selection questions with four options and two or more correct answers. Return the zero-based indexes of correct options in correctAnswers."
+            : input.questionType === "matching"
+              ? "All questions must be matching questions with clinically meaningful left/right pairs."
+              : input.questionType === "hotspot"
+                ? "All questions must be hotspot templates. State which ultrasound or echocardiography image is required and describe the correct region."
+                : "All questions must be multiple choice with 4 options.";
 
       const response = await invokeLLM({
         messages: [
@@ -355,12 +361,22 @@ export const questionBankRouter = router({
                     type: "object",
                     properties: {
                       question: { type: "string" },
-                      type: { type: "string", enum: ["mcq", "truefalse"] },
+                      type: { type: "string", enum: ["mcq", "truefalse", "multiselect", "matching", "hotspot"] },
                       options: { type: "array", items: { type: "string" } },
                       correctAnswer: { type: "string" },
+                      correctAnswers: { type: "array", items: { type: "integer" } },
+                      matchingPairs: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: { left: { type: "string" }, right: { type: "string" } },
+                          required: ["left", "right"],
+                          additionalProperties: false,
+                        },
+                      },
                       explanation: { type: "string" },
                     },
-                    required: ["question", "type", "options", "correctAnswer", "explanation"],
+                    required: ["question", "type", "options", "correctAnswer", "correctAnswers", "matchingPairs", "explanation"],
                     additionalProperties: false,
                   },
                 },
@@ -373,8 +389,17 @@ export const questionBankRouter = router({
       });
 
       const raw = response.choices?.[0]?.message?.content ?? "{}";
-      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      let parsed: any;
+      try {
+        parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+      } catch (cause) {
+        console.error("[questionBank.aiGenerateToBank] Invalid AI JSON", cause);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The AI returned an unreadable response. Please generate again." });
+      }
       const questions: any[] = (parsed.questions ?? []).slice(0, input.count);
+      if (questions.length === 0) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The AI did not return any questions. Please generate again." });
+      }
 
       // Resolve or create folder
       let resolvedFolderId: number | null = null;
@@ -389,14 +414,25 @@ export const questionBankRouter = router({
         resolvedFolderId = input.folderId;
       }
 
+      // Persisted AI questions are returned to the Quiz Creator for selection.
       const inserted: number[] = [];
+      const getReturnedQuestions = () => questions.map((question, index) => ({
+        id: inserted[index],
+        question: question.question,
+        type: question.type,
+        options: question.options,
+        correctAnswer: question.correctAnswer,
+        explanation: question.explanation,
+      }));
       for (const q of questions) {
         const opts = Array.isArray(q.options) ? q.options.map((o: string) => ({ text: o })) : [];
         const [result] = await db.insert(questionBank).values({
           question: q.question,
-          type: q.type === "truefalse" ? "truefalse" : "mcq",
+          type: q.type === "truefalse" ? "truefalse" : q.type === "multiselect" ? "multiselect" : q.type === "matching" ? "matching" : q.type === "hotspot" ? "hotspot" : "mcq",
           options: opts.length > 0 ? JSON.stringify(opts) : null,
           correctAnswer: q.correctAnswer,
+          correctAnswers: q.type === "multiselect" ? JSON.stringify(q.correctAnswers ?? []) : null,
+          matchingPairs: q.type === "matching" ? JSON.stringify(q.matchingPairs ?? []) : null,
           explanation: q.explanation ?? null,
           folderId: resolvedFolderId,
           createdByAdminId: ctx.user.id,
@@ -407,7 +443,7 @@ export const questionBankRouter = router({
         }
       }
 
-      return { inserted: inserted.length, ids: inserted, folderId: resolvedFolderId };
+      return { inserted: inserted.length, ids: inserted, folderId: resolvedFolderId, questions: getReturnedQuestions() };
     }),
 
   // ─── Import CSV/Excel into Bank ────────────────────────────────────────────
@@ -464,6 +500,7 @@ export const questionBankRouter = router({
       const normalizedRows = rows.map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [norm(k), String(v ?? "").trim()])));
 
       const inserted: number[] = [];
+      const getReturnedQuestions = () => inserted.map(id => ({ id }));
       for (const row of normalizedRows) {
         const questionText = row["question"] || row["question_text"] || row["stem"] || "";
         if (!questionText) continue;
@@ -991,4 +1028,3 @@ export const questionBankRouter = router({
     }),
 
 });
-

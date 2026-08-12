@@ -517,7 +517,7 @@ function AddQuestionsDialog({
   const [aiTopic, setAITopic] = useState("");
   const [aiCount, setAICount] = useState(10);
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
-  const [aiType, setAIType] = useState<"mcq" | "truefalse" | "mixed">("mcq");
+  const [aiType, setAIType] = useState<"mcq" | "truefalse" | "multiselect" | "matching" | "hotspot" | "mixed">("mcq");
   const [aiFolderId, setAIFolderId] = useState<number | null>(null);
   const [aiNewFolderName, setAINewFolderName] = useState("");
   const [aiTagIds, setAITagIds] = useState<number[]>([]);
@@ -588,9 +588,14 @@ function AddQuestionsDialog({
 
   const aiGenerateMut = trpc.questionBank.aiGenerateToBank.useMutation({
     onSuccess: (res) => {
-      setAIGenerated(res.questions ?? []);
-      setAISelectedIds(new Set((res.questions ?? []).map((q: any) => q.id)));
-      toast.success(`Generated ${(res.questions ?? []).length} questions`);
+      const generated = res.questions ?? [];
+      if (generated.length === 0) {
+        toast.error("No questions were returned. Please try generating again.");
+        return;
+      }
+      setAIGenerated(generated);
+      setAISelectedIds(new Set(generated.map((q: any) => q.id)));
+      toast.success(`Generated ${generated.length} questions`);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -795,6 +800,9 @@ function AddQuestionsDialog({
                       <select value={aiType} onChange={e => setAIType(e.target.value as any)} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
                         <option value="mcq">Multiple Choice</option>
                         <option value="truefalse">True / False</option>
+                        <option value="multiselect">Multiple Select</option>
+                        <option value="matching">Matching</option>
+                        <option value="hotspot">Hotspot Template</option>
                         <option value="mixed">Mixed</option>
                       </select>
                     </div>
