@@ -4,6 +4,8 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { FeedbackPopup } from "../client/src/components/quiz/BuilderQuizPlayer";
+import { QuestionCard } from "../client/src/pages/StandaloneQuizResults";
+import { StandaloneQuestionMedia } from "../client/src/components/quiz/StandaloneQuestionMedia";
 
 const source = (file: string) => fs.readFileSync(path.resolve(process.cwd(), file), "utf8");
 
@@ -53,6 +55,45 @@ describe("all-quiz media workflow", () => {
       videoUrl: "https://media.example/feedback.mp4",
       onClose: () => undefined,
     }));
+    expect(markup).toContain('src="https://media.example/feedback.png"');
+    expect(markup).toContain('src="https://media.example/feedback.mp4"');
+  });
+
+  it("renders question and feedback image/video on standalone quiz result review", () => {
+    const markup = renderToStaticMarkup(React.createElement(QuestionCard, {
+      idx: 0,
+      a: {
+        id: 1,
+        isCorrect: false,
+        givenAnswer: "0",
+        question: {
+          question: "Identify this anatomy.",
+          options: '[{"text":"Aorta"},{"text":"IVC"}]',
+          correctAnswer: "1",
+          questionImageUrl: "https://media.example/question.png",
+          questionVideoUrl: "https://media.example/question.mp4",
+          feedbackImageUrl: "https://media.example/feedback.png",
+          feedbackVideoUrl: "https://media.example/feedback.mp4",
+          explanation: "The vessel is the IVC.",
+        },
+      },
+    }));
+    expect(markup).toContain('src="https://media.example/question.png"');
+    expect(markup).toContain('src="https://media.example/question.mp4"');
+    expect(markup).toContain('src="https://media.example/feedback.png"');
+    expect(markup).toContain('src="https://media.example/feedback.mp4"');
+  });
+
+  it("renders question and revealed-feedback media on the standalone quiz player surface", () => {
+    const markup = renderToStaticMarkup(React.createElement(StandaloneQuestionMedia, {
+      questionImageUrl: "https://media.example/question.png",
+      questionVideoUrl: "https://media.example/question.mp4",
+      feedbackImageUrl: "https://media.example/feedback.png",
+      feedbackVideoUrl: "https://media.example/feedback.mp4",
+      showFeedback: true,
+    }));
+    expect(markup).toContain('src="https://media.example/question.png"');
+    expect(markup).toContain('src="https://media.example/question.mp4"');
     expect(markup).toContain('src="https://media.example/feedback.png"');
     expect(markup).toContain('src="https://media.example/feedback.mp4"');
   });

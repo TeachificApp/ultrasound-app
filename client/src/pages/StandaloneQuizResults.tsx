@@ -190,7 +190,7 @@ export default function StandaloneQuizResults() {
   );
 }
 
-function QuestionCard({ a, idx }: { a: any; idx: number }) {
+export function QuestionCard({ a, idx }: { a: any; idx: number }) {
   const q = a.question;
   if (!q) return null;
   let options: { text: string }[] = [];

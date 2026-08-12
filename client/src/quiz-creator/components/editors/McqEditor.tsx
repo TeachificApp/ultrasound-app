@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import React from "react";
 import { Trash2, Plus, GripVertical } from "lucide-react";
 import type { McqData } from "../../types/quiz";
 

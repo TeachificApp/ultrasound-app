@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Loader2, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, AlertTriangle, BookOpen } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { StandaloneQuestionMedia } from "@/components/quiz/StandaloneQuestionMedia";
 import { getLoginUrl } from "@/const";
 import {
   BuilderIntroScreen,
@@ -409,8 +410,7 @@ export default function StandaloneQuizPlayer() {
       {/* Question */}
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-4">
-          {q.questionImageUrl && <img src={q.questionImageUrl} alt="Question" className="w-full max-h-64 object-contain rounded-lg mb-4 bg-gray-50" />}
-          {q.questionVideoUrl && <video src={q.questionVideoUrl} controls className="w-full max-h-64 rounded-lg mb-4 bg-black" />}
+          <StandaloneQuestionMedia questionImageUrl={q.questionImageUrl} questionVideoUrl={q.questionVideoUrl} />
           <p className="text-gray-900 text-base font-medium leading-relaxed mb-6">{q.question}</p>
 
           {/* MCQ / truefalse options */}
@@ -492,10 +492,7 @@ export default function StandaloneQuizPlayer() {
                   {q.explanation}
                 </div>
               )}
-              {q.feedbackImageUrl && (
-                <img src={q.feedbackImageUrl} alt="Explanation" className="mt-3 w-full max-h-48 object-contain rounded-lg bg-gray-50" />
-              )}
-              {q.feedbackVideoUrl && <video src={q.feedbackVideoUrl} controls className="mt-3 w-full max-h-48 rounded-lg bg-black" />}
+              <StandaloneQuestionMedia feedbackImageUrl={q.feedbackImageUrl} feedbackVideoUrl={q.feedbackVideoUrl} showFeedback />
             </div>
           )}
         </div>

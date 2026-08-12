@@ -7,8 +7,9 @@ import { OrderingEditor, DragWordsEditor, DropdownEditor, NumericEditor, LikertE
 import { BranchingEditor } from "./BranchingEditor";
 import type { QuizQuestion, QuestionData, BranchRule } from "../types/quiz";
 import { Upload, Trash2, Music, Video, Image, Palette, GitBranch } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 import { toast } from "sonner";
+import { reuseMediaRepositoryUrl } from "@/lib/mediaReuse";
 
 const TYPE_LABELS: Record<string, string> = {
   mcq: "Multiple Choice",
@@ -93,8 +94,7 @@ export function QuestionEditor() {
   };
 
   const reuseMediaUrl = (label: string, callback: (url: string) => void) => {
-    const url = window.prompt(`Paste the ${label} URL from Media Repository`);
-    if (url?.trim()) callback(url.trim());
+    reuseMediaRepositoryUrl(label, callback);
   };
 
   return (

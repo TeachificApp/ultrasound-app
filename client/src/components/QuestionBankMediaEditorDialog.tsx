@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
+import { reuseMediaRepositoryUrl } from "@/lib/mediaReuse";
 import { toast } from "sonner";
 import { Image as ImageIcon, Loader2, Plus, Trash2, Upload, Video } from "lucide-react";
 
@@ -36,7 +37,7 @@ async function uploadQuestionMedia(file: File): Promise<{ url: string; mediaType
   return data;
 }
 
-function MediaPicker({ label, field, value, onChange }: { label: string; field: MediaField; value: string; onChange: (value: string) => void }) {
+export function MediaPicker({ label, field, value, onChange }: { label: string; field: MediaField; value: string; onChange: (value: string) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const isVideo = field.toLowerCase().includes("video");
@@ -59,8 +60,7 @@ function MediaPicker({ label, field, value, onChange }: { label: string; field: 
   };
 
   const useExistingUrl = () => {
-    const url = window.prompt(`Paste the ${label.toLowerCase()} URL from Media Repository`);
-    if (url?.trim()) onChange(url.trim());
+    reuseMediaRepositoryUrl(label.toLowerCase(), onChange);
   };
 
   return (

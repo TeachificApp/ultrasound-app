@@ -4,7 +4,7 @@
  * Supports AI generation (lesson / course / pick lessons / topic), image/video on
  * questions and feedback, and saving questions to the bank with folder + tag assignment.
  */
-import { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
+import { reuseMediaRepositoryUrl } from "@/lib/mediaReuse";
 import { toast } from "sonner";
 import {
   Pencil, Trash2, Plus, Database, Search, Video, Image as ImageIcon,
@@ -552,8 +553,7 @@ function QuestionEditor({
   };
 
   const reuseMediaUrl = (label: string, onReuse: (url: string) => void) => {
-    const url = window.prompt(`Paste the ${label} URL from Media Repository`);
-    if (url?.trim()) onReuse(url.trim());
+    reuseMediaRepositoryUrl(label, onReuse);
   };
 
   const toggleMultiCorrect = (j: number) => {
@@ -966,6 +966,8 @@ function QuestionEditor({
     </div>
   );
 }
+
+export { QuestionEditor as LessonQuizQuestionEditor };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
