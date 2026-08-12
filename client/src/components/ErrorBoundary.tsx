@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { buildFreshAssetUrl, isStaleAssetError, staleAssetRecoveryKey } from "@/lib/staleAssetRecovery";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Component, ReactNode } from "react";
 
@@ -20,21 +21,34 @@ interface State {
  */
 function isChunkLoadError(error: Error): boolean {
   const msg = error?.message ?? "";
-  // Standard chunk load failures
-  if (
-    msg.includes("Failed to fetch dynamically imported module") ||
-    msg.includes("Importing a module script failed") ||
-    msg.includes("Loading chunk") ||
-    msg.includes("Loading CSS chunk") ||
-    /ChunkLoadError/.test(msg)
-  ) return true;
+  if (isStaleAssetError(error)) return true;
   // ReferenceErrors where an identifier "is not defined" — these indicate a stale
   // cached JS bundle referencing a variable that was renamed or removed in a newer build.
   if (error instanceof ReferenceError && msg.includes("is not defined")) return true;
   return false;
 }
 
-const CHUNK_RELOAD_KEY = "chunk_reload_attempted";
+async function reloadWithFreshAssets(error: Error) {
+  const key = staleAssetRecoveryKey(error);
+  if (sessionStorage.getItem(key)) return false;
+  sessionStorage.setItem(key, "1");
+
+  try {
+    if ("caches" in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+    }
+    if ("serviceWorker" in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map((registration) => registration.update()));
+    }
+  } catch {
+    // A cache clean-up failure must not prevent the fresh document request.
+  }
+
+  window.location.replace(buildFreshAssetUrl(window.location.href));
+  return true;
+}
 
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -45,11 +59,10 @@ class ErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: Error): State {
     // If it's a chunk load error and we haven't already tried reloading, auto-reload
     if (isChunkLoadError(error)) {
-      const alreadyTried = sessionStorage.getItem(CHUNK_RELOAD_KEY);
+      const alreadyTried = sessionStorage.getItem(staleAssetRecoveryKey(error));
       if (!alreadyTried) {
-        sessionStorage.setItem(CHUNK_RELOAD_KEY, "1");
-        // Trigger reload after a short tick so React finishes this render cycle
-        setTimeout(() => window.location.reload(), 100);
+        // Trigger recovery after React finishes this render cycle.
+        setTimeout(() => { void reloadWithFreshAssets(error); }, 100);
         return { hasError: true, error, autoReloading: true };
       }
     }
@@ -88,8 +101,8 @@ class ErrorBoundary extends Component<Props, State> {
 
             <button
               onClick={() => {
-                sessionStorage.removeItem(CHUNK_RELOAD_KEY);
-                window.location.reload();
+                sessionStorage.removeItem(staleAssetRecoveryKey(this.state.error ?? new Error("manual reload")));
+                void reloadWithFreshAssets(this.state.error ?? new Error("manual reload"));
               }}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg",
