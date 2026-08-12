@@ -290,7 +290,7 @@ export default function StandaloneQuizPlayer() {
     return (
       <>
         {feedbackPopup && (
-          <FeedbackPopup type={feedbackPopup.type} message={feedbackPopup.message} onClose={() => setFeedbackPopup(null)} />
+          <FeedbackPopup type={feedbackPopup.type} message={feedbackPopup.message} imageUrl={q.feedbackImageUrl} videoUrl={q.feedbackVideoUrl} onClose={() => setFeedbackPopup(null)} />
         )}
         <BuilderQuestionFrame branding={branding} question={q} footer={
           <div className="flex items-center gap-3 w-full justify-between pt-4">
@@ -383,9 +383,8 @@ export default function StandaloneQuizPlayer() {
       {/* Question */}
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-4">
-          {q.questionImageUrl && (
-            <img src={q.questionImageUrl} alt="Question" className="w-full max-h-64 object-contain rounded-lg mb-4 bg-gray-50" />
-          )}
+          {q.questionImageUrl && <img src={q.questionImageUrl} alt="Question" className="w-full max-h-64 object-contain rounded-lg mb-4 bg-gray-50" />}
+          {q.questionVideoUrl && <video src={q.questionVideoUrl} controls className="w-full max-h-64 rounded-lg mb-4 bg-black" />}
           <p className="text-gray-900 text-base font-medium leading-relaxed mb-6">{q.question}</p>
 
           {/* MCQ / truefalse options */}
@@ -464,6 +463,7 @@ export default function StandaloneQuizPlayer() {
               {q.feedbackImageUrl && (
                 <img src={q.feedbackImageUrl} alt="Explanation" className="mt-3 w-full max-h-48 object-contain rounded-lg bg-gray-50" />
               )}
+              {q.feedbackVideoUrl && <video src={q.feedbackVideoUrl} controls className="mt-3 w-full max-h-48 rounded-lg bg-black" />}
             </div>
           )}
         </div>

@@ -246,12 +246,7 @@ export const useQuizStore = create<QuizStore>((set, get) => ({
     })),
 
   addQuestion: (type) => {
-    const { quiz, license } = get();
-    const FREE_LIMIT = 10;
-    if (license.tier === "free" && quiz.questions.length >= FREE_LIMIT) {
-      alert(`Free tier is limited to ${FREE_LIMIT} questions per quiz. Upgrade to Pro for unlimited questions.`);
-      return;
-    }
+    const { quiz } = get();
     const q = newQuestion(type, quiz.questions.length + 1);
     set((s) => ({
       quiz: { ...s.quiz, questions: [...s.quiz.questions, q] },

@@ -22,8 +22,10 @@ describe("SCORM extraction queue policy", () => {
     expect(canStartQueuedScormExtraction(1)).toBe(false);
   });
 
-  it("selects Railway for managed Heartbeat extraction when the live media database is configured", () => {
+  it("uses the active Media Repository database unless a legacy Railway worker is explicitly enabled", () => {
     expect(resolveScormWorkerDatabaseUrl({ RAILWAY_MYSQL_URL: "mysql://railway.example/database" } as NodeJS.ProcessEnv))
+      .toBeNull();
+    expect(resolveScormWorkerDatabaseUrl({ RAILWAY_MYSQL_URL: "mysql://railway.example/database", ENABLE_LEGACY_RAILWAY_SCORM_WORKER: "true" } as NodeJS.ProcessEnv))
       .toBe("mysql://railway.example/database");
     expect(resolveScormWorkerDatabaseUrl({} as NodeJS.ProcessEnv)).toBeNull();
   });

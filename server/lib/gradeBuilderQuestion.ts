@@ -90,6 +90,8 @@ export function builderQuestionToPlayerPayload(
     stem: string;
     image?: { url: string; alt: string } | null;
     video?: { url: string } | null;
+    feedbackImage?: { url: string; alt: string } | null;
+    feedbackVideo?: { url: string } | null;
     explanation?: string;
     feedback?: { correct?: string; incorrect?: string; partial?: string };
     branchRules?: unknown[];
@@ -114,6 +116,8 @@ export function builderQuestionToPlayerPayload(
     order: q.order,
     questionImageUrl: q.image?.url ?? null,
     questionVideoUrl: q.video?.url ?? null,
+    feedbackImageUrl: q.feedbackImage?.url ?? null,
+    feedbackVideoUrl: q.feedbackVideo?.url ?? null,
     backgroundImageUrl: q.backgroundImageUrl ?? null,
     backgroundColor: q.backgroundColor ?? null,
     feedback: q.feedback ?? null,

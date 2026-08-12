@@ -30,6 +30,7 @@ import {
   Download,
 } from "lucide-react";
 import { getAdminUrl, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
+import { QuestionBankMediaEditorDialog } from "@/components/QuestionBankMediaEditorDialog";
 
 // --- Helpers ---
 const statusColor: Record<string, string> = {
@@ -1571,6 +1572,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
 
   const [settings, setSettings] = useState<any>(null);
   const [showAddQ, setShowAddQ] = useState(false);
+  const [editingBankQuestion, setEditingBankQuestion] = useState<any | null>(null);
 
   useEffect(() => {
     if (data?.quiz && !settings) {
@@ -2021,6 +2023,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                         <th className="text-center px-4 py-3 font-medium text-gray-600">Type</th>
                         <th className="text-center px-4 py-3 font-medium text-gray-600">Points</th>
                         <th className="text-center px-4 py-3 font-medium text-gray-600">Shuffle Options</th>
+                        <th className="text-center px-4 py-3 font-medium text-gray-600">Edit</th>
                         <th className="text-right px-4 py-3 font-medium text-gray-600">Remove</th>
                       </tr>
                     </thead>
@@ -2042,6 +2045,11 @@ function QuizEditor({ quizId }: { quizId: number }) {
                               disabled={updateAnswerOrderMutation.isPending}
                               aria-label={`Shuffle answer options for question ${idx + 1}`}
                             />
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Button size="sm" variant="ghost" className="text-teal-700 hover:text-teal-800" onClick={() => setEditingBankQuestion(qb)} aria-label={`Edit question ${idx + 1}`}>
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
                           </td>
                           <td className="px-4 py-3 text-right">
                             <Button
@@ -2066,6 +2074,12 @@ function QuizEditor({ quizId }: { quizId: number }) {
               quizId={quiz.id}
               existingQuestionIds={existingQuestionIds}
               onAdded={refetch}
+            />
+            <QuestionBankMediaEditorDialog
+              question={editingBankQuestion}
+              open={!!editingBankQuestion}
+              onOpenChange={(open) => { if (!open) setEditingBankQuestion(null); }}
+              onSaved={refetch}
             />
           </TabsContent>
 

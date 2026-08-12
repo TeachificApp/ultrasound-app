@@ -13,8 +13,6 @@ import { SlideViewEditor } from "@/quiz-creator/components/SlideViewEditor";
 import { QuizPreview } from "@/quiz-creator/components/QuizPreview";
 import { QuizSettings } from "@/quiz-creator/components/QuizSettings";
 import { CloudQuizBrowser } from "@/quiz-creator/components/CloudQuizBrowser";
-import { ShareDialog } from "@/quiz-creator/components/ShareDialog";
-import { LicenseManager } from "@/quiz-creator/components/LicenseManager";
 import BrandingPanel from "@/quiz-creator/components/BrandingPanel";
 import QuizAnalyticsPanel from "@/quiz-creator/components/QuizAnalyticsPanel";
 import { Loader2, ArrowLeft, BarChart3, Palette } from "lucide-react";
@@ -30,19 +28,12 @@ export default function QuizVisualBuilder() {
   const { quiz, loadQuiz, newQuiz, activeSlide } = useQuizStore();
   const [showPreview, setShowPreview] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [showLicense, setShowLicense] = useState(false);
   const [showCloud, setShowCloud] = useState(false);
-  const [showShare, setShowShare] = useState(false);
   const [sidePanel, setSidePanel] = useState<"none" | "branding" | "analytics">("none");
 
   const { data, isLoading } = trpc.quizMaker.getQuiz.useQuery(
     { quizId: quizId! },
     { enabled: !isNew }
-  );
-
-  const publishStatus = trpc.quizMaker.getPublishStatus.useQuery(
-    { quizId: (quiz.meta as { cloudId?: number }).cloudId ?? quizId! },
-    { enabled: !!(quiz.meta as { cloudId?: number }).cloudId || !isNew }
   );
 
   useEffect(() => {
@@ -71,10 +62,7 @@ export default function QuizVisualBuilder() {
       <EditorToolbar
         onPreview={() => setShowPreview(true)}
         onSettings={() => setShowSettings(true)}
-        onLicense={() => setShowLicense(true)}
         onCloudOpen={() => setShowCloud(true)}
-        onPublish={() => setShowShare(true)}
-        isPublished={publishStatus.data?.isPublished}
       />
 
       <div className="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-100">
@@ -121,9 +109,7 @@ export default function QuizVisualBuilder() {
 
       {showPreview && <QuizPreview onClose={() => setShowPreview(false)} />}
       {showSettings && <QuizSettings onClose={() => setShowSettings(false)} />}
-      {showLicense && <LicenseManager onClose={() => setShowLicense(false)} />}
       {showCloud && <CloudQuizBrowser onClose={() => setShowCloud(false)} />}
-      <ShareDialog open={showShare} onClose={() => setShowShare(false)} quizId={cloudId ?? null} />
     </div>
   );
 }

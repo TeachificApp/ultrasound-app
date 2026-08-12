@@ -4,11 +4,13 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   standaloneQuizzes,
+  standaloneQuizQuestions,
+  questionBank,
   standaloneQuizAttempts,
   standaloneQuizAttemptAnswers,
   users,
@@ -46,6 +48,46 @@ function metaToQuizSettings(meta: QuizFile["meta"]) {
   };
 }
 
+function parseJson<T>(value: string | null, fallback: T): T {
+  if (!value) return fallback;
+  try { return JSON.parse(value) as T; } catch { return fallback; }
+}
+
+function standaloneQuestionToBuilderQuestion(row: { sqq: typeof standaloneQuizQuestions.$inferSelect; qb: typeof questionBank.$inferSelect }) {
+  const options = parseJson<{ text?: string; imageUrl?: string; videoUrl?: string }[]>(row.qb.options, []);
+  const correctAnswer = String(row.qb.correctAnswer ?? "0");
+  const correctAnswers = parseJson<number[]>(row.qb.correctAnswers, []);
+  const base = {
+    id: `bank-${row.qb.id}`,
+    order: row.sqq.sortOrder + 1,
+    points: row.sqq.points,
+    stem: row.qb.question,
+    required: true,
+    shuffleAnswerOptions: row.sqq.shuffleAnswerOptions,
+    explanation: row.qb.explanation ?? "",
+    image: row.qb.questionImageUrl ? { url: row.qb.questionImageUrl, alt: "Question media" } : null,
+    video: row.qb.questionVideoUrl ? { url: row.qb.questionVideoUrl, type: "file" } : null,
+    feedbackImage: row.qb.feedbackImageUrl ? { url: row.qb.feedbackImageUrl, alt: "Feedback media" } : null,
+    feedbackVideo: row.qb.feedbackVideoUrl ? { url: row.qb.feedbackVideoUrl, type: "file" } : null,
+    branchRules: [],
+  };
+
+  if (row.qb.type === "truefalse") return { ...base, type: "tf", data: { correct: correctAnswer === "true" || correctAnswer === "0" } };
+  if (row.qb.type === "matching") return { ...base, type: "matching", data: { pairs: parseJson(row.qb.matchingPairs, []) } };
+  if (row.qb.type === "hotspot") return { ...base, type: "hotspot", data: { markers: parseJson(row.qb.hotspotMarkers, []) } };
+  return {
+    ...base,
+    type: "mcq",
+    data: {
+      multiple: row.qb.type === "multiselect",
+      choices: options.map((option, index) => ({
+        id: String(index), text: option.text ?? "", imageUrl: option.imageUrl, videoUrl: option.videoUrl,
+        correct: row.qb.type === "multiselect" ? correctAnswers.includes(index) : String(index) === correctAnswer,
+      })),
+    },
+  };
+}
+
 export const quizMakerRouter = router({
   listQuizzes: protectedProcedure.query(async ({ ctx }) => {
     await assertAdmin(ctx);
@@ -66,7 +108,20 @@ export const quizMakerRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const quiz = await getQuizOrThrow(db, input.quizId);
-      const config = builderConfigFromQuizRow(quiz, ctx.user);
+      const savedConfig = parseBuilderConfig(quiz.builderConfig);
+      let config = builderConfigFromQuizRow(quiz, ctx.user);
+      if (!savedConfig || config.questions.length === 0) {
+        const linkedQuestions = await db
+          .select({ sqq: standaloneQuizQuestions, qb: questionBank })
+          .from(standaloneQuizQuestions)
+          .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
+          .where(eq(standaloneQuizQuestions.quizId, quiz.id))
+          .orderBy(asc(standaloneQuizQuestions.sortOrder));
+        if (linkedQuestions.length > 0) {
+          config = { ...config, questions: linkedQuestions.map(standaloneQuestionToBuilderQuestion) };
+          await db.update(standaloneQuizzes).set({ builderConfig: serializeBuilderConfig(config) }).where(eq(standaloneQuizzes.id, quiz.id));
+        }
+      }
       const branding = config.meta.branding;
       return {
         ...quiz,

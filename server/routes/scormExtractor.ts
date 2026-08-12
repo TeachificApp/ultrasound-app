@@ -64,11 +64,13 @@ let railwayScormWorkerUrl: string | null = null;
 let extractionR2Client: S3Client | null = null;
 
 /**
- * Heartbeat callbacks run on the managed deployment, while the public learning
- * site stores media in Railway. Prefer that live database when it is configured.
+ * The Media Repository and learner application use the active application
+ * database. Keep extraction on that same database by default so queued state
+ * is visible to admins and can resume without a manual restart. Railway may be
+ * explicitly selected only for a separate legacy backfill worker.
  */
 export function resolveScormWorkerDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string | null {
-  return env.RAILWAY_MYSQL_URL || null;
+  return env.ENABLE_LEGACY_RAILWAY_SCORM_WORKER === "true" ? env.RAILWAY_MYSQL_URL || null : null;
 }
 
 export function buildNoPendingScormDiagnostic(rawPendingVersions: number, usingRailway: boolean) {

@@ -33,10 +33,14 @@ export interface BuilderResultSlide {
 export function FeedbackPopup({
   type,
   message,
+  imageUrl,
+  videoUrl,
   onClose,
 }: {
   type: "correct" | "incorrect" | "partial";
   message: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
   onClose: () => void;
 }) {
   const headerColor = type === "correct" ? "#22c55e" : type === "incorrect" ? "#ef4444" : "#f59e0b";
@@ -49,8 +53,10 @@ export function FeedbackPopup({
           <span>{label}</span>
           <button type="button" onClick={onClose} className="text-white/80 hover:text-white text-lg leading-none">▾</button>
         </div>
-        <div className="bg-white px-5 py-4 text-sm text-gray-800 leading-relaxed max-h-48 overflow-y-auto">
+        <div className="bg-white px-5 py-4 text-sm text-gray-800 leading-relaxed max-h-[60vh] overflow-y-auto">
           {message}
+          {imageUrl && <img src={imageUrl} alt="Feedback" className="mt-3 max-h-56 w-full rounded border bg-gray-50 object-contain" />}
+          {videoUrl && <video src={videoUrl} controls className="mt-3 max-h-56 w-full rounded bg-black" />}
         </div>
       </div>
       <button

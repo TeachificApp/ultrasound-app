@@ -1,5 +1,5 @@
 /**
- * .quiz file format utilities
+ * UltrasoundAssist .aausquiz file format utilities
  *
  * Free tier: plain JSON wrapped in a header (no encryption)
  * Pro/Enterprise: AES-256-GCM encrypted, key derived from license key + static salt
@@ -48,7 +48,7 @@ function fromBase64(b64: string): Uint8Array {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }
 
-/** Serialize a QuizFile to a .quiz string */
+/** Serialize a QuizFile to the native UltrasoundAssist quiz-file payload. */
 export async function serializeQuiz(
   quiz: QuizFile,
   licenseKey: string | null
@@ -79,17 +79,17 @@ export async function serializeQuiz(
   return `${HEADER}\n${payload}`;
 }
 
-/** Deserialize a .quiz string back to a QuizFile */
+/** Deserialize a native UltrasoundAssist quiz-file payload back to a QuizFile. */
 export async function deserializeQuiz(
   content: string,
   licenseKey: string | null
 ): Promise<QuizFile> {
   const lines = content.trim().split("\n");
   if (lines[0] !== HEADER) {
-    throw new Error("Invalid .quiz file: missing header");
+    throw new Error("Invalid UltrasoundAssist quiz file: missing header");
   }
   const payload = lines[1];
-  if (!payload) throw new Error("Invalid .quiz file: empty payload");
+  if (!payload) throw new Error("Invalid UltrasoundAssist quiz file: empty payload");
 
   const raw = fromBase64(payload);
 
@@ -116,7 +116,7 @@ export async function deserializeQuiz(
       json = decodeURIComponent(escape(Array.from(raw, (b) => String.fromCharCode(b)).join("")));
     } catch {
       throw new Error(
-        "This .quiz file is encrypted. Please enter your license key to open it."
+        "This UltrasoundAssist quiz file is encrypted. Please enter your license key to open it."
       );
     }
   }
@@ -125,7 +125,9 @@ export async function deserializeQuiz(
   return parsed;
 }
 
-/** Trigger a browser download of the .quiz file */
+/** Trigger a browser download of the native UltrasoundAssist quiz file.
+ * iSpring's `.quiz` format is proprietary and must not be used for this payload.
+ */
 export async function downloadQuiz(
   quiz: QuizFile,
   licenseKey: string | null
@@ -134,7 +136,7 @@ export async function downloadQuiz(
   const blob = new Blob([content], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const filename = `${quiz.meta.title.replace(/[^a-z0-9]/gi, "_")}.quiz`;
+  const filename = `${quiz.meta.title.replace(/[^a-z0-9]/gi, "_")}.aausquiz`;
   a.href = url;
   a.download = filename;
   a.click();
@@ -142,7 +144,7 @@ export async function downloadQuiz(
   return filename;
 }
 
-/** Read a .quiz file from a File object */
+/** Read a native UltrasoundAssist quiz file (including legacy `.quiz` files). */
 export async function openQuizFile(
   file: File,
   licenseKey: string | null
