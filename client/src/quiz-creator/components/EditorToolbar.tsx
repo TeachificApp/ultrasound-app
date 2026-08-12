@@ -59,6 +59,16 @@ export function EditorToolbar({ onPreview, onSettings, onCloudOpen }: Props) {
     }
   };
 
+  const handleISpringExport = () => {
+    const quizId = (quiz.meta as { cloudId?: number }).cloudId;
+    if (!quizId) {
+      alert("Save this quiz to the platform first, then choose Export for iSpring (XLSX).");
+      return;
+    }
+    window.open(`/api/quiz/standalone-export/${quizId}`, "_blank", "noopener,noreferrer");
+    setFileMenuOpen(false);
+  };
+
   const handleOpen = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -153,6 +163,12 @@ export function EditorToolbar({ onPreview, onSettings, onCloudOpen }: Props) {
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-700"
                 >
                   <Save className="w-4 h-4 text-gray-400" /> Save as UltrasoundAssist File
+                </button>
+                <button
+                  onClick={handleISpringExport}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-700"
+                >
+                  <FileArchive className="w-4 h-4 text-teal-500" /> Export for iSpring (XLSX)
                 </button>
                 {user && (
                   <>

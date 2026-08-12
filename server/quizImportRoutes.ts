@@ -230,6 +230,60 @@ router.get("/export/:quizId", async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/quiz/standalone-export/:quizId ──────────────────────────────────
+// Export an embedded Quiz Creator quiz in the documented iSpring XLSX template.
+router.get("/standalone-export/:quizId", async (req: Request, res: Response) => {
+  try {
+    const authUser = await authenticateRequest(req);
+    if (!authUser) return res.status(401).json({ error: "Unauthorized" });
+    const quizId = Number(req.params.quizId);
+    if (!Number.isInteger(quizId)) return res.status(400).json({ error: "Invalid quiz ID" });
+    const db = await getDb();
+    if (!db) return res.status(500).json({ error: "Database unavailable" });
+    const [quiz] = await db.select().from(standaloneQuizzes).where(eq(standaloneQuizzes.id, quizId)).limit(1);
+    if (!quiz) return res.status(404).json({ error: "Quiz not found" });
+    const rows = await db.select({ link: standaloneQuizQuestions, question: questionBank })
+      .from(standaloneQuizQuestions)
+      .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
+      .where(eq(standaloneQuizQuestions.quizId, quizId))
+      .orderBy(asc(standaloneQuizQuestions.sortOrder));
+    const parseJson = <T,>(value: string | null, fallback: T): T => {
+      if (!value) return fallback;
+      try { return JSON.parse(value) as T; } catch { return fallback; }
+    };
+    const questions = rows.map(({ link, question }) => {
+      const correctAnswers = parseJson<number[]>(question.correctAnswers, []);
+      const choices = parseJson<{ text?: string }[]>(question.options, []).map((option, index) => ({
+        choiceText: option.text ?? "",
+        isCorrect: question.type === "multiselect" ? correctAnswers.includes(index) : String(index) === String(question.correctAnswer),
+        sortOrder: index,
+      }));
+      if (question.type === "truefalse" && choices.length === 0) {
+        const trueIsCorrect = String(question.correctAnswer) === "true" || String(question.correctAnswer) === "0";
+        choices.push({ choiceText: "True", isCorrect: trueIsCorrect, sortOrder: 0 }, { choiceText: "False", isCorrect: !trueIsCorrect, sortOrder: 1 });
+      }
+      return {
+        questionType: question.type === "truefalse" ? "true_false" : question.type === "multiselect" ? "multiple_select" : question.type === "matching" ? "matching" : "multiple_choice",
+        questionText: question.question,
+        imagePath: question.questionImageUrl ?? undefined,
+        videoPath: question.questionVideoUrl ?? undefined,
+        choices,
+        correctFeedback: question.explanation ?? undefined,
+        incorrectFeedback: question.explanation ?? undefined,
+        points: link.points,
+      };
+    });
+    const buffer = exportQuizToExcel(quiz.title, questions as any);
+    const filename = `${quiz.title.replace(/[^a-z0-9]/gi, "_")}_iSpring_import.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    return res.send(buffer);
+  } catch (err: unknown) {
+    console.error("[Standalone Quiz Export] Error:", err);
+    return res.status(500).json({ error: "Failed to create iSpring spreadsheet", detail: String(err) });
+  }
+});
+
 // ── POST /api/quiz/bank-import/preview ───────────────────────────────────────
 // Parse a CSV, SCORM ZIP/XML, iSpring/Teachific .quiz, or XLSX file and return questions for preview.
 // ZIP/.quiz uploads are also hosted so admins can keep the original package while optionally extracting questions.

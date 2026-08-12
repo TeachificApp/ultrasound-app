@@ -8,6 +8,7 @@ import { BranchingEditor } from "./BranchingEditor";
 import type { QuizQuestion, QuestionData, BranchRule } from "../types/quiz";
 import { Upload, Trash2, Music, Video, Image, Palette, GitBranch } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 const TYPE_LABELS: Record<string, string> = {
   mcq: "Multiple Choice",
@@ -49,12 +50,20 @@ export function QuestionEditor() {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = accept;
-    input.onchange = (e) => {
+    input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => callback(reader.result as string, file.name);
-      reader.readAsDataURL(file);
+      try {
+        const body = new FormData();
+        body.append("file", file);
+        const response = await fetch("/api/upload-question-media", { method: "POST", body, credentials: "include" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.url) throw new Error(data.error || "Media upload failed");
+        callback(data.url, file.name);
+        toast.success("Media uploaded");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Media upload failed");
+      }
     };
     input.click();
   };
