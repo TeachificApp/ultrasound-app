@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { standaloneQuestionToBuilderQuestion } from "./routers/quizMakerRouter";
+import { assignBuilderQuestionGroup, standaloneQuestionToBuilderQuestion } from "./routers/quizMakerRouter";
 
 describe("standalone Question Bank hydration for Visual Builder", () => {
   it("preserves question content, media, points, and per-question shuffle settings", () => {
@@ -41,5 +41,10 @@ describe("standalone Question Bank hydration for Visual Builder", () => {
       { id: "0", text: "Aorta", imageUrl: undefined, videoUrl: undefined, feedback: "The aorta is not the vessel shown.", correct: false },
       { id: "1", text: "Pulmonary artery", imageUrl: undefined, videoUrl: undefined, feedback: "Correct: the image shows the pulmonary artery.", correct: true },
     ]);
+  });
+
+  it("places selected Question Bank additions directly into the chosen quiz group", () => {
+    const additions = assignBuilderQuestionGroup([{ id: "bank-101", stem: "Generated question" }], "hemodynamics");
+    expect(additions).toEqual([{ id: "bank-101", stem: "Generated question", groupId: "hemodynamics" }]);
   });
 });

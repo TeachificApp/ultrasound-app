@@ -93,6 +93,10 @@ export function standaloneQuestionToBuilderQuestion(row: { sqq: typeof standalon
   };
 }
 
+export function assignBuilderQuestionGroup<T extends Record<string, unknown>>(questions: T[], groupId?: string): Array<T & { groupId?: string }> {
+  return questions.map((question) => ({ ...question, groupId }));
+}
+
 export const quizMakerRouter = router({
   addQuestionBankQuestions: protectedProcedure
     .input(z.object({
@@ -126,7 +130,7 @@ export const quizMakerRouter = router({
         .where(and(eq(standaloneQuizQuestions.quizId, input.quizId), inArray(standaloneQuizQuestions.questionBankId, newIds)))
         .orderBy(asc(standaloneQuizQuestions.sortOrder));
       const config = builderConfigFromQuizRow(quiz, ctx.user);
-      const additions = linked.map((row) => ({ ...standaloneQuestionToBuilderQuestion(row), groupId: input.groupId }));
+      const additions = assignBuilderQuestionGroup(linked.map(standaloneQuestionToBuilderQuestion), input.groupId);
       const alreadyInBuilder = new Set(config.questions.map((question) => question.id));
       config.questions = [...config.questions, ...additions.filter((question) => !alreadyInBuilder.has(question.id))];
       await db.update(standaloneQuizzes).set({ builderConfig: serializeBuilderConfig(config) }).where(eq(standaloneQuizzes.id, input.quizId));
