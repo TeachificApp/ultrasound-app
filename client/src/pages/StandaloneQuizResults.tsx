@@ -224,6 +224,9 @@ function QuestionCard({ a, idx }: { a: any; idx: number }) {
           {q.questionImageUrl && (
             <img src={q.questionImageUrl} alt="" className="w-full max-h-40 object-contain rounded-lg bg-gray-50 mb-3" />
           )}
+          {q.questionVideoUrl && (
+            <video src={q.questionVideoUrl} controls className="w-full max-h-56 rounded-lg bg-black mb-3" />
+          )}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-xs text-gray-400 mb-1">Your answer</p>
@@ -244,6 +247,9 @@ function QuestionCard({ a, idx }: { a: any; idx: number }) {
           )}
           {q.feedbackImageUrl && (
             <img src={q.feedbackImageUrl} alt="Explanation" className="mt-2 w-full max-h-40 object-contain rounded-lg bg-gray-50" />
+          )}
+          {q.feedbackVideoUrl && (
+            <video src={q.feedbackVideoUrl} controls className="mt-2 w-full max-h-56 rounded-lg bg-black" />
           )}
         </div>
       </div>

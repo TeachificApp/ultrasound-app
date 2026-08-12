@@ -21,6 +21,9 @@ import {
   questionBankTags,
   questionBankTagMap,
   users,
+  lmsLessons,
+  lmsEnrollments,
+  lmsCourses,
 } from "../../drizzle/schema";
 import { drawQuestionsFromBuilder, parseBuilderConfig } from "../lib/quizBuilderConfig";
 import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
@@ -31,6 +34,39 @@ async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
   }
+}
+
+/** Quiz Creator content is available through an assigned LMS lesson, not as a public standalone product. */
+export async function assertEmbeddedQuizAccess(db: any, user: { id: number; role: string }, quizId: number) {
+  if (user.role === "admin") return;
+  const [assignment] = await db
+    .select({ lessonId: lmsLessons.id })
+    .from(lmsLessons)
+    .innerJoin(lmsEnrollments, and(
+      eq(lmsEnrollments.courseId, lmsLessons.courseId),
+      eq(lmsEnrollments.userId, user.id),
+      or(isNull(lmsEnrollments.accessExpiresAt), gte(lmsEnrollments.accessExpiresAt, new Date())),
+    ))
+    .where(and(
+      eq(lmsLessons.type, "standalone_quiz"),
+      eq(lmsLessons.standaloneQuizId, quizId),
+    ))
+    .limit(1);
+  if (assignment) return;
+  const [previewAssignment] = await db
+    .select({ lessonId: lmsLessons.id })
+    .from(lmsLessons)
+    .where(and(
+      eq(lmsLessons.type, "standalone_quiz"),
+      eq(lmsLessons.standaloneQuizId, quizId),
+      or(
+        eq(lmsLessons.previewMode, "preview"),
+        eq(lmsLessons.previewMode, "preview_hide_after_purchase"),
+      ),
+    ))
+    .limit(1);
+  if (previewAssignment) return;
+  throw new TRPCError({ code: "FORBIDDEN", message: "This quiz is available through its assigned learning experience." });
 }
 
 /** Shuffle an array in-place using Fisher-Yates */
@@ -57,7 +93,7 @@ const quizSettingsInput = z.object({
   showExplanations: z.boolean().default(true),
   allowRetakes: z.boolean().default(true),
   maxAttempts: z.number().int().min(1).nullable().optional(),
-  accessType: z.enum(["public", "enrolled", "members_only"]).default("enrolled"),
+  accessType: z.enum(["enrolled", "members_only"]).default("enrolled"),
   brand: z.enum(["aaus", "iheartecho"]).default("aaus"),
   status: z.enum(["draft", "published", "archived"]).default("draft"),
   coverImageUrl: z.string().nullable().optional(),
@@ -74,25 +110,11 @@ const quizSettingsInput = z.object({
 
 // ─── Public Router ────────────────────────────────────────────────────────────
 export const standaloneQuizPublicRouter = router({
-  /** Get quiz metadata for a public quiz (no auth required) */
+  /** Public metadata is disabled; Quiz Creator content is embedded in assigned learning experiences. */
   getPublicQuiz: publicProcedure
     .input(z.object({ id: z.number().int() }))
-    .query(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [quiz] = await db
-        .select()
-        .from(standaloneQuizzes)
-        .where(and(eq(standaloneQuizzes.id, input.id), eq(standaloneQuizzes.status, "published")))
-        .limit(1);
-      if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
-      if (quiz.accessType !== "public") throw new TRPCError({ code: "FORBIDDEN", message: "This quiz requires authentication" });
-      // Return metadata only (no questions)
-      const [{ count }] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(standaloneQuizQuestions)
-        .where(eq(standaloneQuizQuestions.quizId, quiz.id));
-      return { ...quiz, questionCount: Number(count) };
+    .query(async () => {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Quiz Creator quizzes are available through assigned learning experiences." });
     }),
 });
 
@@ -110,6 +132,7 @@ export const standaloneQuizLearnerRouter = router({
         .where(and(eq(standaloneQuizzes.id, input.quizId), eq(standaloneQuizzes.status, "published")))
         .limit(1);
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       const builderConfig = parseBuilderConfig(quiz.builderConfig);
       const [{ count }] = await db
         .select({ count: sql<number>`count(*)` })
@@ -149,9 +172,10 @@ export const standaloneQuizLearnerRouter = router({
       const [quiz] = await db
         .select()
         .from(standaloneQuizzes)
-        .where(and(eq(standaloneQuizzes.id, input.quizId), eq(standaloneQuizzes.status, "published")))
+      .where(and(eq(standaloneQuizzes.id, input.quizId), eq(standaloneQuizzes.status, "published")))
         .limit(1);
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
 
       const builderConfig = parseBuilderConfig(quiz.builderConfig);
 
@@ -622,7 +646,21 @@ export const standaloneQuizAdminRouter = router({
         .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
         .where(eq(standaloneQuizQuestions.quizId, quiz.id))
         .orderBy(asc(standaloneQuizQuestions.sortOrder));
-      return { quiz, questions };
+      const assignments = await db
+        .select({
+          lessonId: lmsLessons.id,
+          lessonTitle: lmsLessons.title,
+          courseId: lmsCourses.id,
+          courseTitle: lmsCourses.title,
+          previewMode: lmsLessons.previewMode,
+        })
+        .from(lmsLessons)
+        .leftJoin(lmsCourses, eq(lmsCourses.id, lmsLessons.courseId))
+        .where(and(
+          eq(lmsLessons.type, "standalone_quiz"),
+          eq(lmsLessons.standaloneQuizId, quiz.id),
+        ));
+      return { quiz, questions, assignments };
     }),
 
   /** Create a new quiz */

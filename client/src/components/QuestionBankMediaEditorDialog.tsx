@@ -58,6 +58,11 @@ function MediaPicker({ label, field, value, onChange }: { label: string; field: 
     }
   };
 
+  const useExistingUrl = () => {
+    const url = window.prompt(`Paste the ${label.toLowerCase()} URL from Media Repository`);
+    if (url?.trim()) onChange(url.trim());
+  };
+
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50/60 p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
@@ -65,7 +70,10 @@ function MediaPicker({ label, field, value, onChange }: { label: string; field: 
           {isVideo ? <Video className="h-3.5 w-3.5 text-teal-600" /> : <ImageIcon className="h-3.5 w-3.5 text-teal-600" />}
           {label}
         </Label>
-        {value && <Button type="button" size="sm" variant="ghost" className="h-7 text-red-600 hover:text-red-700" onClick={() => onChange("")}><Trash2 className="mr-1 h-3.5 w-3.5" />Remove</Button>}
+        <div className="flex items-center gap-1">
+          <Button type="button" size="sm" variant="ghost" className="h-7 text-teal-700 hover:text-teal-800" onClick={useExistingUrl}>Use URL</Button>
+          {value && <Button type="button" size="sm" variant="ghost" className="h-7 text-red-600 hover:text-red-700" onClick={() => onChange("")}><Trash2 className="mr-1 h-3.5 w-3.5" />Remove</Button>}
+        </div>
       </div>
       {value ? (
         isVideo

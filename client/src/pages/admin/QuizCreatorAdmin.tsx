@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { getAdminUrl, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 import { QuestionBankMediaEditorDialog } from "@/components/QuestionBankMediaEditorDialog";
+import { EmbeddedQuizAssignmentCard } from "@/components/quiz/EmbeddedQuizAssignmentCard";
 
 // --- Helpers ---
 const statusColor: Record<string, string> = {
@@ -1593,7 +1594,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
 
   useEffect(() => {
     if (data?.quiz && !settings) {
-      setSettings({ ...data.quiz });
+      setSettings({ ...data.quiz, accessType: data.quiz.accessType === "public" ? "enrolled" : data.quiz.accessType });
     }
   }, [data?.quiz]);
 
@@ -1614,6 +1615,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
   }
 
   const { quiz, questions } = data;
+  const assignments = data.assignments ?? [];
   const existingQuestionIds = questions.map(({ qb }: any) => qb.id);
 
   return (
@@ -1705,30 +1707,16 @@ function QuizEditor({ quizId }: { quizId: number }) {
                         </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Status</Label>
-                        <Select value={settings.status} onValueChange={(v) => setSettings((s: any) => ({ ...s, status: v }))}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="published">Published</SelectItem>
-                            <SelectItem value="archived">Archived</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Access</Label>
-                        <Select value={settings.accessType} onValueChange={(v) => setSettings((s: any) => ({ ...s, accessType: v }))}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="public">Public</SelectItem>
-                            <SelectItem value="enrolled">Enrolled</SelectItem>
-                            <SelectItem value="members_only">Members Only</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+                    <EmbeddedQuizAssignmentCard
+                      assignments={assignments}
+                      widgetSrc={`${window.location.origin}/quizzes/${quiz.id}?embed=1`}
+                      onManageAssignments={() => navigate(getAdminUrl("/lms-admin"))}
+                      onOpenCourse={() => navigate(getAdminUrl("/lms-admin"))}
+                      onCopyWidget={() => {
+                        const code = `<iframe src="${window.location.origin}/quizzes/${quiz.id}?embed=1" width="100%" height="720" frameborder="0" style="border:0;border-radius:12px" title="${quiz.title.replace(/"/g, "&quot;")}"></iframe>`;
+                        navigator.clipboard.writeText(code).then(() => toast.success("Quiz HTML widget copied")).catch(() => toast.error("Could not copy the embed code"));
+                      }}
+                    />
                   </CardContent>
                 </Card>
 

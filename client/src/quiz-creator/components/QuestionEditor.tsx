@@ -92,6 +92,11 @@ export function QuestionEditor() {
     uploadFile("image/*", (url) => update({ backgroundImageUrl: url }));
   };
 
+  const reuseMediaUrl = (label: string, callback: (url: string) => void) => {
+    const url = window.prompt(`Paste the ${label} URL from Media Repository`);
+    if (url?.trim()) callback(url.trim());
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       {/* Question header */}
@@ -181,12 +186,10 @@ export function QuestionEditor() {
         {/* Add media buttons */}
         <div className="flex flex-wrap gap-2">
           {!question.image && (
-            <button
-              onClick={uploadStemImage}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-teal-600 border border-gray-200 hover:border-teal-300 rounded-lg transition-colors"
-            >
-              <Image className="w-3.5 h-3.5" /> Image
-            </button>
+            <>
+              <button onClick={uploadStemImage} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-teal-600 border border-gray-200 hover:border-teal-300 rounded-lg transition-colors"><Image className="w-3.5 h-3.5" /> Image</button>
+              <button onClick={() => reuseMediaUrl("image", (url) => update({ image: { url, alt: "Question image" } }))} className="px-3 py-1.5 text-xs text-teal-700 border border-teal-200 hover:bg-teal-50 rounded-lg transition-colors">Use image URL</button>
+            </>
           )}
           {!question.audio && (
             <button
@@ -197,12 +200,10 @@ export function QuestionEditor() {
             </button>
           )}
           {!question.video && (
-            <button
-              onClick={uploadVideo}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-blue-600 border border-gray-200 hover:border-blue-300 rounded-lg transition-colors"
-            >
-              <Video className="w-3.5 h-3.5" /> Video
-            </button>
+            <>
+              <button onClick={uploadVideo} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-blue-600 border border-gray-200 hover:border-blue-300 rounded-lg transition-colors"><Video className="w-3.5 h-3.5" /> Video</button>
+              <button onClick={() => reuseMediaUrl("video", (url) => update({ video: { url, type: "file" } }))} className="px-3 py-1.5 text-xs text-teal-700 border border-teal-200 hover:bg-teal-50 rounded-lg transition-colors">Use video URL</button>
+            </>
           )}
           {!question.backgroundImageUrl && (
             <button
@@ -356,14 +357,14 @@ export function QuestionEditor() {
               <span className="flex items-center gap-1"><Image className="h-3.5 w-3.5 text-teal-600" />Feedback Image</span>
               {question.feedbackImage && <button type="button" onClick={() => update({ feedbackImage: null })} className="text-red-600 hover:text-red-700"><Trash2 className="h-3.5 w-3.5" /></button>}
             </div>
-            {question.feedbackImage ? <img src={question.feedbackImage.url} alt={question.feedbackImage.alt} className="max-h-32 w-full rounded bg-white object-contain" /> : <button type="button" onClick={uploadFeedbackImage} className="flex w-full items-center justify-center gap-1 rounded border border-dashed border-teal-300 px-3 py-2 text-xs text-teal-700 hover:bg-teal-50"><Upload className="h-3.5 w-3.5" />Upload Image</button>}
+            {question.feedbackImage ? <img src={question.feedbackImage.url} alt={question.feedbackImage.alt} className="max-h-32 w-full rounded bg-white object-contain" /> : <div className="flex gap-2"><button type="button" onClick={uploadFeedbackImage} className="flex flex-1 items-center justify-center gap-1 rounded border border-dashed border-teal-300 px-3 py-2 text-xs text-teal-700 hover:bg-teal-50"><Upload className="h-3.5 w-3.5" />Upload Image</button><button type="button" onClick={() => reuseMediaUrl("feedback image", (url) => update({ feedbackImage: { url, alt: "Feedback image" } }))} className="rounded border border-teal-200 px-2 py-2 text-xs text-teal-700 hover:bg-teal-50">Use URL</button></div>}
           </div>
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
             <div className="mb-2 flex items-center justify-between text-xs font-semibold text-gray-600">
               <span className="flex items-center gap-1"><Video className="h-3.5 w-3.5 text-teal-600" />Feedback Video</span>
               {question.feedbackVideo && <button type="button" onClick={() => update({ feedbackVideo: null })} className="text-red-600 hover:text-red-700"><Trash2 className="h-3.5 w-3.5" /></button>}
             </div>
-            {question.feedbackVideo ? <video src={question.feedbackVideo.url} controls className="max-h-32 w-full rounded bg-black" /> : <button type="button" onClick={uploadFeedbackVideo} className="flex w-full items-center justify-center gap-1 rounded border border-dashed border-teal-300 px-3 py-2 text-xs text-teal-700 hover:bg-teal-50"><Upload className="h-3.5 w-3.5" />Upload Video</button>}
+            {question.feedbackVideo ? <video src={question.feedbackVideo.url} controls className="max-h-32 w-full rounded bg-black" /> : <div className="flex gap-2"><button type="button" onClick={uploadFeedbackVideo} className="flex flex-1 items-center justify-center gap-1 rounded border border-dashed border-teal-300 px-3 py-2 text-xs text-teal-700 hover:bg-teal-50"><Upload className="h-3.5 w-3.5" />Upload Video</button><button type="button" onClick={() => reuseMediaUrl("feedback video", (url) => update({ feedbackVideo: { url, type: "file" } }))} className="rounded border border-teal-200 px-2 py-2 text-xs text-teal-700 hover:bg-teal-50">Use URL</button></div>}
           </div>
         </div>
       </div>

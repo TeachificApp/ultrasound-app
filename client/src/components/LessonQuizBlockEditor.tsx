@@ -551,6 +551,11 @@ function QuestionEditor({
     }
   };
 
+  const reuseMediaUrl = (label: string, onReuse: (url: string) => void) => {
+    const url = window.prompt(`Paste the ${label} URL from Media Repository`);
+    if (url?.trim()) onReuse(url.trim());
+  };
+
   const toggleMultiCorrect = (j: number) => {
     const prev = q.correctAnswers ?? [];
     setQ(p => ({
@@ -637,6 +642,7 @@ function QuestionEditor({
             <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => imgRef.current?.click()}>
               <ImageIcon size={11} className="mr-1" /> {q.imageUrl ? "Change" : "Add Image"}
             </Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs text-teal-700" onClick={() => reuseMediaUrl("question image", (url) => setQ(prev => ({ ...prev, imageUrl: url })))}>Use URL</Button>
             {q.imageUrl && (
               <Button type="button" size="sm" variant="ghost" className="h-7 text-xs text-red-500"
                 onClick={() => setQ(prev => ({ ...prev, imageUrl: undefined }))}>Remove</Button>
@@ -658,6 +664,7 @@ function QuestionEditor({
               placeholder="https://youtube.com/watch?v=… or direct MP4 URL"
               className="h-8 text-xs flex-1"
             />
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs text-teal-700 shrink-0" onClick={() => reuseMediaUrl("question video", (url) => setQ(prev => ({ ...prev, videoUrl: url })))}>Use URL</Button>
             {q.videoUrl && (
               <Button type="button" size="sm" variant="ghost" className="h-7 text-xs text-red-500 shrink-0"
                 onClick={() => setQ(prev => ({ ...prev, videoUrl: undefined }))}>✕</Button>
@@ -735,6 +742,11 @@ function QuestionEditor({
                     onClick={() => ansImgRefs.current[j]?.click()}>
                     <ImageIcon size={10} /> {q.answerImages?.[j] ? "Change image" : "Add image"}
                   </button>
+                  <button type="button" className="text-xs text-teal-700 hover:text-teal-800" onClick={() => reuseMediaUrl("answer image", (url) => {
+                    const imgs = [...(q.answerImages ?? Array(q.options.length).fill(undefined))];
+                    imgs[j] = url;
+                    setQ(prev => ({ ...prev, answerImages: imgs }));
+                  })}>Use URL</button>
                   {q.answerImages?.[j] && (
                     <button type="button" className="text-xs text-red-400 hover:text-red-600"
                       onClick={() => {
@@ -912,6 +924,7 @@ function QuestionEditor({
               onClick={() => feedbackImgRef.current?.click()}>
               <ImageIcon size={11} className="mr-1" /> {q.feedbackImageUrl ? "Change" : "Add Feedback Image"}
             </Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs text-teal-700" onClick={() => reuseMediaUrl("feedback image", (url) => setQ(prev => ({ ...prev, feedbackImageUrl: url })))}>Use URL</Button>
             {q.feedbackImageUrl && (
               <Button type="button" size="sm" variant="ghost" className="h-7 text-xs text-red-500"
                 onClick={() => setQ(prev => ({ ...prev, feedbackImageUrl: undefined }))}>Remove</Button>
@@ -926,13 +939,14 @@ function QuestionEditor({
         <Label className="text-xs text-gray-600">Feedback Video URL (optional)</Label>
         <div className="flex items-center gap-2 mt-1">
           <Video size={12} className="text-gray-400 shrink-0" />
-          <Input
-            value={q.feedbackVideoUrl ?? ""}
-            onChange={(e) => setQ(prev => ({ ...prev, feedbackVideoUrl: e.target.value || undefined }))}
-            placeholder="https://youtube.com/watch?v=… or direct MP4 URL"
-            className="h-8 text-xs flex-1"
-          />
-          {q.feedbackVideoUrl && (
+            <Input
+              value={q.feedbackVideoUrl ?? ""}
+              onChange={(e) => setQ(prev => ({ ...prev, feedbackVideoUrl: e.target.value || undefined }))}
+              placeholder="https://youtube.com/watch?v=… or direct MP4 URL"
+              className="h-8 text-xs flex-1"
+            />
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs text-teal-700 shrink-0" onClick={() => reuseMediaUrl("feedback video", (url) => setQ(prev => ({ ...prev, feedbackVideoUrl: url })))}>Use URL</Button>
+            {q.feedbackVideoUrl && (
             <Button type="button" size="sm" variant="ghost" className="h-7 text-xs text-red-500 shrink-0"
               onClick={() => setQ(prev => ({ ...prev, feedbackVideoUrl: undefined }))}>✕</Button>
           )}

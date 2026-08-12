@@ -86,6 +86,7 @@ import {
   workshopResources,
   workshopEnrollments,
   digitalBundles,
+  standaloneQuizzes,
 } from "../../drizzle/schema";
 import { draftNotifyEntries, cmeActivityForms } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -1046,6 +1047,11 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       if (input.type === "quiz") {
         await db.insert(lmsQuizzes).values({ lessonId: result.id, title: input.title });
       }
+      if (input.type === "standalone_quiz" && input.standaloneQuizId) {
+        await db.update(standaloneQuizzes)
+          .set({ status: "published", accessType: "enrolled" })
+          .where(eq(standaloneQuizzes.id, input.standaloneQuizId));
+      }
       return { id: result.id };
     }),
 
@@ -1125,6 +1131,12 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         updates.previewMode = updates.isPreview ? "preview" : "none";
       }
       if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates as any).where(eq(lmsLessons.id, id));
+
+      if ((updates.type === "standalone_quiz" || updates.standaloneQuizId !== undefined) && updates.standaloneQuizId) {
+        await db.update(standaloneQuizzes)
+          .set({ status: "published", accessType: "enrolled" })
+          .where(eq(standaloneQuizzes.id, Number(updates.standaloneQuizId)));
+      }
 
       // When countTowardCompletion changes, recalculate progress for all enrollments in this course
       // so existing completions are immediately reflected in the correct percentage.

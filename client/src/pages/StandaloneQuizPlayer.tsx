@@ -88,6 +88,7 @@ export default function StandaloneQuizPlayer() {
   const { user, isLoading: authLoading } = useAuth();
 
   const qId = parseInt(quizId, 10);
+  const isEmbedWidget = new URLSearchParams(window.location.search).get("embed") === "1";
 
   const { data: quizInfo, isLoading: infoLoading } = trpc.standaloneQuizLearner.getQuizInfo.useQuery(
     { quizId: qId },
@@ -189,7 +190,7 @@ export default function StandaloneQuizPlayer() {
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-4">
         <BookOpen className="w-12 h-12 text-teal-600" />
         <h2 className="text-xl font-bold">Sign in to take this quiz</h2>
-        <Button onClick={() => window.location.href = getLoginUrl(`/quizzes/${qId}`)} className="bg-teal-600 hover:bg-teal-700">Sign In</Button>
+        <Button onClick={() => window.location.href = getLoginUrl(`/quizzes/${qId}${isEmbedWidget ? "?embed=1" : ""}`)} className="bg-teal-600 hover:bg-teal-700">Sign In</Button>
       </div>
     );
   }
@@ -383,9 +384,9 @@ export default function StandaloneQuizPlayer() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={isEmbedWidget ? "bg-gray-50" : "min-h-screen bg-gray-50"}>
       {/* Top bar */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3">
+      <div className={`${isEmbedWidget ? "" : "sticky top-0 z-10"} bg-white border-b border-gray-200 px-4 py-3`}>
         <div className="max-w-3xl mx-auto flex items-center gap-4">
           <div className="flex-1">
             <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
