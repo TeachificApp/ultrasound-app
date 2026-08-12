@@ -24,6 +24,9 @@ import { authenticateRequest } from "./authHelper";
 import { parseISpringQuizFromBuffer, type ParsedQuiz } from "./lib/iSpringQuizParser";
 import { uploadISpringImagesFromZip, rewriteStorageRefs } from "./lib/iSpringImageImporter";
 import { buildExportZipFromQuestions } from "./lib/questionBankExport";
+import { getDb } from "./db";
+import { standaloneQuizzes, standaloneQuizQuestions, questionBank } from "../drizzle/schema";
+import { asc, eq } from "drizzle-orm";
 
 // CDN URLs for the pre-built Teachific templates
 const TEMPLATE_ZIP_URL =

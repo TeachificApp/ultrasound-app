@@ -29,6 +29,7 @@ const TYPE_LABELS: Record<string, string> = {
 export function QuestionEditor() {
   const { quiz, activeQuestionId, updateQuestion, deleteQuestion } = useQuizStore();
   const question = quiz.questions.find((q) => q.id === activeQuestionId);
+  const [showMediaPanel, setShowMediaPanel] = useState(false);
 
   if (!question) {
     return (
@@ -43,8 +44,6 @@ export function QuestionEditor() {
 
   const update = (updates: Partial<QuizQuestion>) => updateQuestion(question.id, updates);
   const updateData = (data: QuestionData) => update({ data });
-
-  const [showMediaPanel, setShowMediaPanel] = useState(false);
 
   const uploadFile = (accept: string, callback: (url: string, name: string) => void) => {
     const input = document.createElement("input");

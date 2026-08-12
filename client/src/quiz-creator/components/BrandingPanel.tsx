@@ -64,7 +64,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
     <div className="p-4 space-y-5">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-          <Palette className="w-4 h-4" /> Quiz Branding
+          <Palette className="w-4 h-4" /> All About Ultrasound | iHeartEcho Branding
         </h3>
         <button
           onClick={handleSave}

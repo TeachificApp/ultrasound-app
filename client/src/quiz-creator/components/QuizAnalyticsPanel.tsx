@@ -51,7 +51,7 @@ export default function QuizAnalyticsPanel({ quizId }: QuizAnalyticsPanelProps) 
       <div className="p-6 text-center text-gray-400 text-sm">
         <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-50" />
         <p className="font-medium text-gray-600 mb-1">No attempts yet</p>
-        <p>Publish your quiz and share the link to start collecting responses.</p>
+        <p>Add this quiz to a course, quiz, webinar, cohort, or workshop to begin collecting learner responses.</p>
       </div>
     );
   }

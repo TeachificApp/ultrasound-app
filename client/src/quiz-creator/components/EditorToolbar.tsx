@@ -98,8 +98,8 @@ export function EditorToolbar({ onPreview, onSettings, onCloudOpen }: Props) {
             <FileText className="w-4 h-4 text-white" />
           </div>
           <div>
-            <span className="text-white font-bold text-sm">All About Ultrasound</span>
-            <span className="text-white/60 text-xs ml-1">Quiz Creator</span>
+            <span className="text-white font-bold text-sm">All About Ultrasound <span className="text-aqua-200">| iHeartEcho</span></span>
+            <span className="block text-white/60 text-[10px] leading-none mt-0.5">Quiz Creator</span>
           </div>
         </div>
 
