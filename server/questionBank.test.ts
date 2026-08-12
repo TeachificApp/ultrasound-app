@@ -133,6 +133,9 @@ describe("Question Bank", () => {
       const routerSource = fs.readFileSync(path.resolve(process.cwd(), "server/routers/questionBankRouter.ts"), "utf8");
       expect(routerSource).toContain('questionType: z.enum(["mcq", "truefalse", "multiselect", "matching", "hotspot", "mixed"])');
       expect(routerSource).toContain('type: { type: "string", enum: ["mcq", "truefalse", "multiselect", "matching", "hotspot"] }');
+      expect(routerSource).toContain("For every question, write a concise explanation of why the correct answer is correct.");
+      expect(routerSource).toContain("optionFeedback: { type: \"array\", items: { type: \"string\" } }");
+      expect(routerSource).toContain("feedback: q.optionFeedback?.[index] ?? \"\"");
       expect(routerSource).toContain('questions: getReturnedQuestions()');
     });
   });

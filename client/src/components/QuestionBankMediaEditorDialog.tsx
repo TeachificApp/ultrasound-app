@@ -10,7 +10,7 @@ import { Image as ImageIcon, Loader2, Plus, Trash2, Upload, Video } from "lucide
 
 type MediaField = "questionImageUrl" | "questionVideoUrl" | "feedbackImageUrl" | "feedbackVideoUrl";
 
-function parseOptions(value: unknown): { text: string; imageUrl?: string; videoUrl?: string }[] {
+function parseOptions(value: unknown): { text: string; imageUrl?: string; videoUrl?: string; feedback?: string }[] {
   if (Array.isArray(value)) return value.map((option) => typeof option === "string" ? { text: option } : option);
   if (typeof value !== "string") return [];
   try {
@@ -146,10 +146,13 @@ export function QuestionBankMediaEditorDialog({ question, open, onOpenChange, on
               <div className="flex items-center justify-between"><Label>Answer Choices</Label><Button type="button" size="sm" variant="outline" onClick={() => setDraft({ ...draft, options: [...draft.options, { text: "" }] })}><Plus className="mr-1 h-3.5 w-3.5" />Add Choice</Button></div>
               {draft.options.map((option: any, index: number) => {
                 const checked = isMultiple ? draft.correctAnswers.includes(index) : String(draft.correctAnswer) === String(index);
-                return <div className="flex items-center gap-2" key={index}>
-                  <input aria-label={`Correct answer ${index + 1}`} type={isMultiple ? "checkbox" : "radio"} name={`correct-${draft.id}`} checked={checked} onChange={() => setDraft({ ...draft, correctAnswer: String(index), correctAnswers: isMultiple ? (checked ? draft.correctAnswers.filter((item: number) => item !== index) : [...draft.correctAnswers, index]) : draft.correctAnswers })} className="h-4 w-4 accent-teal-600" />
-                  <Input value={option.text} onChange={(event) => setDraft({ ...draft, options: draft.options.map((item: any, itemIndex: number) => itemIndex === index ? { ...item, text: event.target.value } : item) })} placeholder={`Choice ${index + 1}`} />
-                  <Button type="button" size="icon" variant="ghost" className="text-red-600" disabled={draft.options.length <= 2} onClick={() => setDraft({ ...draft, options: draft.options.filter((_: any, itemIndex: number) => itemIndex !== index) })}><Trash2 className="h-4 w-4" /></Button>
+                return <div className="rounded-lg border border-gray-100 bg-gray-50/50 p-2" key={index}>
+                  <div className="flex items-center gap-2">
+                    <input aria-label={`Correct answer ${index + 1}`} type={isMultiple ? "checkbox" : "radio"} name={`correct-${draft.id}`} checked={checked} onChange={() => setDraft({ ...draft, correctAnswer: String(index), correctAnswers: isMultiple ? (checked ? draft.correctAnswers.filter((item: number) => item !== index) : [...draft.correctAnswers, index]) : draft.correctAnswers })} className="h-4 w-4 accent-teal-600" />
+                    <Input value={option.text} onChange={(event) => setDraft({ ...draft, options: draft.options.map((item: any, itemIndex: number) => itemIndex === index ? { ...item, text: event.target.value } : item) })} placeholder={`Choice ${index + 1}`} />
+                    <Button type="button" size="icon" variant="ghost" className="text-red-600" disabled={draft.options.length <= 2} onClick={() => setDraft({ ...draft, options: draft.options.filter((_: any, itemIndex: number) => itemIndex !== index) })}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                  <Textarea value={option.feedback ?? ""} onChange={(event) => setDraft({ ...draft, options: draft.options.map((item: any, itemIndex: number) => itemIndex === index ? { ...item, feedback: event.target.value } : item) })} placeholder={`Feedback for choice ${index + 1}`} rows={2} className="mt-2 text-xs" />
                 </div>;
               })}
             </div>

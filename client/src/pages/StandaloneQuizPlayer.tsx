@@ -20,6 +20,23 @@ import {
   getFeedbackMessage,
 } from "@/components/quiz/BuilderQuizPlayer";
 
+export function getStandaloneSelectedOptionFeedback(
+  type: string,
+  options: Array<{ text: string; feedback?: string }>,
+  givenAnswer: string | undefined,
+  overallExplanation?: string | null,
+): string {
+  if (givenAnswer === undefined) return "";
+  if (type === "truefalse" && options.length === 0 && (givenAnswer === "true" || givenAnswer === "false")) {
+    const selected = givenAnswer === "true" ? "True" : "False";
+    return overallExplanation ? `You selected ${selected}. ${overallExplanation}` : `You selected ${selected}.`;
+  }
+  const selectedIndex = type === "truefalse"
+    ? options.findIndex((option) => option.text.trim().toLowerCase() === givenAnswer.trim().toLowerCase())
+    : Number(givenAnswer);
+  return Number.isInteger(selectedIndex) && selectedIndex >= 0 ? options[selectedIndex]?.feedback?.trim() ?? "" : "";
+}
+
 // ─── Timer hook ───────────────────────────────────────────────────────────────
 function useTimer(limitSeconds: number | null, onExpire: () => void) {
   const [elapsed, setElapsed] = useState(0);
@@ -253,7 +270,7 @@ export default function StandaloneQuizPlayer() {
   const q = questions[currentIdx];
   if (!q) return null;
 
-  let options: { text: string; imageUrl?: string }[] = [];
+  let options: { text: string; imageUrl?: string; feedback?: string }[] = [];
   try { options = JSON.parse(q.options ?? "[]"); } catch { /* ignore */ }
 
   const givenAnswer = answers[q.questionBankId];
@@ -263,8 +280,16 @@ export default function StandaloneQuizPlayer() {
   // Determine correctness for quiz mode
   let correctIdx: number | null = null;
   if (isQuizMode && q.correctAnswer !== undefined) {
-    correctIdx = parseInt(q.correctAnswer, 10);
+    const storedCorrectAnswer = String(q.correctAnswer).trim().toLowerCase();
+    if (/^\d+$/.test(storedCorrectAnswer)) {
+      correctIdx = Number(storedCorrectAnswer);
+    } else if (q.type === "truefalse") {
+      correctIdx = storedCorrectAnswer === "true" ? 0 : storedCorrectAnswer === "false" ? 1 : options.findIndex((option) => option.text.trim().toLowerCase() === storedCorrectAnswer);
+    } else {
+      correctIdx = options.findIndex((option) => option.text.trim().toLowerCase() === storedCorrectAnswer);
+    }
   }
+  const selectedOptionFeedback = getStandaloneSelectedOptionFeedback(q.type, options, givenAnswer, q.explanation);
 
   const progress = ((currentIdx + 1) / questions.length) * 100;
   const answeredCount = Object.keys(answers).length;
@@ -454,6 +479,12 @@ export default function StandaloneQuizPlayer() {
                   ? <><CheckCircle className="w-4 h-4" /> Correct!</>
                   : <><XCircle className="w-4 h-4" /> Incorrect</>}
               </div>
+              {selectedOptionFeedback && (
+                <div className={`rounded-lg border p-4 text-sm mb-3 ${givenAnswer === String(correctIdx) ? "bg-teal-50 border-teal-100 text-teal-800" : "bg-amber-50 border-amber-100 text-amber-900"}`}>
+                  <strong className="block mb-1">About your answer</strong>
+                  {selectedOptionFeedback}
+                </div>
+              )}
               {q.explanation && (
                 <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
                   <strong className="block mb-1">Explanation</strong>
