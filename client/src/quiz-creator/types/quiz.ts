@@ -227,8 +227,11 @@ export interface QuizQuestion {
   branchRules?: BranchRule[];
   // Group assignment
   groupId?: string;
-  // Randomization override
-  lockAnswerOrder?: boolean; // if true, answers stay in set order even when quiz-level shuffle is on
+  // Per-question randomization. This is intentionally not quiz-wide: questions such as
+  // "All of the above" can always preserve their authored answer order.
+  shuffleAnswerOptions?: boolean;
+  // Legacy import compatibility for older .quiz files. New edits use shuffleAnswerOptions.
+  lockAnswerOrder?: boolean;
   data: QuestionData;
 }
 

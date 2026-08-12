@@ -11,7 +11,9 @@ interface TfData {
   correct: boolean;
 }
 
-export function stableBuilderQuestionId(builderId: string): number {
+import { orderQuestionOptions } from "./questionOptionOrder";
+
+export function stableBuilderQuestionId(builderQuestionId: string): number {
   let h = 0;
   for (let i = 0; i < builderId.length; i++) {
     h = (Math.imul(31, h) + builderId.charCodeAt(i)) | 0;
@@ -92,11 +94,17 @@ export function builderQuestionToPlayerPayload(
     feedback?: { correct?: string; incorrect?: string; partial?: string };
     branchRules?: unknown[];
     data: unknown;
+    shuffleAnswerOptions?: boolean;
     backgroundImageUrl?: string;
     backgroundColor?: string;
   },
   showAnswers: boolean
 ) {
+  const dataWithChoices = q.data as { choices?: unknown[] } | null;
+  const playerData = q.shuffleAnswerOptions && Array.isArray(dataWithChoices?.choices)
+    ? { ...dataWithChoices, choices: orderQuestionOptions(dataWithChoices.choices, true) }
+    : q.data;
+
   return {
     builderQuestionId: q.id,
     questionBankId: stableBuilderQuestionId(q.id),
@@ -110,7 +118,7 @@ export function builderQuestionToPlayerPayload(
     backgroundColor: q.backgroundColor ?? null,
     feedback: q.feedback ?? null,
     branchRules: q.branchRules ?? [],
-    data: q.data,
+    data: playerData,
     ...(showAnswers
       ? {
           explanation: q.explanation,

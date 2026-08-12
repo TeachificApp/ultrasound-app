@@ -260,8 +260,6 @@ export const questionBankRouter = router({
       isPreset: z.boolean().optional(),
       presetCategory: z.string().max(100).nullable().optional(),
       tagIds: z.array(z.number().int()).optional(),
-      isPreset: z.boolean().optional(),
-      presetCategory: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);

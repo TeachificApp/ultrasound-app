@@ -24,6 +24,7 @@ import {
 } from "../../drizzle/schema";
 import { drawQuestionsFromBuilder, parseBuilderConfig } from "../lib/quizBuilderConfig";
 import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
+import { orderQuestionOptions } from "../lib/questionOptionOrder";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
@@ -254,7 +255,7 @@ export const standaloneQuizLearnerRouter = router({
       const questions = quizQs.map((q) => {
         let options: any[] = [];
         try { options = JSON.parse(q.qb.options ?? "[]"); } catch { /* ignore */ }
-        if (quiz.shuffleAnswers && options.length > 0) options = shuffle(options);
+        options = orderQuestionOptions(options, q.sqq.shuffleAnswerOptions);
         return {
           sqqId: q.sqqId,
           questionBankId: q.qb.id,
@@ -753,6 +754,19 @@ export const standaloneQuizAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(standaloneQuizQuestions)
         .set({ points: input.points })
+        .where(eq(standaloneQuizQuestions.id, input.standaloneQuizQuestionId));
+      return { success: true };
+    }),
+
+  /** Configure whether options are shuffled for one question only. */
+  updateQuestionAnswerOrder: protectedProcedure
+    .input(z.object({ standaloneQuizQuestionId: z.number().int(), shuffleAnswerOptions: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.update(standaloneQuizQuestions)
+        .set({ shuffleAnswerOptions: input.shuffleAnswerOptions })
         .where(eq(standaloneQuizQuestions.id, input.standaloneQuizQuestionId));
       return { success: true };
     }),

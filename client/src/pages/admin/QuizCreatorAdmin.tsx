@@ -1564,6 +1564,10 @@ function QuizEditor({ quizId }: { quizId: number }) {
     onSuccess: () => { toast.success("Question removed"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const updateAnswerOrderMutation = trpc.standaloneQuizAdmin.updateQuestionAnswerOrder.useMutation({
+    onSuccess: () => { toast.success("Answer order setting saved"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const [settings, setSettings] = useState<any>(null);
   const [showAddQ, setShowAddQ] = useState(false);
@@ -1741,7 +1745,6 @@ function QuizEditor({ quizId }: { quizId: number }) {
                     <div className="space-y-3 pt-2">
                       {[
                         { key: "shuffleQuestions", label: "Shuffle question order" },
-                        { key: "shuffleAnswers", label: "Shuffle answer options" },
                         { key: "showResultsImmediately", label: "Show results immediately after submission" },
                         { key: "showExplanations", label: "Show explanations in results" },
                         { key: "allowRetakes", label: "Allow retakes" },
@@ -2017,6 +2020,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                         <th className="text-left px-4 py-3 font-medium text-gray-600">Question</th>
                         <th className="text-center px-4 py-3 font-medium text-gray-600">Type</th>
                         <th className="text-center px-4 py-3 font-medium text-gray-600">Points</th>
+                        <th className="text-center px-4 py-3 font-medium text-gray-600">Shuffle Options</th>
                         <th className="text-right px-4 py-3 font-medium text-gray-600">Remove</th>
                       </tr>
                     </thead>
@@ -2031,6 +2035,14 @@ function QuizEditor({ quizId }: { quizId: number }) {
                             <span className="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full capitalize">{qb.type}</span>
                           </td>
                           <td className="px-4 py-3 text-center text-gray-700">{sqq.points}</td>
+                          <td className="px-4 py-3 text-center">
+                            <Switch
+                              checked={!!sqq.shuffleAnswerOptions}
+                              onCheckedChange={(shuffleAnswerOptions) => updateAnswerOrderMutation.mutate({ standaloneQuizQuestionId: sqq.id, shuffleAnswerOptions })}
+                              disabled={updateAnswerOrderMutation.isPending}
+                              aria-label={`Shuffle answer options for question ${idx + 1}`}
+                            />
+                          </td>
                           <td className="px-4 py-3 text-right">
                             <Button
                               size="sm" variant="ghost"

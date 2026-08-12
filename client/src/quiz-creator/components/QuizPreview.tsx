@@ -13,7 +13,7 @@ type Answer = string | boolean | string[] | Record<string, string>;
 function McqQuestion({ q, answer, setAnswer, shuffleChoices }: { q: QuizQuestion; answer: Answer; setAnswer: (a: Answer) => void; shuffleChoices?: boolean }) {
   const data = q.data as McqData;
   const choices = useMemo(() => {
-    if (shuffleChoices && !q.lockAnswerOrder) {
+    if (shuffleChoices) {
       return [...data.choices].sort(() => 0.5 - Math.random());
     }
     return data.choices;
@@ -194,7 +194,7 @@ function ShortAnswerQuestion({ answer, setAnswer }: { answer: Answer; setAnswer:
 function ImageChoiceQuestion({ q, answer, setAnswer, shuffleChoices }: { q: QuizQuestion; answer: Answer; setAnswer: (a: Answer) => void; shuffleChoices?: boolean }) {
   const data = q.data as ImageChoiceData;
   const choices = useMemo(() => {
-    if (shuffleChoices && !q.lockAnswerOrder) {
+    if (shuffleChoices) {
       return [...data.choices].sort(() => 0.5 - Math.random());
     }
     return data.choices;
@@ -547,13 +547,13 @@ export function QuizPreview({ onClose }: Props) {
             {q.image && <img src={q.image.url} alt={q.image.alt} className="mt-3 rounded-xl max-h-48 object-cover" />}
           </div>
 
-          {q.type === "mcq" && <McqQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} shuffleChoices={quiz.meta.shuffleAnswers} />}
+          {q.type === "mcq" && <McqQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} shuffleChoices={q.shuffleAnswerOptions === true} />}
           {q.type === "tf" && <TfQuestion answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
           {q.type === "matching" && <MatchingQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
           {q.type === "hotspot" && (q.data as HotspotData).imageUrl && <HotspotQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
           {q.type === "fill_blank" && <FillBlankQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
           {q.type === "short_answer" && <ShortAnswerQuestion answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "image_choice" && <ImageChoiceQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} shuffleChoices={quiz.meta.shuffleAnswers} />}
+          {q.type === "image_choice" && <ImageChoiceQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} shuffleChoices={q.shuffleAnswerOptions === true} />}
           {q.type === "ordering" && <OrderingQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
           {q.type === "numeric" && <NumericQuestion answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} data={q.data as NumericData} />}
           {q.type === "dropdown" && <DropdownQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
