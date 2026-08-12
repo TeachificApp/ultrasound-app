@@ -7425,6 +7425,7 @@ export const standaloneQuizQuestions = mysqlTable("standalone_quiz_questions", {
   sortOrder: int("sort_order").default(0).notNull(),
   points: int("points").default(1).notNull(),
   shuffleAnswerOptions: boolean("shuffle_answer_options").default(false).notNull(),
+  lockAnswerOrder: boolean("lock_answer_order"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type StandaloneQuizQuestion = typeof standaloneQuizQuestions.$inferSelect;

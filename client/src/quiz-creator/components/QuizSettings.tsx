@@ -230,9 +230,18 @@ export function QuizSettings({ onClose }: Props) {
                     <p className="text-xs text-gray-400">Randomize the order questions appear for each attempt</p>
                   </div>
                 </label>
-                <p className="text-xs text-teal-700 bg-teal-50 px-3 py-2 rounded-lg">
-                  Answer-option shuffling is configured on each question in the question editor. This keeps authored order intact for questions such as “All of the above.”
-                </p>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={m.shuffleAnswers}
+                    onChange={(e) => updateMeta({ shuffleAnswers: e.target.checked })}
+                    className="accent-teal-500 w-4 h-4"
+                  />
+                  <div>
+                    <span className="text-sm text-gray-700">Shuffle answer options by default</span>
+                    <p className="text-xs text-gray-400">Individual questions can preserve authored order, such as “All of the above.”</p>
+                  </div>
+                </label>
               </div>
               <div className="space-y-2 pt-2 border-t border-gray-100">
                 <label className="flex items-center gap-3 cursor-pointer">

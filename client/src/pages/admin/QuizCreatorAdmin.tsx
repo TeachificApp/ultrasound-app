@@ -2039,7 +2039,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                         <th className="text-left px-4 py-3 font-medium text-gray-600">Question</th>
                         <th className="text-center px-4 py-3 font-medium text-gray-600">Type</th>
                         <th className="text-center px-4 py-3 font-medium text-gray-600">Points</th>
-                        <th className="text-center px-4 py-3 font-medium text-gray-600">Shuffle Options</th>
+                        <th className="text-center px-4 py-3 font-medium text-gray-600">Preserve Order</th>
                         <th className="text-center px-4 py-3 font-medium text-gray-600">Edit</th>
                         <th className="text-right px-4 py-3 font-medium text-gray-600">Remove</th>
                       </tr>
@@ -2057,10 +2057,10 @@ function QuizEditor({ quizId }: { quizId: number }) {
                           <td className="px-4 py-3 text-center text-gray-700">{sqq.points}</td>
                           <td className="px-4 py-3 text-center">
                             <Switch
-                              checked={!!sqq.shuffleAnswerOptions}
-                              onCheckedChange={(shuffleAnswerOptions) => updateAnswerOrderMutation.mutate({ standaloneQuizQuestionId: sqq.id, shuffleAnswerOptions })}
+                              checked={!!sqq.lockAnswerOrder}
+                              onCheckedChange={(lockAnswerOrder) => updateAnswerOrderMutation.mutate({ standaloneQuizQuestionId: sqq.id, lockAnswerOrder })}
                               disabled={updateAnswerOrderMutation.isPending}
-                              aria-label={`Shuffle answer options for question ${idx + 1}`}
+                              aria-label={`Preserve authored answer order for question ${idx + 1}`}
                             />
                           </td>
                           <td className="px-4 py-3 text-center">

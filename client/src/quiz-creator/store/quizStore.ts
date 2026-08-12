@@ -122,7 +122,7 @@ function newQuestion(type: QuestionType, order: number): QuizQuestion {
     stem: "",
     image: null,
     explanation: "",
-    shuffleAnswerOptions: false,
+    shuffleAnswerOptions: undefined,
     data: defaultData(type),
   };
 }

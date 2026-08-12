@@ -16,3 +16,42 @@ export function orderQuestionOptions<T>(
   }
   return ordered;
 }
+
+/** Resolve a quiz-wide shuffle default with an explicit question-level authored-order override. */
+export function shouldShuffleQuestionOptions({
+  quizDefault,
+  questionSetting,
+  lockAnswerOrder,
+}: {
+  quizDefault: boolean;
+  questionSetting?: boolean | null;
+  lockAnswerOrder?: boolean | null;
+}): boolean {
+  if (lockAnswerOrder) return false;
+  return questionSetting ?? quizDefault;
+}
+
+/** Build the non-builder learner option payload while honoring quiz defaults and preserve-order overrides. */
+export function buildStandaloneLearnerOptions<T>({
+  options,
+  quizShuffleAnswers,
+  questionShuffleAnswerOptions,
+  lockAnswerOrder,
+  random,
+}: {
+  options: readonly T[];
+  quizShuffleAnswers: boolean;
+  questionShuffleAnswerOptions?: boolean | null;
+  lockAnswerOrder?: boolean | null;
+  random?: () => number;
+}): T[] {
+  return orderQuestionOptions(
+    options,
+    shouldShuffleQuestionOptions({
+      quizDefault: quizShuffleAnswers,
+      questionSetting: questionShuffleAnswerOptions,
+      lockAnswerOrder,
+    }),
+    random,
+  );
+}

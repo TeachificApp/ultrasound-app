@@ -4,7 +4,7 @@ import { standaloneQuestionToBuilderQuestion } from "./routers/quizMakerRouter";
 describe("standalone Question Bank hydration for Visual Builder", () => {
   it("preserves question content, media, points, and per-question shuffle settings", () => {
     const result = standaloneQuestionToBuilderQuestion({
-      sqq: { questionBankId: 42, sortOrder: 3, points: 2, shuffleAnswerOptions: true } as any,
+      sqq: { questionBankId: 42, sortOrder: 3, points: 2, shuffleAnswerOptions: true, lockAnswerOrder: true } as any,
       qb: {
         id: 42,
         type: "mcq",
@@ -31,6 +31,7 @@ describe("standalone Question Bank hydration for Visual Builder", () => {
       points: 2,
       stem: "Which vessel is assessed?",
       shuffleAnswerOptions: true,
+      lockAnswerOrder: true,
       image: { url: "https://cdn.example/question.png" },
       video: { url: "https://cdn.example/question.mp4" },
       feedbackImage: { url: "https://cdn.example/feedback.png" },

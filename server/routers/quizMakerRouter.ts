@@ -68,6 +68,7 @@ export function standaloneQuestionToBuilderQuestion(row: { sqq: typeof standalon
     stem: row.qb.question,
     required: true,
     shuffleAnswerOptions: row.sqq.shuffleAnswerOptions,
+    lockAnswerOrder: row.sqq.lockAnswerOrder ?? false,
     explanation: row.qb.explanation ?? "",
     image: row.qb.questionImageUrl ? { url: row.qb.questionImageUrl, alt: "Question media" } : null,
     video: row.qb.questionVideoUrl ? { url: row.qb.questionVideoUrl, type: "file" } : null,

@@ -24,7 +24,7 @@ import {
 } from "../../drizzle/schema";
 import { drawQuestionsFromBuilder, parseBuilderConfig } from "../lib/quizBuilderConfig";
 import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
-import { orderQuestionOptions } from "../lib/questionOptionOrder";
+import { buildStandaloneLearnerOptions, orderQuestionOptions } from "../lib/questionOptionOrder";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
@@ -195,7 +195,7 @@ export const standaloneQuizLearnerRouter = router({
         const attemptId = (result as { insertId: number }).insertId;
         const showAnswers = quiz.type === "quiz";
         const questions = drawn.map((q) =>
-          builderQuestionToPlayerPayload(q as Parameters<typeof builderQuestionToPlayerPayload>[0], showAnswers)
+          builderQuestionToPlayerPayload(q as Parameters<typeof builderQuestionToPlayerPayload>[0], showAnswers, Boolean(builderConfig.meta.shuffleAnswers))
         );
         return {
           attemptId,
@@ -255,7 +255,12 @@ export const standaloneQuizLearnerRouter = router({
       const questions = quizQs.map((q) => {
         let options: any[] = [];
         try { options = JSON.parse(q.qb.options ?? "[]"); } catch { /* ignore */ }
-        options = orderQuestionOptions(options, q.sqq.shuffleAnswerOptions);
+        options = buildStandaloneLearnerOptions({
+          options,
+          quizShuffleAnswers: quiz.shuffleAnswers,
+          questionShuffleAnswerOptions: q.sqq.shuffleAnswerOptions,
+          lockAnswerOrder: q.sqq.lockAnswerOrder,
+        });
         return {
           sqqId: q.sqqId,
           questionBankId: q.qb.id,
@@ -760,13 +765,13 @@ export const standaloneQuizAdminRouter = router({
 
   /** Configure whether options are shuffled for one question only. */
   updateQuestionAnswerOrder: protectedProcedure
-    .input(z.object({ standaloneQuizQuestionId: z.number().int(), shuffleAnswerOptions: z.boolean() }))
+    .input(z.object({ standaloneQuizQuestionId: z.number().int(), lockAnswerOrder: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(standaloneQuizQuestions)
-        .set({ shuffleAnswerOptions: input.shuffleAnswerOptions })
+        .set({ lockAnswerOrder: input.lockAnswerOrder })
         .where(eq(standaloneQuizQuestions.id, input.standaloneQuizQuestionId));
       return { success: true };
     }),

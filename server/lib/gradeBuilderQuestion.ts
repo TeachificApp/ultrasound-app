@@ -11,12 +11,12 @@ interface TfData {
   correct: boolean;
 }
 
-import { orderQuestionOptions } from "./questionOptionOrder";
+import { orderQuestionOptions, shouldShuffleQuestionOptions } from "./questionOptionOrder";
 
 export function stableBuilderQuestionId(builderQuestionId: string): number {
   let h = 0;
-  for (let i = 0; i < builderId.length; i++) {
-    h = (Math.imul(31, h) + builderId.charCodeAt(i)) | 0;
+  for (let i = 0; i < builderQuestionId.length; i++) {
+    h = (Math.imul(31, h) + builderQuestionId.charCodeAt(i)) | 0;
   }
   return Math.abs(h) || 1;
 }
@@ -97,13 +97,16 @@ export function builderQuestionToPlayerPayload(
     branchRules?: unknown[];
     data: unknown;
     shuffleAnswerOptions?: boolean;
+    lockAnswerOrder?: boolean;
     backgroundImageUrl?: string;
     backgroundColor?: string;
   },
-  showAnswers: boolean
+  showAnswers: boolean,
+  quizShuffleAnswers = false
 ) {
   const dataWithChoices = q.data as { choices?: unknown[] } | null;
-  const playerData = q.shuffleAnswerOptions && Array.isArray(dataWithChoices?.choices)
+  const shouldShuffleAnswers = shouldShuffleQuestionOptions({ quizDefault: quizShuffleAnswers, questionSetting: q.shuffleAnswerOptions, lockAnswerOrder: q.lockAnswerOrder });
+  const playerData = shouldShuffleAnswers && Array.isArray(dataWithChoices?.choices)
     ? { ...dataWithChoices, choices: orderQuestionOptions(dataWithChoices.choices, true) }
     : q.data;
 

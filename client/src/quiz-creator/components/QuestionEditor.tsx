@@ -321,18 +321,18 @@ export function QuestionEditor() {
             ) : null;
           })()}
         </div>
-        {/* Per-question answer-order setting */}
+        {/* Per-question answer-order override */}
         <div className="flex items-end pb-2">
           <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
             <input
               type="checkbox"
-              checked={question.shuffleAnswerOptions ?? false}
-              onChange={(e) => update({ shuffleAnswerOptions: e.target.checked })}
+              checked={question.lockAnswerOrder ?? question.shuffleAnswerOptions === false}
+              onChange={(e) => update({ lockAnswerOrder: e.target.checked })}
               className="accent-teal-500"
             />
             <span className="leading-tight">
-              Shuffle answer options
-              <span className="block text-xs text-gray-400">Enabled only for this question; leave off when answer order matters.</span>
+              Preserve authored answer order
+              <span className="block text-xs text-gray-400">Overrides the quiz default when answer order matters.</span>
             </span>
           </label>
         </div>
