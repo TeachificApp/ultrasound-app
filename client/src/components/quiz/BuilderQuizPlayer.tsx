@@ -222,16 +222,18 @@ export function getFeedbackMessage(q: any, givenAnswer: string): { type: "correc
       selectedChoiceFeedback = "";
     }
   }
-  try {
-    const selectedIds: string[] = q.type === "tf" ? [] : JSON.parse(givenAnswer);
-    const choices = (q.data?.choices ?? []) as { id: string; feedback?: string }[];
-    const selectedFeedback = selectedIds
-      .map((id) => choices.find((choice) => choice.id === id)?.feedback?.trim())
-      .filter(Boolean);
-    selectedChoiceFeedback = selectedFeedback.join(" ");
-  } catch {
-    const selected = (q.data?.choices ?? []).find((choice: { id: string }) => choice.id === givenAnswer);
-    selectedChoiceFeedback = selected?.feedback?.trim() ?? "";
+  if (q.type !== "tf") {
+    try {
+      const selectedIds: string[] = JSON.parse(givenAnswer);
+      const choices = (q.data?.choices ?? []) as { id: string; feedback?: string }[];
+      const selectedFeedback = selectedIds
+        .map((id) => choices.find((choice) => choice.id === id)?.feedback?.trim())
+        .filter(Boolean);
+      selectedChoiceFeedback = selectedFeedback.join(" ");
+    } catch {
+      const selected = (q.data?.choices ?? []).find((choice: { id: string }) => choice.id === givenAnswer);
+      selectedChoiceFeedback = selected?.feedback?.trim() ?? "";
+    }
   }
   if (correct) {
     return { type: "correct", message: selectedChoiceFeedback || feedback?.correct || q.explanation || "That's right! You answered correctly." };
