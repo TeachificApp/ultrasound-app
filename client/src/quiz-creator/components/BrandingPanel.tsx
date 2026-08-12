@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Palette, Type, Image, MessageSquare, Save, Loader2 } from "lucide-react";
+import { useQuizStore } from "../store/quizStore";
 
 interface BrandingPanelProps {
   quizId: number | null;
@@ -12,6 +13,7 @@ const PRESET_COLORS = [
 ];
 
 export default function BrandingPanel({ quizId }: BrandingPanelProps) {
+  const updateMeta = useQuizStore((state) => state.updateMeta);
   const [primaryColor, setPrimaryColor] = useState("#24abbc");
   const [bgColor, setBgColor] = useState("");
   const [backgroundMode, setBackgroundMode] = useState<"solid" | "image" | "gradient">("solid");
@@ -46,6 +48,15 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
 
   const handleSave = () => {
     if (!quizId) return;
+    const branding = {
+      primaryColor: primaryColor || "#24abbc",
+      backgroundColor: backgroundMode === "image" ? "#0d1f3c" : (bgColor || "#f0fdfa"),
+      backgroundImageUrl: backgroundMode === "image" ? (bgColor || undefined) : undefined,
+      backgroundMode,
+      backgroundGradient: backgroundMode === "gradient" ? backgroundGradient : undefined,
+      fontFamily: fontFamily || undefined,
+      logoUrl: logoUrl || undefined,
+    };
     updateBranding.mutate({
       quizId,
         brandPrimaryColor: primaryColor || null,
@@ -55,6 +66,8 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
       brandLogoUrl: logoUrl || null,
       brandFontFamily: fontFamily || null,
       completionMessage: completionMessage || null,
+    }, {
+      onSuccess: () => updateMeta({ branding }),
     });
   };
 

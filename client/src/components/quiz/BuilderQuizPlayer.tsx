@@ -214,8 +214,16 @@ export function getFeedbackMessage(q: any, givenAnswer: string): { type: "correc
   const correct = isBuilderQuestionCorrect(q, givenAnswer);
   const feedback = q.feedback as { correct?: string; incorrect?: string; partial?: string } | undefined;
   let selectedChoiceFeedback = "";
+  if (q.type === "tf") {
+    try {
+      const selected = Boolean(JSON.parse(givenAnswer));
+      selectedChoiceFeedback = selected ? (q.data?.trueFeedback?.trim() ?? "") : (q.data?.falseFeedback?.trim() ?? "");
+    } catch {
+      selectedChoiceFeedback = "";
+    }
+  }
   try {
-    const selectedIds: string[] = JSON.parse(givenAnswer);
+    const selectedIds: string[] = q.type === "tf" ? [] : JSON.parse(givenAnswer);
     const choices = (q.data?.choices ?? []) as { id: string; feedback?: string }[];
     const selectedFeedback = selectedIds
       .map((id) => choices.find((choice) => choice.id === id)?.feedback?.trim())

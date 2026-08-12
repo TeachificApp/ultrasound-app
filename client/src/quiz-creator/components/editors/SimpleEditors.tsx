@@ -5,26 +5,32 @@ import type { TfData, FillBlankData, ShortAnswerData, ImageChoiceData } from "..
 // ─── True / False ─────────────────────────────────────────────────────────────
 export function TfEditor({ data, onChange }: { data: TfData; onChange: (d: TfData) => void }) {
   return (
-    <div className="flex gap-4">
-      {[true, false].map((val) => (
-        <label
-          key={String(val)}
-          className={`flex items-center gap-2 px-5 py-3 rounded-xl border-2 cursor-pointer select-none transition-all ${
-            data.correct === val
-              ? "border-teal-500 bg-teal-50 text-teal-700 font-semibold"
-              : "border-gray-200 text-gray-600 hover:border-gray-300"
-          }`}
-        >
-          <input
-            type="radio"
-            name="tf"
-            checked={data.correct === val}
-            onChange={() => onChange({ correct: val })}
-            className="sr-only"
-          />
-          {val ? "✓ True" : "✗ False"}
-        </label>
-      ))}
+    <div className="space-y-3">
+      <div className="flex gap-4">
+        {[true, false].map((val) => (
+          <label
+            key={String(val)}
+            className={`flex items-center gap-2 px-5 py-3 rounded-xl border-2 cursor-pointer select-none transition-all ${
+              data.correct === val
+                ? "border-teal-500 bg-teal-50 text-teal-700 font-semibold"
+                : "border-gray-200 text-gray-600 hover:border-gray-300"
+            }`}
+          >
+            <input
+              type="radio"
+              name="tf"
+              checked={data.correct === val}
+              onChange={() => onChange({ ...data, correct: val })}
+              className="sr-only"
+            />
+            {val ? "✓ True" : "✗ False"}
+          </label>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <textarea value={data.trueFeedback ?? ""} onChange={(event) => onChange({ ...data, trueFeedback: event.target.value })} rows={2} placeholder="Feedback when True is selected" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/50" />
+        <textarea value={data.falseFeedback ?? ""} onChange={(event) => onChange({ ...data, falseFeedback: event.target.value })} rows={2} placeholder="Feedback when False is selected" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/50" />
+      </div>
     </div>
   );
 }
@@ -344,6 +350,17 @@ export function ImageChoiceEditor({
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
+            <textarea
+              value={choice.feedback ?? ""}
+              onChange={(e) => {
+                e.stopPropagation();
+                onChange({ ...data, choices: data.choices.map((c) => c.id === choice.id ? { ...c, feedback: e.target.value } : c) });
+              }}
+              onClick={(e) => e.stopPropagation()}
+              rows={2}
+              placeholder="Feedback for this answer"
+              className="mx-2 mb-2 block w-[calc(100%-1rem)] rounded border border-gray-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
+            />
           </div>
         ))}
       </div>

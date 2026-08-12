@@ -23,6 +23,8 @@ export interface McqData {
 
 export interface TfData {
   correct: boolean;
+  trueFeedback?: string;
+  falseFeedback?: string;
 }
 
 export interface MatchingPair {
@@ -77,9 +79,10 @@ export interface ShortAnswerData {
 
 export interface ImageChoiceOption {
   id: string;
-  imageUrl: string; // data: URI or uploaded URL
+  imageUrl: string;
   label: string;
   correct: boolean;
+  feedback?: string;
 }
 export interface ImageChoiceData {
   choices: ImageChoiceOption[];
