@@ -1,6 +1,6 @@
 import { getStripeClient } from "../lib/stripeClient";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
-import { shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
+import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from "drizzle-orm";
@@ -410,6 +410,34 @@ export const workshopLearnerRouter = router({
         .from(workshopInstances)
         .where(eq(workshopInstances.id, enrollment.instanceId))
         .limit(1);
+
+      if (enrollment.accessLevel === "presale") {
+        return {
+          workshop,
+          enrollment,
+          instance: instance ?? null,
+          resources: [],
+          sections: [],
+          lessons: [],
+          isPresaleRestricted: true,
+          presaleWelcome: resolvePresaleWelcome(
+            instance ? {
+              heading: instance.presaleWelcomeHeading,
+              body: instance.presaleWelcomeBody,
+              mediaUrl: instance.presaleWelcomeMediaUrl,
+              ctaLabel: instance.presaleWelcomeCtaLabel,
+              ctaUrl: instance.presaleWelcomeCtaUrl,
+            } : null,
+            {
+              heading: workshop.presaleWelcomeHeading,
+              body: workshop.presaleWelcomeBody,
+              mediaUrl: workshop.presaleWelcomeMediaUrl,
+              ctaLabel: workshop.presaleWelcomeCtaLabel,
+              ctaUrl: workshop.presaleWelcomeCtaUrl,
+            },
+          ),
+        };
+      }
 
       // Get resources (workshop-level + instance-specific)
       const resources = await db
