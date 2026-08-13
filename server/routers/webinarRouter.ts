@@ -13,7 +13,7 @@ import {
   webinars, webinarRegistrations, webinarComments, webinarSessions, webinarFunnelSteps, users, cmeActivityForms,
 } from "../../drizzle/schema";
 import { nanoid } from "nanoid";
-import { shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
+import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80); }
 async function assertAdmin(ctx: any) { if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" }); }
@@ -83,12 +83,25 @@ export const webinarPublicRouter = router({
       const isAdmin = (ctx.user as any)?.role === "admin";
       if (w.status !== "published" && !input.preview && !isAdmin) throw new TRPCError({ code: "NOT_FOUND" });
       let isRegistered = false;
+      let isPresaleRestricted = false;
       if ((ctx.user as any)?.id) {
-        const [reg] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
+        const [reg] = await db.select({ id: webinarRegistrations.id, accessLevel: webinarRegistrations.accessLevel }).from(webinarRegistrations)
           .where(and(eq(webinarRegistrations.webinarId, w.id), eq(webinarRegistrations.userId, (ctx.user as any).id))).limit(1);
         isRegistered = !!reg;
+        isPresaleRestricted = reg?.accessLevel === "presale";
       }
-      return { webinar: w, isRegistered };
+      return {
+        webinar: w,
+        isRegistered,
+        isPresaleRestricted,
+        presaleWelcome: isPresaleRestricted ? resolvePresaleWelcome({
+          heading: w.presaleWelcomeHeading,
+          body: w.presaleWelcomeBody,
+          mediaUrl: w.presaleWelcomeMediaUrl,
+          ctaLabel: w.presaleWelcomeCtaLabel,
+          ctaUrl: w.presaleWelcomeCtaUrl,
+        }) : null,
+      };
     }),
 });
 

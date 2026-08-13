@@ -84,6 +84,8 @@ export default function WebinarPlayer() {
   );
   const webinar = data?.webinar;
   const isRegistered = data?.isRegistered ?? false;
+  const isPresaleRestricted = data?.isPresaleRestricted ?? false;
+  const presaleWelcome = data?.presaleWelcome;
 
   // Mark attended heartbeat
   const markAttended = trpc.webinarLearner.markWatchedReplay.useMutation();
@@ -124,6 +126,21 @@ export default function WebinarPlayer() {
         <Button onClick={() => navigate(`/webinars/${slug}`)} className="bg-teal-600 hover:bg-teal-700 text-white">
           View Webinar Details
         </Button>
+      </div>
+    );
+  }
+
+  if (!isAdmin && isPresaleRestricted) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-14 text-center">
+        {presaleWelcome?.mediaUrl && <img src={presaleWelcome.mediaUrl} alt="" className="mx-auto mb-6 max-h-64 rounded-xl object-cover" />}
+        <h1 className="text-3xl font-bold text-slate-900">{presaleWelcome?.heading}</h1>
+        <div className="mt-4 prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: presaleWelcome?.body ?? "" }} />
+        {presaleWelcome?.ctaLabel && presaleWelcome?.ctaUrl && (
+          <a href={presaleWelcome.ctaUrl} className="inline-flex mt-7 rounded-lg bg-teal-600 px-5 py-3 font-semibold text-white hover:bg-teal-700">
+            {presaleWelcome.ctaLabel}
+          </a>
+        )}
       </div>
     );
   }
