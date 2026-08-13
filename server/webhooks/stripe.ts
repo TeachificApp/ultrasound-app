@@ -17,7 +17,7 @@
 import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, teamSubscriptions, teamMembers, deferredCheckoutSessions } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -796,6 +796,31 @@ ${locationStr ? `<p style="margin:0;font-size:14px;color:#0e4a50;"><strong>Locat
   }
 
   console.log(`[Stripe] Workshop enrollment recorded: user ${userId}, workshop ${workshopId}, instance ${instanceId}`);
+}
+
+async function handleWebinarCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  if (meta.type !== "webinar") return;
+  const webinarId = meta.webinar_id ? parseInt(meta.webinar_id, 10) : null;
+  const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
+  if (!webinarId || !userId) {
+    console.warn("[Stripe] Webinar checkout missing webinarId or userId in metadata");
+    return;
+  }
+  const db = await getDb();
+  if (!db) return;
+  const [existing] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
+    .where(and(eq(webinarRegistrations.webinarId, webinarId), eq(webinarRegistrations.userId, userId))).limit(1);
+  if (existing) return;
+  const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, webinarId)).limit(1);
+  if (!webinar) return;
+  await db.insert(webinarRegistrations).values({
+    webinarId,
+    userId,
+    stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined,
+    accessLevel: webinar.status === "presale" ? "presale" : "full",
+  });
+  console.log(`[Stripe] Webinar registration fulfilled: user ${userId}, webinar ${webinarId}`);
 }
 
 /**
@@ -2578,6 +2603,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       await handleDualMembershipCheckoutCompleted(sessionObj);
       await handlePhysicalProductCheckoutCompleted(sessionObj);
       await handleWorkshopCheckoutCompleted(sessionObj);
+      await handleWebinarCheckoutCompleted(sessionObj);
       await handleMembershipCheckoutCompleted(sessionObj);
       await handleDiyCheckoutCompleted(sessionObj);
       await handleTeamCheckoutCompleted(sessionObj);

@@ -4657,6 +4657,7 @@ export const lmsLearnerRouter = router({
       const session = await stripe.checkout.sessions.retrieve(input.sessionId, {
         expand: ["line_items"],
       });
+      const meta = (session.metadata ?? {}) as Record<string, string>;
 
       // Fallback fulfillment: webhook may have missed guest checkouts (no user_id in metadata).
       // IMPORTANT: Only run fulfillment when payment is confirmed — skip delayed-payment methods
@@ -4674,10 +4675,31 @@ export const lmsLearnerRouter = router({
           } catch (err) {
             console.error("[CheckoutStatus] Fallback fulfillment error:", err);
           }
+          if (meta.type === "webinar" && meta.webinar_id && meta.user_id) {
+            try {
+              const webinarId = parseInt(meta.webinar_id, 10);
+              const userId = parseInt(meta.user_id, 10);
+              if (webinarId && userId) {
+                const { webinarRegistrations, webinars } = await import("../../drizzle/schema");
+                const [existing] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
+                  .where(and(eq(webinarRegistrations.webinarId, webinarId), eq(webinarRegistrations.userId, userId))).limit(1);
+                if (!existing) {
+                  const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, webinarId)).limit(1);
+                  if (webinar) await db.insert(webinarRegistrations).values({
+                    webinarId,
+                    userId,
+                    stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined,
+                    accessLevel: webinar.status === "presale" ? "presale" : "full",
+                  });
+                }
+              }
+            } catch (err) {
+              console.error("[CheckoutStatus] Webinar fallback fulfillment error:", err);
+            }
+          }
         }
       }
 
-      const meta = (session.metadata ?? {}) as Record<string, string>;
       let courseSlug: string | null = meta.course_slug ?? null;
       let contentType: string = meta.trigger_order_type ?? "course";
       if (meta.course_id) {
