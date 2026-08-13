@@ -1012,7 +1012,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                 <CohortGroupEmbedSection
                   groupId={embedGroupIdP}
                   accentColor={accentColor}
-                  onEnroll={() => onCheckoutPage?.()}
+                  onEnroll={() => onOpenGroupDetail?.(embedGroupIdP)}
                   enrollNowText={enrollNowTextP}
                   showEnrollNow={showEnrollNowP}
                 />
@@ -1024,7 +1024,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                   <button
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90"
                     style={{ backgroundColor: accentColor }}
-                    onClick={() => onCheckoutPage?.()}
+                    onClick={() => soldOut.status === "waitlist" ? onOpenGroupDetail?.(soldOut.id) : onCheckoutPage?.()}
                   >Join Waitlist</button>
                 </div>
               ) : null}
@@ -1291,7 +1291,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                 <CohortGroupEmbedSection
                   groupId={embedGroupId}
                   accentColor={accentColorCICA}
-                  onEnroll={() => onCheckoutPage?.()}
+                  onEnroll={() => onOpenGroupDetail?.(embedGroupId)}
                   enrollNowText={enrollNowTextCICA}
                   showEnrollNow={showEnrollNowCICA}
                 />
