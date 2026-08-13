@@ -193,7 +193,7 @@ function OverviewPanel() {
         />
         <StatCard
           label="Recorded Revenue"
-          value={`$${(stats?.totalRevenueDollars ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          value={`$${((stats?.totalRevenueCents ?? 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           sub={`Paid LMS orders + checkout purchases · ${(stats?.totalCompletions ?? 0).toLocaleString()} completed enrollments`}
           icon={<DollarSign size={18} />}
           color="amber"
