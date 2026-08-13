@@ -54,6 +54,7 @@ export interface ParsedQuestion {
   correctFeedback?: string;
   incorrectFeedback?: string;
   points: number;
+  groupName?: string;
   isGraded: boolean;
   validationErrors: string[];
 }
@@ -161,6 +162,7 @@ export function parseQuizExcel(buffer: Buffer): ImportResult {
     const incorrectFeedback = String(row[16] ?? "").trim() || undefined;
     const pointsRaw = String(row[17] ?? "").trim();
     const points = pointsRaw && !pointsRaw.startsWith("[") ? parseFloat(pointsRaw) || 1 : 1;
+    const groupName = String(row[18] ?? "").trim() || undefined;
 
     const internalType: InternalQuestionType = TYPE_MAP[typeCode] ?? "multiple_choice";
     const isGraded = GRADED_TYPES.has(typeCode);
@@ -186,6 +188,7 @@ export function parseQuizExcel(buffer: Buffer): ImportResult {
       correctFeedback,
       incorrectFeedback,
       points,
+      groupName,
       isGraded,
       validationErrors,
     });
@@ -301,6 +304,7 @@ export interface ExportQuestion {
   correctFeedback?: string;
   incorrectFeedback?: string;
   points: number;
+  groupName?: string;
   explanation?: string;
 }
 
@@ -329,7 +333,7 @@ export function exportQuizToExcel(quizTitle: string, questions: ExportQuestion[]
     "Question Type", "Question Text", "Image", "Video", "Audio",
     "Answer 1 - CORRECT ANSWER", "Answer 2", "Answer 3", "Answer 4", "Answer 5",
     "Answer 6", "Answer 7", "Answer 8", "Answer 9", "Answer 10",
-    "Correct Feedback", "Incorrect Feedback", "Points",
+    "Correct Feedback", "Incorrect Feedback", "Points", "Group",
   ];
 
   const dataRows: (string | number)[][] = [HEADER];
@@ -369,6 +373,7 @@ export function exportQuizToExcel(quizTitle: string, questions: ExportQuestion[]
       q.correctFeedback ?? "",
       q.incorrectFeedback ?? "",
       q.points,
+      q.groupName ?? "",
     ]);
   }
 
@@ -398,6 +403,7 @@ export function exportQuizToExcel(quizTitle: string, questions: ExportQuestion[]
     { wch: 30 }, // Correct Feedback
     { wch: 30 }, // Incorrect Feedback
     { wch: 8 },  // Points
+    { wch: 24 }, // Group
   ];
 
   XLSX.utils.book_append_sheet(wb, wsQuestions, "Questions");
@@ -405,9 +411,9 @@ export function exportQuizToExcel(quizTitle: string, questions: ExportQuestion[]
   // ── Template reference sheet ─────────────────────────────────────────────
   const templateRows: (string | number)[][] = [
     HEADER,
-    ["TF", "True/False question (Graded)", "[path]", "[path]", "[path]", "*True", "False", "", "", "", "", "", "", "", "", "[Correct]", "[Incorrect]", "[Num]"],
-    ["MC", "Multiple Choice question (Graded)", "[path]", "[path]", "[path]", "*Alternative 1", "Alternative 2", "[Alternative N]", "", "", "", "", "", "", "", "[Correct]", "[Incorrect]", "[Num]"],
-    ["MR", "Multiple Response question (Graded)", "[path]", "[path]", "[path]", "*Alternative 1", "[*]Alternative 2", "[Alternative N]", "", "", "", "", "", "", "", "[Correct]", "[Incorrect]", "[Num]"],
+    ["TF", "True/False question (Graded)", "[path]", "[path]", "[path]", "*True", "False", "", "", "", "", "", "", "", "", "[Correct]", "[Incorrect]", "[Num]", "[Optional group]"],
+    ["MC", "Multiple Choice question (Graded)", "[path]", "[path]", "[path]", "*Alternative 1", "Alternative 2", "[Alternative N]", "", "", "", "", "", "", "", "[Correct]", "[Incorrect]", "[Num]", "[Optional group]"],
+    ["MR", "Multiple Response question (Graded)", "[path]", "[path]", "[path]", "*Alternative 1", "[*]Alternative 2", "[Alternative N]", "", "", "", "", "", "", "", "[Correct]", "[Incorrect]", "[Num]", "[Optional group]"],
     ["TI", "Short Answer question (Graded)", "[path]", "[path]", "[path]", "Answer 1", "[Answer N]", "", "", "", "", "", "", "", "", "[Correct]", "[Incorrect]", "[Num]"],
     ["MG", "Matching question (Graded)", "[path]", "[path]", "[path]", "Premise 1|Response 1", "Premise 2|Response 2", "[Premise N|Response N]", "", "", "", "", "", "", "", "[Correct]", "[Incorrect]", "[Num]"],
     ["SEQ", "Sequence question (Graded)", "[path]", "[path]", "[path]", "Item 1", "Item 2", "Item 3", "[Item N]", "", "", "", "", "", "", "[Correct]", "[Incorrect]", "[Num]"],

@@ -455,7 +455,7 @@ export async function importISpringQuiz(
   };
 }
 
-function convertDocumentToQuiz(
+export function convertDocumentToQuiz(
   doc: any,
   mediaUrlMap: Map<string, string>,
   warnings: string[]
@@ -500,31 +500,39 @@ function convertDocumentToQuiz(
     };
   }
 
-  // Extract questions
-  let rawQuestions: any[] = [];
+  // Extract questions and retain iSpring group boundaries for Visual Builder pools.
+  let rawQuestions: Array<{ question: any; groupId?: string }> = [];
 
   // iSpring format: data.sl.g[].S[]
   if (doc.sl?.g) {
-    for (const group of doc.sl.g) {
+    const groups: NonNullable<QuizMeta["groups"]> = [];
+    for (const [groupIndex, group] of doc.sl.g.entries()) {
       if (group.S && Array.isArray(group.S)) {
-        rawQuestions.push(...group.S);
+        const groupId = `ispring-group-${group.id || group.i || groupIndex + 1}`;
+        groups.push({
+          id: groupId,
+          name: extractText(group.nm || group.name || group.title || `Group ${groupIndex + 1}`),
+          color: ["#189aa1", "#4ad9e0", "#0f766e", "#0ea5e9", "#14b8a6"][groupIndex % 5],
+        });
+        rawQuestions.push(...group.S.map((question: any) => ({ question, groupId })));
       }
     }
+    if (groups.length > 0) meta.groups = groups;
   }
   // Alternative format: data.questions[]
   else if (doc.questions && Array.isArray(doc.questions)) {
-    rawQuestions = doc.questions;
+    rawQuestions = doc.questions.map((question: any) => ({ question }));
   }
   // Alternative: data.slides[]
   else if (doc.slides && Array.isArray(doc.slides)) {
-    rawQuestions = doc.slides.filter((s: any) => s.tp || s.type); // filter out info slides
+    rawQuestions = doc.slides.filter((s: any) => s.tp || s.type).map((question: any) => ({ question })); // filter out info slides
   }
   // Alternative: flat array at root
   else if (Array.isArray(doc)) {
-    rawQuestions = doc;
+    rawQuestions = doc.map((question: any) => ({ question }));
   }
 
-  const questions: QuizQuestion[] = rawQuestions.map((q: any, idx: number) => {
+  const questions: QuizQuestion[] = rawQuestions.map(({ question: q, groupId }, idx: number) => {
     const typeStr = q.tp || q.type || "mc";
     const type = mapQuestionType(typeStr);
     const stem = extractText(q.D || q.question || q.stem || q.text || "");
@@ -582,6 +590,7 @@ function convertDocumentToQuiz(
       feedback,
       backgroundImageUrl: q.bgImage ? (mediaUrlMap.get(q.bgImage) || q.bgImage) : undefined,
       backgroundColor: q.bgColor,
+      groupId,
       data,
     };
   });

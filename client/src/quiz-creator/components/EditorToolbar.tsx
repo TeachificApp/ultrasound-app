@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuizStore } from "../store/quizStore";
 import { downloadQuiz, openQuizFile } from "../lib/quizFile";
+import { importExcelQuiz } from "../lib/excelQuizImporter";
 import {
   Save, FolderOpen, Play, Settings, ChevronDown,
   FileText, Plus, CloudUpload, Cloud, Globe, FileArchive,
@@ -87,6 +88,25 @@ export function EditorToolbar({ onPreview, onSettings, onCloudOpen }: Props) {
     setFileMenuOpen(false);
   };
 
+  const handleExcelImport = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xlsx,.xls";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const imported = await importExcelQuiz(file);
+        loadQuiz(imported.quiz, file.name);
+        if (imported.warnings.length) alert(`Imported ${imported.quiz.questions.length} questions with ${imported.warnings.length} warning(s).`);
+      } catch (err) {
+        alert("Could not import Excel template: " + (err as Error).message);
+      }
+    };
+    input.click();
+    setFileMenuOpen(false);
+  };
+
   const handleOpenImportDialog = () => {
     setFileMenuOpen(false);
     setImportDialogOpen(true);
@@ -148,7 +168,13 @@ export function EditorToolbar({ onPreview, onSettings, onCloudOpen }: Props) {
                   onClick={handleOpen}
                   className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-700"
                 >
-                  <FolderOpen className="w-4 h-4 text-gray-400" /> Open UltrasoundAssist Quiz
+                  <FolderOpen className="w-4 h-4 text-gray-400" /> Import Quiz Creator File (.aausquiz / .quiz)
+                </button>
+                <button
+                  onClick={handleExcelImport}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-sm text-gray-700"
+                >
+                  <FileText className="w-4 h-4 text-teal-500" /> Import Excel Template (.xlsx)
                 </button>
                 <div className="border-t border-gray-100" />
                 <button
