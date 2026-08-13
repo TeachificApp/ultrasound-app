@@ -22,6 +22,7 @@ import {
   User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { hasReachedCmeVideoCompletionThreshold } from "../../../shared/cmeLessonCompletion";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
@@ -1970,11 +1971,11 @@ export default function CoursePlayer() {
             <div className="rounded-lg border border-teal-100 bg-teal-50 p-4 space-y-3">
               <div className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center mt-0.5" style={{ backgroundColor: primaryColor }}>1</span>
-                <p className="text-sm text-gray-700"><strong>Watch each video lesson in its entirety.</strong> Progress is tracked — skipping ahead will not count toward completion.</p>
+                <p className="text-sm text-gray-700"><strong>Watch at least 90% of each required video lesson.</strong> Progress is tracked — skipping ahead will not count toward completion.</p>
               </div>
               <div className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center mt-0.5" style={{ backgroundColor: primaryColor }}>2</span>
-                <p className="text-sm text-gray-700"><strong>Click "Mark Complete"</strong> at the bottom of each lesson after finishing it. The button appears once the video has been fully watched.</p>
+                <p className="text-sm text-gray-700"><strong>Click "Mark Complete"</strong> at the bottom of each lesson after finishing it. The button appears once the required video completion threshold is met.</p>
               </div>
               <div className="flex items-start gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center mt-0.5" style={{ backgroundColor: primaryColor }}>3</span>
@@ -2620,11 +2621,17 @@ export default function CoursePlayer() {
                           src={lessonData.content}
                           controls
                           className="w-full h-full"
+                          onTimeUpdate={(event) => {
+                            const video = event.currentTarget;
+                            if (hasReachedCmeVideoCompletionThreshold(video.currentTime, video.duration)) {
+                              setVideoWatched(true);
+                            }
+                          }}
                           onEnded={() => setVideoWatched(true)}
                         />
                       </div>
                       {requireVideoCompletion && !videoWatched && !isAdminPreviewMode && (
-                        <p className="text-xs mt-2" style={{ color: primaryColor }}>Watch the full video to mark this lesson complete.</p>
+                        <p className="text-xs mt-2" style={{ color: primaryColor }}>Watch at least 90% of this video to mark this lesson complete.</p>
                       )}
                     </div>
                   )}

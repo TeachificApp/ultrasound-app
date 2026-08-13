@@ -557,11 +557,11 @@ export default function AudioBlockEditor({ d, set, handleFileUpload, uploading }
       {/* ── Trim controls ── */}
       {activePreviewUrl && duration > 0 && (
         <div className="border border-gray-100 rounded p-2 space-y-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold text-gray-600 flex items-center gap-1">
               <Scissors size={11} /> Trim Clip
             </p>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               <button
                 type="button"
                 onClick={togglePreview}
