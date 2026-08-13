@@ -8642,44 +8642,44 @@ export default function LandingPageBuilder() {
   return (
     <>
     <BlockTemplateLibraryProvider onInsert={(block) => { setBlocks(prev => [...prev, block]); setSelectedId(block.id); }}>
-    <div className="fixed inset-0 z-40 flex flex-col bg-gray-50" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="fixed inset-0 z-40 flex min-w-0 flex-col bg-gray-50" style={{ fontFamily: "Inter, sans-serif" }}>
       {/* Top Bar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 shadow-sm flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate(`/admin/lms?editCourse=${courseId}`)} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 font-medium transition-colors">
-            <ArrowLeft size={16} /> Back to Course
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-2 shadow-sm border-b border-gray-200 flex-shrink-0 sm:px-4">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
+          <button onClick={() => navigate(`/admin/lms?editCourse=${courseId}`)} className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-teal-700 font-medium transition-colors sm:text-sm">
+            <ArrowLeft size={16} /> <span className="hidden sm:inline">Back to Course</span><span className="sm:hidden">Back</span>
           </button>
-          <div className="w-px h-5 bg-gray-200" />
-          <LandingPageQuickNav currentCourseId={numericCourseId} navigate={navigate} />
-          <div className="w-px h-5 bg-gray-200" />
-          <span className="text-sm font-semibold text-gray-800 truncate max-w-xs">{courseInfo?.title ?? "Landing Page Builder"}</span>
-          <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">Page Editor</span>
+          <div className="hidden h-5 w-px bg-gray-200 md:block" />
+          <div className="max-w-[7.5rem] sm:max-w-[12rem]"><LandingPageQuickNav currentCourseId={numericCourseId} navigate={navigate} /></div>
+          <div className="hidden h-5 w-px bg-gray-200 lg:block" />
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-gray-800 sm:text-sm">{courseInfo?.title ?? "Landing Page Builder"}</span>
+          <span className="hidden rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400 md:inline">Page Editor</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => { setTemplatesInitialTab("page"); setShowTemplates(true); }} className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
-            <FolderOpen size={14} /> Page Templates
+        <div className="flex w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:gap-2">
+          <button onClick={() => { setTemplatesInitialTab("page"); setShowTemplates(true); }} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-600 transition-colors hover:text-teal-700 sm:px-3 sm:text-sm">
+            <FolderOpen size={14} /> <span className="hidden sm:inline">Page </span>Templates
           </button>
-          <OpenTemplateLibraryButton />
-          <button onClick={() => { setTemplatesInitialTab("page"); setShowTemplates(true); }} className="flex items-center gap-1.5 text-sm text-amber-600 hover:text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded-lg px-3 py-1.5 transition-colors" title="Save current page as a reusable template">
+          <div className="hidden sm:block"><OpenTemplateLibraryButton /></div>
+          <button onClick={() => { setTemplatesInitialTab("page"); setShowTemplates(true); }} className="hidden items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-600 transition-colors hover:bg-amber-100 hover:text-amber-700 md:flex" title="Save current page as a reusable template">
             <Bookmark size={14} /> Save as Template
           </button>
           {courseInfo?.slug && (
-            <a href={`https://learn.allaboutultrasound.com/courses/${courseInfo.slug}?preview=admin`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-teal-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-colors">
-              <Eye size={14} /> Preview
+            <a href={`https://learn.allaboutultrasound.com/courses/${courseInfo.slug}?preview=admin`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-600 transition-colors hover:text-teal-700 sm:px-3 sm:text-sm">
+              <Eye size={14} /> <span className="hidden sm:inline">Preview</span>
             </a>
           )}
-          <AutoSaveIndicator status={autoSave.status} />
-          <Button onClick={handleSave} disabled={isSaving} className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm px-4 py-1.5 h-8">
-            <Save size={14} /> {isSaving ? "Saving…" : "Save Page"}
+          <div className="hidden md:block"><AutoSaveIndicator status={autoSave.status} /></div>
+          <Button onClick={handleSave} disabled={isSaving} className="ml-auto flex h-8 items-center gap-1.5 bg-teal-600 px-3 py-1.5 text-xs text-white hover:bg-teal-700 sm:ml-0 sm:px-4 sm:text-sm">
+            <Save size={14} /> {isSaving ? "Saving…" : <><span className="hidden sm:inline">Save </span>Page</>}
           </Button>
         </div>
       </div>
 
       {/* Main Editor Area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* Left Panel: Add Block button */}
-        <div className="w-52 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-          <div className="p-3">
+        <div className="w-full flex-shrink-0 border-b border-gray-200 bg-white lg:w-52 lg:border-r lg:border-b-0 lg:flex lg:flex-col lg:overflow-hidden">
+          <div className="p-3 lg:p-3">
             <button
               onClick={() => { setPickerTab("catalog"); setAddMenuOpen(true); }}
               className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg transition-colors"
@@ -8687,13 +8687,13 @@ export default function LandingPageBuilder() {
               <Plus size={14} /> Add Block
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="hidden flex-1 overflow-y-auto p-2 lg:block">
             <p className="text-xs text-gray-400 text-center mt-4 px-2">Click "Add Block" to open the block picker with all block types, copy blocks from other pages, or insert saved templates.</p>
           </div>
         </div>
 
         {/* Center: Canvas */}
-        <div ref={canvasRef} className="flex-1 overflow-y-auto bg-gray-100">
+        <div ref={canvasRef} className="min-h-[52vh] flex-1 bg-gray-100 lg:min-h-0 lg:overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center h-full text-gray-400">Loading…</div>
           ) : blocks.length === 0 ? (
@@ -8709,7 +8709,7 @@ export default function LandingPageBuilder() {
               <button onClick={() => setShowTemplates(true)} className="text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1.5"><FolderOpen size={16} /> Or start from a template</button>
             </div>
           ) : (
-            <div className="bg-white min-h-full shadow-sm mx-auto" style={{ maxWidth: "900px" }}>
+            <div className="mx-auto min-h-full w-full max-w-[900px] bg-white shadow-sm">
               <DndContext sensors={sensors}
                 modifiers={[restrictToFirstScrollableAncestor]}
                 collisionDetection={(args) => {
@@ -8827,11 +8827,11 @@ export default function LandingPageBuilder() {
         </div>
 
         {/* Right Panel: Block Settings / Page SEO */}
-        <div className="flex-shrink-0 bg-white border-l border-gray-200 overflow-y-auto relative" style={{ width: rightPanelWidth }}>
+        <div className="relative w-full flex-shrink-0 border-t border-gray-200 bg-white lg:w-[var(--page-editor-settings-width)] lg:border-l lg:border-t-0 lg:overflow-y-auto" style={{ "--page-editor-settings-width": `${rightPanelWidth}px` } as React.CSSProperties}>
           {/* Drag handle */}
           <div
             onMouseDown={handleRightPanelMouseDown}
-            className="absolute left-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-teal-400 active:bg-teal-500 z-10 transition-colors"
+            className="absolute bottom-0 left-0 top-0 z-10 hidden w-1.5 cursor-col-resize transition-colors hover:bg-teal-400 active:bg-teal-500 lg:block"
             title="Drag to resize panel"
           />
           {selectedBlock ? (
