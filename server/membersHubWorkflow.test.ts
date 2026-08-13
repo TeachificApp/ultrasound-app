@@ -16,7 +16,8 @@ describe("Members Hub analytics and direct access workflow", () => {
 
   it("includes paid LMS orders and paid checkout purchases in recorded revenue", () => {
     expect(overviewSource).toContain("SUM(amount) FROM lms_orders WHERE status = 'paid'");
-    expect(overviewSource).toContain("SUM(amount_paid) FROM funnel_purchases WHERE status = 'paid'");
+    expect(overviewSource).toContain("SUM(amount_paid) / 100 FROM funnel_purchases WHERE status = 'paid'");
+    expect(overviewSource).toContain("totalRevenueDollars");
   });
 
   it("creates or reuses an email identity before allowing course and product grants", () => {

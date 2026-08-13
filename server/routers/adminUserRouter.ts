@@ -1581,13 +1581,13 @@ export const adminUserRouter = router({
     const [completionRow] = await db.execute(sql`SELECT COUNT(*) as total FROM lms_enrollments WHERE completed_at IS NOT NULL`) as any;
     const totalCompletions = Number(toArr2(completionRow)[0]?.total ?? 0);
 
-    // Revenue is stored in cents in both paid LMS orders and paid embedded/funnel checkouts.
-    // These sources have distinct checkout session IDs, so they can be summed without double-counting.
+    // LMS orders store dollars, whereas embedded checkout purchases store cents.
+    // Normalize both to dollars before combining their distinct checkout sources.
     const [revenueRow] = await db.execute(sql`
       SELECT COALESCE((SELECT SUM(amount) FROM lms_orders WHERE status = 'paid'), 0)
-        + COALESCE((SELECT SUM(amount_paid) FROM funnel_purchases WHERE status = 'paid'), 0) AS total
+        + COALESCE((SELECT SUM(amount_paid) / 100 FROM funnel_purchases WHERE status = 'paid'), 0) AS total
     `) as any;
-    const totalRevenueCents = Number(toArr2(revenueRow)[0]?.total ?? 0);
+    const totalRevenueDollars = Number(toArr2(revenueRow)[0]?.total ?? 0);
 
     const [growthRows] = await db.execute(sql`
       SELECT DATE_FORMAT(createdAt, '%Y-%m') as month, COUNT(*) as count
@@ -1653,7 +1653,7 @@ export const adminUserRouter = router({
         newThisMonth,
         newLastMonth,
         totalCompletions,
-        totalRevenueCents,
+        totalRevenueDollars,
         engagementRate: totalMembers > 0 ? Math.round((activeMembers / totalMembers) * 100) : 0,
       },
       memberGrowth,
