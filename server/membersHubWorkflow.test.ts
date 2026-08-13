@@ -15,9 +15,11 @@ describe("Members Hub analytics and direct access workflow", () => {
   });
 
   it("includes paid LMS orders and paid checkout purchases in recorded revenue", () => {
-    expect(overviewSource).toContain("SUM(amount) FROM lms_orders WHERE status = 'paid'");
-    expect(overviewSource).toContain("SUM(amount_paid) FROM funnel_purchases WHERE status = 'paid'");
+    expect(overviewSource).toMatch(/SUM\(amount\) FROM lms_orders\s+WHERE status = 'paid'/);
+    expect(overviewSource).toMatch(/SUM\(amount_paid\) FROM funnel_purchases\s+WHERE status = 'paid'/);
     expect(overviewSource).toContain("totalRevenueCents");
+    expect(overviewSource).toContain("stripe_session_id LIKE 'cs_live_%'");
+    expect(overviewSource).toContain("stripe_payment_intent_id LIKE 'pi_3%'");
   });
 
   it("creates or reuses an email identity before allowing course and product grants", () => {

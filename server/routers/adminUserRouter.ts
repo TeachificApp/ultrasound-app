@@ -1581,11 +1581,15 @@ export const adminUserRouter = router({
     const [completionRow] = await db.execute(sql`SELECT COUNT(*) as total FROM lms_enrollments WHERE completed_at IS NOT NULL`) as any;
     const totalCompletions = Number(toArr2(completionRow)[0]?.total ?? 0);
 
-    // Paid LMS orders and embedded checkout purchases both store their charged amount in cents.
-    // Keep the aggregate in cents and convert once in the presentation layer.
+    // Both sources store charged amounts in cents. Count only verified live Stripe
+    // records, excluding imported/manual rows without payment identifiers and test data.
     const [revenueRow] = await db.execute(sql`
-      SELECT COALESCE((SELECT SUM(amount) FROM lms_orders WHERE status = 'paid'), 0)
-        + COALESCE((SELECT SUM(amount_paid) FROM funnel_purchases WHERE status = 'paid'), 0) AS total
+      SELECT COALESCE((SELECT SUM(amount) FROM lms_orders
+        WHERE status = 'paid'
+          AND (stripe_session_id LIKE 'cs_live_%' OR stripe_payment_intent_id LIKE 'pi_3%')), 0)
+        + COALESCE((SELECT SUM(amount_paid) FROM funnel_purchases
+          WHERE status = 'paid'
+            AND stripe_payment_intent_id LIKE 'pi_3%'), 0) AS total
     `) as any;
     const totalRevenueCents = Number(toArr2(revenueRow)[0]?.total ?? 0);
 

@@ -192,9 +192,9 @@ function OverviewPanel() {
           color="teal2"
         />
         <StatCard
-          label="Recorded Revenue"
+          label="Live Stripe Revenue"
           value={`$${((stats?.totalRevenueCents ?? 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          sub={`Paid LMS orders + checkout purchases · ${(stats?.totalCompletions ?? 0).toLocaleString()} completed enrollments`}
+          sub={`Verified live payments · ${(stats?.totalCompletions ?? 0).toLocaleString()} completed enrollments`}
           icon={<DollarSign size={18} />}
           color="amber"
         />
