@@ -1298,6 +1298,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         courseId: input.targetCourseId,
         sectionId: input.targetSectionId,
         position: nextPosition,
+        status: "draft",
       }).$returningId();
       // Copy quiz if present
       const [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, input.lessonId)).limit(1);
@@ -1340,6 +1341,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
           ...rest,
           courseId: input.targetCourseId,
           sectionId: newSection.id,
+          status: "draft",
         }).$returningId();
         // Copy quiz if present
         const [quiz] = await db.select().from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, lesson.id)).limit(1);

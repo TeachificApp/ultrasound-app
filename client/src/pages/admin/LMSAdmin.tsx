@@ -152,29 +152,29 @@ function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: course.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-3 bg-white rounded-lg border border-gray-200 px-4 py-3 hover:border-teal-300 transition-colors">
+    <div ref={setNodeRef} style={style} className="flex flex-wrap items-center gap-x-2 gap-y-1.5 bg-white rounded-lg border border-gray-200 px-3 py-3 sm:gap-3 sm:px-4 hover:border-teal-300 transition-colors">
       <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 touch-none" title="Drag to reorder">
         <GripVertical className="w-4 h-4" />
       </button>
       <span className="text-gray-400">{TYPE_ICONS[course.type]}</span>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-gray-900 text-sm truncate">{course.title}</p>
-        <p className="text-xs text-gray-400">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type} · {course.isFree ? "Free" : `$${Number(course.price).toFixed(2)}`} · <span className="font-mono">ID: {course.id}</span></p>
+      <div className="order-2 basis-full min-w-0 sm:order-none sm:basis-auto sm:flex-1">
+        <p className="font-medium text-gray-900 text-sm whitespace-normal break-words sm:truncate">{course.title}</p>
+        <p className="text-xs text-gray-400 break-words">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type} · {course.isFree ? "Free" : `$${Number(course.price).toFixed(2)}`} · <span className="font-mono">ID: {course.id}</span></p>
       </div>
-      <Badge className={`text-xs ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
+      <Badge className={`order-3 text-xs sm:order-none ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
       {((course as any).hasCertificate || (course as any).creditHours) && (course as any).cmeStatus && (
-        <Badge className={`text-xs ${CME_STATUS_COLORS[(course as any).cmeStatus] ?? CME_STATUS_COLORS.draft}`}>
+        <Badge className={`order-3 text-xs sm:order-none ${CME_STATUS_COLORS[(course as any).cmeStatus] ?? CME_STATUS_COLORS.draft}`}>
           {CME_STATUS_LABELS[(course as any).cmeStatus] ?? "CME: Draft"}
         </Badge>
       )}
-      <Button size="sm" variant="ghost" className="h-7 text-xs text-teal-600 hover:bg-teal-50" onClick={() => onEdit(course.id)}>
+      <Button size="sm" variant="ghost" className="order-4 h-7 text-xs text-teal-600 hover:bg-teal-50 sm:order-none" onClick={() => onEdit(course.id)}>
         <Edit2 className="w-3 h-3 mr-1" /> Edit
       </Button>
       <SsoLearnLinkButton slug={course.slug} />
-      <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-500 hover:bg-blue-50" title="Duplicate" onClick={() => onDuplicate(course.id, course.title)}>
+      <Button size="sm" variant="ghost" className="order-4 h-7 text-xs text-blue-500 hover:bg-blue-50 sm:order-none" title="Duplicate" onClick={() => onDuplicate(course.id, course.title)}>
         <Copy className="w-3 h-3" />
       </Button>
-      <Button size="sm" variant="ghost" className="h-7 text-red-400 hover:bg-red-50" onClick={() => onDelete(course.id, course.title)}>
+      <Button size="sm" variant="ghost" className="order-4 h-7 text-red-400 hover:bg-red-50 sm:order-none" onClick={() => onDelete(course.id, course.title)}>
         <Trash2 className="w-3 h-3" />
       </Button>
     </div>
@@ -5126,19 +5126,19 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-white overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-3 bg-white border-b border-gray-200 shrink-0">
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-700 mr-1">
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2 sm:gap-3 sm:px-5 sm:py-3 bg-white border-b border-gray-200 shrink-0">
+        <button onClick={onClose} className="order-1 text-gray-400 hover:text-gray-700 mr-1 sm:order-none">
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex-1 min-w-0">
+        <div className="order-3 basis-full min-w-0 sm:order-none sm:basis-auto sm:flex-1">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-teal-700 font-bold text-sm uppercase tracking-wide shrink-0">Edit Lesson</span>
             <span className="text-gray-300 text-sm shrink-0">·</span>
-            <span className="text-gray-800 font-semibold text-sm truncate min-w-[15ch] max-w-[40vw]" title={lesson.title}>{lesson.title}</span>
+            <span className="text-gray-800 font-semibold text-sm break-words sm:truncate sm:min-w-[15ch] sm:max-w-[40vw]" title={lesson.title}>{lesson.title}</span>
           </div>
         </div>
         {/* Save / Close actions — always visible in header */}
-        <div className="flex items-center gap-1.5 shrink-0 mr-2">
+        <div className="order-2 ml-auto flex items-center gap-1.5 shrink-0 sm:order-none sm:ml-0 sm:mr-2">
           <Button
             size="sm"
             variant="outline"
@@ -5146,7 +5146,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             onClick={handleCloseWithConfirm}
             title="Close without saving"
           >
-            <X className="w-3 h-3 mr-1" /> Close
+            <X className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">Close</span>
           </Button>
           <Button
             size="sm"
@@ -5155,8 +5155,8 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             disabled={headerSaving || update.isPending}
             onClick={() => handleHeaderSave(false)}
           >
-            <Save className="w-3 h-3 mr-1" />
-            {(headerSaving || update.isPending) ? "Saving..." : "Save"}
+            <Save className="w-3 h-3 sm:mr-1" />
+            <span className="hidden sm:inline">{(headerSaving || update.isPending) ? "Saving..." : "Save"}</span>
           </Button>
           <Button
             size="sm"
@@ -5164,7 +5164,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             disabled={headerSaving || update.isPending}
             onClick={() => handleHeaderSave(true)}
           >
-            {(headerSaving || update.isPending) ? "Saving..." : "Save & Close"}
+            <span className="hidden sm:inline">{(headerSaving || update.isPending) ? "Saving..." : "Save & Close"}</span><span className="sm:hidden"><Save className="w-3 h-3" /></span>
           </Button>
         </div>
         {/* Preview as Student — opens lesson in new tab */}
@@ -5172,14 +5172,14 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           <Button
             size="sm"
             variant="outline"
-            className="h-7 text-xs text-teal-600 border-teal-300 hover:bg-teal-50 shrink-0"
+            className="order-4 basis-full justify-center h-7 text-xs text-teal-600 border-teal-300 hover:bg-teal-50 shrink-0 sm:order-none sm:basis-auto"
             onClick={() => openLearnLink(`/courses/${courseData.slug}/player?lesson=${lesson.id}&preview=student`)}
           >
             <Eye className="w-3 h-3 mr-1" /> Preview as Student
           </Button>
         )}
         {/* Tab switcher — always rendered with fixed width so prev/next never shift */}
-        <div className="flex gap-1 shrink-0">
+        <div className="order-5 flex gap-1 shrink-0 sm:order-none">
           <button
             onClick={() => setActiveTab("settings")}
             className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -5199,7 +5199,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
 
         </div>
         {/* Prev / Next lesson navigation — always at far right, never shifts */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="order-6 ml-auto flex items-center gap-1 shrink-0 sm:order-none sm:ml-0">
           <button
             onClick={() => prevLesson && onNavigateLesson?.(prevLesson)}
             disabled={!prevLesson}
