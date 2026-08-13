@@ -326,7 +326,7 @@ export const bundleLearnerRouter = router({
 
 export const bundleAdminRouter = router({
   list: protectedProcedure
-    .input(z.object({ page: z.number().default(1), pageSize: z.number().max(200).default(20), search: z.string().optional(), status: z.enum(["draft","published"]).optional(), brand: z.enum(["all_about_ultrasound","iheartecho"]).optional() }).optional())
+    .input(z.object({ page: z.number().default(1), pageSize: z.number().max(200).default(20), search: z.string().optional(), status: z.enum(["draft","published","enrollment_closed","waitlist","presale"]).optional(), brand: z.enum(["all_about_ultrasound","iheartecho"]).optional() }).optional())
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) return { bundles: [], total: 0 };
       const page = input?.page ?? 1, limit = input?.pageSize ?? 20, offset = (page-1)*limit;
@@ -387,7 +387,7 @@ export const bundleAdminRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(), title: z.string().optional(), brand: z.enum(["all_about_ultrasound","iheartecho"]).optional(),
-      status: z.enum(["draft","published"]).optional(), description: z.string().optional(),
+      status: z.enum(["draft","published","enrollment_closed","waitlist","presale"]).optional(), description: z.string().optional(),
       coverImage: z.string().optional(), accessType: z.enum(["free","paid"]).optional(),
       pricingOptions: z.string().optional(), landingPageBlocks: z.string().optional(),
       // Structured pricing fields

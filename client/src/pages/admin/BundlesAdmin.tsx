@@ -227,7 +227,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<"draft" | "published">("draft");
+  const [status, setStatus] = useState<"draft" | "published" | "enrollment_closed" | "waitlist" | "presale">("draft");
   const [accessType, setAccessType] = useState<"free" | "paid">("paid");
   const [pricingOptions, setPricingOptions] = useState("");
   const [coverImage, setCoverImage] = useState("");
@@ -247,7 +247,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
     setTitle(data.bundle.title);
     setSubtitle((data.bundle as any).subtitle ?? "");
     setDescription(data.bundle.description ?? "");
-    setStatus(data.bundle.status as "draft" | "published");
+    setStatus(data.bundle.status as "draft" | "published" | "enrollment_closed" | "waitlist" | "presale");
     setAccessType(data.bundle.accessType as "free" | "paid");
     setPricingOptions(data.bundle.pricingOptions ?? "");
     setCoverImage(data.bundle.coverImage ?? "");
@@ -406,6 +406,9 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="waitlist">Waitlist</SelectItem>
+                      <SelectItem value="presale">Pre-sale</SelectItem>
+                      <SelectItem value="enrollment_closed">Enrollment Closed</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
