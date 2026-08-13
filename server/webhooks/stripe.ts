@@ -697,6 +697,8 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
   }
   const db = await getDb();
   if (!db) return;
+  const [instanceAvailability] = await db.select({ status: workshopInstances.status })
+    .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
   // Idempotency check
   const [existing] = await db.select({ id: workshopEnrollments.id })
     .from(workshopEnrollments)
@@ -718,6 +720,7 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
     amountPaid,
     currency: (session.currency as string) ?? "usd",
     status: "active",
+    accessLevel: instanceAvailability?.status === "presale" ? "presale" : "full",
     accessGrantedAt: new Date(),
   });
   // Fetch workshop/instance details for notification and email
