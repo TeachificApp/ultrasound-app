@@ -882,6 +882,8 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+    if (plan.status === "waitlist") throw new TRPCError({ code: "FORBIDDEN", message: "This membership is currently accepting Waitlist signups." });
+    if (plan.status === "enrollment_closed") throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment Closed" });
 
     // Only check for duplicate purchase if user is already logged in
     if (ctx.user) await assertCanPurchaseMembership(db, ctx.user.id, plan, ctx.user.email);
