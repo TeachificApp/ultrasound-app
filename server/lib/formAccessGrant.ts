@@ -27,6 +27,7 @@ export async function applyAccessGrantActions(
     physicalProductOrders,
     membershipSubscriptions,
     webinarRegistrations,
+    webinars,
   } = await import("../../drizzle/schema");
 
   const actions: AccessGrantAction[] = JSON.parse(grantAccessActionsJson);
@@ -93,7 +94,8 @@ export async function applyAccessGrantActions(
         .where(and(eq(webinarRegistrations.userId, userId), eq(webinarRegistrations.webinarId, productId)))
         .limit(1);
       if (!existing) {
-        await db.insert(webinarRegistrations).values({ userId, webinarId: productId });
+        const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, productId)).limit(1);
+        await db.insert(webinarRegistrations).values({ userId, webinarId: productId, accessLevel: webinar?.status === "presale" ? "presale" : "full" });
       }
     }
   }
