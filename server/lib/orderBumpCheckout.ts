@@ -226,9 +226,11 @@ export async function fulfillOrderBumpPurchase(
       .where(and(eq(webinarRegistrations.userId, input.userId), eq(webinarRegistrations.webinarId, bumpProductId)))
       .limit(1);
     if (!existing) {
+      const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, bumpProductId)).limit(1);
       await db.insert(webinarRegistrations).values({
         userId: input.userId,
         webinarId: bumpProductId,
+        accessLevel: webinar?.status === "presale" ? "presale" : "full",
         // sessionId is a checkout session ID, not a payment intent, but we store it for reference
         stripePaymentIntentId: input.sessionId,
       });
