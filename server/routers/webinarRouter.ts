@@ -13,6 +13,7 @@ import {
   webinars, webinarRegistrations, webinarComments, webinarSessions, webinarFunnelSteps, users, cmeActivityForms,
 } from "../../drizzle/schema";
 import { nanoid } from "nanoid";
+import { shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 
 function slugify(t: string) { return t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80); }
 async function assertAdmin(ctx: any) { if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" }); }
@@ -242,9 +243,14 @@ export const webinarAdminRouter = router({
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, ...rest } = input;
+      const [existing] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, id)).limit(1);
       const upd: any = {};
       Object.entries(rest).forEach(([k, v]) => { if (v !== undefined) upd[k] = v; });
       if (Object.keys(upd).length) await db.update(webinars).set(upd).where(eq(webinars.id, id));
+      if (shouldReleasePresaleEnrollment(existing?.status, input.status)) {
+        await db.update(webinarRegistrations).set({ accessLevel: "full" })
+          .where(and(eq(webinarRegistrations.webinarId, id), eq(webinarRegistrations.accessLevel, "presale")));
+      }
       return { success: true };
     }),
 
