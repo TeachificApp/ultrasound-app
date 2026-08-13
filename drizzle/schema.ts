@@ -3597,7 +3597,7 @@ export const digitalProducts = mysqlTable("digital_products", {
   isFree: boolean("is_free").default(false).notNull(),
   bundleOnly: boolean("bundle_only").default(false).notNull(), // if true, cannot be purchased standalone
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
-  status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "hidden", "private", "archived", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
   // Landing page content
   landingHeadline: varchar("landing_headline", { length: 500 }),
   landingBody: longtext("landing_body"),
@@ -5239,7 +5239,7 @@ export const bundles = mysqlTable("bundles", {
   coverImage: text("cover_image"),
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
-  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
   accessType: mysqlEnum("access_type", ["free", "paid"]).default("paid").notNull(),
   pricingOptions: longtext("pricing_options"),
   // Structured pricing (mirrors lmsCourses)
@@ -5322,7 +5322,7 @@ export const membershipPlans = mysqlTable("membership_plans", {
   metaDescription: text("meta_description"),
   iconImage: text("icon_image"),
   accentColor: varchar("accent_color", { length: 32 }).default("#189aa1"),
-  status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
   billingInterval: mysqlEnum("billing_interval", ["monthly", "annual", "lifetime", "one_time"]).default("monthly").notNull(),
   price: int("price").default(0).notNull(),
   compareAtPrice: int("compare_at_price"),
@@ -7442,7 +7442,7 @@ export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
   maxAttempts: int("max_attempts"),
   accessType: mysqlEnum("access_type", ["public", "enrolled", "members_only"]).default("enrolled").notNull(),
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
-  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "archived", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
   coverImageUrl: text("cover_image_url"),
   instructions: longtext("instructions"),
   sharedInSonoQuiz: boolean("shared_in_sono_quiz").default(false).notNull(),
