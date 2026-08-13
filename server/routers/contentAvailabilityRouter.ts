@@ -1,12 +1,12 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { contentWaitlistEntries, lmsCohortGroups, lmsCourses, users, webinars, workshopInstances, workshops } from "../../drizzle/schema";
+import { bundles, contentWaitlistEntries, digitalProducts, lmsCohortGroups, lmsCourses, membershipPlans, standaloneQuizzes, users, webinars, workshopInstances, workshops } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { sendEmail } from "../_core/email";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 
-const waitlistProductType = z.enum(["course", "cohort_group", "workshop", "workshop_instance", "webinar"]);
+const waitlistProductType = z.enum(["course", "cohort_group", "workshop", "workshop_instance", "webinar", "download", "bundle", "membership", "quiz"]);
 
 type WaitlistProductType = z.infer<typeof waitlistProductType>;
 
@@ -35,6 +35,26 @@ async function getWaitlistTarget(db: NonNullable<Awaited<ReturnType<typeof getDb
     case "webinar": {
       const [row] = await db.select({ id: webinars.id, title: webinars.title, status: webinars.status })
         .from(webinars).where(eq(webinars.id, productId)).limit(1);
+      return row ? { ...row, parentProductId: null } : null;
+    }
+    case "download": {
+      const [row] = await db.select({ id: digitalProducts.id, title: digitalProducts.title, status: digitalProducts.status })
+        .from(digitalProducts).where(eq(digitalProducts.id, productId)).limit(1);
+      return row ? { ...row, parentProductId: null } : null;
+    }
+    case "bundle": {
+      const [row] = await db.select({ id: bundles.id, title: bundles.title, status: bundles.status })
+        .from(bundles).where(eq(bundles.id, productId)).limit(1);
+      return row ? { ...row, parentProductId: null } : null;
+    }
+    case "membership": {
+      const [row] = await db.select({ id: membershipPlans.id, title: membershipPlans.title, status: membershipPlans.status })
+        .from(membershipPlans).where(eq(membershipPlans.id, productId)).limit(1);
+      return row ? { ...row, parentProductId: null } : null;
+    }
+    case "quiz": {
+      const [row] = await db.select({ id: standaloneQuizzes.id, title: standaloneQuizzes.title, status: standaloneQuizzes.status })
+        .from(standaloneQuizzes).where(eq(standaloneQuizzes.id, productId)).limit(1);
       return row ? { ...row, parentProductId: null } : null;
     }
   }
