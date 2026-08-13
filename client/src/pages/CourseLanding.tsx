@@ -1169,7 +1169,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                               size="sm"
                               className="flex-shrink-0 text-white"
                               style={{ backgroundColor: accentColor }}
-                              onClick={e => { e.stopPropagation(); onCheckoutPage?.(); }}
+                              onClick={e => { e.stopPropagation(); if (g.status === "waitlist") onOpenGroupDetail?.(g.id); else onCheckoutPage?.(); }}
                             >
                               {enrollNowText}
                             </Button>
@@ -1411,7 +1411,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                             size="sm"
                             className="flex-shrink-0 text-white"
                             style={{ backgroundColor: accentColorCICA }}
-                            onClick={e => { e.stopPropagation(); onCheckoutPage?.(); }}
+                            onClick={e => { e.stopPropagation(); if (g.status === "waitlist") onOpenGroupDetail?.(g.id); else onCheckoutPage?.(); }}
                           >
                             {enrollNowTextCICA}
                           </Button>

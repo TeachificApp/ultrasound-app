@@ -27,6 +27,7 @@ import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or, gte } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { evaluateInlineLessonQuizScore, shouldRestoreMissingCourseCertificate } from "../../shared/inlineLessonQuizCompletion";
+import { resolvePresaleWelcome } from "../../shared/contentAvailability";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
@@ -2003,6 +2004,16 @@ export const lmsLearnerRouter = router({
 
       // Paid pre-sale enrollment confirms a seat, but course content stays restricted until opening.
       if (enrollment?.enrollmentType === "presale" && ctx.user.role !== "admin") {
+        const [presaleGroup] = await db.select({
+          heading: lmsCohortGroups.presaleWelcomeHeading,
+          body: lmsCohortGroups.presaleWelcomeBody,
+          mediaUrl: lmsCohortGroups.presaleWelcomeMediaUrl,
+          ctaLabel: lmsCohortGroups.presaleWelcomeCtaLabel,
+          ctaUrl: lmsCohortGroups.presaleWelcomeCtaUrl,
+        }).from(lmsCohortGroupEnrollments)
+          .innerJoin(lmsCohortGroups, eq(lmsCohortGroups.id, lmsCohortGroupEnrollments.cohortGroupId))
+          .where(eq(lmsCohortGroupEnrollments.enrollmentId, enrollment.id))
+          .limit(1);
         return {
           course,
           enrollment,
@@ -2013,13 +2024,13 @@ export const lmsLearnerRouter = router({
           lessonInstructorsMap: {},
           isAdminPreview: false,
           isPresale: true,
-          presaleWelcome: {
-            heading: course.presaleWelcomeHeading || "Thank you for enrolling.",
-            body: course.presaleWelcomeBody || "You’ll be granted access once the course is open.",
-            mediaUrl: course.presaleWelcomeMediaUrl || null,
-            ctaLabel: course.presaleWelcomeCtaLabel || null,
-            ctaUrl: course.presaleWelcomeCtaUrl || null,
-          },
+          presaleWelcome: resolvePresaleWelcome(presaleGroup, {
+            heading: course.presaleWelcomeHeading,
+            body: course.presaleWelcomeBody,
+            mediaUrl: course.presaleWelcomeMediaUrl,
+            ctaLabel: course.presaleWelcomeCtaLabel,
+            ctaUrl: course.presaleWelcomeCtaUrl,
+          }),
         };
       }
 

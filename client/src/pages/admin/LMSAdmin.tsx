@@ -11660,7 +11660,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     onError: (e) => toast.error(e.message),
   });
   const [groupDialog, setGroupDialog] = useState<{ open: boolean; group?: any }>({ open: false });
-  const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false, accessDurationDays: "" });
+  const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "waitlist" | "presale" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false, accessDurationDays: "", presaleWelcomeHeading: "", presaleWelcomeBody: "", presaleWelcomeMediaUrl: "", presaleWelcomeCtaLabel: "", presaleWelcomeCtaUrl: "" });
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const { data: groupStudents = [], isLoading: groupStudentsLoading, refetch: refetchGroupStudents } = trpc.lmsAdmin.listCohortGroupStudents.useQuery({ cohortGroupId: selectedGroupId ?? 0 }, { enabled: !!selectedGroupId });
   const { data: unassignedStudents = [], refetch: refetchUnassigned } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery({ courseId }, { enabled: activeTab === "groups" });
@@ -11784,15 +11784,15 @@ function CohortTab({ courseId }: { courseId: number }) {
   });
   const openGroupDialog = (group?: any) => {
     if (group) {
-      setGroupForm({ name: group.name, slug: group.slug, description: group.description ?? "", startDate: group.startDate ? new Date(group.startDate).toISOString().slice(0, 10) : "", endDate: group.endDate ? new Date(group.endDate).toISOString().slice(0, 10) : "", enrollmentCloseDate: group.enrollmentCloseDate ? new Date(group.enrollmentCloseDate).toISOString().slice(0, 10) : "", maxStudents: group.maxStudents?.toString() ?? "", status: group.status, sortOrder: group.sortOrder, isFeaturedOnLanding: group.isFeaturedOnLanding, accessDurationDays: group.accessDurationDays?.toString() ?? "" });
+      setGroupForm({ name: group.name, slug: group.slug, description: group.description ?? "", startDate: group.startDate ? new Date(group.startDate).toISOString().slice(0, 10) : "", endDate: group.endDate ? new Date(group.endDate).toISOString().slice(0, 10) : "", enrollmentCloseDate: group.enrollmentCloseDate ? new Date(group.enrollmentCloseDate).toISOString().slice(0, 10) : "", maxStudents: group.maxStudents?.toString() ?? "", status: group.status, sortOrder: group.sortOrder, isFeaturedOnLanding: group.isFeaturedOnLanding, accessDurationDays: group.accessDurationDays?.toString() ?? "", presaleWelcomeHeading: group.presaleWelcomeHeading ?? "", presaleWelcomeBody: group.presaleWelcomeBody ?? "", presaleWelcomeMediaUrl: group.presaleWelcomeMediaUrl ?? "", presaleWelcomeCtaLabel: group.presaleWelcomeCtaLabel ?? "", presaleWelcomeCtaUrl: group.presaleWelcomeCtaUrl ?? "" });
     } else {
-      setGroupForm({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft", sortOrder: cohortGroups.length, isFeaturedOnLanding: false, accessDurationDays: "" });
+      setGroupForm({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft", sortOrder: cohortGroups.length, isFeaturedOnLanding: false, accessDurationDays: "", presaleWelcomeHeading: "", presaleWelcomeBody: "", presaleWelcomeMediaUrl: "", presaleWelcomeCtaLabel: "", presaleWelcomeCtaUrl: "" });
     }
     setGroupDialog({ open: true, group });
   };
   const handleSaveGroup = () => {
     if (!groupForm.name.trim() || !groupForm.slug.trim()) { toast.error("Name and slug are required"); return; }
-    const payload = { courseId, name: groupForm.name.trim(), slug: groupForm.slug.trim(), description: groupForm.description || undefined, startDate: groupForm.startDate || undefined, endDate: groupForm.endDate || undefined, enrollmentCloseDate: groupForm.enrollmentCloseDate || undefined, maxStudents: groupForm.maxStudents ? parseInt(groupForm.maxStudents) : undefined, status: groupForm.status, sortOrder: groupForm.sortOrder, accessDurationDays: groupForm.accessDurationDays ? parseInt(groupForm.accessDurationDays) : undefined };
+    const payload = { courseId, name: groupForm.name.trim(), slug: groupForm.slug.trim(), description: groupForm.description || undefined, startDate: groupForm.startDate || undefined, endDate: groupForm.endDate || undefined, enrollmentCloseDate: groupForm.enrollmentCloseDate || undefined, maxStudents: groupForm.maxStudents ? parseInt(groupForm.maxStudents) : undefined, status: groupForm.status, sortOrder: groupForm.sortOrder, accessDurationDays: groupForm.accessDurationDays ? parseInt(groupForm.accessDurationDays) : undefined, presaleWelcomeHeading: groupForm.presaleWelcomeHeading || undefined, presaleWelcomeBody: groupForm.presaleWelcomeBody || undefined, presaleWelcomeMediaUrl: groupForm.presaleWelcomeMediaUrl, presaleWelcomeCtaLabel: groupForm.presaleWelcomeCtaLabel || undefined, presaleWelcomeCtaUrl: groupForm.presaleWelcomeCtaUrl };
     if (groupDialog.group) {
       updateCohortGroup.mutate({ id: groupDialog.group.id, ...payload, isFeaturedOnLanding: groupForm.isFeaturedOnLanding });
     } else {
@@ -13213,6 +13213,8 @@ function CohortTab({ courseId }: { courseId: number }) {
                       <select value={groupForm.status} onChange={e => setGroupForm(p => ({ ...p, status: e.target.value as any }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
                         <option value="draft">Draft</option>
                         <option value="open">Open (accepting enrollments)</option>
+                        <option value="waitlist">Waitlist</option>
+                        <option value="presale">Pre-sale</option>
                         <option value="active">Active (in progress)</option>
                         <option value="completed">Completed</option>
                         <option value="archived">Archived</option>
@@ -13228,6 +13230,36 @@ function CohortTab({ courseId }: { courseId: number }) {
                     <input type="number" min="1" value={groupForm.accessDurationDays} onChange={e => setGroupForm(p => ({ ...p, accessDurationDays: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Leave blank for indefinite access" />
                     <p className="text-xs text-gray-400 mt-1">Students lose access this many days after the group start date. Leave blank for indefinite access.</p>
                   </div>
+                  {groupForm.status === "presale" && (
+                    <div className="space-y-3 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-cyan-900">Pre-sale Welcome Page</h3>
+                        <p className="mt-1 text-xs text-cyan-800">Purchasers see this content until the cohort group opens. Opening the group restores full course access automatically.</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-1 block">Heading</Label>
+                        <input value={groupForm.presaleWelcomeHeading} onChange={e => setGroupForm(p => ({ ...p, presaleWelcomeHeading: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Thank you for enrolling" />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-1 block">Welcome Message</Label>
+                        <RichTextEditor value={groupForm.presaleWelcomeBody} onChange={value => setGroupForm(p => ({ ...p, presaleWelcomeBody: value }))} placeholder="Let learners know when they will receive access." />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium text-gray-700 mb-1 block">Media URL (optional)</Label>
+                        <input value={groupForm.presaleWelcomeMediaUrl} onChange={e => setGroupForm(p => ({ ...p, presaleWelcomeMediaUrl: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="https://..." />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700 mb-1 block">CTA Label (optional)</Label>
+                          <input value={groupForm.presaleWelcomeCtaLabel} onChange={e => setGroupForm(p => ({ ...p, presaleWelcomeCtaLabel: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Contact us" />
+                        </div>
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700 mb-1 block">CTA URL (optional)</Label>
+                          <input value={groupForm.presaleWelcomeCtaUrl} onChange={e => setGroupForm(p => ({ ...p, presaleWelcomeCtaUrl: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="https://..." />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                     <input type="checkbox" id="group-featured" checked={groupForm.isFeaturedOnLanding} onChange={e => setGroupForm(p => ({ ...p, isFeaturedOnLanding: e.target.checked }))} className="w-4 h-4 accent-teal-600" />
                     <label htmlFor="group-featured" className="text-sm text-amber-800 cursor-pointer">

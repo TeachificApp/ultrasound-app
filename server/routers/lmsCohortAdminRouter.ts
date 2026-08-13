@@ -987,18 +987,25 @@ export const lmsCohortAdminRouter = router({
       maxStudents: z.number().optional(),
       status: z.enum(["draft", "open", "waitlist", "presale", "active", "completed", "archived"]).default("draft"),
       sortOrder: z.number().default(0),
+      presaleWelcomeHeading: z.string().max(500).optional(),
+      presaleWelcomeBody: z.string().optional(),
+      presaleWelcomeMediaUrl: z.string().url().optional().or(z.literal("")),
+      presaleWelcomeCtaLabel: z.string().max(255).optional(),
+      presaleWelcomeCtaUrl: z.string().url().optional().or(z.literal("")),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { courseId, name, slug, description, startDate, endDate, enrollmentCloseDate, maxStudents, status, sortOrder } = input;
+      const { courseId, name, slug, description, startDate, endDate, enrollmentCloseDate, maxStudents, status, sortOrder, presaleWelcomeMediaUrl, presaleWelcomeCtaUrl, ...presaleWelcome } = input;
       const [result] = await db.insert(lmsCohortGroups).values({
         courseId, name, slug, description,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
         enrollmentCloseDate: enrollmentCloseDate ? new Date(enrollmentCloseDate) : undefined,
-        maxStudents, status, sortOrder,
+        maxStudents, status, sortOrder, ...presaleWelcome,
+        presaleWelcomeMediaUrl: presaleWelcomeMediaUrl || undefined,
+        presaleWelcomeCtaUrl: presaleWelcomeCtaUrl || undefined,
       }).$returningId();
       return { id: result.id };
     }),
@@ -1019,18 +1026,25 @@ export const lmsCohortAdminRouter = router({
       accessDurationDays: z.number().int().min(1).nullable().optional(),
       pageBlocks: z.string().optional(),
       isFeaturedOnLanding: z.boolean().optional(),
+      presaleWelcomeHeading: z.string().max(500).optional(),
+      presaleWelcomeBody: z.string().optional(),
+      presaleWelcomeMediaUrl: z.string().url().optional().or(z.literal("")),
+      presaleWelcomeCtaLabel: z.string().max(255).optional(),
+      presaleWelcomeCtaUrl: z.string().url().optional().or(z.literal("")),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, startDate, endDate, enrollmentCloseDate, ...rest } = input;
+      const { id, startDate, endDate, enrollmentCloseDate, presaleWelcomeMediaUrl, presaleWelcomeCtaUrl, ...rest } = input;
       const [existingGroup] = await db.select({ status: lmsCohortGroups.status })
         .from(lmsCohortGroups).where(eq(lmsCohortGroups.id, id)).limit(1);
       const updateData: any = { ...rest };
       if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
       if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
       if (enrollmentCloseDate !== undefined) updateData.enrollmentCloseDate = enrollmentCloseDate ? new Date(enrollmentCloseDate) : null;
+      if (presaleWelcomeMediaUrl !== undefined) updateData.presaleWelcomeMediaUrl = presaleWelcomeMediaUrl || null;
+      if (presaleWelcomeCtaUrl !== undefined) updateData.presaleWelcomeCtaUrl = presaleWelcomeCtaUrl || null;
       if (input.isFeaturedOnLanding) {
         const [group] = await db.select({ courseId: lmsCohortGroups.courseId }).from(lmsCohortGroups).where(eq(lmsCohortGroups.id, id));
         if (group) await db.update(lmsCohortGroups).set({ isFeaturedOnLanding: false }).where(eq(lmsCohortGroups.courseId, group.courseId));

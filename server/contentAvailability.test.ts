@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availabilityCtaLabel, isPresaleAvailability, isWaitlistAvailability, shouldReleasePresaleEnrollment } from "../shared/contentAvailability";
+import { availabilityCtaLabel, isPresaleAvailability, isWaitlistAvailability, resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../shared/contentAvailability";
 
 describe("content availability statuses", () => {
   it("routes Waitlist content to visitor signup rather than enrollment", () => {
@@ -21,5 +21,19 @@ describe("content availability statuses", () => {
   it("keeps enrollment closed and public CTAs distinct", () => {
     expect(availabilityCtaLabel("enrollment_closed")).toBe("Enrollment Closed");
     expect(availabilityCtaLabel("public", "Register")).toBe("Register");
+  });
+
+  it("uses a cohort-specific Pre-sale welcome page before falling back to course defaults", () => {
+    expect(resolvePresaleWelcome({ heading: "Your cohort seat is reserved", body: "We will open access shortly." }, { heading: "Course default", body: "Course default body", ctaLabel: "Contact us" })).toEqual({
+      heading: "Your cohort seat is reserved",
+      body: "We will open access shortly.",
+      mediaUrl: null,
+      ctaLabel: "Contact us",
+      ctaUrl: null,
+    });
+    expect(resolvePresaleWelcome()).toMatchObject({
+      heading: "Thank you for enrolling.",
+      body: "You’ll be granted access once the course is open.",
+    });
   });
 });

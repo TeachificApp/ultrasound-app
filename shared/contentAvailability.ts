@@ -13,6 +13,25 @@ export function shouldReleasePresaleEnrollment(previousStatus: ContentAvailabili
   return isPresaleAvailability(previousStatus) && !!nextStatus && !isPresaleAvailability(nextStatus);
 }
 
+export type PresaleWelcomeSource = {
+  heading?: string | null;
+  body?: string | null;
+  mediaUrl?: string | null;
+  ctaLabel?: string | null;
+  ctaUrl?: string | null;
+};
+
+/** Prefer a product-instance welcome configuration while retaining course-level defaults. */
+export function resolvePresaleWelcome(primary?: PresaleWelcomeSource | null, fallback?: PresaleWelcomeSource | null) {
+  return {
+    heading: primary?.heading || fallback?.heading || "Thank you for enrolling.",
+    body: primary?.body || fallback?.body || "You’ll be granted access once the course is open.",
+    mediaUrl: primary?.mediaUrl || fallback?.mediaUrl || null,
+    ctaLabel: primary?.ctaLabel || fallback?.ctaLabel || null,
+    ctaUrl: primary?.ctaUrl || fallback?.ctaUrl || null,
+  };
+}
+
 export function availabilityCtaLabel(status: ContentAvailabilityStatus, fallback = "Enroll Now"): string {
   if (isWaitlistAvailability(status)) return "Join Waitlist";
   if (isPresaleAvailability(status)) return "Pre-sale: Enroll Now";
