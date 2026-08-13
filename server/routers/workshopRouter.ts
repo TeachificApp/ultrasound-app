@@ -1231,9 +1231,11 @@ export const workshopAdminRouter = router({
             eq(workshopEnrollments.instanceId, input.instanceId),
             eq(workshopEnrollments.userId, input.userId)
           )
-        )
+      )
         .limit(1);
       if (existing) return { success: true, alreadyEnrolled: true };
+      const [instance] = await db.select({ status: workshopInstances.status }).from(workshopInstances)
+        .where(eq(workshopInstances.id, input.instanceId)).limit(1);
       await db.insert(workshopEnrollments).values({
         workshopId: input.workshopId,
         instanceId: input.instanceId,
@@ -1241,6 +1243,7 @@ export const workshopAdminRouter = router({
         amountPaid: 0,
         currency: "usd",
         status: "active",
+        accessLevel: instance?.status === "presale" ? "presale" : "full",
       });
       await db
         .update(workshopInstances)
