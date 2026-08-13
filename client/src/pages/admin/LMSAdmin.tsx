@@ -5132,8 +5132,8 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
         </button>
         <div className="order-3 basis-full min-w-0 sm:order-none sm:basis-auto sm:flex-1">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-teal-700 font-bold text-sm uppercase tracking-wide shrink-0">Edit Lesson</span>
-            <span className="text-gray-300 text-sm shrink-0">·</span>
+            <span className="hidden text-teal-700 font-bold text-sm uppercase tracking-wide shrink-0 sm:inline">Edit Lesson</span>
+            <span className="hidden text-gray-300 text-sm shrink-0 sm:inline">·</span>
             <span className="text-gray-800 font-semibold text-sm break-words sm:truncate sm:min-w-[15ch] sm:max-w-[40vw]" title={lesson.title}>{lesson.title}</span>
           </div>
         </div>
