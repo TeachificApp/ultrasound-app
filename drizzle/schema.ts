@@ -5579,6 +5579,11 @@ export const questionBank = mysqlTable("question_bank", {
   // Source tracking
   sourceQuizId: int("source_quiz_id"), // FK → lms_quizzes.id (if created via quiz builder)
   sourceQuizQuestionId: int("source_quiz_question_id"), // FK → lms_quiz_questions.id
+  // Lesson page-builder quiz source tracking. These fields make lesson quiz
+  // questions updatable in the shared bank without creating duplicates.
+  sourceLessonId: int("source_lesson_id"),
+  sourceBlockId: varchar("source_block_id", { length: 128 }),
+  sourceQuestionIndex: int("source_question_index"),
   folderId: int("folder_id"), // FK → question_bank_folders.id
   /** Preset library: when true, this question appears in the Preset Questions picker */
   isPreset: boolean("is_preset").default(false).notNull(),

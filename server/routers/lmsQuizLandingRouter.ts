@@ -24,6 +24,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
+import { syncLegacyLessonQuizQuestionToBank } from "../lib/lessonQuizQuestionBankSync";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
@@ -177,6 +178,7 @@ export const lmsQuizLandingRouter = router({
         correctAnswers: correctAnswers ? JSON.stringify(correctAnswers) : null,
         explanation: rest.explanation ?? null,
       } as any).$returningId();
+      await syncLegacyLessonQuizQuestionToBank(db, result.id, ctx.user.id);
       return { id: result.id };
     }),
 
@@ -220,6 +222,7 @@ export const lmsQuizLandingRouter = router({
       if (options !== undefined) updates.options = JSON.stringify(options);
       if (correctAnswers !== undefined) updates.correctAnswers = correctAnswers ? JSON.stringify(correctAnswers) : null;
       if (Object.keys(updates).length > 0) await db.update(lmsQuizQuestions).set(updates as any).where(eq(lmsQuizQuestions.id, id));
+      await syncLegacyLessonQuizQuestionToBank(db, id, ctx.user.id);
       return { success: true };
     }),
 

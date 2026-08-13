@@ -521,17 +521,30 @@ export const appRouter = router({
         returnTo: z.string().max(500).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        const { getUserByEmail, setMagicLinkToken } = await import('./db');
+        const { getUserByEmail, setMagicLinkToken, upsertUser } = await import('./db');
         const { sendEmail, buildMagicLinkEmail } = await import('./_core/email');
         const crypto = await import('crypto');
 
         const email = input.email.trim().toLowerCase();
-        const user = await getUserByEmail(email);
+        let user = await getUserByEmail(email);
 
-        // Always return success to prevent email enumeration
+        // Passwordless sign-in also provides a safe account-creation path. This
+        // prevents an invited, migrated, or brand-new learner from receiving a
+        // silent success response with no email or usable sign-in route.
         if (!user) {
-          return { success: true };
+          await upsertUser({
+            openId: `email:${email}`,
+            email,
+            name: email.split('@')[0] || 'Learner',
+            loginMethod: 'magic_link',
+            lastSignedIn: new Date(),
+          });
+          user = await getUserByEmail(email);
         }
+
+        // Preserve a generic response even if an underlying account operation
+        // cannot complete, so the endpoint never exposes account existence.
+        if (!user) return { success: true };
 
         const token = crypto.randomBytes(48).toString('hex');
         const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -573,13 +586,16 @@ export const appRouter = router({
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });
-        await sendEmail({
+        const deliveryAccepted = await sendEmail({
           to: { name: firstName, email: user.email! },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
           brandMode,
         });
+        if (!deliveryAccepted) {
+          console.error(`[auth] Magic-link delivery was not accepted for user ${user.id}`);
+        }
 
         return { success: true };
       }),

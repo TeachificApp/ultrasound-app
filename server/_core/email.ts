@@ -147,6 +147,7 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
     if (!res.ok) {
       const text = await res.text();
       console.error(`[email] SendGrid API error ${res.status}: ${text}`);
+      _logEmailSend(opts.to, opts.subject, "failed").catch(() => {});
       return false;
     }
 

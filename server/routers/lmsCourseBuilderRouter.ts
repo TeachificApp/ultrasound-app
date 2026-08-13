@@ -29,6 +29,7 @@ import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
+import { syncLessonQuizBlocksToQuestionBank } from "../lib/lessonQuizQuestionBankSync";
 import {
   lmsCourses,
   lmsSections,
@@ -1143,6 +1144,14 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         updates.previewMode = updates.isPreview ? "preview" : "none";
       }
       if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates as any).where(eq(lmsLessons.id, id));
+
+      if (input.contentBlocks !== undefined) {
+        try {
+          await syncLessonQuizBlocksToQuestionBank(db, id, input.contentBlocks, ctx.user.id);
+        } catch (error) {
+          console.error("[updateLesson] Question Bank sync failed:", error);
+        }
+      }
 
       if ((updates.type === "standalone_quiz" || updates.standaloneQuizId !== undefined) && updates.standaloneQuizId) {
         await db.update(standaloneQuizzes)
