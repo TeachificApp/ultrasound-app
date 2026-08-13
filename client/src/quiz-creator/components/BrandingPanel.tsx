@@ -95,6 +95,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
           Save
         </button>
       </div>
+      <p className="-mt-3 text-xs text-gray-500">Apply consistent branding to reusable learning content.</p>
 
       {/* Primary Color */}
       <div className="space-y-2">
