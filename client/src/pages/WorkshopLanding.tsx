@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { isWaitlistAvailability } from "../../../shared/contentAvailability";
 import { Briefcase, Calendar, MapPin, Clock, Users, Edit2, ArrowLeft, ExternalLink, CheckCircle, Bell, ChevronRight, X } from "lucide-react";
 import { WorkshopInstancesCalendar } from "@/components/WorkshopInstancesCalendar";
 import { Link } from "wouter";
@@ -127,7 +128,7 @@ function InstanceCard({
   isPending,
 }: {
   instance: any;
-  onRegister: (instanceId: number) => void;
+  onRegister: (instanceId: number, availability?: "waitlist") => void;
   isPending: boolean;
 }) {
   return (
@@ -167,11 +168,11 @@ function InstanceCard({
           ) : null}
           <Button
             size="sm"
-            onClick={() => onRegister(instance.id)}
+            onClick={() => onRegister(instance.id, instance.status === "waitlist" ? "waitlist" : undefined)}
             disabled={isPending}
             className="bg-teal-600 hover:bg-teal-700 text-white"
           >
-            Register
+            {instance.status === "waitlist" ? "Join Waitlist" : instance.status === "presale" ? "Pre-sale: Enroll" : "Register"}
           </Button>
         </div>
       </div>
@@ -184,16 +185,19 @@ function WaitlistModal({
   open,
   onClose,
   workshop,
+  availabilityTarget,
 }: {
   open: boolean;
   onClose: () => void;
   workshop: any;
+  availabilityTarget?: { productType: "workshop" | "workshop_instance"; productId: number };
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const usesAvailabilityWaitlist = Boolean(availabilityTarget) || isWaitlistAvailability(workshop.status);
 
   const joinMutation = trpc.workshopWaitlist.join.useMutation({
     onSuccess: (res) => {
@@ -212,11 +216,26 @@ function WaitlistModal({
     },
     onError: (e: any) => toast.error(e.message),
   });
+  const joinAvailabilityWaitlist = trpc.contentAvailability.joinWaitlist.useMutation({
+    onSuccess: (res) => {
+      if (res.alreadyJoined) {
+        toast.info("You're already on the waitlist for this workshop.");
+        onClose();
+        return;
+      }
+      setSubmitted(true);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
-    joinMutation.mutate({ workshopId: workshop.id, name, email, phone: phone || undefined, message: message || undefined });
+    if (usesAvailabilityWaitlist) {
+      joinAvailabilityWaitlist.mutate({ productType: availabilityTarget?.productType ?? "workshop", productId: availabilityTarget?.productId ?? workshop.id, name, email });
+    } else {
+      joinMutation.mutate({ workshopId: workshop.id, name, email, phone: phone || undefined, message: message || undefined });
+    }
   }
 
   const heading = workshop.waitlistHeading || "Join the Waitlist";
@@ -268,10 +287,10 @@ function WaitlistModal({
             </div>
             <Button
               type="submit"
-              disabled={!name.trim() || !email.trim() || joinMutation.isPending}
+              disabled={!name.trim() || !email.trim() || joinMutation.isPending || joinAvailabilityWaitlist.isPending}
               className="w-full bg-teal-600 hover:bg-teal-700 text-white"
             >
-              {joinMutation.isPending ? "Submitting…" : (workshop.waitlistCtaLabel || "Join Waitlist")}
+              {joinMutation.isPending || joinAvailabilityWaitlist.isPending ? "Submitting…" : (workshop.waitlistCtaLabel || "Join Waitlist")}
             </Button>
           </form>
         )}
@@ -287,6 +306,7 @@ export default function WorkshopLanding() {
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [selectedInstanceId, setSelectedInstanceId] = useState<number | null>(null);
+  const [selectedWaitlistInstanceId, setSelectedWaitlistInstanceId] = useState<number | null>(null);
 
   const { data, isLoading, error } = trpc.workshop.getBySlug.useQuery(
     { slug: slug! },
@@ -315,12 +335,13 @@ export default function WorkshopLanding() {
 
   const workshop = data?.workshop;
   const availableInstances = data?.availableInstances ?? [];
+  const waitlistInstances = data?.waitlistInstances ?? [];
   const soldOutInstances = data?.soldOutInstances ?? [];
   const allInstances = data?.allInstances ?? [];
   const pricingOptions = data?.pricingOptions ?? [];
 
   // Determine waitlist mode: admin explicitly enabled waitlist + no active enrolling instances
-  const isWaitlistMode = !!(workshop?.waitlistEnabled && availableInstances.length === 0);
+  const isWaitlistMode = isWaitlistAvailability(workshop?.status) || !!(workshop?.waitlistEnabled && availableInstances.length === 0);
   // isAllSoldOut: all instances are at capacity (no available instances, but sold-out ones exist)
   const isAllSoldOut = availableInstances.length === 0 && soldOutInstances.length > 0;
 
@@ -399,7 +420,12 @@ export default function WorkshopLanding() {
     }
   }
 
-  function handleInstanceRegister(instanceId: number) {
+  function handleInstanceRegister(instanceId: number, availability?: "waitlist") {
+    if (availability === "waitlist") {
+      setSelectedWaitlistInstanceId(instanceId);
+      setWaitlistOpen(true);
+      return;
+    }
     if (isWaitlistMode || isAllSoldOut) {
       openWaitlistOrNotify();
       return;
@@ -850,7 +876,7 @@ export default function WorkshopLanding() {
           )}
 
           {/* Available Instances (non-waitlist mode) */}
-          {!isWaitlistMode && (availableInstances.length > 0 || soldOutInstances.length > 0) && (
+          {!isWaitlistMode && (availableInstances.length > 0 || waitlistInstances.length > 0 || soldOutInstances.length > 0) && (
             <div>
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Available Dates</h2>
               <div className="space-y-3">
@@ -860,6 +886,14 @@ export default function WorkshopLanding() {
                     instance={inst}
                     onRegister={handleInstanceRegister}
                     isPending={enrollMutation.isPending || checkoutMutation.isPending}
+                  />
+                ))}
+                {waitlistInstances.map((inst: any) => (
+                  <InstanceCard
+                    key={inst.id}
+                    instance={inst}
+                    onRegister={handleInstanceRegister}
+                    isPending={joinAvailabilityWaitlist.isPending}
                   />
                 ))}
                 {soldOutInstances.map((inst: any) => (
@@ -923,11 +957,12 @@ export default function WorkshopLanding() {
       )}
 
       {/* Waitlist sign-up modal */}
-      {(isWaitlistMode || isAllSoldOut) && (
+      {(isWaitlistMode || isAllSoldOut || selectedWaitlistInstanceId !== null) && (
         <WaitlistModal
           open={waitlistOpen}
-          onClose={() => setWaitlistOpen(false)}
+          onClose={() => { setWaitlistOpen(false); setSelectedWaitlistInstanceId(null); }}
           workshop={workshop}
+          availabilityTarget={selectedWaitlistInstanceId !== null ? { productType: "workshop_instance", productId: selectedWaitlistInstanceId } : undefined}
         />
       )}
 

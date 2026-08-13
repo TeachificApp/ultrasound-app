@@ -2001,6 +2001,28 @@ export const lmsLearnerRouter = router({
       // If the admin IS enrolled, treat them as a regular enrolled user so progress is tracked.
       const isAdminPreview = input.preview && ctx.user.role === "admin" && !enrollment;
 
+      // Paid pre-sale enrollment confirms a seat, but course content stays restricted until opening.
+      if (enrollment?.enrollmentType === "presale" && ctx.user.role !== "admin") {
+        return {
+          course,
+          enrollment,
+          sections: [],
+          topLevelLessons: [],
+          progress: [],
+          instructors: [],
+          lessonInstructorsMap: {},
+          isAdminPreview: false,
+          isPresale: true,
+          presaleWelcome: {
+            heading: course.presaleWelcomeHeading || "Thank you for enrolling.",
+            body: course.presaleWelcomeBody || "You’ll be granted access once the course is open.",
+            mediaUrl: course.presaleWelcomeMediaUrl || null,
+            ctaLabel: course.presaleWelcomeCtaLabel || null,
+            ctaUrl: course.presaleWelcomeCtaUrl || null,
+          },
+        };
+      }
+
       // Fetch sections + ALL lessons for this course in 2 parallel queries (avoids N+1)
       // Select only lightweight columns for the sidebar — heavy content (contentBlocks, content, videoContent)
       // is fetched on-demand by getLesson when the student opens a specific lesson.
@@ -2139,6 +2161,14 @@ export const lmsLearnerRouter = router({
       // Block draft lessons from non-admin learners
       if (!isAdmin && lesson.lessonStatus === "draft") {
         throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+      }
+      // A pre-sale seat has no instructional-content access until the course opens.
+      if (!isAdmin) {
+        const { getActiveEnrollment: getPresaleEnrollment } = await import("../lib/enrollmentAccess");
+        const presaleEnrollment = await getPresaleEnrollment(db as any, ctx.user.id, resolvedCourseId);
+        if (presaleEnrollment?.enrollmentType === "presale") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This course is not open yet. Your pre-sale welcome page has the latest access information." });
+        }
       }
       const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
       if (pm !== "preview" && !isAdmin) {
@@ -2515,13 +2545,14 @@ export const lmsLearnerRouter = router({
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       if (!course.isFree) throw new TRPCError({ code: "BAD_REQUEST", message: "This course requires payment" });
-      if (course.status !== "public") throw new TRPCError({ code: "FORBIDDEN" });
+      const isPresale = (course.status as string) === "presale";
+      if (course.status !== "public" && !isPresale) throw new TRPCError({ code: "FORBIDDEN" });
 
       const [existing] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType }).from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
       if (existing) {
         if (existing.enrollmentType === "free_preview") {
-          await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existing.id));
+          await db.update(lmsEnrollments).set({ enrollmentType: isPresale ? "presale" : "full" }).where(eq(lmsEnrollments.id, existing.id));
           return { enrollmentId: existing.id, alreadyEnrolled: false };
         }
         return { enrollmentId: existing.id, alreadyEnrolled: true };
@@ -2530,7 +2561,7 @@ export const lmsLearnerRouter = router({
       const [result] = await db.insert(lmsEnrollments).values({
         userId: ctx.user.id, courseId: course.id,
         affiliateCode: input.affiliateCode ?? null,
-        enrollmentType: "full",
+        enrollmentType: isPresale ? "presale" : "full",
       }).$returningId();
       // Log free enrollment to unified activity log (fire-and-forget)
       db.insert(userActivityLogs).values({
@@ -2568,6 +2599,10 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const isPresale = (course.status as string) === "presale";
+      if ((course.status as string) === "waitlist") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This course is currently accepting waitlist signups rather than enrollments." });
+      }
 
       // Block checkout if enrollment close date has passed
       if (course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date()) {
@@ -2630,7 +2665,7 @@ export const lmsLearnerRouter = router({
         const [existingZero] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
           .from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
         if (!existingZero) {
-          await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id, affiliateCode: input.affiliateCode ?? null, enrollmentType: "full" });
+          await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id, affiliateCode: input.affiliateCode ?? null, enrollmentType: isPresale ? "presale" : "full" });
           db.insert(userActivityLogs).values({ userId: ctx.user.id, eventType: "course_enroll", description: `Enrolled in zero-price course: ${course.title}`, courseId: course.id, contentTitle: course.title, metadata: { courseSlug: input.courseSlug, enrollmentType: "free_zero_price" } }).catch(() => {});
           // Send enrollment email and admin notification (fire-and-forget)
           sendEnrollmentEmailForUser({ userId: ctx.user.id, courseId: course.id, db }).catch(() => {});
@@ -2639,7 +2674,7 @@ export const lmsLearnerRouter = router({
             content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in zero-price course: ${course.title} (${input.courseSlug}).`,
           }).catch(() => {});
         } else if (existingZero.enrollmentType === "free_preview") {
-          await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existingZero.id));
+          await db.update(lmsEnrollments).set({ enrollmentType: isPresale ? "presale" : "full" }).where(eq(lmsEnrollments.id, existingZero.id));
         }
         return { freeEnrollment: true, courseSlug: course.slug, url: null };
       }
@@ -2680,6 +2715,7 @@ export const lmsLearnerRouter = router({
         seats: input.seats.toString(),
         pricing_type: pricingType,
         trigger_order_type: "course",
+        enrollment_type: isPresale ? "presale" : "full",
         ...orderBumpCheckout?.metadata,
       };
       // ── Post-purchase redirect ────────────────────────────────────────────────
@@ -2717,7 +2753,7 @@ export const lmsLearnerRouter = router({
               const [existingPromo] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
                 .from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
               if (!existingPromo) {
-                await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id, affiliateCode: input.affiliateCode ?? null, enrollmentType: "full" });
+                await db.insert(lmsEnrollments).values({ userId: ctx.user.id, courseId: course.id, affiliateCode: input.affiliateCode ?? null, enrollmentType: isPresale ? "presale" : "full" });
                 db.insert(userActivityLogs).values({ userId: ctx.user.id, eventType: "course_enroll", description: `Enrolled via 100% promo: ${course.title}`, courseId: course.id, contentTitle: course.title, metadata: { courseSlug: input.courseSlug, enrollmentType: "free_promo", promoCode: input.promoCode } }).catch(() => {});
                 // Send enrollment email and admin notification (fire-and-forget)
                 sendEnrollmentEmailForUser({ userId: ctx.user.id, courseId: course.id, db }).catch(() => {});
@@ -2726,7 +2762,7 @@ export const lmsLearnerRouter = router({
                   content: `User ${ctx.user.id} (${ctx.user.email}) enrolled via 100% promo (${input.promoCode ?? 'unknown'}): ${course.title} (${input.courseSlug}).`,
                 }).catch(() => {});
               } else if (existingPromo.enrollmentType === "free_preview") {
-                await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existingPromo.id));
+                await db.update(lmsEnrollments).set({ enrollmentType: isPresale ? "presale" : "full" }).where(eq(lmsEnrollments.id, existingPromo.id));
               }
               return { freeEnrollment: true, courseSlug: course.slug, url: null };
             }

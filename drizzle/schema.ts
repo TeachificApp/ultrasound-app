@@ -2938,7 +2938,7 @@ export const lmsCourses = mysqlTable("lms_courses", {
   subtitle: varchar("subtitle", { length: 500 }),
   description: longtext("description"),
   coverImageUrl: text("cover_image_url"),
-  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived", "enrollment_closed"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
   type: mysqlEnum("type", ["course", "quiz", "download", "cohort", "workshop"]).default("course").notNull(),
   // Cohort-specific: close enrollment after this date (null = always open)
   enrollmentCloseDate: timestamp("enrollment_close_date"),
@@ -3055,6 +3055,12 @@ export const lmsCourses = mysqlTable("lms_courses", {
   waitlistCtaUrl: varchar("waitlist_cta_url", { length: 2048 }),
   waitlistRedirectUrl: varchar("waitlist_redirect_url", { length: 2048 }),
   waitlistSuccessMessage: longtext("waitlist_success_message"),
+  // Configurable welcome page shown to paid pre-sale enrollees until access opens.
+  presaleWelcomeHeading: varchar("presale_welcome_heading", { length: 500 }),
+  presaleWelcomeBody: longtext("presale_welcome_body"),
+  presaleWelcomeMediaUrl: text("presale_welcome_media_url"),
+  presaleWelcomeCtaLabel: varchar("presale_welcome_cta_label", { length: 255 }),
+  presaleWelcomeCtaUrl: varchar("presale_welcome_cta_url", { length: 2048 }),
   // Block editor content for the Course Player right sidebar (shown below the instructor section)
   playerSidebarBlocks: longtext("player_sidebar_blocks"),
   // Per-course purchase terms agreement checkbox text (null = use site-level default from site_settings)
@@ -3272,7 +3278,7 @@ export const lmsEnrollments = mysqlTable("lms_enrollments", {
   affiliateCode: varchar("affiliate_code", { length: 64 }),
   orderId: int("order_id"),
   // Enrollment type: 'full' = paid/full access, 'free_preview' = free preview only (limited to preview lessons)
-  enrollmentType: mysqlEnum("enrollment_type", ["full", "free_preview", "admin_preview"]).default("full").notNull(),
+  enrollmentType: mysqlEnum("enrollment_type", ["full", "free_preview", "admin_preview", "presale"]).default("full").notNull(),
   /** When set, enrollment is inactive after this time (Thinkific expiry, membership period end) */
   accessExpiresAt: timestamp("access_expires_at"),
   source: varchar("source", { length: 32 }).default("manual").notNull(),
@@ -5079,7 +5085,7 @@ export const webinars = mysqlTable("webinars", {
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
   type: mysqlEnum("type", ["live", "prerecorded"]).default("live").notNull(),
-  status: mysqlEnum("status", ["draft", "published", "ended", "enrollment_closed"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "ended", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
   scheduledAt: bigint("scheduled_at", { mode: "number" }),
   durationMinutes: int("duration_minutes").default(60),
   meetingUrl: text("meeting_url"),
@@ -5093,6 +5099,11 @@ export const webinars = mysqlTable("webinars", {
   // JSON array of course/product IDs that grant automatic access to this community
   linkedAccessItems: longtext("linked_access_items"),
   pricingOptions: longtext("pricing_options"),
+  presaleWelcomeHeading: varchar("presale_welcome_heading", { length: 500 }),
+  presaleWelcomeBody: longtext("presale_welcome_body"),
+  presaleWelcomeMediaUrl: text("presale_welcome_media_url"),
+  presaleWelcomeCtaLabel: varchar("presale_welcome_cta_label", { length: 255 }),
+  presaleWelcomeCtaUrl: varchar("presale_welcome_cta_url", { length: 2048 }),
   // Structured pricing (mirrors lmsCourses)
   pricingType: mysqlEnum("pricing_type", ["free", "one_time", "subscription", "payment_plan", "trial_then_subscription"]).default("one_time").notNull(),
   price: int("price").default(0).notNull(),
@@ -6007,7 +6018,7 @@ export const lmsCohortGroups = mysqlTable("lms_cohort_groups", {
   maxStudents: int("max_students"), // null = unlimited
   location: varchar("location", { length: 300 }), // e.g. "Dallas, TX" or "Online"
   durationHours: int("duration_hours"), // total hours for the cohort program
-  status: mysqlEnum("status", ["draft", "open", "active", "completed", "archived"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "open", "active", "completed", "archived", "waitlist", "presale"]).default("draft").notNull(),
   // Page builder blocks for this specific cohort group's overview page
   pageBlocks: longtext("page_blocks"),
   // Full page builder blocks for this specific cohort group's detail page
@@ -6025,6 +6036,11 @@ export const lmsCohortGroups = mysqlTable("lms_cohort_groups", {
   waitlistCtaUrl: varchar("waitlist_cta_url", { length: 2048 }),
   waitlistRedirectUrl: varchar("waitlist_redirect_url", { length: 2048 }),
   waitlistSuccessMessage: longtext("waitlist_success_message"),
+  presaleWelcomeHeading: varchar("presale_welcome_heading", { length: 500 }),
+  presaleWelcomeBody: longtext("presale_welcome_body"),
+  presaleWelcomeMediaUrl: text("presale_welcome_media_url"),
+  presaleWelcomeCtaLabel: varchar("presale_welcome_cta_label", { length: 255 }),
+  presaleWelcomeCtaUrl: varchar("presale_welcome_cta_url", { length: 2048 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -6055,6 +6071,24 @@ export const draftNotifyEntries = mysqlTable("draft_notify_entries", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type DraftNotifyEntry = typeof draftNotifyEntries.$inferSelect;
+
+// ─── Content Waitlist Entries ─────────────────────────────────────────────────
+// One shared waitlist record per visitor and product or enrolment instance.
+export const contentWaitlistEntries = mysqlTable("content_waitlist_entries", {
+  id: int("id").autoincrement().primaryKey(),
+  productType: mysqlEnum("product_type", ["course", "cohort_group", "workshop", "workshop_instance", "webinar"]).notNull(),
+  productId: int("product_id").notNull(),
+  parentProductId: int("parent_product_id"),
+  userId: int("user_id"),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  notifiedAt: timestamp("notified_at"),
+  enrolledAt: timestamp("enrolled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniqueSignup: uniqueIndex("uq_content_waitlist_signup").on(t.productType, t.productId, t.email),
+}));
+export type ContentWaitlistEntry = typeof contentWaitlistEntries.$inferSelect;
 
 // ─── Cohort Waitlist Entries ──────────────────────────────────────────────────
 export const cohortWaitlistEntries = mysqlTable("cohort_waitlist_entries", {
@@ -7122,7 +7156,7 @@ export const workshops = mysqlTable("workshops", {
   thumbnailUrl: text("thumbnail_url"),
 
   // Status / visibility
-  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived", "enrollment_closed"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "public", "hidden", "private", "archived", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
 
   // Brand
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
@@ -7187,6 +7221,11 @@ export const workshops = mysqlTable("workshops", {
   waitlistRedirectUrl: varchar("waitlist_redirect_url", { length: 2048 }),
   waitlistContentBlocks: longtext("waitlist_content_blocks"),
   waitlistSuccessMessage: longtext("waitlist_success_message"),
+  presaleWelcomeHeading: varchar("presale_welcome_heading", { length: 500 }),
+  presaleWelcomeBody: longtext("presale_welcome_body"),
+  presaleWelcomeMediaUrl: text("presale_welcome_media_url"),
+  presaleWelcomeCtaLabel: varchar("presale_welcome_cta_label", { length: 255 }),
+  presaleWelcomeCtaUrl: varchar("presale_welcome_cta_url", { length: 2048 }),
 
   // Per-workshop checkout terms override (null = use platform_settings global default)
   purchaseTermsText: text("purchase_terms_text"),
@@ -7260,7 +7299,7 @@ export const workshopInstances = mysqlTable("workshop_instances", {
   salesOpenDate: timestamp("sales_open_date"),
 
   // Status
-  status: mysqlEnum("status", ["draft", "published", "cancelled", "completed"]).default("draft").notNull(),
+  status: mysqlEnum("status", ["draft", "published", "cancelled", "completed", "waitlist", "presale"]).default("draft").notNull(),
 
   // Stripe product/price for this specific instance
   stripeProductId: varchar("stripe_product_id", { length: 255 }),
@@ -7269,6 +7308,11 @@ export const workshopInstances = mysqlTable("workshop_instances", {
   instanceContent: longtext("instance_content"),
   // Full page builder blocks for this specific instance's detail page
   landingBlocks: longtext("landing_blocks"),
+  presaleWelcomeHeading: varchar("presale_welcome_heading", { length: 500 }),
+  presaleWelcomeBody: longtext("presale_welcome_body"),
+  presaleWelcomeMediaUrl: text("presale_welcome_media_url"),
+  presaleWelcomeCtaLabel: varchar("presale_welcome_cta_label", { length: 255 }),
+  presaleWelcomeCtaUrl: varchar("presale_welcome_cta_url", { length: 2048 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

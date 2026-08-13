@@ -1638,6 +1638,8 @@ export default function CourseLanding() {
   const [cwPhone, setCwPhone] = useState("");
   const [cwMessage, setCwMessage] = useState("");
   const [cwSubmitted, setCwSubmitted] = useState(false);
+  const [productWaitlistOpen, setProductWaitlistOpen] = useState(false);
+  const [productWaitlistSubmitted, setProductWaitlistSubmitted] = useState(false);
   // Draft "Notify Me When Open" modal state
   const [draftNotifyOpen, setDraftNotifyOpen] = useState(false);
   const [dnName, setDnName] = useState("");
@@ -1755,6 +1757,13 @@ export default function CourseLanding() {
     },
     onError: (e: any) => toast.error(e.message),
   });
+  const joinProductWaitlist = trpc.contentAvailability.joinWaitlist.useMutation({
+    onSuccess: (res) => {
+      if (res.alreadyJoined) toast.info("You’re already on this waitlist.");
+      setProductWaitlistSubmitted(true);
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   // handleFreeEnroll: dispatches free enrollment for any product type selected in the CTA builder
   const handleFreeEnroll = async (productType: string, productId: number) => {
@@ -1866,6 +1875,11 @@ export default function CourseLanding() {
   };
 
   const handleEnroll = async () => {
+    if ((course as any)?.status === "waitlist") {
+      setProductWaitlistSubmitted(false);
+      setProductWaitlistOpen(true);
+      return;
+    }
     if (!user) {
       // Guest: for paid courses, go directly to /checkout/:slug — Stripe collects email,
       // webhook auto-creates account after payment. No pre-payment account creation.
@@ -1896,6 +1910,11 @@ export default function CourseLanding() {
 
   /** Enroll with a specific pricing option ID — avoids React state closure timing issues */
   const handleEnrollWithOption = async (pricingOptionId: number | undefined) => {
+    if ((course as any)?.status === "waitlist") {
+      setProductWaitlistSubmitted(false);
+      setProductWaitlistOpen(true);
+      return;
+    }
     if (!user) {
       // Guest: for paid courses, go directly to /checkout/:slug — no pre-payment account creation.
       const resolvedPricingTypeGuest = pricingOptionId
@@ -1978,6 +1997,7 @@ export default function CourseLanding() {
   }
 
   const lp = course.landingPage;
+  const isProductWaitlist = !enrollment && (course as any).status === "waitlist";
   const isDraft = (course as any).status === "draft" || (course as any).status === "enrollment_closed";
   const price = formatPrice(course);
   const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
@@ -1992,8 +2012,8 @@ export default function CourseLanding() {
   // isAllGroupsClosed: no open groups (all sold out or enrollment-closed) — always show waitlist lead capture
   const isAllGroupsClosed = !enrollment && !hasOpenGroup && !isEnrollmentClosed && ((course as any).cohortGroups?.length ?? 0) > 0;
   // Either explicit waitlist mode OR all groups closed → show waitlist CTA
-  const showWaitlistCta = isWaitlistMode || isAllGroupsClosed;
-  const waitlistCtaLabel = featuredGroup?.waitlistCtaLabel || "Join the Waitlist";
+  const showWaitlistCta = isProductWaitlist || isWaitlistMode || isAllGroupsClosed;
+  const waitlistCtaLabel = isProductWaitlist ? "Join the Waitlist" : (featuredGroup?.waitlistCtaLabel || "Join the Waitlist");
   const isSubscriptionCourse =
     course?.pricingType === "subscription" ||
     (course?.pricingOptions as { pricingType?: string }[] | undefined)?.some((o) => o.pricingType === "subscription");
@@ -2004,6 +2024,7 @@ export default function CourseLanding() {
   const handleEnrollWithOptionGuarded = (pricingOptionId: number | undefined) =>
     runGuarded(() => { void handleEnrollWithOption(pricingOptionId); });
   const handleWaitlistCta = () => {
+    if (isProductWaitlist) { setProductWaitlistSubmitted(false); setProductWaitlistOpen(true); return; }
     if (featuredGroup?.waitlistCtaUrl) { window.open(featuredGroup.waitlistCtaUrl, "_blank"); return; }
     setCwSubmitted(false); setCwName(""); setCwEmail(""); setCwPhone(""); setCwMessage("");
     setCohortWaitlistOpen(true);
@@ -2143,6 +2164,22 @@ export default function CourseLanding() {
         message={cwMessage} setMessage={setCwMessage}
         submitted={cwSubmitted}
         mutation={joinCohortWaitlistMutation}
+      />
+      <ProductWaitlistModal
+        open={productWaitlistOpen}
+        onClose={() => setProductWaitlistOpen(false)}
+        title={course?.title ?? "this course"}
+        name={cwName} setName={setCwName}
+        email={cwEmail} setEmail={setCwEmail}
+        submitted={productWaitlistSubmitted}
+        pending={joinProductWaitlist.isPending}
+        onSubmit={() => joinProductWaitlist.mutate({
+          productType: "course",
+          productId: course?.id ?? 0,
+          name: cwName,
+          email: cwEmail,
+          userId: user?.id,
+        })}
       />
       <CohortGroupDetailModal
         open={selectedCohortGroupId !== null}
@@ -2448,7 +2485,7 @@ export default function CourseLanding() {
                 </Button>
                 <p className="text-xs text-center text-gray-500">Check back soon for enrollment updates.</p>
               </div>
-            ) : isWaitlistMode ? (
+            ) : (isWaitlistMode || isProductWaitlist) ? (
               <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleWaitlistCta}>
                 <Bell className="w-4 h-4 mr-2" />{waitlistCtaLabel}
               </Button>
@@ -2480,6 +2517,22 @@ export default function CourseLanding() {
       message={cwMessage} setMessage={setCwMessage}
       submitted={cwSubmitted}
       mutation={joinCohortWaitlistMutation}
+    />
+    <ProductWaitlistModal
+      open={productWaitlistOpen}
+      onClose={() => setProductWaitlistOpen(false)}
+      title={course?.title ?? "this course"}
+      name={cwName} setName={setCwName}
+      email={cwEmail} setEmail={setCwEmail}
+      submitted={productWaitlistSubmitted}
+      pending={joinProductWaitlist.isPending}
+      onSubmit={() => joinProductWaitlist.mutate({
+        productType: "course",
+        productId: course?.id ?? 0,
+        name: cwName,
+        email: cwEmail,
+        userId: user?.id,
+      })}
     />
     {/* Draft Notify Modal — "Notify Me When Open" for draft courses */}
     <Dialog open={draftNotifyOpen} onOpenChange={setDraftNotifyOpen}>
@@ -2726,6 +2779,48 @@ function CohortWaitlistModal({
               <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white" disabled={mutation.isPending}>
                 {mutation.isPending ? "Submitting..." : buttonLabel}
               </Button>
+            </form>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ProductWaitlistModal({
+  open, onClose, title, name, setName, email, setEmail, submitted, pending, onSubmit,
+}: {
+  open: boolean; onClose: () => void; title: string;
+  name: string; setName: (value: string) => void;
+  email: string; setEmail: (value: string) => void;
+  submitted: boolean; pending: boolean; onSubmit: () => void;
+}) {
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (name.trim() && email.trim()) onSubmit();
+  };
+  return (
+    <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+      <DialogContent className="max-w-md">
+        {submitted ? (
+          <div className="space-y-4 py-6 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-teal-100"><Bell className="h-8 w-8 text-teal-600" /></div>
+            <DialogHeader>
+              <DialogTitle className="text-xl text-teal-700">You’re on the waitlist!</DialogTitle>
+              <DialogDescription>We’ll let you know when enrolment opens for {title}.</DialogDescription>
+            </DialogHeader>
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </div>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-teal-700">Join the Waitlist</DialogTitle>
+              <DialogDescription>Be the first to know when enrolment opens for {title}.</DialogDescription>
+            </DialogHeader>
+            <form className="mt-2 space-y-4" onSubmit={handleSubmit}>
+              <div className="space-y-1"><Label htmlFor="product-waitlist-name">Full Name <span className="text-red-500">*</span></Label><Input id="product-waitlist-name" required autoFocus value={name} onChange={(event) => setName(event.target.value)} placeholder="Jane Smith" /></div>
+              <div className="space-y-1"><Label htmlFor="product-waitlist-email">Email Address <span className="text-red-500">*</span></Label><Input id="product-waitlist-email" required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="jane@example.com" /></div>
+              <Button type="submit" className="w-full bg-teal-600 text-white hover:bg-teal-700" disabled={pending}>{pending ? "Submitting…" : "Join the Waitlist"}</Button>
             </form>
           </>
         )}

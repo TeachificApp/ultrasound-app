@@ -1736,6 +1736,34 @@ export default function CoursePlayer() {
 
   if (!data) return null;
   const { course } = data;
+  if ((data as any).isPresale) {
+    const welcome = (data as any).presaleWelcome ?? {};
+    const mediaUrl = welcome.mediaUrl as string | null | undefined;
+    const isVideo = !!mediaUrl && /\.(mp4|webm|mov|m4v)(\?.*)?$/i.test(mediaUrl);
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-12 sm:px-6">
+        <section className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-sm">
+          <div className="bg-gradient-to-r from-[#123454] to-[#189aa1] px-6 py-8 text-white sm:px-10">
+            <p className="mb-2 text-sm font-semibold uppercase tracking-[0.16em] text-aqua-100">Pre-sale enrolment confirmed</p>
+            <h1 className="text-3xl font-bold">{welcome.heading || "Thank you for enrolling."}</h1>
+          </div>
+          <div className="space-y-6 p-6 sm:p-10">
+            {mediaUrl && (isVideo ? (
+              <video className="w-full rounded-xl bg-slate-950" controls src={mediaUrl} />
+            ) : (
+              <img className="w-full rounded-xl object-cover" src={mediaUrl} alt="Pre-sale welcome" />
+            ))}
+            <div className="prose max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: welcome.body || "<p>You’ll be granted access once the course is open.</p>" }} />
+            {welcome.ctaLabel && welcome.ctaUrl && (
+              <a className="inline-flex min-h-11 items-center rounded-md bg-[#189aa1] px-5 py-3 font-semibold text-white transition-colors hover:bg-[#147c82]" href={welcome.ctaUrl}>
+                {welcome.ctaLabel}
+              </a>
+            )}
+          </div>
+        </section>
+      </main>
+    );
+  }
   // Filter out preview_hide_after_purchase lessons for enrolled students
   const sections: any[] = (data.sections ?? []).map((s: any) => ({
     ...s,

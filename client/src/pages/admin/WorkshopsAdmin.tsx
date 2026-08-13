@@ -50,12 +50,16 @@ function fmtPrice(cents: number | null | undefined) {
 }
 function statusColor(status: string) {
   if (status === "public" || status === "published") return "bg-green-100 text-green-700";
+  if (status === "waitlist") return "bg-sky-100 text-sky-700";
+  if (status === "presale") return "bg-cyan-100 text-cyan-700";
+  if (status === "enrollment_closed") return "bg-orange-100 text-orange-700";
   if (status === "archived" || status === "cancelled" || status === "completed") return "bg-gray-100 text-gray-600";
   return "bg-yellow-100 text-yellow-700";
-  if (status === "enrollment_closed") return "bg-orange-100 text-orange-700";
 }
 function instanceStatusColor(status: string) {
   if (status === "published") return "bg-green-100 text-green-700";
+  if (status === "waitlist") return "bg-sky-100 text-sky-700";
+  if (status === "presale") return "bg-cyan-100 text-cyan-700";
   if (status === "cancelled") return "bg-red-100 text-red-700";
   if (status === "completed") return "bg-gray-100 text-gray-600";
   return "bg-yellow-100 text-yellow-700";
@@ -188,6 +192,8 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="public">Public</SelectItem>
+              <SelectItem value="waitlist">Waitlist</SelectItem>
+              <SelectItem value="presale">Pre-sale</SelectItem>
               <SelectItem value="hidden">Hidden</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
@@ -1340,6 +1346,8 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
                   <SelectContent>
                     <SelectItem value="draft">Draft</SelectItem>
                     <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="waitlist">Waitlist</SelectItem>
+                    <SelectItem value="presale">Pre-sale</SelectItem>
                     <SelectItem value="cancelled">Cancelled</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>
                   </SelectContent>

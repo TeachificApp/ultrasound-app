@@ -1658,6 +1658,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
     : (meta.product_type === "course" && meta.product_id ? parseInt(meta.product_id) : null);
   if (fulfillmentCourseId && resolvedUserId) {
     try {
+      const fulfillmentEnrollmentType = meta.enrollment_type === "presale" ? "presale" : "full";
       const [existingEnrollment] = await db
         .select({ id: lmsEnrollments.id })
         .from(lmsEnrollments)
@@ -1669,6 +1670,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
           courseId: fulfillmentCourseId,
           orderId: null,
           affiliateCode: null,
+          enrollmentType: fulfillmentEnrollmentType,
         });
         console.log(`[Stripe] Auto-enrolled user ${resolvedUserId} in LMS course ${fulfillmentCourseId} after payment ${piId}`);
         onCourseEnrollment(resolvedUserId, fulfillmentCourseId);

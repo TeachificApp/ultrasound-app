@@ -984,7 +984,7 @@ export const lmsCohortAdminRouter = router({
       endDate: z.string().optional(),
       enrollmentCloseDate: z.string().optional(),
       maxStudents: z.number().optional(),
-      status: z.enum(["draft", "open", "active", "completed", "archived"]).default("draft"),
+      status: z.enum(["draft", "open", "waitlist", "presale", "active", "completed", "archived"]).default("draft"),
       sortOrder: z.number().default(0),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1013,7 +1013,7 @@ export const lmsCohortAdminRouter = router({
       endDate: z.string().nullable().optional(),
       enrollmentCloseDate: z.string().nullable().optional(),
       maxStudents: z.number().nullable().optional(),
-      status: z.enum(["draft", "open", "active", "completed", "archived"]).optional(),
+      status: z.enum(["draft", "open", "waitlist", "presale", "active", "completed", "archived"]).optional(),
       sortOrder: z.number().optional(),
       accessDurationDays: z.number().int().min(1).nullable().optional(),
       pageBlocks: z.string().optional(),

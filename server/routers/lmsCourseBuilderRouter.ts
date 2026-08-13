@@ -205,7 +205,7 @@ export const lmsCourseBuilderRouter = router({
       subtitle: z.string().max(500).optional(),
       description: z.string().optional(),
       coverImageUrl: z.string().optional(),
-      status: z.enum(["draft", "public", "hidden", "private", "archived", "enrollment_closed"]).optional(),
+      status: z.enum(["draft", "public", "hidden", "private", "archived", "enrollment_closed", "waitlist", "presale"]).optional(),
       type: z.enum(["course", "quiz", "download", "cohort", "workshop"]).optional(),
       enrollmentCloseDate: z.string().nullable().optional(), // ISO date string or null
       // Course-level waitlist settings
@@ -216,6 +216,11 @@ export const lmsCourseBuilderRouter = router({
       waitlistCtaUrl: z.string().nullable().optional(),
       waitlistRedirectUrl: z.string().nullable().optional(),
       waitlistSuccessMessage: z.string().nullable().optional(),
+      presaleWelcomeHeading: z.string().max(500).nullable().optional(),
+      presaleWelcomeBody: z.string().nullable().optional(),
+      presaleWelcomeMediaUrl: z.string().max(2048).nullable().optional(),
+      presaleWelcomeCtaLabel: z.string().max(255).nullable().optional(),
+      presaleWelcomeCtaUrl: z.string().max(2048).nullable().optional(),
       brand: z.enum(["aaus", "iheartecho"]).optional(),
       price: z.number().min(0).optional(),
       isFree: z.boolean().optional(),
@@ -287,6 +292,13 @@ export const lmsCourseBuilderRouter = router({
       if (filtered.thumbnailUrl && !filtered.coverImageUrl) filtered.coverImageUrl = filtered.thumbnailUrl;
       if (Object.keys(filtered).length > 0) {
         await db.update(lmsCourses).set(filtered).where(eq(lmsCourses.id, id));
+      }
+
+      // Opening a pre-sale course upgrades purchased seats to normal learner access.
+      if (filtered.status === "public") {
+        await db.update(lmsEnrollments)
+          .set({ enrollmentType: "full" })
+          .where(and(eq(lmsEnrollments.courseId, id), eq(lmsEnrollments.enrollmentType, "presale")));
       }
 
       // Notify Me waitlist: when status changes to public, alert admin to send enrollment-open emails

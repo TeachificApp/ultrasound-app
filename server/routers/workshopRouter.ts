@@ -2,7 +2,7 @@ import { getStripeClient } from "../lib/stripeClient";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, asc, desc, eq, gt, gte, like, lte, or, sql, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { syncStripeProduct } from "../stripeSync";
@@ -33,7 +33,7 @@ function isInstanceOnSale(instance: {
   enrolledCount?: number | null;
 }): boolean {
   if (!instance.availableForPurchase) return false;
-  if (instance.status !== "published") return false;
+  if (instance.status !== "published" && instance.status !== "presale") return false;
   const now = new Date();
   // Check sales open date
   if (instance.salesOpenDate && now < instance.salesOpenDate) return false;
@@ -56,7 +56,7 @@ function isInstanceSoldOut(instance: {
   enrolledCount?: number | null;
 }): boolean {
   if (!instance.availableForPurchase) return false;
-  if (instance.status !== "published") return false;
+  if (instance.status !== "published" && instance.status !== "presale") return false;
   const now = new Date();
   if (instance.salesOpenDate && now < instance.salesOpenDate) return false;
   const closeDate = instance.salesCloseDate ?? instance.startDate;
@@ -81,27 +81,30 @@ export const workshopPublicRouter = router({
             eq(workshops.slug, input.slug),
             or(
               eq(workshops.status, "public"),
-              eq(workshops.status, "hidden")
+              eq(workshops.status, "hidden"),
+              eq(workshops.status, "waitlist"),
+              eq(workshops.status, "presale")
             )
           )
         )
         .limit(1);
       if (!workshop) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Get all published instances
+      // Expose active, pre-sale, and waitlist instances so each can render its own CTA.
       const allInstances = await db
         .select()
         .from(workshopInstances)
         .where(
           and(
             eq(workshopInstances.workshopId, workshop.id),
-            eq(workshopInstances.status, "published")
+            inArray(workshopInstances.status, ["published", "presale", "waitlist"])
           )
         )
         .orderBy(asc(workshopInstances.startDate));
 
-      // Filter to those currently on sale (not full)
+      // Filter by the availability CTA each instance should receive.
       const availableInstances = allInstances.filter(isInstanceOnSale);
+      const waitlistInstances = allInstances.filter((instance) => instance.status === "waitlist");
       // Instances that are date-valid but sold out (at capacity)
       const soldOutInstances = allInstances.filter(isInstanceSoldOut);
 
@@ -133,6 +136,7 @@ export const workshopPublicRouter = router({
       return {
         workshop,
         availableInstances,
+        waitlistInstances,
         soldOutInstances,
         allInstances,
         pricingOptions,
@@ -828,7 +832,7 @@ export const workshopAdminRouter = router({
         description: z.string().nullish(),
         coverImageUrl: z.string().nullish(),
         thumbnailUrl: z.string().nullish(),
-        status: z.enum(["draft", "public", "hidden", "private", "archived", "enrollment_closed"]).optional(),
+        status: z.enum(["draft", "public", "hidden", "private", "archived", "enrollment_closed", "waitlist", "presale"]).optional(),
         brand: z.enum(["aaus", "iheartecho"]).optional(),
         price: z.number().optional(),
         compareAtPrice: z.number().nullish(),
@@ -963,7 +967,7 @@ export const workshopAdminRouter = router({
         salesCloseDate: z.string().nullish(),
         salesOpenDate: z.string().nullish(),
         enrollmentCloseDate: z.string().nullish(),
-        status: z.enum(["draft", "published", "cancelled", "completed"]).default("draft"),
+        status: z.enum(["draft", "published", "waitlist", "presale", "cancelled", "completed"]).default("draft"),
         instanceContent: z.string().nullish(),
       })
     )
@@ -1024,7 +1028,7 @@ export const workshopAdminRouter = router({
         salesCloseDate: z.string().nullish(),
         salesOpenDate: z.string().nullish(),
         enrollmentCloseDate: z.string().nullish(),
-        status: z.enum(["draft", "published", "cancelled", "completed"]).optional(),
+        status: z.enum(["draft", "published", "waitlist", "presale", "cancelled", "completed"]).optional(),
         instanceContent: z.string().nullish(),
       })
     )

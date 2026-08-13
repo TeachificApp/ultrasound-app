@@ -19,7 +19,7 @@ import { Download, Mail, UserCheck, Loader2, Users, Settings2, ChevronDown, Chev
 
 interface CourseWaitlistTabProps {
   courseId: number;
-  course: { title: string; price?: number | null; type?: string };
+  course: { title: string; slug?: string; price?: number | null; type?: string };
 }
 
 export function CourseWaitlistTab({ courseId, course }: CourseWaitlistTabProps) {
@@ -72,6 +72,25 @@ export function CourseWaitlistTab({ courseId, course }: CourseWaitlistTabProps) 
   // ── Entries ────────────────────────────────────────────────────────────────
   const { data: entries, isLoading: entriesLoading, refetch: refetchEntries } =
     trpc.lmsAdmin.getCourseWaitlistEntries.useQuery({ courseId });
+  const { data: availabilityEntries, refetch: refetchAvailabilityEntries } =
+    trpc.contentAvailability.listWaitlistEntries.useQuery({ productType: "course", productId: courseId });
+  const [availabilityNotifyOpen, setAvailabilityNotifyOpen] = useState(false);
+  const [availabilitySubject, setAvailabilitySubject] = useState("");
+  const [availabilityMessage, setAvailabilityMessage] = useState("");
+  const [selectedAvailabilityEntryIds, setSelectedAvailabilityEntryIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    setSelectedAvailabilityEntryIds((availabilityEntries ?? []).map((entry: any) => entry.id));
+  }, [availabilityEntries]);
+
+  const notifyAvailabilityWaitlist = trpc.contentAvailability.notifyEnrollmentOpen.useMutation({
+    onSuccess: (result) => {
+      toast.success(`Enrollment-open notification sent to ${result.sent} waitlisted ${result.sent === 1 ? "visitor" : "visitors"}.`);
+      setAvailabilityNotifyOpen(false);
+      refetchAvailabilityEntries();
+    },
+    onError: (error) => toast.error(`Could not send notifications: ${error.message}`),
+  });
 
   const exportCsv = trpc.lmsAdmin.exportCourseWaitlistCsv.useQuery(
     { courseId },
@@ -153,6 +172,31 @@ export function CourseWaitlistTab({ courseId, course }: CourseWaitlistTabProps) 
       {/* Entries Section */}
       {activeSection === "entries" && (
         <div className="space-y-4">
+          {(availabilityEntries?.length ?? 0) > 0 && (
+            <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 space-y-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-semibold text-teal-900">Availability-status waitlist</h3>
+                  <p className="text-sm text-teal-800">{availabilityEntries?.length ?? 0} visitor sign-up{availabilityEntries?.length === 1 ? "" : "s"} captured while this course was set to Waitlist.</p>
+                </div>
+                <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => {
+                  setAvailabilitySubject(`Enrollment is now open: ${course.title}`);
+                  setAvailabilityMessage(`<p>Enrollment is now open for <strong>${course.title}</strong>.</p><p>We would be delighted to welcome you.</p>`);
+                  setAvailabilityNotifyOpen(true);
+                }}>
+                  <Mail className="w-3 h-3 mr-1.5" /> Send Enrollment Open
+                </Button>
+              </div>
+              <div className="max-h-40 overflow-y-auto rounded border border-teal-100 bg-white">
+                {availabilityEntries?.map((entry: any) => (
+                  <label key={entry.id} className="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0 text-sm">
+                    <input type="checkbox" checked={selectedAvailabilityEntryIds.includes(entry.id)} onChange={(event) => setSelectedAvailabilityEntryIds((ids) => event.target.checked ? [...ids, entry.id] : ids.filter((id) => id !== entry.id))} />
+                    <span className="font-medium text-gray-800">{entry.name}</span><span className="text-gray-500">{entry.email}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-gray-900">Waitlist Sign-ups</h3>
@@ -402,6 +446,24 @@ export function CourseWaitlistTab({ courseId, course }: CourseWaitlistTabProps) 
               {grantAccess.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserCheck className="w-4 h-4 mr-2" />}
               {accessType === "free" ? "Grant Free Access" : "Send Checkout Link"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={availabilityNotifyOpen} onOpenChange={setAvailabilityNotifyOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle className="text-teal-700">Send Enrollment Open</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">This is an explicit administrator action. It will email {selectedAvailabilityEntryIds.length} selected waitlisted visitor{selectedAvailabilityEntryIds.length === 1 ? "" : "s"}.</p>
+            <div><Label>Subject</Label><Input value={availabilitySubject} onChange={(event) => setAvailabilitySubject(event.target.value)} className="mt-1" /></div>
+            <div><Label>Message</Label><textarea value={availabilityMessage} onChange={(event) => setAvailabilityMessage(event.target.value)} className="mt-1 min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAvailabilityNotifyOpen(false)}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!availabilitySubject.trim() || !availabilityMessage.trim() || selectedAvailabilityEntryIds.length === 0 || notifyAvailabilityWaitlist.isPending} onClick={() => notifyAvailabilityWaitlist.mutate({
+              productType: "course", productId: courseId, entryIds: selectedAvailabilityEntryIds,
+              subject: availabilitySubject, messageHtml: availabilityMessage,
+              enrollmentUrl: `${window.location.origin}/courses/${course.slug ?? courseId}`,
+            })}>{notifyAvailabilityWaitlist.isPending ? "Sending…" : "Send Enrollment Open"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

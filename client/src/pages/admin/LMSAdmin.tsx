@@ -1999,6 +1999,11 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, o
   const [subtitle, setSubtitle] = useState(course.subtitle ?? "");
   const [description, setDescription] = useState(course.description ?? "");
   const [status, setStatus] = useState(course.status);
+  const [presaleWelcomeHeading, setPresaleWelcomeHeading] = useState((course as any).presaleWelcomeHeading ?? "");
+  const [presaleWelcomeBody, setPresaleWelcomeBody] = useState((course as any).presaleWelcomeBody ?? "");
+  const [presaleWelcomeMediaUrl, setPresaleWelcomeMediaUrl] = useState((course as any).presaleWelcomeMediaUrl ?? "");
+  const [presaleWelcomeCtaLabel, setPresaleWelcomeCtaLabel] = useState((course as any).presaleWelcomeCtaLabel ?? "");
+  const [presaleWelcomeCtaUrl, setPresaleWelcomeCtaUrl] = useState((course as any).presaleWelcomeCtaUrl ?? "");
   const [brand, setBrand] = useState(course.brand);
   const [courseType, setCourseType] = useState<"course" | "quiz" | "download" | "cohort" | "workshop">(course.type ?? "course");
   const [enrollmentCloseDate, setEnrollmentCloseDate] = useState<string>(
@@ -2104,6 +2109,11 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, o
             onSave({
               title: title.trim(), subtitle: subtitle.trim() || undefined,
               description: description || undefined, status, brand, type: courseType,
+              presaleWelcomeHeading: presaleWelcomeHeading.trim() || null,
+              presaleWelcomeBody: presaleWelcomeBody.trim() || null,
+              presaleWelcomeMediaUrl: presaleWelcomeMediaUrl.trim() || null,
+              presaleWelcomeCtaLabel: presaleWelcomeCtaLabel.trim() || null,
+              presaleWelcomeCtaUrl: presaleWelcomeCtaUrl.trim() || null,
               enrollmentCloseDate: courseType === "cohort" ? (enrollmentCloseDate || null) : null,
               pricingType,
               isFree: pricingType === "free",
@@ -2160,8 +2170,37 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, o
               <SelectItem value="private">Private (invite only)</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
               <SelectItem value="enrollment_closed">Enrollment Closed</SelectItem>
+              <SelectItem value="waitlist">Waitlist</SelectItem>
+              <SelectItem value="presale">Pre-sale</SelectItem>
             </SelectContent>
           </Select>
+          {status === "presale" && (
+            <div className="mt-3 space-y-3 rounded-lg border border-teal-200 bg-teal-50 p-3">
+              <div>
+                <Label className="text-xs font-semibold text-teal-900">Pre-sale welcome heading</Label>
+                <Input className="mt-1 bg-white" value={presaleWelcomeHeading} onChange={e => setPresaleWelcomeHeading(e.target.value)} placeholder="Thank you for enrolling." />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-teal-900">Pre-sale welcome message</Label>
+                <Textarea className="mt-1 min-h-24 bg-white" value={presaleWelcomeBody} onChange={e => setPresaleWelcomeBody(e.target.value)} placeholder="You’ll be granted access once the course is open." />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-teal-900">Optional image or video URL</Label>
+                <Input className="mt-1 bg-white" value={presaleWelcomeMediaUrl} onChange={e => setPresaleWelcomeMediaUrl(e.target.value)} placeholder="https://…" />
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs font-semibold text-teal-900">Optional CTA label</Label>
+                  <Input className="mt-1 bg-white" value={presaleWelcomeCtaLabel} onChange={e => setPresaleWelcomeCtaLabel(e.target.value)} placeholder="Contact us" />
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold text-teal-900">Optional CTA URL</Label>
+                  <Input className="mt-1 bg-white" value={presaleWelcomeCtaUrl} onChange={e => setPresaleWelcomeCtaUrl(e.target.value)} placeholder="https://…" />
+                </div>
+              </div>
+              <p className="text-xs text-teal-800">Pre-sale purchasers receive this page and cannot open lessons until the course status changes to Public.</p>
+            </div>
+          )}
         </div>
         <div>
           <Label className="text-sm">Brand</Label>

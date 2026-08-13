@@ -144,7 +144,7 @@ export const webinarLearnerRouter = router({
 
 export const webinarAdminRouter = router({
   list: protectedProcedure
-    .input(z.object({ page: z.number().default(1), pageSize: z.number().max(200).default(20), search: z.string().optional(), status: z.enum(["draft","published","ended","enrollment_closed"]).optional(), brand: z.enum(["all_about_ultrasound","iheartecho"]).optional() }).optional())
+    .input(z.object({ page: z.number().default(1), pageSize: z.number().max(200).default(20), search: z.string().optional(), status: z.enum(["draft","published","waitlist","presale","ended","enrollment_closed"]).optional(), brand: z.enum(["all_about_ultrasound","iheartecho"]).optional() }).optional())
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) return { webinars: [], total: 0 };
       const page = input?.page ?? 1, limit = input?.pageSize ?? 20, offset = (page-1)*limit;
@@ -199,7 +199,7 @@ export const webinarAdminRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(), title: z.string().optional(), brand: z.enum(["all_about_ultrasound","iheartecho"]).optional(),
-      type: z.enum(["live","prerecorded"]).optional(), status: z.enum(["draft","published","ended","enrollment_closed"]).optional(),
+      type: z.enum(["live","prerecorded"]).optional(), status: z.enum(["draft","published","waitlist","presale","ended","enrollment_closed"]).optional(),
       description: z.string().optional(), coverImage: z.string().optional(), thumbnailUrl: z.string().optional(),
       scheduledAt: z.number().optional(), durationMinutes: z.number().optional(), timezone: z.string().optional(),
       meetingUrl: z.string().optional(), meetingId: z.string().optional(), replayUrl: z.string().optional(),
