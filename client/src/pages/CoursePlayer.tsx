@@ -152,7 +152,7 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
 }
 
 // ─── Inline Lesson Quiz (for lesson_quiz content blocks) ────────────────────
-function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string } }) {
+function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComplete }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string }; lessonId: number; courseSlug: string; isAdminPreview?: boolean; onComplete: () => void }) {
   const rawQuestions = data.questions ?? [];
   // Stabilize shuffle with useMemo so re-renders don't re-shuffle
   const shuffledQuestions = useMemo(() => {
@@ -184,6 +184,12 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
   const [surveyAnswers, setSurveyAnswers] = useState<Record<number, string | number>>({});
   // Interactive question type answers: { [questionIndex]: any }
   const [interactiveAnswers, setInteractiveAnswers] = useState<Record<number, any>>({});
+  const recordInlineQuiz = trpc.lmsLearner.submitInlineLessonQuiz.useMutation({
+    onSuccess: (record) => {
+      if (record.passed) onComplete();
+    },
+    onError: (error) => toast.error(`Quiz progress could not be saved: ${error.message}`),
+  });
   const INTERACTIVE_TYPES = ["image_comparison","drag_sort","branching","fill_blank","annotation","flashcard"];
   // Mock exam mode
   const isMockExam = !!(data as any).isMockExam;
@@ -286,6 +292,17 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
     setSurveyAnswers({});
     setInteractiveAnswers({});
     setCurrentIndex(0);
+  };
+
+  const handleSubmit = () => {
+    const calculatedScore = computeScore();
+    setSubmitted(true);
+    recordInlineQuiz.mutate({
+      lessonId,
+      courseSlug,
+      score: calculatedScore,
+      isAdminPreview,
+    });
   };
 
   const handleHotspotClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -798,11 +815,11 @@ function InlineLessonQuiz({ data }: { data: { title?: string; questions?: any[];
             </button>
           ) : !submitted ? (
             <button
-              onClick={() => setSubmitted(true)}
-              disabled={!allAnswered}
+              onClick={handleSubmit}
+              disabled={!allAnswered || recordInlineQuiz.isPending}
               className="px-4 py-2 text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white rounded-lg disabled:opacity-50 transition-colors"
             >
-              Submit
+              {recordInlineQuiz.isPending ? "Saving…" : "Submit"}
             </button>
           ) : (
             <button
@@ -2681,7 +2698,18 @@ export default function CoursePlayer() {
                     <div className="mt-4 space-y-4">
                       {contentBlocks.map((block: Block) => (
                         block.type === "lesson_quiz" ? (
-                          <InlineLessonQuiz key={block.id} data={block.data as any} />
+                          <InlineLessonQuiz
+                            key={block.id}
+                            data={block.data as any}
+                            lessonId={lessonData.id}
+                            courseSlug={slug!}
+                            isAdminPreview={data?.isAdminPreview ?? false}
+                            onComplete={() => {
+                              fireLessonCompleteEffect();
+                              utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
+                              setTimeout(() => utils.lmsLearner.getCourseCertificate.invalidate({ courseSlug: slug! }), 3000);
+                            }}
+                          />
                         ) : block.type === "lesson_flashcard" ? (
                           <InlineLessonFlashcardDeck key={block.id} data={block.data as any} />
                         ) : block.type === "lesson_certificate" ? (

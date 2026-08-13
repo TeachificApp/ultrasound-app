@@ -26,6 +26,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or, gte } from "drizzle-orm";
 import { randomBytes } from "crypto";
+import { evaluateInlineLessonQuizScore, shouldRestoreMissingCourseCertificate } from "../../shared/inlineLessonQuizCompletion";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
@@ -2265,6 +2266,90 @@ export const lmsLearnerRouter = router({
       return { success: true };
     }),
 
+  /**
+   * Record a passed lesson_quiz content block for CME completion and certificate gates.
+   * Inline module quizzes are stored in lesson content rather than lms_quizzes, so their
+   * pass state must be persisted on the lesson progress row just like a standard quiz.
+   */
+  submitInlineLessonQuiz: protectedProcedure
+    .input(z.object({
+      lessonId: z.number().int(),
+      courseSlug: z.string(),
+      score: z.number().min(0).max(100),
+      isAdminPreview: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [course] = await db.select({
+        id: lmsCourses.id,
+        creditHours: lmsCourses.creditHours,
+      }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+
+      let [enrollment] = await db.select().from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+      if (!enrollment && input.isAdminPreview && ctx.user.role === "admin") {
+        await db.insert(lmsEnrollments).values({
+          userId: ctx.user.id,
+          courseId: course.id,
+          enrollmentType: "admin_preview",
+          enrolledAt: new Date(),
+          progressPct: 0,
+        });
+        const [createdEnrollment] = await db.select().from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+        enrollment = createdEnrollment;
+      }
+      if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const [lesson] = await db.select({
+        id: lmsLessons.id,
+        courseId: lmsLessons.courseId,
+        contentBlocks: lmsLessons.contentBlocks,
+      }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson || lesson.courseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
+
+      let blocks: any[] = [];
+      try {
+        blocks = Array.isArray(lesson.contentBlocks)
+          ? lesson.contentBlocks as any[]
+          : JSON.parse(String(lesson.contentBlocks ?? "[]"));
+      } catch {
+        blocks = [];
+      }
+      const inlineQuiz = blocks.find((block: any) => block?.type === "lesson_quiz");
+      if (!inlineQuiz) throw new TRPCError({ code: "BAD_REQUEST", message: "This lesson does not contain a built-in lesson quiz" });
+
+      const { score, passed, passingScore } = evaluateInlineLessonQuizScore(
+        input.score,
+        Number(inlineQuiz?.data?.passingScore ?? 70),
+      );
+      const [existing] = await db.select().from(lmsLessonProgress)
+        .where(and(eq(lmsLessonProgress.enrollmentId, enrollment.id), eq(lmsLessonProgress.lessonId, lesson.id))).limit(1);
+      if (existing) {
+        await db.update(lmsLessonProgress).set({
+          quizScore: score,
+          quizPassed: passed,
+          completedAt: passed ? new Date() : existing.completedAt,
+          attempts: (existing.attempts ?? 0) + 1,
+        }).where(eq(lmsLessonProgress.id, existing.id));
+      } else {
+        await db.insert(lmsLessonProgress).values({
+          enrollmentId: enrollment.id,
+          lessonId: lesson.id,
+          quizScore: score,
+          quizPassed: passed,
+          completedAt: passed ? new Date() : null,
+          attempts: 1,
+        });
+      }
+
+      if (passed) await recalcProgress(db, enrollment.id);
+      return { passed, score, passingScore };
+    }),
+
   /** Submit quiz answers */
   submitQuiz: protectedProcedure
     .input(z.object({
@@ -3246,10 +3331,40 @@ export const lmsLearnerRouter = router({
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      const [course] = await db.select({
+        id: lmsCourses.id,
+        hasCertificate: lmsCourses.hasCertificate,
+        creditHours: lmsCourses.creditHours,
+      }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) return null;
-      const [cert] = await db.select().from(lmsCertificates)
+      let [cert] = await db.select().from(lmsCertificates)
         .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.id))).limit(1);
+
+      // Certificate creation normally happens when progress reaches 100%. If the
+      // asynchronous issuance step was interrupted, repair it when the eligible
+      // learner opens the certificate block instead of leaving the block locked.
+      if (!cert && course.hasCertificate) {
+        const [enrollment] = await db.select({
+          id: lmsEnrollments.id,
+          enrollmentType: lmsEnrollments.enrollmentType,
+          completedAt: lmsEnrollments.completedAt,
+        }).from(lmsEnrollments).where(and(
+          eq(lmsEnrollments.userId, ctx.user.id),
+          eq(lmsEnrollments.courseId, course.id),
+        )).limit(1);
+        if (shouldRestoreMissingCourseCertificate({
+          courseHasCertificate: course.hasCertificate,
+          courseHasCmeCredit: Boolean(course.creditHours),
+          enrollmentCompletedAt: enrollment?.completedAt,
+          hasCertificateRecord: Boolean(cert),
+        })) {
+          await issueCertificateIfEnabled(db, enrollment.id, ctx.user.id, course.id, enrollment.enrollmentType ?? undefined, {
+            completedCmeRecovery: true,
+          });
+          [cert] = await db.select().from(lmsCertificates)
+            .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.id))).limit(1);
+        }
+      }
       return cert ?? null;
     }),
 

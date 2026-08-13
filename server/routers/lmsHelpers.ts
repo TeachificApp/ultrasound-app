@@ -199,18 +199,19 @@ export async function issueCertificateIfEnabled(
    * adminBypass: skip the CERT_CUTOFF_DATE guard (only for explicit admin manual re-issue actions).
    * These are intentionally separate: auto-reissue on course settings change should NOT bypass the cutoff.
    */
-  opts?: boolean | { forceReissue?: boolean; adminBypass?: boolean }
+  opts?: boolean | { forceReissue?: boolean; adminBypass?: boolean; completedCmeRecovery?: boolean }
 ) {
   // Support legacy boolean call signature (forceReissue only, no adminBypass)
   const forceReissue = typeof opts === "boolean" ? opts : (opts?.forceReissue ?? false);
   const adminBypass  = typeof opts === "boolean" ? false : (opts?.adminBypass ?? false);
+  const completedCmeRecovery = typeof opts === "boolean" ? false : (opts?.completedCmeRecovery ?? false);
 
   if (!db) return;
 
   // Enforce completion cutoff: skip certificate for enrollments completed before CERT_CUTOFF_DATE.
   // Only explicit admin manual re-issue (adminBypass=true) bypasses this guard.
   // Automatic reissue triggered by course settings changes does NOT bypass it.
-  if (!adminBypass) {
+  if (!adminBypass && !completedCmeRecovery) {
     const [enroll] = await db.select({ completedAt: lmsEnrollments.completedAt })
       .from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollmentId)).limit(1);
     if (enroll?.completedAt && new Date(enroll.completedAt) < CERT_CUTOFF_DATE) {
