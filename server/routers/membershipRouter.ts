@@ -306,7 +306,7 @@ const createMembership = adminProcedure
       accentColor: z.string().optional(),
       stripePriceId: z.string().optional().nullable(),
       stripeProductId: z.string().optional().nullable(),
-      status: z.enum(["draft", "published"]).optional(),
+      status: z.enum(["draft", "published", "waitlist", "presale", "enrollment_closed"]).optional(),
     })
   )
   .mutation(async ({ input }) => {
@@ -353,7 +353,7 @@ const updateMembership = adminProcedure
       coverImage: z.string().optional().nullable(),
       iconImage: z.string().optional().nullable(),
       accentColor: z.string().optional(),
-      status: z.enum(["draft", "published"]).optional(),
+      status: z.enum(["draft", "published", "waitlist", "presale", "enrollment_closed"]).optional(),
       billingInterval: z.enum(["monthly", "annual", "lifetime", "one_time"]).optional(),
       price: z.number().min(0).optional(),
       compareAtPrice: z.number().optional().nullable(),

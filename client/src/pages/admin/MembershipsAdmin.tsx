@@ -52,7 +52,7 @@ type MembershipPlan = {
   coverImage: string | null;
   iconImage: string | null;
   accentColor: string | null;
-  status: "draft" | "published";
+  status: "draft" | "published" | "waitlist" | "presale" | "enrollment_closed";
   billingInterval: "monthly" | "annual" | "lifetime" | "one_time";
   price: number;
   compareAtPrice: number | null;
@@ -350,15 +350,16 @@ export default function MembershipsAdmin({ initialEditId }: { initialEditId?: nu
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-gray-500 hover:text-teal-700"
-                  onClick={() => updateMutation.mutate({ id: plan.id, status: plan.status === "published" ? "draft" : "published" })}
-                  title={plan.status === "published" ? "Unpublish" : "Publish"}
-                >
-                  {plan.status === "published" ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </Button>
+                <Select value={plan.status} onValueChange={(status) => updateMutation.mutate({ id: plan.id, status: status as MembershipPlan["status"] })}>
+                  <SelectTrigger className="h-8 w-[150px] text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                    <SelectItem value="waitlist">Waitlist</SelectItem>
+                    <SelectItem value="presale">Pre-sale</SelectItem>
+                    <SelectItem value="enrollment_closed">Enrollment Closed</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Button
                   size="sm"
                   variant="ghost"
