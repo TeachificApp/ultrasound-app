@@ -1562,31 +1562,37 @@ export const adminUserRouter = router({
     const db = await getDb();
     const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
 
-    const [totalRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users`) as any;
+    const [totalRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE isPending = 0 AND emailVerified = 1`) as any;
     const totalMembers = Number(toArr2(totalRow)[0]?.total ?? 0);
+    const [migratedRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE isPending = 1 OR emailVerified = 0`) as any;
+    const migratedRecords = Number(toArr2(migratedRow)[0]?.total ?? 0);
 
     // NOTE: users table stores columns as camelCase in DB (createdAt, lastSignedIn, avatarUrl)
     // lms_enrollments uses snake_case (enrolled_at, completed_at)
-    const [activeRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE lastSignedIn >= DATE_SUB(NOW(), INTERVAL 30 DAY)`) as any;
+    const [activeRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE isPending = 0 AND emailVerified = 1 AND lastSignedIn >= DATE_SUB(NOW(), INTERVAL 30 DAY)`) as any;
     const activeMembers = Number(toArr2(activeRow)[0]?.total ?? 0);
 
-    const [newRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE createdAt >= DATE_FORMAT(NOW(), '%Y-%m-01')`) as any;
+    const [newRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE isPending = 0 AND emailVerified = 1 AND createdAt >= DATE_FORMAT(NOW(), '%Y-%m-01')`) as any;
     const newThisMonth = Number(toArr2(newRow)[0]?.total ?? 0);
 
-    const [newLastRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE createdAt >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m-01') AND createdAt < DATE_FORMAT(NOW(), '%Y-%m-01')`) as any;
+    const [newLastRow] = await db.execute(sql`SELECT COUNT(*) as total FROM users WHERE isPending = 0 AND emailVerified = 1 AND createdAt >= DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m-01') AND createdAt < DATE_FORMAT(NOW(), '%Y-%m-01')`) as any;
     const newLastMonth = Number(toArr2(newLastRow)[0]?.total ?? 0);
 
     const [completionRow] = await db.execute(sql`SELECT COUNT(*) as total FROM lms_enrollments WHERE completed_at IS NOT NULL`) as any;
     const totalCompletions = Number(toArr2(completionRow)[0]?.total ?? 0);
 
-    // Revenue from all sources
-    const [revenueRow] = await db.execute(sql`SELECT COALESCE(SUM(amount_paid),0) as total FROM funnel_purchases WHERE status = 'paid'`) as any;
+    // Revenue is stored in cents in both paid LMS orders and paid embedded/funnel checkouts.
+    // These sources have distinct checkout session IDs, so they can be summed without double-counting.
+    const [revenueRow] = await db.execute(sql`
+      SELECT COALESCE((SELECT SUM(amount) FROM lms_orders WHERE status = 'paid'), 0)
+        + COALESCE((SELECT SUM(amount_paid) FROM funnel_purchases WHERE status = 'paid'), 0) AS total
+    `) as any;
     const totalRevenueCents = Number(toArr2(revenueRow)[0]?.total ?? 0);
 
     const [growthRows] = await db.execute(sql`
       SELECT DATE_FORMAT(createdAt, '%Y-%m') as month, COUNT(*) as count
       FROM users
-      WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+      WHERE isPending = 0 AND emailVerified = 1 AND createdAt >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
       GROUP BY month
       ORDER BY month ASC
     `) as any;
@@ -1642,6 +1648,7 @@ export const adminUserRouter = router({
     return {
       stats: {
         totalMembers,
+        migratedRecords,
         activeMembers,
         newThisMonth,
         newLastMonth,
@@ -1651,8 +1658,9 @@ export const adminUserRouter = router({
       },
       memberGrowth,
       statusBreakdown: [
-        { status: 'Active', count: activeMembers },
-        { status: 'Inactive', count: Math.max(0, totalMembers - activeMembers) },
+        { status: 'Active (30d)', count: activeMembers },
+        { status: 'Inactive account', count: Math.max(0, totalMembers - activeMembers) },
+        { status: 'Migrated / unverified', count: migratedRecords },
       ],
       recentMembers,
       recentActivity,

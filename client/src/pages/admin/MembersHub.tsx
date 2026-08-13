@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Users, BookOpen, DollarSign, Crown, Mail, Activity,
   Search, Download, CheckCircle, Clock, TrendingUp,
@@ -168,8 +170,9 @@ function OverviewPanel() {
       {/* Stat Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
-          label="Total Members"
+          label="Verified Members"
           value={(stats?.totalMembers ?? 0).toLocaleString()}
+          sub={`${(stats?.migratedRecords ?? 0).toLocaleString()} migrated or unverified records`}
           icon={<Users size={18} />}
           color="teal"
         />
@@ -181,7 +184,7 @@ function OverviewPanel() {
           color="blue"
         />
         <StatCard
-          label="New This Month"
+          label="New Verified This Month"
           value={(stats?.newThisMonth ?? 0).toLocaleString()}
           icon={<TrendingUp size={18} />}
           trend={newTrend}
@@ -189,9 +192,9 @@ function OverviewPanel() {
           color="teal2"
         />
         <StatCard
-          label="Total Revenue"
+          label="Recorded Revenue"
           value={`$${((stats?.totalRevenueCents ?? 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          sub={`${(stats?.totalCompletions ?? 0).toLocaleString()} completions`}
+          sub={`Paid LMS orders + checkout purchases · ${(stats?.totalCompletions ?? 0).toLocaleString()} completions`}
           icon={<DollarSign size={18} />}
           color="amber"
         />
@@ -202,7 +205,7 @@ function OverviewPanel() {
         {/* Member Growth Chart */}
         <Card className="xl:col-span-2 border border-slate-200 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-700">Member Growth (6 months)</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-700">Verified Account Growth (6 months)</CardTitle>
           </CardHeader>
           <CardContent>
             {growth.length === 0 ? (
@@ -215,7 +218,7 @@ function OverviewPanel() {
                   <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
                   <Tooltip
                     contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12 }}
-                    formatter={(v: number) => [v, "New Members"]}
+                    formatter={(v: number) => [v, "New Verified Members"]}
                   />
                   <Line type="monotone" dataKey="count" stroke="#14b8a6" strokeWidth={2.5} dot={{ r: 4, fill: "#14b8a6" }} />
                 </LineChart>
@@ -227,7 +230,7 @@ function OverviewPanel() {
         {/* Status Donut */}
         <Card className="border border-slate-200 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-700">Members by Status</CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-700">Member Records by Status</CardTitle>
           </CardHeader>
           <CardContent>
             {statusBreakdown.every((s: any) => s.count === 0) ? (
@@ -397,10 +400,20 @@ function OverviewPanel() {
 }
 
 // ─── All Members Panel ────────────────────────────────────────────────────────
-function AllMembersPanel() {
+function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCreateSignal?: number; onCreateConsumed?: () => void }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<{ id: number; type: "download" | "bundle"; title: string }[]>([]);
+  const [selectedPlanIds, setSelectedPlanIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (openCreateSignal) { setCreateOpen(true); onCreateConsumed?.(); }
+  }, [openCreateSignal, onCreateConsumed]);
 
   const { data, isLoading } = trpc.adminUser.listMembers.useQuery(
     { search: search || undefined, status, page, pageSize: 25 },
@@ -410,6 +423,32 @@ function AllMembersPanel() {
   const members = data?.members ?? [];
   const total = data?.total ?? 0;
   const totalPages = data?.totalPages ?? 1;
+  const coursesQuery = trpc.lmsAdmin.listCourses.useQuery({ status: "all", type: "all", page: 1, pageSize: 200 }, { enabled: createOpen });
+  const productsQuery = trpc.productAnalytics.listAllProductsWithStats.useQuery({ type: "all" }, { enabled: createOpen });
+  const membershipsQuery = trpc.membership.listAll.useQuery(undefined, { enabled: createOpen });
+  const utils = trpc.useUtils();
+  const createMember = trpc.lmsAdmin.createMember.useMutation();
+  const createAndEnroll = trpc.lmsAdmin.createAndEnrollUser.useMutation();
+  const grantAccess = trpc.productAnalytics.grantProductAccess.useMutation();
+  const grantMembership = trpc.lmsAdmin.grantMembershipAccess.useMutation();
+  const isCreating = createMember.isPending || createAndEnroll.isPending || grantAccess.isPending || grantMembership.isPending;
+  const toggleCourse = (courseId: number) => setSelectedCourseIds(ids => ids.includes(courseId) ? ids.filter(id => id !== courseId) : [...ids, courseId]);
+  const toggleProduct = (product: { id: number; type: "download" | "bundle"; title: string }) => setSelectedProducts(items => items.some(item => item.id === product.id && item.type === product.type) ? items.filter(item => item.id !== product.id || item.type !== product.type) : [...items, product]);
+  const togglePlan = (planId: number) => setSelectedPlanIds(ids => ids.includes(planId) ? ids.filter(id => id !== planId) : [...ids, planId]);
+  const closeCreate = () => { setCreateOpen(false); setNewName(""); setNewEmail(""); setSelectedCourseIds([]); setSelectedProducts([]); setSelectedPlanIds([]); };
+  const submitCreate = async () => {
+    if (!newName.trim() || !newEmail.trim()) { toast.error("Enter the member's name and email address."); return; }
+    try {
+      const member = await createMember.mutateAsync({ name: newName.trim(), email: newEmail.trim() });
+      for (const courseId of selectedCourseIds) await createAndEnroll.mutateAsync({ name: newName.trim(), email: newEmail.trim(), courseId });
+      for (const product of selectedProducts) await grantAccess.mutateAsync({ userEmail: newEmail.trim(), productType: product.type, productId: product.id });
+      for (const planId of selectedPlanIds) await grantMembership.mutateAsync({ userId: member.userId, planId });
+      await utils.adminUser.listMembers.invalidate();
+      const assignmentCount = selectedCourseIds.length + selectedProducts.length + selectedPlanIds.length;
+      toast.success(`${member.isNewUser ? "Member created" : "Existing member updated"} with ${assignmentCount} access assignment${assignmentCount === 1 ? "" : "s"}.`);
+      closeCreate();
+    } catch (error: any) { toast.error(error?.message ?? "Unable to create the member and assign access."); }
+  };
 
   return (
     <div className="space-y-4">
@@ -435,7 +474,65 @@ function AllMembersPanel() {
           </SelectContent>
         </Select>
         <span className="text-xs text-slate-500">{total.toLocaleString()} total</span>
+        <Button size="sm" className="h-9 gap-1.5 bg-teal-600 hover:bg-teal-700" onClick={() => setCreateOpen(true)}>
+          <UserPlus size={15} /> New Member & Access
+        </Button>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={(open) => open ? setCreateOpen(true) : closeCreate()}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Member & Assign Access</DialogTitle>
+            <DialogDescription>Create or reuse a member, then grant selected courses and product access in one workflow.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div><Label htmlFor="member-name">Name</Label><Input id="member-name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="First Last" className="mt-1" /></div>
+              <div><Label htmlFor="member-email">Email</Label><Input id="member-email" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="name@example.com" className="mt-1" /></div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-lg border border-slate-200 p-3">
+                <Label className="text-sm font-semibold">Courses and content</Label>
+                <p className="text-xs text-slate-500 mt-1">Choose every course, cohort, or quiz course to enroll immediately.</p>
+                <div className="mt-3 max-h-56 overflow-y-auto space-y-2 pr-1">
+                  {(coursesQuery.data?.courses ?? []).map((course: any) => <label key={course.id} className="flex items-start gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={selectedCourseIds.includes(course.id)} onChange={() => toggleCourse(course.id)} className="mt-1 accent-teal-600" />
+                    <span><span className="font-medium text-slate-700">{course.title}</span><span className="block text-xs text-slate-400">{course.type}</span></span>
+                  </label>)}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <Label className="text-sm font-semibold">Products and downloads</Label>
+                <p className="text-xs text-slate-500 mt-1">Choose products to grant at no charge.</p>
+                <div className="mt-3 max-h-56 overflow-y-auto space-y-2 pr-1">
+                  {(productsQuery.data?.products ?? []).filter((product: any) => ["download", "bundle"].includes(product.type)).map((product: any) => {
+                    const typed = { id: product.id, type: product.type as "download" | "bundle", title: product.title };
+                    const checked = selectedProducts.some(item => item.id === typed.id && item.type === typed.type);
+                    return <label key={`${product.type}-${product.id}`} className="flex items-start gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={checked} onChange={() => toggleProduct(typed)} className="mt-1 accent-teal-600" />
+                      <span><span className="font-medium text-slate-700">{product.title}</span><span className="block text-xs text-slate-400 capitalize">{product.type}</span></span>
+                    </label>;
+                  })}
+                </div>
+              </div>
+              <div className="rounded-lg border border-slate-200 p-3">
+                <Label className="text-sm font-semibold">Memberships</Label>
+                <p className="text-xs text-slate-500 mt-1">Grant complimentary active membership access.</p>
+                <div className="mt-3 max-h-56 overflow-y-auto space-y-2 pr-1">
+                  {(membershipsQuery.data ?? []).map((plan: any) => <label key={plan.id} className="flex items-start gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={selectedPlanIds.includes(plan.id)} onChange={() => togglePlan(plan.id)} className="mt-1 accent-teal-600" />
+                    <span><span className="font-medium text-slate-700">{plan.name}</span><span className="block text-xs text-slate-400">{plan.interval ?? "Membership"}</span></span>
+                  </label>)}
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeCreate} disabled={isCreating}>Cancel</Button>
+            <Button onClick={submitCreate} disabled={isCreating}>{isCreating ? "Creating…" : "Create Member & Assign Access"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Table */}
       <Card className="border border-slate-200 shadow-sm overflow-hidden">
@@ -1120,13 +1217,14 @@ export default function MembersHub() {
     if (tab && NAV_ITEMS.some(n => n.id === tab)) setActiveNav(tab);
   }, []);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [newMemberRequest, setNewMemberRequest] = useState(0);
 
   const pageTitle = NAV_ITEMS.find(n => n.id === activeNav)?.label ?? "Members";
 
   function renderContent() {
     switch (activeNav) {
       case "overview":          return <OverviewPanel />;
-      case "all-members":       return <AllMembersPanel />;
+      case "all-members":       return <AllMembersPanel openCreateSignal={newMemberRequest} onCreateConsumed={() => setNewMemberRequest(0)} />;
       case "enrollments":       return <EnrollmentsPanel />;
       case "invitations":       return <InvitationsPanel />;
       case "import":            return <PlaceholderPanel title="Import Members" description="Bulk import members from CSV or connect your existing platform." />;
@@ -1223,11 +1321,9 @@ export default function MembersHub() {
               </Button>
             )}
             {activeNav === "overview" && (
-              <a href={getAdminUrl("/admin/members?tab=all-members")}>
-                <Button size="sm" className="text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 h-8">
-                  <Users size={13} /> All Members
-                </Button>
-              </a>
+              <Button size="sm" className="text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 h-8" onClick={() => { setActiveNav("all-members"); setNewMemberRequest(Date.now()); }}>
+                <UserPlus size={13} /> New Member & Access
+              </Button>
             )}
           </div>
         </div>

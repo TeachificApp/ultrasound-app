@@ -57,6 +57,7 @@ import {
   webinars,
   digitalBundles,
   membershipPlans,
+  membershipSubscriptions,
   users,
   mediaAssets,
   mediaVersions,
@@ -1677,6 +1678,50 @@ CRITICAL REQUIREMENTS:
         previewConversionRate,
       };
     }),
+  /** Create or locate a member before assigning one or more content access grants. */
+  createMember: protectedProcedure
+    .input(z.object({ name: z.string().min(1).max(100), email: z.string().email() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const email = input.email.trim().toLowerCase();
+      const [existing] = await db.select({ id: users.id, openId: users.openId }).from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${email})`).limit(1);
+      if (existing) {
+        if (!existing.openId) await db.update(users).set({ openId: `email:${email}` }).where(eq(users.id, existing.id));
+        return { userId: existing.id, isNewUser: false };
+      }
+      const [inserted] = await db.insert(users).values({
+        openId: `email:${email}`, name: input.name.trim(), displayName: input.name.trim(), email,
+        role: "user", isPending: false,
+      }).$returningId();
+      addToAllContacts(email, input.name.trim(), { userId: inserted.id, source: "members_hub" }).catch(() => {});
+      return { userId: inserted.id, isNewUser: true };
+    }),
+
+  /** Grant a complimentary active membership without creating a Stripe subscription. */
+  grantMembershipAccess: protectedProcedure
+    .input(z.object({ userId: z.number(), planId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [plan] = await db.select({ id: membershipPlans.id, name: membershipPlans.name }).from(membershipPlans).where(eq(membershipPlans.id, input.planId)).limit(1);
+      if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+      const [existing] = await db.select({ id: membershipSubscriptions.id, status: membershipSubscriptions.status })
+        .from(membershipSubscriptions)
+        .where(and(eq(membershipSubscriptions.userId, input.userId), eq(membershipSubscriptions.planId, input.planId)))
+        .limit(1);
+      if (existing?.status === "active" || existing?.status === "trialing") return { subscriptionId: existing.id, alreadyGranted: true };
+      if (existing) {
+        await db.update(membershipSubscriptions).set({ status: "active", cancelAtPeriodEnd: false, currentPeriodEnd: null, stripeSubscriptionId: null, stripeCustomerId: null }).where(eq(membershipSubscriptions.id, existing.id));
+        return { subscriptionId: existing.id, alreadyGranted: false };
+      }
+      const [inserted] = await db.insert(membershipSubscriptions).values({ userId: input.userId, planId: input.planId, status: "active", stripeSubscriptionId: null, stripeCustomerId: null, currentPeriodEnd: null, cancelAtPeriodEnd: false }).$returningId();
+      return { subscriptionId: inserted.id, alreadyGranted: false };
+    }),
+
   /** Create a new user account and immediately enroll them in a course */
   createAndEnrollUser: protectedProcedure
     .input(z.object({
@@ -3654,4 +3699,3 @@ CRITICAL REQUIREMENTS:
       };
     }),
 });
-
