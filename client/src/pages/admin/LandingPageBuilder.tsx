@@ -899,6 +899,27 @@ function InlineInstructorFormDialog({ onClose, onSave, saving }: {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [website, setWebsite] = useState("");
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const uploadAvatar = async (file: File) => {
+    if (!file.type.startsWith("image/")) { toast.error("Please choose an image file."); return; }
+    if (file.size > 10_000_000) { toast.error("Avatar images must be under 10 MB."); return; }
+    setUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: formData });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.url) throw new Error(payload.error ?? "Avatar upload failed");
+      setAvatarUrl(payload.url);
+      toast.success("Instructor avatar uploaded");
+    } catch (error: any) {
+      toast.error(error.message ?? "Avatar upload failed");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -916,8 +937,20 @@ function InlineInstructorFormDialog({ onClose, onSave, saving }: {
             </div>
           </div>
           <div>
-            <Label className="text-sm">Avatar URL</Label>
-            <Input value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://..." className="mt-1" />
+            <Label className="text-sm">Instructor Avatar</Label>
+            <div className="mt-1 flex items-center gap-3">
+              {avatarUrl ? <img src={avatarUrl} alt={`${name || "Instructor"} avatar preview`} className="h-14 w-14 rounded-full border border-teal-100 object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-100 text-lg font-semibold text-teal-700">{name?.trim()?.[0] ?? "?"}</div>}
+              <div className="flex flex-wrap gap-2">
+                <input ref={avatarInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void uploadAvatar(file);
+                  event.currentTarget.value = "";
+                }} />
+                <Button type="button" size="sm" variant="outline" disabled={uploadingAvatar} onClick={() => avatarInputRef.current?.click()}>{uploadingAvatar ? "Uploading…" : avatarUrl ? "Replace photo" : "Upload photo"}</Button>
+                {avatarUrl && <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setAvatarUrl("")}>Remove</Button>}
+              </div>
+            </div>
+            <Input value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="Or paste an image URL" className="mt-2" />
           </div>
           <div>
             <Label className="text-sm">Website</Label>
