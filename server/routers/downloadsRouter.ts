@@ -243,6 +243,8 @@ export const downloadsLearnerRouter = router({
         .where(eq(digitalProducts.id, input.productId)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND" });
       if ((product as any).bundleOnly) throw new TRPCError({ code: "FORBIDDEN", message: "This product is only available as part of a bundle." });
+      if (product.status === "waitlist") throw new TRPCError({ code: "FORBIDDEN", message: "This download is currently accepting Waitlist signups." });
+      if (product.status === "enrollment_closed") throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment Closed" });
       const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
         orderBumpId: input.orderBumpId,
         triggerType: "download",
