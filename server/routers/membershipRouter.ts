@@ -17,7 +17,7 @@ import {
   communities,
   physicalProducts,
 } from "../../drizzle/schema";
-import { eq, and, desc, asc, isNull, or, sql } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, isNull, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "../_core/notification";
 import { syncStripeProduct } from "../stripeSync";
@@ -79,7 +79,7 @@ const listPublicMemberships = publicProcedure
     const plans = await db
       .select()
       .from(membershipPlans)
-      .where(eq(membershipPlans.status, "published"))
+      .where(inArray(membershipPlans.status, ["published", "waitlist", "presale", "enrollment_closed"]))
       .orderBy(asc(membershipPlans.sortOrder), asc(membershipPlans.id));
     return plans;
   });
@@ -94,6 +94,9 @@ const getMembershipBySlug = publicProcedure
       .from(membershipPlans)
       .where(eq(membershipPlans.slug, input.slug));
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found" });
+    if (!["published", "waitlist", "presale", "enrollment_closed"].includes(plan.status)) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found" });
+    }
     const rawItems = await db
       .select()
       .from(membershipPlanAccess)
@@ -764,6 +767,8 @@ const createMembershipCheckout = protectedProcedure
       .from(membershipPlans)
       .where(eq(membershipPlans.id, input.planId));
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found" });
+    if (plan.status === "waitlist") throw new TRPCError({ code: "FORBIDDEN", message: "This membership is currently accepting Waitlist signups." });
+    if (plan.status === "enrollment_closed") throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment Closed" });
 
     await assertCanPurchaseMembership(db, ctx.user.id, plan, ctx.user.email);
 
