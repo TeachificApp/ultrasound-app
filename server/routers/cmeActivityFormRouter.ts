@@ -623,12 +623,15 @@ ${input.body.split('\n').map(line => line.trim() ? `<p style="margin:0 0 12px;">
             if (!reviewer) { console.log(`[CME AutoEnroll] ${email} not found in users table — skipping`); continue; }
             if (productType === "webinar") {
               const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations).where(and(eq(webinarRegistrations.userId, reviewer.id), eq(webinarRegistrations.webinarId, productId))).limit(1);
-              if (!ex) await db.insert(webinarRegistrations).values({ webinarId: productId, userId: reviewer.id, firstName: reviewer.firstName ?? "", lastName: reviewer.lastName ?? "", email });
+              if (!ex) {
+                const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, productId)).limit(1);
+                await db.insert(webinarRegistrations).values({ webinarId: productId, userId: reviewer.id, firstName: reviewer.firstName ?? "", lastName: reviewer.lastName ?? "", email, accessLevel: webinar?.status === "presale" ? "presale" : "full" });
+              }
             } else if (productType === "workshop") {
               const [ex] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments).where(and(eq(workshopEnrollments.userId, reviewer.id), eq(workshopEnrollments.workshopId, productId))).limit(1);
               if (!ex) {
-                const [inst] = await db.select({ id: workshopInstances.id }).from(workshopInstances).where(eq(workshopInstances.workshopId, productId)).limit(1);
-                if (inst) await db.insert(workshopEnrollments).values({ workshopId: productId, instanceId: inst.id, userId: reviewer.id });
+                const [inst] = await db.select({ id: workshopInstances.id, status: workshopInstances.status }).from(workshopInstances).where(eq(workshopInstances.workshopId, productId)).limit(1);
+                if (inst) await db.insert(workshopEnrollments).values({ workshopId: productId, instanceId: inst.id, userId: reviewer.id, accessLevel: inst.status === "presale" ? "presale" : "full" });
               }
             } else {
               const [ex] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, reviewer.id), eq(lmsEnrollments.courseId, productId))).limit(1);
