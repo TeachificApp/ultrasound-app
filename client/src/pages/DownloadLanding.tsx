@@ -6,6 +6,7 @@
  */
 import { useParams } from "wouter";
 import { EnrolledAccessBanner } from "@/components/EnrolledAccessBanner";
+import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 import { trpc } from "@/lib/trpc";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -77,8 +78,8 @@ function CountdownTimer({ mode, durationMinutes, targetDate, textColor }: { mode
 }
 
 // ─── Block Renderer ───────────────────────────────────────────────────────────
-function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user, isDraft }: {
-  block: Block; onBuy: () => void; buying: boolean; price: string; hasPurchased: boolean; slug: string; user?: UserParamSource | null; isDraft?: boolean;
+function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user, isDraft, isWaitlist }: {
+  block: Block; onBuy: () => void; buying: boolean; price: string; hasPurchased: boolean; slug: string; user?: UserParamSource | null; isDraft?: boolean; isWaitlist?: boolean;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -130,7 +131,7 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user, is
                       disabled={isDraft || buying}
                       className={`px-8 py-3 rounded-lg font-semibold text-lg shadow-lg transition-opacity hover:opacity-90 disabled:opacity-60 ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
-                      {isDraft ? "Enrollment Closed" : hasPurchased ? "Access Files" : btn.text}
+                      {isDraft ? "Enrollment Closed" : hasPurchased ? "Access Files" : isWaitlist ? "Join Waitlist" : btn.text}
                     </button>
                     {btn.showStrikethrough && btn.strikethroughPrice && (
                       <span className="text-xs text-white/60 line-through">{btn.strikethroughPrice}</span>
@@ -705,6 +706,7 @@ export default function DownloadLanding() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const [selectedOrderBumpId, setSelectedOrderBumpId] = useState<number | undefined>();
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [promoCode, setPromoCode] = useState<string | null>(null);
   const [promoDiscountText, setPromoDiscountText] = useState<string | null>(null);
   const isPreview = new URLSearchParams(window.location.search).get("preview") === "admin";
@@ -783,11 +785,16 @@ export default function DownloadLanding() {
   const price = product.isFree ? "Free" : `$${product.price % 1 === 0 ? Number(product.price).toLocaleString("en-US") : Number(product.price).toFixed(2)}`;
   const hasPurchased = purchaseStatus?.purchased || product.isFree;
   const isDraft = (product as any).status === "draft" || (product as any).status === "enrollment_closed";
+  const isWaitlist = (product as any).status === "waitlist";
   const features = product.landingFeatures ? product.landingFeatures.split("\n").filter(Boolean) : [];
 
   const handleBuy = () => {
     if (hasPurchased && slug) {
       window.location.href = `/downloads/${slug}/files`;
+      return;
+    }
+    if (isWaitlist) {
+      setWaitlistOpen(true);
       return;
     }
     runGuarded(() => {
@@ -833,10 +840,10 @@ export default function DownloadLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxDL ? (
                 <div style={{ maxWidth: bwMaxDL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} isDraft={isDraft} />
+                  <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} isDraft={isDraft} isWaitlist={isWaitlist} />
                 </div>
               ) : (
-                <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} isDraft={isDraft} />
+                <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={price} hasPurchased={hasPurchased} slug={slug!} user={user} isDraft={isDraft} isWaitlist={isWaitlist} />
               )}
             </div>
           );
@@ -860,6 +867,7 @@ export default function DownloadLanding() {
             )}
           </div>
         )}
+        <AvailabilityWaitlistDialog open={waitlistOpen} onClose={() => setWaitlistOpen(false)} productType="download" productId={product.id} title={product.title} />
       </div>
     );
   }
@@ -990,7 +998,7 @@ export default function DownloadLanding() {
                   </Link>
                 ) : (
                   <Button className="w-full" size="lg" onClick={handleBuy} disabled={buying}>
-                    {checkoutMut.isPending ? "Processing..." : product.isFree ? "Get It Free" : "Buy Now"}
+                    {checkoutMut.isPending ? "Processing..." : isWaitlist ? "Join Waitlist" : product.isFree ? "Get It Free" : "Buy Now"}
                   </Button>
                 )}
                 <p className="text-xs text-gray-400 mt-3 text-center">Instant digital delivery</p>
@@ -1000,7 +1008,7 @@ export default function DownloadLanding() {
         </div>
       </div>
     </div>
+    <AvailabilityWaitlistDialog open={waitlistOpen} onClose={() => setWaitlistOpen(false)} productType="download" productId={product.id} title={product.title} />
     </>
   );
 }
-
