@@ -1337,6 +1337,9 @@ function QuizList() {
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="published">Published</SelectItem>
+              <SelectItem value="waitlist">Waitlist</SelectItem>
+              <SelectItem value="presale">Pre-sale</SelectItem>
+              <SelectItem value="enrollment_closed">Enrollment Closed</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>

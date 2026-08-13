@@ -95,7 +95,7 @@ const quizSettingsInput = z.object({
   maxAttempts: z.number().int().min(1).nullable().optional(),
   accessType: z.enum(["enrolled", "members_only"]).default("enrolled"),
   brand: z.enum(["aaus", "iheartecho"]).default("aaus"),
-  status: z.enum(["draft", "published", "archived"]).default("draft"),
+  status: z.enum(["draft", "published", "archived", "enrollment_closed", "waitlist", "presale"]).default("draft"),
   coverImageUrl: z.string().nullable().optional(),
   instructions: z.string().nullable().optional(),
   sharedInSonoQuiz: z.boolean().optional(),
@@ -591,7 +591,7 @@ export const standaloneQuizAdminRouter = router({
   listQuizzes: protectedProcedure
     .input(z.object({
       search: z.string().optional(),
-      status: z.enum(["draft", "published", "archived"]).optional(),
+      status: z.enum(["draft", "published", "archived", "enrollment_closed", "waitlist", "presale"]).optional(),
       type: z.enum(["quiz", "mock_exam"]).optional(),
       brand: z.enum(["aaus", "iheartecho"]).optional(),
       page: z.number().int().min(1).default(1),
