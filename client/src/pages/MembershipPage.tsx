@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { BlockPreview } from "@/components/BlockPreview";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
+import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 import { Check, Award, Loader2, Tag } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
@@ -34,6 +35,7 @@ export default function MembershipPage() {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const [discountCode, setDiscountCode] = useState("");
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [appliedCode, setAppliedCode] = useState<string | null>(null);
   const [codeError, setCodError] = useState<string | null>(null);
 
@@ -116,6 +118,14 @@ export default function MembershipPage() {
 
   const startCheckout = () => {
     if (!plan) return;
+    if (plan.status === "waitlist") {
+      setWaitlistOpen(true);
+      return;
+    }
+    if (plan.status === "enrollment_closed") {
+      toast.info("Enrollment Closed");
+      return;
+    }
     // Free plan: skip Stripe entirely
     if (isFree) {
       if (!user) {
@@ -162,6 +172,10 @@ export default function MembershipPage() {
 
   const checkoutLabel = hasAccess
     ? SUBSCRIPTION_RESUME_LABEL
+    : plan?.status === "waitlist"
+      ? "Join Waitlist"
+      : plan?.status === "enrollment_closed"
+        ? "Enrollment Closed"
     : isFree
       ? "Join for Free"
       : (plan?.trialDays ?? 0) > 0
@@ -342,13 +356,17 @@ export default function MembershipPage() {
           <Button
             className="shadow-xl text-white font-semibold px-6 py-3 rounded-xl"
             style={{ backgroundColor: accentColor }}
-            disabled={checkoutDisabled}
+            disabled={checkoutDisabled || plan.status === "enrollment_closed"}
             onClick={handleCtaClick}
             >
               {(checkoutMutation.isPending || selfEnrollFreeMutation.isPending) ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing…</>
               ) : hasAccess ? (
                 SUBSCRIPTION_RESUME_LABEL
+              ) : plan?.status === "waitlist" ? (
+                "Join Waitlist"
+              ) : plan?.status === "enrollment_closed" ? (
+                "Enrollment Closed"
               ) : isFree ? (
                 "Join for Free"
               ) : (
@@ -357,6 +375,7 @@ export default function MembershipPage() {
           </Button>
         </div>
       )}
+      <AvailabilityWaitlistDialog open={waitlistOpen} onClose={() => setWaitlistOpen(false)} productType="membership" productId={plan.id} title={plan.title} />
     </div>
   );
 }
