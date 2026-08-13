@@ -998,6 +998,11 @@ export const workshopAdminRouter = router({
         enrollmentCloseDate: z.string().nullish(),
         status: z.enum(["draft", "published", "waitlist", "presale", "cancelled", "completed"]).default("draft"),
         instanceContent: z.string().nullish(),
+        presaleWelcomeHeading: z.string().nullish(),
+        presaleWelcomeBody: z.string().nullish(),
+        presaleWelcomeMediaUrl: z.string().nullish(),
+        presaleWelcomeCtaLabel: z.string().nullish(),
+        presaleWelcomeCtaUrl: z.string().nullish(),
       })
     )
     .mutation(async ({ input }) => {
@@ -1028,6 +1033,11 @@ export const workshopAdminRouter = router({
         status: input.status,
         enrolledCount: 0,
         instanceContent: input.instanceContent ?? undefined,
+        presaleWelcomeHeading: input.presaleWelcomeHeading ?? undefined,
+        presaleWelcomeBody: input.presaleWelcomeBody ?? undefined,
+        presaleWelcomeMediaUrl: input.presaleWelcomeMediaUrl ?? undefined,
+        presaleWelcomeCtaLabel: input.presaleWelcomeCtaLabel ?? undefined,
+        presaleWelcomeCtaUrl: input.presaleWelcomeCtaUrl ?? undefined,
       }).$returningId();
       return { id: ins.id };
     }),
@@ -1059,6 +1069,11 @@ export const workshopAdminRouter = router({
         enrollmentCloseDate: z.string().nullish(),
         status: z.enum(["draft", "published", "waitlist", "presale", "cancelled", "completed"]).optional(),
         instanceContent: z.string().nullish(),
+        presaleWelcomeHeading: z.string().nullish(),
+        presaleWelcomeBody: z.string().nullish(),
+        presaleWelcomeMediaUrl: z.string().nullish(),
+        presaleWelcomeCtaLabel: z.string().nullish(),
+        presaleWelcomeCtaUrl: z.string().nullish(),
       })
     )
     .mutation(async ({ input }) => {

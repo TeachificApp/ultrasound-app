@@ -329,8 +329,13 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
   const [instSalesCloseDate, setInstSalesCloseDate] = useState("");
   const [instSalesOpenDate, setInstSalesOpenDate] = useState("");
   const [instEnrollmentCloseDate, setInstEnrollmentCloseDate] = useState("");
-  const [instStatus, setInstStatus] = useState<"draft" | "published" | "cancelled" | "completed">("draft");
+  const [instStatus, setInstStatus] = useState<"draft" | "published" | "waitlist" | "presale" | "cancelled" | "completed">("draft");
   const [instContent, setInstContent] = useState("");
+  const [instPresaleWelcomeHeading, setInstPresaleWelcomeHeading] = useState("");
+  const [instPresaleWelcomeBody, setInstPresaleWelcomeBody] = useState("");
+  const [instPresaleWelcomeMediaUrl, setInstPresaleWelcomeMediaUrl] = useState("");
+  const [instPresaleWelcomeCtaLabel, setInstPresaleWelcomeCtaLabel] = useState("");
+  const [instPresaleWelcomeCtaUrl, setInstPresaleWelcomeCtaUrl] = useState("");
 
   // Resource dialog state
   const [resourceDialogOpen, setResourceDialogOpen] = useState(false);
@@ -447,6 +452,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setEditingInstance(null);
     setInstTitle(""); setInstDescription(""); setInstStartDate(""); setInstEndDate("");
     setInstContent("");
+    setInstPresaleWelcomeHeading(""); setInstPresaleWelcomeBody(""); setInstPresaleWelcomeMediaUrl(""); setInstPresaleWelcomeCtaLabel(""); setInstPresaleWelcomeCtaUrl("");
     setInstTimezone("America/New_York"); setInstLocationType("in_person");
     setInstVenueName(""); setInstVenueCity(""); setInstVenueState("");
     setInstCapacity(""); setInstPrice(""); setInstAvailableForPurchase(false);
@@ -473,6 +479,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setInstEnrollmentCloseDate(inst.enrollmentCloseDate ? new Date(inst.enrollmentCloseDate).toISOString().slice(0, 10) : "");
     setInstStatus(inst.status ?? "draft");
     setInstContent(inst.instanceContent ?? "");
+    setInstPresaleWelcomeHeading(inst.presaleWelcomeHeading ?? ""); setInstPresaleWelcomeBody(inst.presaleWelcomeBody ?? ""); setInstPresaleWelcomeMediaUrl(inst.presaleWelcomeMediaUrl ?? ""); setInstPresaleWelcomeCtaLabel(inst.presaleWelcomeCtaLabel ?? ""); setInstPresaleWelcomeCtaUrl(inst.presaleWelcomeCtaUrl ?? "");
     setInstanceDialogOpen(true);
   }
 
@@ -496,6 +503,11 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
       enrollmentCloseDate: instEnrollmentCloseDate || null,
       status: instStatus,
       instanceContent: instContent || null,
+      presaleWelcomeHeading: instPresaleWelcomeHeading || null,
+      presaleWelcomeBody: instPresaleWelcomeBody || null,
+      presaleWelcomeMediaUrl: instPresaleWelcomeMediaUrl || null,
+      presaleWelcomeCtaLabel: instPresaleWelcomeCtaLabel || null,
+      presaleWelcomeCtaUrl: instPresaleWelcomeCtaUrl || null,
     };
     if (editingInstance) {
       updateInstanceMutation.mutate({ id: editingInstance.id, ...payload });
@@ -1360,6 +1372,21 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
                 </div>
               </div>
             </div>
+            {instStatus === "presale" && (
+              <div className="rounded-lg border border-teal-200 bg-teal-50/30 p-3 space-y-3">
+                <div>
+                  <Label className="text-xs font-medium">Pre-sale Welcome Page</Label>
+                  <p className="text-xs text-gray-500">Shown to enrolled learners until this instance opens.</p>
+                </div>
+                <Input value={instPresaleWelcomeHeading} onChange={e => setInstPresaleWelcomeHeading(e.target.value)} placeholder="Thank you for enrolling." />
+                <Textarea value={instPresaleWelcomeBody} onChange={e => setInstPresaleWelcomeBody(e.target.value)} rows={3} placeholder="You'll be granted access once the workshop is open." />
+                <Input value={instPresaleWelcomeMediaUrl} onChange={e => setInstPresaleWelcomeMediaUrl(e.target.value)} placeholder="Optional image or video URL" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Input value={instPresaleWelcomeCtaLabel} onChange={e => setInstPresaleWelcomeCtaLabel(e.target.value)} placeholder="Optional CTA label" />
+                  <Input value={instPresaleWelcomeCtaUrl} onChange={e => setInstPresaleWelcomeCtaUrl(e.target.value)} placeholder="Optional CTA URL" />
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setInstanceDialogOpen(false)}>Cancel</Button>
