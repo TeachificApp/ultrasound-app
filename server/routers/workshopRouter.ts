@@ -594,6 +594,7 @@ export const workshopLearnerRouter = router({
           amountPaid: 0,
           currency: workshop.currency,
           status: "active",
+          accessLevel: instance.status === "presale" ? "presale" : "full",
         });
         if (userId) await db
           .update(workshopInstances)
