@@ -6077,7 +6077,7 @@ export type DraftNotifyEntry = typeof draftNotifyEntries.$inferSelect;
 // One shared waitlist record per visitor and product or enrolment instance.
 export const contentWaitlistEntries = mysqlTable("content_waitlist_entries", {
   id: int("id").autoincrement().primaryKey(),
-  productType: mysqlEnum("product_type", ["course", "cohort_group", "workshop", "workshop_instance", "webinar"]).notNull(),
+  productType: mysqlEnum("product_type", ["course", "cohort_group", "workshop", "workshop_instance", "webinar", "download", "bundle", "membership", "quiz"]).notNull(),
   productId: int("product_id").notNull(),
   parentProductId: int("parent_product_id"),
   userId: int("user_id"),
