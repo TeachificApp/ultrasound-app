@@ -5170,6 +5170,7 @@ export const webinarRegistrations = mysqlTable("webinar_registrations", {
   webinarId: int("webinar_id").notNull(),
   userId: int("user_id").notNull(),
   pricingOptionId: varchar("pricing_option_id", { length: 64 }),
+  accessLevel: mysqlEnum("access_level", ["full", "presale"]).default("full").notNull(),
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
   registeredAt: timestamp("registered_at").defaultNow().notNull(),
   attendedAt: timestamp("attended_at"),
@@ -7361,6 +7362,7 @@ export const workshopEnrollments = mysqlTable("workshop_enrollments", {
 
   // Status
   status: mysqlEnum("status", ["active", "cancelled", "refunded"]).default("active").notNull(),
+  accessLevel: mysqlEnum("access_level", ["full", "presale"]).default("full").notNull(),
 
   // Access
   accessGrantedAt: timestamp("access_granted_at").defaultNow().notNull(),
