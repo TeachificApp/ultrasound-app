@@ -623,7 +623,8 @@ export const adminUserRouter = router({
             alreadyGranted = true; grantId = ex.id;
             if (expiresAtDate) await db.update(webinarRegistrations).set({ accessExpiresAt: expiresAtDate }).where(eq(webinarRegistrations.id, ex.id));
           } else {
-            const [r] = await db.insert(webinarRegistrations).values({ userId: input.userId, webinarId: input.courseId, accessExpiresAt: expiresAtDate ?? undefined }).$returningId();
+            const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, input.courseId)).limit(1);
+            const [r] = await db.insert(webinarRegistrations).values({ userId: input.userId, webinarId: input.courseId, accessExpiresAt: expiresAtDate ?? undefined, accessLevel: webinar?.status === "presale" ? "presale" : "full" }).$returningId();
             grantId = r.id;
           }
         } else if (input.productType === "community") {
