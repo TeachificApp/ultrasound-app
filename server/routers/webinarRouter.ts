@@ -457,7 +457,7 @@ export const webinarSessionRouter = router({
               if (userId) {
                 const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
                   .where(and(eq(webinarRegistrations.webinarId, webinar.id), eq(webinarRegistrations.userId, userId))).limit(1);
-                if (!ex) await db.insert(webinarRegistrations).values({ webinarId: webinar.id, userId, registrationSource: "promo_free", email: ctx.user?.email ?? "" });
+                if (!ex) await db.insert(webinarRegistrations).values({ webinarId: webinar.id, userId, registrationSource: "promo_free", email: ctx.user?.email ?? "", accessLevel: webinar.status === "presale" ? "presale" : "full" });
               }
               return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: subtitle, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: 100, brand: webinar.brand ?? "all_about_ultrasound" };
             }
