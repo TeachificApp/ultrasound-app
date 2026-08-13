@@ -96,9 +96,11 @@ export const webinarLearnerRouter = router({
     .input(z.object({ webinarId: z.number(), pricingOptionId: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
+      if (!webinar) throw new TRPCError({ code: "NOT_FOUND" });
       const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
         .where(and(eq(webinarRegistrations.webinarId, input.webinarId), eq(webinarRegistrations.userId, ctx.user.id))).limit(1);
-      if (!ex) await db.insert(webinarRegistrations).values({ webinarId: input.webinarId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId });
+      if (!ex) await db.insert(webinarRegistrations).values({ webinarId: input.webinarId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId, accessLevel: webinar.status === "presale" ? "presale" : "full" });
       return { success: true };
     }),
 
