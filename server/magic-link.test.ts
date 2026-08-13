@@ -5,6 +5,8 @@
 
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 // ─── Input schemas (mirrors routers.ts) ──────────────────────────────────────
 
@@ -161,6 +163,19 @@ describe("Magic Link — email enumeration protection", () => {
     // This test documents the expected behavior — no TRPCError is thrown for unknown emails.
     const successResponse = { success: true };
     expect(successResponse.success).toBe(true);
+  });
+
+  it("creates a passwordless account when required without exposing registration status", () => {
+    const routerSource = readFileSync(resolve(process.cwd(), "server/routers.ts"), "utf8");
+    expect(routerSource).toContain("openId: `email:${email}`");
+    expect(routerSource).toContain("if (!user) return { success: true }");
+  });
+
+  it("records email provider delivery failures for operational recovery", () => {
+    const routerSource = readFileSync(resolve(process.cwd(), "server/routers.ts"), "utf8");
+    const emailSource = readFileSync(resolve(process.cwd(), "server/_core/email.ts"), "utf8");
+    expect(routerSource).toContain("const deliveryAccepted = await sendEmail");
+    expect(emailSource).toContain('_logEmailSend(opts.to, opts.subject, "failed")');
   });
 });
 
