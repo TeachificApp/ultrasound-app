@@ -1640,6 +1640,7 @@ export default function CourseLanding() {
   const [cwSubmitted, setCwSubmitted] = useState(false);
   const [productWaitlistOpen, setProductWaitlistOpen] = useState(false);
   const [productWaitlistSubmitted, setProductWaitlistSubmitted] = useState(false);
+  const [availabilityWaitlistTarget, setAvailabilityWaitlistTarget] = useState<{ productType: "course" | "cohort_group"; productId: number; title: string } | null>(null);
   // Draft "Notify Me When Open" modal state
   const [draftNotifyOpen, setDraftNotifyOpen] = useState(false);
   const [dnName, setDnName] = useState("");
@@ -2167,15 +2168,15 @@ export default function CourseLanding() {
       />
       <ProductWaitlistModal
         open={productWaitlistOpen}
-        onClose={() => setProductWaitlistOpen(false)}
-        title={course?.title ?? "this course"}
+        onClose={() => { setProductWaitlistOpen(false); setAvailabilityWaitlistTarget(null); }}
+        title={availabilityWaitlistTarget?.title ?? course?.title ?? "this course"}
         name={cwName} setName={setCwName}
         email={cwEmail} setEmail={setCwEmail}
         submitted={productWaitlistSubmitted}
         pending={joinProductWaitlist.isPending}
         onSubmit={() => joinProductWaitlist.mutate({
-          productType: "course",
-          productId: course?.id ?? 0,
+          productType: availabilityWaitlistTarget?.productType ?? "course",
+          productId: availabilityWaitlistTarget?.productId ?? course?.id ?? 0,
           name: cwName,
           email: cwEmail,
           userId: user?.id,
@@ -2186,6 +2187,7 @@ export default function CourseLanding() {
         cohortGroupId={selectedCohortGroupId}
         onClose={() => setSelectedCohortGroupId(null)}
         onEnroll={() => { setSelectedCohortGroupId(null); handleGoToCheckoutPage(); }}
+        onWaitlist={(group) => { setAvailabilityWaitlistTarget({ productType: "cohort_group", productId: group.id, title: group.name }); setProductWaitlistSubmitted(false); setProductWaitlistOpen(true); setSelectedCohortGroupId(null); }}
       />
       {/* Draft Notify Modal */}
       <Dialog open={draftNotifyOpen} onOpenChange={setDraftNotifyOpen}>
@@ -2836,11 +2838,13 @@ function CohortGroupDetailModal({
   cohortGroupId,
   onClose,
   onEnroll,
+  onWaitlist,
 }: {
   open: boolean;
   cohortGroupId: number | null;
   onClose: () => void;
   onEnroll: () => void;
+  onWaitlist: (group: { id: number; name: string }) => void;
 }) {
   const { data, isLoading, error } = trpc.lms.getCohortGroupPage.useQuery(
     { cohortGroupId: cohortGroupId! },
@@ -2865,7 +2869,9 @@ function CohortGroupDetailModal({
             {isLoading && <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />}
           </div>
           <div className="flex items-center gap-2">
-            {data?.isSoldOut ? (
+            {data?.status === "waitlist" ? (
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onWaitlist({ id: data.id, name: data.name })}>Join Waitlist</Button>
+            ) : data?.isSoldOut ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
                 Sold Out
               </span>
@@ -2949,8 +2955,8 @@ function CohortGroupDetailModal({
                     )}
                   </div>
                   <div className="text-center pt-4">
-                    <Button className="bg-teal-600 hover:bg-teal-700 text-white px-8" onClick={onEnroll}>
-                      Enroll in This Cohort
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white px-8" onClick={() => data.status === "waitlist" ? onWaitlist({ id: data.id, name: data.name }) : onEnroll()}>
+                      {data.status === "waitlist" ? "Join Waitlist" : "Enroll in This Cohort"}
                     </Button>
                   </div>
                 </div>

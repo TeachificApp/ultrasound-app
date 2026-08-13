@@ -294,6 +294,13 @@ export default function WebinarLanding() {
     onSuccess: () => setDnSubmitted(true),
     onError: (e) => toast.error(e.message),
   });
+  const joinAvailabilityWaitlist = trpc.contentAvailability.joinWaitlist.useMutation({
+    onSuccess: (result) => {
+      setDnSubmitted(true);
+      if (result.alreadyJoined) toast.success("You are already on this webinar waitlist.");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   // Fetch webinar data
   const { data, isLoading, error } = trpc.webinar.getBySlug.useQuery(
@@ -343,11 +350,14 @@ export default function WebinarLanding() {
     );
   }
 
+  const isWaitlist = webinar.status === "waitlist";
   const isDraft = webinar.status === "draft" || webinar.status === "enrollment_closed";
   const price = formatPrice(webinar);
   const isFree = webinar.accessType === "free" || webinar.isFree;
 
-  const ctaText = isDraft
+  const ctaText = isWaitlist
+    ? "Join Waitlist"
+    : isDraft
     ? "Enrollment Closed"
     : isRegistered
     ? "Watch Webinar"
@@ -356,6 +366,13 @@ export default function WebinarLanding() {
     : `Register — ${price}`;
 
   const handleRegister = () => {
+    if (isWaitlist) {
+      setDnName((user as any)?.name ?? "");
+      setDnEmail((user as any)?.email ?? "");
+      setDnSubmitted(false);
+      setDraftNotifyOpen(true);
+      return;
+    }
     if (isDraft) return;
     if (isRegistered) {
       navigate(`/webinar/${slug}`);
@@ -428,11 +445,11 @@ export default function WebinarLanding() {
       <Dialog open={draftNotifyOpen} onOpenChange={setDraftNotifyOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-teal-500" /> Notify Me When Open
+              <DialogTitle className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-teal-500" /> {isWaitlist ? "Join Waitlist" : "Notify Me When Open"}
             </DialogTitle>
             <DialogDescription>
-              Enter your details and we'll email you as soon as enrollment opens for this webinar.
+              Enter your details and we&apos;ll email you as soon as enrollment opens for this webinar.
             </DialogDescription>
           </DialogHeader>
           {dnSubmitted ? (
@@ -443,7 +460,7 @@ export default function WebinarLanding() {
               <Button className="mt-4" onClick={() => setDraftNotifyOpen(false)}>Close</Button>
             </div>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); submitDraftNotify.mutate({ name: dnName, email: dnEmail, productId: webinar.id, productType: "webinar" }); }} className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); if (isWaitlist) joinAvailabilityWaitlist.mutate({ name: dnName, email: dnEmail, productId: webinar.id, productType: "webinar", userId: (user as any)?.id }); else submitDraftNotify.mutate({ name: dnName, email: dnEmail, productId: webinar.id, productType: "webinar" }); }} className="space-y-4">
               <div>
                 <Label htmlFor="dn-name">Name</Label>
                 <Input id="dn-name" value={dnName} onChange={e => setDnName(e.target.value)} placeholder="Your name" required className="mt-1" />
@@ -454,8 +471,8 @@ export default function WebinarLanding() {
               </div>
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setDraftNotifyOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={submitDraftNotify.isPending} className="bg-teal-600 hover:bg-teal-700 text-white">
-                  {submitDraftNotify.isPending ? "Saving…" : "Notify Me"}
+                <Button type="submit" disabled={submitDraftNotify.isPending || joinAvailabilityWaitlist.isPending} className="bg-teal-600 hover:bg-teal-700 text-white">
+                  {submitDraftNotify.isPending || joinAvailabilityWaitlist.isPending ? "Saving…" : isWaitlist ? "Join Waitlist" : "Notify Me"}
                 </Button>
               </div>
             </form>
