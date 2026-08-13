@@ -509,6 +509,7 @@ export const workshopLearnerRouter = router({
         amountPaid: 0,
         currency: "usd",
         status: "active",
+        accessLevel: instance.status === "presale" ? "presale" : "full",
       });
       await db.update(workshopInstances)
         .set({ enrolledCount: sql`enrolled_count + 1` })
