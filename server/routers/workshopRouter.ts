@@ -702,6 +702,8 @@ export const workshopLearnerRouter = router({
       if (!workshopId || !instanceId || !userId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid session metadata." });
       }
+      const [instanceAvailability] = await db.select({ status: workshopInstances.status }).from(workshopInstances)
+        .where(eq(workshopInstances.id, instanceId)).limit(1);
 
       // Idempotent: check if already enrolled
       const [existing] = await db
@@ -727,6 +729,7 @@ export const workshopLearnerRouter = router({
           amountPaid: session.amount_total ?? 0,
           currency: session.currency ?? "usd",
           status: "active",
+          accessLevel: instanceAvailability?.status === "presale" ? "presale" : "full",
         });
         // Increment enrolled count
         await db
