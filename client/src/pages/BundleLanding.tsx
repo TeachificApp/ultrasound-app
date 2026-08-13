@@ -16,12 +16,13 @@ import {
   FileDown, Radio, HelpCircle, Box, Sparkles, Truck
 } from "lucide-react";
 import { Link } from "wouter";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { PURCHASE_ACCESS_LABEL, bundleAccessHref } from "@/lib/accessCta";
 import { BlockPreview } from "@/components/BlockPreview";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
+import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 
 const ITEM_TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-5 h-5 text-teal-600" />,
@@ -43,6 +44,7 @@ export default function BundleLanding() {
   const { slug } = useParams<{ slug: string }>();
   const search = useSearch();
   const { user, loading: authLoading } = useAuth();
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   const { data, isLoading, refetch } = trpc.bundles.getBySlug.useQuery(
     { slug: slug! },
@@ -73,6 +75,10 @@ export default function BundleLanding() {
   const runCheckout = (bundleId: number, pricingOptionId?: string) => {
     if (data?.isEnrolled) {
       window.location.href = bundleAccessHref();
+      return;
+    }
+    if (data?.bundle.status === "waitlist") {
+      setWaitlistOpen(true);
       return;
     }
     runGuarded(() => {
@@ -127,6 +133,8 @@ export default function BundleLanding() {
   }
 
   const { bundle, items, isEnrolled } = data;
+  const isWaitlist = bundle.status === "waitlist";
+  const isClosed = bundle.status === "enrollment_closed";
   const landingBlocks = useMemo(() => {
     if (!bundle.landingPageBlocks) return [];
     try { return JSON.parse(bundle.landingPageBlocks) as any[]; } catch { return []; }
@@ -134,6 +142,7 @@ export default function BundleLanding() {
   const itemCount = items.length;
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       {/* Hero */}
       <div className="bg-gradient-to-br from-slate-900 via-teal-900 to-slate-900 text-white py-16">
@@ -195,6 +204,12 @@ export default function BundleLanding() {
                   <Check className="w-5 h-5" /> {PURCHASE_ACCESS_LABEL}
                 </Button>
               </Link>
+            ) : isWaitlist ? (
+              <Button size="lg" className="bg-teal-500 hover:bg-teal-600 gap-2" onClick={() => setWaitlistOpen(true)}>
+                <ShoppingCart className="w-5 h-5" /> Join Waitlist
+              </Button>
+            ) : isClosed ? (
+              <Button size="lg" variant="secondary" disabled>Enrollment Closed</Button>
             ) : bundle.accessType === "free" && !user ? (
               // Free bundles require sign-in (no payment to create account through)
               <a href={getLoginUrl(`/bundles/${slug}`)}>
@@ -275,5 +290,7 @@ export default function BundleLanding() {
         />
       )}
     </div>
+    <AvailabilityWaitlistDialog open={waitlistOpen} onClose={() => setWaitlistOpen(false)} productType="bundle" productId={bundle.id} title={bundle.title} />
+    </>
   );
 }
