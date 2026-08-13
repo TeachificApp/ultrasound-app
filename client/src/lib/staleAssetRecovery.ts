@@ -7,6 +7,8 @@ export function isStaleAssetError(error: Error): boolean {
   return (
     message.includes("Failed to fetch dynamically imported module") ||
     message.includes("Importing a module script failed") ||
+    message.includes("is not a valid JavaScript MIME type") ||
+    message.includes("text/html") ||
     message.includes("Loading chunk") ||
     message.includes("Loading CSS chunk") ||
     /ChunkLoadError/.test(message)
