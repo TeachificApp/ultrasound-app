@@ -798,7 +798,7 @@ ${locationStr ? `<p style="margin:0;font-size:14px;color:#0e4a50;"><strong>Locat
   console.log(`[Stripe] Workshop enrollment recorded: user ${userId}, workshop ${workshopId}, instance ${instanceId}`);
 }
 
-async function handleWebinarCheckoutCompleted(session: Record<string, unknown>) {
+export async function handleWebinarCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.type !== "webinar") return;
   const webinarId = meta.webinar_id ? parseInt(meta.webinar_id, 10) : null;
