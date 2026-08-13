@@ -762,6 +762,9 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
                 <select className="border rounded px-2 py-1 text-sm bg-background" value={form.status ?? "draft"} onChange={(e) => setForm({ ...form, status: e.target.value })}>
                   <option value="draft">Draft</option>
                   <option value="published">Published</option>
+                  <option value="waitlist">Waitlist</option>
+                  <option value="presale">Pre-sale</option>
+                  <option value="enrollment_closed">Enrollment Closed</option>
                   <option value="hidden">Hidden (URL only)</option>
                   <option value="private">Private (invite only)</option>
                   <option value="archived">Archived</option>
