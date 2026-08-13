@@ -252,6 +252,11 @@ export const webinarAdminRouter = router({
       purchaseTermsLinkUrl1: z.string().max(2048).nullable().optional(),
       purchaseTermsLinkText2: z.string().max(255).nullable().optional(),
       purchaseTermsLinkUrl2: z.string().max(2048).nullable().optional(),
+      presaleWelcomeHeading: z.string().max(500).nullable().optional(),
+      presaleWelcomeBody: z.string().nullable().optional(),
+      presaleWelcomeMediaUrl: z.string().max(4096).nullable().optional(),
+      presaleWelcomeCtaLabel: z.string().max(255).nullable().optional(),
+      presaleWelcomeCtaUrl: z.string().max(2048).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });

@@ -286,7 +286,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<"live" | "prerecorded">("live");
-  const [status, setStatus] = useState<"draft" | "published" | "ended">("draft");
+  const [status, setStatus] = useState<"draft" | "published" | "ended" | "waitlist" | "presale" | "enrollment_closed">("draft");
   const [accessType, setAccessType] = useState<"free" | "paid" | "restricted">("free");
   const [scheduledAt, setScheduledAt] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(60);
@@ -313,6 +313,11 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
   const [purchaseTermsLinkUrl1, setPurchaseTermsLinkUrl1] = useState("");
   const [purchaseTermsLinkText2, setPurchaseTermsLinkText2] = useState("");
   const [purchaseTermsLinkUrl2, setPurchaseTermsLinkUrl2] = useState("");
+  const [presaleWelcomeHeading, setPresaleWelcomeHeading] = useState("");
+  const [presaleWelcomeBody, setPresaleWelcomeBody] = useState("");
+  const [presaleWelcomeMediaUrl, setPresaleWelcomeMediaUrl] = useState("");
+  const [presaleWelcomeCtaLabel, setPresaleWelcomeCtaLabel] = useState("");
+  const [presaleWelcomeCtaUrl, setPresaleWelcomeCtaUrl] = useState("");
   const [uploadingCover, setUploadingCover] = useState(false);
   const coverInputRef = useRef<HTMLInputElement>(null);
   // AI viewers
@@ -357,6 +362,11 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
     setPurchaseTermsLinkUrl1((webinar as any).purchaseTermsLinkUrl1 ?? "");
     setPurchaseTermsLinkText2((webinar as any).purchaseTermsLinkText2 ?? "");
     setPurchaseTermsLinkUrl2((webinar as any).purchaseTermsLinkUrl2 ?? "");
+    setPresaleWelcomeHeading((webinar as any).presaleWelcomeHeading ?? "");
+    setPresaleWelcomeBody((webinar as any).presaleWelcomeBody ?? "");
+    setPresaleWelcomeMediaUrl((webinar as any).presaleWelcomeMediaUrl ?? "");
+    setPresaleWelcomeCtaLabel((webinar as any).presaleWelcomeCtaLabel ?? "");
+    setPresaleWelcomeCtaUrl((webinar as any).presaleWelcomeCtaUrl ?? "");
   }, [webinar]);
 
   const updateMutation = trpc.webinarAdmin.update.useMutation({
@@ -401,6 +411,11 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
       metaTitle: metaTitle || undefined,
       metaDescription: metaDescription || undefined,
       coverImage: coverImage || undefined,
+      presaleWelcomeHeading: presaleWelcomeHeading || null,
+      presaleWelcomeBody: presaleWelcomeBody || null,
+      presaleWelcomeMediaUrl: presaleWelcomeMediaUrl || null,
+      presaleWelcomeCtaLabel: presaleWelcomeCtaLabel || null,
+      presaleWelcomeCtaUrl: presaleWelcomeCtaUrl || null,
     });
   }
 
@@ -531,6 +546,8 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
                     <SelectContent>
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="published">Published</SelectItem>
+                      <SelectItem value="waitlist">Waitlist</SelectItem>
+                      <SelectItem value="presale">Pre-sale</SelectItem>
                       <SelectItem value="ended">Ended</SelectItem>
                       <SelectItem value="enrollment_closed">Enrollment Closed</SelectItem>
                     </SelectContent>
@@ -718,6 +735,20 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
                 </>
               )}
             </div>
+            {status === "presale" && (
+              <Card className="border-teal-200 bg-teal-50/30">
+                <CardHeader><CardTitle className="text-sm">Pre-sale Welcome Page</CardTitle></CardHeader>
+                <CardContent className="space-y-3">
+                  <Input value={presaleWelcomeHeading} onChange={e => setPresaleWelcomeHeading(e.target.value)} placeholder="Thank you for enrolling." />
+                  <Textarea value={presaleWelcomeBody} onChange={e => setPresaleWelcomeBody(e.target.value)} rows={4} placeholder="You'll be granted access once the webinar is open." />
+                  <Input value={presaleWelcomeMediaUrl} onChange={e => setPresaleWelcomeMediaUrl(e.target.value)} placeholder="Optional image or video URL" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Input value={presaleWelcomeCtaLabel} onChange={e => setPresaleWelcomeCtaLabel(e.target.value)} placeholder="Optional CTA label" />
+                    <Input value={presaleWelcomeCtaUrl} onChange={e => setPresaleWelcomeCtaUrl(e.target.value)} placeholder="Optional CTA URL" />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <div className="space-y-3">
               <div>
                 <Label className="text-xs font-medium text-gray-600">Replay URL</Label>
