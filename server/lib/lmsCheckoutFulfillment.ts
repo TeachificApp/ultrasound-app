@@ -670,7 +670,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
       // Find the featured cohort group (isFeaturedOnLanding = true), or fall back
       // to the next upcoming open group ordered by start_date asc.
       const [featuredGroup] = await db
-        .select({ id: lmsCohortGroups.id })
+        .select({ id: lmsCohortGroups.id, status: lmsCohortGroups.status })
         .from(lmsCohortGroups)
         .where(and(eq(lmsCohortGroups.courseId, courseId), eq(lmsCohortGroups.isFeaturedOnLanding, true)))
         .limit(1);
@@ -703,6 +703,12 @@ export async function reconcileLmsCheckoutFromStripeSession(
               userId,
               courseId,
             });
+            if (featuredGroup.status === "presale") {
+              await db.update(lmsEnrollments)
+                .set({ enrollmentType: "presale" })
+                .where(eq(lmsEnrollments.id, enrollment.id));
+              notes.push(`Restricted Pre-sale access until cohort group #${cohortGroupId} opens`);
+            }
             notes.push(`Auto-assigned to cohort group #${cohortGroupId}`);
           } else {
             notes.push(`Already assigned to cohort group #${existing.id}`);

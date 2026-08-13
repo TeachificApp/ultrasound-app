@@ -8,6 +8,11 @@ export function isPresaleAvailability(status: ContentAvailabilityStatus): boolea
   return status === "presale";
 }
 
+/** A restricted pre-sale enrolment is released when availability moves out of Pre-sale. */
+export function shouldReleasePresaleEnrollment(previousStatus: ContentAvailabilityStatus, nextStatus: ContentAvailabilityStatus): boolean {
+  return isPresaleAvailability(previousStatus) && !!nextStatus && !isPresaleAvailability(nextStatus);
+}
+
 export function availabilityCtaLabel(status: ContentAvailabilityStatus, fallback = "Enroll Now"): string {
   if (isWaitlistAvailability(status)) return "Join Waitlist";
   if (isPresaleAvailability(status)) return "Pre-sale: Enroll Now";

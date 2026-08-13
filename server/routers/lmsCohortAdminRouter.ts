@@ -32,6 +32,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
+import { shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 import { processRichTextHtml } from "../lib/processRichTextHtml";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
@@ -1024,6 +1025,8 @@ export const lmsCohortAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, startDate, endDate, enrollmentCloseDate, ...rest } = input;
+      const [existingGroup] = await db.select({ status: lmsCohortGroups.status })
+        .from(lmsCohortGroups).where(eq(lmsCohortGroups.id, id)).limit(1);
       const updateData: any = { ...rest };
       if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
       if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
@@ -1033,6 +1036,17 @@ export const lmsCohortAdminRouter = router({
         if (group) await db.update(lmsCohortGroups).set({ isFeaturedOnLanding: false }).where(eq(lmsCohortGroups.courseId, group.courseId));
       }
       await db.update(lmsCohortGroups).set(updateData).where(eq(lmsCohortGroups.id, id));
+      if (shouldReleasePresaleEnrollment(existingGroup?.status, input.status)) {
+        const groupSeats = await db.select({ enrollmentId: lmsCohortGroupEnrollments.enrollmentId })
+          .from(lmsCohortGroupEnrollments)
+          .where(eq(lmsCohortGroupEnrollments.cohortGroupId, id));
+        const enrollmentIds = groupSeats.map((seat) => seat.enrollmentId);
+        if (enrollmentIds.length) {
+          await db.update(lmsEnrollments)
+            .set({ enrollmentType: "full" })
+            .where(and(inArray(lmsEnrollments.id, enrollmentIds), eq(lmsEnrollments.enrollmentType, "presale")));
+        }
+      }
       return { success: true };
     }),
 
