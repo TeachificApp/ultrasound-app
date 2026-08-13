@@ -114,6 +114,7 @@ import BulkCsvUploadPanel, { type BulkResult } from "@/components/BulkCsvUploadP
 import { isIHeartEchoDomain, LEARN_APP_URL, APP_URL, getAdminUrl } from "@/hooks/useSubdomain";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
+import { ContentWaitlistDashboard } from "@/components/admin/ContentWaitlistDashboard";
 
 // Lazy-loaded CME Management Hub components
 const CmeFormsListTab = lazy(() => import("@/components/admin/CmeFormsListTab").then(m => ({ default: m.CmeFormsListTab })));
@@ -2624,7 +2625,7 @@ function exportToCsv(filename: string, rows: Record<string, any>[]) {
 
 // ─── CME Management Hub ────────────────────────────────────────────────────────
 function CmeManagementHub() {
-  const [activeTab, setActiveTab] = useState<"certificates" | "activity_forms" | "disclosures" | "sdms_cme" | "notify_signups" | "google_drive">("activity_forms");
+  const [activeTab, setActiveTab] = useState<"certificates" | "activity_forms" | "disclosures" | "sdms_cme" | "notify_signups" | "waitlists" | "google_drive">("activity_forms");
   const [notifySearch, setNotifySearch] = useState("");
   const [notifyTypeFilter, setNotifyTypeFilter] = useState("");
   const [disclosureSubTab, setDisclosureSubTab] = useState<"course_linked" | "generic">("course_linked");
@@ -2696,6 +2697,7 @@ function CmeManagementHub() {
             { id: "certificates", label: "Certificate Templates", icon: Award },
             { id: "sdms_cme", label: "SDMS CME Data", icon: GraduationCap },
             { id: "notify_signups", label: "Notify Me Signups", icon: Bell },
+            { id: "waitlists", label: "Waitlists", icon: Users },
             { id: "google_drive", label: "Google Drive", icon: HardDrive },
           ] as const).map(tab => (
             <button
@@ -2719,6 +2721,8 @@ function CmeManagementHub() {
             <CmeFormsListTab />
           </Suspense>
         )}
+
+        {activeTab === "waitlists" && <ContentWaitlistDashboard />}
 
         {/* Financial Disclosures */}
         {activeTab === "disclosures" && (
