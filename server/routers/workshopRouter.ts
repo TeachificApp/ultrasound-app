@@ -1469,6 +1469,12 @@ export const workshopAdminRouter = router({
       const [workshop] = await db.select().from(workshops)
         .where(eq(workshops.id, input.workshopId)).limit(1);
       if (!workshop) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop not found" });
+      const [instance] = await db.select({ id: workshopInstances.id, status: workshopInstances.status })
+        .from(workshopInstances)
+        .where(eq(workshopInstances.workshopId, input.workshopId))
+        .orderBy(asc(workshopInstances.startDate))
+        .limit(1);
+      if (!instance) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop instance not found" });
 
       let userId: number;
       const [existingUser] = await db.select({ id: users.id })
@@ -1492,7 +1498,7 @@ export const workshopAdminRouter = router({
           .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.workshopId, input.workshopId)))
           .limit(1);
         if (!existing) {
-          await db.insert(workshopEnrollments).values({ userId, workshopId: input.workshopId, enrollmentType: "full" as any });
+          await db.insert(workshopEnrollments).values({ userId, workshopId: input.workshopId, instanceId: instance.id, status: "active", accessLevel: instance.status === "presale" ? "presale" : "full" });
         }
         await sendEmail({
           to: { name: entry.name, email: entry.email },
@@ -1507,7 +1513,7 @@ export const workshopAdminRouter = router({
           const [existing] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)
             .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.workshopId, input.workshopId))).limit(1);
           if (!existing) {
-            await db.insert(workshopEnrollments).values({ userId, workshopId: input.workshopId, enrollmentType: "full" as any });
+            await db.insert(workshopEnrollments).values({ userId, workshopId: input.workshopId, instanceId: instance.id, status: "active", accessLevel: instance.status === "presale" ? "presale" : "full" });
           }
           await sendEmail({
             to: { name: entry.name, email: entry.email },
