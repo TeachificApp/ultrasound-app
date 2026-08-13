@@ -1,5 +1,6 @@
 import { getStripeClient } from "../lib/stripeClient";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
+import { shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from "drizzle-orm";
@@ -1036,6 +1037,7 @@ export const workshopAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, startDate, endDate, salesCloseDate, salesOpenDate, enrollmentCloseDate, ...rest } = input;
+      const [existing] = await db.select({ status: workshopInstances.status }).from(workshopInstances).where(eq(workshopInstances.id, id)).limit(1);
       const updateData: Record<string, any> = { ...rest };
       if (startDate) updateData.startDate = new Date(startDate);
       if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
@@ -1043,6 +1045,10 @@ export const workshopAdminRouter = router({
       if (salesOpenDate !== undefined) updateData.salesOpenDate = salesOpenDate ? new Date(salesOpenDate) : null;
       if (enrollmentCloseDate !== undefined) updateData.enrollmentCloseDate = enrollmentCloseDate ? new Date(enrollmentCloseDate) : null;
       await db.update(workshopInstances).set(updateData).where(eq(workshopInstances.id, id));
+      if (shouldReleasePresaleEnrollment(existing?.status, input.status)) {
+        await db.update(workshopEnrollments).set({ accessLevel: "full" })
+          .where(and(eq(workshopEnrollments.instanceId, id), eq(workshopEnrollments.accessLevel, "presale")));
+      }
       return { success: true };
     }),
 
