@@ -22,7 +22,7 @@ import {
   User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { hasReachedCmeVideoCompletionThreshold } from "../../../shared/cmeLessonCompletion";
+import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance } from "../../../shared/cmeLessonCompletion";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
@@ -1936,6 +1936,15 @@ export default function CoursePlayer() {
     try { return lessonData?.contentBlocks ? JSON.parse(lessonData.contentBlocks) : []; }
     catch { return []; }
   })();
+  const hasInlineLessonQuiz = contentBlocks.some((block) => block.type === "lesson_quiz");
+  const isCmeCourse = Boolean(data?.course?.hasCertificate && Number(data?.course?.creditHours ?? 0) > 0);
+  const shouldAutoCompleteOnAdvance = shouldAutoCompleteCmeLessonOnAdvance({
+    isCmeCourse,
+    lessonType: lessonData?.type,
+    requiresVideoCompletion: requireVideoCompletion,
+    hasInlineQuiz: hasInlineLessonQuiz,
+    isCompleted,
+  });
   const learningObjectives: string[] = (() => {
     try {
       if (lessonData?.learningObjectives) return JSON.parse(lessonData.learningObjectives);
@@ -1946,6 +1955,25 @@ export default function CoursePlayer() {
 
   const playerTheme = data?.course?.playerTheme ?? "light";
   const isDarkTheme = playerTheme === "dark";
+  const handleNextLesson = async () => {
+    if (!nextLesson) return;
+    if (shouldAutoCompleteOnAdvance && selectedLessonId) {
+      setOptimisticCompleted((previous) => new Set([...previous, selectedLessonId]));
+      try {
+        await markComplete.mutateAsync({ lessonId: selectedLessonId, courseSlug: slug!, isAdminPreview: data?.isAdminPreview ?? false });
+        fireLessonCompleteEffect();
+      } catch (error: any) {
+        setOptimisticCompleted((previous) => {
+          const next = new Set(previous);
+          next.delete(selectedLessonId);
+          return next;
+        });
+        toast.error(error?.message ?? "Unable to record this CME lesson as complete. Please try again.");
+        return;
+      }
+    }
+    handleLessonSelect(nextLesson.id);
+  };
 
   return (
     <div className={cn("flex flex-col h-screen overflow-hidden", isDarkTheme ? "bg-gray-900 text-gray-100" : "bg-gray-50 text-gray-900")}>
@@ -2593,7 +2621,7 @@ export default function CoursePlayer() {
                 </Button>
               )}
               {nextLesson && (
-                <Button size="sm" variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="text-xs h-7" style={{ borderColor: primaryColor, color: primaryColor }}>
+                <Button size="sm" variant="outline" onClick={handleNextLesson} className="text-xs h-7" style={{ borderColor: primaryColor, color: primaryColor }}>
                   {lbl.nextLesson} <ChevronRight className="w-3 h-3 ml-1" />
                 </Button>
               )}
@@ -2799,7 +2827,7 @@ export default function CoursePlayer() {
                   {lessonData.type !== "quiz" && (
                     <div className="mt-auto pt-5 pb-4 flex items-center justify-end gap-3 flex-wrap">
                       {nextLesson && (
-                        <Button variant="outline" onClick={() => handleLessonSelect(nextLesson.id)} className="text-sm" style={{ borderColor: primaryColor, color: primaryColor }}>
+                        <Button variant="outline" onClick={handleNextLesson} className="text-sm" style={{ borderColor: primaryColor, color: primaryColor }}>
                           {lbl.nextLesson} <ChevronRight className="w-4 h-4 ml-1" />
                         </Button>
                       )}

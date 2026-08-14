@@ -6,6 +6,14 @@ describe("enrollmentAccess", () => {
     expect(isEnrollmentAccessActive({ enrollmentType: "full", accessExpiresAt: null })).toBe(true);
   });
 
+  it("keeps a full CME course enrollment active while lesson completion and certificate eligibility are evaluated separately", () => {
+    const cmeEnrollment = {
+      enrollmentType: "full",
+      accessExpiresAt: null,
+    };
+    expect(isEnrollmentAccessActive(cmeEnrollment)).toBe(true);
+  });
+
   it("treats future expiry as active", () => {
     const future = new Date(Date.now() + 86400000);
     expect(isEnrollmentAccessActive({ enrollmentType: "full", accessExpiresAt: future })).toBe(true);

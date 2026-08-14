@@ -124,6 +124,7 @@ import { lmsQuizLandingRouter } from "./lmsQuizLandingRouter";
 import { lmsEnrollmentAdminRouter } from "./lmsEnrollmentAdminRouter";
 import { lmsCohortAdminRouter } from "./lmsCohortAdminRouter";
 import { generateImage } from "../_core/imageGeneration";
+import { getCourseLessonAccessDecision } from "../lib/lessonAccess";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
 // ─── Certificate Template Router (admin) ─────────────────────────────────────
@@ -2192,16 +2193,18 @@ export const lmsLearnerRouter = router({
             throw new TRPCError({ code: "FORBIDDEN", message: "This lesson is no longer available" });
           }
         }
-        if (pm === "preview_hide_after_purchase" && enrollment && enrollment.enrollmentType !== "free_preview") {
-          // Purchased (full access) — hide this lesson (it was a pre-purchase teaser)
-          throw new TRPCError({ code: "FORBIDDEN", message: "This preview lesson is no longer available after purchase" });
-        }
-        if (pm === "none" && !enrollment) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
-        }
-        // Free preview enrollees can only access preview lessons
-        if (pm === "none" && enrollment?.enrollmentType === "free_preview") {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Full course enrollment required to access this lesson" });
+        const accessDecision = getCourseLessonAccessDecision({
+          previewMode: pm,
+          hasActiveEnrollment: Boolean(enrollment),
+          enrollmentType: enrollment?.enrollmentType,
+        });
+        if (!accessDecision.allowed) {
+          const message = accessDecision.reason === "preview_hidden_after_purchase"
+            ? "This preview lesson is no longer available after purchase"
+            : accessDecision.reason === "full_enrollment_required"
+              ? "Full course enrollment required to access this lesson"
+              : "Enrollment required";
+          throw new TRPCError({ code: "FORBIDDEN", message });
         }
       }
 
