@@ -7,10 +7,11 @@
  *   Analytics: Sales, Product Analytics, Memberships, Contacts
  *   Settings
  */
-import { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { MemberAccessCatalogList } from "@/components/admin/MemberAccessCatalogList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,6 +31,7 @@ import {
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { getAdminUrl } from "@/hooks/useSubdomain";
+import { submitMemberAccessGrants, toggleMemberAccessId, toggleMemberAccessProduct, type MemberAccessProduct } from "@/lib/memberAccessCatalog";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -400,7 +402,7 @@ function OverviewPanel() {
 }
 
 // ─── All Members Panel ────────────────────────────────────────────────────────
-function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCreateSignal?: number; onCreateConsumed?: () => void }) {
+export function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCreateSignal?: number; onCreateConsumed?: () => void }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
   const [page, setPage] = useState(1);
@@ -408,8 +410,9 @@ function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCreateSig
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [selectedCourseIds, setSelectedCourseIds] = useState<number[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<{ id: number; type: "download" | "bundle"; title: string }[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<MemberAccessProduct[]>([]);
   const [selectedPlanIds, setSelectedPlanIds] = useState<number[]>([]);
+  const [accessSearch, setAccessSearch] = useState("");
 
   useEffect(() => {
     if (openCreateSignal) { setCreateOpen(true); onCreateConsumed?.(); }
@@ -432,17 +435,23 @@ function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCreateSig
   const grantAccess = trpc.productAnalytics.grantProductAccess.useMutation();
   const grantMembership = trpc.lmsAdmin.grantMembershipAccess.useMutation();
   const isCreating = createMember.isPending || createAndEnroll.isPending || grantAccess.isPending || grantMembership.isPending;
-  const toggleCourse = (courseId: number) => setSelectedCourseIds(ids => ids.includes(courseId) ? ids.filter(id => id !== courseId) : [...ids, courseId]);
-  const toggleProduct = (product: { id: number; type: "download" | "bundle"; title: string }) => setSelectedProducts(items => items.some(item => item.id === product.id && item.type === product.type) ? items.filter(item => item.id !== product.id || item.type !== product.type) : [...items, product]);
-  const togglePlan = (planId: number) => setSelectedPlanIds(ids => ids.includes(planId) ? ids.filter(id => id !== planId) : [...ids, planId]);
-  const closeCreate = () => { setCreateOpen(false); setNewName(""); setNewEmail(""); setSelectedCourseIds([]); setSelectedProducts([]); setSelectedPlanIds([]); };
+  const toggleCourse = (courseId: number) => setSelectedCourseIds(ids => toggleMemberAccessId(ids, courseId));
+  const toggleProduct = (product: MemberAccessProduct) => setSelectedProducts(items => toggleMemberAccessProduct(items, product));
+  const togglePlan = (planId: number) => setSelectedPlanIds(ids => toggleMemberAccessId(ids, planId));
+  const closeCreate = () => { setCreateOpen(false); setNewName(""); setNewEmail(""); setSelectedCourseIds([]); setSelectedProducts([]); setSelectedPlanIds([]); setAccessSearch(""); };
   const submitCreate = async () => {
     if (!newName.trim() || !newEmail.trim()) { toast.error("Enter the member's name and email address."); return; }
     try {
       const member = await createMember.mutateAsync({ name: newName.trim(), email: newEmail.trim() });
-      for (const courseId of selectedCourseIds) await createAndEnroll.mutateAsync({ name: newName.trim(), email: newEmail.trim(), courseId });
-      for (const product of selectedProducts) await grantAccess.mutateAsync({ userEmail: newEmail.trim(), productType: product.type, productId: product.id });
-      for (const planId of selectedPlanIds) await grantMembership.mutateAsync({ userId: member.userId, planId });
+      await submitMemberAccessGrants({
+        member: { name: newName.trim(), email: newEmail.trim(), userId: member.userId },
+        courseIds: selectedCourseIds,
+        products: selectedProducts,
+        planIds: selectedPlanIds,
+        createAndEnroll: createAndEnroll.mutateAsync,
+        grantProductAccess: grantAccess.mutateAsync,
+        grantMembershipAccess: grantMembership.mutateAsync,
+      });
       await utils.adminUser.listMembers.invalidate();
       const assignmentCount = selectedCourseIds.length + selectedProducts.length + selectedPlanIds.length;
       toast.success(`${member.isNewUser ? "Member created" : "Existing member updated"} with ${assignmentCount} access assignment${assignmentCount === 1 ? "" : "s"}.`);
@@ -480,7 +489,7 @@ function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCreateSig
       </div>
 
       <Dialog open={createOpen} onOpenChange={(open) => open ? setCreateOpen(true) : closeCreate()}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Member & Assign Access</DialogTitle>
             <DialogDescription>Create or reuse a member, then grant selected courses and product access in one workflow.</DialogDescription>
@@ -490,41 +499,29 @@ function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCreateSig
               <div><Label htmlFor="member-name">Name</Label><Input id="member-name" value={newName} onChange={e => setNewName(e.target.value)} placeholder="First Last" className="mt-1" /></div>
               <div><Label htmlFor="member-email">Email</Label><Input id="member-email" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="name@example.com" className="mt-1" /></div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="rounded-lg border border-slate-200 p-3">
-                <Label className="text-sm font-semibold">Courses and content</Label>
-                <p className="text-xs text-slate-500 mt-1">Choose every course, cohort, or quiz course to enroll immediately.</p>
-                <div className="mt-3 max-h-56 overflow-y-auto space-y-2 pr-1">
-                  {(coursesQuery.data?.courses ?? []).map((course: any) => <label key={course.id} className="flex items-start gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={selectedCourseIds.includes(course.id)} onChange={() => toggleCourse(course.id)} className="mt-1 accent-teal-600" />
-                    <span><span className="font-medium text-slate-700">{course.title}</span><span className="block text-xs text-slate-400">{course.type}</span></span>
-                  </label>)}
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <Label className="text-sm font-semibold text-slate-800">Choose access to grant</Label>
+                  <p className="mt-1 text-xs text-slate-500">Search all currently grantable courses, downloads, bundles, and memberships, then select any number of items.</p>
+                </div>
+                <div className="relative w-full sm:w-80">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input value={accessSearch} onChange={event => setAccessSearch(event.target.value)} placeholder="Search all access options…" className="h-9 bg-white pl-9" />
                 </div>
               </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <Label className="text-sm font-semibold">Products and downloads</Label>
-                <p className="text-xs text-slate-500 mt-1">Choose products to grant at no charge.</p>
-                <div className="mt-3 max-h-56 overflow-y-auto space-y-2 pr-1">
-                  {(productsQuery.data?.products ?? []).filter((product: any) => ["download", "bundle"].includes(product.type)).map((product: any) => {
-                    const typed = { id: product.id, type: product.type as "download" | "bundle", title: product.title };
-                    const checked = selectedProducts.some(item => item.id === typed.id && item.type === typed.type);
-                    return <label key={`${product.type}-${product.id}`} className="flex items-start gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" checked={checked} onChange={() => toggleProduct(typed)} className="mt-1 accent-teal-600" />
-                      <span><span className="font-medium text-slate-700">{product.title}</span><span className="block text-xs text-slate-400 capitalize">{product.type}</span></span>
-                    </label>;
-                  })}
-                </div>
-              </div>
-              <div className="rounded-lg border border-slate-200 p-3">
-                <Label className="text-sm font-semibold">Memberships</Label>
-                <p className="text-xs text-slate-500 mt-1">Grant complimentary active membership access.</p>
-                <div className="mt-3 max-h-56 overflow-y-auto space-y-2 pr-1">
-                  {(membershipsQuery.data ?? []).map((plan: any) => <label key={plan.id} className="flex items-start gap-2 text-sm cursor-pointer">
-                    <input type="checkbox" checked={selectedPlanIds.includes(plan.id)} onChange={() => togglePlan(plan.id)} className="mt-1 accent-teal-600" />
-                    <span><span className="font-medium text-slate-700">{plan.name}</span><span className="block text-xs text-slate-400">{plan.interval ?? "Membership"}</span></span>
-                  </label>)}
-                </div>
-              </div>
+              <MemberAccessCatalogList
+                courses={coursesQuery.data?.courses ?? []}
+                products={productsQuery.data?.products ?? []}
+                memberships={membershipsQuery.data ?? []}
+                search={accessSearch}
+                selectedCourseIds={selectedCourseIds}
+                selectedProducts={selectedProducts}
+                selectedPlanIds={selectedPlanIds}
+                onToggleCourse={toggleCourse}
+                onToggleProduct={toggleProduct}
+                onTogglePlan={togglePlan}
+              />
             </div>
           </div>
           <DialogFooter>
