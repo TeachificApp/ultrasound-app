@@ -657,3 +657,20 @@ textarea,
 [data-type="block-math"] .katex-display {
   margin: 0;
 }
+
+/* ── Global phone grid safety net ────────────────────────────────────────────
+   The app contains long-lived content and administration screens authored at
+   different times. On the smallest phones, dense fixed Tailwind grid utilities
+   can otherwise compress labels and inputs below a usable width. Explicit
+   sm:/md:/lg: variants still restore each screen's authored multi-column layout
+   as soon as space is available. Add mobile-keep-grid where a compact swatch or
+   keypad intentionally must remain multi-column. */
+@media (max-width: 479px) {
+  .grid.grid-cols-2:not(.mobile-keep-grid),
+  .grid.grid-cols-3:not(.mobile-keep-grid),
+  .grid.grid-cols-4:not(.mobile-keep-grid),
+  .grid.grid-cols-5:not(.mobile-keep-grid),
+  .grid.grid-cols-6:not(.mobile-keep-grid) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
