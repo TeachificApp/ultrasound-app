@@ -338,7 +338,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
           {user.bio && <div className="sm:col-span-2"><span className="text-xs text-gray-400 uppercase tracking-wide">Bio</span><p className="text-gray-700 mt-0.5 leading-relaxed">{user.bio}</p></div>}
         </div>
         {/* Quick stats */}
-        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 border-t border-gray-100 pt-4 text-center sm:grid-cols-3">
           <div className="text-center"><div className="text-lg font-bold text-gray-900">{data.enrollments?.length ?? 0}</div><div className="text-xs text-gray-500">Enrollments</div></div>
           <div className="text-center"><div className="text-lg font-bold text-gray-900">{data.certificates?.length ?? 0}</div><div className="text-xs text-gray-500">Certificates</div></div>
           <div className="text-center"><div className="text-lg font-bold text-gray-900">{data.memberships?.length ?? 0}</div><div className="text-xs text-gray-500">Memberships</div></div>
@@ -358,7 +358,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
         {data.memberships && data.memberships.length > 0 ? (
           <div className="space-y-2">
             {data.memberships.map((m: any) => (
-              <div key={m.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100">
+              <div key={m.id} className="flex flex-col gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div><BrandBadge brand={m.brand} /><p className="text-xs text-gray-500 mt-1">{m.tier === "premium" ? "★ Premium" : "Free"}{m.expiresAt ? ` • Expires ${formatDate(m.expiresAt)}` : " • No expiry"}</p></div>
                 <StatusBadge status={m.status ?? "active"} />
               </div>
@@ -406,7 +406,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
             <Button
               onClick={() => setPasswordMutation.mutate({ userId, newPassword })}
               disabled={newPassword.length < 8 || setPasswordMutation.isPending}
-              className="bg-violet-600 hover:bg-violet-700 text-white"
+              className="bg-[#189aa1] text-white hover:bg-[#157f85]"
             >
               {setPasswordMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Set Password
@@ -423,7 +423,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
             <DialogDescription>Update this member's profile information.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5"><Label>First Name</Label><Input value={editForm.firstName} onChange={e => setEditForm(f => ({ ...f, firstName: e.target.value }))} placeholder="First name" /></div>
               <div className="space-y-1.5"><Label>Last Name</Label><Input value={editForm.lastName} onChange={e => setEditForm(f => ({ ...f, lastName: e.target.value }))} placeholder="Last name" /></div>
             </div>
@@ -438,7 +438,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
               <textarea value={editForm.bio} onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))} placeholder="Short bio..." rows={3} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none" />
             </div>
             <div className="space-y-1.5"><Label>Timezone</Label><Input value={editForm.timezone} onChange={e => setEditForm(f => ({ ...f, timezone: e.target.value }))} placeholder="e.g. America/New_York" /></div>
-            <div className="flex items-center gap-4 pt-1">
+            <div className="flex flex-wrap items-center gap-4 pt-1">
               <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editForm.isPremium} onChange={e => setEditForm(f => ({ ...f, isPremium: e.target.checked }))} className="rounded" /><span className="text-sm text-gray-700">Premium member</span></label>
               <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editForm.isDemo} onChange={e => setEditForm(f => ({ ...f, isDemo: e.target.checked }))} className="rounded" /><span className="text-sm text-gray-700">Demo/test account</span></label>
             </div>

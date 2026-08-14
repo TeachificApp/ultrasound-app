@@ -120,7 +120,7 @@ export default function StandaloneQuizResults() {
 
           {/* Show stats only when not percentage-only */}
           {!showOnlyPercentage && (
-            <div className="grid grid-cols-3 gap-4 mt-6 text-sm">
+            <div className="grid grid-cols-1 gap-3 mt-6 text-sm sm:grid-cols-3 sm:gap-4">
               <div className="bg-gray-50 rounded-xl p-3">
                 <p className="text-2xl font-bold text-gray-900">{attempt.correctAnswers}</p>
                 <p className="text-gray-500">Correct</p>
@@ -136,7 +136,7 @@ export default function StandaloneQuizResults() {
             </div>
           )}
 
-          <div className="flex justify-center gap-3 mt-6">
+          <div className="flex flex-wrap justify-center gap-3 mt-6">
             {quiz.allowRetakes && (
               <Button variant="outline" onClick={() => navigate(`/quizzes/${quizId}`)}>
                 <RotateCcw className="w-4 h-4 mr-2" /> Retake
@@ -227,7 +227,7 @@ export function QuestionCard({ a, idx }: { a: any; idx: number }) {
           {q.questionVideoUrl && (
             <video src={q.questionVideoUrl} controls className="w-full max-h-56 rounded-lg bg-black mb-3" />
           )}
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <div>
               <p className="text-xs text-gray-400 mb-1">Your answer</p>
               <p className={`font-medium ${a.isCorrect ? "text-green-700" : "text-red-600"}`}>{givenText}</p>

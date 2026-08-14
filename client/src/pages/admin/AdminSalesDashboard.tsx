@@ -406,10 +406,10 @@ export default function AdminSalesDashboard() {
               ))}
             </div>
             {preset === "custom" && (
-              <div className="flex items-center gap-2">
-                <Input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setPage(1); }} className="w-36 h-8 text-sm" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setPage(1); }} className="w-full sm:w-36 h-8 text-sm" />
                 <span className="text-gray-400 text-sm">to</span>
-                <Input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setPage(1); }} className="w-36 h-8 text-sm" />
+                <Input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setPage(1); }} className="w-full sm:w-36 h-8 text-sm" />
               </div>
             )}
           </div>
@@ -418,7 +418,7 @@ export default function AdminSalesDashboard() {
 
       {/* KPI Cards */}
       {analyticsQuery.isLoading ? (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {[1,2,3].map(i => <Card key={i} className="border border-gray-200 animate-pulse"><CardContent className="p-5 h-24" /></Card>)}
         </div>
       ) : (
