@@ -12,6 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MemberAccessCatalogList } from "@/components/admin/MemberAccessCatalogList";
+import type { MemberAccessCatalogFilter } from "@/components/admin/MemberAccessCatalogList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -147,7 +148,7 @@ function OverviewPanel() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}
         </div>
         <Skeleton className="h-64 rounded-xl" />
@@ -170,7 +171,7 @@ function OverviewPanel() {
   return (
     <div className="space-y-6">
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Verified Members"
           value={(stats?.totalMembers ?? 0).toLocaleString()}
@@ -267,7 +268,7 @@ function OverviewPanel() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Recent Members Table */}
         <Card className="xl:col-span-2 border border-slate-200 shadow-sm">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col gap-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-sm font-semibold text-slate-700">Recent Members</CardTitle>
             <a href={getAdminUrl("/admin/members?tab=all-members")}>
               <Button variant="ghost" size="sm" className="text-teal-600 hover:text-teal-700 text-xs h-7 px-2">
@@ -281,7 +282,7 @@ function OverviewPanel() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {recentMembers.map((m: any) => (
-                  <div key={m.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+                  <div key={m.id} className="flex flex-wrap items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50 sm:flex-nowrap">
                     <Avatar className="h-8 w-8 flex-shrink-0">
                       <AvatarImage src={m.avatarUrl ?? undefined} />
                       <AvatarFallback className="bg-teal-100 text-teal-700 text-xs font-semibold">
@@ -304,7 +305,7 @@ function OverviewPanel() {
                       <p className="text-xs text-slate-400 truncate">{m.email}</p>
                       {m.enrollmentCount > 0 && <ProgressBar value={m.progress} />}
                     </div>
-                    <div className="text-right flex-shrink-0">
+                    <div className="w-full text-left sm:w-auto sm:flex-shrink-0 sm:text-right">
                       <p className="text-xs text-slate-500">{fmtDate(m.createdAt)}</p>
                       <p className="text-xs text-slate-400">{fmtRelative(m.lastSignedIn)}</p>
                     </div>
@@ -413,6 +414,7 @@ export function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCr
   const [selectedProducts, setSelectedProducts] = useState<MemberAccessProduct[]>([]);
   const [selectedPlanIds, setSelectedPlanIds] = useState<number[]>([]);
   const [accessSearch, setAccessSearch] = useState("");
+  const [accessFilter, setAccessFilter] = useState<MemberAccessCatalogFilter>("all");
 
   useEffect(() => {
     if (openCreateSignal) { setCreateOpen(true); onCreateConsumed?.(); }
@@ -438,7 +440,7 @@ export function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCr
   const toggleCourse = (courseId: number) => setSelectedCourseIds(ids => toggleMemberAccessId(ids, courseId));
   const toggleProduct = (product: MemberAccessProduct) => setSelectedProducts(items => toggleMemberAccessProduct(items, product));
   const togglePlan = (planId: number) => setSelectedPlanIds(ids => toggleMemberAccessId(ids, planId));
-  const closeCreate = () => { setCreateOpen(false); setNewName(""); setNewEmail(""); setSelectedCourseIds([]); setSelectedProducts([]); setSelectedPlanIds([]); setAccessSearch(""); };
+  const closeCreate = () => { setCreateOpen(false); setNewName(""); setNewEmail(""); setSelectedCourseIds([]); setSelectedProducts([]); setSelectedPlanIds([]); setAccessSearch(""); setAccessFilter("all"); };
   const submitCreate = async () => {
     if (!newName.trim() || !newEmail.trim()) { toast.error("Enter the member's name and email address."); return; }
     try {
@@ -510,11 +512,30 @@ export function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCr
                   <Input value={accessSearch} onChange={event => setAccessSearch(event.target.value)} placeholder="Search all access options…" className="h-9 bg-white pl-9" />
                 </div>
               </div>
+              <div className="mt-3 flex flex-wrap gap-2" aria-label="Filter access catalog by type">
+                {([
+                  ["all", "All access"],
+                  ["courses", "Courses"],
+                  ["downloads", "Downloads"],
+                  ["bundles", "Bundles"],
+                  ["memberships", "Memberships"],
+                ] as const).map(([filter, label]) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setAccessFilter(filter)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${accessFilter === filter ? "border-teal-600 bg-teal-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:bg-teal-50"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <MemberAccessCatalogList
                 courses={coursesQuery.data?.courses ?? []}
                 products={productsQuery.data?.products ?? []}
                 memberships={membershipsQuery.data ?? []}
                 search={accessSearch}
+                filter={accessFilter}
                 selectedCourseIds={selectedCourseIds}
                 selectedProducts={selectedProducts}
                 selectedPlanIds={selectedPlanIds}

@@ -2,6 +2,8 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { buildMemberAccessCatalog, type MemberAccessProduct } from "@/lib/memberAccessCatalog";
 
+export type MemberAccessCatalogFilter = "all" | "courses" | "downloads" | "bundles" | "memberships";
+
 function CatalogSection({ title, count, emptyMessage, children }: { title: string; count: number; emptyMessage: string; children: React.ReactNode }) {
   return (
     <section className="border-b border-slate-200 last:border-b-0" data-catalog-section={title}>
@@ -19,6 +21,7 @@ export function MemberAccessCatalogList({
   products,
   memberships,
   search,
+  filter = "all",
   selectedCourseIds,
   selectedProducts,
   selectedPlanIds,
@@ -30,6 +33,7 @@ export function MemberAccessCatalogList({
   products: any[];
   memberships: any[];
   search: string;
+  filter?: MemberAccessCatalogFilter;
   selectedCourseIds: number[];
   selectedProducts: MemberAccessProduct[];
   selectedPlanIds: number[];
@@ -38,17 +42,21 @@ export function MemberAccessCatalogList({
   onTogglePlan: (id: number) => void;
 }) {
   const catalog = buildMemberAccessCatalog({ courses, products, memberships }, search);
+  const showCourses = filter === "all" || filter === "courses";
+  const showProducts = filter === "all" || filter === "downloads" || filter === "bundles";
+  const filteredProducts = filter === "downloads" ? catalog.products.filter((product) => product.type === "download") : filter === "bundles" ? catalog.products.filter((product) => product.type === "bundle") : catalog.products;
+  const showMemberships = filter === "all" || filter === "memberships";
   return (
     <div className="mt-4 max-h-[52vh] overflow-y-auto rounded-lg border border-slate-200 bg-white" data-testid="member-access-catalog">
-      <CatalogSection title="Courses and content" count={catalog.courses.length} emptyMessage="No courses or content match this search.">
+      {showCourses && <CatalogSection title="Courses and content" count={catalog.courses.length} emptyMessage="No courses or content match this search.">
         {catalog.courses.map((course: any) => <label key={course.id} className="flex cursor-pointer items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-teal-50/50">
           <input type="checkbox" checked={selectedCourseIds.includes(course.id)} onChange={() => onToggleCourse(course.id)} className="mt-1 h-4 w-4 accent-teal-600" />
           <span className="min-w-0 flex-1"><span className="block break-words font-medium text-slate-800">{course.title || "Untitled Course"}</span><span className="mt-0.5 block text-xs text-slate-500">{course.type || "Course"}</span></span>
           <Badge variant="outline" className="shrink-0 border-teal-200 bg-teal-50 text-teal-700">Course</Badge>
         </label>)}
-      </CatalogSection>
-      <CatalogSection title="Downloads and bundles" count={catalog.products.length} emptyMessage="No downloads or bundles match this search.">
-        {catalog.products.map((product) => {
+      </CatalogSection>}
+      {showProducts && <CatalogSection title={filter === "downloads" ? "Downloads" : filter === "bundles" ? "Bundles" : "Downloads and bundles"} count={filteredProducts.length} emptyMessage="No matching downloadable products or bundles were found.">
+        {filteredProducts.map((product) => {
           const checked = selectedProducts.some((item) => item.id === product.id && item.type === product.type);
           return <label key={`${product.type}-${product.id}`} className="flex cursor-pointer items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-teal-50/50">
             <input type="checkbox" checked={checked} onChange={() => onToggleProduct(product)} className="mt-1 h-4 w-4 accent-teal-600" />
@@ -56,14 +64,14 @@ export function MemberAccessCatalogList({
             <Badge variant="outline" className="shrink-0 border-sky-200 bg-sky-50 text-sky-700 capitalize">{product.type}</Badge>
           </label>;
         })}
-      </CatalogSection>
-      <CatalogSection title="Memberships" count={catalog.memberships.length} emptyMessage="No memberships match this search.">
+      </CatalogSection>}
+      {showMemberships && <CatalogSection title="Memberships" count={catalog.memberships.length} emptyMessage="No memberships match this search.">
         {catalog.memberships.map((plan: any) => <label key={plan.id} className="flex cursor-pointer items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-teal-50/50">
           <input type="checkbox" checked={selectedPlanIds.includes(plan.id)} onChange={() => onTogglePlan(plan.id)} className="mt-1 h-4 w-4 accent-teal-600" />
           <span className="min-w-0 flex-1"><span className="block break-words font-medium text-slate-800">{plan.title ?? plan.name ?? "Untitled Membership"}</span><span className="mt-0.5 block text-xs capitalize text-slate-500">{plan.billingInterval ?? plan.interval ?? "Membership"} · complimentary active access</span></span>
           <Badge variant="outline" className="shrink-0 border-amber-200 bg-amber-50 text-amber-700">Membership</Badge>
         </label>)}
-      </CatalogSection>
+      </CatalogSection>}
     </div>
   );
 }

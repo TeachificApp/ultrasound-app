@@ -8,13 +8,19 @@ const quizPreview = readFileSync(resolve(process.cwd(), "client/src/quiz-creator
 const quizResults = readFileSync(resolve(process.cwd(), "client/src/pages/StandaloneQuizResults.tsx"), "utf8");
 const salesDashboard = readFileSync(resolve(process.cwd(), "client/src/pages/admin/AdminSalesDashboard.tsx"), "utf8");
 const adminUserDetail = readFileSync(resolve(process.cwd(), "client/src/pages/admin/AdminUserDetailPage.tsx"), "utf8");
+const sonoTravelers = readFileSync(resolve(process.cwd(), "client/src/pages/SonoTravelers.tsx"), "utf8");
 
 describe("Responsive member access and Quiz Preview workflows", () => {
   it("keeps the direct member access search and catalog usable in a single responsive column", () => {
+    expect(membersHub).toContain("grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4");
     expect(membersHub).toContain("flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between");
     expect(membersHub).toContain("w-full sm:w-80");
+    expect(membersHub).toContain('aria-label="Filter access catalog by type"');
+    expect(membersHub).toContain("[\"courses\", \"Courses\"]");
+    expect(membersHub).toContain("[\"memberships\", \"Memberships\"]");
     expect(accessCatalog).toContain("max-h-[52vh] overflow-y-auto");
     expect(accessCatalog).toContain("min-w-0 flex-1");
+    expect(membersHub).toContain("flex flex-wrap items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50 sm:flex-nowrap");
   });
 
   it("keeps the preview modal, answer rows, feedback media, and navigation within narrow viewports", () => {
@@ -42,5 +48,9 @@ describe("Responsive member access and Quiz Preview workflows", () => {
     expect(adminUserDetail).toContain("flex flex-col gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 sm:flex-row sm:items-center sm:justify-between");
     expect(adminUserDetail).toContain("grid grid-cols-1 gap-3 sm:grid-cols-2");
     expect(adminUserDetail).toContain("flex flex-wrap items-center gap-4 pt-1");
+  });
+
+  it("stacks public Sono Travelers benefit cards before restoring three columns", () => {
+    expect(sonoTravelers).toContain("mt-8 grid grid-cols-1 gap-4 text-center sm:grid-cols-3");
   });
 });

@@ -56,6 +56,29 @@ describe("Members Hub searchable access catalog", () => {
     expect(markup).not.toContain("Physical Probe");
   });
 
+  it("filters the rendered catalog by supported access type without losing search behavior", () => {
+    const baseProps = {
+      ...catalogData,
+      search: "",
+      selectedCourseIds: [],
+      selectedProducts: [],
+      selectedPlanIds: [],
+      onToggleCourse: vi.fn(),
+      onToggleProduct: vi.fn(),
+      onTogglePlan: vi.fn(),
+    };
+    const downloadMarkup = renderToStaticMarkup(createElement(MemberAccessCatalogList, { ...baseProps, filter: "downloads" }));
+    const bundleMarkup = renderToStaticMarkup(createElement(MemberAccessCatalogList, { ...baseProps, filter: "bundles" }));
+    const membershipMarkup = renderToStaticMarkup(createElement(MemberAccessCatalogList, { ...baseProps, filter: "memberships", search: "legacy" }));
+
+    expect(downloadMarkup).toContain("Vascular Workbook");
+    expect(downloadMarkup).not.toContain("Registry Review Bundle");
+    expect(bundleMarkup).toContain("Registry Review Bundle");
+    expect(bundleMarkup).not.toContain("Vascular Workbook");
+    expect(membershipMarkup).toContain("Legacy Membership");
+    expect(membershipMarkup).not.toContain("CME Membership");
+  });
+
   it("selects and deselects the access records that the grant workflow submits", () => {
     expect(toggleMemberAccessId([], 1)).toEqual([1]);
     expect(toggleMemberAccessId([1], 1)).toEqual([]);

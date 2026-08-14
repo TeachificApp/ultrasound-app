@@ -652,7 +652,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                 <Label className="text-sm">Subtitle</Label>
                 <Input value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Short description" className="mt-1" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <Label className="text-sm">Type</Label>
                   <Select value={type} onValueChange={v => setType(v as any)}>
@@ -698,7 +698,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                 </div>
               )}
               {pricingType === "subscription" && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <Label className="text-sm">Price per Period (USD)</Label>
                     <div className="relative mt-1">
@@ -721,7 +721,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
               )}
               {pricingType === "payment_plan" && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <Label className="text-sm">Down Payment (USD)</Label>
                       <div className="relative mt-1">
@@ -737,7 +737,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                       </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
                       <Label className="text-sm"># Installments</Label>
                       <Input value={installmentCount} onChange={e => setInstallmentCount(e.target.value)} placeholder="3" className="mt-1" type="number" min="1" />

@@ -22,4 +22,10 @@ describe("LMS administration mobile layouts", () => {
     expect(lessonEditor).toContain("order-3 basis-full min-w-0");
     expect(lessonEditor).toContain("order-4 basis-full justify-center");
   });
+
+  it("stacks course creation pricing and installment fields before restoring desktop columns", () => {
+    const createCourseDialog = source.slice(source.indexOf("function CreateCourseDialog"), source.indexOf("function ImportMediaAsLessonDialog"));
+    expect(createCourseDialog).toContain("grid grid-cols-1 gap-3 sm:grid-cols-2");
+    expect(createCourseDialog).toContain("grid grid-cols-1 gap-3 sm:grid-cols-3");
+  });
 });

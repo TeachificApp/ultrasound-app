@@ -361,7 +361,7 @@ export default function SonoTravelers() {
         </div>
 
         {/* Social proof */}
-        <div className="mt-8 grid grid-cols-3 gap-4 text-center">
+        <div className="mt-8 grid grid-cols-1 gap-4 text-center sm:grid-cols-3">
           {[
             { stat: "Free", label: "Always free to join" },
             { stat: "Instant", label: "Immediate access" },
