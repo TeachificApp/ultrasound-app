@@ -1,9 +1,10 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useQuizStore } from "../store/quizStore";
 import { resolveQuizBackground } from "@shared/quizBackground";
-import { X, ChevronLeft, ChevronRight, CheckCircle2, XCircle, RotateCcw } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, CheckCircle2, XCircle, RotateCcw, AlertTriangle } from "lucide-react";
 import type { QuizQuestion, McqData, TfData, MatchingData, HotspotData, FillBlankData, ShortAnswerData, ImageChoiceData, OrderingData, DragWordsData, DropdownData, NumericData, LikertData, EssayData, DrawConfig } from "../types/quiz";
 import { DndOrdering, DndDragWords } from "./DndQuizInteractions";
+import { RichTextDisplay } from "@/components/RichTextEditor";
 
 interface Props {
   onClose: () => void;
@@ -13,7 +14,71 @@ interface Props {
 
 type Answer = string | boolean | string[] | Record<string, string>;
 
-function McqQuestion({ q, answer, setAnswer, shuffleChoices }: { q: QuizQuestion; answer: Answer; setAnswer: (a: Answer) => void; shuffleChoices?: boolean }) {
+export type PreviewFeedbackStatus = "correct" | "incorrect" | "partial" | "ungraded";
+
+export function evaluatePreviewAnswer(q: QuizQuestion, answer: Answer | undefined): PreviewFeedbackStatus {
+  if (answer === undefined || answer === "") return "ungraded";
+  if (q.type === "mcq" || q.type === "image_choice") {
+    const data = q.data as McqData | ImageChoiceData;
+    const correctIds = data.choices.filter((choice) => choice.correct).map((choice) => choice.id).sort();
+    const selectedIds = ((answer as string[]) ?? []).slice().sort();
+    if (JSON.stringify(correctIds) === JSON.stringify(selectedIds)) return "correct";
+    if (selectedIds.length > 0 && selectedIds.every((id) => correctIds.includes(id))) return "partial";
+    return "incorrect";
+  }
+  if (q.type === "tf") return answer === (q.data as TfData).correct ? "correct" : "incorrect";
+  if (q.type === "matching") {
+    const selections = answer as Record<string, string>;
+    return (q.data as MatchingData).pairs.every((pair) => selections?.[pair.id] === pair.id) ? "correct" : "incorrect";
+  }
+  if (q.type === "hotspot") {
+    const data = q.data as HotspotData;
+    const expected = data.regions.filter((region) => region.correct).map((region) => region.id).sort();
+    const selected = ((answer as string[]) ?? []).slice().sort();
+    return JSON.stringify(expected) === JSON.stringify(selected) ? "correct" : "incorrect";
+  }
+  if (q.type === "ordering") {
+    const expected = (q.data as OrderingData).items.map((item) => item.id);
+    const selected = answer as string[];
+    return expected.every((id, index) => selected?.[index] === id) ? "correct" : "incorrect";
+  }
+  if (q.type === "fill_blank") {
+    const selections = answer as Record<string, string>;
+    const correct = (q.data as FillBlankData).blanks.every((blank) => blank.acceptedAnswers.some((accepted) => blank.caseSensitive ? selections?.[blank.id] === accepted : selections?.[blank.id]?.toLowerCase() === accepted.toLowerCase()));
+    return correct ? "correct" : "incorrect";
+  }
+  if (q.type === "dropdown") {
+    const selections = answer as Record<string, string>;
+    return (q.data as DropdownData).blanks.every((blank) => Number(selections?.[blank.id]) === blank.correctIndex) ? "correct" : "incorrect";
+  }
+  if (q.type === "numeric") {
+    const data = q.data as NumericData;
+    const selected = Number(answer);
+    const correct = data.allowRange && data.rangeMin != null && data.rangeMax != null
+      ? selected >= data.rangeMin && selected <= data.rangeMax
+      : Math.abs(selected - data.correctValue) <= data.tolerance;
+    return correct ? "correct" : "incorrect";
+  }
+  return "ungraded";
+}
+
+export function getPreviewAnswerFeedbackHtml(q: QuizQuestion, answer: Answer | undefined): string {
+  if (answer === undefined) return "";
+  if (q.type === "mcq" || q.type === "image_choice") {
+    const data = q.data as McqData | ImageChoiceData;
+    return ((answer as string[]) ?? [])
+      .map((id) => data.choices.find((choice) => choice.id === id)?.feedbackHtml ?? data.choices.find((choice) => choice.id === id)?.feedback ?? "")
+      .filter(Boolean)
+      .join("<hr />");
+  }
+  if (q.type === "tf") {
+    const data = q.data as TfData;
+    return answer === true ? data.trueFeedback ?? "" : data.falseFeedback ?? "";
+  }
+  return "";
+}
+
+function McqQuestion({ q, answer, setAnswer, shuffleChoices, revealed }: { q: QuizQuestion; answer: Answer; setAnswer: (a: Answer) => void; shuffleChoices?: boolean; revealed: boolean }) {
   const data = q.data as McqData;
   const choices = useMemo(() => {
     if (shuffleChoices) {
@@ -32,38 +97,47 @@ function McqQuestion({ q, answer, setAnswer, shuffleChoices }: { q: QuizQuestion
   };
   return (
     <div className="space-y-2">
-      {choices.map((c) => (
+      {choices.map((c) => {
+        const isSelected = selected.includes(c.id);
+        const showCorrect = revealed && c.correct;
+        const showIncorrect = revealed && isSelected && !c.correct;
+        return (
         <button
           key={c.id}
-          onClick={() => toggle(c.id)}
+          onClick={() => !revealed && toggle(c.id)}
+          disabled={revealed}
+          data-feedback-state={showCorrect ? "correct" : showIncorrect ? "incorrect" : undefined}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-            selected.includes(c.id) ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-gray-300"
+            showCorrect ? "border-emerald-500 bg-emerald-50" : showIncorrect ? "border-red-500 bg-red-50" : isSelected ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-gray-300"
           }`}
         >
           <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-            selected.includes(c.id) ? "border-teal-500 bg-teal-500" : "border-gray-300"
+            showCorrect ? "border-emerald-500 text-emerald-600" : showIncorrect ? "border-red-500 text-red-600" : isSelected ? "border-teal-500 bg-teal-500" : "border-gray-300"
           }`}>
-            {selected.includes(c.id) && <span className="w-2 h-2 rounded-full bg-white" />}
+            {showCorrect ? <CheckCircle2 className="h-4 w-4" /> : showIncorrect ? <XCircle className="h-4 w-4" /> : isSelected && <span className="w-2 h-2 rounded-full bg-white" />}
           </span>
           <span className="text-sm text-gray-700">{c.text}</span>
         </button>
-      ))}
+      )})}
     </div>
   );
 }
 
-function TfQuestion({ answer, setAnswer }: { answer: Answer; setAnswer: (a: Answer) => void }) {
+function TfQuestion({ q, answer, setAnswer, revealed }: { q: QuizQuestion; answer: Answer; setAnswer: (a: Answer) => void; revealed: boolean }) {
+  const correct = (q.data as TfData).correct;
   return (
     <div className="flex gap-4">
       {[true, false].map((val) => (
         <button
           key={String(val)}
-          onClick={() => setAnswer(val)}
+          onClick={() => !revealed && setAnswer(val)}
+          disabled={revealed}
+          data-feedback-state={revealed && val === correct ? "correct" : revealed && answer === val ? "incorrect" : undefined}
           className={`flex-1 py-4 rounded-xl border-2 text-sm font-semibold transition-all ${
-            answer === val ? "border-teal-500 bg-teal-50 text-teal-700" : "border-gray-200 text-gray-600 hover:border-gray-300"
+            revealed && val === correct ? "border-emerald-500 bg-emerald-50 text-emerald-700" : revealed && answer === val ? "border-red-500 bg-red-50 text-red-700" : answer === val ? "border-teal-500 bg-teal-50 text-teal-700" : "border-gray-200 text-gray-600 hover:border-gray-300"
           }`}
         >
-          {val ? "✓ True" : "✗ False"}
+          {revealed && val === correct ? <><CheckCircle2 className="mr-1 inline h-4 w-4" />{val ? "True" : "False"}</> : revealed && answer === val ? <><XCircle className="mr-1 inline h-4 w-4" />{val ? "True" : "False"}</> : val ? "✓ True" : "✗ False"}
         </button>
       ))}
     </div>
@@ -194,7 +268,7 @@ function ShortAnswerQuestion({ answer, setAnswer }: { answer: Answer; setAnswer:
   );
 }
 
-function ImageChoiceQuestion({ q, answer, setAnswer, shuffleChoices }: { q: QuizQuestion; answer: Answer; setAnswer: (a: Answer) => void; shuffleChoices?: boolean }) {
+function ImageChoiceQuestion({ q, answer, setAnswer, shuffleChoices, revealed }: { q: QuizQuestion; answer: Answer; setAnswer: (a: Answer) => void; shuffleChoices?: boolean; revealed: boolean }) {
   const data = q.data as ImageChoiceData;
   const choices = useMemo(() => {
     if (shuffleChoices) {
@@ -213,18 +287,24 @@ function ImageChoiceQuestion({ q, answer, setAnswer, shuffleChoices }: { q: Quiz
   };
   return (
     <div className="grid grid-cols-2 gap-3">
-      {choices.map((c) => (
+      {choices.map((c) => {
+        const isSelected = selected.includes(c.id);
+        const showCorrect = revealed && c.correct;
+        const showIncorrect = revealed && isSelected && !c.correct;
+        return (
         <button
           key={c.id}
-          onClick={() => toggle(c.id)}
+          onClick={() => !revealed && toggle(c.id)}
+          disabled={revealed}
+          data-feedback-state={showCorrect ? "correct" : showIncorrect ? "incorrect" : undefined}
           className={`border-2 rounded-xl overflow-hidden text-left transition-all ${
-            selected.includes(c.id) ? "border-teal-500" : "border-gray-200 hover:border-gray-300"
+            showCorrect ? "border-emerald-500 bg-emerald-50" : showIncorrect ? "border-red-500 bg-red-50" : isSelected ? "border-teal-500" : "border-gray-200 hover:border-gray-300"
           }`}
         >
           {c.imageUrl && <img src={c.imageUrl} alt={c.label} className="w-full h-28 object-cover" />}
-          <div className="p-2 text-xs text-gray-700 text-center">{c.label}</div>
+          <div className="flex items-center justify-center gap-1 p-2 text-xs text-gray-700 text-center">{showCorrect && <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />}{showIncorrect && <XCircle className="h-3.5 w-3.5 text-red-600" />}{c.label}</div>
         </button>
-      ))}
+      )})}
     </div>
   );
 }
@@ -427,12 +507,33 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [feedbackRevealed, setFeedbackRevealed] = useState<Record<string, boolean>>({});
   const [questionPath, setQuestionPath] = useState<string[]>([]);
   const branchingEnabled = questions.some((qq) => qq.branchRules && qq.branchRules.length > 0);
 
   const q = questions[currentIdx];
   const totalPoints = questions.reduce((s, q) => s + q.points, 0);
   const questionPreviewBackground = resolveQuizBackground(branding, q);
+  const answer = q ? answers[q.id] : undefined;
+  const feedbackStatus = q ? evaluatePreviewAnswer(q, answer) : "ungraded";
+  const isFeedbackRevealed = !!(q && feedbackRevealed[q.id]);
+  const requiresExplicitFeedbackCheck = q && (
+    (q.type === "mcq" && (q.data as McqData).multiSelect) ||
+    (q.type === "image_choice" && (q.data as ImageChoiceData).multiSelect) ||
+    (q.type === "matching") ||
+    (q.type === "hotspot" && (q.data as HotspotData).multiSelect) ||
+    (q.type === "fill_blank") ||
+    (q.type === "ordering") ||
+    (q.type === "drag_words") ||
+    (q.type === "dropdown") ||
+    (q.type === "likert") ||
+    (q.type === "essay")
+  );
+  const setQuestionAnswer = (nextAnswer: Answer) => {
+    if (!q) return;
+    setAnswers((previous) => ({ ...previous, [q.id]: nextAnswer }));
+    setFeedbackRevealed((previous) => ({ ...previous, [q.id]: quiz.meta.showFeedback === "immediate" && !requiresExplicitFeedbackCheck }));
+  };
 
   const calcScore = () => {
     let earned = 0;
@@ -557,19 +658,34 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
             {q.image && <img src={q.image.url} alt={q.image.alt} className="mt-3 rounded-xl max-h-48 object-cover" />}
           </div>
 
-          {q.type === "mcq" && <McqQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} shuffleChoices={!q.lockAnswerOrder && (q.shuffleAnswerOptions ?? quiz.meta.shuffleAnswers)} />}
-          {q.type === "tf" && <TfQuestion answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "matching" && <MatchingQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "hotspot" && (q.data as HotspotData).imageUrl && <HotspotQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "fill_blank" && <FillBlankQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "short_answer" && <ShortAnswerQuestion answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "image_choice" && <ImageChoiceQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} shuffleChoices={!q.lockAnswerOrder && (q.shuffleAnswerOptions ?? quiz.meta.shuffleAnswers)} />}
-          {q.type === "ordering" && <OrderingQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "numeric" && <NumericQuestion answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} data={q.data as NumericData} />}
-          {q.type === "dropdown" && <DropdownQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "drag_words" && <DragWordsQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "likert" && <LikertQuestion q={q} answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} />}
-          {q.type === "essay" && <EssayQuestion answer={answers[q.id]} setAnswer={(a) => setAnswers((p) => ({ ...p, [q.id]: a }))} data={q.data as EssayData} />}
+          {q.type === "mcq" && <McqQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} revealed={isFeedbackRevealed} shuffleChoices={!q.lockAnswerOrder && (q.shuffleAnswerOptions ?? quiz.meta.shuffleAnswers)} />}
+          {q.type === "tf" && <TfQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} revealed={isFeedbackRevealed} />}
+          {q.type === "matching" && <MatchingQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
+          {q.type === "hotspot" && (q.data as HotspotData).imageUrl && <HotspotQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
+          {q.type === "fill_blank" && <FillBlankQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
+          {q.type === "short_answer" && <ShortAnswerQuestion answer={answer} setAnswer={setQuestionAnswer} />}
+          {q.type === "image_choice" && <ImageChoiceQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} revealed={isFeedbackRevealed} shuffleChoices={!q.lockAnswerOrder && (q.shuffleAnswerOptions ?? quiz.meta.shuffleAnswers)} />}
+          {q.type === "ordering" && <OrderingQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
+          {q.type === "numeric" && <NumericQuestion answer={answer} setAnswer={setQuestionAnswer} data={q.data as NumericData} />}
+          {q.type === "dropdown" && <DropdownQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
+          {q.type === "drag_words" && <DragWordsQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
+          {q.type === "likert" && <LikertQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
+          {q.type === "essay" && <EssayQuestion answer={answer} setAnswer={setQuestionAnswer} data={q.data as EssayData} />}
+          {quiz.meta.showFeedback === "immediate" && answer !== undefined && !isFeedbackRevealed && requiresExplicitFeedbackCheck && (
+            <button onClick={() => setFeedbackRevealed((previous) => ({ ...previous, [q.id]: true }))} className="mt-4 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700">Check Answer</button>
+          )}
+          {quiz.meta.showFeedback === "immediate" && isFeedbackRevealed && (
+            <div className={`mt-4 rounded-xl border p-4 ${feedbackStatus === "correct" ? "border-emerald-200 bg-emerald-50" : feedbackStatus === "partial" ? "border-amber-200 bg-amber-50" : feedbackStatus === "incorrect" ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"}`} data-testid="quiz-preview-feedback">
+              <div className={`flex items-center gap-2 text-sm font-semibold ${feedbackStatus === "correct" ? "text-emerald-700" : feedbackStatus === "partial" ? "text-amber-800" : feedbackStatus === "incorrect" ? "text-red-700" : "text-slate-700"}`}>
+                {feedbackStatus === "correct" ? <><CheckCircle2 className="h-5 w-5" />Correct</> : feedbackStatus === "partial" ? <><AlertTriangle className="h-5 w-5" />Partially correct</> : feedbackStatus === "incorrect" ? <><XCircle className="h-5 w-5" />Incorrect</> : "Answer recorded"}
+              </div>
+              {getPreviewAnswerFeedbackHtml(q, answer) && <RichTextDisplay html={getPreviewAnswerFeedbackHtml(q, answer)} className="mt-3" />}
+              {(feedbackStatus !== "ungraded" ? q.feedback?.[feedbackStatus] : undefined) && <RichTextDisplay html={q.feedback?.[feedbackStatus] ?? ""} className="mt-3" />}
+              {(q.explanationHtml || q.explanation) && <div className="mt-3 border-t border-current/10 pt-3"><p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">Explanation</p><RichTextDisplay html={q.explanationHtml ?? q.explanation} /></div>}
+              {q.feedbackImage && <img src={q.feedbackImage.url} alt={q.feedbackImage.alt} className="mt-3 max-h-64 rounded-lg object-contain" />}
+              {q.feedbackVideo && <video src={q.feedbackVideo.url} controls className="mt-3 max-h-64 w-full rounded-lg bg-black" />}
+            </div>
+          )}
           </div>
         </div>
 

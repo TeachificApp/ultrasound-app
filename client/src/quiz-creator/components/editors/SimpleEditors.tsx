@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { Plus, Trash2, X } from "lucide-react";
 import type { TfData, FillBlankData, ShortAnswerData, ImageChoiceData } from "../../types/quiz";
+import RichTextEditor from "@/components/RichTextEditor";
 
 // ─── True / False ─────────────────────────────────────────────────────────────
 export function TfEditor({ data, onChange }: { data: TfData; onChange: (d: TfData) => void }) {
@@ -27,9 +28,9 @@ export function TfEditor({ data, onChange }: { data: TfData; onChange: (d: TfDat
           </label>
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <textarea value={data.trueFeedback ?? ""} onChange={(event) => onChange({ ...data, trueFeedback: event.target.value })} rows={2} placeholder="Feedback when True is selected" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/50" />
-        <textarea value={data.falseFeedback ?? ""} onChange={(event) => onChange({ ...data, falseFeedback: event.target.value })} rows={2} placeholder="Feedback when False is selected" className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/50" />
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <RichTextEditor value={data.trueFeedback ?? ""} onChange={(trueFeedback) => onChange({ ...data, trueFeedback })} placeholder="Feedback when True is selected" minHeight={88} maxHeight={220} />
+        <RichTextEditor value={data.falseFeedback ?? ""} onChange={(falseFeedback) => onChange({ ...data, falseFeedback })} placeholder="Feedback when False is selected" minHeight={88} maxHeight={220} />
       </div>
     </div>
   );
@@ -350,17 +351,18 @@ export function ImageChoiceEditor({
                 <Trash2 className="w-3 h-3" />
               </button>
             </div>
-            <textarea
-              value={choice.feedback ?? ""}
-              onChange={(e) => {
-                e.stopPropagation();
-                onChange({ ...data, choices: data.choices.map((c) => c.id === choice.id ? { ...c, feedback: e.target.value } : c) });
-              }}
-              onClick={(e) => e.stopPropagation()}
-              rows={2}
-              placeholder="Feedback for this answer"
-              className="mx-2 mb-2 block w-[calc(100%-1rem)] rounded border border-gray-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
-            />
+            <div className="mx-2 mb-2" onClick={(event) => event.stopPropagation()}>
+              <RichTextEditor
+                value={choice.feedbackHtml ?? choice.feedback ?? ""}
+                onChange={(feedbackHtml) => {
+                  const feedback = feedbackHtml.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+                  onChange({ ...data, choices: data.choices.map((choiceItem) => choiceItem.id === choice.id ? { ...choiceItem, feedback, feedbackHtml } : choiceItem) });
+                }}
+                placeholder="Feedback for this answer"
+                minHeight={72}
+                maxHeight={220}
+              />
+            </div>
           </div>
         ))}
       </div>

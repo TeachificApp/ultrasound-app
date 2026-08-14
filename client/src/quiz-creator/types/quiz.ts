@@ -17,7 +17,7 @@ export type QuestionType =
   | "essay";
 
 export interface McqData {
-  choices: { id: string; text: string; correct: boolean; imageUrl?: string; feedback?: string }[];
+  choices: { id: string; text: string; correct: boolean; imageUrl?: string; feedback?: string; feedbackHtml?: string }[];
   multiSelect: boolean;
 }
 
@@ -83,6 +83,7 @@ export interface ImageChoiceOption {
   label: string;
   correct: boolean;
   feedback?: string;
+  feedbackHtml?: string;
 }
 export interface ImageChoiceData {
   choices: ImageChoiceOption[];

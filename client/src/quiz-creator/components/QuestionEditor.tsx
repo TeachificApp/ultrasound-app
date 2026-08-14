@@ -10,6 +10,7 @@ import { Upload, Trash2, Music, Video, Image, Palette, GitBranch } from "lucide-
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { reuseMediaRepositoryUrl } from "@/lib/mediaReuse";
+import RichTextEditor from "@/components/RichTextEditor";
 
 const TYPE_LABELS: Record<string, string> = {
   mcq: "Multiple Choice",
@@ -344,12 +345,12 @@ export function QuestionEditor() {
         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
           Explanation / Feedback (shown after answer)
         </label>
-        <textarea
-          value={question.explanation}
-          onChange={(e) => update({ explanation: e.target.value })}
-          rows={2}
-          placeholder="Optional: explain why the answer is correct..."
-          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-400/50 resize-none"
+        <RichTextEditor
+          value={question.explanationHtml ?? question.explanation ?? ""}
+          onChange={(html) => update({ explanationHtml: html, explanation: html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() })}
+          placeholder="Explain why the answer is correct. Use the image or video controls in the toolbar when helpful."
+          minHeight={120}
+          maxHeight={360}
         />
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">

@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import React from "react";
 import { Trash2, Plus, GripVertical } from "lucide-react";
 import type { McqData } from "../../types/quiz";
+import RichTextEditor from "@/components/RichTextEditor";
 
 interface Props {
   data: McqData;
@@ -20,8 +21,9 @@ export function McqEditor({ data, onChange }: Props) {
     onChange({ ...data, choices: data.choices.map((c) => (c.id === id ? { ...c, text } : c)) });
   };
 
-  const updateFeedback = (id: string, feedback: string) => {
-    onChange({ ...data, choices: data.choices.map((c) => (c.id === id ? { ...c, feedback } : c)) });
+  const updateFeedback = (id: string, feedbackHtml: string) => {
+    const feedback = feedbackHtml.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    onChange({ ...data, choices: data.choices.map((c) => (c.id === id ? { ...c, feedback, feedbackHtml } : c)) });
   };
 
   const addChoice = () => {
@@ -77,13 +79,15 @@ export function McqEditor({ data, onChange }: Props) {
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
-            <input
-              type="text"
-              value={choice.feedback ?? ""}
-              onChange={(e) => updateFeedback(choice.id, e.target.value)}
-              placeholder={choice.correct ? "Why this answer is correct" : "Why this answer is incorrect"}
-              className="ml-11 w-[calc(100%-2.75rem)] px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-400/50"
-            />
+            <div className="ml-11 w-[calc(100%-2.75rem)]">
+              <RichTextEditor
+                value={choice.feedbackHtml ?? choice.feedback ?? ""}
+                onChange={(html) => updateFeedback(choice.id, html)}
+                placeholder={choice.correct ? "Why this answer is correct" : "Why this answer is incorrect"}
+                minHeight={72}
+                maxHeight={220}
+              />
+            </div>
           </div>
         ))}
       </div>
