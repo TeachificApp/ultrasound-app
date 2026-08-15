@@ -226,6 +226,8 @@ export interface QuizQuestion {
     incorrect?: string;
     partial?: string;
   };
+  /** Question-based uses shared correct/incorrect feedback; answer-based uses each selected choice's feedback. */
+  feedbackMode?: "question" | "answer";
   // Per-question appearance
   backgroundImageUrl?: string;
   backgroundColor?: string;

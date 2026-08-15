@@ -78,6 +78,37 @@ export function getPreviewAnswerFeedbackHtml(q: QuizQuestion, answer: Answer | u
   return "";
 }
 
+function getPreviewCorrectAnswerFeedbackHtml(q: QuizQuestion): string {
+  if (q.type === "mcq" || q.type === "image_choice") {
+    const data = q.data as McqData | ImageChoiceData;
+    return data.choices
+      .filter((choice) => choice.correct)
+      .map((choice) => choice.feedbackHtml ?? choice.feedback ?? "")
+      .filter(Boolean)
+      .join("<hr />");
+  }
+  if (q.type === "tf") {
+    const data = q.data as TfData;
+    return data.correct ? data.trueFeedback ?? "" : data.falseFeedback ?? "";
+  }
+  return "";
+}
+
+export function getPreviewFeedbackContent(q: QuizQuestion, answer: Answer | undefined, status: PreviewFeedbackStatus) {
+  // Existing quizzes stored answer feedback on choices before the setting existed.
+  // Preserve that behavior; newly created questions explicitly default to question mode.
+  const feedbackMode = q.feedbackMode ?? "answer";
+  const statusKey = status === "correct" ? "correct" : status === "partial" ? "partial" : "incorrect";
+  const questionFeedbackHtml = q.feedback?.[statusKey] ?? (statusKey === "partial" ? q.feedback?.incorrect : "") ?? "";
+  const correctExplanationHtml = q.explanationHtml ?? q.explanation ?? "";
+  if (feedbackMode === "question") {
+    return { feedbackMode, questionFeedbackHtml, selectedAnswerHtml: "", correctAnswerHtml: "", correctExplanationHtml };
+  }
+  const selectedAnswerHtml = getPreviewAnswerFeedbackHtml(q, answer);
+  const correctAnswerHtml = status === "correct" ? "" : getPreviewCorrectAnswerFeedbackHtml(q);
+  return { feedbackMode, questionFeedbackHtml: "", selectedAnswerHtml, correctAnswerHtml, correctExplanationHtml };
+}
+
 function McqQuestion({ q, answer, setAnswer, shuffleChoices, revealed }: { q: QuizQuestion; answer: Answer; setAnswer: (a: Answer) => void; shuffleChoices?: boolean; revealed: boolean }) {
   const data = q.data as McqData;
   const choices = useMemo(() => {
@@ -516,6 +547,7 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
   const questionPreviewBackground = resolveQuizBackground(branding, q);
   const answer = q ? answers[q.id] : undefined;
   const feedbackStatus = q ? evaluatePreviewAnswer(q, answer) : "ungraded";
+  const feedbackContent = q ? getPreviewFeedbackContent(q, answer, feedbackStatus) : null;
   const isFeedbackRevealed = !!(q && feedbackRevealed[q.id]);
   const requiresExplicitFeedbackCheck = q && (
     (q.type === "mcq" && (q.data as McqData).multiSelect) ||
@@ -679,9 +711,10 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
               <div className={`flex items-center gap-2 text-sm font-semibold ${feedbackStatus === "correct" ? "text-emerald-700" : feedbackStatus === "partial" ? "text-amber-800" : feedbackStatus === "incorrect" ? "text-red-700" : "text-slate-700"}`}>
                 {feedbackStatus === "correct" ? <><CheckCircle2 className="h-5 w-5" />Correct</> : feedbackStatus === "partial" ? <><AlertTriangle className="h-5 w-5" />Partially correct</> : feedbackStatus === "incorrect" ? <><XCircle className="h-5 w-5" />Incorrect</> : "Answer recorded"}
               </div>
-              {getPreviewAnswerFeedbackHtml(q, answer) && <RichTextDisplay html={getPreviewAnswerFeedbackHtml(q, answer)} className="mt-3" />}
-              {(feedbackStatus !== "ungraded" ? q.feedback?.[feedbackStatus] : undefined) && <RichTextDisplay html={q.feedback?.[feedbackStatus] ?? ""} className="mt-3" />}
-              {(q.explanationHtml || q.explanation) && <div className="mt-3 border-t border-current/10 pt-3"><p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">Explanation</p><RichTextDisplay html={q.explanationHtml ?? q.explanation} /></div>}
+              {feedbackContent?.feedbackMode === "question" && feedbackContent.questionFeedbackHtml && <RichTextDisplay html={feedbackContent.questionFeedbackHtml} className="mt-3" />}
+              {feedbackContent?.feedbackMode === "answer" && feedbackContent.selectedAnswerHtml && <div className="mt-3 border-t border-current/10 pt-3"><p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">Your selected answer</p><RichTextDisplay html={feedbackContent.selectedAnswerHtml} /></div>}
+              {feedbackContent?.feedbackMode === "answer" && feedbackContent.correctAnswerHtml && <div className="mt-3 border-t border-current/10 pt-3"><p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">Correct answer</p><RichTextDisplay html={feedbackContent.correctAnswerHtml} /></div>}
+              {feedbackContent?.correctExplanationHtml && <div className="mt-3 border-t border-current/10 pt-3"><p className="mb-1 text-xs font-semibold uppercase tracking-wide opacity-70">Why the correct answer is correct</p><RichTextDisplay html={feedbackContent.correctExplanationHtml} /></div>}
               {q.feedbackImage && <img src={q.feedbackImage.url} alt={q.feedbackImage.alt} className="mt-3 max-h-64 rounded-lg object-contain" />}
               {q.feedbackVideo && <video src={q.feedbackVideo.url} controls className="mt-3 max-h-64 w-full rounded-lg bg-black" />}
             </div>

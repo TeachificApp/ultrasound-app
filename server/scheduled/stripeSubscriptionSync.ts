@@ -16,12 +16,13 @@ import type { Request, Response } from "express";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
 import { getUserById } from "../db";
-import { lmsEnrollments, lmsCourses } from "../../drizzle/schema";
+import { lmsEnrollments, lmsCourses, stripeSubscriptionSyncRuns, stripeSubscriptionSyncSnapshots } from "../../drizzle/schema";
 import { getStripeClient } from "../lib/stripeClient";
 import { notifyOwner } from "../_core/notification";
 import { sendEmail, emailWrapper } from "../_core/email";
 import { isNotNull, eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { formatStripeSubscriptionSyncReport, isAccountAddedSincePreviousSync, type RevokedStripeAccessAccount } from "./stripeSubscriptionSyncReport";
 
 const GRACE_PERIOD_DAYS = 3;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
@@ -97,10 +98,26 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
     }
 
     const stripe = getStripeClient();
+    const [previousRun] = await db.select({ id: stripeSubscriptionSyncRuns.id })
+      .from(stripeSubscriptionSyncRuns).limit(1);
+    const knownSnapshots = await db.select({ enrollmentId: stripeSubscriptionSyncSnapshots.enrollmentId })
+      .from(stripeSubscriptionSyncSnapshots);
+    const knownEnrollmentIds = new Set(knownSnapshots.map((snapshot) => snapshot.enrollmentId));
+    const hasPreviousSync = Boolean(previousRun);
     let synced = 0;
     let errors = 0;
     let accessRevoked = 0;
+    let accountsAdded = 0;
     let warningEmailsSent = 0;
+    const revokedAccounts: RevokedStripeAccessAccount[] = [];
+
+    const recordAccessRemoval = async (row: typeof allRows[number], reason: string) => {
+      const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses)
+        .where(eq(lmsCourses.id, row.courseId)).limit(1);
+      const userRecord = await getUserById(row.userId);
+      const displayName = [userRecord?.firstName, userRecord?.lastName].filter(Boolean).join(" ") || "Unnamed learner";
+      revokedAccounts.push({ userId: row.userId, displayName, courseTitle: course?.title ?? "Course", reason });
+    };
 
     for (const row of allRows) {
       try {
@@ -170,8 +187,11 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
             if (now >= gracePeriodEnd) {
               // Grace period expired — revoke access
               newAccessExpiresAt = gracePeriodEnd; // set to when grace period ended
-              accessRevoked++;
-              console.log(`[StripeSubSync] Grace period expired for enrollment ${row.id} — revoking access`);
+              if (!row.accessExpiresAt || row.accessExpiresAt > now) {
+                accessRevoked++;
+                await recordAccessRemoval(row, "Grace period expired");
+                console.log(`[StripeSubSync] Grace period expired for enrollment ${row.id} — revoking access`);
+              }
             } else {
               // Still within grace period — keep access
               newAccessExpiresAt = null;
@@ -183,6 +203,7 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
           newPaymentFailedAt = null; // clear grace period flag
           if (!row.accessExpiresAt || row.accessExpiresAt > (periodEnd ?? now)) {
             accessRevoked++;
+            await recordAccessRemoval(row, "Subscription canceled");
           }
         } else if (cancelAtPeriodEnd && periodEnd) {
           // Scheduled to cancel — set access expiry to period end
@@ -210,6 +231,9 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
             .where(sql`id = ${row.id}`);
         }
 
+        if (isAccountAddedSincePreviousSync({ hasPreviousSync, wasPreviouslyObserved: knownEnrollmentIds.has(row.id) })) accountsAdded++;
+        await db.insert(stripeSubscriptionSyncSnapshots).values({ enrollmentId: row.id, lastSyncedAt: now })
+          .onDuplicateKeyUpdate({ set: { lastSyncedAt: now } });
         synced++;
       } catch (err: any) {
         // Stripe 404 = subscription deleted/not found — revoke access immediately
@@ -219,7 +243,10 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
               .update(lmsEnrollments)
               .set({ accessExpiresAt: now, paymentFailedAt: null })
               .where(sql`id = ${row.id}`);
-            accessRevoked++;
+            if (!row.accessExpiresAt || row.accessExpiresAt > now) {
+              accessRevoked++;
+              await recordAccessRemoval(row, "Stripe subscription not found");
+            }
           } catch (_) { /* ignore secondary error */ }
         } else {
           console.error(`[StripeSubSync] Error syncing enrollment ${row.id}:`, err?.message ?? err);
@@ -229,23 +256,30 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
     }
 
     console.log(
-      `[StripeSubSync] Done. synced=${synced} errors=${errors} accessRevoked=${accessRevoked} warningEmails=${warningEmailsSent}`
+      `[StripeSubSync] Done. synced=${synced} accountsAdded=${accountsAdded} errors=${errors} accessRevoked=${accessRevoked} warningEmails=${warningEmailsSent}`
     );
 
-    // Notify owner if access was revoked or warning emails were sent
-    if (accessRevoked > 0 || warningEmailsSent > 0) {
-      await notifyOwner({
-        title: "Stripe Subscription Sync Report",
-        content: [
-          `Daily sync completed. Total subscriptions checked: ${allRows.length}.`,
-          warningEmailsSent > 0 ? `Payment warning emails sent: ${warningEmailsSent} (grace period started).` : null,
-          accessRevoked > 0 ? `Access revoked: ${accessRevoked} enrollment(s) — grace period expired or subscription canceled.` : null,
-          errors > 0 ? `Errors: ${errors} (check server logs).` : null,
-        ].filter(Boolean).join(" "),
-      });
-    }
+    await db.insert(stripeSubscriptionSyncRuns).values({
+      subscriptionsChecked: allRows.length,
+      accountsAdded,
+      accessRevoked,
+      errors,
+      completedAt: now,
+    });
 
-    return res.json({ ok: true, total: allRows.length, synced, errors, accessRevoked, warningEmailsSent });
+    await notifyOwner({
+      title: "Stripe Subscription Sync Report",
+      content: formatStripeSubscriptionSyncReport({
+        totalSubscriptions: allRows.length,
+        accountsAdded,
+        accessRevoked,
+        revokedAccounts,
+        warningEmailsSent,
+        errors,
+      }),
+    });
+
+    return res.json({ ok: true, total: allRows.length, synced, accountsAdded, errors, accessRevoked, revokedAccounts, warningEmailsSent });
   } catch (err: any) {
     console.error("[StripeSubSync] Unhandled error:", err);
     return res.status(500).json({

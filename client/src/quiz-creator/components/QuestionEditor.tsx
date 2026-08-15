@@ -47,6 +47,14 @@ export function QuestionEditor() {
 
   const update = (updates: Partial<QuizQuestion>) => updateQuestion(question.id, updates);
   const updateData = (data: QuestionData) => update({ data });
+  const updateQuestionFeedback = (kind: "correct" | "incorrect", html: string) => {
+    update({
+      feedback: {
+        ...question.feedback,
+        [kind]: html,
+      },
+    });
+  };
 
   const uploadFile = (accept: string, callback: (url: string, name: string) => void) => {
     const input = document.createElement("input");
@@ -340,15 +348,35 @@ export function QuestionEditor() {
         </div>
       </div>
 
-      {/* Explanation / Feedback */}
+      {/* Feedback mode and content */}
       <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-          Explanation / Feedback (shown after answer)
+        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Feedback mode</label>
+        <div className="grid gap-3 md:grid-cols-2">
+          <button type="button" onClick={() => update({ feedbackMode: "question" })} className={`rounded-lg border p-3 text-left transition-colors ${question.feedbackMode === "question" ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-teal-300"}`}>
+            <span className="block text-sm font-semibold text-gray-800">Question-based</span>
+            <span className="mt-1 block text-xs text-gray-600">Show the same correct or incorrect feedback for this question, regardless of the option selected.</span>
+          </button>
+          <button type="button" onClick={() => update({ feedbackMode: "answer" })} className={`rounded-lg border p-3 text-left transition-colors ${(question.feedbackMode ?? "answer") === "answer" ? "border-teal-500 bg-teal-50" : "border-gray-200 hover:border-teal-300"}`}>
+            <span className="block text-sm font-semibold text-gray-800">Answer-based</span>
+            <span className="mt-1 block text-xs text-gray-600">Show feedback for the learner’s selected answer and, when wrong, the correct answer’s rationale.</span>
+          </button>
+        </div>
+        {(question.feedbackMode ?? "answer") === "answer" && (
+          <p className="mt-3 rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs text-teal-900">Edit feedback for every answer in the <strong>Answer</strong> section above. Each answer field accepts rich text, images, and video from its editor toolbar. Learners who choose a wrong answer also see the correct answer’s rationale.</p>
+        )}
+        {question.feedbackMode === "question" && (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div><label className="mb-1 block text-xs font-semibold text-emerald-700">Correct feedback</label><RichTextEditor value={question.feedback?.correct ?? ""} onChange={(html) => updateQuestionFeedback("correct", html)} placeholder="Explain why this question was answered correctly. Add images or video from the toolbar when helpful." minHeight={100} maxHeight={260} /></div>
+            <div><label className="mb-1 block text-xs font-semibold text-red-700">Incorrect feedback</label><RichTextEditor value={question.feedback?.incorrect ?? ""} onChange={(html) => updateQuestionFeedback("incorrect", html)} placeholder="Explain what learners should understand after an incorrect response. Add images or video from the toolbar when helpful." minHeight={100} maxHeight={260} /></div>
+          </div>
+        )}
+        <label className="mt-4 block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+          Why the correct answer is correct
         </label>
         <RichTextEditor
           value={question.explanationHtml ?? question.explanation ?? ""}
           onChange={(html) => update({ explanationHtml: html, explanation: html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() })}
-          placeholder="Explain why the answer is correct. Use the image or video controls in the toolbar when helpful."
+          placeholder="Give the shared rationale for the correct answer. Use the image or video controls in the toolbar when helpful."
           minHeight={120}
           maxHeight={360}
         />

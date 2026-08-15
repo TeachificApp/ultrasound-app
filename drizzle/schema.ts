@@ -3292,6 +3292,28 @@ export const lmsEnrollments = mysqlTable("lms_enrollments", {
 }));
 export type LmsEnrollment = typeof lmsEnrollments.$inferSelect;
 
+/** Snapshot of subscription-linked enrollments observed by the daily Stripe sync. */
+export const stripeSubscriptionSyncSnapshots = mysqlTable("stripe_subscription_sync_snapshots", {
+  id: int("id").autoincrement().primaryKey(),
+  enrollmentId: int("enrollment_id").notNull(),
+  firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
+  lastSyncedAt: timestamp("last_synced_at").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  uqStripeSyncSnapshotEnrollment: uniqueIndex("uq_stripe_sync_snapshot_enrollment").on(t.enrollmentId),
+}));
+export type StripeSubscriptionSyncSnapshot = typeof stripeSubscriptionSyncSnapshots.$inferSelect;
+
+/** One row per completed Stripe subscription sync, used to establish the prior-sync baseline. */
+export const stripeSubscriptionSyncRuns = mysqlTable("stripe_subscription_sync_runs", {
+  id: int("id").autoincrement().primaryKey(),
+  subscriptionsChecked: int("subscriptions_checked").default(0).notNull(),
+  accountsAdded: int("accounts_added").default(0).notNull(),
+  accessRevoked: int("access_revoked").default(0).notNull(),
+  errors: int("errors").default(0).notNull(),
+  completedAt: timestamp("completed_at").defaultNow().notNull(),
+});
+export type StripeSubscriptionSyncRun = typeof stripeSubscriptionSyncRuns.$inferSelect;
+
 export const lmsLessonProgress = mysqlTable("lms_lesson_progress", {
   id: int("id").autoincrement().primaryKey(),
   enrollmentId: int("enrollment_id").notNull(),

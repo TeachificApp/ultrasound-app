@@ -39,6 +39,7 @@ const previewQuiz = {
     order: 1,
     points: 1,
     required: true,
+    feedbackMode: "answer" as const,
     stem: "Which answer is correct?",
     explanation: "The correct option is supported by the source material.",
     feedbackImage: { url: "https://example.com/feedback.png", alt: "Feedback visual" },
@@ -57,8 +58,8 @@ describe("Quiz Preview immediate feedback", () => {
   let host: HTMLDivElement;
   let root: Root;
 
-  const renderPreview = async () => {
-    useQuizStore.getState().loadQuiz(previewQuiz as any);
+  const renderPreview = async (quiz = previewQuiz) => {
+    useQuizStore.getState().loadQuiz(quiz as any);
     host = document.createElement("div");
     document.body.appendChild(host);
     root = createRoot(host);
@@ -96,5 +97,29 @@ describe("Quiz Preview immediate feedback", () => {
     expect(correct?.className).toContain("border-emerald-500");
     expect(document.body.textContent).toContain("That is correct.");
     expect(document.querySelector('img[alt="Correct answer feedback image"]')?.getAttribute("src")).toBe("https://example.com/answer-correct.png");
+  });
+
+  it("shows the shared wrong-answer rationale instead of choice feedback in question-based mode", async () => {
+    const questionBasedQuiz = {
+      ...previewQuiz,
+      questions: [{
+        ...previewQuiz.questions[0],
+        feedbackMode: "question" as const,
+        feedback: { correct: "<p>Shared correct rationale.</p>", incorrect: "<p>Shared wrong-answer rationale.</p>" },
+        data: {
+          multiSelect: false,
+          choices: [
+            { id: "correct", text: "Correct option", correct: true, feedbackHtml: "<p>Choice-specific correct rationale.</p>" },
+            { id: "incorrect", text: "Incorrect option", correct: false, feedbackHtml: "<p>Choice-specific wrong rationale.</p>" },
+          ],
+        },
+      }],
+    };
+    await renderPreview(questionBasedQuiz);
+    const wrong = Array.from(document.querySelectorAll("button")).find((button) => button.textContent?.includes("Incorrect option"));
+    await act(async () => wrong?.click());
+
+    expect(document.querySelector('[data-testid="quiz-preview-feedback"]')?.textContent).toContain("Shared wrong-answer rationale.");
+    expect(document.body.textContent).not.toContain("Choice-specific wrong rationale.");
   });
 });
