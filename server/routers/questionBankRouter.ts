@@ -310,7 +310,7 @@ export const questionBankRouter = router({
   aiGenerateToBank: protectedProcedure
     .input(z.object({
       topic: z.string().min(1),
-      count: z.number().int().min(1).max(50).default(10),
+      count: z.number().int().min(1).max(250).default(10),
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
       questionType: z.enum(["mcq", "truefalse", "multiselect", "matching", "hotspot", "mixed"]).default("mcq"),
       tagIds: z.array(z.number().int()).optional(),
@@ -347,16 +347,7 @@ export const questionBankRouter = router({
                 : "All questions must be multiple choice with 4 options.";
 
       const sourceFiles = input.sourceFiles?.length ? input.sourceFiles : input.sourceFile ? [input.sourceFile] : [];
-      const response = await invokeLLM({
-        model: sourceFiles.length ? "gemini-3-flash-preview" : undefined,
-        messages: [
-          {
-            role: "system",
-            content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, write a concise explanation of why the correct answer is correct. For every option, write optionFeedback explaining why that specific option is correct or incorrect. Return JSON only.`,
-          },
-          { role: "user", content: buildAiSourceMessage(`Generate ${input.count} questions about: ${input.topic}`, sourceFiles) as any },
-        ],
-        response_format: {
+      const responseFormat = {
           type: "json_schema",
           json_schema: {
             name: "questions",
@@ -395,18 +386,28 @@ export const questionBankRouter = router({
               additionalProperties: false,
             },
           },
-        } as any,
-      });
-
-      const raw = response.choices?.[0]?.message?.content ?? "{}";
-      let parsed: any;
-      try {
-        parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      } catch (cause) {
-        console.error("[questionBank.aiGenerateToBank] Invalid AI JSON", cause);
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The AI returned an unreadable response. Please generate again." });
+      } as any;
+      const questions: any[] = [];
+      const batchSize = 50;
+      for (let offset = 0; offset < input.count; offset += batchSize) {
+        const batchCount = Math.min(batchSize, input.count - offset);
+        const response = await invokeLLM({
+          model: sourceFiles.length ? "gemini-3-flash-preview" : undefined,
+          messages: [
+            { role: "system", content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, write a concise explanation of why the correct answer is correct. For every option, write optionFeedback explaining why that specific option is correct or incorrect. Return JSON only.` },
+            { role: "user", content: buildAiSourceMessage(`Generate ${batchCount} unique questions about: ${input.topic}. This is batch ${Math.floor(offset / batchSize) + 1}; do not repeat questions from earlier batches.`, sourceFiles) as any },
+          ],
+          response_format: responseFormat,
+        });
+        const raw = response.choices?.[0]?.message?.content ?? "{}";
+        try {
+          const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+          questions.push(...(parsed.questions ?? []).slice(0, batchCount));
+        } catch (cause) {
+          console.error("[questionBank.aiGenerateToBank] Invalid AI JSON", cause);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The AI returned an unreadable response. Please generate again." });
+        }
       }
-      const questions: any[] = (parsed.questions ?? []).slice(0, input.count);
       if (questions.length === 0) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The AI did not return any questions. Please generate again." });
       }
