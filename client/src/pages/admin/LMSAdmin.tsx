@@ -76,6 +76,7 @@ import { CourseWaitlistTab } from "@/components/CourseWaitlistTab";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
 import TeachAdminPanel from "@/pages/admin/TeachAdminPanel";
 import { QuizQuestionGroups } from "@/components/QuizQuestionGroups";
+import { AiSourceFileReview } from "@/components/admin/AiSourceFileReview";
 import { QuizResultsAdmin } from "./QuizResultsAdmin";
 import { InteractiveQuestionEditorPanel, isInteractiveType } from "@/components/InteractiveQuestionEditorPanel";
 /** Convenience alias used in LandingPageEditor */
@@ -560,7 +561,7 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
 
 // ─── Create Course Dialog ─────────────────────────────────────────────────────
 
-function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }: { open: boolean; onClose: () => void; onCreated: (id: number) => void; defaultType?: "course" | "quiz" | "download" | "cohort" }) {
+export function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }: { open: boolean; onClose: () => void; onCreated: (id: number) => void; defaultType?: "course" | "quiz" | "download" | "cohort" }) {
   const [mode, setMode] = useState<"manual" | "ai">("manual");
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -586,7 +587,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
   const [aiStarterContent, setAiStarterContent] = useState("");
   const [aiGenerateQuizzes, setAiGenerateQuizzes] = useState(true);
   const [aiGenerateCourseQuiz, setAiGenerateCourseQuiz] = useState(false);
-  const [aiSourceFile, setAiSourceFile] = useState<{ url: string; mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; name: string } | null>(null);
+  const [aiSourceFiles, setAiSourceFiles] = useState<{ url: string; mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; name: string }[]>([]);
   const [aiSourceUploading, setAiSourceUploading] = useState(false);
 
   const create = trpc.lmsAdmin.createCourse.useMutation({
@@ -627,17 +628,23 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
     });
   };
 
-  const uploadAiSourceFile = async (file: File) => {
+  const uploadAiSourceFiles = async (files: File[]) => {
+    const acceptedFiles = files.slice(0, Math.max(0, 3 - aiSourceFiles.length));
+    if (files.length > acceptedFiles.length) toast.error("You can use up to three source files per generation.");
+    if (acceptedFiles.some(file => file.size > 50 * 1024 * 1024)) { toast.error("Each source file must be 50 MB or smaller."); return; }
+    if (acceptedFiles.length === 0) return;
     setAiSourceUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch("/api/upload-ai-generation-source", { method: "POST", credentials: "include", body: formData });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.sourceFile) throw new Error(payload.error || "Source upload failed");
-      setAiSourceFile(payload.sourceFile);
-      if (!aiTopics.trim()) setAiTopics(file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
-      toast.success("AI source file ready");
+      const uploaded = await Promise.all(acceptedFiles.map(async file => {
+        const formData = new FormData(); formData.append("file", file);
+        const response = await fetch("/api/upload-ai-generation-source", { method: "POST", credentials: "include", body: formData });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.sourceFile) throw new Error(payload.error || `Could not upload ${file.name}`);
+        return payload.sourceFile;
+      }));
+      setAiSourceFiles(current => [...current, ...uploaded].slice(0, 3));
+      if (!aiTopics.trim() && acceptedFiles[0]) setAiTopics(acceptedFiles[0].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
+      toast.success(`${uploaded.length} source file${uploaded.length === 1 ? "" : "s"} ready`);
     } catch (error: any) {
       toast.error(error?.message ?? "Source upload failed");
     } finally {
@@ -821,19 +828,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                     />
                     <p className="text-xs text-gray-500 mt-1">Be specific — include clinical concepts, procedures, or anatomy you want covered.</p>
                   </div>
-                  <div className="rounded-lg border border-dashed border-teal-300 bg-white p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <Label className="text-sm text-teal-800">Source PDF or image (optional)</Label>
-                        <p className="text-xs text-gray-500">Upload a PDF, JPG, PNG, or WebP up to 20 MB. AI uses it as the primary source.</p>
-                      </div>
-                      <label className="cursor-pointer">
-                        <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) uploadAiSourceFile(file); e.currentTarget.value = ""; }} />
-                        <span className="inline-flex items-center rounded-md border border-teal-300 px-3 py-2 text-xs font-medium text-teal-700 hover:bg-teal-50">{aiSourceUploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1.5 h-3.5 w-3.5" />}{aiSourceUploading ? "Uploading…" : "Upload source"}</span>
-                      </label>
-                    </div>
-                    {aiSourceFile && <div className="mt-2 flex items-center gap-2 rounded bg-teal-50 px-2 py-1.5 text-xs text-teal-800"><FileText className="h-3.5 w-3.5" /><span className="truncate">{aiSourceFile.name}</span><button type="button" onClick={() => setAiSourceFile(null)} className="ml-auto text-red-600 hover:text-red-700"><X className="h-3.5 w-3.5" /></button></div>}
-                  </div>
+                  <AiSourceFileReview sourceFiles={aiSourceFiles} isUploading={aiSourceUploading} onFiles={uploadAiSourceFiles} onRemove={index => setAiSourceFiles(current => current.filter((_, sourceIndex) => sourceIndex !== index))} description="Drop up to three PDF, JPG, PNG, or WebP files here, or upload files up to 50 MB each. AI uses them as the primary source." />
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-sm">Target Audience (optional)</Label>
@@ -1016,7 +1011,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
           ) : aiStep === "input" ? (
             <Button
               className="bg-teal-600 hover:bg-teal-700 text-white"
-              disabled={(!aiTopics.trim() && !aiSourceFile) || aiGenerate.isPending || aiSourceUploading}
+              disabled={(!aiTopics.trim() && aiSourceFiles.length === 0) || aiGenerate.isPending || aiSourceUploading}
               onClick={() => aiGenerate.mutate({
                 topics: aiTopics.trim(),
                 productType: type === "quiz" ? "quiz" : "course",
@@ -1028,7 +1023,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                 starterContent: aiStarterContent.trim() || undefined,
                 generateQuizzes: aiGenerateQuizzes,
                 generateCourseQuiz: aiGenerateCourseQuiz,
-                sourceFile: aiSourceFile ?? undefined,
+                sourceFiles: aiSourceFiles.length > 0 ? aiSourceFiles : undefined,
               })}
             >
               {aiGenerate.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4 mr-1" /> Generate Preview</>}

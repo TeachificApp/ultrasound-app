@@ -664,6 +664,11 @@ export const lmsEnrollmentAdminRouter = router({
         mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
         name: z.string().min(1).max(255),
       }).optional(),
+      sourceFiles: z.array(z.object({
+        url: z.string().url(),
+        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
+        name: z.string().min(1).max(255),
+      })).min(1).max(3).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -774,11 +779,12 @@ CRITICAL REQUIREMENTS:
 - All landing page fields must be fully written — NO placeholders like "[Topic]" or "[Description]"
 - imageSearchQuery should be a specific, descriptive search query for a relevant medical/ultrasound image`;
 
+      const sourceFiles = input.sourceFiles?.length ? input.sourceFiles : input.sourceFile ? [input.sourceFile] : [];
       const response = await invokeLLM({
-        model: input.sourceFile ? "gemini-3-flash-preview" : undefined,
+        model: sourceFiles.length ? "gemini-3-flash-preview" : undefined,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: buildAiSourceMessage(userPrompt, input.sourceFile) as any },
+          { role: "user", content: buildAiSourceMessage(userPrompt, sourceFiles) as any },
         ],
         response_format: { type: "json_object" },
       });

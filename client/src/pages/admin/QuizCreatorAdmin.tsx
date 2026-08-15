@@ -32,6 +32,7 @@ import {
 import { getAdminUrl, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 import { QuestionBankMediaEditorDialog } from "@/components/QuestionBankMediaEditorDialog";
 import { EmbeddedQuizAssignmentCard } from "@/components/quiz/EmbeddedQuizAssignmentCard";
+import { AiSourceFileReview } from "@/components/admin/AiSourceFileReview";
 
 // --- Helpers ---
 const statusColor: Record<string, string> = {
@@ -493,20 +494,22 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
 }
 
 // --- Add Questions Dialog (tabbed: From Bank | AI Generate | Import SCORM | Import CSV) ---
-function AddQuestionsDialog({
+export function AddQuestionsDialog({
   open,
   onClose,
   quizId,
   existingQuestionIds,
   onAdded,
+  initialTab = "bank",
 }: {
   open: boolean;
   onClose: () => void;
   quizId: number;
   existingQuestionIds: number[];
   onAdded: () => void;
+  initialTab?: "bank" | "ai" | "scorm" | "csv";
 }) {
-  const [tab, setTab] = useState("bank");
+  const [tab, setTab] = useState(initialTab);
 
 // --- From Bank ---
   const [qSearch, setQSearch] = useState("");
@@ -526,7 +529,7 @@ function AddQuestionsDialog({
   const [aiGenerated, setAIGenerated] = useState<any[] | null>(null);
   const [aiSelectedIds, setAISelectedIds] = useState<Set<number>>(new Set());
   const [aiGroupId, setAIGroupId] = useState("");
-  const [aiSourceFile, setAiSourceFile] = useState<{ url: string; mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; name: string } | null>(null);
+  const [aiSourceFiles, setAiSourceFiles] = useState<{ url: string; mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; name: string }[]>([]);
   const [aiSourceUploading, setAiSourceUploading] = useState(false);
 
 // --- SCORM Import ---
@@ -635,7 +638,7 @@ function AddQuestionsDialog({
     setTab("bank"); setQSearch(""); setQPage(1); setSelectedBankIds(new Set());
     setBankFolderId(""); setBankTagId("");
     setAITopic(""); setAIGenerated(null); setAISelectedIds(new Set()); setAITagIds([]);
-    setAIFolderId(null); setAINewFolderName(""); setAIGroupId(""); setAiSourceFile(null); setAiSourceUploading(false);
+    setAIFolderId(null); setAINewFolderName(""); setAIGroupId(""); setAiSourceFiles([]); setAiSourceUploading(false);
     setScormFile(null); setScormPreview(null); setScormSelectedGroups(new Set()); setScormGroupPrefix("");
     setScormFolderId(null); setScormNewFolderName(""); setScormTagIds([]);
     setCsvFile(null); setCsvPreview(null); setCsvFolderId(null); setCsvNewFolderName(""); setCsvTagIds([]);
@@ -668,17 +671,23 @@ function AddQuestionsDialog({
     finally { setCsvUploading(false); }
   };
 
-  const handleAiSourceUpload = async (file: File) => {
+  const handleAiSourceUpload = async (files: File[]) => {
+    const acceptedFiles = files.slice(0, Math.max(0, 3 - aiSourceFiles.length));
+    if (files.length > acceptedFiles.length) toast.error("You can use up to three source files per generation.");
+    if (acceptedFiles.some(file => file.size > 50 * 1024 * 1024)) { toast.error("Each source file must be 50 MB or smaller."); return; }
+    if (acceptedFiles.length === 0) return;
     setAiSourceUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch("/api/upload-ai-generation-source", { method: "POST", credentials: "include", body: formData });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok || !payload.sourceFile) throw new Error(payload.error || "Source upload failed");
-      setAiSourceFile(payload.sourceFile);
-      if (!aiTopic.trim()) setAITopic(file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
-      toast.success("AI source file ready");
+      const uploaded = await Promise.all(acceptedFiles.map(async file => {
+        const formData = new FormData(); formData.append("file", file);
+        const response = await fetch("/api/upload-ai-generation-source", { method: "POST", credentials: "include", body: formData });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.sourceFile) throw new Error(payload.error || `Could not upload ${file.name}`);
+        return payload.sourceFile;
+      }));
+      setAiSourceFiles(current => [...current, ...uploaded].slice(0, 3));
+      if (!aiTopic.trim() && acceptedFiles[0]) setAITopic(acceptedFiles[0].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
+      toast.success(`${uploaded.length} source file${uploaded.length === 1 ? "" : "s"} ready`);
     } catch (error: any) {
       toast.error(error?.message ?? "Source upload failed");
     } finally {
@@ -729,7 +738,7 @@ function AddQuestionsDialog({
         <Tabs value={tab} onValueChange={setTab} className="flex-1 flex flex-col min-h-0">
           <TabsList className="flex-shrink-0">
             <TabsTrigger value="bank"><BookOpen className="w-3.5 h-3.5 mr-1.5" />From Bank</TabsTrigger>
-            <TabsTrigger value="ai"><Sparkles className="w-3.5 h-3.5 mr-1.5" />AI Generate</TabsTrigger>
+            <TabsTrigger value="ai" data-testid="quiz-ai-generate-tab"><Sparkles className="w-3.5 h-3.5 mr-1.5" />AI Generate</TabsTrigger>
             <TabsTrigger value="scorm"><Upload className="w-3.5 h-3.5 mr-1.5" />Import SCORM</TabsTrigger>
             <TabsTrigger value="csv"><FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />Import CSV</TabsTrigger>
           </TabsList>
@@ -811,13 +820,7 @@ function AddQuestionsDialog({
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Topic *</Label>
                       <Input value={aiTopic} onChange={e => setAITopic(e.target.value)} placeholder="e.g. Doppler physics, DVT diagnosis, Normal fetal echo anatomy" className="bg-white border-teal-200" />
                     </div>
-                    <div className="md:col-span-2 rounded-lg border border-dashed border-teal-300 bg-white p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div><Label className="text-xs font-medium text-teal-700">Source PDF or image (optional)</Label><p className="text-xs text-gray-500">Upload a PDF, JPG, PNG, or WebP up to 20 MB. Generated questions include explanations and answer-level feedback.</p></div>
-                        <label className="cursor-pointer"><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) handleAiSourceUpload(file); e.currentTarget.value = ""; }} /><span className="inline-flex items-center rounded-md border border-teal-300 px-3 py-2 text-xs font-medium text-teal-700 hover:bg-teal-50">{aiSourceUploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileUp className="mr-1.5 h-3.5 w-3.5" />}{aiSourceUploading ? "Uploading…" : "Upload source"}</span></label>
-                      </div>
-                      {aiSourceFile && <div className="mt-2 flex items-center gap-2 rounded bg-teal-50 px-2 py-1.5 text-xs text-teal-800"><FileQuestion className="h-3.5 w-3.5" /><span className="truncate">{aiSourceFile.name}</span><button type="button" onClick={() => setAiSourceFile(null)} className="ml-auto text-red-600 hover:text-red-700"><X className="h-3.5 w-3.5" /></button></div>}
-                    </div>
+                    <div className="md:col-span-2"><AiSourceFileReview sourceFiles={aiSourceFiles} isUploading={aiSourceUploading} onFiles={handleAiSourceUpload} onRemove={index => setAiSourceFiles(current => current.filter((_, sourceIndex) => sourceIndex !== index))} description="Drop up to three PDF, JPG, PNG, or WebP files here, or upload files up to 50 MB each. Generated questions include explanations and answer-level feedback." /></div>
                     <div>
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Number of Questions</Label>
                       <select value={aiCount} onChange={e => setAICount(Number(e.target.value))} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
@@ -873,8 +876,8 @@ function AddQuestionsDialog({
                     accentColor="teal"
                   />
                   <div className="flex justify-end">
-                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={(!aiTopic.trim() && !aiSourceFile) || aiGenerateMut.isPending || aiSourceUploading}
-                      onClick={() => aiGenerateMut.mutate({ topic: aiTopic.trim() || `Source: ${aiSourceFile?.name ?? "uploaded reference"}`, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined, newFolderName: aiNewFolderName.trim() || undefined, sourceFile: aiSourceFile ?? undefined })}>
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={(!aiTopic.trim() && aiSourceFiles.length === 0) || aiGenerateMut.isPending || aiSourceUploading}
+                      onClick={() => aiGenerateMut.mutate({ topic: aiTopic.trim() || `Sources: ${aiSourceFiles.map(source => source.name).join(", ")}`, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined, newFolderName: aiNewFolderName.trim() || undefined, sourceFiles: aiSourceFiles.length > 0 ? aiSourceFiles : undefined })}>
                       {aiGenerateMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate Questions</>}
                     </Button>
                   </div>

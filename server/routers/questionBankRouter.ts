@@ -323,6 +323,11 @@ export const questionBankRouter = router({
         mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
         name: z.string().min(1).max(255),
       }).optional(),
+      sourceFiles: z.array(z.object({
+        url: z.string().url(),
+        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
+        name: z.string().min(1).max(255),
+      })).min(1).max(3).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -341,14 +346,15 @@ export const questionBankRouter = router({
                 ? "All questions must be hotspot templates. State which ultrasound or echocardiography image is required and describe the correct region."
                 : "All questions must be multiple choice with 4 options.";
 
+      const sourceFiles = input.sourceFiles?.length ? input.sourceFiles : input.sourceFile ? [input.sourceFile] : [];
       const response = await invokeLLM({
-        model: input.sourceFile ? "gemini-3-flash-preview" : undefined,
+        model: sourceFiles.length ? "gemini-3-flash-preview" : undefined,
         messages: [
           {
             role: "system",
             content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, write a concise explanation of why the correct answer is correct. For every option, write optionFeedback explaining why that specific option is correct or incorrect. Return JSON only.`,
           },
-          { role: "user", content: buildAiSourceMessage(`Generate ${input.count} questions about: ${input.topic}`, input.sourceFile) as any },
+          { role: "user", content: buildAiSourceMessage(`Generate ${input.count} questions about: ${input.topic}`, sourceFiles) as any },
         ],
         response_format: {
           type: "json_schema",
