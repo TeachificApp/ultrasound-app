@@ -585,6 +585,9 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
   const [aiLessonsPerModule, setAiLessonsPerModule] = useState(4);
   const [aiStarterContent, setAiStarterContent] = useState("");
   const [aiGenerateQuizzes, setAiGenerateQuizzes] = useState(true);
+  const [aiGenerateCourseQuiz, setAiGenerateCourseQuiz] = useState(false);
+  const [aiSourceFile, setAiSourceFile] = useState<{ url: string; mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; name: string } | null>(null);
+  const [aiSourceUploading, setAiSourceUploading] = useState(false);
 
   const create = trpc.lmsAdmin.createCourse.useMutation({
     onSuccess: (data) => { toast.success("Course created!"); onCreated(data.id); },
@@ -622,6 +625,24 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
         onCreated(data.id);
       },
     });
+  };
+
+  const uploadAiSourceFile = async (file: File) => {
+    setAiSourceUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/upload-ai-generation-source", { method: "POST", credentials: "include", body: formData });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.sourceFile) throw new Error(payload.error || "Source upload failed");
+      setAiSourceFile(payload.sourceFile);
+      if (!aiTopics.trim()) setAiTopics(file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
+      toast.success("AI source file ready");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Source upload failed");
+    } finally {
+      setAiSourceUploading(false);
+    }
   };
 
   const productLabel = type === "quiz" ? "Quiz" : type === "download" ? "Download" : type === "cohort" ? "Cohort" : "Course";
@@ -800,6 +821,19 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                     />
                     <p className="text-xs text-gray-500 mt-1">Be specific — include clinical concepts, procedures, or anatomy you want covered.</p>
                   </div>
+                  <div className="rounded-lg border border-dashed border-teal-300 bg-white p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <Label className="text-sm text-teal-800">Source PDF or image (optional)</Label>
+                        <p className="text-xs text-gray-500">Upload a PDF, JPG, PNG, or WebP up to 20 MB. AI uses it as the primary source.</p>
+                      </div>
+                      <label className="cursor-pointer">
+                        <input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) uploadAiSourceFile(file); e.currentTarget.value = ""; }} />
+                        <span className="inline-flex items-center rounded-md border border-teal-300 px-3 py-2 text-xs font-medium text-teal-700 hover:bg-teal-50">{aiSourceUploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-1.5 h-3.5 w-3.5" />}{aiSourceUploading ? "Uploading…" : "Upload source"}</span>
+                      </label>
+                    </div>
+                    {aiSourceFile && <div className="mt-2 flex items-center gap-2 rounded bg-teal-50 px-2 py-1.5 text-xs text-teal-800"><FileText className="h-3.5 w-3.5" /><span className="truncate">{aiSourceFile.name}</span><button type="button" onClick={() => setAiSourceFile(null)} className="ml-auto text-red-600 hover:text-red-700"><X className="h-3.5 w-3.5" /></button></div>}
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label className="text-sm">Target Audience (optional)</Label>
@@ -852,6 +886,10 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                         <label htmlFor="aiGenerateQuizzes" className="text-sm cursor-pointer">
                           Generate a <strong>5-question quiz</strong> after each lesson
                         </label>
+                      </div>
+                      <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900 rounded-md border">
+                        <input type="checkbox" id="aiGenerateCourseQuiz" checked={aiGenerateCourseQuiz} onChange={e => setAiGenerateCourseQuiz(e.target.checked)} className="accent-teal-600 w-4 h-4" />
+                        <label htmlFor="aiGenerateCourseQuiz" className="text-sm cursor-pointer">Generate a final <strong>course-wide assessment</strong> from the full source and course content</label>
                       </div>
                       <div>
                         <Label className="text-sm">Starter Content / Outline (optional)</Label>
@@ -978,7 +1016,7 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
           ) : aiStep === "input" ? (
             <Button
               className="bg-teal-600 hover:bg-teal-700 text-white"
-              disabled={!aiTopics.trim() || aiGenerate.isPending}
+              disabled={(!aiTopics.trim() && !aiSourceFile) || aiGenerate.isPending || aiSourceUploading}
               onClick={() => aiGenerate.mutate({
                 topics: aiTopics.trim(),
                 productType: type === "quiz" ? "quiz" : "course",
@@ -989,6 +1027,8 @@ function CreateCourseDialog({ open, onClose, onCreated, defaultType = "course" }
                 lessonsPerModule: aiLessonsPerModule,
                 starterContent: aiStarterContent.trim() || undefined,
                 generateQuizzes: aiGenerateQuizzes,
+                generateCourseQuiz: aiGenerateCourseQuiz,
+                sourceFile: aiSourceFile ?? undefined,
               })}
             >
               {aiGenerate.isPending ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Generating...</> : <><Sparkles className="w-4 h-4 mr-1" /> Generate Preview</>}

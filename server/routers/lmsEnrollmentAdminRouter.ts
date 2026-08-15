@@ -31,6 +31,8 @@ import { sendEnrollmentEmail, sendQuizAccessEmail } from "../lib/enrollmentEmail
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { addToAllContacts } from "../lib/emailListHelper";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
+import { buildAiSourceMessage } from "../lib/aiSourceFile";
+import { persistGeneratedCourseAssessment } from "../lib/aiCourseAssessment";
 import {
   lmsCourses,
   lmsSections,
@@ -656,6 +658,12 @@ export const lmsEnrollmentAdminRouter = router({
       lessonsPerModule: z.number().int().min(3).max(10).default(4),
       starterContent: z.string().max(20000).optional(), // optional outline / existing content
       generateQuizzes: z.boolean().default(true), // generate 5-question quiz per lesson
+      generateCourseQuiz: z.boolean().default(false),
+      sourceFile: z.object({
+        url: z.string().url(),
+        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
+        name: z.string().min(1).max(255),
+      }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -669,7 +677,7 @@ IMPORTANT: Each lesson must include exactly 5 MCQ quiz questions with 4 options 
 IMPORTANT: The landing page must have fully written, publication-ready content — not placeholders.`;
 
       const isQuiz = input.productType === "quiz";
-      const { moduleCount, lessonsPerModule, starterContent, generateQuizzes } = input;
+      const { moduleCount, lessonsPerModule, starterContent, generateQuizzes, generateCourseQuiz } = input;
 
       const starterSection = starterContent
         ? `\n\nSTARTER CONTENT / OUTLINE PROVIDED BY AUTHOR (use this as the primary source of truth for topics, structure, and terminology):\n---\n${starterContent}\n---\n`
@@ -741,6 +749,12 @@ Return a JSON object with this exact structure:
       ]
     }
   ],
+  "courseQuiz": ${generateCourseQuiz ? `{
+    "title": "Course Assessment",
+    "questions": [
+      { "question": "Clinical assessment question", "options": ["Option A", "Option B", "Option C", "Option D"], "correctAnswer": "Option A", "explanation": "Why this answer is correct" }
+    ]
+  }` : "null"},
   "landingPage": {
     "heroTitle": "Compelling course headline (not a placeholder)",
     "heroSubtitle": "One powerful sentence describing the transformation or outcome",
@@ -756,14 +770,15 @@ CRITICAL REQUIREMENTS:
 - EXACTLY ${moduleCount} sections in the sections array
 - EXACTLY ${lessonsPerModule} lessons in each section's lessons array
 - Each lesson content must be minimum 300 words of rich HTML
-- Each lesson quiz must have EXACTLY 5 questions with 4 options each
+- Each requested lesson quiz and the optional course-wide quiz must have exactly 5 questions with 4 options each
 - All landing page fields must be fully written — NO placeholders like "[Topic]" or "[Description]"
 - imageSearchQuery should be a specific, descriptive search query for a relevant medical/ultrasound image`;
 
       const response = await invokeLLM({
+        model: input.sourceFile ? "gemini-3-flash-preview" : undefined,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "user", content: buildAiSourceMessage(userPrompt, input.sourceFile) as any },
         ],
         response_format: { type: "json_object" },
       });
@@ -876,6 +891,7 @@ CRITICAL REQUIREMENTS:
             }
           }
         }
+        await persistGeneratedCourseAssessment(db, courseId, generated.sections.length, generated.courseQuiz);
       } else if (productType === "quiz" && Array.isArray(generated.questions)) {
         // For standalone quiz: create a single section + quiz lesson + questions
         const [secResult] = await db.insert(lmsSections).values({ courseId, title: "Quiz Questions", position: 0 }).$returningId();

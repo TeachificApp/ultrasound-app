@@ -26,6 +26,8 @@ import * as XLSX from "xlsx";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { buildAiSourceMessage } from "../lib/aiSourceFile";
+import { buildAiQuestionBankInsertValues } from "../lib/aiQuestionBankPersistence";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -316,6 +318,11 @@ export const questionBankRouter = router({
       presetCategory: z.string().optional(),
       folderId: z.number().int().optional(),
       newFolderName: z.string().max(200).optional(),
+      sourceFile: z.object({
+        url: z.string().url(),
+        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
+        name: z.string().min(1).max(255),
+      }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -335,15 +342,13 @@ export const questionBankRouter = router({
                 : "All questions must be multiple choice with 4 options.";
 
       const response = await invokeLLM({
+        model: input.sourceFile ? "gemini-3-flash-preview" : undefined,
         messages: [
           {
             role: "system",
             content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, write a concise explanation of why the correct answer is correct. For every option, write optionFeedback explaining why that specific option is correct or incorrect. Return JSON only.`,
           },
-          {
-            role: "user",
-            content: `Generate ${input.count} questions about: ${input.topic}`,
-          },
+          { role: "user", content: buildAiSourceMessage(`Generate ${input.count} questions about: ${input.topic}`, input.sourceFile) as any },
         ],
         response_format: {
           type: "json_schema",
@@ -424,18 +429,7 @@ export const questionBankRouter = router({
         explanation: question.explanation,
       }));
       for (const q of questions) {
-        const opts = Array.isArray(q.options) ? q.options.map((o: string, index: number) => ({ text: o, feedback: q.optionFeedback?.[index] ?? "" })) : [];
-        const [result] = await db.insert(questionBank).values({
-          question: q.question,
-          type: q.type === "truefalse" ? "truefalse" : q.type === "multiselect" ? "multiselect" : q.type === "matching" ? "matching" : q.type === "hotspot" ? "hotspot" : "mcq",
-          options: opts.length > 0 ? JSON.stringify(opts) : null,
-          correctAnswer: q.correctAnswer,
-          correctAnswers: q.type === "multiselect" ? JSON.stringify(q.correctAnswers ?? []) : null,
-          matchingPairs: q.type === "matching" ? JSON.stringify(q.matchingPairs ?? []) : null,
-          explanation: q.explanation ?? null,
-          folderId: resolvedFolderId,
-          createdByAdminId: ctx.user.id,
-        }).$returningId();
+        const [result] = await db.insert(questionBank).values(buildAiQuestionBankInsertValues(q, resolvedFolderId, ctx.user.id)).$returningId();
         inserted.push(result.id);
         if (input.tagIds && input.tagIds.length > 0) {
           await db.insert(questionBankTagMap).values(input.tagIds.map(tagId => ({ questionId: result.id, tagId })));

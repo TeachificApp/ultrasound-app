@@ -20,6 +20,7 @@ import { registerUploadCourseImageRoute } from "../routes/uploadCourseImage";
 import { registerProcessRichTextHtmlRoute } from "../routes/processRichTextHtml";
 import { registerReconstructMathRoute } from "../routes/reconstructMath";
 import { registerUploadQuizBankFileRoute } from "../routes/uploadQuizBankFile";
+import { registerUploadAiGenerationSourceRoute } from "../routes/uploadAiGenerationSource";
 import quizImportRouter from "../quizImportRoutes";
 import questionBankExportRouter from "../routes/questionBankExport";
 import { registerUploadDigitalFileRoute } from "../routes/uploadDigitalFile";
@@ -244,6 +245,7 @@ async function startServer() {
   registerReconstructMathRoute(app);
   // Quiz bank direct file upload (SCORM .quiz, CSV, XLSX — bypasses media library)
   registerUploadQuizBankFileRoute(app);
+  registerUploadAiGenerationSourceRoute(app);
   // Quiz bank import REST routes (preview, confirm-native, csv-template, xlsx template)
   app.use("/api/quiz", quizImportRouter);
   app.use("/api/quiz/question-bank", questionBankExportRouter);

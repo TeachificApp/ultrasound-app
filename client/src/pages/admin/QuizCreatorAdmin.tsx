@@ -526,6 +526,8 @@ function AddQuestionsDialog({
   const [aiGenerated, setAIGenerated] = useState<any[] | null>(null);
   const [aiSelectedIds, setAISelectedIds] = useState<Set<number>>(new Set());
   const [aiGroupId, setAIGroupId] = useState("");
+  const [aiSourceFile, setAiSourceFile] = useState<{ url: string; mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; name: string } | null>(null);
+  const [aiSourceUploading, setAiSourceUploading] = useState(false);
 
 // --- SCORM Import ---
   const [scormFile, setScormFile] = useState<File | null>(null);
@@ -633,7 +635,7 @@ function AddQuestionsDialog({
     setTab("bank"); setQSearch(""); setQPage(1); setSelectedBankIds(new Set());
     setBankFolderId(""); setBankTagId("");
     setAITopic(""); setAIGenerated(null); setAISelectedIds(new Set()); setAITagIds([]);
-    setAIFolderId(null); setAINewFolderName(""); setAIGroupId("");
+    setAIFolderId(null); setAINewFolderName(""); setAIGroupId(""); setAiSourceFile(null); setAiSourceUploading(false);
     setScormFile(null); setScormPreview(null); setScormSelectedGroups(new Set()); setScormGroupPrefix("");
     setScormFolderId(null); setScormNewFolderName(""); setScormTagIds([]);
     setCsvFile(null); setCsvPreview(null); setCsvFolderId(null); setCsvNewFolderName(""); setCsvTagIds([]);
@@ -664,6 +666,24 @@ function AddQuestionsDialog({
       setCsvPreview(json);
     } catch (e: any) { toast.error(e.message); setCsvFile(null); }
     finally { setCsvUploading(false); }
+  };
+
+  const handleAiSourceUpload = async (file: File) => {
+    setAiSourceUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/upload-ai-generation-source", { method: "POST", credentials: "include", body: formData });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.sourceFile) throw new Error(payload.error || "Source upload failed");
+      setAiSourceFile(payload.sourceFile);
+      if (!aiTopic.trim()) setAITopic(file.name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
+      toast.success("AI source file ready");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Source upload failed");
+    } finally {
+      setAiSourceUploading(false);
+    }
   };
 
   const handleAddFromBank = () => {
@@ -791,6 +811,13 @@ function AddQuestionsDialog({
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Topic *</Label>
                       <Input value={aiTopic} onChange={e => setAITopic(e.target.value)} placeholder="e.g. Doppler physics, DVT diagnosis, Normal fetal echo anatomy" className="bg-white border-teal-200" />
                     </div>
+                    <div className="md:col-span-2 rounded-lg border border-dashed border-teal-300 bg-white p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div><Label className="text-xs font-medium text-teal-700">Source PDF or image (optional)</Label><p className="text-xs text-gray-500">Upload a PDF, JPG, PNG, or WebP up to 20 MB. Generated questions include explanations and answer-level feedback.</p></div>
+                        <label className="cursor-pointer"><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" className="hidden" onChange={e => { const file = e.target.files?.[0]; if (file) handleAiSourceUpload(file); e.currentTarget.value = ""; }} /><span className="inline-flex items-center rounded-md border border-teal-300 px-3 py-2 text-xs font-medium text-teal-700 hover:bg-teal-50">{aiSourceUploading ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <FileUp className="mr-1.5 h-3.5 w-3.5" />}{aiSourceUploading ? "Uploading…" : "Upload source"}</span></label>
+                      </div>
+                      {aiSourceFile && <div className="mt-2 flex items-center gap-2 rounded bg-teal-50 px-2 py-1.5 text-xs text-teal-800"><FileQuestion className="h-3.5 w-3.5" /><span className="truncate">{aiSourceFile.name}</span><button type="button" onClick={() => setAiSourceFile(null)} className="ml-auto text-red-600 hover:text-red-700"><X className="h-3.5 w-3.5" /></button></div>}
+                    </div>
                     <div>
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Number of Questions</Label>
                       <select value={aiCount} onChange={e => setAICount(Number(e.target.value))} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
@@ -846,8 +873,8 @@ function AddQuestionsDialog({
                     accentColor="teal"
                   />
                   <div className="flex justify-end">
-                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={!aiTopic.trim() || aiGenerateMut.isPending}
-                      onClick={() => aiGenerateMut.mutate({ topic: aiTopic, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined, newFolderName: aiNewFolderName.trim() || undefined })}>
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={(!aiTopic.trim() && !aiSourceFile) || aiGenerateMut.isPending || aiSourceUploading}
+                      onClick={() => aiGenerateMut.mutate({ topic: aiTopic.trim() || `Source: ${aiSourceFile?.name ?? "uploaded reference"}`, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined, newFolderName: aiNewFolderName.trim() || undefined, sourceFile: aiSourceFile ?? undefined })}>
                       {aiGenerateMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate Questions</>}
                     </Button>
                   </div>
