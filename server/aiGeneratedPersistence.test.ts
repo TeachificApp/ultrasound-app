@@ -11,8 +11,12 @@ describe("AI-generated source content persistence", () => {
       optionFeedback: ["A is incorrect", "B is correct", "C is incorrect", "D is incorrect"],
       correctAnswer: "B",
       explanation: "B is the expected finding.",
+      correctFeedback: "Correct. B is the expected finding.",
+      incorrectFeedback: "Not quite. Review why B is the expected finding.",
     }, 9, 4);
     expect(values.explanation).toBe("B is the expected finding.");
+    expect(values.correctFeedback).toBe("Correct. B is the expected finding.");
+    expect(values.incorrectFeedback).toBe("Not quite. Review why B is the expected finding.");
     expect(JSON.parse(values.options!)).toEqual([
       { text: "A", feedback: "A is incorrect" },
       { text: "B", feedback: "B is correct" },

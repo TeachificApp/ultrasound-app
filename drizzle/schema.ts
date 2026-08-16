@@ -5588,6 +5588,10 @@ export const questionBank = mysqlTable("question_bank", {
   /** For multiselect: JSON array of correct answer indices. For hotspot: JSON {x,y,radius}. For matching: not used (use matchingPairs) */
   correctAnswers: text("correct_answers"),
   explanation: longtext("explanation"),
+  /** Shared rationale for question-based feedback when the learner answers correctly. */
+  correctFeedback: longtext("correct_feedback"),
+  /** Shared rationale for question-based feedback when the learner answers incorrectly. */
+  incorrectFeedback: longtext("incorrect_feedback"),
   // Media attached to the question stem
   questionImageUrl: text("question_image_url"),
   questionVideoUrl: text("question_video_url"),

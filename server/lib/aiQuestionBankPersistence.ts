@@ -10,6 +10,8 @@ export function buildAiQuestionBankInsertValues(question: any, folderId: number 
     correctAnswers: question.type === "multiselect" ? JSON.stringify(question.correctAnswers ?? []) : null,
     matchingPairs: question.type === "matching" ? JSON.stringify(question.matchingPairs ?? []) : null,
     explanation: question.explanation ?? null,
+    correctFeedback: question.correctFeedback ?? question.explanation ?? null,
+    incorrectFeedback: question.incorrectFeedback ?? question.explanation ?? null,
     folderId,
     createdByAdminId,
   };

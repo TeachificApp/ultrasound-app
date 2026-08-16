@@ -376,8 +376,10 @@ export const questionBankRouter = router({
                         },
                       },
                       explanation: { type: "string" },
+                      correctFeedback: { type: "string" },
+                      incorrectFeedback: { type: "string" },
                     },
-                    required: ["question", "type", "options", "correctAnswer", "correctAnswers", "optionFeedback", "matchingPairs", "explanation"],
+                    required: ["question", "type", "options", "correctAnswer", "correctAnswers", "optionFeedback", "matchingPairs", "explanation", "correctFeedback", "incorrectFeedback"],
                     additionalProperties: false,
                   },
                 },
@@ -394,7 +396,7 @@ export const questionBankRouter = router({
         const response = await invokeLLM({
           model: sourceFiles.length ? "gemini-3-flash-preview" : undefined,
           messages: [
-            { role: "system", content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, write a concise explanation of why the correct answer is correct. For every option, write optionFeedback explaining why that specific option is correct or incorrect. Return JSON only.` },
+            { role: "system", content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, return: (1) explanation, a concise rationale for why the correct answer is correct; (2) correctFeedback, a shared question-based rationale shown after a correct response; (3) incorrectFeedback, a shared question-based rationale shown after an incorrect response that explains the correct concept without referring to a particular selected option; and (4) optionFeedback, one explanation for every option describing why that specific answer is correct or incorrect. Return JSON only.` },
             { role: "user", content: buildAiSourceMessage(`Generate ${batchCount} unique questions about: ${input.topic}. This is batch ${Math.floor(offset / batchSize) + 1}; do not repeat questions from earlier batches.`, sourceFiles) as any },
           ],
           response_format: responseFormat,
