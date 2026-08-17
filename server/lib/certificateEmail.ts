@@ -27,7 +27,7 @@ function emailWrapper(content: string): string {
                 alt="All About Ultrasound™" width="80" height="80"
                 style="border-radius:50%;display:block;margin:0 auto 12px;" />
               <div style="font-size:22px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">All About Ultrasound™</div>
-              <div style="font-size:12px;color:#4ad9e0;margin-top:4px;">General & Vascular Ultrasound Clinical Intelligence</div>
+              <div style="font-size:12px;color:#4ad9e0;margin-top:4px;">Ultrasound Clinical Intelligence</div>
             </td>
           </tr>
           <tr>

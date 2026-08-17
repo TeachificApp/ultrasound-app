@@ -100,7 +100,7 @@ async function startServer() {
       id: "https://app.allaboutultrasound.com/",
       name: "UltrasoundAssist\u2122",
       short_name: "UltrasoundAssist",
-      description: "General & Vascular Ultrasound Clinical Intelligence \u2014 real-time ultrasound interpretation and measurement assistant for sonographers, radiologists, OB/Gyn, vascular surgeons, and ultrasound educators from All About Ultrasound\u2122.",
+      description: "Ultrasound Clinical Intelligence \u2014 real-time ultrasound interpretation and measurement assistant for sonographers, radiologists, OB/Gyn, vascular surgeons, and ultrasound educators from All About Ultrasound\u2122.",
       start_url: "/",
       scope: "/",
       display: "standalone" as const,
@@ -139,7 +139,7 @@ async function startServer() {
       id: "https://members.allaboutultrasound.com/",
       name: "All About Ultrasound | iHeartEcho",
       short_name: "AAUS | iHE",
-      description: "General, Vascular & Cardiac Ultrasound Clinical Intelligence \u2014 learning platform for sonographers, physicians, and ultrasound educators.",
+      description: "Ultrasound Clinical Intelligence \u2014 learning platform for sonographers, physicians, and ultrasound educators.",
     };
 
     let manifest;

@@ -2,7 +2,7 @@
   "id": "https://app.allaboutultrasound.com/",
   "name": "UltrasoundAssist™",
   "short_name": "UltrasoundAssist",
-  "description": "General & Vascular Ultrasound Clinical Intelligence — real-time ultrasound interpretation and measurement assistant for sonographers, radiologists, OB/Gyn, vascular surgeons, and ultrasound educators from All About Ultrasound™.",
+  "description": "Ultrasound Clinical Intelligence — real-time ultrasound interpretation and measurement assistant for sonographers, radiologists, OB/Gyn, vascular surgeons, and ultrasound educators from All About Ultrasound™.",
   "start_url": "https://app.allaboutultrasound.com/",
   "scope": "https://app.allaboutultrasound.com/",
   "display": "standalone",

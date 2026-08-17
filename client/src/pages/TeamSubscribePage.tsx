@@ -27,7 +27,7 @@ const BRAND_OPTIONS = [
   {
     value: "aaus" as const,
     label: "UltrasoundAssist™",
-    description: "General & Vascular Ultrasound",
+    description: "Ultrasound Clinical Intelligence",
     color: "teal",
   },
   {

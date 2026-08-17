@@ -293,11 +293,11 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
           doc.font("Helvetica").fontSize(9).fillColor(TEAL).text(orgName, 0, 76, { align: "center" });
         } catch {
           doc.font("Helvetica-Bold").fontSize(22).fillColor("#ffffff").text(orgName, 0, 38, { align: "center" });
-          doc.font("Helvetica").fontSize(10).fillColor(TEAL).text("General & Vascular Ultrasound Clinical Intelligence", 0, 64, { align: "center" });
+          doc.font("Helvetica").fontSize(10).fillColor(TEAL).text("Ultrasound Clinical Intelligence", 0, 64, { align: "center" });
         }
       } else {
         doc.font("Helvetica-Bold").fontSize(22).fillColor("#ffffff").text(orgName, 0, 38, { align: "center" });
-        doc.font("Helvetica").fontSize(10).fillColor(TEAL).text("General & Vascular Ultrasound Clinical Intelligence", 0, 64, { align: "center" });
+        doc.font("Helvetica").fontSize(10).fillColor(TEAL).text("Ultrasound Clinical Intelligence", 0, 64, { align: "center" });
       }
 
       doc.font("Helvetica").fontSize(13).fillColor(TEAL)

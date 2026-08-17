@@ -21,7 +21,7 @@ const BRAND_CONFIGS: Record<Brand, BrandConfig> = {
     brand: "aaus",
     name: "All About Ultrasound™",
     shortName: "All About Ultrasound",
-    tagline: "General & Vascular Ultrasound Clinical Intelligence",
+    tagline: "Ultrasound Clinical Intelligence",
     primaryColor: "#0d9488", // teal-600
     accentColor: "#14b8a6", // teal-500
     domain: "app.allaboutultrasound.com",
