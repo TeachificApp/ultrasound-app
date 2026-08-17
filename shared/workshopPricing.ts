@@ -28,3 +28,32 @@ export function shouldRouteWorkshopCtaToCheckout(action: string | undefined, lab
   const normalizedLabel = (label ?? "").replace(/\s+/g, " ").trim().toLowerCase();
   return (action === "url" || action === "scroll_to_section") && /^(save my seat|register now|enroll now|reserve your seat)$/.test(normalizedLabel);
 }
+
+export function buildWorkshopCheckoutIdempotencyKey({
+  userId,
+  workshopId,
+  instanceId,
+  priceInCents,
+  currency,
+  orderBumpId,
+  bumpMode,
+}: {
+  userId?: number | null;
+  workshopId: number;
+  instanceId: number;
+  priceInCents: number;
+  currency?: string | null;
+  orderBumpId?: string | number | null;
+  bumpMode?: string | null;
+}) {
+  return [
+    "workshop-checkout-v2",
+    userId ?? "guest",
+    workshopId,
+    instanceId,
+    priceInCents,
+    (currency ?? "usd").toLowerCase(),
+    orderBumpId ?? "no-bump",
+    bumpMode ?? "standard",
+  ].join("-");
+}

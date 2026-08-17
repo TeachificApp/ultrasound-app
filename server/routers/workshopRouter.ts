@@ -1,7 +1,7 @@
 import { getStripeClient } from "../lib/stripeClient";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
-import { resolveWorkshopCheckoutPrice, workshopDollarsToCents } from "../../shared/workshopPricing";
+import { buildWorkshopCheckoutIdempotencyKey, resolveWorkshopCheckoutPrice, workshopDollarsToCents } from "../../shared/workshopPricing";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from "drizzle-orm";
@@ -636,7 +636,15 @@ export const workshopLearnerRouter = router({
         quantity: 1,
       };
       const isUpgradeBump = orderBumpCheckout?.bumpMode === "upgrade";
-      const workshopIdempotencyDate = new Date().toISOString().slice(0, 10);
+      const workshopCheckoutIdempotencyKey = buildWorkshopCheckoutIdempotencyKey({
+        userId,
+        workshopId: workshop.id,
+        instanceId: instance.id,
+        priceInCents,
+        currency: workshop.currency,
+        orderBumpId: orderBumpCheckout?.metadata?.order_bump_id,
+        bumpMode: orderBumpCheckout?.bumpMode,
+      });
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
@@ -657,7 +665,7 @@ export const workshopLearnerRouter = router({
         },
         payment_intent_data: { description: `${workshop.title} — Workshop Registration` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=workshop`,
-      }, { idempotencyKey: `workshop-checkout-${userId}-${workshop.id}-${instance.id}-${workshopIdempotencyDate}` });
+      }, { idempotencyKey: workshopCheckoutIdempotencyKey });
 
       return {
         clientSecret: session.client_secret!,
