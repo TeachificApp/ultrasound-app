@@ -34,6 +34,7 @@ import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
+import { formatWorkshopDollars } from "../../../../shared/workshopPricing";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function fmtDate(ts: number | Date | null | undefined) {
@@ -44,9 +45,9 @@ function fmtDateShort(ts: number | Date | null | undefined) {
   if (!ts) return "—";
   return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
-function fmtPrice(cents: number | null | undefined) {
-  if (cents == null) return "—";
-  return `$${(cents / 100).toFixed(2)}`;
+function fmtPrice(dollars: number | string | null | undefined) {
+  if (dollars == null) return "—";
+  return formatWorkshopDollars(dollars);
 }
 function statusColor(status: string) {
   if (status === "public" || status === "published") return "bg-green-100 text-green-700";
@@ -362,7 +363,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setStatus((w.status as any) ?? "draft");
     setBrand((w.brand as any) ?? "aaus");
     setPrice(w.price ?? 0);
-    setCompareAtPrice(w.compareAtPrice != null ? w.compareAtPrice / 100 : "");
+    setCompareAtPrice(w.compareAtPrice != null ? w.compareAtPrice : "");
     setIsFree(w.isFree ?? false);
     setCurriculumEnabled(w.curriculumEnabled ?? true);
     setShowInLibrary(w.showInLibrary ?? true);
@@ -437,7 +438,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
       id: workshopId,
       title, slug, subtitle: subtitle || null, description: description || null,
       status, brand, price: Number(price),
-      compareAtPrice: compareAtPrice !== "" ? Math.round(Number(compareAtPrice) * 100) : null,
+      compareAtPrice: compareAtPrice !== "" ? Number(compareAtPrice) : null,
       isFree, curriculumEnabled, showInLibrary, isFeatured,
       publishDomain: publishDomain || null,
       primaryColor, accentColor,

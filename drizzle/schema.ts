@@ -5346,8 +5346,8 @@ export const membershipPlans = mysqlTable("membership_plans", {
   accentColor: varchar("accent_color", { length: 32 }).default("#189aa1"),
   status: mysqlEnum("status", ["draft", "published", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
   billingInterval: mysqlEnum("billing_interval", ["monthly", "annual", "lifetime", "one_time"]).default("monthly").notNull(),
-  price: int("price").default(0).notNull(),
-  compareAtPrice: int("compare_at_price"),
+  price: decimal("price", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   stripeProductId: varchar("stripe_product_id", { length: 128 }),
   stripePriceId: varchar("stripe_price_id", { length: 128 }),
@@ -7193,9 +7193,9 @@ export const workshops = mysqlTable("workshops", {
   // Brand
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
 
-  // Pricing (per-instance can override)
-  price: int("price").default(0).notNull(),           // cents — default price
-  compareAtPrice: int("compare_at_price"),             // cents — crossed-out price
+  // Pricing (entered and persisted as dollars, retaining up to two decimal places)
+  price: decimal("price", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
   isFree: boolean("is_free").default(false).notNull(),
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   pricingType: mysqlEnum("pricing_type", ["free", "one_time"]).default("one_time").notNull(),
@@ -7312,9 +7312,9 @@ export const workshopInstances = mysqlTable("workshop_instances", {
   capacity: int("capacity"),                                    // null = unlimited
   enrolledCount: int("enrolled_count").default(0).notNull(),
 
-  // Pricing override (null = use workshop default)
-  price: int("price"),                                          // cents
-  compareAtPrice: int("compare_at_price"),                      // cents
+  // Pricing override (null = use workshop default); entered and persisted as dollars
+  price: decimal("price", { precision: 10, scale: 2 }),
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),
   stripePriceId: varchar("stripe_price_id", { length: 255 }),
 
   // Enrollment window

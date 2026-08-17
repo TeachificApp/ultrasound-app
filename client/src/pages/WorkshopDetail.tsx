@@ -13,10 +13,11 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
+import { formatWorkshopDollars } from "../../../shared/workshopPricing";
 
-function formatPrice(cents: number | null | undefined, isFree: boolean) {
-  if (isFree || cents === 0 || cents == null) return "Free";
-  return `$${(cents / 100).toFixed(2)}`;
+function formatPrice(dollars: number | string | null | undefined, isFree: boolean) {
+  if (isFree || dollars === 0 || dollars == null) return "Free";
+  return formatWorkshopDollars(dollars);
 }
 
 function LocationIcon({ type }: { type: string }) {
@@ -27,10 +28,10 @@ function LocationIcon({ type }: { type: string }) {
 
 function InstanceCard({ instance, workshopSlug, isDraft }: { instance: any; workshopSlug: string; isDraft?: boolean }) {
   const price = instance.price != null
-    ? `$${(instance.price / 100).toFixed(2)}`
+    ? formatWorkshopDollars(instance.price)
     : null;
   const compareAt = instance.compareAtPrice != null
-    ? `$${(instance.compareAtPrice / 100).toFixed(2)}`
+    ? formatWorkshopDollars(instance.compareAtPrice)
     : null;
   const startDate = instance.startDate ? new Date(instance.startDate) : null;
   const endDate = instance.endDate ? new Date(instance.endDate) : null;
@@ -139,9 +140,7 @@ export default function WorkshopDetail() {
 
   const { workshop, availableInstances, pricingOptions } = data;
   const defaultPrice = formatPrice(workshop.price, workshop.isFree);
-  const compareAt = workshop.compareAtPrice
-    ? `$${Number(workshop.compareAtPrice).toFixed(2)}`
-    : null;
+  const compareAt = workshop.compareAtPrice ? formatWorkshopDollars(workshop.compareAtPrice) : null;
   const isDraft = workshop.status === "draft" || workshop.status === "enrollment_closed";
 
   return (

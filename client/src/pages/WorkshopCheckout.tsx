@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import {
   Lock, ArrowLeft, AlertCircle, CheckCircle2, ShieldCheck,
 } from "lucide-react";
+import { formatWorkshopDollars } from "../../../shared/workshopPricing";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "");
 
@@ -46,7 +47,7 @@ export default function WorkshopCheckout() {
     primaryColor: string;
     accentColor: string;
     productName: string;
-    displayPrice: number;
+    displayPrice: number | string;
     currency: string;
     termsUrl: string;
     privacyUrl: string;
@@ -183,9 +184,7 @@ export default function WorkshopCheckout() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">Registration fee</span>
                     <span className="text-2xl font-bold" style={{ color: primary }}>
-                      {sessionMeta.displayPrice === 0
-                        ? "Free"
-                        : `$${sessionMeta.displayPrice.toLocaleString()}`}
+                      {formatWorkshopDollars(sessionMeta.displayPrice, sessionMeta.currency)}
                     </span>
                   </div>
                 </>

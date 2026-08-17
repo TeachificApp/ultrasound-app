@@ -1,6 +1,7 @@
 import { getStripeClient } from "../lib/stripeClient";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
+import { resolveWorkshopCheckoutPrice, workshopDollarsToCents } from "../../shared/workshopPricing";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from "drizzle-orm";
@@ -574,12 +575,8 @@ export const workshopLearnerRouter = router({
         if (existing) throw new TRPCError({ code: "CONFLICT", message: "You are already enrolled in this workshop." });
       }
 
-      // Determine price (instance override or workshop default)
-      // Both instance.price and workshop.price are stored in dollars (matching all other product types)
-      const priceInCents =
-        instance.price != null
-          ? Math.round(Number(instance.price))
-          : Math.round(Number(workshop.price));
+      // Workshop and instance prices are canonical decimal dollars; Stripe receives cents only here.
+      const { displayDollars: displayPrice, stripeCents: priceInCents } = resolveWorkshopCheckoutPrice(instance.price, workshop.price);
 
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select().from(platformSettings).limit(1);
@@ -671,7 +668,7 @@ export const workshopLearnerRouter = router({
         primaryColor: workshop.primaryColor ?? "#179ca3",
         accentColor: workshop.accentColor ?? "#0d9488",
         productName: `${workshop.title} — ${instanceTitle}`,
-        displayPrice: Math.round(priceInCents),
+        displayPrice,
         currency: workshop.currency,
         ...workshopTerms,
       };
@@ -1457,7 +1454,9 @@ export const workshopAdminRouter = router({
       entryId: z.number(),
       workshopId: z.number(),
       accessType: z.enum(["free", "paid"]),
-      priceOverrideCents: z.number().int().min(0).optional(),
+        priceOverrideDollars: z.number().min(0).optional(),
+        /** Deprecated caller compatibility; values are converted into canonical dollars. */
+        priceOverrideCents: z.number().int().min(0).optional(),
       origin: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1508,7 +1507,8 @@ export const workshopAdminRouter = router({
         return { success: true, type: "free", message: `Free access granted and email sent to ${entry.email}` };
       } else {
         const stripe = getStripeClient();
-        const priceInCents = input.priceOverrideCents !== undefined ? input.priceOverrideCents : (workshop.price ?? 0);
+        const priceInDollars = input.priceOverrideDollars
+          ?? (input.priceOverrideCents !== undefined ? input.priceOverrideCents / 100 : Number(workshop.price ?? 0));
         if (priceInCents === 0) {
           const [existing] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)
             .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.workshopId, input.workshopId))).limit(1);
@@ -1525,7 +1525,7 @@ export const workshopAdminRouter = router({
         const session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: entry.email,
-          line_items: [{ price_data: { currency: "usd", product_data: { name: workshop.title }, unit_amount: Math.round(priceInCents * 100) }, quantity: 1 }],
+          line_items: [{ price_data: { currency: "usd", product_data: { name: workshop.title }, unit_amount: workshopDollarsToCents(priceInDollars) }, quantity: 1 }],
           success_url: `${input.origin}/workshops/${workshop.slug}?enrolled=1`,
           cancel_url: `${input.origin}/workshops/${workshop.slug}`,
           metadata: { workshopId: String(input.workshopId), waitlistEntryId: String(input.entryId), grantedByAdminId: String(ctx.user.id) },
@@ -1536,7 +1536,7 @@ export const workshopAdminRouter = router({
         await sendEmail({
           to: { name: entry.name, email: entry.email },
           subject: `Your spot in ${workshop.title} — Complete your enrollment`,
-          htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px"><h2 style="color:#189aa1">You've been granted access to ${workshop.title}</h2><p>Hi ${entry.name},</p><p>Great news! You've been selected from the waitlist for <strong>${workshop.title}</strong>.</p><p>Please complete your enrollment:</p><p style="text-align:center;margin:30px 0"><a href="${session.url}" style="background:#189aa1;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">Complete Enrollment — $${Number(priceInCents).toFixed(2)}</a></p></div>`,
+          htmlBody: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px"><h2 style="color:#189aa1">You've been granted access to ${workshop.title}</h2><p>Hi ${entry.name},</p><p>Great news! You've been selected from the waitlist for <strong>${workshop.title}</strong>.</p><p>Please complete your enrollment:</p><p style="text-align:center;margin:30px 0"><a href="${session.url}" style="background:#189aa1;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block">Complete Enrollment — $${Number(priceInDollars).toFixed(2)}</a></p></div>`,
         });
         return { success: true, type: "paid", checkoutUrl: session.url, message: `Checkout link sent to ${entry.email}` };
       }

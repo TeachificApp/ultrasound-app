@@ -125,6 +125,8 @@ import { lmsEnrollmentAdminRouter } from "./lmsEnrollmentAdminRouter";
 import { lmsCohortAdminRouter } from "./lmsCohortAdminRouter";
 import { generateImage } from "../_core/imageGeneration";
 import { getCourseLessonAccessDecision } from "../lib/lessonAccess";
+import { courseDollarsToStripeCents } from "../lib/courseCheckoutPricing";
+import { formatWorkshopDollars } from "../../shared/workshopPricing";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
 // ─── Certificate Template Router (admin) ─────────────────────────────────────
@@ -694,7 +696,7 @@ export const lmsAIRouter = router({
         } else if (input.productType === "workshop") {
           const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, price: workshops.price, isFree: workshops.isFree }).from(workshops).where(eq(workshops.id, input.productId)).limit(1);
           if (workshop) {
-            const priceStr = workshop.isFree ? "Free" : workshop.price ? `$${Number(workshop.price).toFixed(2)}` : "Paid";
+            const priceStr = workshop.isFree ? "Free" : workshop.price ? formatWorkshopDollars(workshop.price, workshop.currency) : "Paid";
             productDetails = `Product: "${workshop.title}" (Workshop)\nPrice: ${priceStr}`;
             if (!landingPageUrl && workshop.slug) landingPageUrl = `https://learn.allaboutultrasound.com/workshops/${workshop.slug}`;
           }
@@ -4505,13 +4507,13 @@ export const lmsLearnerRouter = router({
             metadata: { course_id: String(course.id), pricing_option_id: String(opt.id) },
           });
           if (pricingType === "one_time" || pricingType === "free") {
-            const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(displayPrice * 100), currency });
+            const p = await stripe.prices.create({ product: product.id, unit_amount: courseDollarsToStripeCents(displayPrice), currency });
             stripePriceId = p.id;
           } else if (pricingType === "subscription") {
             const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
             const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
             const interval = opt.subscriptionInterval ?? "monthly";
-            const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(displayPrice * 100), currency, recurring: { interval: intervalMap[interval] ?? "month", interval_count: intervalCountMap[interval] ?? 1 } });
+            const p = await stripe.prices.create({ product: product.id, unit_amount: courseDollarsToStripeCents(displayPrice), currency, recurring: { interval: intervalMap[interval] ?? "month", interval_count: intervalCountMap[interval] ?? 1 } });
             stripePriceId = p.id;
           } else if (pricingType === "payment_plan") {
             const installmentAmt = opt.installmentAmount && opt.installmentAmount > 0 ? opt.installmentAmount : displayPrice;
@@ -4582,13 +4584,13 @@ export const lmsLearnerRouter = router({
           metadata: { course_id: String(course.id), source: "hosted_checkout_primary" },
         });
         if (pricingType === "one_time" || pricingType === "free") {
-          const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(displayPrice * 100), currency });
+          const p = await stripe.prices.create({ product: product.id, unit_amount: courseDollarsToStripeCents(displayPrice), currency });
           stripePriceId = p.id;
         } else if (pricingType === "subscription") {
           const intervalMap: Record<string, "month" | "year"> = { monthly: "month", quarterly: "month", annual: "year" };
           const intervalCountMap: Record<string, number> = { monthly: 1, quarterly: 3, annual: 1 };
           const interval = course.subscriptionInterval ?? "monthly";
-          const p = await stripe.prices.create({ product: product.id, unit_amount: Math.round(displayPrice * 100), currency, recurring: { interval: intervalMap[interval] ?? "month", interval_count: intervalCountMap[interval] ?? 1 } });
+          const p = await stripe.prices.create({ product: product.id, unit_amount: courseDollarsToStripeCents(displayPrice), currency, recurring: { interval: intervalMap[interval] ?? "month", interval_count: intervalCountMap[interval] ?? 1 } });
           stripePriceId = p.id;
         } else if (pricingType === "payment_plan") {
           const installmentAmt = course.installmentAmount && course.installmentAmount > 0 ? course.installmentAmount : displayPrice;

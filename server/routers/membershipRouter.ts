@@ -21,6 +21,7 @@ import { eq, and, desc, asc, inArray, isNull, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "../_core/notification";
 import { syncStripeProduct } from "../stripeSync";
+import { dollarsToStripeCents } from "../lib/stripePriceUnits";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -787,7 +788,7 @@ const createMembershipCheckout = protectedProcedure
       priceData = {
         price_data: {
           currency: plan.currency ?? "usd",
-          unit_amount: plan.price,
+          unit_amount: dollarsToStripeCents(plan.price),
           product_data: {
             name: plan.title,
             description: plan.description ?? undefined,
@@ -935,7 +936,7 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
       lineItem = {
         price_data: {
           currency: plan.currency ?? "usd",
-          unit_amount: plan.price,
+          unit_amount: dollarsToStripeCents(plan.price),
           product_data: { name: plan.title, description: plan.description ?? undefined, images: plan.coverImage ? [plan.coverImage] : [] },
           ...(isRecurring ? { recurring: { interval: plan.billingInterval === "annual" ? "year" : "month" } } : {}),
         },

@@ -31,16 +31,11 @@ import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { handleCtaBtnClick } from "@/lib/ctaUtils";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { getAdminUrl } from "@/hooks/useSubdomain";
+import { formatWorkshopDollars, shouldRouteWorkshopCtaToCheckout } from "../../../shared/workshopPricing";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtPrice(cents: number, currency = "usd") {
-  if (cents === 0) return "Free";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
+function fmtPrice(dollars: number | string, currency = "usd") {
+  return formatWorkshopDollars(dollars, currency);
 }
 
 function fmtDate(dateStr: string | null | undefined) {
@@ -440,6 +435,24 @@ export default function WorkshopLanding() {
     }
   }
 
+  function handleLandingBlockCta(e: React.MouseEvent<HTMLElement>) {
+    const button = (e.target as HTMLElement).closest("[data-cta-btn]") as HTMLElement | null;
+    const action = button?.dataset.action;
+    if (button && shouldRouteWorkshopCtaToCheckout(action, button.textContent ?? undefined)) {
+      e.preventDefault();
+      e.stopPropagation();
+      handleCta();
+      return;
+    }
+    handleCtaBtnClick(
+      e,
+      (isWaitlistMode || isAllSoldOut) ? openWaitlistOrNotify : () => enrollMutation.mutate({ workshopId: workshop!.id }),
+      undefined,
+      (pricingOptionId?: number) => handleCta(pricingOptionId),
+      (isWaitlistMode || isAllSoldOut) ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined,
+    );
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className={`min-h-screen bg-white ${isPreview ? "pt-10" : ""}`}>
@@ -484,23 +497,7 @@ export default function WorkshopLanding() {
       {landingBlocks.length > 0 ? (
         // Page builder blocks — CTA delegation intercepts all enroll/checkout clicks
         <div
-          onClick={(e) =>
-            handleCtaBtnClick(
-              e as React.MouseEvent<HTMLElement>,
-              // onEnroll (free) — in waitlist/sold-out mode, open waitlist instead
-              (isWaitlistMode || isAllSoldOut)
-                ? openWaitlistOrNotify
-                : () => enrollMutation.mutate({ workshopId: workshop!.id }),
-              // onEnrollWithOption
-              undefined,
-              // onCheckoutPage (paid)
-              (pricingOptionId?: number) => handleCta(pricingOptionId),
-              // onSoldOutOverride — when sold out and button has override URL, navigate there
-              (isWaitlistMode || isAllSoldOut)
-                ? (url: string) => window.open(url, "_blank", "noopener,noreferrer")
-                : undefined,
-            )
-          }
+          onClick={handleLandingBlockCta}
         >
           {landingBlocks.map((block: Block) => {
             // cohort_sessions_auto — list, page, calendar, or groups mode

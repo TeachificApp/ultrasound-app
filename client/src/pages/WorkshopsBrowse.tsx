@@ -10,12 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Briefcase, Search } from "lucide-react";
 import { CourseInstanceInfo } from "@/components/CourseInstanceInfo";
+import { formatWorkshopDollars } from "../../../shared/workshopPricing";
 
 function WorkshopCard({ workshop }: { workshop: any }) {
   const price =
     workshop.isFree || workshop.price === 0
       ? "Free"
-      : `$${Number(workshop.price).toFixed(2)}`;
+      : formatWorkshopDollars(workshop.price, workshop.currency);
 
   return (
     <Link href={`/workshops/${workshop.slug}`}>
