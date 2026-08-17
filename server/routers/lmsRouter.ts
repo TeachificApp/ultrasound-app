@@ -357,6 +357,11 @@ export function resolveUpgradeProductCheckoutCents(price: number | string | null
   return dollarsToStripeCents(price);
 }
 
+/** Course and cohort offers store authored primary prices as decimal dollars. */
+export function resolveCourseOfferCheckoutCents(price: number | string | null | undefined) {
+  return courseDollarsToStripeCents(price);
+}
+
 export const lmsRouter = router({
   /** AI: Generate quiz questions from lesson content */
   generateQuizFromLesson: protectedProcedure
@@ -2806,7 +2811,7 @@ export const lmsLearnerRouter = router({
               price_data: {
                 currency: course.currency,
                 product_data: { name: productName, description: course.subtitle ?? undefined },
-                unit_amount: Math.round(Number(effectivePrice) * 100),
+                unit_amount: resolveCourseOfferCheckoutCents(effectivePrice),
               },
               quantity: input.seats,
             };
@@ -2839,7 +2844,7 @@ export const lmsLearnerRouter = router({
           });
           const stripePrice = await stripe.prices.create({
             product: stripeProduct.id,
-            unit_amount: Math.round(Number(effectivePrice) * 100),
+            unit_amount: resolveCourseOfferCheckoutCents(effectivePrice),
             currency: course.currency,
             recurring: { interval: intervalMap[interval], interval_count: intervalCountMap[interval] },
           });
