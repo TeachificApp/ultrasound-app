@@ -17,6 +17,7 @@ import {
 } from "../bookvault";
 import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
 import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
+import { dollarsToStripeCents } from "../lib/stripePriceUnits";
 import {
   getSyncProduct,
   isPrintfulConfigured,
@@ -367,7 +368,11 @@ export const productsLearnerRouter = router({
 });
 
 // ─── Admin Router ─────────────────────────────────────────────────────────────
-export const productsAdminRouter = router({
+export function resolveProductCheckoutCents(price: number | string | null | undefined) {
+  return dollarsToStripeCents(price);
+}
+
+export const productsRouter = router({
   /** List all products (admin) */
   list: protectedProcedure.query(async ({ ctx }) => {
     if ((ctx.user as any).role !== "admin" && (ctx.user as any).role !== "platform_admin") {
@@ -1293,7 +1298,7 @@ Make ALL content specific and compelling based on the product title and descript
               description: product.subtitle ?? undefined,
               images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
             },
-            unit_amount: Math.round(Number(product.price) * 100),
+            unit_amount: resolveProductCheckoutCents(product.price),
           },
           quantity: 1,
         }],

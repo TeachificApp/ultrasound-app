@@ -2943,7 +2943,7 @@ export const lmsCourses = mysqlTable("lms_courses", {
   // Cohort-specific: close enrollment after this date (null = always open)
   enrollmentCloseDate: timestamp("enrollment_close_date"),
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
-  price: int("price").default(0).notNull(), // cents — used for one_time and payment_plan total
+  price: decimal("price", { precision: 10, scale: 2 }).default("0.00").notNull(), // dollars — used for one_time and payment_plan total
   isFree: boolean("is_free").default(false).notNull(),
   bundleOnly: boolean("bundle_only").default(false).notNull(), // if true, cannot be purchased standalone
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
@@ -3615,7 +3615,7 @@ export const digitalProducts = mysqlTable("digital_products", {
   subtitle: varchar("subtitle", { length: 500 }),
   description: longtext("description"),
   thumbnailUrl: text("thumbnail_url"),
-  price: int("price").default(0).notNull(), // cents
+  price: decimal("price", { precision: 10, scale: 2 }).default("0.00").notNull(), // dollars
   isFree: boolean("is_free").default(false).notNull(),
   bundleOnly: boolean("bundle_only").default(false).notNull(), // if true, cannot be purchased standalone
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
@@ -4560,8 +4560,8 @@ export const physicalProducts = mysqlTable("physical_products", {
   details: longtext("details"),               // Rich text product details / specs
   thumbnailUrl: text("thumbnail_url"),
   // Pricing
-  price: int("price").default(0).notNull(),   // cents — primary / default price
-  compareAtPrice: int("compare_at_price"),    // cents — original/crossed-out price
+  price: decimal("price", { precision: 10, scale: 2 }).default("0.00").notNull(), // dollars — primary / default price
+  compareAtPrice: decimal("compare_at_price", { precision: 10, scale: 2 }),          // dollars — original/crossed-out price
   isFree: boolean("is_free").default(false).notNull(),
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   // Checkout mode

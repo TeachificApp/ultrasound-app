@@ -31,7 +31,7 @@ function parseWebinarPricingOptions(raw: string | null): WebinarPricingOption[] 
   try { return JSON.parse(raw || "[]"); } catch { return []; }
 }
 
-function resolveWebinarPricing(
+export function resolveWebinarPricing(
   webinar: { accessType: string; pricingOptions: string | null },
   pricingOptionId?: string,
 ) {

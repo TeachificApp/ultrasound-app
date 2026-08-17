@@ -26,6 +26,12 @@ async function uniqueSlug(db: any, base: string) {
   }
 }
 
+/** Structured bundle options persist integer cents; legacy options already expose dollars. */
+export function resolveBundleCheckoutDollars(storedPrice: number | string | null | undefined, isStructured: boolean) {
+  const amount = Number(storedPrice ?? 0);
+  return isStructured ? amount / 100 : amount;
+}
+
 export const bundlePublicRouter = router({
   list: publicProcedure
     .input(z.object({ page: z.number().default(1), limit: z.number().max(50).default(12), search: z.string().optional(), brand: z.enum(["all_about_ultrasound","iheartecho"]).optional() }).optional())
@@ -213,7 +219,7 @@ export const bundleLearnerRouter = router({
       }
 
       // Normalize price: structured table stores cents, legacy JSON stores dollars
-      const price = isStructured ? (selectedOption.price / 100) : (selectedOption.price ?? 0);
+      const price = resolveBundleCheckoutDollars(selectedOption.price, isStructured);
 
       if (price <= 0 || selectedOption.pricingType === "free") {
         // Free pricing option — enroll directly
@@ -324,7 +330,7 @@ export const bundleLearnerRouter = router({
   }),
 });
 
-export const bundleAdminRouter = router({
+export const bundleRouter = router({
   list: protectedProcedure
     .input(z.object({ page: z.number().default(1), pageSize: z.number().max(200).default(20), search: z.string().optional(), status: z.enum(["draft","published","enrollment_closed","waitlist","presale"]).optional(), brand: z.enum(["all_about_ultrasound","iheartecho"]).optional() }).optional())
     .query(async ({ ctx, input }) => {
@@ -682,3 +688,6 @@ export const bundleAdminRouter = router({
     return { courses, downloads, products, webinars: webinarRows, quizzes };
   }),
 });
+
+// Compatibility export used by the application router for administrative bundle management.
+export const bundleAdminRouter = bundleRouter;
