@@ -126,6 +126,7 @@ import { lmsCohortAdminRouter } from "./lmsCohortAdminRouter";
 import { generateImage } from "../_core/imageGeneration";
 import { getCourseLessonAccessDecision } from "../lib/lessonAccess";
 import { courseDollarsToStripeCents } from "../lib/courseCheckoutPricing";
+import { dollarsToStripeCents } from "../lib/stripePriceUnits";
 import { formatWorkshopDollars } from "../../shared/workshopPricing";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
@@ -352,7 +353,11 @@ const lmsCertificateRouter = router({
 
 
 // ─── AI Generation Router ─────────────────────────────────────────────────
-export const lmsAIRouter = router({
+export function resolveUpgradeProductCheckoutCents(price: number | string | null | undefined) {
+  return dollarsToStripeCents(price);
+}
+
+export const lmsRouter = router({
   /** AI: Generate quiz questions from lesson content */
   generateQuizFromLesson: protectedProcedure
     .input(z.object({
@@ -913,7 +918,6 @@ export const lmsAdminRouter = router({
   ...lmsEnrollmentAdminRouter._def.procedures,
   ...lmsCohortAdminRouter._def.procedures,
   ...lmsCertificateRouter._def.procedures,
-  ...lmsAIRouter._def.procedures,
   ...cmeActivityFormRouter._def.procedures,
 });
 
@@ -3225,7 +3229,7 @@ export const lmsLearnerRouter = router({
           customer_email: ctx.user.email ?? undefined,
           client_reference_id: ctx.user.id.toString(),
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
-          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: Math.round(Number(product.price) * 100) }, quantity: 1 }],
+          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: resolveUpgradeProductCheckoutCents(product.price) }, quantity: 1 }],
           metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
           payment_intent_data: { description: `${product.title} — Digital Download` },
           success_url: `${origin}/downloads/${product.slug}/files?success=1`,
@@ -3249,7 +3253,7 @@ export const lmsLearnerRouter = router({
           client_reference_id: ctx.user.id.toString(),
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
           shipping_address_collection: { allowed_countries: allowedCountries as any },
-          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: Math.round(Number(product.price) * 100) }, quantity: 1 }],
+          line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: resolveUpgradeProductCheckoutCents(product.price) }, quantity: 1 }],
           metadata: { type: "physical_product", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
           payment_intent_data: { description: `${product.title} — Physical Product` },
           success_url: `${origin}/product/${product.slug}?success=1`,
