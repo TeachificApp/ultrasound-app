@@ -1471,3 +1471,6 @@ export const productsCheckoutPublicRouter = router({
       };
     }),
 });
+
+// Compatibility export used by the application router for administrative product management.
+export const productsAdminRouter = productsRouter;
