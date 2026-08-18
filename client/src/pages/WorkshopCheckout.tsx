@@ -10,7 +10,7 @@
  *  3. Show workshop info on left, Stripe EmbeddedCheckout on right
  *  4. On free: show success immediately
  */
-import { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
@@ -26,6 +26,22 @@ import { formatWorkshopDollars } from "../../../shared/workshopPricing";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "");
+
+export function WorkshopCheckoutClosedState({ title, backHref }: { title: string; backHref: string }) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-md w-full text-center">
+        <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Enrollment Closed</h2>
+        <p className="text-gray-500 text-sm mb-6">Registration for {title} is closed. Payment is not available for this session.</p>
+        <div className="flex flex-col sm:flex-row justify-center gap-3">
+          <Button data-testid="workshop-checkout-closed-cta" disabled variant="outline">Enrollment Closed</Button>
+          <Link href={backHref}><Button variant="outline">Back to Workshop</Button></Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function WorkshopCheckout() {
   const { slug } = useParams<{ slug: string }>();
@@ -117,19 +133,7 @@ export default function WorkshopCheckout() {
   }
 
   if (sessionMeta?.availabilityStatus === "enrollment_closed") {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-md w-full text-center">
-          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Enrollment Closed</h2>
-          <p className="text-gray-500 text-sm mb-6">Registration for {sessionMeta.instanceTitle ?? sessionMeta.workshopTitle} is closed. Payment is not available for this session.</p>
-          <div className="flex flex-col sm:flex-row justify-center gap-3">
-            <Button disabled variant="outline">Enrollment Closed</Button>
-            <Link href={backHref}><Button variant="outline">Back to Workshop</Button></Link>
-          </div>
-        </div>
-      </div>
-    );
+    return <WorkshopCheckoutClosedState title={sessionMeta.instanceTitle ?? sessionMeta.workshopTitle} backHref={backHref} />;
   }
 
   // ── Error state ───────────────────────────────────────────────────────────

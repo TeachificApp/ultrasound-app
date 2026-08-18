@@ -26,7 +26,7 @@ describe("embedded CourseLanding availability actions", () => {
     expect(workshopCheckoutSource).toContain('sessionMeta?.availabilityStatus === "waitlist"');
     expect(workshopCheckoutSource).toContain('sessionMeta?.availabilityStatus === "enrollment_closed"');
     expect(workshopCheckoutSource).toContain('productType="workshop_instance"');
-    expect(workshopCheckoutSource).toContain('Button disabled variant="outline">Enrollment Closed</Button>');
+    expect(workshopCheckoutSource).toContain('data-testid="workshop-checkout-closed-cta" disabled variant="outline"');
   });
 
   it("returns structured restricted availability before reaching Stripe checkout creation", () => {
@@ -58,6 +58,6 @@ describe("embedded CourseLanding availability actions", () => {
 
   it("keeps the WorkshopCheckout Enrollment Closed state non-actionable", () => {
     expect(workshopLandingSource).toContain('if (instance?.status === "enrollment_closed" || instance?.availableForPurchase === false) return;');
-    expect(workshopCheckoutSource).toContain('Button disabled variant="outline">Enrollment Closed</Button>');
+    expect(workshopCheckoutSource).toContain('data-testid="workshop-checkout-closed-cta" disabled variant="outline"');
   });
 });
