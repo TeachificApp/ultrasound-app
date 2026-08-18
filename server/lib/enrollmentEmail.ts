@@ -8,7 +8,7 @@
  * automatically when they click the link — no separate login required.
  */
 
-import { sendEmail } from "../_core/email";
+import { buildTransactionalEmailCta, sendEmail } from "../_core/email";
 const brandColor = "#0d9488";
 const brandDark = "#0e4a50";
 
@@ -45,7 +45,7 @@ function emailWrapper(content: string): string {
       <td align="center">
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
           <tr>
-            <td style="background:linear-gradient(135deg,#0e4a50 0%,#0e4a50 60%,${brandColor} 100%);padding:28px 32px;text-align:center;">
+            <td bgcolor="#0e4a50" style="background-color:#0e4a50;padding:28px 32px;text-align:center;">
               <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp"
                 alt="All About Ultrasound™" width="72" height="72"
                 style="border-radius:50%;display:block;margin:0 auto 12px;" />
@@ -74,6 +74,14 @@ function emailWrapper(content: string): string {
   </table>
 </body>
 </html>`;
+}
+
+function accessCtaWithFallback(url: string, label: string): string {
+  return `${buildTransactionalEmailCta({ href: url, label, color: brandColor })}
+    <p style="margin:0 0 24px;text-align:center;font-size:13px;color:#64748b;line-height:1.5;">
+      If the button is not visible or does not work, use this direct access link:<br />
+      <a href="${url}" style="color:${brandColor};font-weight:700;word-break:break-word;">${label}</a>
+    </p>`;
 }
 
 async function deliverEmail(opts: {
@@ -136,12 +144,7 @@ export async function sendEnrollmentEmail(opts: {
         <li style="margin:4px 0;">Earn a certificate of completion when you finish</li>
       </ul>
     </div>
-    <div style="text-align:center;margin:28px 0;">
-      <a href="${courseUrl}"
-        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
-        Start Learning Now
-      </a>
-    </div>
+    ${accessCtaWithFallback(courseUrl, "Start Learning Now")}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
       If you have any questions, reply to this email or visit our help center.
     </p>
@@ -245,12 +248,7 @@ export async function sendDownloadAccessEmail(opts: {
         <li style="margin:4px 0;">Contact support if you experience any issues</li>
       </ul>
     </div>
-    <div style="text-align:center;margin:28px 0;">
-      <a href="${filesUrl}"
-        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
-        Access Your Files
-      </a>
-    </div>
+    ${accessCtaWithFallback(filesUrl, "Access Your Files")}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
       If you have any questions, reply to this email or visit our help center.
     </p>
@@ -291,12 +289,7 @@ export async function sendBundleAccessEmail(opts: {
         <li style="margin:4px 0;">Contact support if you need assistance</li>
       </ul>
     </div>
-    <div style="text-align:center;margin:28px 0;">
-      <a href="${bundleUrl}"
-        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
-        Access Your Bundle
-      </a>
-    </div>
+    ${accessCtaWithFallback(bundleUrl, "Access Your Bundle")}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
       If you have any questions, reply to this email or visit our help center.
     </p>
@@ -346,12 +339,7 @@ export async function sendQuizAccessEmail(opts: {
         <li style="margin:4px 0;">Start the quiz at any time during your access period</li>
       </ul>
     </div>
-    <div style="text-align:center;margin:28px 0;">
-      <a href="${appUrl}"
-        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">
-        Access My Quiz
-      </a>
-    </div>
+    ${accessCtaWithFallback(appUrl, "Access My Quiz")}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
       If you have any questions, reply to this email or visit our help center.
     </p>
