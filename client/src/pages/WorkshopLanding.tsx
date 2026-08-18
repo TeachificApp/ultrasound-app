@@ -795,7 +795,20 @@ export default function WorkshopLanding() {
                                   <p className="text-sm text-gray-600 mt-2 line-clamp-2">{inst.description}</p>
                                 )}
                               </div>
-                              {showEnrollNow && (
+                              {showEnrollNow && inst.status === "waitlist" && (
+                                <Button
+                                  size="sm"
+                                  className="flex-shrink-0"
+                                  variant="outline"
+                                  onClick={e => { e.stopPropagation(); handleInstanceRegister(inst.id, "waitlist"); }}
+                                >
+                                  Join Waitlist
+                                </Button>
+                              )}
+                              {showEnrollNow && (inst.status === "enrollment_closed" || inst.availableForPurchase === false) && (
+                                <Button size="sm" className="flex-shrink-0" disabled variant="outline">Enrollment Closed</Button>
+                              )}
+                              {showEnrollNow && inst.status !== "waitlist" && inst.status !== "enrollment_closed" && inst.availableForPurchase !== false && (
                                 <Button
                                   size="sm"
                                   className="flex-shrink-0 text-white"

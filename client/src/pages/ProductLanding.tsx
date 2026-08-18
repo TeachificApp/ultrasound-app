@@ -22,10 +22,14 @@ import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { PURCHASE_ACCESS_LABEL, productAccessHref } from "@/lib/accessCta";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ImageLinkWrapper, BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
+
+export function PhysicalProductPrice({ price }: { price: number | string | null | undefined }) {
+  return <>{formatAuthoredDollars(price)}</>;
+}
 
 // ─── Shopify Embed ─────────────────────────────────────────────────────────────
 function ShopifyEmbed({ embedCode }: { embedCode: string }) {
@@ -330,7 +334,7 @@ function PricingOptionSelector({
           }`}
         >
           <span className="font-medium text-gray-900">{opt.label}</span>
-          <span className="font-bold text-teal-700">{formatAuthoredDollars(opt.price)}</span>
+          <span className="font-bold text-teal-700"><PhysicalProductPrice price={opt.price} /></span>
         </button>
       ))}
     </div>

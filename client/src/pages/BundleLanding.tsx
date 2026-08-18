@@ -16,7 +16,7 @@ import {
   FileDown, Radio, HelpCircle, Box, Sparkles, Truck
 } from "lucide-react";
 import { Link } from "wouter";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { PURCHASE_ACCESS_LABEL, bundleAccessHref } from "@/lib/accessCta";
 import { BlockPreview } from "@/components/BlockPreview";
@@ -40,6 +40,10 @@ const ITEM_TYPE_LABELS: Record<string, string> = {
   product: "Product",
   webinar: "Webinar",
 };
+
+export function BundleOptionPrice({ price }: { price: number | string | null | undefined }) {
+  return <>{formatAuthoredDollars(price)}</>;
+}
 
 export default function BundleLanding() {
   const { slug } = useParams<{ slug: string }>();
@@ -181,7 +185,7 @@ export default function BundleLanding() {
             <div className="mt-8 flex flex-wrap items-end gap-4">
               {pricingOptions.map((opt: any, i: number) => (
                 <div key={opt.id || i} className="bg-white/10 rounded-lg px-4 py-2">
-                  <span className="text-2xl font-bold">{formatAuthoredDollars(opt.price)}</span>
+                  <span className="text-2xl font-bold"><BundleOptionPrice price={opt.price} /></span>
                   {opt.type === "subscription" && (
                     <span className="text-sm text-teal-200">/{opt.interval || "month"}</span>
                   )}

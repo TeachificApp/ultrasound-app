@@ -39,8 +39,24 @@ describe("embedded CourseLanding availability actions", () => {
     expect(source).toContain('scheduledWallTimeToUtc(enrollmentDeadline!, "America/New_York")');
   });
 
-  it("keeps Enrollment Closed non-actionable across course and workshop landing surfaces", () => {
-    expect(source).toContain('disabled variant="outline">Enrollment Closed</Button>');
+  it("keeps the CourseLanding main Enrollment Closed CTA disabled", () => {
+    expect(source).toContain('(course as any).status === "enrollment_closed"');
+    expect(source).toContain('Enrollment Closed\n                </Button>');
+  });
+
+  it("keeps the CourseLanding cohort embed Enrollment Closed CTA disabled and out of the enrollment branch", () => {
+    expect(source).toContain('const isClosedCG = data.status === "enrollment_closed";');
+    expect(source).toContain('{showEnrollNow && isClosedCG && (');
+    expect(source).toContain('!isSoldOutCG && !hideGroupEnrollmentPresentation');
+  });
+
+  it("keeps the WorkshopLanding instance Enrollment Closed CTA out of checkout", () => {
+    expect(workshopLandingSource).toContain('if (instance?.status === "enrollment_closed" || instance?.availableForPurchase === false) return;');
+    expect(workshopLandingSource).toContain('inst.status === "enrollment_closed" || inst.availableForPurchase === false');
+    expect(workshopLandingSource).toContain('disabled variant="outline">Enrollment Closed</Button>');
+  });
+
+  it("keeps the WorkshopCheckout Enrollment Closed state non-actionable", () => {
     expect(workshopLandingSource).toContain('if (instance?.status === "enrollment_closed" || instance?.availableForPurchase === false) return;');
     expect(workshopCheckoutSource).toContain('Button disabled variant="outline">Enrollment Closed</Button>');
   });

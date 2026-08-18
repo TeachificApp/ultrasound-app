@@ -26,7 +26,7 @@ import OrderBumpOffer from "@/components/OrderBumpOffer";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import CarouselBlock from "@/components/CarouselBlock";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSeoHead } from "@/hooks/useSeoHead";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { CountdownV2Block, ImageLinkWrapper, CC } from "@/components/BlockPreview";
@@ -35,6 +35,10 @@ import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
+
+export function DownloadProductPrice({ price }: { price: number | string | null | undefined }) {
+  return <>{formatAuthoredDollars(price)}</>;
+}
 
 // ─── Countdown Timer ─────────────────────────────────────────────────────────
 function CountdownTimer({ mode, durationMinutes, targetDate, textColor }: { mode?: string; durationMinutes?: number; targetDate?: string; textColor: string }) {
