@@ -387,7 +387,7 @@ function ListCalView({ sessions, cursor, now }: { sessions: any[]; cursor: Date;
 
   const grouped: Record<string, any[]> = {};
   for (const s of upcoming.slice(0, 30)) {
-    const key = new Date(s.sessionDate).toDateString();
+    const key = formatInTimeZone(s.sessionDate, { weekday: "long", month: "long", day: "numeric" }, PLATFORM_TIMEZONE);
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(s);
   }
@@ -401,7 +401,7 @@ function ListCalView({ sessions, cursor, now }: { sessions: any[]; cursor: Date;
         </Card>
       ) : Object.entries(grouped).map(([dateStr, evts]) => (
         <div key={dateStr}>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{new Date(dateStr).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</p>
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{dateStr}</p>
           <div className="space-y-2">
             {evts.map((s: any) => <CalEventChip key={s.id} session={s} now={now} />)}
           </div>
