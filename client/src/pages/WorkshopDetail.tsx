@@ -2,6 +2,7 @@
  * WorkshopDetail.tsx
  * Public workshop landing page — /workshops/:slug
  */
+import { useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +13,9 @@ import {
   CheckCircle, ArrowLeft, Globe, Video, Building2
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { format } from "date-fns";
 import { formatWorkshopDollars } from "../../../shared/workshopPricing";
+import { formatInTimeZone } from "@shared/platformTime";
+import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 
 function formatPrice(dollars: number | string | null | undefined, isFree: boolean) {
   if (isFree || dollars === 0 || dollars == null) return "Free";
@@ -26,7 +28,7 @@ function LocationIcon({ type }: { type: string }) {
   return <Building2 className="w-4 h-4 text-teal-600" />;
 }
 
-function InstanceCard({ instance, workshopSlug, isDraft }: { instance: any; workshopSlug: string; isDraft?: boolean }) {
+function InstanceCard({ instance, workshopSlug, isDraft, onWaitlist }: { instance: any; workshopSlug: string; isDraft?: boolean; onWaitlist: (instance: any) => void }) {
   const price = instance.price != null
     ? formatWorkshopDollars(instance.price)
     : null;
@@ -38,6 +40,8 @@ function InstanceCard({ instance, workshopSlug, isDraft }: { instance: any; work
   const spotsLeft = instance.capacity != null
     ? Math.max(0, instance.capacity - (instance.enrolledCount ?? 0))
     : null;
+  const isWaitlist = instance.status === "waitlist";
+  const isClosed = isDraft || instance.status === "enrollment_closed";
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 hover:border-teal-400 hover:shadow-md transition-all">
@@ -48,8 +52,8 @@ function InstanceCard({ instance, workshopSlug, isDraft }: { instance: any; work
             <div className="flex items-center gap-1.5 text-sm text-gray-600 mt-2">
               <Calendar className="w-4 h-4 text-teal-500 flex-shrink-0" />
               <span>
-                {format(startDate, "MMMM d, yyyy")}
-                {endDate && ` – ${format(endDate, "MMMM d, yyyy")}`}
+                {formatInTimeZone(startDate, { month: "long", day: "numeric", year: "numeric" }, instance.timezone)}
+                {endDate && ` – ${formatInTimeZone(endDate, { month: "long", day: "numeric", year: "numeric" }, instance.timezone)}`}
               </span>
             </div>
           )}
@@ -62,7 +66,7 @@ function InstanceCard({ instance, workshopSlug, isDraft }: { instance: any; work
               </span>
             )}
           </div>
-          {spotsLeft != null && (
+          {!isWaitlist && !isClosed && spotsLeft != null && (
             <div className="flex items-center gap-1.5 text-sm mt-1">
               <Users className="w-4 h-4 text-teal-500 flex-shrink-0" />
               <span className={spotsLeft <= 5 ? "text-red-600 font-medium" : "text-gray-600"}>
@@ -80,8 +84,10 @@ function InstanceCard({ instance, workshopSlug, isDraft }: { instance: any; work
               )}
             </div>
           )}
-          {isDraft ? (
+          {isClosed ? (
             <Button className="font-semibold" size="sm" disabled variant="outline">Enrollment Closed</Button>
+          ) : isWaitlist ? (
+            <Button className="font-semibold" size="sm" onClick={() => onWaitlist(instance)} variant="outline">Join Waitlist</Button>
           ) : (
             <Link href={`/checkout/workshop/${workshopSlug}?instance=${instance.id}`}>
               <Button
@@ -103,6 +109,7 @@ function InstanceCard({ instance, workshopSlug, isDraft }: { instance: any; work
 export default function WorkshopDetail() {
   const { slug } = useParams<{ slug: string }>();
   const [, navigate] = useLocation();
+  const [waitlistInstance, setWaitlistInstance] = useState<any>(null);
 
   const { data, isLoading, error } = trpc.workshop.getBySlug.useQuery(
     { slug: slug ?? "" },
@@ -138,7 +145,7 @@ export default function WorkshopDetail() {
     );
   }
 
-  const { workshop, availableInstances, pricingOptions } = data;
+  const { workshop, availableInstances, waitlistInstances = [], pricingOptions } = data;
   const defaultPrice = formatPrice(workshop.price, workshop.isFree);
   const compareAt = workshop.compareAtPrice ? formatWorkshopDollars(workshop.compareAtPrice) : null;
   const isDraft = workshop.status === "draft" || workshop.status === "enrollment_closed";
@@ -197,15 +204,15 @@ export default function WorkshopDetail() {
               )}
 
               {/* Available instances */}
-              {availableInstances.length > 0 && (
+              {(availableInstances.length > 0 || waitlistInstances.length > 0) && (
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <Calendar className="w-5 h-5 text-teal-600" />
                     Upcoming Dates
                   </h2>
                   <div className="space-y-3">
-                    {availableInstances.map((inst: any) => (
-                      <InstanceCard key={inst.id} instance={inst} workshopSlug={slug ?? ""} isDraft={isDraft} />
+                    {[...availableInstances, ...waitlistInstances].map((inst: any) => (
+                      <InstanceCard key={inst.id} instance={inst} workshopSlug={slug ?? ""} isDraft={isDraft} onWaitlist={setWaitlistInstance} />
                     ))}
                   </div>
                 </div>
@@ -243,7 +250,7 @@ export default function WorkshopDetail() {
                             <div>
                               <p className="text-sm font-medium text-gray-900">{inst.title}</p>
                               {d && (
-                                <p className="text-xs text-gray-500">{format(d, "MMM d, yyyy")}</p>
+                              <p className="text-xs text-gray-500">{formatInTimeZone(d, { month: "short", day: "numeric", year: "numeric" }, inst.timezone)}</p>
                               )}
                             </div>
                             <ChevronRight className="w-4 h-4 text-gray-400" />
@@ -293,6 +300,15 @@ export default function WorkshopDetail() {
             </div>
           </div>
         </div>
+        {waitlistInstance && (
+          <AvailabilityWaitlistDialog
+            open={true}
+            onClose={() => setWaitlistInstance(null)}
+            productType="workshop_instance"
+            productId={waitlistInstance.id}
+            title={waitlistInstance.title || workshop.title}
+          />
+        )}
     </div>
   );
 }

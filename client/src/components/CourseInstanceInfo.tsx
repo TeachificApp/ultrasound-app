@@ -7,6 +7,7 @@
  * - If no instance/group: shows "Enrollment Closed — Join Waitlist"
  */
 import { Calendar, MapPin, Clock } from "lucide-react";
+import { formatInTimeZone } from "@shared/platformTime";
 
 interface NextInstance {
   startDate?: Date | string | null;
@@ -33,18 +34,9 @@ interface Props {
 
 function formatDateRange(start: Date | string | null | undefined, end: Date | string | null | undefined): string {
   if (!start) return "";
-  const s = new Date(start);
   const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
-  if (!end) return s.toLocaleDateString("en-US", opts);
-  const e = new Date(end);
-  // Same year: "Jun 12 – 14, 2026" or "Jun 12 – Jul 5, 2026"
-  if (s.getFullYear() === e.getFullYear()) {
-    if (s.getMonth() === e.getMonth()) {
-      return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${e.getDate()}, ${s.getFullYear()}`;
-    }
-    return `${s.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${e.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${s.getFullYear()}`;
-  }
-  return `${s.toLocaleDateString("en-US", opts)} – ${e.toLocaleDateString("en-US", opts)}`;
+  if (!end) return formatInTimeZone(start, opts);
+  return `${formatInTimeZone(start, opts)} – ${formatInTimeZone(end, opts)}`;
 }
 
 export function CourseInstanceInfo({ type, nextInstance, primaryCohortGroup, accentColor = "#179ca3", compact = false }: Props) {
@@ -55,7 +47,7 @@ export function CourseInstanceInfo({ type, nextInstance, primaryCohortGroup, acc
       return (
         <div className={`flex items-center gap-1.5 ${compact ? "text-[10px]" : "text-xs"} text-amber-600 font-medium`}>
           <Clock size={compact ? 10 : 12} className="flex-shrink-0" />
-          <span>Enrollment Closed — Join Waitlist</span>
+          <span>Enrollment Closed</span>
         </div>
       );
     }
@@ -89,7 +81,7 @@ export function CourseInstanceInfo({ type, nextInstance, primaryCohortGroup, acc
     return (
       <div className={`flex items-center gap-1.5 ${compact ? "text-[10px]" : "text-xs"} text-amber-600 font-medium`}>
         <Clock size={compact ? 10 : 12} className="flex-shrink-0" />
-        <span>Enrollment Closed — Join Waitlist</span>
+        <span>Enrollment Closed</span>
       </div>
     );
   }
