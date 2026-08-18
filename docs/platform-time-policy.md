@@ -5,3 +5,15 @@ The platform persists business timestamps as UTC `Date` values. Administrators s
 Zone-less administrator inputs, including `datetime-local` values and legacy MySQL scheduled timestamps, must be converted with `parseScheduledTimestamp(value, PLATFORM_TIMEZONE, boundary)` before persistence or comparison. Date-only enrollment deadlines use the `end` boundary so they remain open through 11:59:59.999 PM Eastern on the stated date.
 
 Availability decisions must use `isScheduledDeadlineOpen()` rather than raw `new Date(value) < new Date()` comparisons. User-facing scheduled times should use `formatInTimeZone()` with an explicit timezone; learner cohort schedules, enrollment windows, workshop sales windows, and email campaign confirmations use the platform Eastern timezone. Event telemetry and historical activity timestamps remain UTC instants and may be rendered in the viewer’s locale when they are not business deadlines.
+
+## Audited workflow classifications
+
+| Workflow | Persistence and evaluation rule | Presentation rule |
+|---|---|---|
+| Course and cohort enrollment deadlines | UTC persistence; `isScheduledDeadlineOpen()` with the Eastern platform timezone | Eastern scheduled date and countdown |
+| Workshop instance sales and enrollment close | UTC persistence; server sales-window helpers evaluate Eastern wall-clock deadlines | Eastern scheduled date/time and restricted availability labels |
+| LMS and Workshop Administration inputs | Convert stored UTC instants with `formatScheduledInput()`; parse submitted zone-less inputs as Eastern | `datetime-local` and date-only fields retain the administrator’s intended Eastern value |
+| Cohort schedules and Course Overview | Session instants remain UTC | Course schedule cards and calendar labels use `formatInTimeZone()` in Eastern |
+| Learner workshop dashboard | Instance start instant remains UTC | Enrollment card date uses `formatInTimeZone()` in Eastern |
+| Email campaign scheduling | Persist the parsed UTC instant | Admin scheduler input and confirmation use Eastern wall-clock time |
+| Audit logs, sent/open/click analytics, and subscription history | UTC instants | Viewer-local display is intentional because these are historical events, not scheduled platform deadlines |
