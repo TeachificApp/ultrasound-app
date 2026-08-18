@@ -42,6 +42,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { platformCalendarDayBoundaryToUtc } from "@shared/platformTime";
 
 const BRAND = "#189aa1";
 const BRAND_DARK = "#0e4a50";
@@ -343,8 +344,8 @@ export default function FormResponsesTab({ lab, members }: FormResponsesTabProps
         | "submitted"
         | "reviewed"
         | undefined,
-      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
-      dateTo: dateTo ? new Date(dateTo + "T23:59:59") : undefined,
+      dateFrom: dateFrom ? platformCalendarDayBoundaryToUtc(dateFrom, "start") : undefined,
+      dateTo: dateTo ? platformCalendarDayBoundaryToUtc(dateTo, "end") : undefined,
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE,
     }),

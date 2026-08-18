@@ -36,6 +36,7 @@ import { PublicLandingBlock } from "@/components/PublicLandingBlock";
 import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
+import { getFirstPublishedPreviewLesson, isPublishedPreviewLesson } from "@shared/coursePreviewEligibility";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -282,6 +283,10 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
   onDraftNotify?: () => void;
 }) {
   const d = block.data;
+  const previewLesson = getFirstPublishedPreviewLesson((course?.sections ?? []).flatMap((section: any) => section.lessons ?? []));
+  const freePreviewAction = previewLesson && onFreePreviewClick
+    ? () => onFreePreviewClick(previewLesson.id)
+    : undefined;
   // When ctaText has been overridden (e.g., "Join Waitlist"), apply it to enroll/checkout action buttons
   const enrollActions = new Set(["direct_checkout", "pricing_option", "group_purchase", "free_enrollment", "enroll_next_available"]);
   const isCtaOverridden = ctaText !== "Enroll Now" && ctaText !== "Continue Learning" && ctaText !== SUBSCRIPTION_RESUME_LABEL && ctaText !== "Enrollment Closed";
@@ -343,11 +348,11 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4 leading-tight break-words animate-fade-slide-up" dangerouslySetInnerHTML={{ __html: `<span style="${d.headlineColor ? `color:${d.headlineColor}` : ''}">${d.headline ?? ''}</span>${d.headline2 ? `<br/><span style="${d.headline2Color ? `color:${d.headline2Color}` : ''}">${d.headline2}</span>` : ''}` }} />
               {d.subheadline && <p className="text-base sm:text-lg md:text-xl opacity-90 mb-6 sm:mb-8 break-words animate-fade-slide-up-delay-1" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
               {!d.hideButtons && <div className="flex flex-wrap gap-3 animate-fade-slide-up-delay-2" style={{ justifyContent: d.align === "center" ? "center" : d.align === "right" ? "flex-end" : "flex-start" }}>
-                {buttons.map((btn, i) => {
+                {buttons.filter((btn) => (btn as any).behavior !== "free_preview" || Boolean(freePreviewAction)).map((btn, i) => {
                   const isEnrollBtn = enrollActions.has((btn as any).behavior ?? "");
                   return (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button onClick={isDraft && isEnrollBtn ? undefined : resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : undefined, onCheckoutPage, (btn as any).freeEnrollProductType, (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null, onFreeEnroll)}
+                    <button onClick={isDraft && isEnrollBtn ? undefined : resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, freePreviewAction, onCheckoutPage, (btn as any).freeEnrollProductType, (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null, onFreeEnroll)}
                       disabled={isDraft && isEnrollBtn}
                       className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto transition-opacity hover:opacity-90 disabled:opacity-60 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
@@ -395,7 +400,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
       const imgOnAction = (() => {
         const beh = d.linkBehavior as string | undefined;
         if (!beh) return undefined;
-        if (beh === "free_preview") return onFreePreviewClick ? () => { const fp = (course?.sections ?? []).flatMap((s: any) => s.lessons ?? []).find((l: any) => l.isPreview || l.previewMode === "preview") ?? (course?.sections ?? []).flatMap((s: any) => s.lessons ?? [])[0]; if (fp && onFreePreviewClick) onFreePreviewClick(fp.id); else onEnroll(); } : onEnroll;
+        if (beh === "free_preview") return freePreviewAction;
         if (beh === "pricing_option") return onEnrollWithOption ? () => onEnrollWithOption(d.linkPricingOptionId ? Number(d.linkPricingOptionId) : undefined) : onEnroll;
         if (beh === "direct_checkout" || beh === "group_purchase") return onEnroll;
         if (beh === "free_enrollment") {
@@ -1959,13 +1964,13 @@ export default function CourseLanding() {
     // If user is already logged in, navigate directly to the player
     if (user) {
       const allLessons = (course.sections ?? []).flatMap((s: any) => s.lessons ?? []);
-      const firstPreview = allLessons.find((l: any) => l.isPreview || l.previewMode === "preview") ?? allLessons[0];
+      const firstPreview = getFirstPublishedPreviewLesson(allLessons);
       if (firstPreview) navigate(`/courses/${course.slug}/player?lesson=${firstPreview.id}`);
       return;
     }
     // Guest: open the registration modal with the first preview lesson
     const allLessons = (course.sections ?? []).flatMap((s: any) => s.lessons ?? []);
-    const firstPreview = allLessons.find((l: any) => l.isPreview || l.previewMode === "preview") ?? allLessons[0];
+    const firstPreview = getFirstPublishedPreviewLesson(allLessons);
     if (firstPreview) {
       setFreePreviewLessonId(firstPreview.id);
       setFpFirstName("");
@@ -2061,7 +2066,7 @@ export default function CourseLanding() {
   // Compute first preview lesson for free_preview CTA buttons
   const firstPreviewLesson = (() => {
     const allLessons = (course.sections ?? []).flatMap((s: any) => s.lessons ?? []);
-    return allLessons.find((l: any) => l.isPreview || l.previewMode === "preview") ?? allLessons[0] ?? null;
+    return getFirstPublishedPreviewLesson(allLessons);
   })();
   const handleFreePreviewCta = firstPreviewLesson
     ? () => handleFreePreviewClick(firstPreviewLesson.id)

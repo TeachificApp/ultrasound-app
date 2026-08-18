@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildWorkshopCheckoutIdempotencyKey, formatWorkshopDollars, resolveWorkshopCheckoutPrice, shouldRouteWorkshopCtaToCheckout, workshopDollarsToCents } from "../shared/workshopPricing";
-import { isScheduledDeadlineOpen, scheduledWallTimeToUtc } from "../shared/platformTime";
+import { formatInTimeZone, isScheduledDeadlineOpen, platformCalendarDayBoundaryToUtc, scheduledWallTimeToUtc } from "../shared/platformTime";
 
 describe("workshop dollar pricing", () => {
   it("converts a $2,297.00 workshop price to Stripe cents without multiplying display values", () => {
@@ -33,5 +33,14 @@ describe("workshop Eastern sales deadlines", () => {
     expect(scheduledWallTimeToUtc(configuredWallTime, "America/New_York").toISOString()).toBe("2026-08-18T03:59:00.000Z");
     expect(isScheduledDeadlineOpen(configuredWallTime, "America/New_York", new Date("2026-08-18T00:41:16.000Z"))).toBe(true);
     expect(isScheduledDeadlineOpen(configuredWallTime, "America/New_York", new Date("2026-08-18T04:00:00.000Z"))).toBe(false);
+  });
+
+  it("formats scheduled platform timestamps in their explicit timezone", () => {
+    expect(formatInTimeZone("2026-08-18T13:00:00.000Z", { hour: "numeric", minute: "2-digit", timeZoneName: "short" }, "America/New_York")).toBe("9:00 AM EDT");
+  });
+
+  it("converts a selected Eastern calendar date into explicit UTC filter boundaries", () => {
+    expect(platformCalendarDayBoundaryToUtc("2026-08-17", "start").toISOString()).toBe("2026-08-17T04:00:00.000Z");
+    expect(platformCalendarDayBoundaryToUtc("2026-08-17", "end").toISOString()).toBe("2026-08-18T03:59:59.999Z");
   });
 });

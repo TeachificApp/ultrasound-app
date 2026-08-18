@@ -38,3 +38,29 @@ export function scheduledWallTimeToUtc(date: Date, timeZone = PLATFORM_TIMEZONE)
 export function isScheduledDeadlineOpen(deadline: Date, timeZone: string | null | undefined, now = new Date()): boolean {
   return now < scheduledWallTimeToUtc(deadline, timeZone || PLATFORM_TIMEZONE);
 }
+
+export function formatInTimeZone(
+  value: Date | string,
+  options: Intl.DateTimeFormatOptions,
+  timeZone = PLATFORM_TIMEZONE,
+): string {
+  return new Intl.DateTimeFormat("en-US", { ...options, timeZone }).format(new Date(value));
+}
+
+export function platformCalendarDayBoundaryToUtc(
+  dateOnly: string,
+  boundary: "start" | "end",
+  timeZone = PLATFORM_TIMEZONE,
+): Date {
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  const wallTime = new Date(Date.UTC(
+    year,
+    month - 1,
+    day,
+    boundary === "start" ? 0 : 23,
+    boundary === "start" ? 0 : 59,
+    boundary === "start" ? 0 : 59,
+    boundary === "start" ? 0 : 999,
+  ));
+  return scheduledWallTimeToUtc(wallTime, timeZone);
+}

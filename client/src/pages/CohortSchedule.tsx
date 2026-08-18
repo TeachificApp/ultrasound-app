@@ -14,21 +14,20 @@ import {
 } from "lucide-react";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
+import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { Link, useParams, useLocation, useSearch } from "wouter";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtDate(d: Date | string | null | undefined) {
+function fmtDate(d: Date | string | null | undefined, timeZone = PLATFORM_TIMEZONE) {
   if (!d) return "TBD";
-  const dt = new Date(d);
-  return dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  return formatInTimeZone(d, { weekday: "short", month: "short", day: "numeric", year: "numeric" }, timeZone);
 }
 
-function fmtTime(d: Date | string | null | undefined) {
+function fmtTime(d: Date | string | null | undefined, timeZone = PLATFORM_TIMEZONE) {
   if (!d) return "";
-  const dt = new Date(d);
-  return dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+  return formatInTimeZone(d, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }, timeZone);
 }
 
 function fmtDuration(mins: number) {
@@ -422,7 +421,7 @@ function CalEventChip({ session, now, compact }: { session: any; now: number; co
     return (
       <div className="text-[10px] bg-teal-500 text-white rounded px-1.5 py-1 space-y-0.5">
         <p className="font-medium truncate">{session.title}</p>
-        <p className="opacity-80">{fmtTime(session.sessionDate)}</p>
+        <p className="opacity-80">{fmtTime(session.sessionDate, session.timezone)}</p>
         {joinable && session.meetingUrl && (
           <a href={session.meetingUrl} target="_blank" rel="noopener noreferrer" className="underline block">Join</a>
         )}
@@ -437,7 +436,7 @@ function CalEventChip({ session, now, compact }: { session: any; now: number; co
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-gray-900 text-sm">{session.title}</p>
-        <p className="text-xs text-gray-500 mt-0.5">{fmtTime(session.sessionDate)} · {fmtDuration(session.durationMinutes ?? 60)}</p>
+        <p className="text-xs text-gray-500 mt-0.5">{fmtTime(session.sessionDate, session.timezone)} · {fmtDuration(session.durationMinutes ?? 60)}</p>
         {!past && !joinable && minutesUntil > 0 && minutesUntil <= 120 && (
           <p className="text-xs text-amber-600 mt-0.5 font-medium">Starts in {minutesUntil} min — link available 15 min before</p>
         )}
@@ -1001,11 +1000,11 @@ function SessionCard({ session, isUpcoming: isUpcomingProp, now }: { session: an
             <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 flex-wrap">
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
-                {fmtDate(session.sessionDate)}
+                {fmtDate(session.sessionDate, session.timezone)}
               </span>
               <span className="flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
-                {fmtTime(session.sessionDate)} · {fmtDuration(session.durationMinutes)}
+                {fmtTime(session.sessionDate, session.timezone)} · {fmtDuration(session.durationMinutes)}
                 {tz && <span className="text-gray-400 text-xs ml-1">({tz})</span>}
               </span>
             </div>
@@ -1348,4 +1347,3 @@ function RecordingListRow({ recording, courseId }: { recording: any; courseId: n
     </Link>
   );
 }
-
