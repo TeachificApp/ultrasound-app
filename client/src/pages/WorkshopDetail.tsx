@@ -2,7 +2,7 @@
  * WorkshopDetail.tsx
  * Public workshop landing page — /workshops/:slug
  */
-import { useState } from "react";
+import React, { useState } from "react";
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import { Link, useLocation } from "wouter";
 import { formatWorkshopDollars } from "../../../shared/workshopPricing";
 import { formatInTimeZone } from "@shared/platformTime";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
+import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from "@shared/availabilityPresentation";
 
 function formatPrice(dollars: number | string | null | undefined, isFree: boolean) {
   if (isFree || dollars === 0 || dollars == null) return "Free";
@@ -28,7 +29,7 @@ function LocationIcon({ type }: { type: string }) {
   return <Building2 className="w-4 h-4 text-teal-600" />;
 }
 
-function InstanceCard({ instance, workshopSlug, isDraft, onWaitlist }: { instance: any; workshopSlug: string; isDraft?: boolean; onWaitlist: (instance: any) => void }) {
+export function WorkshopInstanceCard({ instance, workshopSlug, isDraft, onWaitlist }: { instance: any; workshopSlug: string; isDraft?: boolean; onWaitlist: (instance: any) => void }) {
   const price = instance.price != null
     ? formatWorkshopDollars(instance.price)
     : null;
@@ -40,8 +41,10 @@ function InstanceCard({ instance, workshopSlug, isDraft, onWaitlist }: { instanc
   const spotsLeft = instance.capacity != null
     ? Math.max(0, instance.capacity - (instance.enrolledCount ?? 0))
     : null;
-  const isWaitlist = instance.status === "waitlist";
-  const isClosed = isDraft || instance.status === "enrollment_closed";
+  const restricted = shouldHideEnrollmentPresentation({ status: instance.status, availableForPurchase: instance.availableForPurchase });
+  const presentationLabel = availabilityPresentationLabel(instance.status);
+  const isWaitlist = presentationLabel === "Waitlist";
+  const isClosed = isDraft || presentationLabel === "Enrollment Closed" || (restricted && !isWaitlist);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-5 hover:border-teal-400 hover:shadow-md transition-all">
@@ -85,9 +88,9 @@ function InstanceCard({ instance, workshopSlug, isDraft, onWaitlist }: { instanc
             </div>
           )}
           {isClosed ? (
-            <Button className="font-semibold" size="sm" disabled variant="outline">Enrollment Closed</Button>
+            <Button data-testid="workshop-closed-cta" className="font-semibold" size="sm" disabled variant="outline">Enrollment Closed</Button>
           ) : isWaitlist ? (
-            <Button className="font-semibold" size="sm" onClick={() => onWaitlist(instance)} variant="outline">Join Waitlist</Button>
+            <Button data-testid="workshop-waitlist-cta" className="font-semibold" size="sm" onClick={() => onWaitlist(instance)} variant="outline">Join Waitlist</Button>
           ) : (
             <Link href={`/checkout/workshop/${workshopSlug}?instance=${instance.id}`}>
               <Button
@@ -212,7 +215,7 @@ export default function WorkshopDetail() {
                   </h2>
                   <div className="space-y-3">
                     {[...availableInstances, ...waitlistInstances].map((inst: any) => (
-                      <InstanceCard key={inst.id} instance={inst} workshopSlug={slug ?? ""} isDraft={isDraft} onWaitlist={setWaitlistInstance} />
+                      <WorkshopInstanceCard key={inst.id} instance={inst} workshopSlug={slug ?? ""} isDraft={isDraft} onWaitlist={setWaitlistInstance} />
                     ))}
                   </div>
                 </div>

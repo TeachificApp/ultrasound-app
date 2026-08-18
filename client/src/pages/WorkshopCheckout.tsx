@@ -20,9 +20,10 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
-  Lock, ArrowLeft, AlertCircle, CheckCircle2, ShieldCheck,
+  Lock, ArrowLeft, AlertCircle, Bell, CheckCircle2, ShieldCheck,
 } from "lucide-react";
 import { formatWorkshopDollars } from "../../../shared/workshopPricing";
+import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "");
 
@@ -38,6 +39,7 @@ export default function WorkshopCheckout() {
   }, [location]);
 
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [freeSuccess, setFreeSuccess] = useState(false);
   const [sessionMeta, setSessionMeta] = useState<{
@@ -57,6 +59,7 @@ export default function WorkshopCheckout() {
     checkoutTermsLink2Text: string;
     checkoutTermsLink2Url: string;
     free: boolean;
+    availabilityStatus?: "waitlist" | "enrollment_closed";
   } | null>(null);
 
   const createSession = trpc.workshopLearner.createEmbeddedCheckoutSession.useMutation({
@@ -86,6 +89,48 @@ export default function WorkshopCheckout() {
   const stripeOptions = useMemo(() => (clientSecret ? { clientSecret } : undefined), [clientSecret]);
 
   const backHref = `/workshops/${slug}`;
+
+  // Restricted workshop instances never receive a Stripe client secret. Keep users
+  // on a clear availability screen so Waitlist capture and closed enrollment cannot
+  // fall through into a payment form.
+  if (sessionMeta?.availabilityStatus === "waitlist") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-teal-100 p-8 max-w-md w-full text-center">
+          <Bell className="h-12 w-12 text-teal-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Join the Waitlist</h2>
+          <p className="text-gray-500 text-sm mb-6">{sessionMeta.instanceTitle ?? sessionMeta.workshopTitle} is not currently open for registration. Share your name and email and we’ll notify you when enrolment opens.</p>
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <Button className="text-white" style={{ background: sessionMeta.primaryColor }} onClick={() => setWaitlistOpen(true)}>Join Waitlist</Button>
+            <Link href={backHref}><Button variant="outline">Back to Workshop</Button></Link>
+          </div>
+          <AvailabilityWaitlistDialog
+            open={waitlistOpen}
+            onClose={() => setWaitlistOpen(false)}
+            productType="workshop_instance"
+            productId={searchParams.instanceId ?? 0}
+            title={sessionMeta.instanceTitle ?? sessionMeta.workshopTitle}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionMeta?.availabilityStatus === "enrollment_closed") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-md w-full text-center">
+          <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Enrollment Closed</h2>
+          <p className="text-gray-500 text-sm mb-6">Registration for {sessionMeta.instanceTitle ?? sessionMeta.workshopTitle} is closed. Payment is not available for this session.</p>
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <Button disabled variant="outline">Enrollment Closed</Button>
+            <Link href={backHref}><Button variant="outline">Back to Workshop</Button></Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Error state ───────────────────────────────────────────────────────────
   if (createSession.isError) {

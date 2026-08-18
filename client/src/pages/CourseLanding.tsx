@@ -38,6 +38,7 @@ import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 import { getFirstPublishedPreviewLesson, isPublishedPreviewLesson } from "@shared/coursePreviewEligibility";
 import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from "@shared/availabilityPresentation";
+import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -3007,6 +3008,7 @@ function CohortGroupEmbedSection({
   showEnrollNow: boolean;
 }) {
   const { data, isLoading, error } = trpc.lms.getCohortGroupPage.useQuery({ cohortGroupId: groupId });
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   const fmtDate = (d: Date | string | null | undefined) => {
     if (!d) return null;
@@ -3034,6 +3036,9 @@ function CohortGroupEmbedSection({
   }
 
   const isSoldOutCG = data.isSoldOut ?? false;
+  const isWaitlistCG = data.status === "waitlist";
+  const isClosedCG = data.status === "enrollment_closed";
+  const hideGroupEnrollmentPresentation = shouldHideEnrollmentPresentation({ status: data.status });
   const enrollmentCountCG = data.enrollmentCount ?? 0;
   const maxStudentsCG = data.maxStudents ?? null;
   const seatsRemainingCG = maxStudentsCG !== null ? Math.max(0, maxStudentsCG - enrollmentCountCG) : null;
@@ -3043,7 +3048,15 @@ function CohortGroupEmbedSection({
       {/* Header bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColor}08`, borderColor: `${accentColor}22` }}>
         <h3 className="text-lg font-bold text-gray-900">{data.name}</h3>
-        {showEnrollNow && !isSoldOutCG && (
+        {showEnrollNow && isWaitlistCG && (
+          <Button size="sm" className="text-white flex-shrink-0" style={{ backgroundColor: accentColor }} onClick={() => setWaitlistOpen(true)}>
+            Join Waitlist
+          </Button>
+        )}
+        {showEnrollNow && isClosedCG && (
+          <Button size="sm" className="flex-shrink-0" disabled variant="outline">Enrollment Closed</Button>
+        )}
+        {showEnrollNow && !isSoldOutCG && !hideGroupEnrollmentPresentation && (
           <Button
             size="sm"
             className="text-white flex-shrink-0"
@@ -3080,7 +3093,7 @@ function CohortGroupEmbedSection({
                 </div>
               </div>
             )}
-            {maxStudentsCG != null && (
+            {maxStudentsCG != null && !hideGroupEnrollmentPresentation && (
               <div className={`flex items-start gap-3 p-4 rounded-xl border ${isSoldOutCG ? 'bg-red-50 border-red-100' : isLowSeatsCG ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
                 <Users className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isSoldOutCG ? 'text-red-500' : isLowSeatsCG ? 'text-amber-500' : 'text-gray-400'}`} />
                 <div>
@@ -3135,6 +3148,13 @@ function CohortGroupEmbedSection({
           )}
         </div>
       )}
+      <AvailabilityWaitlistDialog
+        open={waitlistOpen}
+        onClose={() => setWaitlistOpen(false)}
+        productType="cohort_group"
+        productId={groupId}
+        title={data.name}
+      />
     </div>
   );
 }
@@ -3143,6 +3163,7 @@ function CohortGroupEmbedSection({
 // Renders a cohort_instance_cards_auto block when selectedParentKind === "workshop".
 // Must be a proper React component (not inline in switch) because it calls hooks.
 function CICAWorkshopBlock({ data: d, onCheckoutPage }: { data: any; onCheckoutPage?: (pricingOptionId?: number) => void }) {
+  const [waitlistInstance, setWaitlistInstance] = useState<any>(null);
   const selectedGroupIds: number[] = d.selectedGroupIds ?? [];
   const selectedParentId: number | null = d.selectedParentId ?? null;
   const groupSelectionMode = d.groupSelectionMode ?? "all";
@@ -3271,7 +3292,15 @@ function CICAWorkshopBlock({ data: d, onCheckoutPage }: { data: any; onCheckoutP
                         <p className="text-sm text-gray-600 mt-2 line-clamp-2">{inst.description}</p>
                       )}
                     </div>
-                    {showEnrollNow && !isFull && (
+                    {showEnrollNow && inst.status === "waitlist" && (
+                      <Button size="sm" className="flex-shrink-0" variant="outline" onClick={() => setWaitlistInstance(inst)}>
+                        Join Waitlist
+                      </Button>
+                    )}
+                    {showEnrollNow && inst.status === "enrollment_closed" && (
+                      <Button size="sm" className="flex-shrink-0" disabled variant="outline">Enrollment Closed</Button>
+                    )}
+                    {showEnrollNow && !isFull && !shouldHideEnrollmentPresentation({ status: inst.status, availableForPurchase: inst.availableForPurchase }) && (
                       <Button size="sm" className="flex-shrink-0 text-white" style={{ backgroundColor: accentColor }} onClick={() => onCheckoutPage?.()}>
                         {enrollNowText}
                       </Button>
@@ -3285,6 +3314,15 @@ function CICAWorkshopBlock({ data: d, onCheckoutPage }: { data: any; onCheckoutP
             );
           })}
         </div>
+        {waitlistInstance && (
+          <AvailabilityWaitlistDialog
+            open={true}
+            onClose={() => setWaitlistInstance(null)}
+            productType="workshop_instance"
+            productId={waitlistInstance.id}
+            title={waitlistInstance.title ?? waitlistInstance.workshopTitle ?? "this workshop"}
+          />
+        )}
       </div>
     </div>
   );
@@ -3305,6 +3343,7 @@ function WorkshopInstanceEmbedSection({
   showEnrollNow: boolean;
 }) {
   const { data, isLoading, error } = trpc.workshop.getInstancePage.useQuery({ instanceId });
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
   const fmtDate = (d: Date | string | null | undefined) => {
     if (!d) return null;
     try {
@@ -3328,6 +3367,12 @@ function WorkshopInstanceEmbedSection({
     );
   }
   const isSoldOut = (data as any).isSoldOut ?? false;
+  const isWaitlist = (data as any).status === "waitlist";
+  const isClosed = (data as any).status === "enrollment_closed";
+  const hideEnrollmentPresentation = shouldHideEnrollmentPresentation({
+    status: (data as any).status,
+    availableForPurchase: (data as any).availableForPurchase,
+  });
   const seatsRemaining: number | null = (data as any).seatsRemaining ?? null;
   const capacity: number | null = (data as any).capacity ?? null;
   const enrolledCount: number = (data as any).enrolledCount ?? 0;
@@ -3336,7 +3381,15 @@ function WorkshopInstanceEmbedSection({
     <div className="rounded-2xl border overflow-hidden" style={{ borderColor: `${accentColor}22` }}>
       <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColor}08`, borderColor: `${accentColor}22` }}>
         <h3 className="text-lg font-bold text-gray-900">{data.title}</h3>
-        {showEnrollNow && !isSoldOut && (
+        {showEnrollNow && isWaitlist && (
+          <Button size="sm" className="text-white flex-shrink-0" style={{ backgroundColor: accentColor }} onClick={() => setWaitlistOpen(true)}>
+            Join Waitlist
+          </Button>
+        )}
+        {showEnrollNow && isClosed && (
+          <Button size="sm" className="flex-shrink-0" disabled variant="outline">Enrollment Closed</Button>
+        )}
+        {showEnrollNow && !isSoldOut && !hideEnrollmentPresentation && (
           <Button size="sm" className="text-white flex-shrink-0" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
             {enrollNowText}
           </Button>
@@ -3364,7 +3417,7 @@ function WorkshopInstanceEmbedSection({
                 </div>
               </div>
             )}
-            {capacity != null && (
+            {capacity != null && !hideEnrollmentPresentation && (
               <div className={`flex items-start gap-3 p-4 rounded-xl border ${isSoldOut ? 'bg-red-50 border-red-100' : isLowSeats ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
                 <Users className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isSoldOut ? 'text-red-500' : isLowSeats ? 'text-amber-500' : 'text-gray-400'}`} />
                 <div>
@@ -3397,7 +3450,7 @@ function WorkshopInstanceEmbedSection({
             ))}
           </div>
         )}
-        {showEnrollNow && !isSoldOut && (
+        {showEnrollNow && !isSoldOut && !hideEnrollmentPresentation && (
           <div className="text-center pt-2">
             <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
               {enrollNowText}
@@ -3405,6 +3458,13 @@ function WorkshopInstanceEmbedSection({
           </div>
         )}
       </div>
+      <AvailabilityWaitlistDialog
+        open={waitlistOpen}
+        onClose={() => setWaitlistOpen(false)}
+        productType="workshop_instance"
+        productId={instanceId}
+        title={(data as any).title ?? "this workshop"}
+      />
     </div>
   );
 }

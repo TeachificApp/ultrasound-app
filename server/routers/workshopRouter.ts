@@ -557,13 +557,26 @@ export const workshopLearnerRouter = router({
         .limit(1);
       if (!instance) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop instance not found" });
 
+      const { platformSettings } = await import("../../drizzle/schema");
+      const [settings] = await db.select().from(platformSettings).limit(1);
+      const workshopTerms = resolveCheckoutTerms(workshop, settings);
+
       // Verify still on sale (includes capacity check)
       if (!isInstanceOnSale(instance)) {
-        // Distinguish sold-out from date-closed for a better error message
-        if (isInstanceSoldOut(instance)) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "This workshop session is sold out." });
-        }
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This workshop is no longer available for purchase." });
+        return {
+          clientSecret: null,
+          free: false,
+          availabilityStatus: instance.status === "waitlist" ? "waitlist" as const : "enrollment_closed" as const,
+          workshopTitle: workshop.title,
+          instanceTitle: instance.title,
+          workshopThumbnail: workshop.thumbnailUrl ?? null,
+          primaryColor: workshop.primaryColor ?? "#179ca3",
+          accentColor: workshop.accentColor ?? "#0d9488",
+          productName: `${workshop.title} — ${instance.title}`,
+          displayPrice: instance.price ?? workshop.price ?? 0,
+          currency: workshop.currency,
+          ...workshopTerms,
+        };
       }
 
       // Check for existing enrollment (only for authenticated users — guests have userId=0
@@ -586,10 +599,6 @@ export const workshopLearnerRouter = router({
 
       // Workshop and instance prices are canonical decimal dollars; Stripe receives cents only here.
       const { displayDollars: displayPrice, stripeCents: priceInCents } = resolveWorkshopCheckoutPrice(instance.price, workshop.price);
-
-      const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select().from(platformSettings).limit(1);
-      const workshopTerms = resolveCheckoutTerms(workshop, settings);
 
       if (priceInCents === 0 || workshop.isFree) {
         // Free enrollment — only if user is logged in
