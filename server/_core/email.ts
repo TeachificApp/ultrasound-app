@@ -222,6 +222,23 @@ export function emailWrapper(content: string, brandMode?: BrandMode): string {
 </html>`;
 }
 
+/**
+ * Transactional CTAs must remain visible in clients that discard CSS gradients.
+ * The table-cell fallback is broadly supported by Gmail and Outlook.
+ */
+export function buildTransactionalEmailCta(opts: { href: string; label: string; color?: string }): string {
+  const color = opts.color || brandColor;
+  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" align="center" style="margin:28px auto 14px;">
+    <tr>
+      <td align="center" bgcolor="${color}" style="background-color:${color};border:1px solid ${color};border-radius:8px;mso-padding-alt:14px 32px;">
+        <a href="${opts.href}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background-color:${color};color:#ffffff;font-family:Arial,sans-serif;font-weight:700;font-size:15px;line-height:20px;padding:14px 32px;border-radius:8px;text-decoration:none;">
+          ${opts.label}
+        </a>
+      </td>
+    </tr>
+  </table>`;
+}
+
 export function buildStreakReminderEmail(opts: {
   firstName: string;
   currentStreak: number;
@@ -999,6 +1016,11 @@ export function buildFunnelPurchaseConfirmationEmail(opts: {
   const previewText = `Thank you for your purchase! Your access to ${opts.productName} is now active.`;
   const totalCents = opts.amountPaid;
   const totalDisplay = `$${(totalCents / 100).toFixed(2)}`;
+  const accessCta = buildTransactionalEmailCta({
+    href: opts.loginUrl,
+    label: "Access Your Purchase",
+    color: bc.primaryColor,
+  });
 
   // Format purchase date
   const purchaseDateDisplay = opts.purchaseDate
@@ -1059,12 +1081,11 @@ export function buildFunnelPurchaseConfirmationEmail(opts: {
     <p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.6;">
       Your access is now active. Log in to start learning right away.
     </p>
-    <div style="text-align:center;margin:28px 0;">
-      <a href="${opts.loginUrl}"
-        style="display:inline-block;background:linear-gradient(135deg,${brandColor},#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
-        Access Your Purchase
-      </a>
-    </div>
+    ${accessCta}
+    <p style="margin:0 0 24px;text-align:center;font-size:13px;color:#64748b;line-height:1.5;">
+      If the button is not visible or does not work, use this direct access link:<br />
+      <a href="${opts.loginUrl}" style="color:${bc.primaryColor};font-weight:700;word-break:break-word;" target="_blank" rel="noopener noreferrer">Access your purchase</a>
+    </p>
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       Questions? Contact us at
       <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
