@@ -1650,7 +1650,7 @@ export const lmsPublicRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [group] = await db
-        .select({ id: lmsCohortGroups.id, name: lmsCohortGroups.name, maxStudents: lmsCohortGroups.maxStudents })
+        .select({ id: lmsCohortGroups.id, name: lmsCohortGroups.name, maxStudents: lmsCohortGroups.maxStudents, status: lmsCohortGroups.status })
         .from(lmsCohortGroups)
         .where(eq(lmsCohortGroups.id, input.cohortGroupId))
         .limit(1);
@@ -1670,6 +1670,7 @@ export const lmsPublicRouter = router({
         enrolled,
         remaining, // null = unlimited
         isFull: capacity !== null && enrolled >= capacity,
+        hideEnrollmentPresentation: group.status === "waitlist" || group.status === "enrollment_closed",
       };
     }),
 

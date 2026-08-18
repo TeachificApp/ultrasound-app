@@ -28,11 +28,12 @@ export function scheduledWallTimeToUtc(date: Date, timeZone = PLATFORM_TIMEZONE)
     hour: date.getUTCHours(),
     minute: date.getUTCMinutes(),
     second: date.getUTCSeconds(),
+    millisecond: date.getUTCMilliseconds(),
   };
-  const intendedUtc = Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second);
-  const rendered = partsInTimeZone(new Date(intendedUtc), timeZone);
-  const offsetMs = Date.UTC(rendered.year, rendered.month - 1, rendered.day, rendered.hour, rendered.minute, rendered.second) - intendedUtc;
-  return new Date(intendedUtc - offsetMs);
+  const intendedUtcSeconds = Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second);
+  const rendered = partsInTimeZone(new Date(intendedUtcSeconds), timeZone);
+  const offsetMs = Date.UTC(rendered.year, rendered.month - 1, rendered.day, rendered.hour, rendered.minute, rendered.second) - intendedUtcSeconds;
+  return new Date(intendedUtcSeconds - offsetMs + wall.millisecond);
 }
 
 export function isScheduledDeadlineOpen(deadline: Date, timeZone: string | null | undefined, now = new Date()): boolean {

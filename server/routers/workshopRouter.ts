@@ -288,6 +288,8 @@ export const workshopPublicRouter = router({
           title: workshopInstances.title,
           capacity: workshopInstances.capacity,
           enrolledCount: workshopInstances.enrolledCount,
+          status: workshopInstances.status,
+          availableForPurchase: workshopInstances.availableForPurchase,
         })
         .from(workshopInstances)
         .where(eq(workshopInstances.id, input.instanceId))
@@ -303,6 +305,7 @@ export const workshopPublicRouter = router({
         enrolled,
         remaining, // null = unlimited
         isFull: capacity !== null && enrolled >= capacity,
+        hideEnrollmentPresentation: instance.status === "waitlist" || instance.status === "enrollment_closed" || !instance.availableForPurchase,
       };
     }),
 

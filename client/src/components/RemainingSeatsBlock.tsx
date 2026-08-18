@@ -75,6 +75,7 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
     enrolled: number;
     remaining: number | null;
     isFull: boolean;
+    hideEnrollmentPresentation?: boolean;
   } | undefined;
 
   // Preview mode: show static placeholder (no live data fetch)
@@ -135,6 +136,8 @@ export function RemainingSeatsBlock({ data, preview = false }: RemainingSeatsBlo
       </div>
     );
   }
+
+  if (seatData.hideEnrollmentPresentation) return null;
 
   const { capacity, enrolled, remaining, isFull } = seatData;
   const isUnlimited = capacity === null;

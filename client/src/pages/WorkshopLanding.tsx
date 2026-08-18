@@ -4,8 +4,7 @@
  *
  * Waitlist mode: when workshop.waitlistEnabled is true AND no active enrolling
  * instance exists, all CTAs switch to waitlist sign-up mode.
- * - If waitlistCtaUrl is set, CTAs navigate there.
- * - Otherwise a modal collects name/email/phone/message and submits to
+ * - CTAs always open a modal that collects name/email/phone/message and submits to
  *   workshopWaitlist.join, then shows the success message or redirects.
  *
  * Also handles ?preview=admin to show an admin edit bar.
@@ -32,6 +31,7 @@ import { handleCtaBtnClick } from "@/lib/ctaUtils";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 import { formatWorkshopDollars, shouldRouteWorkshopCtaToCheckout } from "../../../shared/workshopPricing";
+import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from "@shared/availabilityPresentation";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtPrice(dollars: number | string, currency = "usd") {
@@ -126,6 +126,11 @@ function InstanceCard({
   onRegister: (instanceId: number, availability?: "waitlist") => void;
   isPending: boolean;
 }) {
+  const hideEnrollmentPresentation = shouldHideEnrollmentPresentation({
+    status: instance.status,
+    availableForPurchase: instance.availableForPurchase,
+  });
+  const availabilityLabel = availabilityPresentationLabel(instance.status) ?? (hideEnrollmentPresentation ? "Enrollment Closed" : null);
   return (
     <div className="border border-gray-200 rounded-xl p-5 bg-white hover:border-teal-300 transition-colors">
       <div className="flex items-start justify-between gap-4">
@@ -146,7 +151,7 @@ function InstanceCard({
                 {instance.location}
               </span>
             )}
-            {instance.maxCapacity && (
+            {instance.maxCapacity && !hideEnrollmentPresentation && (
               <span className="flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-teal-500" />
                 {instance.maxCapacity} spots
@@ -161,14 +166,27 @@ function InstanceCard({
           {instance.price !== null && instance.price !== undefined ? (
             <div className="text-lg font-bold text-gray-900 mb-2">{fmtPrice(instance.price)}</div>
           ) : null}
-          <Button
-            size="sm"
-            onClick={() => onRegister(instance.id, instance.status === "waitlist" ? "waitlist" : undefined)}
-            disabled={isPending}
-            className="bg-teal-600 hover:bg-teal-700 text-white"
-          >
-            {instance.status === "waitlist" ? "Join Waitlist" : instance.status === "presale" ? "Pre-sale: Enroll" : "Register"}
-          </Button>
+          {instance.status === "waitlist" ? (
+            <Button
+              size="sm"
+              onClick={() => onRegister(instance.id, "waitlist")}
+              disabled={isPending}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              Join Waitlist
+            </Button>
+          ) : hideEnrollmentPresentation ? (
+            <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">{availabilityLabel}</span>
+          ) : (
+            <Button
+              size="sm"
+              onClick={() => onRegister(instance.id)}
+              disabled={isPending}
+              className="bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              {instance.status === "presale" ? "Pre-sale: Enroll" : "Register"}
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -337,6 +355,7 @@ export default function WorkshopLanding() {
 
   // Determine waitlist mode: admin explicitly enabled waitlist + no active enrolling instances
   const isWaitlistMode = isWaitlistAvailability(workshop?.status) || !!(workshop?.waitlistEnabled && availableInstances.length === 0);
+  const isEnrollmentClosedMode = workshop?.status === "enrollment_closed";
   // isAllSoldOut: all instances are at capacity (no available instances, but sold-out ones exist)
   const isAllSoldOut = availableInstances.length === 0 && soldOutInstances.length > 0;
 
@@ -385,14 +404,11 @@ export default function WorkshopLanding() {
 
   // ── CTA handler — routes to waitlist or checkout ───────────────────────────
   function openWaitlistOrNotify() {
-    if (workshop!.waitlistCtaUrl) {
-      window.open(workshop!.waitlistCtaUrl, "_blank");
-    } else {
-      // Always open the waitlist lead capture modal when sold out or in waitlist mode
-      setWaitlistOpen(true);
-    }
+    // Always collect lead details; waitlist URLs must never bypass platform tracking.
+    setWaitlistOpen(true);
   }
   function handleCta(pricingOptionId?: number) {
+    if (isEnrollmentClosedMode) return;
     // Waitlist mode or all sold out: route to waitlist
     if (isWaitlistMode || isAllSoldOut) {
       openWaitlistOrNotify();
@@ -416,11 +432,13 @@ export default function WorkshopLanding() {
   }
 
   function handleInstanceRegister(instanceId: number, availability?: "waitlist") {
+    const instance = allInstances.find((candidate: any) => candidate.id === instanceId);
     if (availability === "waitlist") {
       setSelectedWaitlistInstanceId(instanceId);
       setWaitlistOpen(true);
       return;
     }
+    if (instance?.status === "enrollment_closed" || instance?.availableForPurchase === false) return;
     if (isWaitlistMode || isAllSoldOut) {
       openWaitlistOrNotify();
       return;
@@ -449,7 +467,7 @@ export default function WorkshopLanding() {
       (isWaitlistMode || isAllSoldOut) ? openWaitlistOrNotify : () => enrollMutation.mutate({ workshopId: workshop!.id }),
       undefined,
       (pricingOptionId?: number) => handleCta(pricingOptionId),
-      (isWaitlistMode || isAllSoldOut) ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined,
+      undefined,
     );
   }
 
@@ -469,7 +487,7 @@ export default function WorkshopLanding() {
             size="sm"
             variant="outline"
             className="ml-3 border-teal-400 text-teal-700 hover:bg-teal-100 text-xs"
-            onClick={() => workshop.waitlistCtaUrl ? window.open(workshop.waitlistCtaUrl, "_blank") : setWaitlistOpen(true)}
+            onClick={() => setWaitlistOpen(true)}
           >
             {workshop.waitlistCtaLabel || "Join Waitlist"}
           </Button>
@@ -591,7 +609,7 @@ export default function WorkshopLanding() {
                             <button
                               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold text-sm transition-opacity hover:opacity-90"
                               style={{ backgroundColor: accentColor }}
-                              onClick={() => { if (workshop?.waitlistCtaUrl) { window.open(workshop.waitlistCtaUrl, "_blank"); } else { setWaitlistOpen(true); } }}
+                              onClick={() => setWaitlistOpen(true)}
                             >Join Waitlist</button>
                           )}
                         </div>
@@ -863,7 +881,7 @@ export default function WorkshopLanding() {
                 />
               )}
               <Button
-                onClick={() => workshop.waitlistCtaUrl ? window.open(workshop.waitlistCtaUrl, "_blank") : setWaitlistOpen(true)}
+                onClick={() => setWaitlistOpen(true)}
                 className="bg-teal-600 hover:bg-teal-700 text-white gap-2"
               >
                 <Bell className="w-4 h-4" />

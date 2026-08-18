@@ -5,6 +5,7 @@ import { bundles, contentWaitlistEntries, digitalProducts, lmsCohortGroups, lmsC
 import { getDb } from "../db";
 import { sendEmail } from "../_core/email";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
+import { buildContentWaitlistAdminNotification } from "../lib/contentWaitlistNotification";
 
 const waitlistProductType = z.enum(["course", "cohort_group", "workshop", "workshop_instance", "webinar", "download", "bundle", "membership", "quiz"]);
 
@@ -96,6 +97,16 @@ export const contentAvailabilityRouter = router({
         name: input.name,
         email: normalizedEmail,
       });
+      try {
+        await sendEmail(buildContentWaitlistAdminNotification({
+          title: target.title,
+          productType: input.productType,
+          name: input.name,
+          email: normalizedEmail,
+        }));
+      } catch (error) {
+        console.error("[content-waitlist] Failed to send admin notification:", error);
+      }
       return { success: true, alreadyJoined: false, title: target.title };
     }),
 

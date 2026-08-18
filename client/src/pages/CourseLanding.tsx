@@ -37,6 +37,7 @@ import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 import { getFirstPublishedPreviewLesson, isPublishedPreviewLesson } from "@shared/coursePreviewEligibility";
+import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from "@shared/availabilityPresentation";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -283,6 +284,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
   onDraftNotify?: () => void;
 }) {
   const d = block.data;
+  const hideCourseEnrollmentPresentation = shouldHideEnrollmentPresentation({ status: (course as any)?.status });
   const previewLesson = getFirstPublishedPreviewLesson((course?.sections ?? []).flatMap((section: any) => section.lessons ?? []));
   const freePreviewAction = previewLesson && onFreePreviewClick
     ? () => onFreePreviewClick(previewLesson.id)
@@ -1019,7 +1021,8 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
                   accentColor={accentColor}
                   onEnroll={() => onOpenGroupDetail?.(embedGroupIdP)}
                   enrollNowText={enrollNowTextP}
-                  showEnrollNow={showEnrollNowP}
+                  showEnrollNow={showEnrollNowP && !hideCourseEnrollmentPresentation}
+                  hideEnrollmentPresentation={hideCourseEnrollmentPresentation}
                 />
               ) : soldOut ? (
                 <div className="rounded-2xl border p-6 text-center space-y-3" style={{ borderColor: `${accentColor}33`, backgroundColor: `${accentColor}06` }}>
@@ -1596,7 +1599,7 @@ function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, c
           rsData.sourceType = "cohort_group";
         }
       }
-      return <RemainingSeatsBlock data={rsData} />;
+      return hideCourseEnrollmentPresentation ? null : <RemainingSeatsBlock data={rsData} />;
     }
     default:
       return null;
@@ -2031,7 +2034,6 @@ export default function CourseLanding() {
     runGuarded(() => { void handleEnrollWithOption(pricingOptionId); });
   const handleWaitlistCta = () => {
     if (isProductWaitlist) { setProductWaitlistSubmitted(false); setProductWaitlistOpen(true); return; }
-    if (featuredGroup?.waitlistCtaUrl) { window.open(featuredGroup.waitlistCtaUrl, "_blank"); return; }
     setCwSubmitted(false); setCwName(""); setCwEmail(""); setCwPhone(""); setCwMessage("");
     setCohortWaitlistOpen(true);
   };
@@ -2344,7 +2346,11 @@ export default function CourseLanding() {
               )}
               {pricingType === "free" && <p className="text-xs text-gray-500">No payment required</p>}
             </div>
-            {isWaitlistMode ? (
+            {isEnrollmentClosed ? (
+              <Button className="w-full font-semibold" size="lg" disabled variant="outline">
+                Enrollment Closed
+              </Button>
+            ) : isWaitlistMode ? (
               <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleWaitlistCta}>
                 <Bell className="w-4 h-4 mr-2" />{waitlistCtaLabel}
               </Button>
@@ -2876,6 +2882,8 @@ function CohortGroupDetailModal({
           <div className="flex items-center gap-2">
             {data?.status === "waitlist" ? (
               <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white" onClick={() => onWaitlist({ id: data.id, name: data.name })}>Join Waitlist</Button>
+            ) : data?.status === "enrollment_closed" ? (
+              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Enrollment Closed</span>
             ) : data?.isSoldOut ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
                 Sold Out
@@ -2940,7 +2948,7 @@ function CohortGroupDetailModal({
                         </div>
                       </div>
                     )}
-                    {data.maxStudents && (
+                    {data.maxStudents && data.status !== "waitlist" && data.status !== "enrollment_closed" && (
                       <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50 border border-gray-100">
                         <Users className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
                         <div>
@@ -2949,7 +2957,7 @@ function CohortGroupDetailModal({
                         </div>
                       </div>
                     )}
-                    {data.enrollmentCloseDate && (
+                    {data.enrollmentCloseDate && data.status !== "waitlist" && data.status !== "enrollment_closed" && (
                       <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-100">
                         <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                         <div>
@@ -2959,11 +2967,13 @@ function CohortGroupDetailModal({
                       </div>
                     )}
                   </div>
-                  <div className="text-center pt-4">
-                    <Button className="bg-teal-600 hover:bg-teal-700 text-white px-8" onClick={() => data.status === "waitlist" ? onWaitlist({ id: data.id, name: data.name }) : onEnroll()}>
-                      {data.status === "waitlist" ? "Join Waitlist" : "Enroll in This Cohort"}
-                    </Button>
-                  </div>
+                  {data.status !== "enrollment_closed" && (
+                    <div className="text-center pt-4">
+                      <Button className="bg-teal-600 hover:bg-teal-700 text-white px-8" onClick={() => data.status === "waitlist" ? onWaitlist({ id: data.id, name: data.name }) : onEnroll()}>
+                        {data.status === "waitlist" ? "Join Waitlist" : "Enroll in This Cohort"}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Render landing blocks with live data for remaining_seats */
@@ -3103,7 +3113,7 @@ function CohortGroupEmbedSection({
               </div>
             )}
           </div>
-          {showEnrollNow && !isSoldOutCG && (
+          {showEnrollNow && !isSoldOutCG && !hideGroupEnrollmentPresentation && (
             <div className="text-center pt-2">
               <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
                 {enrollNowText}
@@ -3116,7 +3126,7 @@ function CohortGroupEmbedSection({
           {(data.landingBlocks as any[]).map((block: any) => (
             <PublicLandingBlock key={block.id} block={block} context={{ cohortGroupId: groupId }} />
           ))}
-          {showEnrollNow && !isSoldOutCG && (
+          {showEnrollNow && !isSoldOutCG && !hideGroupEnrollmentPresentation && (
             <div className="text-center py-6">
               <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onEnroll}>
                 {enrollNowText}
