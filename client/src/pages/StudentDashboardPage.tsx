@@ -79,7 +79,7 @@ function BrandBadge({ brand }: { brand?: string | null }) {
 
 function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return formatInTimeZone(date, { year: "numeric", month: "short", day: "numeric" }, PLATFORM_TIMEZONE);
 }
 
 function formatCurrency(cents: number, currency = "usd"): string {
@@ -2025,8 +2025,8 @@ function ContentCard({
           <p className={`text-xs mb-1 flex items-center gap-1 ${cancelAtPeriodEnd ? "text-orange-500" : "text-teal-600"}`}>
             {cancelAtPeriodEnd ? <XCircle className="w-3 h-3 flex-shrink-0" /> : <Clock className="w-3 h-3 flex-shrink-0" />}
             {cancelAtPeriodEnd
-              ? `Cancels ${new Date(stripePeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
-              : `Renews ${new Date(stripePeriodEnd).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+              ? `Cancels ${formatInTimeZone(stripePeriodEnd, { month: "short", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)}`
+              : `Renews ${formatInTimeZone(stripePeriodEnd, { month: "short", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)}`
             }
           </p>
         )}
@@ -2034,7 +2034,7 @@ function ContentCard({
         {expiresAt && !subscriptionCancelledAt && !stripePeriodEnd && (
           <p className="text-xs text-amber-600 mb-1 flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            Access until {new Date(expiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+            Access until {formatInTimeZone(expiresAt, { month: "short", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)}
           </p>
         )}
         {trackingInfo && (
@@ -2061,7 +2061,7 @@ function ContentCard({
         {subscriptionCancelledAt && (
           <p className="text-xs text-orange-600 mt-2 flex items-center gap-1 font-medium">
             <XCircle className="w-3 h-3 flex-shrink-0" />
-            Subscription cancelled — access ends {new Date(subscriptionCancelledAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+            Subscription cancelled — access ends {formatInTimeZone(subscriptionCancelledAt, { month: "long", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)}
           </p>
         )}
       </div>

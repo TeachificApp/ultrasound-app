@@ -10,6 +10,8 @@ describe("learner workshop schedule timezone presentation", () => {
     expect(source).toContain('formatInTimeZone(w.instanceStartDate, { year: "numeric", month: "short", day: "numeric" }, PLATFORM_TIMEZONE)');
     expect(source).toContain('resolveDashboardSubscriptionCancelledAt((c as any).stripeSubscriptionId, (c as any).accessExpiresAt)');
     expect(source).toContain('resolveDashboardSubscriptionCancelledAt((q as any).stripeSubscriptionId, (q as any).accessExpiresAt)');
+    expect(source).toContain('formatInTimeZone(stripePeriodEnd, { month: "short", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)');
+    expect(source).toContain('formatInTimeZone(expiresAt, { month: "short", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)');
   });
 
   it("uses the dashboard subscription decision boundary to distinguish active from expired access", () => {
