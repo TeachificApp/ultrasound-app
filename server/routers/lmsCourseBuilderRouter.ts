@@ -91,6 +91,7 @@ import {
 } from "../../drizzle/schema";
 import { draftNotifyEntries, cmeActivityForms } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
+import { parseScheduledTimestamp } from "../../shared/platformTime";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -276,9 +277,9 @@ export const lmsCourseBuilderRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, pricingType, defaultMarkComplete: dmc, enrollmentCloseDate, ...updates } = input;
-      // Handle enrollmentCloseDate: convert ISO string to Date or null
+      // Interpret administrator-entered zone-less or date-only deadlines in platform time.
       if (enrollmentCloseDate !== undefined) {
-        (updates as any).enrollmentCloseDate = enrollmentCloseDate ? new Date(enrollmentCloseDate) : null;
+        (updates as any).enrollmentCloseDate = enrollmentCloseDate ? parseScheduledTimestamp(enrollmentCloseDate) : null;
       }
       if (dmc !== undefined) (updates as any).defaultMarkComplete = dmc ? 1 : 0;
       // Sync isFree with pricingType

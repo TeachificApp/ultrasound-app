@@ -87,6 +87,7 @@ import {
   cohortWaitlistEntries,
 } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
+import { parseScheduledTimestamp } from "../../shared/platformTime";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -140,7 +141,7 @@ export const lmsCohortAdminRouter = router({
         cohortGroupId: input.cohortGroupId ?? null,
         title: input.title,
         description,
-        sessionDate: new Date(input.sessionDate),
+        sessionDate: parseScheduledTimestamp(input.sessionDate, input.timezone ?? "America/New_York", "start"),
         durationMinutes: input.durationMinutes,
         meetingUrl: input.meetingUrl ?? null,
         recordingUrl: input.recordingUrl ?? null,
@@ -148,7 +149,7 @@ export const lmsCohortAdminRouter = router({
         timezone: input.timezone ?? "America/New_York",
         recurrenceRule: input.recurrenceRule ?? null,
         recurrenceDaysOfWeek: input.recurrenceDaysOfWeek ?? null,
-        recurrenceEndDate: input.recurrenceEndDate ? new Date(input.recurrenceEndDate) : null,
+        recurrenceEndDate: input.recurrenceEndDate ? parseScheduledTimestamp(input.recurrenceEndDate, input.timezone ?? "America/New_York", "end") : null,
         recurrenceOccurrenceCount: input.recurrenceOccurrenceCount ?? null,
       }).$returningId();
 
@@ -218,8 +219,9 @@ export const lmsCohortAdminRouter = router({
           ? (await processRichTextHtml(description, "cohort-session")) ?? null
           : null;
       }
-      if (sessionDate) updates.sessionDate = new Date(sessionDate);
-      if (recurrenceEndDate !== undefined) updates.recurrenceEndDate = recurrenceEndDate ? new Date(recurrenceEndDate) : null;
+      const timezone = (rest.timezone as string | undefined) ?? "America/New_York";
+      if (sessionDate) updates.sessionDate = parseScheduledTimestamp(sessionDate, timezone, "start");
+      if (recurrenceEndDate !== undefined) updates.recurrenceEndDate = recurrenceEndDate ? parseScheduledTimestamp(recurrenceEndDate, timezone, "end") : null;
       if (Object.keys(updates).length > 0) {
         await db.update(lmsCohortSessions).set(updates).where(eq(lmsCohortSessions.id, id));
       }

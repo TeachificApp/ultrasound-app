@@ -2,7 +2,7 @@ import { getStripeClient } from "../lib/stripeClient";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 import { buildWorkshopCheckoutIdempotencyKey, resolveWorkshopCheckoutPrice, workshopDollarsToCents } from "../../shared/workshopPricing";
-import { isScheduledDeadlineOpen } from "../../shared/platformTime";
+import { isScheduledDeadlineOpen, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "../../shared/platformTime";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from "drizzle-orm";
@@ -1031,8 +1031,8 @@ export const workshopAdminRouter = router({
         workshopId: input.workshopId,
         title: input.title,
         description: input.description,
-        startDate: new Date(input.startDate),
-        endDate: input.endDate ? new Date(input.endDate) : undefined,
+        startDate: parseScheduledTimestamp(input.startDate, input.timezone ?? PLATFORM_TIMEZONE, "start"),
+        endDate: input.endDate ? parseScheduledTimestamp(input.endDate, input.timezone ?? PLATFORM_TIMEZONE, "end") : undefined,
         timezone: input.timezone,
         durationMinutes: input.durationMinutes,
         locationType: input.locationType,
@@ -1046,9 +1046,9 @@ export const workshopAdminRouter = router({
         price: input.price ?? undefined,
         compareAtPrice: input.compareAtPrice ?? undefined,
         availableForPurchase: input.availableForPurchase,
-        salesCloseDate: input.salesCloseDate ? new Date(input.salesCloseDate) : undefined,
-        salesOpenDate: input.salesOpenDate ? new Date(input.salesOpenDate) : undefined,
-        enrollmentCloseDate: input.enrollmentCloseDate ? new Date(input.enrollmentCloseDate) : undefined,
+        salesCloseDate: input.salesCloseDate ? parseScheduledTimestamp(input.salesCloseDate, input.timezone ?? PLATFORM_TIMEZONE, "end") : undefined,
+        salesOpenDate: input.salesOpenDate ? parseScheduledTimestamp(input.salesOpenDate, input.timezone ?? PLATFORM_TIMEZONE, "start") : undefined,
+        enrollmentCloseDate: input.enrollmentCloseDate ? parseScheduledTimestamp(input.enrollmentCloseDate, input.timezone ?? PLATFORM_TIMEZONE, "end") : undefined,
         status: input.status,
         enrolledCount: 0,
         instanceContent: input.instanceContent ?? undefined,
@@ -1101,11 +1101,12 @@ export const workshopAdminRouter = router({
       const { id, startDate, endDate, salesCloseDate, salesOpenDate, enrollmentCloseDate, ...rest } = input;
       const [existing] = await db.select({ status: workshopInstances.status }).from(workshopInstances).where(eq(workshopInstances.id, id)).limit(1);
       const updateData: Record<string, any> = { ...rest };
-      if (startDate) updateData.startDate = new Date(startDate);
-      if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
-      if (salesCloseDate !== undefined) updateData.salesCloseDate = salesCloseDate ? new Date(salesCloseDate) : null;
-      if (salesOpenDate !== undefined) updateData.salesOpenDate = salesOpenDate ? new Date(salesOpenDate) : null;
-      if (enrollmentCloseDate !== undefined) updateData.enrollmentCloseDate = enrollmentCloseDate ? new Date(enrollmentCloseDate) : null;
+      const timezone = (rest.timezone as string | undefined) ?? PLATFORM_TIMEZONE;
+      if (startDate) updateData.startDate = parseScheduledTimestamp(startDate, timezone, "start");
+      if (endDate !== undefined) updateData.endDate = endDate ? parseScheduledTimestamp(endDate, timezone, "end") : null;
+      if (salesCloseDate !== undefined) updateData.salesCloseDate = salesCloseDate ? parseScheduledTimestamp(salesCloseDate, timezone, "end") : null;
+      if (salesOpenDate !== undefined) updateData.salesOpenDate = salesOpenDate ? parseScheduledTimestamp(salesOpenDate, timezone, "start") : null;
+      if (enrollmentCloseDate !== undefined) updateData.enrollmentCloseDate = enrollmentCloseDate ? parseScheduledTimestamp(enrollmentCloseDate, timezone, "end") : null;
       await db.update(workshopInstances).set(updateData).where(eq(workshopInstances.id, id));
       if (shouldReleasePresaleEnrollment(existing?.status, input.status)) {
         await db.update(workshopEnrollments).set({ accessLevel: "full" })

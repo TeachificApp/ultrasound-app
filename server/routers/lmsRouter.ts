@@ -28,6 +28,7 @@ import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or, gte } fro
 import { randomBytes } from "crypto";
 import { evaluateInlineLessonQuizScore, shouldRestoreMissingCourseCertificate } from "../../shared/inlineLessonQuizCompletion";
 import { resolvePresaleWelcome } from "../../shared/contentAvailability";
+import { isScheduledDeadlineOpen } from "../../shared/platformTime";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
@@ -1228,14 +1229,14 @@ export const lmsPublicRouter = router({
       const now = new Date();
       const isCohortGroupOnSale = (g: typeof cohortGroupsRaw[0]) => {
         if (g.status !== "open") return false;
-        if (g.enrollmentCloseDate && now >= new Date(g.enrollmentCloseDate)) return false;
+        if (g.enrollmentCloseDate && !isScheduledDeadlineOpen(g.enrollmentCloseDate, "America/New_York", now)) return false;
         // Capacity check — if capacity is set and fully enrolled, not on sale
         if (g.maxStudents != null && Number(g.enrollmentCount ?? 0) >= g.maxStudents) return false;
         return true;
       };
       const isCohortGroupSoldOut = (g: typeof cohortGroupsRaw[0]) => {
         if (g.status !== "open") return false;
-        if (g.enrollmentCloseDate && now >= new Date(g.enrollmentCloseDate)) return false;
+        if (g.enrollmentCloseDate && !isScheduledDeadlineOpen(g.enrollmentCloseDate, "America/New_York", now)) return false;
         // Must have capacity set and be at/over it
         return g.maxStudents != null && Number(g.enrollmentCount ?? 0) >= g.maxStudents;
       };
@@ -2631,7 +2632,7 @@ export const lmsLearnerRouter = router({
       }
 
       // Block checkout if enrollment close date has passed
-      if (course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date()) {
+      if (course.enrollmentCloseDate && !isScheduledDeadlineOpen(course.enrollmentCloseDate, "America/New_York")) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
       }
 
@@ -2993,7 +2994,7 @@ export const lmsLearnerRouter = router({
       // 4. Create Stripe checkout session (same logic as createCheckout but with user.id)
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      if (course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date()) {
+      if (course.enrollmentCloseDate && !isScheduledDeadlineOpen(course.enrollmentCloseDate, "America/New_York")) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
       }
       if ((course.status as string) === "enrollment_closed") {

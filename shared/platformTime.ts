@@ -40,6 +40,26 @@ export function isScheduledDeadlineOpen(deadline: Date, timeZone: string | null 
   return now < scheduledWallTimeToUtc(deadline, timeZone || PLATFORM_TIMEZONE);
 }
 
+/**
+ * Accepts an ISO instant unchanged, but interprets zone-less administrator inputs as
+ * scheduled wall-clock time in the configured platform timezone. A date-only deadline
+ * closes at the end of that platform calendar day.
+ */
+export function parseScheduledTimestamp(
+  value: string | Date,
+  timeZone = PLATFORM_TIMEZONE,
+  dateOnlyBoundary: "start" | "end" = "end",
+): Date {
+  if (value instanceof Date) return value;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return platformCalendarDayBoundaryToUtc(value, dateOnlyBoundary, timeZone);
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(value)) return new Date(value);
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/);
+  if (!match) return new Date(value);
+  const [, year, month, day, hour, minute, second = "0", milliseconds = "0"] = match;
+  const wall = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second), Number(milliseconds.padEnd(3, "0"))));
+  return scheduledWallTimeToUtc(wall, timeZone);
+}
+
 export function formatInTimeZone(
   value: Date | string,
   options: Intl.DateTimeFormatOptions,
