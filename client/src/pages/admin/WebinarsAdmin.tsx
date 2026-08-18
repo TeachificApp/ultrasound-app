@@ -26,6 +26,7 @@ import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import { SdmsCmeConfigPanel, resolveWebinarActivityType } from "@/components/admin/SdmsCmeConfigPanel";
+import { formatScheduledInput, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 const CME_STATUS_COLORS: Record<string, string> = {
@@ -333,7 +334,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
     setType(webinar.type ?? "live");
     setStatus(webinar.status ?? "draft");
     setAccessType((webinar.accessType as any) ?? "free");
-    setScheduledAt(webinar.scheduledAt ? new Date(webinar.scheduledAt).toISOString().slice(0, 16) : "");
+    setScheduledAt(webinar.scheduledAt ? formatScheduledInput(webinar.scheduledAt, PLATFORM_TIMEZONE) : "");
     setDurationMinutes(webinar.durationMinutes ?? 60);
     setTimezone(webinar.timezone ?? "America/New_York");
     setMeetingUrl(webinar.meetingUrl ?? "");
@@ -399,7 +400,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
     updateMutation.mutate({
       id: webinarId,
       title, description, type, status, accessType,
-      scheduledAt: scheduledAt ? new Date(scheduledAt).getTime() : undefined,
+      scheduledAt: scheduledAt ? parseScheduledTimestamp(scheduledAt, PLATFORM_TIMEZONE, "start").getTime() : undefined,
       durationMinutes, timezone, meetingUrl, meetingId,
       videoSource, videoUrl, replayUrl, replayEnabled, replayDelayMinutes,
       hostName, hostTitle,

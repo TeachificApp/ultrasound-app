@@ -12,6 +12,7 @@ import { getDb } from "../db";
 import { cmeActivityForms, lmsCourses } from "../../drizzle/schema";
 import { notifyOwner } from "../_core/notification";
 import { eq, and, isNotNull, lt, gt } from "drizzle-orm";
+import { formatInTimeZone, PLATFORM_TIMEZONE } from "../../shared/platformTime";
 
 const TWO_YEARS_MS = 2 * 365 * 24 * 60 * 60 * 1000;
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
@@ -61,7 +62,7 @@ export async function cmeExpiryCheckHandler(req: Request, res: Response) {
     const lines = forms.map(f => {
       const expiresAt = (f.approvedAt ?? 0) + TWO_YEARS_MS;
       const daysLeft = Math.ceil((expiresAt - now) / (24 * 60 * 60 * 1000));
-      return `• ${f.courseTitle ?? `Course #${f.courseId}`} — expires in ${daysLeft} day${daysLeft !== 1 ? "s" : ""} (${new Date(expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })})`;
+      return `• ${f.courseTitle ?? `Course #${f.courseId}`} — expires in ${daysLeft} day${daysLeft !== 1 ? "s" : ""} (${formatInTimeZone(expiresAt, { year: "numeric", month: "long", day: "numeric" }, PLATFORM_TIMEZONE)})`;
     });
 
     const title = `⚠️ CME Renewal Reminder: ${forms.length} course${forms.length !== 1 ? "s" : ""} expiring within 90 days`;
