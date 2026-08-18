@@ -11,9 +11,14 @@ Availability decisions must use `isScheduledDeadlineOpen()` rather than raw `new
 | Workflow | Persistence and evaluation rule | Presentation rule |
 |---|---|---|
 | Course and cohort enrollment deadlines | UTC persistence; `isScheduledDeadlineOpen()` with the Eastern platform timezone | Eastern scheduled date and countdown |
+| Cohort administration persistence | Zone-less start dates parse at Eastern start-of-day; end and enrollment-close values parse at Eastern end-of-day | Administrator date fields preserve their entered Eastern calendar date |
 | Workshop instance sales and enrollment close | UTC persistence; server sales-window helpers evaluate Eastern wall-clock deadlines | Eastern scheduled date/time and restricted availability labels |
+| Embedded course checkout | Cohort enrollment-close validation uses `isScheduledDeadlineOpen()` before payment session creation | Closed checkout is rejected after the Eastern deadline boundary |
 | LMS and Workshop Administration inputs | Convert stored UTC instants with `formatScheduledInput()`; parse submitted zone-less inputs as Eastern | `datetime-local` and date-only fields retain the administrator’s intended Eastern value |
+| Webinar administration and landing | Stored schedule values parse and hydrate as Eastern wall-clock time | Webinar time remains configured by the webinar timezone; administrator input defaults to Eastern |
+| CME expiry monitoring | Expiry is calculated from the persisted approval instant | Daily renewal notification date renders in Eastern |
 | Cohort schedules and Course Overview | Session instants remain UTC | Course schedule cards and calendar labels use `formatInTimeZone()` in Eastern |
 | Learner workshop dashboard | Instance start instant remains UTC | Enrollment card date uses `formatInTimeZone()` in Eastern |
+| Learner subscription access | Access expiry is an exact UTC instant, not a scheduled wall-clock deadline | Dashboard cancellation branch uses the shared instant-expiry evaluator |
 | Email campaign scheduling | Persist the parsed UTC instant | Admin scheduler input and confirmation use Eastern wall-clock time |
 | Audit logs, sent/open/click analytics, and subscription history | UTC instants | Viewer-local display is intentional because these are historical events, not scheduled platform deadlines |
