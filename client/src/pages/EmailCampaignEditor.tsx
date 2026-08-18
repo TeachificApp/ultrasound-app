@@ -34,6 +34,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import type { AudienceFilter, LegacyInterestKey } from "@shared/emailCampaignAudience";
 import { DEFAULT_AUDIENCE_FILTER } from "@shared/emailCampaignAudience";
 import { wrapInBrandedCampaignEmail } from "@shared/emailCampaignLayout";
+import { formatInTimeZone, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 // Block type is imported from LandingPageBuilder via EmailBlockEditor
 function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -646,7 +647,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   });
   const scheduleMutation = trpc.emailCampaign.scheduleCampaign.useMutation({
     onSuccess: (r) => {
-      toast.success(`Scheduled for ${new Date(r.scheduledAt).toLocaleString()}`);
+      toast.success(`Scheduled for ${formatInTimeZone(r.scheduledAt, { dateStyle: "medium", timeStyle: "short", timeZoneName: "short" }, PLATFORM_TIMEZONE)}`);
       setScheduleDialogOpen(false);
       if (onClose) onClose(); else navigate("/admin/email-campaigns");
     },
@@ -704,7 +705,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     scheduleMutation.mutate({
       subject, htmlBody: wrappedHtml, previewText,
       audienceFilter: filter,
-      scheduledAt: new Date(scheduledAt),
+      scheduledAt: parseScheduledTimestamp(scheduledAt, PLATFORM_TIMEZONE, "start"),
       blocksJson: JSON.stringify(blocks),
       headerTitle: headerTitle || undefined,
       headerSubtext: headerSubtext || undefined,

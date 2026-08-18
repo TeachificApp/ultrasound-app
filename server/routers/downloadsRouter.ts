@@ -264,7 +264,7 @@ export const downloadsLearnerRouter = router({
       // Check if already purchased
       const [existing] = await db.select().from(digitalPurchases)
         .where(and(
-          eq(digitalPurchases.userId, ctx.user.id),
+          eq(digitalPurchases.userId, userId),
           eq(digitalPurchases.productId, input.productId),
         )).limit(1);
       if (existing && !orderBumpCheckout) {

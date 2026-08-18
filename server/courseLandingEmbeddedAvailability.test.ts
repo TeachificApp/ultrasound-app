@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("../client/src/pages/CourseLanding.tsx", import.meta.url), "utf8");
 const workshopCheckoutSource = readFileSync(new URL("../client/src/pages/WorkshopCheckout.tsx", import.meta.url), "utf8");
 const workshopRouterSource = readFileSync(new URL("./routers/workshopRouter.ts", import.meta.url), "utf8");
+const workshopLandingSource = readFileSync(new URL("../client/src/pages/WorkshopLanding.tsx", import.meta.url), "utf8");
 
 describe("embedded CourseLanding availability actions", () => {
   it("routes cohort-group Waitlist cards to shared name-and-email capture and hides capacity urgency", () => {
@@ -36,5 +37,11 @@ describe("embedded CourseLanding availability actions", () => {
   it("evaluates CourseLanding enrollment deadlines through the shared Eastern scheduled-time policy", () => {
     expect(source).toContain('isScheduledDeadlineOpen(enrollmentDeadline, "America/New_York")');
     expect(source).toContain('scheduledWallTimeToUtc(enrollmentDeadline!, "America/New_York")');
+  });
+
+  it("keeps Enrollment Closed non-actionable across course and workshop landing surfaces", () => {
+    expect(source).toContain('disabled variant="outline">Enrollment Closed</Button>');
+    expect(workshopLandingSource).toContain('if (instance?.status === "enrollment_closed" || instance?.availableForPurchase === false) return;');
+    expect(workshopCheckoutSource).toContain('Button disabled variant="outline">Enrollment Closed</Button>');
   });
 });

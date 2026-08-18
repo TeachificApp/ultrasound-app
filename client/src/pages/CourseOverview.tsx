@@ -31,6 +31,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
+import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -824,11 +825,11 @@ function QuizAttemptsSection({ byLesson, primaryColor }: { byLesson: LessonAttem
 
 function fmtCohortDate(d: Date | string | null | undefined) {
   if (!d) return "TBD";
-  return new Date(d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  return formatInTimeZone(d, { weekday: "short", month: "short", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE);
 }
 function fmtCohortTime(d: Date | string | null | undefined) {
   if (!d) return "";
-  return new Date(d).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+  return formatInTimeZone(d, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }, PLATFORM_TIMEZONE);
 }
 function fmtCohortDuration(mins: number) {
   if (mins < 60) return `${mins} min`;
