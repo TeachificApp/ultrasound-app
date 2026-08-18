@@ -25,6 +25,7 @@ import { Calendar, Clock, Users, Video, Bell, CheckCircle } from "lucide-react";
 import type { Block } from "@/components/BlockPreview";
 import { BlockPreview } from "@/components/BlockPreview";
 import type { UserParamSource } from "@/lib/userUrlParams";
+import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function formatPrice(webinar: any): string {
@@ -35,14 +36,14 @@ function formatPrice(webinar: any): string {
   return "Free";
 }
 
-function formatDate(ts: number | null | undefined): string {
+export function formatDate(ts: number | null | undefined, timeZone = PLATFORM_TIMEZONE): string {
   if (!ts) return "";
-  return new Date(ts).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  return formatInTimeZone(ts, { weekday: "long", year: "numeric", month: "long", day: "numeric" }, timeZone);
 }
 
-function formatTime(ts: number | null | undefined, tz?: string | null): string {
+export function formatTime(ts: number | null | undefined, tz?: string | null): string {
   if (!ts) return "";
-  return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short", timeZone: tz ?? undefined });
+  return formatInTimeZone(ts, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }, tz ?? PLATFORM_TIMEZONE);
 }
 
 // ─── RenderBlock ──────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const webinarAdminSource = readFileSync(new URL("../client/src/pages/admin/WebinarsAdmin.tsx", import.meta.url), "utf8");
+const webinarLandingSource = readFileSync(new URL("../client/src/pages/WebinarLanding.tsx", import.meta.url), "utf8");
 const cmeExpirySource = readFileSync(new URL("./scheduled/cmeExpiryCheck.ts", import.meta.url), "utf8");
 
 describe("webinar and CME timestamp policy", () => {
@@ -13,5 +14,10 @@ describe("webinar and CME timestamp policy", () => {
 
   it("renders CME expiry notification dates in the configured Eastern timezone", () => {
     expect(cmeExpirySource).toContain('formatInTimeZone(expiresAt, { year: "numeric", month: "long", day: "numeric" }, PLATFORM_TIMEZONE)');
+  });
+
+  it("uses the shared formatter for public webinar date and time presentation", () => {
+    expect(webinarLandingSource).toContain('formatInTimeZone(ts, { weekday: "long", year: "numeric", month: "long", day: "numeric" }, timeZone)');
+    expect(webinarLandingSource).toContain('formatInTimeZone(ts, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }, tz ?? PLATFORM_TIMEZONE)');
   });
 });
