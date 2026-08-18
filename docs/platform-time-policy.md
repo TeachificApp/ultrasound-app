@@ -20,5 +20,9 @@ Availability decisions must use `isScheduledDeadlineOpen()` rather than raw `new
 | Cohort schedules and Course Overview | Session instants remain UTC | Course schedule cards and calendar labels use `formatInTimeZone()` in Eastern |
 | Learner workshop dashboard | Instance start instant remains UTC | Enrollment card date uses `formatInTimeZone()` in Eastern |
 | Learner subscription access | Access expiry is an exact UTC instant, not a scheduled wall-clock deadline | Dashboard cancellation branch uses the shared instant-expiry evaluator |
+
+## Intentional instant and relative-duration handling
+
+The remaining direct `Date.now()` arithmetic in learner progression and public on-load countdowns is **not** a scheduled calendar interpretation. Course drip eligibility is measured as elapsed duration from the stored enrollment instant, and “on load” timers are explicitly relative durations held in session storage. Those paths do not receive a timezone conversion. Likewise, activity history and analytics timestamps may use the learner’s local display context because they are historical instants rather than sales, enrollment, or scheduled-content deadlines.
 | Email campaign scheduling | Persist the parsed UTC instant | Admin scheduler input and confirmation use Eastern wall-clock time |
 | Audit logs, sent/open/click analytics, and subscription history | UTC instants | Viewer-local display is intentional because these are historical events, not scheduled platform deadlines |
