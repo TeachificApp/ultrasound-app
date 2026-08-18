@@ -35,7 +35,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import Layout from "@/components/Layout";
 import { isMembersDomain, isLearnDomain, LEARN_APP_URL, APP_URL, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
-import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
+import { formatInTimeZone, isInstantExpired, PLATFORM_TIMEZONE } from "@shared/platformTime";
+
+export function resolveDashboardSubscriptionCancelledAt(
+  stripeSubscriptionId: string | null | undefined,
+  accessExpiresAt: Date | string | number | null | undefined,
+): Date | null {
+  if (!stripeSubscriptionId || !accessExpiresAt || !isInstantExpired(accessExpiresAt)) return null;
+  return new Date(accessExpiresAt);
+}
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 
@@ -909,7 +917,7 @@ function MyContentTab() {
                   expiresAt={(c as any).accessExpiresAt ?? null}
                   cancelAtPeriodEnd={(c as any).cancelAtPeriodEnd ?? false}
                   stripePeriodEnd={(c as any).stripePeriodEnd ?? null}
-                  subscriptionCancelledAt={(c as any).stripeSubscriptionId && (c as any).accessExpiresAt && new Date((c as any).accessExpiresAt) < new Date() ? new Date((c as any).accessExpiresAt) : null}
+                  subscriptionCancelledAt={resolveDashboardSubscriptionCancelledAt((c as any).stripeSubscriptionId, (c as any).accessExpiresAt)}
                   actions={[
                     { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${c.courseSlug}/player` },
                     { label: "Overview", icon: FileText, href: `/courses/${c.courseSlug}/overview`, secondary: true },
@@ -943,7 +951,7 @@ function MyContentTab() {
                   expiresAt={(q as any).accessExpiresAt ?? null}
                   cancelAtPeriodEnd={(q as any).cancelAtPeriodEnd ?? false}
                   stripePeriodEnd={(q as any).stripePeriodEnd ?? null}
-                  subscriptionCancelledAt={(q as any).stripeSubscriptionId && (q as any).accessExpiresAt && new Date((q as any).accessExpiresAt) < new Date() ? new Date((q as any).accessExpiresAt) : null}
+                  subscriptionCancelledAt={resolveDashboardSubscriptionCancelledAt((q as any).stripeSubscriptionId, (q as any).accessExpiresAt)}
                   actions={[
                     { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
                   ]}

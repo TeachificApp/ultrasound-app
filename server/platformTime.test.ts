@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatScheduledInput, isScheduledDeadlineOpen, parseScheduledTimestamp } from "../shared/platformTime";
+import { formatScheduledInput, isInstantExpired, isScheduledDeadlineOpen, parseScheduledTimestamp } from "../shared/platformTime";
 
 describe("platform scheduled timestamps", () => {
   it("treats a date-only enrollment close as 11:59:59.999 PM Eastern", () => {
@@ -22,5 +22,11 @@ describe("platform scheduled timestamps", () => {
     const instant = new Date("2026-08-18T01:30:00.000Z");
     expect(formatScheduledInput(instant)).toBe("2026-08-17T21:30");
     expect(formatScheduledInput(instant, undefined, false)).toBe("2026-08-17");
+  });
+
+  it("compares access-expiry instants without depending on local calendar time", () => {
+    const boundary = Date.parse("2026-08-18T00:00:00.000Z");
+    expect(isInstantExpired("2026-08-17T23:59:59.999Z", boundary)).toBe(true);
+    expect(isInstantExpired("2026-08-18T00:00:00.000Z", boundary)).toBe(false);
   });
 });

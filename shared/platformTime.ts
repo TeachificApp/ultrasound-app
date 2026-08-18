@@ -79,6 +79,11 @@ export function formatScheduledInput(
   return includeTime ? `${date}T${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}` : date;
 }
 
+/** Evaluates an access-expiry instant without introducing browser-local calendar interpretation. */
+export function isInstantExpired(value: Date | string | number, now = Date.now()): boolean {
+  return new Date(value).getTime() < now;
+}
+
 export function platformCalendarDayBoundaryToUtc(
   dateOnly: string,
   boundary: "start" | "end",
