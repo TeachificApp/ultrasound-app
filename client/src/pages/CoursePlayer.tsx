@@ -9,6 +9,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1395,7 +1396,7 @@ function MobileSidebarContent({
                         const prereqLocked = prereqLockedIds.has(lesson.id);
                         const lessonLocked = dripLocked || dripExpired || prereqLocked;
                         const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
-                        const lessonExpiredDate = dripExpired ? new Date(enrolledAt.getTime() + (lesson.dripOutDays ?? 0) * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                        const lessonExpiredDate = dripExpired ? formatInTimeZone(new Date(enrolledAt.getTime() + (lesson.dripOutDays ?? 0) * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
                         return (
                           <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
                             className={cn("w-full text-left px-2 py-1.5 flex items-center gap-2 text-[11px] transition-colors rounded",
@@ -2392,7 +2393,7 @@ export default function CoursePlayer() {
               const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
               const prereqLocked = prereqLockedIds.has(lesson.id);
               const lessonLocked = dripLocked || prereqLocked;
-              const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+              const lessonUnlockDate = dripLocked ? formatInTimeZone(new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
               return (
                 <button
                   key={lesson.id}
@@ -2430,7 +2431,7 @@ export default function CoursePlayer() {
             {sections.map((section: any, sIdx: number) => {
               const sectionLocked = !dripBypassed && (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
               const unlockDate = sectionLocked
-                ? new Date(enrolledAt.getTime() + section.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                ? formatInTimeZone(new Date(enrolledAt.getTime() + section.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE)
                 : null;
               const sectionNum = topLevelLessons.length + sIdx + 1;
               const allSectionDone = section.lessons.every((l: any) => completedIds.has(l.id)) && section.lessons.length > 0;
@@ -2496,7 +2497,7 @@ export default function CoursePlayer() {
                         const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
                         const prereqLocked = prereqLockedIds.has(lesson.id);
                         const lessonLocked = dripLocked || prereqLocked;
-                        const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                        const lessonUnlockDate = dripLocked ? formatInTimeZone(new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
                         return (
                           <button
                             key={lesson.id}
