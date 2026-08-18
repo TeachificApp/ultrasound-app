@@ -17,6 +17,7 @@ import { sendEmail, buildFunnelPurchaseConfirmationEmail } from "../_core/email"
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { assertFreeOrderEligible, resolveEmbeddedCheckoutExpectedCents } from "../lib/checkoutPricing";
 import { getStripeClient } from "../lib/stripeClient";
+import { isScheduledDeadlineOpen, PLATFORM_TIMEZONE } from "../../shared/platformTime";
 
 const billingAddressSchema = z.object({
   address: z.string(),
@@ -180,7 +181,7 @@ export const embeddedCheckoutRouter = router({
       if (input.lmsCourseId) {
         const [courseRow] = await db.select({ enrollmentCloseDate: lmsCourses.enrollmentCloseDate })
           .from(lmsCourses).where(eq(lmsCourses.id, input.lmsCourseId)).limit(1);
-        if (courseRow?.enrollmentCloseDate && new Date(courseRow.enrollmentCloseDate) < new Date()) {
+        if (courseRow?.enrollmentCloseDate && !isScheduledDeadlineOpen(courseRow.enrollmentCloseDate, PLATFORM_TIMEZONE)) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
         }
       }
