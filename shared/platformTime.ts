@@ -60,6 +60,11 @@ export function parseScheduledTimestamp(
   return scheduledWallTimeToUtc(wall, timeZone);
 }
 
+/** Resolves a public event-countdown target, treating zone-less authoring values as Eastern scheduled time. */
+export function resolveScheduledCountdownTarget(value: string | Date, timeZone = PLATFORM_TIMEZONE): number {
+  return parseScheduledTimestamp(value, timeZone, "end").getTime();
+}
+
 export function formatInTimeZone(
   value: Date | string,
   options: Intl.DateTimeFormatOptions,

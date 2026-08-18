@@ -32,6 +32,7 @@ import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from
 import { CountdownV2Block, ImageLinkWrapper, CC } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
+import { resolveScheduledCountdownTarget } from "@shared/platformTime";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
@@ -47,7 +48,7 @@ function CountdownTimer({ mode, durationMinutes, targetDate, textColor }: { mode
   const resolvedMode = mode ?? (targetDate ? "event" : "on_load");
   useEffect(() => {
     if (resolvedMode === "event" && targetDate) {
-      endRef.current = new Date(targetDate).getTime();
+      endRef.current = resolveScheduledCountdownTarget(targetDate);
     } else {
       const storageKey = `countdown_dl_${durationMinutes ?? 90}`;
       const stored = sessionStorage.getItem(storageKey);

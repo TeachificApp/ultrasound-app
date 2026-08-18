@@ -26,6 +26,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { ImageLinkWrapper, BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
+import { resolveScheduledCountdownTarget } from "@shared/platformTime";
 
 export function PhysicalProductPrice({ price }: { price: number | string | null | undefined }) {
   return <>{formatAuthoredDollars(price)}</>;
@@ -55,7 +56,7 @@ function ProductCountdownTimer({ mode, durationMinutes, targetDate, headline, te
   const [time, setTime] = useState({ days: 0, hours: 0, mins: 0, secs: 0 });
   useEffect(() => {
     if (mode === "event" && targetDate) {
-      endRef.current = new Date(targetDate).getTime();
+      endRef.current = resolveScheduledCountdownTarget(targetDate);
     } else {
       const storageKey = `countdown_pl_${durationMinutes ?? 90}`;
       const stored = sessionStorage.getItem(storageKey);
