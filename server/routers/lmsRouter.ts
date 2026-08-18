@@ -363,6 +363,26 @@ export function resolveCourseOfferCheckoutCents(price: number | string | null | 
   return courseDollarsToStripeCents(price);
 }
 
+/** Builds the actual one-time line item passed to Stripe by LMS course and cohort checkout. */
+export function buildCourseOfferStripeLineItem(input: {
+  stripePriceId?: string | null;
+  price: number | string | null | undefined;
+  currency: string;
+  productName: string;
+  description?: string | null;
+  seats: number;
+}) {
+  if (input.stripePriceId) return { price: input.stripePriceId, quantity: input.seats };
+  return {
+    price_data: {
+      currency: input.currency,
+      product_data: { name: input.productName, description: input.description ?? undefined },
+      unit_amount: resolveCourseOfferCheckoutCents(input.price),
+    },
+    quantity: input.seats,
+  };
+}
+
 export const lmsRouter = router({
   /** AI: Generate quiz questions from lesson content */
   generateQuizFromLesson: protectedProcedure
@@ -2807,16 +2827,14 @@ export const lmsLearnerRouter = router({
 
       if (pricingType === "one_time") {
         // If the option has a pre-created Stripe Price ID, use it directly
-        const lineItem = effectiveStripePriceId
-          ? { price: effectiveStripePriceId, quantity: input.seats }
-          : {
-              price_data: {
-                currency: course.currency,
-                product_data: { name: productName, description: course.subtitle ?? undefined },
-                unit_amount: resolveCourseOfferCheckoutCents(effectivePrice),
-              },
-              quantity: input.seats,
-            };
+        const lineItem = buildCourseOfferStripeLineItem({
+          stripePriceId: effectiveStripePriceId,
+          price: effectivePrice,
+          currency: course.currency,
+          productName,
+          description: course.subtitle,
+          seats: input.seats,
+        });
         const isUpgradeBump = orderBumpCheckout?.bumpMode === "upgrade";
         session = await stripe.checkout.sessions.create({
           mode: "payment",

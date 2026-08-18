@@ -4,7 +4,7 @@
  * falls back to the auto-generated layout.
  * Route: /courses/:slug
  */
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSeoHead, buildCourseJsonLd } from "@/hooks/useSeoHead";
 import { EnrolledAccessBanner } from "@/components/EnrolledAccessBanner";
 import { useParams, useLocation } from "wouter";
@@ -39,6 +39,8 @@ import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 import { getFirstPublishedPreviewLesson, isPublishedPreviewLesson } from "@shared/coursePreviewEligibility";
 import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from "@shared/availabilityPresentation";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
+import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
+import { isScheduledDeadlineOpen, scheduledWallTimeToUtc } from "@shared/platformTime";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -133,26 +135,26 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   download: <Download className="w-5 h-5" />,
 };
 
-function formatPrice(c: any): string {
+export function formatPrice(c: any): string {
   const pt = c?.pricingType ?? (c?.isFree ? "free" : "one_time");
   if (pt === "free") return "Free";
   if (pt === "trial_then_subscription") {
     const trialDays = c.trialDays ?? 7;
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `${trialDays}-day free trial, then $${c.price % 1 === 0 ? Number(c.price).toLocaleString("en-US") : Number(c.price).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `${trialDays}-day free trial, then ${formatAuthoredDollars(c.price)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "subscription") {
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `$${c.price % 1 === 0 ? Number(c.price).toLocaleString("en-US") : Number(c.price).toFixed(2)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `${formatAuthoredDollars(c.price)}${intervalLabel[c.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "payment_plan") {
-    const dp = c.downPayment ? `$${c.downPayment % 1 === 0 ? Number(c.downPayment).toLocaleString("en-US") : Number(c.downPayment).toFixed(2)} down` : "";
+    const dp = c.downPayment ? `${formatAuthoredDollars(c.downPayment)} down` : "";
     const inst = c.installmentCount && c.installmentAmount
-      ? ` + ${c.installmentCount}×$${c.installmentAmount % 1 === 0 ? Number(c.installmentAmount).toLocaleString("en-US") : Number(c.installmentAmount).toFixed(2)}`
+      ? ` + ${c.installmentCount}×${formatAuthoredDollars(c.installmentAmount)}`
       : "";
-    return dp + inst || `$${c.price % 1 === 0 ? Number(c.price).toLocaleString("en-US") : Number(c.price).toFixed(2)}`;
+    return dp + inst || formatAuthoredDollars(c.price);
   }
-  return `$${c.price % 1 === 0 ? Number(c.price).toLocaleString("en-US") : Number(c.price).toFixed(2)}`;
+  return formatAuthoredDollars(c.price);
 }
 
 function formatPricingOption(opt: any): string {
@@ -160,16 +162,16 @@ function formatPricingOption(opt: any): string {
   if (pt === "free") return "Free";
   if (pt === "subscription") {
     const intervalLabel: Record<string, string> = { monthly: "/mo", quarterly: "/qtr", annual: "/yr" };
-    return `$${Number(opt.price).toFixed(2)}${intervalLabel[opt.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
+    return `${formatAuthoredDollars(opt.price)}${intervalLabel[opt.subscriptionInterval ?? "monthly"] ?? "/mo"}`;
   }
   if (pt === "payment_plan") {
-const dp = opt.downPayment ? `$${Number(opt.downPayment).toFixed(2)} down` : "";
+const dp = opt.downPayment ? `${formatAuthoredDollars(opt.downPayment)} down` : "";
     const inst = opt.installmentCount && opt.installmentAmount
-      ? ` + ${opt.installmentCount}×$${Number(opt.installmentAmount).toFixed(2)}`
+      ? ` + ${opt.installmentCount}×${formatAuthoredDollars(opt.installmentAmount)}`
       : "";
-    return dp + inst || `$${Number(opt.price).toFixed(2)}`;
+    return dp + inst || formatAuthoredDollars(opt.price);
   }
-  return `$${Number(opt.price).toFixed(2)}`;
+  return formatAuthoredDollars(opt.price);
 }
 
 function accessLabel(c: any): string {
@@ -272,7 +274,7 @@ function resolveBtnAction(
   return onEnroll;
 }
 
-function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage, onFreeEnroll, onOpenGroupDetail, onSoldOutOverride, isDraft }: {
+export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrolling, ctaText, price, selectedPricingOptionId, onSelectPricingOption, slug, enrollment, user, onFreePreviewClick, onCheckoutPage, onFreeEnroll, onOpenGroupDetail, onSoldOutOverride, isDraft }: {
   block: Block; course: any; onEnroll: () => void; onEnrollWithOption?: (pricingOptionId: number | undefined) => void; enrolling: boolean; ctaText: string; price: string;
   selectedPricingOptionId?: number; onSelectPricingOption?: (id: number | undefined) => void;
   slug?: string; enrollment?: any; user?: UserParamSource | null;
@@ -2011,7 +2013,8 @@ export default function CourseLanding() {
   const isDraft = (course as any).status === "draft" || (course as any).status === "enrollment_closed";
   const price = formatPrice(course);
   const pricingType = course.pricingType ?? (course.isFree ? "free" : "one_time");
-  const isEnrollmentClosed = !enrollment && course.enrollmentCloseDate && new Date(course.enrollmentCloseDate) < new Date();
+  const enrollmentDeadline = course.enrollmentCloseDate ? new Date(course.enrollmentCloseDate) : null;
+  const isEnrollmentClosed = !enrollment && enrollmentDeadline !== null && !isScheduledDeadlineOpen(enrollmentDeadline, "America/New_York");
   // Cohort waitlist mode: featuredGroup has waitlist enabled AND no open cohort group exists
   const featuredGroup = (course as any).featuredGroup ?? null;
   // Keep ref in sync so the mutation callback (declared before early returns) can access featuredGroup
@@ -2046,7 +2049,7 @@ export default function CourseLanding() {
   // Enrollment countdown: days remaining until close (only for cohorts, not yet closed, not enrolled)
   const enrollmentCountdownDays = (() => {
     if (enrollment || isEnrollmentClosed || !course.enrollmentCloseDate) return null;
-    const diff = new Date(course.enrollmentCloseDate).getTime() - Date.now();
+    const diff = scheduledWallTimeToUtc(enrollmentDeadline!, "America/New_York").getTime() - Date.now();
     const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
     return days > 0 && days <= 30 ? days : null; // show banner up to 30 days out
   })();

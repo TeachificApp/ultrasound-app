@@ -25,6 +25,7 @@ import { PURCHASE_ACCESS_LABEL, productAccessHref } from "@/lib/accessCta";
 import { useState, useEffect, useRef } from "react";
 import { ImageLinkWrapper, BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
+import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 
 // ─── Shopify Embed ─────────────────────────────────────────────────────────────
 function ShopifyEmbed({ embedCode }: { embedCode: string }) {
@@ -329,7 +330,7 @@ function PricingOptionSelector({
           }`}
         >
           <span className="font-medium text-gray-900">{opt.label}</span>
-          <span className="font-bold text-teal-700">${Number(opt.price).toFixed(2)}</span>
+          <span className="font-bold text-teal-700">{formatAuthoredDollars(opt.price)}</span>
         </button>
       ))}
     </div>
@@ -431,8 +432,8 @@ export default function ProductLanding() {
   const displayPrice = product.isFree
     ? "Free"
     : selectedOption
-      ? `$${Number(selectedOption.price).toFixed(2)}`
-      : `$${Number(product.price).toFixed(2)}`;
+      ? formatAuthoredDollars(selectedOption.price)
+      : formatAuthoredDollars(product.price);
 
   const handleBuy = () => {
     if (hasPurchased) {

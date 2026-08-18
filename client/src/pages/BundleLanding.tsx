@@ -23,6 +23,7 @@ import { BlockPreview } from "@/components/BlockPreview";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
+import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 
 const ITEM_TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-5 h-5 text-teal-600" />,
@@ -180,7 +181,7 @@ export default function BundleLanding() {
             <div className="mt-8 flex flex-wrap items-end gap-4">
               {pricingOptions.map((opt: any, i: number) => (
                 <div key={opt.id || i} className="bg-white/10 rounded-lg px-4 py-2">
-                  <span className="text-2xl font-bold">${Number(opt.price).toFixed(2)}</span>
+                  <span className="text-2xl font-bold">{formatAuthoredDollars(opt.price)}</span>
                   {opt.type === "subscription" && (
                     <span className="text-sm text-teal-200">/{opt.interval || "month"}</span>
                   )}
@@ -232,8 +233,8 @@ export default function BundleLanding() {
                       <ShoppingCart className="w-5 h-5" />
                       {checkoutBusy ? "Processing..." : (
                         opt.type === "subscription"
-                          ? `Subscribe — $${Number(opt.price).toFixed(2)}/${opt.interval || "mo"}`
-                          : `${opt.label || "Buy Now"} — $${Number(opt.price).toFixed(2)}`
+                          ? `Subscribe — ${formatAuthoredDollars(opt.price)}/${opt.interval || "mo"}`
+                          : `${opt.label || "Buy Now"} — ${formatAuthoredDollars(opt.price)}`
                       )}
                     </Button>
                   ))

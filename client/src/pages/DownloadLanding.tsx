@@ -31,6 +31,7 @@ import { useSeoHead } from "@/hooks/useSeoHead";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { CountdownV2Block, ImageLinkWrapper, CC } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
+import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 
 // ─── Block type (matches builder) ─────────────────────────────────────────────
 interface Block { id: string; type: string; data: Record<string, any>; }
@@ -782,7 +783,7 @@ export default function DownloadLanding() {
     );
   }
 
-  const price = product.isFree ? "Free" : `$${product.price % 1 === 0 ? Number(product.price).toLocaleString("en-US") : Number(product.price).toFixed(2)}`;
+  const price = product.isFree ? "Free" : formatAuthoredDollars(product.price);
   const hasPurchased = purchaseStatus?.purchased || product.isFree;
   const isDraft = (product as any).status === "draft" || (product as any).status === "enrollment_closed";
   const isWaitlist = (product as any).status === "waitlist";

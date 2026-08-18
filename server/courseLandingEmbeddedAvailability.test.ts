@@ -32,4 +32,9 @@ describe("embedded CourseLanding availability actions", () => {
     expect(workshopRouterSource).toContain('availabilityStatus: instance.status === "waitlist" ? "waitlist" as const : "enrollment_closed" as const');
     expect(workshopRouterSource.indexOf('availabilityStatus: instance.status')).toBeLessThan(workshopRouterSource.indexOf('stripe.checkout.sessions.create'));
   });
+
+  it("evaluates CourseLanding enrollment deadlines through the shared Eastern scheduled-time policy", () => {
+    expect(source).toContain('isScheduledDeadlineOpen(enrollmentDeadline, "America/New_York")');
+    expect(source).toContain('scheduledWallTimeToUtc(enrollmentDeadline!, "America/New_York")');
+  });
 });
