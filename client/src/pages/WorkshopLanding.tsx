@@ -25,7 +25,7 @@ import { Briefcase, Calendar, MapPin, Clock, Users, Edit2, ArrowLeft, ExternalLi
 import { WorkshopInstancesCalendar } from "@/components/WorkshopInstancesCalendar";
 import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { handleCtaBtnClick } from "@/lib/ctaUtils";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
@@ -50,6 +50,33 @@ function fmtDate(dateStr: string | null | undefined) {
   } catch {
     return dateStr;
   }
+}
+
+export function WorkshopLandingInstanceAction({
+  showEnrollNow,
+  status,
+  availableForPurchase,
+  accentColor,
+  enrollNowText,
+  onRegister,
+  onWaitlist,
+}: {
+  showEnrollNow: boolean;
+  status?: string | null;
+  availableForPurchase?: boolean | null;
+  accentColor: string;
+  enrollNowText: string;
+  onRegister: () => void;
+  onWaitlist: () => void;
+}) {
+  if (!showEnrollNow) return null;
+  if (status === "waitlist") {
+    return <Button size="sm" className="flex-shrink-0" variant="outline" onClick={onWaitlist}>Join Waitlist</Button>;
+  }
+  if (status === "enrollment_closed" || availableForPurchase === false) {
+    return <Button data-testid="workshop-landing-closed-cta" size="sm" className="flex-shrink-0" disabled variant="outline">Enrollment Closed</Button>;
+  }
+  return <Button size="sm" className="flex-shrink-0 text-white" style={{ backgroundColor: accentColor }} onClick={onRegister}>{enrollNowText}</Button>;
 }
 
 // ─── Admin Preview Bar ────────────────────────────────────────────────────────
@@ -795,29 +822,15 @@ export default function WorkshopLanding() {
                                   <p className="text-sm text-gray-600 mt-2 line-clamp-2">{inst.description}</p>
                                 )}
                               </div>
-                              {showEnrollNow && inst.status === "waitlist" && (
-                                <Button
-                                  size="sm"
-                                  className="flex-shrink-0"
-                                  variant="outline"
-                                  onClick={e => { e.stopPropagation(); handleInstanceRegister(inst.id, "waitlist"); }}
-                                >
-                                  Join Waitlist
-                                </Button>
-                              )}
-                              {showEnrollNow && (inst.status === "enrollment_closed" || inst.availableForPurchase === false) && (
-                                <Button size="sm" className="flex-shrink-0" disabled variant="outline">Enrollment Closed</Button>
-                              )}
-                              {showEnrollNow && inst.status !== "waitlist" && inst.status !== "enrollment_closed" && inst.availableForPurchase !== false && (
-                                <Button
-                                  size="sm"
-                                  className="flex-shrink-0 text-white"
-                                  style={{ backgroundColor: accentColor }}
-                                  onClick={e => { e.stopPropagation(); handleInstanceRegister(inst.id); }}
-                                >
-                                  {enrollNowText}
-                                </Button>
-                              )}
+                              <WorkshopLandingInstanceAction
+                                showEnrollNow={showEnrollNow}
+                                status={inst.status}
+                                availableForPurchase={inst.availableForPurchase}
+                                accentColor={accentColor}
+                                enrollNowText={enrollNowText}
+                                onRegister={() => handleInstanceRegister(inst.id)}
+                                onWaitlist={() => handleInstanceRegister(inst.id, "waitlist")}
+                              />
                             </div>
                           </div>
                           <div className="px-5 pb-3 flex items-center gap-1 text-[11px]" style={{ color: accentColor }}>

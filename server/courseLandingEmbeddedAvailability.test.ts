@@ -46,14 +46,16 @@ describe("embedded CourseLanding availability actions", () => {
 
   it("keeps the CourseLanding cohort embed Enrollment Closed CTA disabled and out of the enrollment branch", () => {
     expect(source).toContain('const isClosedCG = data.status === "enrollment_closed";');
-    expect(source).toContain('{showEnrollNow && isClosedCG && (');
-    expect(source).toContain('!isSoldOutCG && !hideGroupEnrollmentPresentation');
+    expect(source).toContain('export function CohortGroupAvailabilityAction');
+    expect(source).toContain('status === "enrollment_closed"');
+    expect(source).toContain('data-testid="cohort-closed-cta"');
   });
 
   it("keeps the WorkshopLanding instance Enrollment Closed CTA out of checkout", () => {
     expect(workshopLandingSource).toContain('if (instance?.status === "enrollment_closed" || instance?.availableForPurchase === false) return;');
-    expect(workshopLandingSource).toContain('inst.status === "enrollment_closed" || inst.availableForPurchase === false');
-    expect(workshopLandingSource).toContain('disabled variant="outline">Enrollment Closed</Button>');
+    expect(workshopLandingSource).toContain('export function WorkshopLandingInstanceAction');
+    expect(workshopLandingSource).toContain('status === "enrollment_closed" || availableForPurchase === false');
+    expect(workshopLandingSource).toContain('data-testid="workshop-landing-closed-cta"');
   });
 
   it("keeps the WorkshopCheckout Enrollment Closed state non-actionable", () => {

@@ -1611,6 +1611,17 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+export function CourseLandingClosedEnrollmentAction() {
+  return (
+    <div className="space-y-2">
+      <Button data-testid="course-landing-closed-cta" className="w-full font-semibold" size="lg" disabled variant="outline">
+        Enrollment Closed
+      </Button>
+      <p className="text-xs text-center text-gray-500">Enrollment for this course is currently closed.</p>
+    </div>
+  );
+}
+
 export default function CourseLanding() {
   const { slug } = useParams<{ slug: string }>();
   const [, navigate] = useLocation();
@@ -2486,12 +2497,7 @@ export default function CourseLanding() {
             )}
 
             {(course as any).status === "enrollment_closed" ? (
-              <div className="space-y-2">
-                <Button className="w-full font-semibold" size="lg" disabled variant="outline">
-                  Enrollment Closed
-                </Button>
-                <p className="text-xs text-center text-gray-500">Enrollment for this course is currently closed.</p>
-              </div>
+              <CourseLandingClosedEnrollmentAction />
             ) : isDraft ? (
               <div className="space-y-2">
                 <Button className="w-full font-semibold" size="lg" disabled variant="outline">
@@ -2997,6 +3003,36 @@ function CohortGroupDetailModal({
 
 // ─── CohortGroupEmbedSection ──────────────────────────────────────────────────
 // Renders a cohort group's full detail inline (no modal) for embed display mode.
+export function CohortGroupAvailabilityAction({
+  showEnrollNow,
+  status,
+  isSoldOut,
+  accentColor,
+  enrollNowText,
+  onEnroll,
+  onWaitlist,
+}: {
+  showEnrollNow: boolean;
+  status?: string | null;
+  isSoldOut: boolean;
+  accentColor: string;
+  enrollNowText: string;
+  onEnroll: () => void;
+  onWaitlist: () => void;
+}) {
+  if (!showEnrollNow) return null;
+  if (status === "waitlist") {
+    return <Button size="sm" className="text-white flex-shrink-0" style={{ backgroundColor: accentColor }} onClick={onWaitlist}>Join Waitlist</Button>;
+  }
+  if (status === "enrollment_closed") {
+    return <Button data-testid="cohort-closed-cta" size="sm" className="flex-shrink-0" disabled variant="outline">Enrollment Closed</Button>;
+  }
+  if (!isSoldOut) {
+    return <Button size="sm" className="text-white flex-shrink-0" style={{ backgroundColor: accentColor }} onClick={onEnroll}>{enrollNowText}</Button>;
+  }
+  return <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">Sold Out</span>;
+}
+
 function CohortGroupEmbedSection({
   groupId,
   accentColor,
@@ -3051,27 +3087,15 @@ function CohortGroupEmbedSection({
       {/* Header bar */}
       <div className="flex items-center justify-between px-6 py-4 border-b" style={{ backgroundColor: `${accentColor}08`, borderColor: `${accentColor}22` }}>
         <h3 className="text-lg font-bold text-gray-900">{data.name}</h3>
-        {showEnrollNow && isWaitlistCG && (
-          <Button size="sm" className="text-white flex-shrink-0" style={{ backgroundColor: accentColor }} onClick={() => setWaitlistOpen(true)}>
-            Join Waitlist
-          </Button>
-        )}
-        {showEnrollNow && isClosedCG && (
-          <Button size="sm" className="flex-shrink-0" disabled variant="outline">Enrollment Closed</Button>
-        )}
-        {showEnrollNow && !isSoldOutCG && !hideGroupEnrollmentPresentation && (
-          <Button
-            size="sm"
-            className="text-white flex-shrink-0"
-            style={{ backgroundColor: accentColor }}
-            onClick={onEnroll}
-          >
-            {enrollNowText}
-          </Button>
-        )}
-        {showEnrollNow && isSoldOutCG && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 flex-shrink-0">Sold Out</span>
-        )}
+        <CohortGroupAvailabilityAction
+          showEnrollNow={showEnrollNow}
+          status={data.status}
+          isSoldOut={isSoldOutCG}
+          accentColor={accentColor}
+          enrollNowText={enrollNowText}
+          onEnroll={onEnroll}
+          onWaitlist={() => setWaitlistOpen(true)}
+        />
       </div>
       {/* Content */}
       {(!data.landingBlocks || (data.landingBlocks as any[]).length === 0) ? (

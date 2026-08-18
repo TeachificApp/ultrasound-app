@@ -41,6 +41,8 @@ vi.mock("@/lib/trpc", () => ({
 
 import { WorkshopInstanceCard } from "../client/src/pages/WorkshopDetail";
 import WorkshopCheckout, { WorkshopCheckoutClosedState } from "../client/src/pages/WorkshopCheckout";
+import { CohortGroupAvailabilityAction, CourseLandingClosedEnrollmentAction } from "../client/src/pages/CourseLanding";
+import { WorkshopLandingInstanceAction } from "../client/src/pages/WorkshopLanding";
 
 const containers: HTMLElement[] = [];
 const roots: Root[] = [];
@@ -133,5 +135,81 @@ describe("WorkshopCheckout closed availability state", () => {
     expect(container.querySelector("iframe")).toBeNull();
     expect(container.querySelector('a[href*="/checkout/"]')).toBeNull();
     expect(container.querySelector('a[href*="/workshops/"]')).not.toBeNull();
+  });
+});
+
+describe("CourseLanding embedded cohort closed action", () => {
+  it("renders a disabled action that cannot invoke enrollment", async () => {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    (globalThis as any).window = dom.window;
+    (globalThis as any).document = dom.window.document;
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    const onEnroll = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    containers.push(container);
+    const root = createRoot(container);
+    roots.push(root);
+    await act(async () => root.render(React.createElement(CohortGroupAvailabilityAction, {
+      showEnrollNow: true,
+      status: "enrollment_closed",
+      isSoldOut: false,
+      accentColor: "#189aa1",
+      enrollNowText: "Enroll Now",
+      onEnroll,
+      onWaitlist: vi.fn(),
+    })));
+    const button = container.querySelector('[data-testid="cohort-closed-cta"]') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    await act(async () => button.click());
+    expect(onEnroll).not.toHaveBeenCalled();
+    expect(container.querySelector('a[href*="checkout"]')).toBeNull();
+  });
+});
+
+describe("WorkshopLanding closed instance action", () => {
+  it("renders a disabled action that cannot invoke registration", async () => {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    (globalThis as any).window = dom.window;
+    (globalThis as any).document = dom.window.document;
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    const onRegister = vi.fn();
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    containers.push(container);
+    const root = createRoot(container);
+    roots.push(root);
+    await act(async () => root.render(React.createElement(WorkshopLandingInstanceAction, {
+      showEnrollNow: true,
+      status: "enrollment_closed",
+      availableForPurchase: false,
+      accentColor: "#189aa1",
+      enrollNowText: "Register",
+      onRegister,
+      onWaitlist: vi.fn(),
+    })));
+    const button = container.querySelector('[data-testid="workshop-landing-closed-cta"]') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    await act(async () => button.click());
+    expect(onRegister).not.toHaveBeenCalled();
+    expect(container.querySelector('a[href*="checkout"]')).toBeNull();
+  });
+});
+
+describe("CourseLanding primary closed action", () => {
+  it("renders a disabled action with no checkout navigation", async () => {
+    const dom = new JSDOM("<!doctype html><html><body></body></html>");
+    (globalThis as any).window = dom.window;
+    (globalThis as any).document = dom.window.document;
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    containers.push(container);
+    const root = createRoot(container);
+    roots.push(root);
+    await act(async () => root.render(React.createElement(CourseLandingClosedEnrollmentAction)));
+    const button = container.querySelector('[data-testid="course-landing-closed-cta"]') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    expect(container.querySelector('a[href*="checkout"]')).toBeNull();
   });
 });
