@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import Layout from "@/components/Layout";
 import { isMembersDomain, isLearnDomain, LEARN_APP_URL, APP_URL, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
+import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 
@@ -1059,7 +1060,7 @@ function MyContentTab() {
                   brand={w.workshopBrand}
                   subtitle={[
                     w.instanceTitle,
-                    w.instanceStartDate ? new Date(w.instanceStartDate).toLocaleDateString() : null,
+                    w.instanceStartDate ? formatInTimeZone(w.instanceStartDate, { year: "numeric", month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null,
                     w.instanceVenueCity ? `${w.instanceVenueCity}${w.instanceVenueState ? `, ${w.instanceVenueState}` : ""}` : w.instanceLocationType === "virtual" ? "Virtual" : null,
                   ].filter(Boolean).join(" · ")}
                   badge={w.attended ? "Attended" : w.instanceLocationType === "virtual" ? "Virtual" : "In-Person"}
