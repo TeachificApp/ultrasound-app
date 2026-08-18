@@ -14,6 +14,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
+import { formatScheduledInput, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import {
   DndContext, DragOverlay, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors, type DragEndEvent,
 } from "@dnd-kit/core";
@@ -2042,7 +2043,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, o
   const [brand, setBrand] = useState(course.brand);
   const [courseType, setCourseType] = useState<"course" | "quiz" | "download" | "cohort" | "workshop">(course.type ?? "course");
   const [enrollmentCloseDate, setEnrollmentCloseDate] = useState<string>(
-    course.enrollmentCloseDate ? new Date(course.enrollmentCloseDate).toISOString().split("T")[0] : ""
+    course.enrollmentCloseDate ? formatScheduledInput(course.enrollmentCloseDate, PLATFORM_TIMEZONE, false) : ""
   );
   const [pricingType, setPricingType] = useState<"free"|"one_time"|"subscription"|"payment_plan"|"trial_then_subscription">(course.pricingType ?? (course.isFree ? "free" : "one_time"));
   const [price, setPrice] = useState(String(Number(course.price).toFixed(2)));
