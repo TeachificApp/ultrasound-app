@@ -1506,14 +1506,12 @@ function CohortCalendarTab({ cohortData, isLoading }: { cohortData: any; isLoadi
   };
 
   sessions.forEach((s: any) => {
-    const d = new Date(s.sessionDate);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const key = formatInTimeZone(s.sessionDate, { year: "numeric", month: "2-digit", day: "2-digit" }, PLATFORM_TIMEZONE);
     addEvent(key, { type: "session", id: s.id, title: s.title, ts: s.sessionDate, durationMinutes: s.durationMinutes ?? 60, meetingUrl: s.meetingUrl, description: s.description ?? "" });
   });
   assignments.forEach((a: any) => {
     if (!a.dueDate) return;
-    const d = new Date(a.dueDate);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const key = formatInTimeZone(a.dueDate, { year: "numeric", month: "2-digit", day: "2-digit" }, PLATFORM_TIMEZONE);
     addEvent(key, { type: "assignment", id: a.id, title: a.title, ts: a.dueDate, description: a.description ?? "" });
   });
 
