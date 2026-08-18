@@ -2,6 +2,7 @@ import { getStripeClient } from "../lib/stripeClient";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 import { buildWorkshopCheckoutIdempotencyKey, resolveWorkshopCheckoutPrice, workshopDollarsToCents } from "../../shared/workshopPricing";
+import { isScheduledDeadlineOpen } from "../../shared/platformTime";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from "drizzle-orm";
@@ -30,7 +31,9 @@ function isInstanceOnSale(instance: {
   status: string;
   salesOpenDate: Date | null;
   salesCloseDate: Date | null;
+  enrollmentCloseDate?: Date | null;
   startDate: Date;
+  timezone?: string | null;
   capacity?: number | null;
   enrolledCount?: number | null;
 }): boolean {
@@ -39,9 +42,10 @@ function isInstanceOnSale(instance: {
   const now = new Date();
   // Check sales open date
   if (instance.salesOpenDate && now < instance.salesOpenDate) return false;
-  // Check sales close date — if set by admin, use it; otherwise auto-close at startDate
-  const closeDate = instance.salesCloseDate ?? instance.startDate;
-  if (now >= closeDate) return false;
+  // A configured enrollment close date takes precedence over the workshop start.
+  // Legacy workshop timestamps carry wall-clock values in the instance timezone.
+  const closeDate = instance.salesCloseDate ?? instance.enrollmentCloseDate ?? instance.startDate;
+  if (!isScheduledDeadlineOpen(closeDate, instance.timezone, now)) return false;
   // Capacity check — if capacity is set and fully enrolled, not on sale
   if (instance.capacity != null && (instance.enrolledCount ?? 0) >= instance.capacity) return false;
   return true;
@@ -53,7 +57,9 @@ function isInstanceSoldOut(instance: {
   status: string;
   salesOpenDate: Date | null;
   salesCloseDate: Date | null;
+  enrollmentCloseDate?: Date | null;
   startDate: Date;
+  timezone?: string | null;
   capacity?: number | null;
   enrolledCount?: number | null;
 }): boolean {
@@ -61,8 +67,8 @@ function isInstanceSoldOut(instance: {
   if (instance.status !== "published" && instance.status !== "presale") return false;
   const now = new Date();
   if (instance.salesOpenDate && now < instance.salesOpenDate) return false;
-  const closeDate = instance.salesCloseDate ?? instance.startDate;
-  if (now >= closeDate) return false;
+  const closeDate = instance.salesCloseDate ?? instance.enrollmentCloseDate ?? instance.startDate;
+  if (!isScheduledDeadlineOpen(closeDate, instance.timezone, now)) return false;
   // Must have capacity set and be at/over it
   return instance.capacity != null && (instance.enrolledCount ?? 0) >= instance.capacity;
 }

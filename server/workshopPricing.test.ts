@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildWorkshopCheckoutIdempotencyKey, formatWorkshopDollars, resolveWorkshopCheckoutPrice, shouldRouteWorkshopCtaToCheckout, workshopDollarsToCents } from "../shared/workshopPricing";
+import { isScheduledDeadlineOpen, scheduledWallTimeToUtc } from "../shared/platformTime";
 
 describe("workshop dollar pricing", () => {
   it("converts a $2,297.00 workshop price to Stripe cents without multiplying display values", () => {
@@ -23,5 +24,14 @@ describe("workshop dollar pricing", () => {
     const legacyPrice = buildWorkshopCheckoutIdempotencyKey({ userId: 42, workshopId: 60001, instanceId: 1, priceInCents: 22970000, currency: "usd" });
     expect(corrected).toBe(original);
     expect(corrected).not.toBe(legacyPrice);
+  });
+});
+
+describe("workshop Eastern sales deadlines", () => {
+  it("keeps a configured 11:59 PM Eastern deadline open until 03:59:00 UTC", () => {
+    const configuredWallTime = new Date("2026-08-17T23:59:00.000Z");
+    expect(scheduledWallTimeToUtc(configuredWallTime, "America/New_York").toISOString()).toBe("2026-08-18T03:59:00.000Z");
+    expect(isScheduledDeadlineOpen(configuredWallTime, "America/New_York", new Date("2026-08-18T00:41:16.000Z"))).toBe(true);
+    expect(isScheduledDeadlineOpen(configuredWallTime, "America/New_York", new Date("2026-08-18T04:00:00.000Z"))).toBe(false);
   });
 });
