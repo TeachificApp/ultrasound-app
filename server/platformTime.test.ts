@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isScheduledDeadlineOpen, parseScheduledTimestamp } from "../shared/platformTime";
+import { formatScheduledInput, isScheduledDeadlineOpen, parseScheduledTimestamp } from "../shared/platformTime";
 
 describe("platform scheduled timestamps", () => {
   it("treats a date-only enrollment close as 11:59:59.999 PM Eastern", () => {
@@ -16,5 +16,11 @@ describe("platform scheduled timestamps", () => {
 
   it("keeps explicit ISO instants unchanged", () => {
     expect(parseScheduledTimestamp("2026-08-18T03:59:59.999Z").toISOString()).toBe("2026-08-18T03:59:59.999Z");
+  });
+
+  it("formats stored UTC instants back into Eastern administrator datetime and date input values", () => {
+    const instant = new Date("2026-08-18T01:30:00.000Z");
+    expect(formatScheduledInput(instant)).toBe("2026-08-17T21:30");
+    expect(formatScheduledInput(instant, undefined, false)).toBe("2026-08-17");
   });
 });

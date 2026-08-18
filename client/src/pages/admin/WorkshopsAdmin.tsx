@@ -35,6 +35,7 @@ import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import { formatWorkshopDollars } from "../../../../shared/workshopPricing";
+import { formatScheduledInput, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function fmtDate(ts: number | Date | null | undefined) {
@@ -465,7 +466,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setEditingInstance(inst);
     setInstTitle(inst.title ?? "");
     setInstDescription(inst.description ?? "");
-    setInstStartDate(inst.startDate ? new Date(inst.startDate).toISOString().slice(0, 16) : "");
+    setInstStartDate(inst.startDate ? formatScheduledInput(inst.startDate, PLATFORM_TIMEZONE) : "");
     setInstEndDate(inst.endDate ? new Date(inst.endDate).toISOString().slice(0, 16) : "");
     setInstTimezone(inst.timezone ?? "America/New_York");
     setInstLocationType(inst.locationType ?? "in_person");
@@ -475,9 +476,9 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setInstCapacity(inst.capacity ?? "");
     setInstPrice(inst.price != null ? inst.price : "");
     setInstAvailableForPurchase(inst.availableForPurchase ?? false);
-    setInstSalesCloseDate(inst.salesCloseDate ? new Date(inst.salesCloseDate).toISOString().slice(0, 16) : "");
+    setInstSalesCloseDate(inst.salesCloseDate ? formatScheduledInput(inst.salesCloseDate, PLATFORM_TIMEZONE) : "");
     setInstSalesOpenDate(inst.salesOpenDate ? new Date(inst.salesOpenDate).toISOString().slice(0, 16) : "");
-    setInstEnrollmentCloseDate(inst.enrollmentCloseDate ? new Date(inst.enrollmentCloseDate).toISOString().slice(0, 10) : "");
+    setInstEnrollmentCloseDate(inst.enrollmentCloseDate ? formatScheduledInput(inst.enrollmentCloseDate, PLATFORM_TIMEZONE, false) : "");
     setInstStatus(inst.status ?? "draft");
     setInstContent(inst.instanceContent ?? "");
     setInstPresaleWelcomeHeading(inst.presaleWelcomeHeading ?? ""); setInstPresaleWelcomeBody(inst.presaleWelcomeBody ?? ""); setInstPresaleWelcomeMediaUrl(inst.presaleWelcomeMediaUrl ?? ""); setInstPresaleWelcomeCtaLabel(inst.presaleWelcomeCtaLabel ?? ""); setInstPresaleWelcomeCtaUrl(inst.presaleWelcomeCtaUrl ?? "");

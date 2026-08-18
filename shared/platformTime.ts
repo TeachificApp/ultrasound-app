@@ -68,6 +68,17 @@ export function formatInTimeZone(
   return new Intl.DateTimeFormat("en-US", { ...options, timeZone }).format(new Date(value));
 }
 
+/** Formats a stored UTC instant for a `datetime-local` or date-only administrator input. */
+export function formatScheduledInput(
+  value: Date | string,
+  timeZone = PLATFORM_TIMEZONE,
+  includeTime = true,
+): string {
+  const parts = partsInTimeZone(new Date(value), timeZone);
+  const date = `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+  return includeTime ? `${date}T${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}` : date;
+}
+
 export function platformCalendarDayBoundaryToUtc(
   dateOnly: string,
   boundary: "start" | "end",
