@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { formatDate, formatTime } from "../client/src/pages/WebinarLanding";
 
 const webinarAdminSource = readFileSync(new URL("../client/src/pages/admin/WebinarsAdmin.tsx", import.meta.url), "utf8");
 const webinarLandingSource = readFileSync(new URL("../client/src/pages/WebinarLanding.tsx", import.meta.url), "utf8");
@@ -19,5 +20,8 @@ describe("webinar and CME timestamp policy", () => {
   it("uses the shared formatter for public webinar date and time presentation", () => {
     expect(webinarLandingSource).toContain('formatInTimeZone(ts, { weekday: "long", year: "numeric", month: "long", day: "numeric" }, timeZone)');
     expect(webinarLandingSource).toContain('formatInTimeZone(ts, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }, tz ?? PLATFORM_TIMEZONE)');
+    const scheduledAt = Date.parse("2026-08-18T00:30:00.000Z");
+    expect(formatDate(scheduledAt)).toBe("Monday, August 17, 2026");
+    expect(formatTime(scheduledAt)).toContain("8:30 PM EDT");
   });
 });
