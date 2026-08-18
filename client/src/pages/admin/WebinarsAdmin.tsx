@@ -26,7 +26,7 @@ import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import { SdmsCmeConfigPanel, resolveWebinarActivityType } from "@/components/admin/SdmsCmeConfigPanel";
-import { formatScheduledInput, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "@shared/platformTime";
+import { formatInTimeZone, formatScheduledInput, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 const CME_STATUS_COLORS: Record<string, string> = {
@@ -46,7 +46,7 @@ const CME_STATUS_LABELS: Record<string, string> = {
 
 function fmtDate(ts: number | null | undefined) {
   if (!ts) return "—";
-  return new Date(ts).toLocaleString();
+  return formatInTimeZone(ts, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }, PLATFORM_TIMEZONE);
 }
 function fmtDuration(mins: number | null | undefined) {
   if (!mins) return "—";

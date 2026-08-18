@@ -8,6 +8,7 @@ describe("webinar and CME timestamp policy", () => {
   it("hydrates and persists webinar scheduled values through the shared Eastern wall-clock helpers", () => {
     expect(webinarAdminSource).toContain('formatScheduledInput(webinar.scheduledAt, PLATFORM_TIMEZONE)');
     expect(webinarAdminSource).toContain('parseScheduledTimestamp(scheduledAt, PLATFORM_TIMEZONE, "start").getTime()');
+    expect(webinarAdminSource).toContain('formatInTimeZone(ts, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }, PLATFORM_TIMEZONE)');
   });
 
   it("renders CME expiry notification dates in the configured Eastern timezone", () => {
