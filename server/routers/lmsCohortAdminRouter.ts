@@ -87,7 +87,7 @@ import {
   cohortWaitlistEntries,
 } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
-import { parseScheduledTimestamp } from "../../shared/platformTime";
+import { parseScheduledTimestamp, PLATFORM_TIMEZONE } from "../../shared/platformTime";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -1002,9 +1002,9 @@ export const lmsCohortAdminRouter = router({
       const { courseId, name, slug, description, startDate, endDate, enrollmentCloseDate, maxStudents, status, sortOrder, presaleWelcomeMediaUrl, presaleWelcomeCtaUrl, ...presaleWelcome } = input;
       const [result] = await db.insert(lmsCohortGroups).values({
         courseId, name, slug, description,
-        startDate: startDate ? new Date(startDate) : undefined,
-        endDate: endDate ? new Date(endDate) : undefined,
-        enrollmentCloseDate: enrollmentCloseDate ? new Date(enrollmentCloseDate) : undefined,
+        startDate: startDate ? parseScheduledTimestamp(startDate, PLATFORM_TIMEZONE, "start") : undefined,
+        endDate: endDate ? parseScheduledTimestamp(endDate, PLATFORM_TIMEZONE, "end") : undefined,
+        enrollmentCloseDate: enrollmentCloseDate ? parseScheduledTimestamp(enrollmentCloseDate, PLATFORM_TIMEZONE, "end") : undefined,
         maxStudents, status, sortOrder, ...presaleWelcome,
         presaleWelcomeMediaUrl: presaleWelcomeMediaUrl || undefined,
         presaleWelcomeCtaUrl: presaleWelcomeCtaUrl || undefined,
@@ -1042,9 +1042,9 @@ export const lmsCohortAdminRouter = router({
       const [existingGroup] = await db.select({ status: lmsCohortGroups.status })
         .from(lmsCohortGroups).where(eq(lmsCohortGroups.id, id)).limit(1);
       const updateData: any = { ...rest };
-      if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
-      if (endDate !== undefined) updateData.endDate = endDate ? new Date(endDate) : null;
-      if (enrollmentCloseDate !== undefined) updateData.enrollmentCloseDate = enrollmentCloseDate ? new Date(enrollmentCloseDate) : null;
+      if (startDate !== undefined) updateData.startDate = startDate ? parseScheduledTimestamp(startDate, PLATFORM_TIMEZONE, "start") : null;
+      if (endDate !== undefined) updateData.endDate = endDate ? parseScheduledTimestamp(endDate, PLATFORM_TIMEZONE, "end") : null;
+      if (enrollmentCloseDate !== undefined) updateData.enrollmentCloseDate = enrollmentCloseDate ? parseScheduledTimestamp(enrollmentCloseDate, PLATFORM_TIMEZONE, "end") : null;
       if (presaleWelcomeMediaUrl !== undefined) updateData.presaleWelcomeMediaUrl = presaleWelcomeMediaUrl || null;
       if (presaleWelcomeCtaUrl !== undefined) updateData.presaleWelcomeCtaUrl = presaleWelcomeCtaUrl || null;
       if (input.isFeaturedOnLanding) {
