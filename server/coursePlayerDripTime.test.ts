@@ -8,5 +8,7 @@ describe("Course Player drip schedule timezone presentation", () => {
     expect(source).toContain('from "@shared/platformTime"');
     expect(source).toContain('formatInTimeZone(new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE)');
     expect(source).toContain('formatInTimeZone(new Date(enrolledAt.getTime() + section.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE)');
+    expect(source).not.toContain('lesson.dripDays * 86400000).toLocaleDateString');
+    expect(source).not.toContain('section.dripDays * 86400000).toLocaleDateString');
   });
 });

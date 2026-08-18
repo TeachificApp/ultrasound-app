@@ -1331,8 +1331,8 @@ function MobileSidebarContent({
               const dripExpired = !dripBypassed && (lesson.dripOutDays ?? 0) > 0 && daysSinceEnroll >= lesson.dripOutDays;
               const prereqLocked = prereqLockedIds.has(lesson.id);
               const lessonLocked = dripLocked || dripExpired || prereqLocked;
-              const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
-              const lessonExpiredDate = dripExpired ? new Date(enrolledAt.getTime() + (lesson.dripOutDays ?? 0) * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+              const lessonUnlockDate = dripLocked ? formatInTimeZone(new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
+              const lessonExpiredDate = dripExpired ? formatInTimeZone(new Date(enrolledAt.getTime() + (lesson.dripOutDays ?? 0) * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
               return (
                 <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
                   className={cn("w-full text-left px-3 py-2.5 flex items-center gap-3 text-xs transition-all border-l-4",
@@ -1352,7 +1352,7 @@ function MobileSidebarContent({
             })}
             {sections.map((section: any, sIdx: number) => {
               const sectionLocked = !dripBypassed && (section.dripDays ?? 0) > 0 && daysSinceEnroll < section.dripDays;
-              const unlockDate = sectionLocked ? new Date(enrolledAt.getTime() + section.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+              const unlockDate = sectionLocked ? formatInTimeZone(new Date(enrolledAt.getTime() + section.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
               const sectionNum = topLevelLessons.length + sIdx + 1;
               const allSectionDone = section.lessons.every((l: any) => completedIds.has(l.id)) && section.lessons.length > 0;
               const isSectionActive = section.lessons.some((l: any) => l.id === selectedLessonId);
@@ -1395,7 +1395,7 @@ function MobileSidebarContent({
                         const dripExpired = !dripBypassed && (lesson.dripOutDays ?? 0) > 0 && daysSinceEnroll >= lesson.dripOutDays;
                         const prereqLocked = prereqLockedIds.has(lesson.id);
                         const lessonLocked = dripLocked || dripExpired || prereqLocked;
-                        const lessonUnlockDate = dripLocked ? new Date(enrolledAt.getTime() + lesson.dripDays * 86400000).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null;
+                        const lessonUnlockDate = dripLocked ? formatInTimeZone(new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
                         const lessonExpiredDate = dripExpired ? formatInTimeZone(new Date(enrolledAt.getTime() + (lesson.dripOutDays ?? 0) * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
                         return (
                           <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
