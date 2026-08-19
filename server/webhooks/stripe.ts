@@ -28,8 +28,11 @@ import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmai
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
 
-// Stripe webhook secret — optional but strongly recommended in production
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+// Stripe webhook secret — optional but strongly recommended in production.
+// Resolve at request time so a rotated secret takes effect without a module reload.
+function getStripeWebhookSecret(): string {
+  return process.env.STRIPE_WEBHOOK_SECRET ?? "";
+}
 
 // Stripe Concierge product price ID (from the payment link)
 const CONCIERGE_PRICE_ID = "price_concierge_4997"; // update if Stripe price ID is known
@@ -992,7 +995,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
       console.error(`[Stripe] Brand membership: failed to send access email to existing user ${customerEmail}:`, emailErr);
       notifyOwner({
         title: "⚠️ Membership Access Email Failed",
-        content: `Failed to send ${planLabel} access email to ${customerEmail} (userId=${userId}). Check SendGrid API key in Settings → Secrets.`,
+        content: `Failed to send membership access email to ${customerEmail} (userId=${userId}). Check SendGrid API key in Settings → Secrets.`,
       }).catch(() => {});
     }
   }
@@ -1226,7 +1229,7 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
       console.error(`[Stripe] Dual membership: failed to send access email to existing user ${customerEmail}:`, emailErr);
       notifyOwner({
         title: "⚠️ Dual Membership Access Email Failed",
-        content: `Failed to send ${planLabel} access email to ${customerEmail} (userId=${userId}). Check SendGrid API key in Settings → Secrets.`,
+        content: `Failed to send dual membership access email to ${customerEmail} (userId=${userId}). Check SendGrid API key in Settings → Secrets.`,
       }).catch(() => {});
     }
   }
@@ -1918,7 +1921,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
 /**
  * Handle invoice.paid — confirm subscription renewal and extend expiresAt for all brand/DIY memberships.
  */
-async function handleInvoicePaid(invoice: Record<string, unknown>) {
+export async function handleInvoicePaid(invoice: Record<string, unknown>) {
   const subscriptionId = invoice.subscription as string | null;
   if (!subscriptionId) return;
   const db = await getDb();
@@ -2255,7 +2258,7 @@ async function handleDiySubscriptionLifecycle(subscription: Record<string, unkno
  *   - Always send a payment failed email with a link to update payment method.
  *   - If attempt_count >= 3 OR next_payment_attempt is null (Stripe gave up), cancel the subscription.
  */
-async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
+export async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
   const subscriptionId = invoice.subscription as string | null;
   const customerEmail = (invoice.customer_email as string) ?? null;
   const attemptCount = (invoice.attempt_count as number) ?? 1;
@@ -2306,19 +2309,45 @@ async function handleInvoicePaymentFailed(invoice: Record<string, unknown>) {
     console.error(`[Stripe] Failed to send payment failed email to ${customerEmail}:`, emailErr);
   }
 
-  // Cancel subscription if Stripe has given up (attempt_count >= 3 or no next retry)
+  // Revoke subscription-backed access only after Stripe has given up
+  // (attempt_count >= 3 or no next retry). Earlier attempts preserve the grace period.
   const shouldCancel = attemptCount >= 3 || nextPaymentAttempt === null;
-  if (shouldCancel && subscriptionId && membership) {
+  if (!shouldCancel || !subscriptionId) return;
+
+  let revoked = false;
+  if (membership) {
     await db.update(brandMemberships)
       .set({ status: "cancelled", tier: "free" })
       .where(eq(brandMemberships.id, membership.id));
-    console.log(`[Stripe] Subscription cancelled after ${attemptCount} failed payment attempts: sub ${subscriptionId}, user ${membership.userId}`);
+    revoked = true;
+  }
+
+  const [nativeMembership] = await db.select().from(membershipSubscriptions)
+    .where(eq(membershipSubscriptions.stripeSubscriptionId, subscriptionId)).limit(1);
+  if (nativeMembership) {
+    await db.update(membershipSubscriptions)
+      .set({ status: "expired", cancelAtPeriodEnd: false })
+      .where(eq(membershipSubscriptions.id, nativeMembership.id));
+    revoked = true;
+  }
+
+  const lmsEnrollmentRows = await db.select().from(lmsEnrollments)
+    .where(eq(lmsEnrollments.stripeSubscriptionId, subscriptionId));
+  for (const enrollment of lmsEnrollmentRows) {
+    await db.update(lmsEnrollments)
+      .set({ accessExpiresAt: new Date() })
+      .where(eq(lmsEnrollments.id, enrollment.id));
+    revoked = true;
+  }
+
+  if (revoked) {
+    console.log(`[Stripe] Subscription access revoked after ${attemptCount} failed payment attempts: sub ${subscriptionId}`);
     await notifyOwner({
       title: "⚠️ Subscription Cancelled — Failed Payments",
       content: `Subscription ${subscriptionId} for ${customerEmail} has been cancelled after ${attemptCount} failed payment attempts. Access revoked.`,
     });
-  } else if (shouldCancel && subscriptionId && !membership) {
-    console.warn(`[Stripe] invoice.payment_failed: no brand membership found for subscription ${subscriptionId} — cannot revoke access`);
+  } else {
+    console.warn(`[Stripe] invoice.payment_failed: no entitlement found for terminal failed subscription ${subscriptionId}`);
   }
 }
 
@@ -2467,9 +2496,10 @@ async function handleTeamCheckoutCompleted(session: Record<string, unknown>) {
 async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Response) {
   const rawBody = req.rawBody ?? "";
   const sig = req.headers["stripe-signature"] as string | undefined;
+  const stripeWebhookSecret = getStripeWebhookSecret();
   let event: Record<string, unknown>;
 
-  if (STRIPE_WEBHOOK_SECRET) {
+  if (stripeWebhookSecret) {
     if (!sig) {
       console.error("[Stripe] Webhook rejected: missing stripe-signature header");
       res.status(400).json({ error: "Missing stripe-signature header" });
@@ -2484,7 +2514,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       const timestamp = tPart.slice(2);
       const expectedSig = v1Part.slice(3);
       const payload = `${timestamp}.${rawBody}`;
-      const hmac = crypto.createHmac("sha256", STRIPE_WEBHOOK_SECRET).update(payload).digest("hex");
+      const hmac = crypto.createHmac("sha256", stripeWebhookSecret).update(payload).digest("hex");
       if (hmac !== expectedSig) throw new Error("Signature mismatch");
       event = JSON.parse(rawBody) as Record<string, unknown>;
     } catch (err) {

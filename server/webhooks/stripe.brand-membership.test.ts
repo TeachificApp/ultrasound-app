@@ -37,7 +37,14 @@ vi.mock("../../server/_core/email", () => ({
     htmlBody: "<html><body>Welcome</body></html>",
     subject: "Welcome",
   }),
+  emailWrapper: vi.fn((body: string) => body),
   sendEmail: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("../../server/lib/stripeClient", () => ({
+  getStripeClient: vi.fn(() => ({
+    subscriptions: { update: vi.fn().mockResolvedValue({}) },
+  })),
 }));
 
 // Mock Thinkific (dynamic import inside the dual handler)
@@ -224,7 +231,7 @@ describe("handleBrandMembershipCheckoutCompleted — guest recovery", () => {
     );
   });
 
-  it("does NOT send a welcome email for existing accounts", async () => {
+  it("sends an access-confirmation email for existing accounts without issuing a welcome reset", async () => {
     vi.mocked(dbModule.getOrCreateUserByEmail).mockResolvedValue({
       user: { id: 99, email: "guest@example.com", firstName: "Guest", lastName: "User", name: "Guest User" },
       isNew: false,
@@ -234,7 +241,10 @@ describe("handleBrandMembershipCheckoutCompleted — guest recovery", () => {
     await handleBrandMembershipCheckoutCompleted(guestBrandSession());
 
     const emailModule = await import("../_core/email");
-    expect(emailModule.sendEmail).not.toHaveBeenCalled();
+    expect(emailModule.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
+      to: expect.objectContaining({ email: "guest@example.com" }),
+      subject: expect.stringContaining("Premium Membership"),
+    }));
   });
 
   it("notifies the owner and returns early when no email is available", async () => {
@@ -297,14 +307,16 @@ describe("handleDualMembershipCheckoutCompleted — guest recovery", () => {
       expect.objectContaining({ email: "dual@example.com" })
     );
 
-    // Two inserts — one per brand
-    expect(db.insert).toHaveBeenCalledTimes(2);
-    const brands = db._insertedRows.map((r: any) => r.brand);
+    // Two entitlement rows — one per brand. Purchase logging can add a
+    // separate non-entitlement record and must not weaken this assertion.
+    const membershipRows = db._insertedRows.filter((r: any) => r.brand);
+    expect(membershipRows).toHaveLength(2);
+    const brands = membershipRows.map((r: any) => r.brand);
     expect(brands).toContain("aaus");
     expect(brands).toContain("iheartecho");
 
     // Both rows should be premium
-    for (const row of db._insertedRows as any[]) {
+    for (const row of membershipRows as any[]) {
       expect(row).toMatchObject({ userId: 55, tier: "premium", status: "active" });
     }
   });
@@ -326,8 +338,9 @@ describe("handleDualMembershipCheckoutCompleted — guest recovery", () => {
 
     await handleDualMembershipCheckoutCompleted(lifetimeSession);
 
-    expect(db.insert).toHaveBeenCalledTimes(2);
-    for (const row of db._insertedRows as any[]) {
+    const membershipRows = db._insertedRows.filter((r: any) => r.brand);
+    expect(membershipRows).toHaveLength(2);
+    for (const row of membershipRows as any[]) {
       expect(row.source).toBe("stripe_dual_lifetime");
     }
   });

@@ -47,9 +47,8 @@ export const BRAND_PRODUCTS: Record<Brand, {
     annualPrice: 9997,   // $99.97/year — HIDDEN
     lifetimePrice: 9997, // $99.97 one-time Founding Member
     currency: "usd",
-    // Canonical Stripe Price IDs — created 2026-06-22 via create-live-stripe-products.mts
-    // If these IDs are missing in the active Stripe account (test vs live), checkout falls back to price_data.
-    monthlyPriceId: "price_1Tl7paPvVOPkJOleJ54i6mht",
+    // Canonical live Stripe monthly price — verified 2026-08-18.
+    monthlyPriceId: "price_1U5xVtBj9HgnkZLK6pvUcG4P",
     lifetimePriceId: "price_1Tl7pbPvVOPkJOleDjA0D43O",
     showAnnual: !isLifetimeOfferActive() ? true : false,
   },
@@ -59,8 +58,8 @@ export const BRAND_PRODUCTS: Record<Brand, {
     annualPrice: 9997,   // $99.97/year — HIDDEN
     lifetimePrice: 9997, // $99.97 one-time Founding Member
     currency: "usd",
-    // Canonical Stripe Price IDs — created 2026-06-22 via create-live-stripe-products.mts
-    monthlyPriceId: "price_1Tl7pbPvVOPkJOleNx8QfKEJ",
+    // Canonical live Stripe monthly price — verified 2026-08-18.
+    monthlyPriceId: "price_1U5xVtBj9HgnkZLKzl3Qo0pE",
     lifetimePriceId: "price_1Tl7pbPvVOPkJOleQayUZjad",
     showAnnual: !isLifetimeOfferActive() ? true : false,
   },
@@ -77,8 +76,8 @@ export const DUAL_MEMBERSHIP_PRODUCT = {
   annualPrice: 14700,   // $147.00/year — same rate as former lifetime
   lifetimePrice: 14700, // $147.00 one-time Founding Member
   currency: "usd",
-  // Canonical Stripe Price IDs — created 2026-06-22 via create-live-stripe-products.mts
-  monthlyPriceId: "price_1Tl7pcPvVOPkJOleacNhh6ki",
+  // Canonical live Stripe monthly price — verified 2026-08-18.
+  monthlyPriceId: "price_1U5xVuBj9HgnkZLKEL1A9qkU",
   lifetimePriceId: "price_1Tl7pcPvVOPkJOleJDKwSypQ",
 } as const;
 

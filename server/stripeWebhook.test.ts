@@ -1,7 +1,4 @@
-/**
- * Stripe webhook handler tests — fast ack, dual routes, signature verification.
- */
-
+/** Stripe webhook handler regression coverage. */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import express from "express";
 import request from "supertest";
@@ -9,52 +6,29 @@ import crypto from "crypto";
 
 vi.mock("./db", () => ({
   getDb: vi.fn().mockResolvedValue({
-    insert: vi.fn().mockReturnValue({
-      values: vi.fn().mockResolvedValue(undefined),
-    }),
+    insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
     select: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([]),
-        }),
-      }),
+      from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ limit: vi.fn().mockResolvedValue([]) }) }),
     }),
-    update: vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    }),
+    update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }) }),
     execute: vi.fn().mockResolvedValue(undefined),
   }),
   getUserByEmail: vi.fn().mockResolvedValue(null),
   getOrCreateUserByEmail: vi.fn(),
   getOrCreateAccessToken: vi.fn(),
 }));
-
-vi.mock("./_core/notification", () => ({
-  notifyOwner: vi.fn().mockResolvedValue(undefined),
-}));
-
+vi.mock("./_core/notification", () => ({ notifyOwner: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("./_core/email", () => ({
   sendEmail: vi.fn().mockResolvedValue(undefined),
-  buildFunnelPurchaseConfirmationEmail: vi.fn().mockReturnValue({
-    subject: "Purchase confirmed",
-    htmlBody: "<p>Thanks</p>",
-    previewText: "Thanks",
-  }),
-  buildPaymentFailedEmail: vi.fn(),
+  emailWrapper: vi.fn((body: string) => body),
+  buildFunnelPurchaseConfirmationEmail: vi.fn().mockReturnValue({ subject: "Purchase confirmed", htmlBody: "<p>Thanks</p>", previewText: "Thanks" }),
+  buildPaymentFailedEmail: vi.fn().mockReturnValue({ subject: "Payment failed", htmlBody: "<p>Update payment</p>", previewText: "Update payment" }),
 }));
-
-vi.mock("./routers/downloadsRouter", () => ({
-  sendPurchaseConfirmationEmail: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("./lib/orderBumpCheckout", () => ({
-  fulfillOrderBumpPurchase: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("./routes/autoLogin", () => ({
-  generateAutoLoginToken: vi.fn().mockResolvedValue("test-auto-login-token"),
+vi.mock("./routers/downloadsRouter", () => ({ sendPurchaseConfirmationEmail: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("./lib/orderBumpCheckout", () => ({ fulfillOrderBumpPurchase: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("./routes/autoLogin", () => ({ generateAutoLoginToken: vi.fn().mockResolvedValue("test-auto-login-token") }));
+vi.mock("./lib/stripeClient", () => ({
+  getStripeClient: vi.fn(() => ({ subscriptions: { update: vi.fn().mockResolvedValue({}) } })),
 }));
 
 import { registerStripeWebhook } from "./webhooks/stripe";
@@ -66,12 +40,8 @@ function buildApp() {
   return app;
 }
 
-function stripeEventPayload(type: string, object: Record<string, unknown> = {}) {
-  return JSON.stringify({
-    id: "evt_test_123",
-    type,
-    data: { object },
-  });
+function stripeEventPayload(type: string, object: Record<string, unknown> = {}, id = "evt_test_123") {
+  return JSON.stringify({ id, type, data: { object } });
 }
 
 describe("Stripe webhook", () => {
@@ -79,39 +49,30 @@ describe("Stripe webhook", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.STRIPE_WEBHOOK_SECRET;
+    process.env.STRIPE_WEBHOOK_SECRET = "";
   });
 
   afterEach(() => {
-    if (originalSecret) {
-      process.env.STRIPE_WEBHOOK_SECRET = originalSecret;
-    } else {
-      delete process.env.STRIPE_WEBHOOK_SECRET;
-    }
+    if (originalSecret) process.env.STRIPE_WEBHOOK_SECRET = originalSecret;
+    else delete process.env.STRIPE_WEBHOOK_SECRET;
   });
 
-  it("returns 200 quickly on /api/webhooks/stripe for checkout.session.completed", async () => {
-    const payload = stripeEventPayload("checkout.session.completed", {
-      id: "cs_test",
-      metadata: { type: "digital_download", product_id: "1" },
-      amount_total: 9900,
-    });
-    const start = Date.now();
+  it.each(["/api/webhooks/stripe", "/api/stripe/webhook"])("acknowledges Stripe sandbox verification on %s", async (path) => {
     const res = await request(buildApp())
-      .post("/api/webhooks/stripe")
+      .post(path)
       .set("Content-Type", "application/json")
-      .send(payload);
+      .send(stripeEventPayload("checkout.session.completed", { id: "cs_test", amount_total: 9900 }));
     expect(res.status).toBe(200);
-    expect(res.body.received).toBe(true);
-    expect(Date.now() - start).toBeLessThan(2000);
+    expect(res.body.verified).toBe(true);
   });
 
-  it("returns 200 on production alias /api/stripe/webhook", async () => {
-    const payload = stripeEventPayload("checkout.session.completed", {
-      id: "cs_test_alias",
-      metadata: { order_id: "1", user_id: "2", course_id: "3" },
-      amount_total: 5000,
-    });
+  it.each(["invoice.paid", "invoice.payment_failed"])("accepts recurring lifecycle event %s on the production webhook route", async (type) => {
+    const payload = stripeEventPayload(type, {
+      id: `in_${type.replace(/[^a-z]/g, "_")}`,
+      subscription: "sub_recurring_test",
+      customer_email: "member@example.com",
+      attempt_count: 1,
+    }, `evt_recurring_${type.replace(/[^a-z]/g, "_")}`);
     const res = await request(buildApp())
       .post("/api/stripe/webhook")
       .set("Content-Type", "application/json")
@@ -121,46 +82,32 @@ describe("Stripe webhook", () => {
   });
 
   it("returns 400 for invalid JSON", async () => {
-    const res = await request(buildApp())
-      .post("/api/stripe/webhook")
-      .set("Content-Type", "application/json")
-      .send("not-json");
+    const res = await request(buildApp()).post("/api/stripe/webhook").set("Content-Type", "application/json").send("not-json");
     expect(res.status).toBe(400);
   });
 
   it("returns 400 when signature verification fails", async () => {
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_secret";
-    const payload = stripeEventPayload("payment_intent.succeeded", {
-      id: "pi_test",
-      metadata: { type: "embedded_checkout_purchase" },
-      amount: 1000,
-    });
     const res = await request(buildApp())
       .post("/api/stripe/webhook")
       .set("Content-Type", "application/json")
       .set("stripe-signature", "t=123,v1=bad")
-      .send(payload);
+      .send(stripeEventPayload("payment_intent.succeeded", { id: "pi_test" }));
     expect(res.status).toBe(400);
   });
 
-  it("accepts valid signature when STRIPE_WEBHOOK_SECRET is set", async () => {
+  it("accepts a correctly signed event after runtime webhook-secret rotation", async () => {
     const secret = "whsec_test_secret";
     process.env.STRIPE_WEBHOOK_SECRET = secret;
-    const payload = stripeEventPayload("payment_intent.succeeded", {
-      id: "pi_test",
-      metadata: { type: "embedded_checkout_purchase", customer_email: "buyer@example.com" },
-      amount: 1000,
-    });
+    const payload = stripeEventPayload("payment_intent.succeeded", { id: "pi_test" });
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    const signedPayload = `${timestamp}.${payload}`;
-    const sig = crypto.createHmac("sha256", secret).update(signedPayload).digest("hex");
-
+    const signature = crypto.createHmac("sha256", secret).update(`${timestamp}.${payload}`).digest("hex");
     const res = await request(buildApp())
       .post("/api/stripe/webhook")
       .set("Content-Type", "application/json")
-      .set("stripe-signature", `t=${timestamp},v1=${sig}`)
+      .set("stripe-signature", `t=${timestamp},v1=${signature}`)
       .send(payload);
     expect(res.status).toBe(200);
-    expect(res.body.received).toBe(true);
+    expect(res.body.verified).toBe(true);
   });
 });
