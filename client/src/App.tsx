@@ -14,6 +14,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import DemoModeBanner from "./components/DemoModeBanner";
 import GetAppBanner from "./components/GetAppBanner";
 import ProfileNameBanner from "./components/ProfileNameBanner";
+import MaintenanceBanner from "./components/MaintenanceBanner";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
@@ -1464,6 +1465,7 @@ function App() {
         <TooltipProvider>
           <MetaPixel />
           <Toaster />
+          <MaintenanceBanner />
           {onMarketingStaging ? (
             <MarketingSiteRouter />
           ) : onMembersSubdomain ? (
