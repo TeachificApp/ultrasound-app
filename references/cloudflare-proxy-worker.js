@@ -38,7 +38,7 @@
  * ─── Configuration ────────────────────────────────────────────────────────
  * Set these as Worker environment variables in the Cloudflare dashboard:
  *
- *   APP_ORIGIN   = https://ultrasound-urcfdrve.manus.space
+ *   APP_ORIGIN   = https://app.allaboutultrasound.com
  *   ROOT_DOMAIN  = allaboutultrasound.com
  *
  * ─── Canonical URL signal ─────────────────────────────────────────────────
@@ -50,7 +50,7 @@
 
 // ── Configurable constants ─────────────────────────────────────────────────
 // These are overridden by Worker environment variables when deployed.
-const DEFAULT_APP_ORIGIN = "https://ultrasound-urcfdrve.manus.space";
+const DEFAULT_APP_ORIGIN = "https://app.allaboutultrasound.com";
 const DEFAULT_ROOT_DOMAIN = "allaboutultrasound.com";
 
 // ── Path matchers ──────────────────────────────────────────────────────────

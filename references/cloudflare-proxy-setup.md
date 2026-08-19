@@ -67,11 +67,11 @@ allaboutultrasound.com/p/*
 
 ---
 
-## Step 3 — Set the `CANONICAL_ROOT_DOMAIN` Secret in Manus
+## Step 3 — Set `CANONICAL_ROOT_DOMAIN` on Railway
 
 The app server needs to know the root domain so it can emit correct `<link rel="canonical">` tags when pages are proxied.
 
-1. In the Manus project settings → **Secrets**, add:
+1. In Railway → your service → **Variables**, add:
 
 | Key | Value |
 |---|---|
