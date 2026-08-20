@@ -18,6 +18,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import https from "https";
 import http from "http";
+import { isRailwayPrimaryHost } from "../lib/storageBackend";
 import { needsScormExtraction } from "../lib/scormPackage";
 
 const execAsync = promisify(exec);
@@ -507,6 +508,12 @@ let mirrorSyncStarted = false;
 export function startMirrorSync() {
   if (mirrorSyncStarted) return;
   mirrorSyncStarted = true;
+
+  // Railway is the live host — no need to mirror Manus → Railway
+  if (isRailwayPrimaryHost()) {
+    console.log("[MirrorSync] Railway is primary host, mirror sync disabled");
+    return;
+  }
 
   // Check if Railway/R2 credentials are configured
   const hasRailway = !!getRailwayUrl();

@@ -2,11 +2,14 @@
 
 ## Overview
 
-This app is configured for Railway deployment with custom domains:
+This app runs on **Railway** with custom domains:
+
 - **Main app:** `app.allaboutultrasound.com`
 - **LMS subdomain:** `learn.allaboutultrasound.com`
 
 Both domains point to the same Railway service. The app detects which subdomain is active and renders the appropriate UI.
+
+> **Manus → Railway cutover:** The app previously ran on Manus hosting with TiDB + Forge storage. Railway uses **Railway MySQL** + **Cloudflare R2**. Set `RAILWAY_PRIMARY=true` and `STORAGE_BACKEND=r2` on Railway after DNS cutover.
 
 ---
 
@@ -23,7 +26,7 @@ Build: pnpm install && pnpm build
 Start: pnpm start
 ```
 
-Railway will automatically deploy on every push to `main`.
+Railway deploys automatically on every push to `main`.
 
 ---
 
@@ -31,10 +34,28 @@ Railway will automatically deploy on every push to `main`.
 
 Set these in your Railway service's **Variables** tab:
 
-### Core App
+### Railway Primary (required after cutover)
+
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | MySQL connection string | `mysql://user:pass@host:port/db?ssl={"rejectUnauthorized":true}` |
+| `RAILWAY_PRIMARY` | Disables Manus→Railway mirror sync | `true` |
+| `STORAGE_BACKEND` | Use R2 instead of Manus Forge | `r2` |
+| `DATABASE_URL` | Railway MySQL connection string | `mysql://root:pass@viaduct.proxy.rlwy.net:37790/railway` |
+
+### Cloudflare R2 (required on Railway)
+
+| Variable | Description |
+|----------|-------------|
+| `CF_R2_ACCOUNT_ID` | Cloudflare account ID |
+| `CF_R2_ACCESS_KEY_ID` | R2 API token access key |
+| `CF_R2_SECRET_ACCESS_KEY` | R2 API token secret |
+| `CF_R2_BUCKET_NAME` | Bucket name (default: `ultrasound-assist`) |
+| `CF_R2_PUBLIC_URL` | Public R2 URL prefix (e.g. `https://pub-xxx.r2.dev`) |
+
+### Core App
+
+| Variable | Description | Example |
+|----------|-------------|---------|
 | `JWT_SECRET` | Session cookie signing secret | (random 32+ char string) |
 | `NODE_ENV` | Must be `production` | `production` |
 | `VITE_APP_URL` | Canonical app URL | `https://app.allaboutultrasound.com` |
@@ -45,16 +66,11 @@ Set these in your Railway service's **Variables** tab:
 | `VITE_OAUTH_PORTAL_URL` | Manus login portal | (from Manus) |
 | `OWNER_OPEN_ID` | Owner's Manus open ID | (from Manus) |
 | `OWNER_NAME` | Owner's display name | (your name) |
-
-### Manus Forge (Storage, LLM, Notifications)
-| Variable | Description |
-|----------|-------------|
-| `BUILT_IN_FORGE_API_URL` | Forge API base URL |
-| `BUILT_IN_FORGE_API_KEY` | Forge API key (server-side) |
-| `VITE_FRONTEND_FORGE_API_URL` | Forge API URL (client-side) |
-| `VITE_FRONTEND_FORGE_API_KEY` | Forge API key (client-side) |
+| `CANONICAL_ROOT_DOMAIN` | SEO root domain for Cloudflare proxy | `allaboutultrasound.com` |
+| `IHE_CANONICAL_ROOT_DOMAIN` | iHeartEcho canonical domain | `app.iheartecho.com` |
 
 ### Stripe
+
 | Variable | Description |
 |----------|-------------|
 | `STRIPE_SECRET_KEY` | Stripe secret key |
@@ -62,6 +78,7 @@ Set these in your Railway service's **Variables** tab:
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
 
 ### SendGrid
+
 | Variable | Description |
 |----------|-------------|
 | `SENDGRID_API_KEY` | SendGrid API key |
@@ -69,74 +86,117 @@ Set these in your Railway service's **Variables** tab:
 | `SENDGRID_FROM_NAME` | Sender display name |
 
 ### Thinkific
+
 | Variable | Description |
 |----------|-------------|
 | `THINKIFIC_API_KEY` | Thinkific API key |
 | `THINKIFIC_SUBDOMAIN` | Thinkific subdomain |
 
-### BookVault (Physical book fulfillment)
-| Variable | Description |
-|----------|-------------|
-| `BOOKVAULT_API_KEY` | BookVault API key from the BookVault portal (include `bv_` prefix) |
-| `BOOKVAULT_DISPATCH_SERVICE` | Optional dispatch service (default: `CheapestTracked`) |
-| `BOOKVAULT_PRODUCTION_LEVEL` | Optional production level (default: `Standard`) |
-
-### Printful (Print-on-demand fulfillment)
-| Variable | Description |
-|----------|-------------|
-| `PRINTFUL_API_KEY` | API key from Printful → Stores → API |
-| `PRINTFUL_DEFAULT_STORE_ID` | Optional default store ID (e.g. `18405098` for All About Ultrasound \| iHeartEcho) |
-| `PRINTFUL_SHIPPING_METHOD` | Optional shipping method (default: `STANDARD`) |
-
 ### Analytics (Optional)
+
 | Variable | Description |
 |----------|-------------|
 | `VITE_ANALYTICS_ENDPOINT` | Analytics endpoint URL |
 | `VITE_ANALYTICS_WEBSITE_ID` | Analytics website ID |
 
+### Legacy Manus (optional after cutover)
+
+These are only needed if `STORAGE_BACKEND=forge` or during transition:
+
+| Variable | Description |
+|----------|-------------|
+| `BUILT_IN_FORGE_API_URL` | Forge API base URL |
+| `BUILT_IN_FORGE_API_KEY` | Forge API key (server-side) |
+| `VITE_FRONTEND_FORGE_API_URL` | Forge API URL (client-side) |
+| `VITE_FRONTEND_FORGE_API_KEY` | Forge API key (client-side) |
+| `RAILWAY_MYSQL_URL` | Only used by mirror sync on Manus (not needed on Railway) |
+
+---
+
+## Manus → Railway Migration Checklist
+
+### 1. Pre-cutover (on Manus)
+
+- [ ] Confirm mirror sync has populated Railway MySQL (`RAILWAY_MYSQL_URL` on Manus)
+- [ ] Confirm media is mirrored to R2 (check `CF_R2_*` bucket object count)
+- [ ] Run a final mirror sync from admin or wait for the 6-hour cron
+- [ ] Note all Manus env vars — copy them to Railway Variables
+
+### 2. Railway service setup
+
+- [ ] Connect GitHub repo to Railway
+- [ ] Add Railway MySQL plugin (or use existing `viaduct.proxy.rlwy.net` instance)
+- [ ] Set all env vars from the tables above
+- [ ] Set `RAILWAY_PRIMARY=true`
+- [ ] Set `STORAGE_BACKEND=r2`
+- [ ] Set `DATABASE_URL` to Railway MySQL URL (not TiDB)
+- [ ] Deploy from `main` and verify health check at `/api/trpc`
+
+### 3. DNS cutover
+
+In Railway **Settings → Networking → Custom Domains**:
+
+1. Add `app.allaboutultrasound.com`
+2. Add `learn.allaboutultrasound.com`
+3. Update DNS CNAME records to Railway's provided targets
+4. Wait for TLS certificates to provision (~5 min)
+
+### 4. External webhooks
+
+Update these to point at `https://app.allaboutultrasound.com`:
+
+| Service | Endpoint |
+|---------|----------|
+| Stripe | `/api/stripe/webhook` |
+| SendGrid | `/api/webhooks/sendgrid` |
+| Thinkific | `/api/webhooks/thinkific` |
+
+### 5. OAuth callback
+
+Register with Manus (if not already):
+
+- `https://app.allaboutultrasound.com/api/oauth/callback`
+
+### 6. Cloudflare SEO proxy
+
+Update the Cloudflare Worker `APP_ORIGIN` variable:
+
+```
+APP_ORIGIN = https://app.allaboutultrasound.com
+```
+
+See `references/cloudflare-proxy-setup.md` for full setup.
+
+### 7. Post-cutover verification
+
+- [ ] Login via Manus OAuth works
+- [ ] `/api/debug/db-status` shows `dbConnected: true`
+- [ ] Media uploads go to R2 (check new objects in bucket)
+- [ ] SCORM packages play correctly
+- [ ] Stripe test purchase completes
+- [ ] Email delivery works (SendGrid)
+
+### 8. Decommission Manus hosting
+
+After 48 hours of stable Railway operation:
+
+- [ ] Remove Manus deploy (keep OAuth app registration)
+- [ ] Remove `RAILWAY_MYSQL_URL` from any remaining Manus secrets
+- [ ] Plan migration of `manuscdn.com` assets to R2 (URLs expire ~March 2027)
+
 ---
 
 ## Custom Domain Setup
 
-In Railway's **Settings → Networking → Custom Domains**:
-
-1. Add `app.allaboutultrasound.com`
-2. Add `learn.allaboutultrasound.com`
-3. Railway will provide CNAME records — update your DNS accordingly
-
 Both domains serve the same Railway service. The app's `useSubdomain` hook detects `learn.*` hostnames and renders the LMS interface.
-
----
-
-## Webhook URLs to Update
-
-After deployment, update these external services to point to your Railway domain:
-
-### Stripe
-- Dashboard → Developers → Webhooks
-- Update endpoint URL to: `https://app.allaboutultrasound.com/api/stripe/webhook`
-
-### SendGrid
-- Settings → Mail Settings → Event Webhook
-- Update HTTP Post URL to: `https://app.allaboutultrasound.com/api/webhooks/sendgrid`
-
-### Thinkific
-- If using Thinkific webhooks, update to: `https://app.allaboutultrasound.com/api/webhooks/thinkific`
-
----
-
-## OAuth Callback Registration
-
-Ensure the OAuth callback URL is registered with Manus:
-- `https://app.allaboutultrasound.com/api/oauth/callback`
-
-This should already be configured if you were previously using this domain.
 
 ---
 
 ## Notes
 
 - **PORT:** The app binds to `process.env.PORT` in production (Railway sets this automatically)
-- **Manus plugins:** `vite-plugin-manus-runtime` and `@builder.io/vite-plugin-jsx-loc` are optional dev dependencies. They load via try/catch and won't break the build if missing.
-- **CDN assets:** FetalScanCoach images use signed Manus CDN URLs that expire in March 2027. Plan to migrate these to Cloudflare R2 before then.
-- **Database:** The app uses MySQL/TiDB. If migrating the database to Railway MySQL, update `DATABASE_URL` accordingly.
+- **Storage:** `STORAGE_BACKEND=auto` (default) prefers R2 when `CF_R2_*` is configured; set `r2` explicitly on Railway
+- **Mirror sync:** Disabled automatically when `RAILWAY_PRIMARY=true` or `DATABASE_URL` points to Railway
+- **Manus plugins:** `vite-plugin-manus-runtime` is optional; loads via try/catch and won't break builds
+- **Manus HMR:** Set `MANUS_SANDBOX=true` only when developing inside the Manus sandbox proxy
+- **CDN assets:** FetalScanCoach images use signed Manus CDN URLs that expire in March 2027 — migrate to R2 before then

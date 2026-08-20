@@ -1,5 +1,13 @@
 import type { Express } from "express";
 import { ENV } from "./env";
+import { resolveStorageBackend } from "../lib/storageBackend";
+
+function buildR2PublicUrl(key: string): string | null {
+  const base = process.env.CF_R2_PUBLIC_URL?.replace(/\/+$/, "");
+  if (!base) return null;
+  return `${base}/${key.replace(/^\/+/, "")}`;
+}
+
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*", async (req, res) => {
     const key = req.params[0];
@@ -7,6 +15,21 @@ export function registerStorageProxy(app: Express) {
       res.status(400).send("Missing storage key");
       return;
     }
+
+    // Railway / R2-primary: redirect to public R2 URL
+    try {
+      if (resolveStorageBackend() === "r2") {
+        const r2Url = buildR2PublicUrl(key);
+        if (r2Url) {
+          res.set("Cache-Control", "public, max-age=3600");
+          res.redirect(307, r2Url);
+          return;
+        }
+      }
+    } catch {
+      // Fall through to Forge proxy
+    }
+
     if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
       res.status(500).send("Storage proxy not configured");
       return;

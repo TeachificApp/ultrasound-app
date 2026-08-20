@@ -32,7 +32,7 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 ### Important caveats
 
-1. **Vite HMR in Cloud VMs**: The `vite.config.ts` sets `hmr.clientPort: 443` and `hmr.protocol: "wss"` for the Manus sandbox proxy. In Cloud Agent VMs, this causes Chrome to hang when loading the dev server UI (hundreds of module requests + failed WSS connection). **Workaround**: Use `pnpm build && node dist/index.js` to verify UI rendering in browser, or rely on curl/tests for API verification. The dev server itself works correctly for API development.
+1. **Vite HMR in Manus sandbox**: Set `MANUS_SANDBOX=true` when developing inside the Manus sandbox proxy (enables WSS HMR on port 443). In Cloud Agent VMs and Railway, leave this unset — use `pnpm build && node dist/index.js` to verify UI rendering in browser, or rely on curl/tests for API verification.
 
 2. **Tests without DATABASE_URL**: Run tests with `JWT_SECRET` and `STRIPE_SECRET_KEY` set (same as dev server); otherwise any test file that imports `appRouter` fails at collection time. Without a database, expect ~10 failures in `server/scanCoachAdmin.test.ts` (live MySQL required) plus a handful of env-gated failures (SendGrid, Thinkific GraphQL, LMS email vars). The majority of the ~817 tests pass without `DATABASE_URL`.
 

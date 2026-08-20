@@ -1,11 +1,13 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
-// Also supports dual-write to Cloudflare R2 for mirroring
+// Storage helpers — Cloudflare R2 (Railway) or Manus Forge (legacy hosting).
+// Set STORAGE_BACKEND=r2 on Railway; defaults to auto (R2 when configured).
 
+import { createReadStream, promises as fsPromises, statSync } from "node:fs";
 import { ENV } from './_core/env';
+import { resolveStorageBackend } from './lib/storageBackend';
 import {
   S3Client,
   PutObjectCommand,
+  DeleteObjectCommand,
   CreateMultipartUploadCommand,
   UploadPartCommand,
   CompleteMultipartUploadCommand,
@@ -76,7 +78,13 @@ function buildAuthHeaders(apiKey: string): HeadersInit {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
-// ── R2 Dual-Write Support ──────────────────────────────────────────────────────
+function buildR2PublicUrl(key: string): string {
+  const base = process.env.CF_R2_PUBLIC_URL?.replace(/\/+$/, "");
+  if (!base) throw new Error("CF_R2_PUBLIC_URL is not configured");
+  return `${base}/${key}`;
+}
+
+// ── R2 Client ──────────────────────────────────────────────────────────────────
 
 let r2Client: S3Client | null = null;
 
@@ -102,9 +110,38 @@ function getR2Bucket(): string {
   return process.env.CF_R2_BUCKET_NAME || "ultrasound-assist";
 }
 
+async function r2Put(
+  relKey: string,
+  data: Buffer | Uint8Array | string,
+  contentType: string
+): Promise<{ key: string; url: string }> {
+  const client = getR2Client();
+  if (!client) throw new Error("R2 client is not configured");
+
+  const key = normalizeKey(relKey);
+  const body = typeof data === "string" ? Buffer.from(data) : data;
+  await client.send(
+    new PutObjectCommand({
+      Bucket: getR2Bucket(),
+      Key: key,
+      Body: body as any,
+      ContentType: contentType,
+    })
+  );
+  return { key, url: buildR2PublicUrl(key) };
+}
+
+async function r2Delete(relKey: string): Promise<void> {
+  const client = getR2Client();
+  if (!client) throw new Error("R2 client is not configured");
+
+  const key = normalizeKey(relKey);
+  await client.send(new DeleteObjectCommand({ Bucket: getR2Bucket(), Key: key }));
+}
+
 /**
  * Mirror a file upload to Cloudflare R2 (fire-and-forget).
- * This runs in the background and does not block the primary upload.
+ * Used when Forge is primary and R2 is a secondary mirror.
  */
 async function mirrorToR2(
   relKey: string,
@@ -126,7 +163,6 @@ async function mirrorToR2(
     );
     console.log(`[R2Mirror] Uploaded: ${relKey}`);
   } catch (err: any) {
-    // Don't fail the primary upload if R2 mirror fails
     console.error(`[R2Mirror] Failed to mirror ${relKey}: ${err.message}`);
   }
 }
@@ -145,10 +181,8 @@ export async function storagePutLarge(
 ): Promise<{ key: string; url: string }> {
   const client = getR2Client();
   const bucket = getR2Bucket();
-  const r2PublicUrl = process.env.CF_R2_PUBLIC_URL;
 
-  if (!client || !r2PublicUrl) {
-    // Fall back to regular storagePut if R2 is not configured
+  if (!client || !process.env.CF_R2_PUBLIC_URL) {
     console.warn("[StorageLarge] R2 not configured, falling back to storagePut");
     return storagePut(relKey, data, contentType);
   }
@@ -157,7 +191,6 @@ export async function storagePutLarge(
   const body = Buffer.isBuffer(data) ? data : Buffer.from(data);
   const PART_SIZE = 10 * 1024 * 1024; // 10 MB per part
 
-  // Initiate multipart upload
   const initResult = await client.send(
     new CreateMultipartUploadCommand({
       Bucket: bucket,
@@ -187,7 +220,6 @@ export async function storagePutLarge(
       console.log(`[StorageLarge] Uploaded part ${i + 1}/${totalParts} for ${key}`);
     }
 
-    // Complete the multipart upload
     await client.send(
       new CompleteMultipartUploadCommand({
         Bucket: bucket,
@@ -197,16 +229,112 @@ export async function storagePutLarge(
       })
     );
   } catch (err) {
-    // Abort the multipart upload on error to avoid orphaned parts
     await client.send(
       new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId })
     ).catch(() => {});
     throw err;
   }
 
-  const url = `${r2PublicUrl.replace(/\/+$/, "")}/${key}`;
+  const url = buildR2PublicUrl(key);
   console.log(`[StorageLarge] R2 multipart upload complete: ${url}`);
   return { key, url };
+}
+
+/** Stream a file from disk to storage without loading the full file into RAM. */
+export async function storagePutStream(
+  relKey: string,
+  filePath: string,
+  contentType = "application/octet-stream"
+): Promise<{ key: string; url: string }> {
+  if (resolveStorageBackend() === "r2") {
+    return r2PutStream(relKey, filePath, contentType);
+  }
+
+  const { size } = statSync(filePath);
+  const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024;
+  const buffer = await fsPromises.readFile(filePath);
+  if (size > LARGE_FILE_THRESHOLD) {
+    return storagePutLarge(relKey, buffer, contentType);
+  }
+  return storagePut(relKey, buffer, contentType);
+}
+
+async function r2PutStream(
+  relKey: string,
+  filePath: string,
+  contentType: string
+): Promise<{ key: string; url: string }> {
+  const client = getR2Client();
+  if (!client || !process.env.CF_R2_PUBLIC_URL) {
+    throw new Error("R2 is not configured for streaming upload");
+  }
+
+  const key = normalizeKey(relKey);
+  const bucket = getR2Bucket();
+  const { size } = statSync(filePath);
+  const PART_SIZE = 10 * 1024 * 1024;
+
+  const initResult = await client.send(
+    new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: contentType })
+  );
+  const uploadId = initResult.UploadId!;
+
+  const parts: { ETag: string; PartNumber: number }[] = [];
+  const stream = createReadStream(filePath);
+  let partNumber = 0;
+  let buffer = Buffer.alloc(0);
+
+  try {
+    for await (const chunk of stream) {
+      buffer = Buffer.concat([buffer, Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)]);
+      while (buffer.length >= PART_SIZE) {
+        partNumber++;
+        const partBuffer = buffer.subarray(0, PART_SIZE);
+        buffer = buffer.subarray(PART_SIZE);
+        const partResult = await client.send(
+          new UploadPartCommand({
+            Bucket: bucket,
+            Key: key,
+            UploadId: uploadId,
+            PartNumber: partNumber,
+            Body: partBuffer,
+          })
+        );
+        parts.push({ ETag: partResult.ETag!, PartNumber: partNumber });
+      }
+    }
+
+    if (buffer.length > 0 || parts.length === 0) {
+      partNumber++;
+      const partResult = await client.send(
+        new UploadPartCommand({
+          Bucket: bucket,
+          Key: key,
+          UploadId: uploadId,
+          PartNumber: partNumber,
+          Body: buffer,
+        })
+      );
+      parts.push({ ETag: partResult.ETag!, PartNumber: partNumber });
+    }
+
+    await client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: { Parts: parts },
+      })
+    );
+  } catch (err) {
+    await client.send(
+      new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId })
+    ).catch(() => {});
+    throw err;
+  }
+
+  console.log(`[StorageStream] R2 stream upload complete (${size} bytes): ${key}`);
+  return { key, url: buildR2PublicUrl(key) };
 }
 
 // ── Primary Storage Operations ─────────────────────────────────────────────────
@@ -216,6 +344,10 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
+  if (resolveStorageBackend() === "r2") {
+    return r2Put(relKey, data, contentType);
+  }
+
   const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
   const uploadUrl = buildUploadUrl(baseUrl, key);
@@ -234,56 +366,48 @@ export async function storagePut(
   }
   const url = (await response.json()).url;
 
-  // Fire-and-forget: mirror to R2 in background
   mirrorToR2(key, data, contentType).catch(() => {});
 
   return { key, url };
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
-  const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
+
+  if (resolveStorageBackend() === "r2") {
+    return { key, url: buildR2PublicUrl(key) };
+  }
+
+  const { baseUrl, apiKey } = getStorageConfig();
   return {
     key,
     url: await buildDownloadUrl(baseUrl, key, apiKey),
   };
 }
 
-/**
- * storagePutStream — upload a file from a local path to storage.
- * Used by scormUploadRoutes for large ZIP file uploads.
- */
-export async function storagePutStream(
-  relKey: string,
-  filePath: string,
-  contentType = "application/octet-stream"
-): Promise<{ key: string; url: string }> {
-  const { readFileSync } = await import("fs");
-  const data = readFileSync(filePath);
-  return storagePut(relKey, data, contentType);
-}
-
 export async function storageDelete(relKey: string): Promise<void> {
-  const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
+
+  if (resolveStorageBackend() === "r2") {
+    await r2Delete(relKey);
+    return;
+  }
+
+  const { baseUrl, apiKey } = getStorageConfig();
   const deleteUrl = new URL("v1/storage/delete", ensureTrailingSlash(baseUrl));
   deleteUrl.searchParams.set("path", key);
   const response = await fetch(deleteUrl, {
     method: "DELETE",
     headers: buildAuthHeaders(apiKey),
   });
-  // 404 is acceptable — file may already be gone
   if (!response.ok && response.status !== 404) {
     const message = await response.text().catch(() => response.statusText);
     throw new Error(`Storage delete failed (${response.status}): ${message}`);
   }
 
-  // Also delete from R2 (fire-and-forget)
   const client = getR2Client();
   if (client) {
-    import("@aws-sdk/client-s3").then(({ DeleteObjectCommand }) => {
-      client.send(new DeleteObjectCommand({ Bucket: getR2Bucket(), Key: key }))
-        .catch((err: any) => console.error(`[R2Mirror] Failed to delete ${key}: ${err.message}`));
-    }).catch(() => {});
+    client.send(new DeleteObjectCommand({ Bucket: getR2Bucket(), Key: key }))
+      .catch((err: any) => console.error(`[R2Mirror] Failed to delete ${key}: ${err.message}`));
   }
 }
