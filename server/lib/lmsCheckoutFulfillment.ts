@@ -501,7 +501,8 @@ export async function reconcileLmsCheckoutFromStripeSession(
     }
     const courseTitle = course?.title ?? `Course #${courseId}`;
     const stripeLink = `https://dashboard.stripe.com/payments/${paymentIntentFromSession}`;
-    const adminEmail = process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com";
+    const { resolvePlatformAdminEmail } = await import("./platformAdminEmail");
+    const adminEmail = resolvePlatformAdminEmail();
     // Notify owner via in-app notification
     await notifyOwner({
       title: "⚠️ Duplicate LMS Payment — Action Required",
