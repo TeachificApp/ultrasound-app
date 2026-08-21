@@ -185,6 +185,10 @@ async function startServer() {
     const cookieHeader = req.headers.cookie || "";
     res.json({ cookieSet: true, domain: cookieOpts.domain || '(none)', sameSite: cookieOpts.sameSite, secure: cookieOpts.secure, cookieHeader: cookieHeader.substring(0, 200), canonicalRootDomain: process.env.CANONICAL_ROOT_DOMAIN || '(not set)', nodeEnv: process.env.NODE_ENV });
   });
+  // Railway/load-balancer health probe — must return HTTP 200 with no auth
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ ok: true, ts: Date.now() });
+  });
   // Build version debug endpoint to verify deployed code
   app.get("/api/debug/build-version", (_req, res) => {
     res.json({ version: "2026-05-14-v2-api-media", deployedAt: new Date().toISOString(), spaRegex: "^/(?!media/|api/|manus-storage/).*" });

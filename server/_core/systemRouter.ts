@@ -5,9 +5,11 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from "./t
 export const systemRouter = router({
   health: publicProcedure
     .input(
-      z.object({
-        timestamp: z.number().min(0, "timestamp cannot be negative"),
-      })
+      z
+        .object({
+          timestamp: z.number().min(0, "timestamp cannot be negative").optional(),
+        })
+        .optional()
     )
     .query(() => ({
       ok: true,
