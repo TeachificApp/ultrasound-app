@@ -130,7 +130,7 @@ These are only needed if `STORAGE_BACKEND=forge` or during transition:
 - [ ] Set `RAILWAY_PRIMARY=true`
 - [ ] Set `STORAGE_BACKEND=r2`
 - [ ] Set `DATABASE_URL` to Railway MySQL URL (not TiDB)
-- [ ] Deploy from `main` and verify health check at `/api/trpc`
+- [ ] Deploy from `main` and verify health check at `/api/health`
 
 ### 3. DNS cutover
 

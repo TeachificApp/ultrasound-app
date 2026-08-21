@@ -5,7 +5,7 @@ watchPatterns = ["client/**", "server/**", "shared/**", "drizzle/**", "package.j
 
 [deploy]
 startCommand = "pnpm start"
-healthcheckPath = "/api/trpc"
+healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
