@@ -18,6 +18,10 @@ import { z } from "zod";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { getDb, getOrCreateAccessToken } from "../db";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { getTeachUserContext } from "../lib/teachAccess";
+import { parseKahootSpreadsheet } from "../lib/kahootSpreadsheetImport";
+import { storagePut } from "../storage";
+import { aggregateWordCloud, evaluateTeachResponse } from "../lib/teachGameInteractions";
 import {
   sonoQuizzes,
   sonoQuizQuestions,
@@ -77,12 +81,36 @@ function calcPoints(basePoints: number, timeLimitMs: number, responseTimeMs: num
 }
 
 // ─── Admin guard helper ───────────────────────────────────────────────────────
-async function requireAdmin(userId: number) {
+async function requirePlatformAdmin(userId: number) {
   const db = (await getDb())!;
   const user = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
   if (!user[0] || user[0].role !== "admin") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
   }
+}
+
+const requireAdmin = requirePlatformAdmin;
+
+async function requireTeachGameAuthor(userId: number) {
+  const db = (await getDb())!;
+  const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
+  if (user?.role === "admin") return { isAdmin: true };
+  const teachContext = await getTeachUserContext(userId);
+  if (!teachContext.canAccessTeach) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "TEACH educator access required" });
+  }
+  return { isAdmin: false };
+}
+
+async function assertTeachGameOwnership(userId: number, quizId: number) {
+  const author = await requireTeachGameAuthor(userId);
+  const db = (await getDb())!;
+  const [quiz] = await db.select().from(sonoQuizzes).where(eq(sonoQuizzes.id, quizId)).limit(1);
+  if (!quiz) throw new TRPCError({ code: "NOT_FOUND", message: "Live game not found" });
+  if (!author.isAdmin && quiz.createdByUserId !== userId) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "You can only manage your own Teach games" });
+  }
+  return quiz;
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -94,7 +122,7 @@ export const sonoQuizRouter = router({
   listQuizzes: protectedProcedure
     .input(z.object({ status: z.enum(["draft", "published", "archived", "all"]).default("all") }).optional())
     .query(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
+      await requireTeachGameAuthor(ctx.user.id);
       const db = (await getDb())!;
       const conditions = [eq(sonoQuizzes.createdByUserId, ctx.user.id)];
       if (input?.status && input.status !== "all") {
@@ -128,16 +156,14 @@ export const sonoQuizRouter = router({
   getQuiz: protectedProcedure
     .input(z.object({ quizId: z.number() }))
     .query(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
+      const quiz = await assertTeachGameOwnership(ctx.user.id, input.quizId);
       const db = (await getDb())!;
-      const quiz = await db.select().from(sonoQuizzes).where(eq(sonoQuizzes.id, input.quizId)).limit(1);
-      if (!quiz[0]) throw new TRPCError({ code: "NOT_FOUND" });
       const questions = await db
         .select()
         .from(sonoQuizQuestions)
         .where(eq(sonoQuizQuestions.quizId, input.quizId))
         .orderBy(asc(sonoQuizQuestions.sortOrder));
-      return { quiz: quiz[0], questions };
+      return { quiz, questions };
     }),
 
   createQuiz: protectedProcedure
@@ -149,12 +175,23 @@ export const sonoQuizRouter = router({
       theme: z.string().default("teal"),
       coverImageUrl: z.string().optional(),
       category: z.string().default("General"),
+      isTeachGame: z.boolean().default(false),
+      ownerContext: z.enum(["platform", "lms_instructor", "educator_assist"]).default("platform"),
+      educatorOrgId: z.number().int().nullable().optional(),
+      importSource: z.enum(["manual", "kahoot_xlsx"]).default("manual"),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
+      const author = await requireTeachGameAuthor(ctx.user.id);
+      if (!author.isAdmin && !input.isTeachGame) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Educators can create Teach games only" });
+      }
       const db = (await getDb())!;
       const result = await db.insert(sonoQuizzes).values({
         createdByUserId: ctx.user.id,
+        isTeachGame: input.isTeachGame,
+        ownerContext: input.ownerContext,
+        educatorOrgId: input.educatorOrgId ?? null,
+        importSource: input.importSource,
         title: input.title,
         description: input.description,
         timeLimitSeconds: input.timeLimitSeconds,
@@ -168,6 +205,77 @@ export const sonoQuizRouter = router({
       return { quizId: Number((result as any).insertId) };
     }),
 
+  importKahootSpreadsheet: protectedProcedure
+    .input(z.object({
+      title: z.string().min(1).max(300),
+      fileName: z.string().min(1).max(255),
+      fileData: z.string().min(1),
+      ownerContext: z.enum(["lms_instructor", "educator_assist"]).default("lms_instructor"),
+      educatorOrgId: z.number().int().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await requireTeachGameAuthor(ctx.user.id);
+      if (!/\.xlsx$/i.test(input.fileName)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Upload a .xlsx spreadsheet exported from your authorised Kahoot quiz template." });
+      }
+      const buffer = Buffer.from(input.fileData, "base64");
+      if (buffer.byteLength > 5 * 1024 * 1024) {
+        throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Kahoot spreadsheet imports are limited to 5 MB." });
+      }
+      let parsed;
+      try {
+        parsed = parseKahootSpreadsheet(buffer);
+      } catch (error: any) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error?.message ?? "Could not read the Kahoot spreadsheet." });
+      }
+      const db = (await getDb())!;
+      const result = await db.insert(sonoQuizzes).values({
+        createdByUserId: ctx.user.id,
+        isTeachGame: true,
+        ownerContext: input.ownerContext,
+        educatorOrgId: input.educatorOrgId ?? null,
+        importSource: "kahoot_xlsx",
+        title: input.title,
+        timeLimitSeconds: 20,
+        theme: "teal",
+        category: "General",
+        questionCount: parsed.questions.length,
+        status: "draft",
+      });
+      const quizId = Number((result as any).insertId);
+      await db.insert(sonoQuizQuestions).values(parsed.questions.map((question, sortOrder) => ({
+        quizId,
+        interactionType: "multiple_choice" as const,
+        interactionConfig: JSON.stringify({ source: "kahoot_xlsx", correctIndexes: question.correctIndexes }),
+        question: question.question,
+        options: JSON.stringify(question.options),
+        correctAnswer: question.correctAnswer,
+        timeLimitSeconds: question.timeLimitSeconds,
+        points: 100,
+        sortOrder,
+      })));
+      return { quizId, questionCount: parsed.questions.length, warnings: parsed.warnings };
+    }),
+
+  uploadTeachGameMedia: protectedProcedure
+    .input(z.object({
+      quizId: z.number(),
+      fileName: z.string().min(1).max(255),
+      mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
+      fileData: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertTeachGameOwnership(ctx.user.id, input.quizId);
+      const buffer = Buffer.from(input.fileData, "base64");
+      if (buffer.byteLength > 10 * 1024 * 1024) {
+        throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Slide images are limited to 10 MB." });
+      }
+      const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
+      const key = `teach-games/${ctx.user.id}/${Date.now()}-${safeName}`;
+      const { url } = await storagePut(key, buffer, input.mimeType);
+      return { url, mediaType: input.mimeType === "image/gif" ? "gif" : "image" as const };
+    }),
+
   updateQuiz: protectedProcedure
     .input(z.object({
       quizId: z.number(),
@@ -179,9 +287,11 @@ export const sonoQuizRouter = router({
       coverImageUrl: z.string().nullable().optional(),
       category: z.string().optional(),
       status: z.enum(["draft", "published", "archived"]).optional(),
+      ownerContext: z.enum(["platform", "lms_instructor", "educator_assist"]).optional(),
+      educatorOrgId: z.number().int().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
+      await assertTeachGameOwnership(ctx.user.id, input.quizId);
       const db = (await getDb())!;
       const { quizId, ...updates } = input;
       await db.update(sonoQuizzes).set(updates as any).where(
@@ -193,7 +303,7 @@ export const sonoQuizRouter = router({
   deleteQuiz: protectedProcedure
     .input(z.object({ quizId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
+      await assertTeachGameOwnership(ctx.user.id, input.quizId);
       const db = (await getDb())!;
       const [quiz] = await db.select().from(sonoQuizzes).where(eq(sonoQuizzes.id, input.quizId)).limit(1);
       if (quiz) {
@@ -221,8 +331,11 @@ export const sonoQuizRouter = router({
       questionId: z.number().optional(), // omit to create
       quizId: z.number(),
       question: z.string().min(1),
-      options: z.array(z.string().min(1)).min(2).max(4),
-      correctAnswer: z.number().min(0).max(3),
+      interactionType: z.enum(["multiple_choice", "true_false", "word_cloud", "hotspot", "puzzle"]).default("multiple_choice"),
+      interactionConfig: z.record(z.unknown()).optional(),
+      slideTitle: z.string().max(300).optional(),
+      options: z.array(z.string()).max(6).default([]),
+      correctAnswer: z.number().min(-1).max(5).default(-1),
       explanation: z.string().optional(),
       mediaUrl: z.string().optional(),
       mediaType: z.enum(["image", "video", "gif"]).optional(),
@@ -231,12 +344,22 @@ export const sonoQuizRouter = router({
       sortOrder: z.number().default(0),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
+      await assertTeachGameOwnership(ctx.user.id, input.quizId);
       const db = (await getDb())!;
-      const optionsJson = JSON.stringify(input.options);
+      const normalizedOptions = input.interactionType === "true_false"
+        ? ["True", "False"]
+        : input.options.map((option) => option.trim()).filter(Boolean);
+      if ((input.interactionType === "multiple_choice" || input.interactionType === "true_false") && normalizedOptions.length < 2) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Choice slides need at least two answer options" });
+      }
+      const optionsJson = JSON.stringify(normalizedOptions);
+      const interactionConfig = input.interactionConfig ? JSON.stringify(input.interactionConfig) : null;
 
       if (input.questionId) {
         await db.update(sonoQuizQuestions).set({
+          interactionType: input.interactionType,
+          interactionConfig,
+          slideTitle: input.slideTitle ?? null,
           question: input.question,
           options: optionsJson,
           correctAnswer: input.correctAnswer,
@@ -251,6 +374,9 @@ export const sonoQuizRouter = router({
       } else {
         const result = await db.insert(sonoQuizQuestions).values({
           quizId: input.quizId,
+          interactionType: input.interactionType,
+          interactionConfig,
+          slideTitle: input.slideTitle ?? null,
           question: input.question,
           options: optionsJson,
           correctAnswer: input.correctAnswer,
@@ -272,7 +398,7 @@ export const sonoQuizRouter = router({
   deleteQuestion: protectedProcedure
     .input(z.object({ questionId: z.number(), quizId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
+      await assertTeachGameOwnership(ctx.user.id, input.quizId);
       const db = (await getDb())!;
       await db.delete(sonoQuizQuestions).where(eq(sonoQuizQuestions.id, input.questionId));
       await db.update(sonoQuizzes)
@@ -288,7 +414,7 @@ export const sonoQuizRouter = router({
       order: z.array(z.object({ questionId: z.number(), sortOrder: z.number() })),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
+      await assertTeachGameOwnership(ctx.user.id, input.quizId);
       const db = (await getDb())!;
       for (const { questionId, sortOrder } of input.order) {
         await db.update(sonoQuizQuestions)
@@ -307,13 +433,11 @@ export const sonoQuizRouter = router({
       showLeaderboard: z.boolean().default(true),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
+      const ownedQuiz = await assertTeachGameOwnership(ctx.user.id, input.quizId);
       const db = (await getDb())!;
 
       // Verify quiz exists and has questions
-      const quiz = await db.select().from(sonoQuizzes).where(eq(sonoQuizzes.id, input.quizId)).limit(1);
-      if (!quiz[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Quiz not found" });
-      if (quiz[0].questionCount === 0) {
+      if (ownedQuiz.questionCount === 0) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Quiz has no questions" });
       }
 
@@ -336,7 +460,7 @@ export const sonoQuizRouter = router({
         .where(eq(sonoQuizQuestions.quizId, input.quizId))
         .orderBy(asc(sonoQuizQuestions.sortOrder));
 
-      const snapshot = JSON.stringify({ quiz: quiz[0], questions });
+      const snapshot = JSON.stringify({ quiz: ownedQuiz, questions });
 
       const result = await db.insert(sonoQuizSessions).values({
         quizId: input.quizId,
@@ -355,11 +479,11 @@ export const sonoQuizRouter = router({
   getSession: protectedProcedure
     .input(z.object({ sessionId: z.number() }))
     .query(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
       const db = (await getDb())!;
       const session = await db.select().from(sonoQuizSessions)
         .where(eq(sonoQuizSessions.id, input.sessionId)).limit(1);
       if (!session[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTeachGameOwnership(ctx.user.id, session[0].quizId);
       const participants = await db.select().from(sonoQuizParticipants)
         .where(and(eq(sonoQuizParticipants.sessionId, input.sessionId), eq(sonoQuizParticipants.isActive, true)))
         .orderBy(desc(sonoQuizParticipants.totalScore));
@@ -437,12 +561,12 @@ export const sonoQuizRouter = router({
   startSession: protectedProcedure
     .input(z.object({ sessionId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
       const db = (await getDb())!;
       const session = await db.select().from(sonoQuizSessions)
         .where(and(eq(sonoQuizSessions.id, input.sessionId), eq(sonoQuizSessions.hostUserId, ctx.user.id)))
         .limit(1);
       if (!session[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTeachGameOwnership(ctx.user.id, session[0].quizId);
       if (session[0].status !== "lobby") throw new TRPCError({ code: "BAD_REQUEST", message: "Session already started" });
 
       const snapshot = JSON.parse(session[0].quizSnapshot ?? "{}");
@@ -463,6 +587,9 @@ export const sonoQuizRouter = router({
         input.sessionId,
         {
           id: q.id,
+          interactionType: q.interactionType ?? "multiple_choice",
+          interactionConfig: q.interactionConfig ? JSON.parse(q.interactionConfig) : null,
+          slideTitle: q.slideTitle ?? null,
           question: q.question,
           options: JSON.parse(q.options),
           mediaUrl: q.mediaUrl,
@@ -481,12 +608,12 @@ export const sonoQuizRouter = router({
   advanceQuestion: protectedProcedure
     .input(z.object({ sessionId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
       const db = (await getDb())!;
       const session = await db.select().from(sonoQuizSessions)
         .where(and(eq(sonoQuizSessions.id, input.sessionId), eq(sonoQuizSessions.hostUserId, ctx.user.id)))
         .limit(1);
       if (!session[0]) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTeachGameOwnership(ctx.user.id, session[0].quizId);
       if (session[0].status !== "active") throw new TRPCError({ code: "BAD_REQUEST", message: "Session not active" });
 
       const snapshot = JSON.parse(session[0].quizSnapshot ?? "{}");
@@ -570,6 +697,9 @@ export const sonoQuizRouter = router({
         input.sessionId,
         {
           id: nextQ.id,
+          interactionType: nextQ.interactionType ?? "multiple_choice",
+          interactionConfig: nextQ.interactionConfig ? JSON.parse(nextQ.interactionConfig) : null,
+          slideTitle: nextQ.slideTitle ?? null,
           question: nextQ.question,
           options: JSON.parse(nextQ.options),
           mediaUrl: nextQ.mediaUrl,
@@ -588,8 +718,10 @@ export const sonoQuizRouter = router({
   endSession: protectedProcedure
     .input(z.object({ sessionId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await requireAdmin(ctx.user.id);
       const db = (await getDb())!;
+      const [session] = await db.select().from(sonoQuizSessions).where(eq(sonoQuizSessions.id, input.sessionId)).limit(1);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTeachGameOwnership(ctx.user.id, session.quizId);
       await db.update(sonoQuizSessions).set({ status: "ended", endedAt: new Date() })
         .where(and(eq(sonoQuizSessions.id, input.sessionId), eq(sonoQuizSessions.hostUserId, ctx.user.id)));
 
@@ -613,7 +745,8 @@ export const sonoQuizRouter = router({
       sessionId: z.number(),
       participantId: z.number(),
       questionId: z.number(),
-      selectedAnswer: z.number().min(-1).max(3),
+      selectedAnswer: z.number().min(-1).max(5).default(-1),
+      responsePayload: z.record(z.unknown()).optional(),
       responseTimeMs: z.number().min(0),
     }))
     .mutation(async ({ input }) => {
@@ -629,7 +762,14 @@ export const sonoQuizRouter = router({
       const question = questions.find((q: any) => q.id === input.questionId);
       if (!question) throw new TRPCError({ code: "NOT_FOUND", message: "Question not found" });
 
-      const isCorrect = input.selectedAnswer === question.correctAnswer;
+      const interactionType = question.interactionType ?? "multiple_choice";
+      const isCorrect = evaluateTeachResponse({
+        interactionType,
+        selectedAnswer: input.selectedAnswer,
+        correctAnswer: question.correctAnswer,
+        interactionConfig: question.interactionConfig,
+        responsePayload: input.responsePayload,
+      });
       const timeLimitMs = (question.timeLimitSeconds ?? snapshot.quiz?.timeLimitSeconds ?? 20) * 1000;
       const pointsEarned = isCorrect ? calcPoints(question.points, timeLimitMs, input.responseTimeMs) : 0;
 
@@ -643,6 +783,7 @@ export const sonoQuizRouter = router({
           isCorrect,
           pointsEarned,
           responseTimeMs: input.responseTimeMs,
+          responsePayload: input.responsePayload ? JSON.stringify(input.responsePayload) : null,
         });
 
         // Update participant score
@@ -677,6 +818,34 @@ export const sonoQuizRouter = router({
         totalScore: p.totalScore,
         finalRank: p.finalRank,
       }));
+    }),
+
+  getLiveResponseSummary: protectedProcedure
+    .input(z.object({ sessionId: z.number(), questionId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const db = (await getDb())!;
+      const [session] = await db.select().from(sonoQuizSessions).where(eq(sonoQuizSessions.id, input.sessionId)).limit(1);
+      if (!session) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertTeachGameOwnership(ctx.user.id, session.quizId);
+      const snapshot = JSON.parse(session.quizSnapshot ?? "{}");
+      const question = (snapshot.questions ?? []).find((item: any) => item.id === input.questionId);
+      if (!question) throw new TRPCError({ code: "NOT_FOUND", message: "Question not found" });
+      const answers = await db.select({ responsePayload: sonoQuizAnswers.responsePayload, isCorrect: sonoQuizAnswers.isCorrect })
+        .from(sonoQuizAnswers)
+        .where(and(eq(sonoQuizAnswers.sessionId, input.sessionId), eq(sonoQuizAnswers.questionId, input.questionId)));
+      const payloads = answers.map((answer) => {
+        try { return answer.responsePayload ? JSON.parse(answer.responsePayload) : null; } catch { return null; }
+      });
+      if (question.interactionType === "word_cloud") {
+        return { type: "word_cloud" as const, responseCount: answers.length, words: aggregateWordCloud(payloads) };
+      }
+      if (question.interactionType === "hotspot") {
+        return { type: "hotspot" as const, responseCount: answers.length, hotspots: payloads.map((payload) => payload?.hotspot).filter(Boolean), correctCount: answers.filter((answer) => answer.isCorrect).length };
+      }
+      if (question.interactionType === "puzzle") {
+        return { type: "puzzle" as const, responseCount: answers.length, correctCount: answers.filter((answer) => answer.isCorrect).length };
+      }
+      return { type: "choice" as const, responseCount: answers.length, correctCount: answers.filter((answer) => answer.isCorrect).length };
     }),
 
   /** Get session by join code (for participant join page) */

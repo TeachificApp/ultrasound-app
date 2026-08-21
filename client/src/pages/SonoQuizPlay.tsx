@@ -44,7 +44,10 @@ function useSonoQuizWS(sessionId: number | null, participantId: number | null, o
     const url = `${protocol}//${window.location.host}/ws/sonoquiz?sessionId=${sessionId}&participantId=${participantId}&role=player`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
-    ws.onopen = () => setConnected(true);
+    ws.onopen = () => {
+      setConnected(true);
+      ws.send(JSON.stringify({ type: "join", sessionId, participantId }));
+    };
     ws.onclose = () => setConnected(false);
     ws.onmessage = (e) => {
       try { onMessage(JSON.parse(e.data)); } catch {}
@@ -87,6 +90,9 @@ export default function SonoQuizPlay() {
   const [participantCount, setParticipantCount] = useState(0);
   const [quizInfo, setQuizInfo] = useState<any>(null);
   const [pointsEarned, setPointsEarned] = useState<number | null>(null);
+  const [freeResponse, setFreeResponse] = useState("");
+  const [hotspot, setHotspot] = useState<{ x: number; y: number } | null>(null);
+  const [puzzleOrder, setPuzzleOrder] = useState<string[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -115,30 +121,40 @@ export default function SonoQuizPlay() {
   // ── WebSocket ──────────────────────────────────────────────────────────────
   const { connected } = useSonoQuizWS(sessionId, participantId, (msg) => {
     switch (msg.type) {
+      case "question_start":
       case "question_started":
         setCurrentQuestion(msg.question);
         setQuestionIndex(msg.questionIndex);
         setTotalQuestions(msg.totalQuestions);
         setSelectedAnswer(null);
+        setFreeResponse("");
+        setHotspot(null);
+        try {
+          const order = JSON.parse(msg.question?.interactionConfig ?? "{}").correctOrder;
+          setPuzzleOrder(Array.isArray(order) ? [...order].sort(() => Math.random() - 0.5) : []);
+        } catch { setPuzzleOrder([]); }
         setCorrectAnswer(null);
         setPointsEarned(null);
         setPhase("question");
         setTimeLeft(msg.timeLimitSeconds);
         startTimer(msg.timeLimitSeconds);
         break;
+      case "question_end":
       case "question_ended":
         setCorrectAnswer(msg.correctAnswer);
         stopTimer();
         if (phase !== "answered") setPhase("answered");
         break;
+      case "leaderboard":
       case "leaderboard_update":
-        setLeaderboard(msg.leaderboard);
-        const myEntry = msg.leaderboard.find((e: any) => e.participantId === participantId);
+        const receivedLeaderboard = msg.leaderboard ?? msg.rankings ?? [];
+        setLeaderboard(receivedLeaderboard);
+        const myEntry = receivedLeaderboard.find((e: any) => e.participantId === participantId);
         if (myEntry) setRank(myEntry.rank);
         setPhase("leaderboard");
         break;
       case "session_ended":
-        setLeaderboard(msg.leaderboard ?? []);
+        setLeaderboard(msg.leaderboard ?? msg.finalRankings ?? []);
         setPhase("ended");
         break;
       case "participant_count":
@@ -202,7 +218,24 @@ export default function SonoQuizPlay() {
     });
   }
 
-  const opts = currentQuestion ? JSON.parse(currentQuestion.options) : [];
+  function submitStructuredResponse(responsePayload: Record<string, unknown>) {
+    if (phase !== "question" || selectedAnswer !== null) return;
+    setSelectedAnswer(-1);
+    stopTimer();
+    submitAnswer.mutate({
+      sessionId: sessionId!,
+      participantId: participantId!,
+      questionId: currentQuestion.id,
+      selectedAnswer: -1,
+      responsePayload,
+      responseTimeMs: Math.max(0, (currentQuestion.timeLimitSeconds ?? 20) * 1000 - timeLeft * 1000),
+    });
+  }
+
+  let opts: string[] = [];
+  try { opts = currentQuestion ? JSON.parse(currentQuestion.options) : []; } catch { opts = []; }
+  const interactionType = currentQuestion?.interactionType ?? "multiple_choice";
+  const isChoiceSlide = interactionType === "multiple_choice" || interactionType === "true_false";
   const myLeaderboardEntry = leaderboard.find(e => e.participantId === participantId);
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -323,12 +356,13 @@ export default function SonoQuizPlay() {
                   )}
                 </div>
               )}
+              {currentQuestion.slideTitle && <p className="text-xs uppercase tracking-wide text-teal-300 mb-2">{currentQuestion.slideTitle}</p>}
               <p className="text-lg font-bold text-white">{currentQuestion.question}</p>
-              <p className="text-xs text-slate-400 mt-1">{currentQuestion.points} points</p>
+              <p className="text-xs text-slate-400 mt-1">{isChoiceSlide ? `${currentQuestion.points} points` : interactionType.replace("_", " ")}</p>
             </div>
 
-            {/* Answer buttons */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Answer buttons or collaborative responses */}
+            {isChoiceSlide ? <div className="grid grid-cols-2 gap-3">
               {opts.map((opt: string, i: number) => (
                 <button key={i}
                   onClick={() => handleSelectAnswer(i)}
@@ -345,7 +379,7 @@ export default function SonoQuizPlay() {
                   <p className="text-sm text-white font-medium leading-snug">{opt}</p>
                 </button>
               ))}
-            </div>
+            </div> : interactionType === "word_cloud" ? <div className="space-y-3"><Input value={freeResponse} onChange={(event) => setFreeResponse(event.target.value)} placeholder="Share a word or short phrase" maxLength={80} className="h-14 bg-slate-900 border-slate-600 text-white text-lg" onKeyDown={(event) => event.key === "Enter" && freeResponse.trim() && submitStructuredResponse({ words: freeResponse.trim().split(/\s+/).slice(0, 3) })} /><Button className="w-full h-12 font-bold" style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)` }} disabled={!freeResponse.trim() || selectedAnswer !== null} onClick={() => submitStructuredResponse({ words: freeResponse.trim().split(/\s+/).slice(0, 3) })}>Add to the group word cloud</Button></div> : interactionType === "hotspot" ? <div className="space-y-3"><button type="button" aria-label="Select hotspot location" disabled={selectedAnswer !== null} onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); setHotspot({ x: Math.round(((event.clientX - rect.left) / rect.width) * 100), y: Math.round(((event.clientY - rect.top) / rect.height) * 100) }); }} className="relative block w-full min-h-40 rounded-2xl border-2 border-dashed border-teal-400/60 bg-teal-950/30 overflow-hidden">{currentQuestion.mediaUrl ? <img src={currentQuestion.mediaUrl} alt="Select the correct area" className="absolute inset-0 h-full w-full object-contain" /> : <span className="text-teal-100">Tap the correct location</span>}{hotspot && <span className="absolute w-7 h-7 rounded-full border-4 border-yellow-300 bg-yellow-400/30 -translate-x-1/2 -translate-y-1/2" style={{ left: `${hotspot.x}%`, top: `${hotspot.y}%` }} />}</button><Button className="w-full h-12 font-bold" style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)` }} disabled={!hotspot || selectedAnswer !== null} onClick={() => submitStructuredResponse({ hotspot })}>Submit location</Button></div> : <div className="space-y-3">{(puzzleOrder.length ? puzzleOrder : (() => { try { return JSON.parse(currentQuestion.interactionConfig ?? "{}").correctOrder ?? []; } catch { return []; } })()).map((item: string, index: number, all: string[]) => <div key={`${item}-${index}`} className="flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl p-3"><span className="text-slate-400">{index + 1}</span><span className="flex-1 text-white">{item}</span><Button size="sm" variant="ghost" disabled={index === 0 || selectedAnswer !== null} onClick={() => { const next = [...all]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; setPuzzleOrder(next); }}>↑</Button><Button size="sm" variant="ghost" disabled={index === all.length - 1 || selectedAnswer !== null} onClick={() => { const next = [...all]; [next[index + 1], next[index]] = [next[index], next[index + 1]]; setPuzzleOrder(next); }}>↓</Button></div>)}<Button className="w-full h-12 font-bold" style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)` }} disabled={selectedAnswer !== null} onClick={() => submitStructuredResponse({ order: puzzleOrder })}>Submit puzzle order</Button></div>}
           </div>
         )}
 

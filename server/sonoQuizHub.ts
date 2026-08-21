@@ -34,6 +34,9 @@ export interface ParticipantInfo {
 
 export interface QuestionPayload {
   id: number;
+  interactionType?: "multiple_choice" | "true_false" | "word_cloud" | "hotspot" | "puzzle";
+  interactionConfig?: Record<string, unknown> | null;
+  slideTitle?: string | null;
   question: string;
   options: string[];
   mediaUrl?: string;

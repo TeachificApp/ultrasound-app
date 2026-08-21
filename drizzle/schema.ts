@@ -2651,6 +2651,13 @@ export type InsertTeachMaterialPermission = typeof teachMaterialPermissions.$inf
 export const sonoQuizzes = mysqlTable("sonoQuizzes", {
   id: int("id").autoincrement().primaryKey(),
   createdByUserId: int("createdByUserId").notNull(),
+  // Marks games authored from the TEACH workspace while preserving existing SonoQuiz records.
+  isTeachGame: boolean("isTeachGame").default(false).notNull(),
+  // TEACH ownership scope controls which instructors and educator organisations can manage a game.
+  ownerContext: mysqlEnum("ownerContext", ["platform", "lms_instructor", "educator_assist"]).default("platform").notNull(),
+  educatorOrgId: int("educatorOrgId"),
+  // Import provenance supports transparent user-owned Kahoot spreadsheet imports.
+  importSource: mysqlEnum("importSource", ["manual", "kahoot_xlsx"]).default("manual").notNull(),
   title: varchar("title", { length: 300 }).notNull(),
   description: text("description"),
   // Time limit per question in seconds (null = no limit, default 20s)
@@ -2676,6 +2683,12 @@ export type InsertSonoQuiz = typeof sonoQuizzes.$inferInsert;
 export const sonoQuizQuestions = mysqlTable("sonoQuizQuestions", {
   id: int("id").autoincrement().primaryKey(),
   quizId: int("quizId").notNull(),
+  // A live game slide can be scored or collaborative depending on interaction type.
+  interactionType: mysqlEnum("interactionType", ["multiple_choice", "true_false", "word_cloud", "hotspot", "puzzle"]).default("multiple_choice").notNull(),
+  // JSON configuration for interaction-specific properties such as hotspot targets, word limits, and puzzle pieces.
+  interactionConfig: longtext("interactionConfig"),
+  // Optional teacher-facing slide heading, separate from the participant prompt.
+  slideTitle: varchar("slideTitle", { length: 300 }),
   // Question text
   question: longtext("question").notNull(),
   // JSON array of 2–4 option strings: ["Option A", "Option B", ...]
@@ -2758,6 +2771,8 @@ export const sonoQuizAnswers = mysqlTable("sonoQuizAnswers", {
   pointsEarned: int("pointsEarned").default(0).notNull(),
   // How fast they answered (ms from question reveal)
   responseTimeMs: int("responseTimeMs"),
+  // Structured response for non-choice slides: words, hotspot coordinates, or puzzle arrangements.
+  responsePayload: longtext("responsePayload"),
   answeredAt: timestamp("answeredAt").defaultNow().notNull(),
 });
 export type SonoQuizAnswer = typeof sonoQuizAnswers.$inferSelect;

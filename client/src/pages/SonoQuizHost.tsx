@@ -25,23 +25,26 @@ const ANSWER_LABELS = ["A", "B", "C", "D"];
 const ANSWER_SHAPES = ["▲", "◆", "●", "■"];
 
 // ─── WebSocket hook ───────────────────────────────────────────────────────────
-function useSonoQuizWS(sessionId: number | null, onMessage: (msg: any) => void) {
+function useSonoQuizWS(sessionId: number | null, hostUserId: number | null, onMessage: (msg: any) => void) {
   const wsRef = useRef<WebSocket | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !hostUserId) return;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const url = `${protocol}//${window.location.host}/ws/sonoquiz?sessionId=${sessionId}&role=host`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
-    ws.onopen = () => setConnected(true);
+    ws.onopen = () => {
+      setConnected(true);
+      ws.send(JSON.stringify({ type: "join_host", sessionId, hostUserId }));
+    };
     ws.onclose = () => setConnected(false);
     ws.onmessage = (e) => {
       try { onMessage(JSON.parse(e.data)); } catch {}
     };
     return () => ws.close();
-  }, [sessionId]);
+  }, [sessionId, hostUserId]);
 
   const send = useCallback((msg: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -55,7 +58,9 @@ function useSonoQuizWS(sessionId: number | null, onMessage: (msg: any) => void) 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function SonoQuizHost() {
   const [, params] = useRoute("/admin/sonoquiz/host/:sessionId");
-  const sessionId = params?.sessionId ? parseInt(params.sessionId) : null;
+  const [, teachParams] = useRoute("/teach/games/host/:sessionId");
+  const sessionIdValue = params?.sessionId ?? teachParams?.sessionId;
+  const sessionId = sessionIdValue ? parseInt(sessionIdValue) : null;
   const { user } = useAuth();
   
   const utils = trpc.useUtils();
@@ -77,6 +82,10 @@ export default function SonoQuizHost() {
     { sessionId: sessionId! },
     { enabled: !!sessionId }
   );
+  const { data: liveResponseSummary } = trpc.sonoQuiz.getLiveResponseSummary.useQuery(
+    { sessionId: sessionId!, questionId: currentQuestion?.id ?? 0 },
+    { enabled: !!sessionId && !!currentQuestion?.id && ["word_cloud", "hotspot", "puzzle"].includes(currentQuestion?.interactionType ?? "") , refetchInterval: phase === "question" ? 1500 : false }
+  );
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const startSession = trpc.sonoQuiz.startSession.useMutation({
@@ -91,8 +100,11 @@ export default function SonoQuizHost() {
   });
 
   // ── WebSocket ──────────────────────────────────────────────────────────────
-  const { connected, send } = useSonoQuizWS(sessionId, (msg) => {
+  const { connected, send } = useSonoQuizWS(sessionId, user?.id ?? null, (msg) => {
     switch (msg.type) {
+      case "lobby_update":
+        setParticipants(msg.participants.map((participant: any) => ({ id: participant.participantId, ...participant })));
+        break;
       case "participant_joined":
         setParticipants(prev => {
           if (prev.find(p => p.id === msg.participant.id)) return prev;
@@ -110,6 +122,7 @@ export default function SonoQuizHost() {
         });
         break;
       case "question_started":
+      case "question_start":
         setCurrentQuestion(msg.question);
         setQuestionIndex(msg.questionIndex);
         setTotalQuestions(msg.totalQuestions);
@@ -120,17 +133,19 @@ export default function SonoQuizHost() {
         startTimer(msg.timeLimitSeconds);
         break;
       case "question_ended":
+      case "question_end":
         setShowAnswers(true);
         setPhase("results");
         stopTimer();
         break;
       case "leaderboard_update":
-        setLeaderboard(msg.leaderboard);
+      case "leaderboard":
+        setLeaderboard(msg.leaderboard ?? msg.rankings ?? []);
         setPhase("leaderboard");
         break;
       case "session_ended":
         setPhase("ended");
-        setLeaderboard(msg.leaderboard ?? []);
+        setLeaderboard(msg.leaderboard ?? msg.finalRankings ?? []);
         break;
       case "participants_list":
         setParticipants(msg.participants);
@@ -233,7 +248,11 @@ export default function SonoQuizHost() {
     </div>
   );
 
-  const opts = currentQuestion ? JSON.parse(currentQuestion.options) : [];
+  let opts: string[] = [];
+  try { opts = currentQuestion ? JSON.parse(currentQuestion.options) : []; } catch { opts = []; }
+  const interactionType = currentQuestion?.interactionType ?? "multiple_choice";
+  const isChoiceSlide = interactionType === "multiple_choice" || interactionType === "true_false";
+  const interactionLabel = interactionType === "word_cloud" ? "Word cloud" : interactionType === "hotspot" ? "Hotspot" : interactionType === "puzzle" ? "Puzzle" : interactionType === "true_false" ? "True or false" : "Multiple choice";
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
@@ -392,8 +411,8 @@ export default function SonoQuizHost() {
               </div>
             </div>
 
-            {/* Answer options */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Answer options or live collaborative response summary */}
+            {isChoiceSlide ? <div className="grid grid-cols-2 gap-3">
               {opts.map((opt: string, i: number) => (
                 <div key={i} className="rounded-xl p-4 flex items-center gap-3"
                   style={{ background: ANSWER_COLORS[i] + "22", border: `2px solid ${ANSWER_COLORS[i]}44` }}>
@@ -404,7 +423,10 @@ export default function SonoQuizHost() {
                   </Badge>
                 </div>
               ))}
-            </div>
+            </div> : <div className="rounded-2xl border border-teal-500/30 bg-teal-950/20 p-6 text-center">
+              <p className="text-sm uppercase tracking-wide text-teal-300">{interactionLabel} responses</p>
+              {interactionType === "word_cloud" && (liveResponseSummary as any)?.words?.length ? <div className="flex flex-wrap gap-3 justify-center mt-5">{(liveResponseSummary as any).words.slice(0, 24).map((entry: any) => <span key={entry.word} className="rounded-full bg-teal-500/15 px-3 py-1 font-semibold text-teal-100" style={{ fontSize: `${Math.min(28, 14 + entry.count * 4)}px` }}>{entry.word}</span>)}</div> : <><p className="mt-4 text-4xl font-black" style={{ color: themeColor }}>{(liveResponseSummary as any)?.responseCount ?? totalAnswers}</p><p className="text-slate-300 mt-1">group response{((liveResponseSummary as any)?.responseCount ?? totalAnswers) === 1 ? "" : "s"} collected</p></>}
+            </div>}
 
             <div className="flex gap-3">
               <Button className="flex-1" variant="outline" style={{ borderColor: themeColor, color: themeColor }}

@@ -125,6 +125,7 @@ const StripeOnboardingRedirect = lazy(() => import("./pages/StripeOnboardingRedi
 const CmeDisclosureForm = lazy(() => import("./pages/CmeDisclosureForm"));
 const CmeDisclosureFormGeneric = lazy(() => import("./pages/CmeDisclosureFormGeneric"));
 const TeachDashboard = lazy(() => import("./pages/teach/TeachDashboard"));
+const TeachGames = lazy(() => import("./pages/teach/TeachGames"));
 const TeachPresentationEditor = lazy(() => import("./pages/teach/TeachPresentationEditor"));
 const TeachMasterDesigner = lazy(() => import("./pages/teach/TeachMasterDesigner"));
 const TeachPresenter = lazy(() => import("./pages/teach/TeachPresenter"));
@@ -794,6 +795,8 @@ function MembersRouter() {
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/teach" component={TeachDashboard} />
+        <Route path="/teach/games" component={TeachGames} />
+        <Route path="/teach/games/host/:sessionId" component={SonoQuizHost} />
         <Route path="/teach/master/:id/design" component={TeachMasterDesigner} />
         <Route path="/teach/presentation/:id/edit" component={TeachPresentationEditor} />
         <Route path="/teach/presentation/:id/present" component={TeachPresenter} />
@@ -986,6 +989,8 @@ function LMSRouter() {
         <Route path="/my-memberships/:slug">{() => <Suspense fallback={pageFallback}><MyMemberships /></Suspense>}</Route>
         <Route path="/my-memberships">{() => <Suspense fallback={pageFallback}><MyMemberships /></Suspense>}</Route>
         <Route path="/teach" component={TeachDashboard} />
+        <Route path="/teach/games" component={TeachGames} />
+        <Route path="/teach/games/host/:sessionId" component={SonoQuizHost} />
         <Route path="/teach/master/:id/design" component={TeachMasterDesigner} />
         <Route path="/teach/presentation/:id/edit" component={TeachPresentationEditor} />
         <Route path="/teach/presentation/:id/present" component={TeachPresenter} />

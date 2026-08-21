@@ -350,10 +350,10 @@ export default function TeachDashboard() {
                   <Button variant="outline" size="sm"><Building2 className="w-4 h-4 mr-1" /> EducatorAssist™</Button>
                 </Link>
               )}
-              {(user?.role === "admin" || ctx.lmsInstructor) && (
-                <Link href="/admin/sonoquiz">
-                  <Button variant="outline" size="sm" className="border-purple-200 text-purple-700 hover:bg-purple-50">
-                    <Radio className="w-4 h-4 mr-1" /> SonoQuiz
+              {ctx.canAccessTeach && (
+                <Link href="/teach/games">
+                  <Button variant="outline" size="sm" className="border-teal-200 text-teal-700 hover:bg-teal-50">
+                    <Radio className="w-4 h-4 mr-1" /> Live Games
                   </Button>
                 </Link>
               )}
