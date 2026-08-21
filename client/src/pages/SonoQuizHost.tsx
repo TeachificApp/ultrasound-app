@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
+import { getHostSessionReturnPath } from "@shared/teachLiveSessionPresentation";
 import {
   Users, Play, ChevronRight, Trophy, Clock, CheckCircle,
   XCircle, Zap, StopCircle, BarChart2, Eye, EyeOff, Copy,
@@ -180,6 +181,8 @@ export default function SonoQuizHost() {
   const sessionRow = sessionData?.session;
   const quizSnapshot = sessionRow?.quizSnapshot ? (() => { try { return JSON.parse(sessionRow.quizSnapshot); } catch { return null; } })() : null;
   const quizMeta = quizSnapshot?.quiz ?? null;
+  const isTeachGame = Boolean(quizMeta?.isTeachGame) || Boolean(teachParams?.sessionId);
+  const hostReturnPath = getHostSessionReturnPath(isTeachGame);
   const joinUrl = sessionRow ? `${window.location.origin}/quiz/${sessionRow.joinCode}` : "";
   const totalAnswers = answerCounts.reduce((a, b) => a + b, 0);
   const themeColor = quizMeta?.theme === "teal" ? "#7c3aed"
@@ -260,7 +263,7 @@ export default function SonoQuizHost() {
       <div className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white"
-            onClick={() => window.location.href = "/admin/sonoquiz"}>
+            onClick={() => window.location.href = hostReturnPath}>
             <ChevronLeft className="w-4 h-4 mr-1" /> Back
           </Button>
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -270,7 +273,7 @@ export default function SonoQuizHost() {
             </div>
             <div className="min-w-0">
               <h1 className="font-bold text-white truncate">{quizMeta?.title}</h1>
-              <p className="text-xs text-slate-400">Host Dashboard</p>
+              <p className="text-xs text-slate-400">{isTeachGame ? "Teach Live Game Host" : "Host Dashboard"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -535,7 +538,7 @@ export default function SonoQuizHost() {
             {phase === "ended" && (
               <Button className="w-full mt-4" style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}cc)` }}
                 onClick={() => window.location.href = "/admin/sonoquiz"}>
-                Back to Quiz Library
+                {isTeachGame ? "Back to Teach Games" : "Back to Quiz Library"}
               </Button>
             )}
           </div>

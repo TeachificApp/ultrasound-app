@@ -552,6 +552,7 @@ export const sonoQuizRouter = router({
         displayName,
         avatarSeed,
         quizTitle: quizInfo?.quiz?.title ?? "SonoQuiz",
+        isTeachGame: Boolean(quizInfo?.quiz?.isTeachGame),
         musicTrack: quizInfo?.quiz?.musicTrack ?? null,
         theme: quizInfo?.quiz?.theme ?? "teal",
       };
@@ -867,11 +868,13 @@ export const sonoQuizRouter = router({
       let quizTitle = "SonoQuiz";
       let theme = "teal";
       let musicTrack: string | null = null;
+      let isTeachGame = false;
       try {
         const snap = JSON.parse(session[0].quizSnapshot ?? "{}");
         quizTitle = snap.quiz?.title ?? quizTitle;
         theme = snap.quiz?.theme ?? theme;
         musicTrack = snap.quiz?.musicTrack ?? null;
+        isTeachGame = Boolean(snap.quiz?.isTeachGame);
       } catch {}
       return {
         id: session[0].id,
@@ -880,6 +883,7 @@ export const sonoQuizRouter = router({
         participantCount: session[0].participantCount,
         allowAnonymous: session[0].allowAnonymous,
         quizTitle,
+        isTeachGame,
         theme,
         musicTrack,
       };
