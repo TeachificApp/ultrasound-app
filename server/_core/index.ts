@@ -42,7 +42,6 @@ import { startChallengeCron } from "../jobs/challengeCron";
 import { startMediaPurgeCron } from "../jobs/mediaPurgeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
 import { backfillAllContacts } from "../lib/emailListHelper";
-import { backfillUserOpenIds } from "../lib/backfillUserOpenIds";
 import { getDb } from "../db";
 import { sql as drizzleSql } from "drizzle-orm";
 import { initSonoQuizHub } from "../sonoQuizHub";
@@ -237,6 +236,23 @@ async function startServer() {
     const result = await ensureLmsCoursesSchema(db);
     const after = await inspectLmsCoursesSchema(db);
     res.json({ ...result, after, deployedAt: new Date().toISOString() });
+  });
+  // User identity + entitlement accounting (Railway post-migration)
+  app.get("/api/debug/user-access-audit", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { auditUserAccess } = await import("../lib/ensureUserAccessAccounting");
+    const db = await getDb();
+    const audit = await auditUserAccess(db);
+    res.json({ audit, deployedAt: new Date().toISOString() });
+  });
+  app.post("/api/debug/user-access-reconcile", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { ensureUserAccessAccounting, auditUserAccess } = await import("../lib/ensureUserAccessAccounting");
+    const db = await getDb();
+    const before = await auditUserAccess(db);
+    const reconcile = await ensureUserAccessAccounting(db);
+    const after = await auditUserAccess(db);
+    res.json({ before, reconcile, after, deployedAt: new Date().toISOString() });
   });
   // Storage proxy for /manus-storage/* assets
   registerStorageProxy(app);
@@ -645,10 +661,14 @@ async function startServer() {
     startSharingMonitor();
     // Backfill all existing users into the "All Contacts" email list (safe to run on every startup)
     backfillAllContacts().catch((err) => console.error("[backfillAllContacts] Error:", err));
-    // Backfill missing user.openId for legacy accounts (SSO / magic link session lookup)
+    // Backfill user openId + base roles so migrated users can sign in with correct access
     getDb()
-      .then((db) => (db ? backfillUserOpenIds(db) : null))
-      .catch((err) => console.error("[backfillUserOpenIds] Error:", err));
+      .then(async (db) => {
+        if (!db) return;
+        const { ensureUserAccessAccounting } = await import("../lib/ensureUserAccessAccounting");
+        return ensureUserAccessAccounting(db);
+      })
+      .catch((err) => console.error("[ensureUserAccessAccounting] Error:", err));
     // Auto-create manualInvoices table if it doesn't exist (production DB migration)
     getDb().then(async (db) => {
       if (!db) return;
