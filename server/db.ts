@@ -370,9 +370,17 @@ export async function getUserByEmail(email: string) {
     .from(userEmailAliases)
     .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`)
     .limit(1);
-  if (!aliasRows[0]) return undefined;
-  const primaryRows = await db.select().from(users).where(eq(users.id, aliasRows[0].userId)).limit(1);
-  return primaryRows[0];
+  if (aliasRows[0]) {
+    const primaryRows = await db.select().from(users).where(eq(users.id, aliasRows[0].userId)).limit(1);
+    if (primaryRows[0]) return primaryRows[0];
+  }
+  // Fallback: synthetic email openId used by migrated / email-auth accounts
+  const openIdRows = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, `email:${normalised}`))
+    .limit(1);
+  return openIdRows[0];
 }
 
 /**
