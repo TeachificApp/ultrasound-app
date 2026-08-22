@@ -1,0 +1,68 @@
+# Project TODO
+
+- [x] Trace and repair purchaser-access emails that state an access button exists but render without a usable button or link.
+- [x] Add regression coverage for purchaser-access email CTA rendering and URL generation.
+- [x] Verify the corrected purchaser-access email output before requesting approval to resend it to Jennifer Olsen.
+- [x] Send the user-approved corrected course access email to Jennifer Olsen and verify SendGrid accepts delivery.
+- [x] Audit recurring Stripe plans, price mappings, subscriptions, and corresponding app-access entitlements.
+- [x] Verify subscription webhooks and lifecycle transitions grant, retain, and revoke app access correctly.
+- [x] Repair verified recurring-billing or access-entitlement discrepancies and add regression coverage.
+- [x] Replace production-missing brand membership Stripe Price IDs with verified live recurring price mappings.
+- [x] Enable the missing invoice.paid and invoice.payment_failed events on the production Stripe webhook before relying on renewal and failed-payment workflows.
+- [x] Exclude sunsetted Thinkific billing from current-platform recurring-payment reconciliation and remediation.
+- [x] Create, map, and validate live current-platform Stripe recurring prices without modifying existing subscriptions.
+- [x] Add executable invoice.paid and invoice.payment_failed entitlement tests for brand, LMS, and native membership subscriptions.
+- [x] Investigate the active subscription linked to the inactive $0 Free Membership price and either document it as an intentional comped plan or correct its billing/access mapping.
+- [x] Extend the recurring audit to validate active subscription product and amount expectations, not only Stripe status parity.
+- [x] Add executable failed-payment grace and terminal-revocation tests for native membership subscriptions and LMS subscription-backed access.
+- [x] Document the active $0 Free Membership subscription as an intentional comped/free plan or correct its linked brand/native entitlements.
+- [x] Add an audit regression that flags active paid-brand access mapped to a $0/free subscription unless an explicit approved exemption applies.
+- [x] Verify Allison Gillan’s legacy Thinkific history before removing any premium current-platform access.
+- [x] Resolve the Thinkific API authentication gap or use an authoritative legacy export to verify Allison’s paid lifetime and enrollment history.
+- [x] Record the final Free Membership resolution after legacy verification, or restore approved premium access if a valid lifetime or migrated entitlement is found.
+- [x] Verify and checkpoint the Free Membership operations note and post-documentation recurring audit result.
+- [x] Add a narrow yellow maintenance banner visible only to signed-in users with the August 22–24, 2026 notice.
+- [x] Persist each user browser’s dismissal of the maintenance banner and add focused regression coverage.
+- [x] Automatically remove the maintenance banner after August 25, 2026 at 9:00 AM Eastern Time.
+- [x] Add a component-level MaintenanceBanner interaction regression for dismissal, localStorage persistence, remount hiding, signed-in visibility, and logged-out suppression.
+- [x] Design a live Teach gamification architecture for teacher-led QR/PIN sessions with persistent game and response state.
+- [x] Add mixed interactive game slides: multiple choice, true/false, free-word word cloud, hotspot, and puzzle interactions.
+- [x] Build teacher game authoring with ordered/rotatable slides and question-level image, video URL, and GIF media controls.
+- [x] Build participant QR/PIN joining, live answer submission, teacher presentation controls, and real-time group results.
+- [ ] Add end-to-end regression coverage for session joining, question progression, scoring, media, and response aggregation.
+- [ ] Select and configure an education-appropriate GIF search provider for Teach game authoring.
+- [ ] Activate the deferred GIPHY search integration after the user supplies a GIPHY API key; retain direct GIF URL support in the meantime.
+- [x] Update the reused live host and player screens with Teach branding, Teach navigation, and no admin-only presentation assumptions.
+- [ ] Add interaction-level regression coverage for Teach host/player route navigation, QR/PIN joining, question progression, and collaborative results across all interactive slide types.
+- [ ] Add end-to-end regression coverage for session joining, scoring, media rendering, and teacher presentation controls on the real Teach routes.
+- [x] Add mounted Teach host-route interaction tests for branding, teacher controls, question progression, and collaborative result rendering.
+- [x] Extend the mounted Teach host-route suite to cover Reveal Answers, Next, and End session controls.
+- [x] Assert mounted host phase transitions through lobby, question, results, and leaderboard states using real callbacks and socket events.
+- [x] Add mounted host collaborative-result assertions for a second interaction type such as hotspot or puzzle.
+- [ ] Add mounted participant join/play interaction tests for PIN/QR join, media rendering, and word-cloud, hotspot, and puzzle submissions.
+- [x] Add mounted participant coverage for PIN joining, slide media rendering, hotspot submission, and puzzle submission.
+- [ ] Add mounted participant word-cloud text-entry and submission coverage using the real controlled-input flow.
+- [x] Add a WebSocket integration regression that exercises the actual session join protocol and broadcasts across interactive Teach slides.
+- [x] Extend the real WebSocket regression to cover interaction-specific word-cloud or puzzle payloads and result broadcasts in addition to hotspot slides.
+- [x] Trace and repair Registry Review Quiz access emails whose password-setup link returns a not-found page.
+- [x] Add regression coverage for password-setup URL generation, route registration, and learner-access completion.
+- [x] Verify the corrected password-setup flow before requesting approval to resend access instructions to the affected learner.
+- [x] Add a mounted route regression proving /auth/reset-password preserves its token and resolves to the ResetPassword page.
+- [x] Add a route-level valid-token password completion regression before offering a corrected access-email resend.
+- [x] Send the user-approved corrected Registry Review Quiz access email to badici Lavinia and verify delivery acceptance.
+- [ ] Inventory Manus-managed and Railway MySQL schemas, record counts, identities, and data freshness before synchronization.
+- [x] Produce a non-destructive Manus-to-Railway reconciliation plan with clear conflict rules and excluded data categories.
+- [ ] Prepare source and target backup evidence plus a dry-run synchronization report before requesting migration approval.
+- [x] Perform the approved controlled synchronization and verify Railway data integrity.
+- [x] Create backups for the seven approved Railway tables and insert only the 706 source-only primary-key rows identified by the dry run.
+- [x] Add the five approved nullable Question Bank metadata columns to Railway before the insert-only synchronization.
+- [x] Add source/target freshness reporting for synchronization-scoped tables and archive the report.
+- [x] Archive the executed Railway backup manifest and checksums, and require backup creation before approval for future synchronization batches.
+- [ ] Run and archive a true pre-sync freshness audit before future synchronization batches.
+- [ ] Generate and archive the Railway backup manifest/checksums before requesting approval for future synchronization batches.
+- [ ] Identify and map dependencies for a high-priority Manus-only learner and Teach-game synchronization batch.
+- [ ] Produce a future-batch pre-sync freshness, backup, schema, and conflict dry-run proposal before requesting execution approval.
+- [x] Document the next learner and Teach-game batch dependency order and approval safeguards.
+- [x] Verify Kahoot-supported export or import formats and implement a permitted Teach game import workflow.
+- [x] Implement and run a fresh read-only next-batch synchronization dry-run with exact table, dependency, schema, identity-conflict, freshness, and insert-count evidence.
+- [x] Update the next-batch proposal with the fresh dry-run findings and an explicit no-update/no-delete approval table.
