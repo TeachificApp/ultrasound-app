@@ -86,3 +86,6 @@
 - [ ] Reconcile Railway `JWT_SECRET` and cookie configuration so locally issued sessions verify across every Railway application instance without relying on Manus values.
 - [ ] Verify SendGrid delivery events, sender verification, suppression status, and inbox receipt for a separately approved Railway magic-link test.
 - [x] Show the scheduled maintenance banner on the All About Ultrasound, Learn, and iHeartEcho login pages while retaining expiry and dismissal behavior.
+- [x] Inventory and reconcile all user access records, including enrollments, entitlements, memberships, subscriptions, progress, quiz attempts, completions, CME credentials, and access grants.
+- [x] Synchronize verified missing user-access and learning-content records to Railway with parent-to-child, insert-only safeguards and post-sync parity evidence.
+- [x] Complete a bounded primary-key parity sweep for the remaining equal-count learning and user-access tables, retaining any deliberate sensitive exclusions.
