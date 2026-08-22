@@ -396,31 +396,8 @@ export const emailAuthRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const email = input.email.toLowerCase().trim();
-
-      // Look up user by primary email OR by alias email
-      const result = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-      let user = result[0] as typeof result[0] | undefined;
-
-      // If not found by primary email, check alias emails
-      if (!user) {
-        const aliasRows = await db
-          .select({ userId: userEmailAliases.userId })
-          .from(userEmailAliases)
-          .where(eq(userEmailAliases.email, email))
-          .limit(1);
-        if (aliasRows[0]) {
-          const aliasUserResult = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, aliasRows[0].userId))
-            .limit(1);
-          user = aliasUserResult[0];
-        }
-      }
+      const { getUserByEmail } = await import("../db");
+      const user = await getUserByEmail(email);
 
       // Always return success to avoid email enumeration
       // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)

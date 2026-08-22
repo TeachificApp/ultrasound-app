@@ -458,6 +458,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setPasswordResetToken } = await import('./db');
         const { sendEmail, buildPasswordResetEmail } = await import('./_core/email');
+        const { resolveAuthDeliveryEmail } = await import('./lib/authEmailDelivery');
         const crypto = await import('crypto');
         const email = input.email.trim().toLowerCase();
         const user = await getUserByEmail(email);
@@ -467,9 +468,19 @@ export const appRouter = router({
         if (!user) {
           return { success: true };
         }
+        const deliveryEmail = resolveAuthDeliveryEmail(user, email);
+        if (!deliveryEmail) {
+          console.error(`[auth] Password reset skipped: user ${user.id} has no deliverable email`);
+          return { success: true };
+        }
         const token = crypto.randomBytes(48).toString('hex');
         const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-        await setPasswordResetToken(user.id, token, expiry);
+        try {
+          await setPasswordResetToken(user.id, token, expiry);
+        } catch (err) {
+          console.error(`[auth] Failed to store password reset token for user ${user.id}:`, err);
+          return { success: true };
+        }
         // Use the origin the user is actually on for the reset URL so the link works on any domain
         const { detectBrandMode: dbm2 } = await import('@shared/brands');
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
@@ -478,13 +489,16 @@ export const appRouter = router({
         const resetUrl = `${appUrlReset}/reset-password?token=${token}`;
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
-        await sendEmail({
-          to: { name: firstName, email: user.email! },
+        const emailSent = await sendEmail({
+          to: { name: firstName, email: deliveryEmail },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
           brandMode,
         });
+        if (!emailSent) {
+          console.error(`[auth] Password reset email was not accepted by SendGrid for user ${user.id} (${deliveryEmail})`);
+        }
         return { success: true };
       }),
 
@@ -586,8 +600,14 @@ export const appRouter = router({
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });
+        const { resolveAuthDeliveryEmail } = await import('./lib/authEmailDelivery');
+        const deliveryEmail = resolveAuthDeliveryEmail(user, email);
+        if (!deliveryEmail) {
+          console.error(`[auth] Magic-link delivery skipped: user ${user.id} has no deliverable email`);
+          return { success: true };
+        }
         const deliveryAccepted = await sendEmail({
-          to: { name: firstName, email: user.email! },
+          to: { name: firstName, email: deliveryEmail },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,

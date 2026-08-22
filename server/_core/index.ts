@@ -199,7 +199,34 @@ async function startServer() {
     const hasDbUrl = !!process.env.DATABASE_URL;
     const dbUrlPrefix = process.env.DATABASE_URL?.substring(0, 30) || "NOT SET";
     const db = await getDb();
-    res.json({ hasDbUrl, dbUrlPrefix, dbConnected: !!db });
+    let usersTable: string | null = null;
+    let userCount: number | null = null;
+    let passwordResetColumns: string | null = null;
+    if (db) {
+      try {
+        const { sql } = await import("drizzle-orm");
+        await db.execute(sql`SELECT 1 FROM users LIMIT 1`);
+        usersTable = "ok";
+        const countRows = await db.execute(sql`SELECT COUNT(*) AS c FROM users`);
+        const countRow = Array.isArray(countRows) ? countRows[0] : (countRows as any)?.[0]?.[0];
+        userCount = Number((countRow as { c?: number })?.c ?? 0);
+        await db.execute(sql`SELECT passwordResetToken, passwordResetExpiry FROM users LIMIT 1`);
+        passwordResetColumns = "ok";
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "query failed";
+        if (!usersTable) usersTable = message;
+        if (!passwordResetColumns) passwordResetColumns = message;
+      }
+    }
+    res.json({
+      hasDbUrl,
+      dbUrlPrefix,
+      dbConnected: !!db,
+      usersTable,
+      userCount,
+      passwordResetColumns,
+      deployedAt: new Date().toISOString(),
+    });
   });
   // Temporary debug endpoint to diagnose email/SendGrid configuration
   app.get("/api/debug/email-status", async (_req, res) => {
@@ -220,6 +247,81 @@ async function startServer() {
       htmlBody: "<h2>Email is working!</h2><p>If you see this, SendGrid is correctly configured.</p>",
     });
     res.json({ sent: result, to, timestamp: new Date().toISOString() });
+  });
+  // Diagnose password-reset lookup without sending email (no account enumeration in response shape)
+  app.get("/api/debug/password-reset-lookup", async (req, res) => {
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass ?email=your@email.com" });
+    const { getUserByEmail } = await import("../db");
+    const { resolveAuthDeliveryEmail } = await import("../lib/authEmailDelivery");
+    const user = await getUserByEmail(email);
+    res.json({
+      userFound: !!user,
+      userId: user?.id ?? null,
+      hasPasswordHash: !!user?.passwordHash,
+      deliveryEmail: user ? resolveAuthDeliveryEmail(user, email) : null,
+      timestamp: new Date().toISOString(),
+    });
+  });
+  // End-to-end password reset email test (same path as Forgot Password UI)
+  app.get("/api/debug/test-password-reset", async (req, res) => {
+    const to = String(req.query.to ?? "").trim().toLowerCase();
+    if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
+    const origin = String(req.query.origin ?? "https://learn.allaboutultrasound.com");
+    const { getUserByEmail, setPasswordResetToken } = await import("../db");
+    const { sendEmail, buildPasswordResetEmail } = await import("./email");
+    const { resolveAuthDeliveryEmail } = await import("../lib/authEmailDelivery");
+    const { detectBrandMode } = await import("@shared/brands");
+    const crypto = await import("crypto");
+    const user = await getUserByEmail(to);
+    if (!user) {
+      return res.json({ userFound: false, emailSent: false, to, timestamp: new Date().toISOString() });
+    }
+    const deliveryEmail = resolveAuthDeliveryEmail(user, to);
+    if (!deliveryEmail) {
+      return res.json({
+        userFound: true,
+        userId: user.id,
+        emailSent: false,
+        reason: "no_delivery_email",
+        to,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    const token = crypto.randomBytes(48).toString("hex");
+    const expiry = new Date(Date.now() + 60 * 60 * 1000);
+    try {
+      await setPasswordResetToken(user.id, token, expiry);
+    } catch (err) {
+      return res.json({
+        userFound: true,
+        userId: user.id,
+        emailSent: false,
+        reason: "token_store_failed",
+        error: err instanceof Error ? err.message : "unknown",
+        to,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    const brandMode = detectBrandMode(new URL(origin).hostname);
+    const resetUrl = `${origin}/reset-password?token=${token}`;
+    const firstName = (user.displayName || user.name || "there").split(" ")[0];
+    const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
+    const emailSent = await sendEmail({
+      to: { name: firstName, email: deliveryEmail },
+      subject: emailPayload.subject,
+      htmlBody: emailPayload.htmlBody,
+      previewText: emailPayload.previewText,
+      brandMode,
+    });
+    res.json({
+      userFound: true,
+      userId: user.id,
+      deliveryEmail,
+      emailSent,
+      to,
+      timestamp: new Date().toISOString(),
+    });
   });
   // Storage proxy for /manus-storage/* assets
   registerStorageProxy(app);
