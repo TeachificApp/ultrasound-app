@@ -10,9 +10,10 @@ describe("Railway local authentication configuration", () => {
     ]);
     expect(envSource).toContain('authBackend: process.env.AUTH_BACKEND ?? "manus"');
     expect(sdkSource).toContain('ENV.authBackend === "local"');
+    expect(sdkSource).toContain('if (ENV.authBackend !== "local")');
+    expect(sdkSource).toContain('Managed OAuth is disabled for the local authentication backend');
     expect(sdkSource).toContain('throw ForbiddenError("User not found")');
     expect(railwaySource).toContain('AUTH_BACKEND = "local"');
     expect(railwaySource).toContain('STORAGE_BACKEND = "r2"');
   });
 });
-

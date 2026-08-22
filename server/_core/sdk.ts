@@ -110,12 +110,28 @@ const createOAuthHttpClient = (): AxiosInstance =>
   });
 
 class SDKServer {
-  private readonly client: AxiosInstance;
-  private readonly oauthService: OAuthService;
+  private readonly client?: AxiosInstance;
+  private readonly oauthService?: OAuthService;
 
-  constructor(client: AxiosInstance = createOAuthHttpClient()) {
-    this.client = client;
-    this.oauthService = new OAuthService(this.client);
+  constructor(client?: AxiosInstance) {
+    if (ENV.authBackend !== "local") {
+      this.client = client ?? createOAuthHttpClient();
+      this.oauthService = new OAuthService(this.client);
+    }
+  }
+
+  private requireManagedOAuth(): OAuthService {
+    if (!this.oauthService || !this.client) {
+      throw ForbiddenError("Managed OAuth is disabled for the local authentication backend");
+    }
+    return this.oauthService;
+  }
+
+  private requireManagedClient(): AxiosInstance {
+    if (!this.client) {
+      throw ForbiddenError("Managed OAuth is disabled for the local authentication backend");
+    }
+    return this.client;
   }
 
   private deriveLoginMethod(
@@ -149,7 +165,7 @@ class SDKServer {
     code: string,
     state: string
   ): Promise<ExchangeTokenResponse> {
-    return this.oauthService.getTokenByCode(code, state);
+    return this.requireManagedOAuth().getTokenByCode(code, state);
   }
 
   /**
@@ -158,7 +174,7 @@ class SDKServer {
    * const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
    */
   async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
-    const data = await this.oauthService.getUserInfoByToken({
+    const data = await this.requireManagedOAuth().getUserInfoByToken({
       accessToken,
     } as ExchangeTokenResponse);
     const loginMethod = this.deriveLoginMethod(
@@ -266,7 +282,7 @@ class SDKServer {
       projectId: ENV.appId,
     };
 
-    const { data } = await this.client.post<GetUserInfoWithJwtResponse>(
+    const { data } = await this.requireManagedClient().post<GetUserInfoWithJwtResponse>(
       GET_USER_INFO_WITH_JWT_PATH,
       payload
     );
