@@ -16,6 +16,14 @@ describe("ensureLmsCoursesSchema", () => {
     expect(source).toContain("/api/debug/lms-courses-schema");
   });
 
+  it("listFeatured uses a partial column select", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(new URL("./routers/lmsRouter.ts", import.meta.url), "utf8"),
+    );
+    expect(source).toContain("List featured courses for LMS home page");
+    expect(source).toMatch(/listFeatured:[\s\S]*?db\.select\(\{/);
+  });
+
   it("ships a manual SQL fallback for Railway MySQL", async () => {
     const sql = await import("node:fs/promises").then((fs) =>
       fs.readFile(new URL("../drizzle/railway_lms_courses_schema_sync.sql", import.meta.url), "utf8"),
@@ -31,5 +39,16 @@ describe("ensureLmsCoursesSchema", () => {
     );
     expect(source).toContain("LMS_COURSES_COLUMN_DEFS");
     expect(source).toContain("existingColumns.has(column)");
+    expect(source).toContain("extractExecuteRows");
+  });
+
+  it("parses mysql2 execute tuples", async () => {
+    const { extractExecuteRows } = await import("./lib/ensureLmsCoursesSchema");
+    const rows = extractExecuteRows<{ COLUMN_NAME: string }>([
+      [{ COLUMN_NAME: "bundle_only" }, { COLUMN_NAME: "show_in_library" }],
+      [],
+    ]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.COLUMN_NAME).toBe("bundle_only");
   });
 });
