@@ -1115,7 +1115,21 @@ export const lmsPublicRouter = router({
   listFeatured: publicProcedure.query(async () => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const courses = await db.select().from(lmsCourses)
+    // Select only listing/card columns so partial Railway mirror schemas still work.
+    const courses = await db.select({
+      id: lmsCourses.id,
+      slug: lmsCourses.slug,
+      title: lmsCourses.title,
+      subtitle: lmsCourses.subtitle,
+      coverImageUrl: lmsCourses.coverImageUrl,
+      status: lmsCourses.status,
+      type: lmsCourses.type,
+      brand: lmsCourses.brand,
+      price: lmsCourses.price,
+      isFree: lmsCourses.isFree,
+      isFeatured: lmsCourses.isFeatured,
+      updatedAt: lmsCourses.updatedAt,
+    }).from(lmsCourses)
       .where(and(eq(lmsCourses.status, "public"), eq(lmsCourses.isFeatured, true)))
       .orderBy(desc(lmsCourses.updatedAt))
       .limit(8);

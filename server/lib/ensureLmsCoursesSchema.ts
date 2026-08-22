@@ -85,7 +85,7 @@ const LMS_COURSES_COLUMN_DEFS: Record<(typeof LMS_COURSES_REQUIRED_COLUMNS)[numb
   send_enrollment_email: "TINYINT(1) NOT NULL DEFAULT 1",
   custom_thank_you_enabled: "TINYINT(1) NOT NULL DEFAULT 0",
   custom_thank_you_blocks: "LONGTEXT NULL",
-  post_purchase_redirect_url: "VARCHAR(1024) NULL",
+  post_purchase_redirect_url: "TEXT NULL",
   welcome_email_enabled: "TINYINT(1) NOT NULL DEFAULT 1",
   welcome_email_subject: "VARCHAR(500) NULL",
   welcome_email_body: "LONGTEXT NULL",
@@ -96,7 +96,7 @@ const LMS_COURSES_COLUMN_DEFS: Record<(typeof LMS_COURSES_REQUIRED_COLUMNS)[numb
   upsell_product_id: "INT NULL",
   upsell_headline: "VARCHAR(500) NULL",
   upsell_description: "TEXT NULL",
-  completion_redirect_url: "VARCHAR(1024) NULL",
+  completion_redirect_url: "TEXT NULL",
   completion_email_enabled: "TINYINT(1) NOT NULL DEFAULT 0",
   completion_email_subject: "VARCHAR(500) NULL",
   completion_email_body: "LONGTEXT NULL",
@@ -117,20 +117,20 @@ const LMS_COURSES_COLUMN_DEFS: Record<(typeof LMS_COURSES_REQUIRED_COLUMNS)[numb
   waitlist_heading: "VARCHAR(500) NULL",
   waitlist_body: "LONGTEXT NULL",
   waitlist_cta_label: "VARCHAR(255) NULL",
-  waitlist_cta_url: "VARCHAR(2048) NULL",
-  waitlist_redirect_url: "VARCHAR(2048) NULL",
+  waitlist_cta_url: "TEXT NULL",
+  waitlist_redirect_url: "TEXT NULL",
   waitlist_success_message: "LONGTEXT NULL",
   presale_welcome_heading: "VARCHAR(500) NULL",
   presale_welcome_body: "LONGTEXT NULL",
   presale_welcome_media_url: "TEXT NULL",
-  presale_welcome_cta_label: "VARCHAR(255) NULL",
-  presale_welcome_cta_url: "VARCHAR(2048) NULL",
+  presale_welcome_cta_label: "TEXT NULL",
+  presale_welcome_cta_url: "TEXT NULL",
   player_sidebar_blocks: "LONGTEXT NULL",
   purchase_terms_text: "TEXT NULL",
   purchase_terms_link_text_1: "VARCHAR(255) NULL",
-  purchase_terms_link_url_1: "VARCHAR(2048) NULL",
+  purchase_terms_link_url_1: "TEXT NULL",
   purchase_terms_link_text_2: "VARCHAR(255) NULL",
-  purchase_terms_link_url_2: "VARCHAR(2048) NULL",
+  purchase_terms_link_url_2: "TEXT NULL",
 };
 
 const MODIFY_STATEMENTS = [
@@ -153,18 +153,23 @@ function isBenignAlterError(message: string): boolean {
   return lower.includes("duplicate column") || lower.includes("duplicate column name");
 }
 
+/** mysql2 returns [rows, fields]; drizzle execute preserves that tuple shape. */
+export function extractExecuteRows<T extends Record<string, unknown>>(result: unknown): T[] {
+  if (!Array.isArray(result)) return [];
+  const first = result[0];
+  if (Array.isArray(first)) return first as T[];
+  if (first && typeof first === "object") return result as T[];
+  return [];
+}
+
 async function listTableColumns(db: Db, tableName: string): Promise<Set<string>> {
-  const rows = await db.execute(
+  const result = await db.execute(
     sql`SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ${tableName}`,
   );
-  const list = Array.isArray(rows)
-    ? rows
-    : Array.isArray((rows as { 0?: unknown[] })?.[0])
-      ? (rows as unknown as [Array<{ COLUMN_NAME?: string; column_name?: string }>])[0]
-      : [];
+  const list = extractExecuteRows<{ COLUMN_NAME?: string; column_name?: string }>(result);
   const names = new Set<string>();
-  for (const row of list as Array<{ COLUMN_NAME?: string; column_name?: string }>) {
+  for (const row of list) {
     const name = row.COLUMN_NAME ?? row.column_name;
     if (name) names.add(name);
   }
@@ -201,26 +206,22 @@ export async function inspectLmsCoursesSchema(db: Db | null | undefined) {
 
   try {
     const countRows = await db.execute(sql`SELECT COUNT(*) AS c FROM lms_courses`);
-    const countRow = Array.isArray(countRows)
-      ? countRows[0]
-      : (countRows as unknown as [Array<{ c?: number }>])?.[0]?.[0];
-    courseCount = Number((countRow as { c?: number })?.c ?? 0);
+    const countRow = extractExecuteRows<{ c?: number }>(countRows)[0];
+    courseCount = Number(countRow?.c ?? 0);
   } catch {
     courseCount = null;
   }
 
   try {
     await db.execute(
-      sql`SELECT id FROM lms_courses WHERE status = 'public' AND is_featured = 1 LIMIT 1`,
+      sql`SELECT id, slug, title, bundle_only, show_in_library FROM lms_courses LIMIT 1`,
     );
     queryOk = true;
     const featuredRows = await db.execute(
       sql`SELECT COUNT(*) AS c FROM lms_courses WHERE status = 'public' AND is_featured = 1`,
     );
-    const featuredRow = Array.isArray(featuredRows)
-      ? featuredRows[0]
-      : (featuredRows as unknown as [Array<{ c?: number }>])?.[0]?.[0];
-    featuredPublicCount = Number((featuredRow as { c?: number })?.c ?? 0);
+    const featuredRow = extractExecuteRows<{ c?: number }>(featuredRows)[0];
+    featuredPublicCount = Number(featuredRow?.c ?? 0);
   } catch (err) {
     queryOk = false;
     queryError = err instanceof Error ? err.message : "Featured courses query failed";
@@ -268,6 +269,15 @@ export async function ensureLmsCoursesSchema(db: Db | null | undefined): Promise
   }
 
   let existingColumns = await listTableColumns(db, "lms_courses");
+
+  try {
+    await runAlter(db, "ALTER TABLE `lms_courses` ROW_FORMAT=DYNAMIC");
+  } catch (err) {
+    const message = formatSqlError(err);
+    if (!isBenignAlterError(message)) {
+      console.warn("[ensureLmsCoursesSchema] ROW_FORMAT=DYNAMIC:", message);
+    }
+  }
 
   for (const statement of MODIFY_STATEMENTS) {
     try {
