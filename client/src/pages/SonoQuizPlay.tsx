@@ -5,7 +5,7 @@
  * Route: /quiz/:joinCode
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useRoute } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -267,7 +267,7 @@ export default function SonoQuizPlay() {
                 style={{ background: `linear-gradient(135deg, ${themeColor}, ${themeColor}88)` }}>
                 <Zap className="w-8 h-8 text-white" />
               </div>
-              <h1 className="text-3xl font-black text-white">{getLiveSessionBrand(Boolean(sessionInfo?.isTeachGame))}</h1>
+              <h1 className="text-3xl font-black text-white">{getLiveSessionBrand(Boolean(quizInfo?.isTeachGame))}</h1>
               <p className="text-slate-400 mt-1">Join code: <span className="font-mono font-bold text-white">{joinCode}</span></p>
             </div>
 
