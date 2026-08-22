@@ -196,9 +196,20 @@ export const appRouter = router({
       if (!opts.ctx.user) return null;
       // Backfill the base "user" role for any existing user who may be missing it
       await ensureUserRole(opts.ctx.user.id);
-      const roles = await getUserRoles(opts.ctx.user.id);
+      let roles = await getUserRoles(opts.ctx.user.id);
       // Fetch full user row to expose pendingEmail and isPremium for the profile UI
       const fullUser = await getUserById(opts.ctx.user.id);
+      if (fullUser?.email) {
+        const { isPlatformOwnerEmail } = await import("../shared/platformOwnerAccess");
+        if (isPlatformOwnerEmail(fullUser.email)) {
+          const dbConn = await (await import("./db")).getDb();
+          if (dbConn) {
+            const { ensurePlatformOwnerAccess } = await import("./lib/ensureUserAccessAccounting");
+            await ensurePlatformOwnerAccess(dbConn);
+            roles = await getUserRoles(opts.ctx.user.id);
+          }
+        }
+      }
       // Derive isPremium from both the DB flag and role-based premium access
       const PREMIUM_ROLES = new Set(["premium_user", "diy_user", "diy_admin", "platform_admin", "platform_owner"]);
       const isPremiumByRole = roles.some(r => PREMIUM_ROLES.has(r));
