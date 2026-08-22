@@ -2,7 +2,7 @@
  * ResetPassword.tsx — Set a new password after clicking the reset link
  * URL: /reset-password?token=xxx
  */
-import { useState } from "react";
+import React, { useState } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, Heart, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { buildPasswordSetupSubmission } from "@shared/passwordSetupSubmission";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -35,19 +36,12 @@ export default function ResetPassword() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirmPassword) {
-      toast.error("Passwords do not match");
+    const submission = buildPasswordSetupSubmission(token, password, confirmPassword);
+    if ("error" in submission) {
+      toast.error(submission.error);
       return;
     }
-    if (password.length < 8) {
-      toast.error("Password must be at least 8 characters");
-      return;
-    }
-    if (!token) {
-      toast.error("Invalid reset link. Please request a new one.");
-      return;
-    }
-    resetMutation.mutate({ token, newPassword: password });
+    resetMutation.mutate(submission);
   };
 
   return (

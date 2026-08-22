@@ -15,6 +15,7 @@ import DemoModeBanner from "./components/DemoModeBanner";
 import GetAppBanner from "./components/GetAppBanner";
 import ProfileNameBanner from "./components/ProfileNameBanner";
 import MaintenanceBanner from "./components/MaintenanceBanner";
+import LegacyPasswordSetupRedirect from "./components/LegacyPasswordSetupRedirect";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
@@ -1471,6 +1472,7 @@ function App() {
           <MetaPixel />
           <Toaster />
           <MaintenanceBanner />
+          <LegacyPasswordSetupRedirect />
           {onMarketingStaging ? (
             <MarketingSiteRouter />
           ) : onMembersSubdomain ? (
