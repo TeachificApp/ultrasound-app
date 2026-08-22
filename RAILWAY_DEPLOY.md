@@ -184,10 +184,28 @@ See `references/cloudflare-proxy-setup.md` for full setup.
 
 - [ ] Login via Manus OAuth works
 - [ ] `/api/debug/db-status` shows `dbConnected: true`
+- [ ] `/api/debug/lms-courses-schema` shows `queryOk: true` and `missingColumns: []`
+- [ ] Featured courses load on `learn.allaboutultrasound.com` (`lms.listFeatured` — not "Failed query")
 - [ ] Media uploads go to R2 (check new objects in bucket)
 - [ ] SCORM packages play correctly
 - [ ] Stripe test purchase completes
 - [ ] Email delivery works (SendGrid)
+
+### 7b. LMS courses schema (Railway mirror gap)
+
+If the learn homepage shows **no featured courses** but downloads work, Railway MySQL likely has the old Manus `lms_courses` table (~30 columns) while the app expects ~90.
+
+**Automatic fix (recommended):** Current app versions run `ensureLmsCoursesSchema` on startup and add missing columns with `ADD COLUMN IF NOT EXISTS`.
+
+**Manual fallback:** Run `drizzle/railway_lms_courses_schema_sync.sql` in Railway → MySQL-UltrasoundAssist → Connect.
+
+**Diagnostics:**
+
+```bash
+curl https://learn.allaboutultrasound.com/api/debug/lms-courses-schema
+curl -X POST https://learn.allaboutultrasound.com/api/debug/lms-courses-schema-sync
+```
+
 
 ### 8. Decommission Manus hosting
 
