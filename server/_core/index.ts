@@ -196,10 +196,25 @@ async function startServer() {
   // Temporary debug endpoint to diagnose Railway DB connection
   app.get("/api/debug/db-status", async (_req, res) => {
     const { getDb } = await import("../db");
-    const hasDbUrl = !!process.env.DATABASE_URL;
-    const dbUrlPrefix = process.env.DATABASE_URL?.substring(0, 30) || "NOT SET";
+    const { databaseUrlDiagnostics } = await import("../lib/databaseUrl");
+    const diagnostics = databaseUrlDiagnostics();
     const db = await getDb();
-    res.json({ hasDbUrl, dbUrlPrefix, dbConnected: !!db });
+    let usersTable: string | null = null;
+    if (db) {
+      try {
+        const { sql } = await import("drizzle-orm");
+        await db.execute(sql`SELECT 1 FROM users LIMIT 1`);
+        usersTable = "ok";
+      } catch (err) {
+        usersTable = err instanceof Error ? err.message : "query failed";
+      }
+    }
+    res.json({
+      ...diagnostics,
+      dbConnected: !!db,
+      usersTable,
+      deployedAt: new Date().toISOString(),
+    });
   });
   // Temporary debug endpoint to diagnose email/SendGrid configuration
   app.get("/api/debug/email-status", async (_req, res) => {

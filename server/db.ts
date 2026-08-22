@@ -83,13 +83,15 @@ import {
   userEmailAliases,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { resolveDatabaseUrl } from "./lib/databaseUrl";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  const databaseUrl = resolveDatabaseUrl();
+  if (!_db && databaseUrl) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle(databaseUrl);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
