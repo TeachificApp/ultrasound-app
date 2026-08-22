@@ -8,6 +8,7 @@ export const ENV = {
   iheCanonicalRootDomain: process.env.IHE_CANONICAL_ROOT_DOMAIN ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
   databaseUrl: process.env.DATABASE_URL ?? "",
+  authBackend: process.env.AUTH_BACKEND ?? "manus",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",

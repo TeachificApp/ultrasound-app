@@ -171,10 +171,12 @@ describe("Magic Link — email enumeration protection", () => {
     expect(routerSource).toContain("if (!user) return { success: true }");
   });
 
-  it("records email provider delivery failures for operational recovery", () => {
+  it("returns a visible service error when email delivery is not accepted", () => {
     const routerSource = readFileSync(resolve(process.cwd(), "server/routers.ts"), "utf8");
     const emailSource = readFileSync(resolve(process.cwd(), "server/_core/email.ts"), "utf8");
     expect(routerSource).toContain("const deliveryAccepted = await sendEmail");
+    expect(routerSource).toContain("We could not send your sign-in email");
+    expect(routerSource).toContain("code: 'SERVICE_UNAVAILABLE'");
     expect(emailSource).toContain('_logEmailSend(opts.to, opts.subject, "failed")');
   });
 });

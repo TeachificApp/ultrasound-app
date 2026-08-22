@@ -322,7 +322,15 @@ class SDKServer {
       user = await db.getUserByEmail(sessionUserId.slice("email:".length));
     }
 
-    // If user not in DB, sync from OAuth server automatically
+    // Railway uses the locally signed session and Railway MySQL as the sole
+    // production authentication source. Do not fall back to Manus OAuth when a
+    // local session points to an unknown user.
+    if (!user && ENV.authBackend === "local") {
+      throw ForbiddenError("User not found");
+    }
+
+    // Legacy managed-hosting fallback: sync an OAuth user only when the
+    // deployment explicitly uses the Manus authentication backend.
     if (!user) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");

@@ -595,6 +595,10 @@ export const appRouter = router({
         });
         if (!deliveryAccepted) {
           console.error(`[auth] Magic-link delivery was not accepted for user ${user.id}`);
+          throw new TRPCError({
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'We could not send your sign-in email. Please try again shortly or contact support.',
+          });
         }
 
         return { success: true };

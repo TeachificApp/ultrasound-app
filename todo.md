@@ -66,3 +66,18 @@
 - [x] Verify Kahoot-supported export or import formats and implement a permitted Teach game import workflow.
 - [x] Implement and run a fresh read-only next-batch synchronization dry-run with exact table, dependency, schema, identity-conflict, freshness, and insert-count evidence.
 - [x] Update the next-batch proposal with the fresh dry-run findings and an explicit no-update/no-delete approval table.
+- [x] Design independent Railway authentication and a deterministic Manus-to-Railway user-ID mapping that excludes managed credentials and authentication tokens.
+- [x] Create a complete read-only dependency, schema, conflict, and batch inventory for the remaining Manus-only tables.
+- [x] Create verified pre-write Railway backups and apply only approved additive schema foundations.
+- [ ] Migrate remaining authorized platform data in dependency-ordered, guarded, insert-only batches.
+- [ ] Reconcile all completed migration batches and document any deliberate exclusions or pending integrations.
+- [ ] Repair Railway-backed password and magic-link sign-in so it no longer queries managed-only `users` columns or relies on the managed database connection.
+- [x] Add focused authentication regressions for Railway profile lookup, password sign-in, and magic-link issuance without exposing source authentication material.
+- [x] Inventory every Manus-managed runtime dependency, provider integration, environment variable category, and domain route required for a complete Railway cutover.
+- [ ] Replace Manus OAuth, managed mail delivery, storage, background jobs, and platform-only service dependencies with Railway-compatible integrations.
+- [ ] Deploy the full application runtime to Railway and validate production sign-in, email delivery, data access, and custom-domain routing.
+- [ ] Transfer every production supporting service to Railway-compatible hosting: independent authentication, mail delivery, object storage, AI/media providers, scheduled work, webhooks, and domain configuration.
+- [ ] Add executable Railway-local authentication regressions for local-session profile resolution, password success/failure, and provider-accepted versus provider-rejected magic-link issuance.
+- [x] Create an exact Railway cutover inventory mapping every production hostname, canonical route, cookie scope, redirect, and webhook destination.
+- [ ] Confirm each per-production-host Railway service target and production custom-domain binding from the authenticated Railway project.
+- [ ] Confirm every active provider webhook endpoint and dashboard setting, including the single Stripe production route, after Railway deployment.

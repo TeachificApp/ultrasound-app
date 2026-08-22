@@ -11,5 +11,10 @@
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3,
     "numReplicas": 1
+  },
+  "deployEnv": {
+    "NODE_ENV": "production",
+    "AUTH_BACKEND": "local",
+    "STORAGE_BACKEND": "r2"
   }
 }
