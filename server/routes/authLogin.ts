@@ -51,19 +51,20 @@ export function registerAuthLoginRoute(app: Express) {
 
       const normalizedEmail = String(email).toLowerCase().trim();
 
-      const result = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, normalizedEmail))
-        .limit(1);
-
-      const user = result[0];
+      const { getUserByEmail } = await import("../db");
+      const user = await getUserByEmail(normalizedEmail);
 
       // Generic error to prevent email enumeration
       const invalidError = { error: "Invalid email or password." };
 
-      if (!user || !user.passwordHash) {
+      if (!user) {
         return res.status(401).json(invalidError);
+      }
+      if (!user.passwordHash) {
+        return res.status(401).json({
+          error:
+            'This account does not have a password yet. Click "Send me a magic link instead" or use Forgot password to set one.',
+        });
       }
 
       const passwordMatch = await bcrypt.compare(String(password), user.passwordHash);
