@@ -62,6 +62,13 @@ describe("Teach participant route interaction", () => {
     const submit = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Submit location")) as HTMLButtonElement;
     await act(async () => submit.click());
     expect(mocks.submit).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 101, participantId: 202, questionId: 5, responsePayload: { hotspot: { x: 50, y: 25 } } }));
+    await act(async () => { mocks.socket.emit({ type: "question_started", questionIndex: 1, totalQuestions: 3, timeLimitSeconds: 20, question: { id: 6, question: "Name the structure", interactionType: "word_cloud", points: 0, options: "[]", mediaUrl: null, mediaType: null } }); });
+    const wordInput = container.querySelector('input[placeholder="Share a word or short phrase"]') as HTMLInputElement;
+    expect(wordInput).not.toBeNull();
+    await act(async () => { mocks.socket.emit({ type: "question_started", questionIndex: 2, totalQuestions: 3, timeLimitSeconds: 20, question: { id: 7, question: "Order the steps", interactionType: "puzzle", points: 0, options: "[]", interactionConfig: JSON.stringify({ correctOrder: ["Assess", "Measure"] }), mediaUrl: null, mediaType: null } }); });
+    const puzzleSubmit = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Submit puzzle order")) as HTMLButtonElement;
+    await act(async () => puzzleSubmit.click());
+    expect(mocks.submit).toHaveBeenLastCalledWith(expect.objectContaining({ questionId: 7, responsePayload: expect.objectContaining({ order: expect.any(Array) }) }));
     await act(async () => { root.unmount(); await new Promise((resolve) => setTimeout(resolve, 0)); });
   });
 });
