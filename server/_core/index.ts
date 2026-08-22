@@ -254,6 +254,43 @@ async function startServer() {
     const after = await auditUserAccess(db);
     res.json({ before, reconcile, after, deployedAt: new Date().toISOString() });
   });
+  app.get("/api/debug/user-by-email", async (req, res) => {
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email) {
+      res.status(400).json({ error: "email query param required" });
+      return;
+    }
+    const { getDb, getUserByEmail, getUserRoles } = await import("../db");
+    const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+    const db = await getDb();
+    const user = await getUserByEmail(email);
+    if (!user) {
+      res.json({ found: false, email, deployedAt: new Date().toISOString() });
+      return;
+    }
+    const roles = await getUserRoles(user.id);
+    const hasPlatformAdmin =
+      roles.includes("platform_admin") ||
+      roles.includes("platform_owner") ||
+      user.role === "admin";
+    res.json({
+      found: true,
+      email,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        openId: user.openId,
+        isPending: user.isPending,
+        name: user.name,
+        loginMethod: user.loginMethod,
+      },
+      roles,
+      hasPlatformAdmin,
+      isPlatformOwnerEmail: isPlatformOwnerEmail(user.email),
+      deployedAt: new Date().toISOString(),
+    });
+  });
   // Storage proxy for /manus-storage/* assets
   registerStorageProxy(app);
   // OAuth callback under /api/oauth/callback
