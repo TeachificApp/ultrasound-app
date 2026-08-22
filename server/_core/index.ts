@@ -269,9 +269,10 @@ async function startServer() {
       return;
     }
     const roles = await getUserRoles(user.id);
+    const hasPlatformOwner = roles.includes("platform_owner");
     const hasPlatformAdmin =
       roles.includes("platform_admin") ||
-      roles.includes("platform_owner") ||
+      hasPlatformOwner ||
       user.role === "admin";
     res.json({
       found: true,
@@ -286,6 +287,7 @@ async function startServer() {
         loginMethod: user.loginMethod,
       },
       roles,
+      hasPlatformOwner,
       hasPlatformAdmin,
       isPlatformOwnerEmail: isPlatformOwnerEmail(user.email),
       deployedAt: new Date().toISOString(),

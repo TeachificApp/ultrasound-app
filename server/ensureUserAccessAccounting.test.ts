@@ -18,6 +18,7 @@ describe("ensureUserAccessAccounting", () => {
     );
     expect(source).toContain("INSERT INTO userRoles");
     expect(source).toContain("platform_admin");
+    expect(source).toContain("platform_owner");
     expect(source).toContain("ensurePlatformOwnerAccess");
     expect(source).toContain("backfillUserOpenIds");
   });

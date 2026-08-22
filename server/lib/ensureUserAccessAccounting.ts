@@ -13,6 +13,7 @@ export type UserAccessAudit = {
   usersMissingOpenId: number;
   usersMissingBaseRole: number;
   adminUsersMissingPlatformAdmin: number;
+  platformOwnersMissingOwnerRole: number;
   platformOwnersMissingPlatformAdmin: number;
   activeEnrollments: number;
   enrollmentsMissingUser: number;
@@ -26,6 +27,7 @@ export type UserAccessReconcileResult = {
   baseRolesBackfilled: number;
   platformAdminRolesBackfilled: number;
   platformOwnerRolesBackfilled: number;
+  platformOwnerAdminRolesBackfilled: number;
   platformOwnerAdminFlagsSet: number;
   openIdsBackfilled: number;
   openIdBackfillSkipped: number;
@@ -53,20 +55,33 @@ function platformOwnerMatchClause(): ReturnType<typeof sql> {
   return sql.raw(`LOWER(u.email) IN (${emailList})`);
 }
 
-/** Idempotent: platform owners always get users.role=admin and platform_admin. */
+/** Idempotent: platform/site owners always get users.role=admin, platform_owner, and platform_admin. */
 export async function ensurePlatformOwnerAccess(
   db: Db | null | undefined,
-): Promise<{ adminFlagsSet: number; rolesBackfilled: number }> {
-  if (!db) return { adminFlagsSet: 0, rolesBackfilled: 0 };
+): Promise<{
+  adminFlagsSet: number;
+  ownerRolesBackfilled: number;
+  adminRolesBackfilled: number;
+}> {
+  if (!db) return { adminFlagsSet: 0, ownerRolesBackfilled: 0, adminRolesBackfilled: 0 };
 
   const ownerMatch = platformOwnerMatchClause();
-  const beforeMissing = await scalarCount(
+  const beforeMissingOwner = await scalarCount(
     db,
     sql`SELECT COUNT(*) AS c FROM users u
         WHERE ${ownerMatch}
           AND NOT EXISTS (
             SELECT 1 FROM userRoles ur
-            WHERE ur.userId = u.id AND ur.role IN ('platform_admin', 'platform_owner')
+            WHERE ur.userId = u.id AND ur.role = 'platform_owner'
+          )`,
+  );
+  const beforeMissingAdmin = await scalarCount(
+    db,
+    sql`SELECT COUNT(*) AS c FROM users u
+        WHERE ${ownerMatch}
+          AND NOT EXISTS (
+            SELECT 1 FROM userRoles ur
+            WHERE ur.userId = u.id AND ur.role = 'platform_admin'
           )`,
   );
 
@@ -80,28 +95,49 @@ export async function ensurePlatformOwnerAccess(
 
   await db.execute(sql`
     INSERT INTO userRoles (userId, role, assignedByUserId, createdAt)
+    SELECT u.id, 'platform_owner', u.id, NOW()
+    FROM users u
+    WHERE ${ownerMatch}
+      AND NOT EXISTS (
+        SELECT 1 FROM userRoles ur
+        WHERE ur.userId = u.id AND ur.role = 'platform_owner'
+      )
+  `);
+
+  await db.execute(sql`
+    INSERT INTO userRoles (userId, role, assignedByUserId, createdAt)
     SELECT u.id, 'platform_admin', u.id, NOW()
     FROM users u
     WHERE ${ownerMatch}
       AND NOT EXISTS (
         SELECT 1 FROM userRoles ur
-        WHERE ur.userId = u.id AND ur.role IN ('platform_admin', 'platform_owner')
+        WHERE ur.userId = u.id AND ur.role = 'platform_admin'
       )
   `);
 
-  const afterMissing = await scalarCount(
+  const afterMissingOwner = await scalarCount(
     db,
     sql`SELECT COUNT(*) AS c FROM users u
         WHERE ${ownerMatch}
           AND NOT EXISTS (
             SELECT 1 FROM userRoles ur
-            WHERE ur.userId = u.id AND ur.role IN ('platform_admin', 'platform_owner')
+            WHERE ur.userId = u.id AND ur.role = 'platform_owner'
+          )`,
+  );
+  const afterMissingAdmin = await scalarCount(
+    db,
+    sql`SELECT COUNT(*) AS c FROM users u
+        WHERE ${ownerMatch}
+          AND NOT EXISTS (
+            SELECT 1 FROM userRoles ur
+            WHERE ur.userId = u.id AND ur.role = 'platform_admin'
           )`,
   );
 
   return {
     adminFlagsSet,
-    rolesBackfilled: Math.max(0, beforeMissing - afterMissing),
+    ownerRolesBackfilled: Math.max(0, beforeMissingOwner - afterMissingOwner),
+    adminRolesBackfilled: Math.max(0, beforeMissingAdmin - afterMissingAdmin),
   };
 }
 
@@ -116,6 +152,7 @@ export async function auditUserAccess(db: Db | null | undefined): Promise<UserAc
     usersMissingOpenId,
     usersMissingBaseRole,
     adminUsersMissingPlatformAdmin,
+    platformOwnersMissingOwnerRole,
     platformOwnersMissingPlatformAdmin,
     activeEnrollments,
     enrollmentsMissingUser,
@@ -158,7 +195,16 @@ export async function auditUserAccess(db: Db | null | undefined): Promise<UserAc
           WHERE ${platformOwnerMatchClause()}
             AND NOT EXISTS (
               SELECT 1 FROM userRoles ur
-              WHERE ur.userId = u.id AND ur.role IN ('platform_admin', 'platform_owner')
+              WHERE ur.userId = u.id AND ur.role = 'platform_owner'
+            )`,
+    ),
+    scalarCount(
+      db,
+      sql`SELECT COUNT(*) AS c FROM users u
+          WHERE ${platformOwnerMatchClause()}
+            AND NOT EXISTS (
+              SELECT 1 FROM userRoles ur
+              WHERE ur.userId = u.id AND ur.role = 'platform_admin'
             )`,
     ),
     scalarCount(
@@ -204,6 +250,7 @@ export async function auditUserAccess(db: Db | null | undefined): Promise<UserAc
     usersMissingOpenId,
     usersMissingBaseRole,
     adminUsersMissingPlatformAdmin,
+    platformOwnersMissingOwnerRole,
     platformOwnersMissingPlatformAdmin,
     activeEnrollments,
     enrollmentsMissingUser,
@@ -269,19 +316,21 @@ export async function ensureUserAccessAccounting(
   if (
     baseRolesBackfilled > 0 ||
     platformAdminRolesBackfilled > 0 ||
-    ownerAccess.rolesBackfilled > 0 ||
+    ownerAccess.ownerRolesBackfilled > 0 ||
+    ownerAccess.adminRolesBackfilled > 0 ||
     ownerAccess.adminFlagsSet > 0 ||
     openIdResult.updated > 0
   ) {
     console.log(
-      `[ensureUserAccessAccounting] baseRoles=${baseRolesBackfilled}, platformAdmin=${platformAdminRolesBackfilled}, platformOwners=${ownerAccess.rolesBackfilled}, ownerAdminFlags=${ownerAccess.adminFlagsSet}, openIds=${openIdResult.updated}`,
+      `[ensureUserAccessAccounting] baseRoles=${baseRolesBackfilled}, platformAdmin=${platformAdminRolesBackfilled}, platformOwner=${ownerAccess.ownerRolesBackfilled}, ownerPlatformAdmin=${ownerAccess.adminRolesBackfilled}, ownerAdminFlags=${ownerAccess.adminFlagsSet}, openIds=${openIdResult.updated}`,
     );
   }
 
   return {
     baseRolesBackfilled,
     platformAdminRolesBackfilled,
-    platformOwnerRolesBackfilled: ownerAccess.rolesBackfilled,
+    platformOwnerRolesBackfilled: ownerAccess.ownerRolesBackfilled,
+    platformOwnerAdminRolesBackfilled: ownerAccess.adminRolesBackfilled,
     platformOwnerAdminFlagsSet: ownerAccess.adminFlagsSet,
     openIdsBackfilled: openIdResult.updated,
     openIdBackfillSkipped: openIdResult.skipped,

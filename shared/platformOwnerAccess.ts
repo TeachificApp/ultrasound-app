@@ -1,4 +1,4 @@
-/** Platform owners who must always have admin + platform_admin access. */
+/** Platform / site owners who must always have admin, platform_owner, and platform_admin. */
 export const PLATFORM_OWNER_EMAILS = ["larawilliams0501@gmail.com"] as const;
 
 export function normalizeOwnerEmail(email: string): string {
