@@ -99,16 +99,29 @@ Set these in your Railway service's **Variables** tab:
 | `VITE_ANALYTICS_ENDPOINT` | Analytics endpoint URL |
 | `VITE_ANALYTICS_WEBSITE_ID` | Analytics website ID |
 
-### Legacy Manus (optional after cutover)
+### AI (OpenAI on Railway — no Manus Forge)
 
-These are only needed if `STORAGE_BACKEND=forge` or during transition:
+Manus Forge is not available on Railway. Use your **own OpenAI API key** server-side:
+
+| Variable | Value |
+|----------|--------|
+| `BUILT_IN_FORGE_API_URL` | `https://api.openai.com` |
+| `BUILT_IN_FORGE_API_KEY` | Your OpenAI `sk-...` key |
+
+This powers **text AI**, **DALL-E image generation**, and **Whisper voice transcription**.
+
+Do **not** set `VITE_FRONTEND_FORGE_*` — those are Manus-managed browser credentials (maps only). Google Maps is optional and unused if you do not need maps.
+
+### Legacy Manus Forge (optional)
+
+These are only needed if `STORAGE_BACKEND=forge` or during transition on Manus hosting:
 
 | Variable | Description |
 |----------|-------------|
-| `BUILT_IN_FORGE_API_URL` | Forge API base URL |
-| `BUILT_IN_FORGE_API_KEY` | Forge API key (server-side) |
-| `VITE_FRONTEND_FORGE_API_URL` | Forge API URL (client-side) |
-| `VITE_FRONTEND_FORGE_API_KEY` | Forge API key (client-side) |
+| `BUILT_IN_FORGE_API_URL` | Forge API base URL (Manus only) |
+| `BUILT_IN_FORGE_API_KEY` | Forge API key (Manus only) |
+| `VITE_FRONTEND_FORGE_API_URL` | Manus-managed — do not copy to Railway |
+| `VITE_FRONTEND_FORGE_API_KEY` | Manus-managed — do not copy to Railway |
 | `RAILWAY_MYSQL_URL` | Only used by mirror sync on Manus (not needed on Railway) |
 
 ---

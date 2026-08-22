@@ -26,6 +26,7 @@
  * ```
  */
 import { ENV } from "./env";
+import { getOpenAiApiKey, openAiV1Url } from "../lib/openAiConfig";
 
 export type TranscribeOptions = {
   audioUrl: string; // URL to the audio file (e.g., S3 URL)
@@ -142,20 +143,16 @@ export async function transcribeAudio(
     );
     formData.append("prompt", prompt);
 
-    // Step 4: Call the transcription service
-    const baseUrl = ENV.forgeApiUrl.endsWith("/")
-      ? ENV.forgeApiUrl
-      : `${ENV.forgeApiUrl}/`;
-    
-    const fullUrl = new URL(
-      "v1/audio/transcriptions",
-      baseUrl
-    ).toString();
+    if (options.language) {
+      formData.append("language", options.language);
+    }
+
+    const fullUrl = openAiV1Url("audio/transcriptions");
 
     const response = await fetch(fullUrl, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${ENV.forgeApiKey}`,
+        authorization: `Bearer ${getOpenAiApiKey()}`,
         "Accept-Encoding": "identity",
       },
       body: formData,
