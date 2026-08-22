@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Mail, Loader2, Stethoscope, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft, GraduationCap, Award, Users, Eye, EyeOff, Lock, UserPlus, KeyRound } from "lucide-react";
 import { isCombinedBrandingDomain, isIHeartEchoDomain, isLearnDomain, MEMBERS_APP_URL } from "@/hooks/useSubdomain";
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
+import MaintenanceBanner from "@/components/MaintenanceBanner";
 import { toast } from "sonner";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
@@ -217,9 +218,11 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row" style={{ fontFamily: "Open Sans, sans-serif" }}>
-      {/* ── Left panel: branding ── */}
-      <div
+    <div className="min-h-screen flex flex-col" style={{ fontFamily: "Open Sans, sans-serif" }}>
+      <MaintenanceBanner showForUnauthenticated />
+      <div className="flex flex-1 flex-col lg:flex-row">
+        {/* ── Left panel: branding ── */}
+        <div
         className="relative flex flex-col justify-between p-8 lg:p-12 lg:w-[55%] overflow-hidden"
         style={{ background: "linear-gradient(145deg, #0e1e2e 0%, #0d3d44 55%, #189aa1 100%)" }}
       >
@@ -278,10 +281,10 @@ export default function Login() {
           ))}
         </div>
         <div className="relative mt-8 lg:mt-0 text-white/30 text-xs">&copy; {new Date().getFullYear()} {BRAND_NAME}</div>
-      </div>
+        </div>
 
-      {/* ── Right panel: auth forms ── */}
-      <div className="flex flex-col items-center justify-center flex-1 p-8 lg:p-12 bg-white">
+        {/* ── Right panel: auth forms ── */}
+        <div className="flex flex-col items-center justify-center flex-1 p-8 lg:p-12 bg-white">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
@@ -673,6 +676,7 @@ export default function Login() {
               </p>
             </>
           )}
+        </div>
         </div>
       </div>
     </div>

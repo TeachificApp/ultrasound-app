@@ -81,3 +81,8 @@
 - [x] Create an exact Railway cutover inventory mapping every production hostname, canonical route, cookie scope, redirect, and webhook destination.
 - [ ] Confirm each per-production-host Railway service target and production custom-domain binding from the authenticated Railway project.
 - [ ] Confirm every active provider webhook endpoint and dashboard setting, including the single Stripe production route, after Railway deployment.
+- [ ] Reconcile every source user against Railway identity records, including IDs, email uniqueness, open-ID values, and excluded-account reasons.
+- [ ] Diagnose and repair Railway’s live user lookup, password setup, and magic-link provider handoff so existing users are recognized and delivery is verifiable.
+- [ ] Reconcile Railway `JWT_SECRET` and cookie configuration so locally issued sessions verify across every Railway application instance without relying on Manus values.
+- [ ] Verify SendGrid delivery events, sender verification, suppression status, and inbox receipt for a separately approved Railway magic-link test.
+- [x] Show the scheduled maintenance banner on the All About Ultrasound, Learn, and iHeartEcho login pages while retaining expiry and dismissal behavior.

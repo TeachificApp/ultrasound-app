@@ -23,7 +23,7 @@ afterEach(() => {
   auth.loading = false;
 });
 
-async function mount() {
+async function mount(props: { showForUnauthenticated?: boolean } = {}) {
   const dom = new JSDOM("<!doctype html><html><body></body></html>", { url: "https://learn.allaboutultrasound.com" });
   (globalThis as any).window = dom.window;
   (globalThis as any).document = dom.window.document;
@@ -31,7 +31,7 @@ async function mount() {
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => root?.render(React.createElement(MaintenanceBanner)));
+  await act(async () => root?.render(React.createElement(MaintenanceBanner, props)));
   return container;
 }
 
@@ -55,5 +55,17 @@ describe("MaintenanceBanner interaction", () => {
     auth.user = null;
     const mounted = await mount();
     expect(mounted.textContent).toBe("");
+  });
+
+  it("renders on an unauthenticated login shell when explicitly enabled and shares dismissal state", async () => {
+    auth.user = null;
+    auth.loading = true;
+    const mounted = await mount({ showForUnauthenticated: true });
+    expect(mounted.textContent).toContain("Scheduled Server Maintenance Aug 22–24, 2026");
+
+    const dismiss = mounted.querySelector('[aria-label="Dismiss maintenance notice"]') as HTMLButtonElement;
+    await act(async () => dismiss.click());
+    expect(window.localStorage.getItem(MAINTENANCE_BANNER_DISMISSAL_KEY)).toBe("true");
+    expect(mounted.textContent).not.toContain("Scheduled Server Maintenance");
   });
 });

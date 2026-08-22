@@ -7,7 +7,12 @@ import {
   shouldShowMaintenanceBanner,
 } from "@shared/maintenanceBanner";
 
-export default function MaintenanceBanner() {
+type MaintenanceBannerProps = {
+  /** Use on authentication pages so the scheduled notice is available before sign-in. */
+  showForUnauthenticated?: boolean;
+};
+
+export default function MaintenanceBanner({ showForUnauthenticated = false }: MaintenanceBannerProps) {
   const { user, loading } = useAuth();
   const [isDismissed, setIsDismissed] = useState(() =>
     typeof window !== "undefined" && window.localStorage.getItem(MAINTENANCE_BANNER_DISMISSAL_KEY) === "true",
@@ -21,7 +26,8 @@ export default function MaintenanceBanner() {
     return () => window.clearTimeout(timeout);
   }, []);
 
-  if (loading || !shouldShowMaintenanceBanner({ isAuthenticated: Boolean(user), isDismissed, now })) return null;
+  const isEligible = showForUnauthenticated || Boolean(user);
+  if ((!showForUnauthenticated && loading) || !shouldShowMaintenanceBanner({ isAuthenticated: isEligible, isDismissed, now })) return null;
 
   const dismiss = () => {
     window.localStorage.setItem(MAINTENANCE_BANNER_DISMISSAL_KEY, "true");

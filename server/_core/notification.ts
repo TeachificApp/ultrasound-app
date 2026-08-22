@@ -14,11 +14,6 @@ const trimValue = (value: string): string => value.trim();
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.trim().length > 0;
 
-const buildEndpointUrl = (baseUrl: string): string => {
-  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  return new URL("webdevtoken.v1.WebDevService/SendNotification", normalizedBase).toString();
-};
-
 const validatePayload = (input: NotificationPayload): NotificationPayload => {
   if (!isNonEmptyString(input.title)) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Notification title is required." });
@@ -97,16 +92,12 @@ export async function sendAdminAlert(title: string, content: string): Promise<vo
 }
 
 /**
- * Dispatches a Manus in-app push notification to the Manus project owner account
- * AND sends a primary admin alert email to PLATFORM_ADMIN_EMAIL via SendGrid.
+ * Dispatches a Railway-compatible administrator notification using the configured
+ * email provider and the local administrative-notification table. It deliberately
+ * makes no call to Manus-managed notification services.
  *
- * NOTE: The Manus push notification always goes to the Manus account that owns
- * this project (the developer's account). For client-facing admin alerts, the
- * SendGrid email to PLATFORM_ADMIN_EMAIL is the reliable channel.
- *
- * Returns `true` if the Manus notification request was accepted, `false` when
- * the upstream service cannot be reached. Validation errors bubble up as TRPC
- * errors so callers can fix the payload.
+ * Returns whether an email provider is configured. Validation errors bubble up as
+ * TRPC errors so callers can fix the payload.
  *
  * Pass { skipAdminEmail: true } when the caller is already sending its own
  * detailed admin email to avoid duplicates.
@@ -127,39 +118,5 @@ export async function notifyOwner(
   // Log to the in-app admin notifications DB (fire-and-forget, never throws)
   logAdminNotification({ title, content, source: "system" }).catch(() => {});
 
-  // SECONDARY: Send Manus in-app push notification to the project owner account.
-  // This goes to the Manus account owner (developer) — useful for developer awareness
-  // but NOT the primary channel for client admin alerts.
-  if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-    // Manus push not configured — that's fine, email is the primary channel
-    return false;
-  }
-
-  const endpoint = buildEndpointUrl(ENV.forgeApiUrl);
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${ENV.forgeApiKey}`,
-        "content-type": "application/json",
-        "connect-protocol-version": "1",
-      },
-      body: JSON.stringify({ title, content }),
-    });
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      console.warn(
-        `[Notification] Manus push failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`
-      );
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.warn("[Notification] Error calling Manus notification service:", error);
-    return false;
-  }
+  return Boolean(process.env.SENDGRID_API_KEY);
 }
