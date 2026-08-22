@@ -68,6 +68,91 @@ export const LMS_COURSES_REQUIRED_COLUMNS = [
   "purchase_terms_link_url_2",
 ] as const;
 
+/** Plain ADD COLUMN definitions (Railway MySQL does not support ADD COLUMN IF NOT EXISTS). */
+const LMS_COURSES_COLUMN_DEFS: Record<(typeof LMS_COURSES_REQUIRED_COLUMNS)[number], string> = {
+  enrollment_close_date: "TIMESTAMP NULL",
+  bundle_only: "TINYINT(1) NOT NULL DEFAULT 0",
+  meta_keywords: "TEXT NULL",
+  certificate_template_id: "INT NULL",
+  credit_hours: "VARCHAR(16) NULL",
+  certificate_title_override: "VARCHAR(512) NULL",
+  show_instructor: "TINYINT(1) NOT NULL DEFAULT 0",
+  hide_progress: "TINYINT(1) NOT NULL DEFAULT 0",
+  show_in_library: "TINYINT(1) NOT NULL DEFAULT 1",
+  course_overview_top_blocks: "LONGTEXT NULL",
+  course_overview_blocks: "LONGTEXT NULL",
+  course_overview_bottom_blocks: "LONGTEXT NULL",
+  send_enrollment_email: "TINYINT(1) NOT NULL DEFAULT 1",
+  custom_thank_you_enabled: "TINYINT(1) NOT NULL DEFAULT 0",
+  custom_thank_you_blocks: "LONGTEXT NULL",
+  post_purchase_redirect_url: "VARCHAR(1024) NULL",
+  welcome_email_enabled: "TINYINT(1) NOT NULL DEFAULT 1",
+  welcome_email_subject: "VARCHAR(500) NULL",
+  welcome_email_body: "LONGTEXT NULL",
+  hide_pricing_options: "TINYINT(1) NOT NULL DEFAULT 0",
+  upsell_enabled: "TINYINT(1) NOT NULL DEFAULT 0",
+  upsell_course_id: "INT NULL",
+  upsell_product_type: "VARCHAR(20) NULL",
+  upsell_product_id: "INT NULL",
+  upsell_headline: "VARCHAR(500) NULL",
+  upsell_description: "TEXT NULL",
+  completion_redirect_url: "VARCHAR(1024) NULL",
+  completion_email_enabled: "TINYINT(1) NOT NULL DEFAULT 0",
+  completion_email_subject: "VARCHAR(500) NULL",
+  completion_email_body: "LONGTEXT NULL",
+  primary_color: "VARCHAR(20) DEFAULT '#179ca3'",
+  accent_color: "VARCHAR(20) DEFAULT '#0d9488'",
+  gradient_from: "VARCHAR(20) DEFAULT '#179ca3'",
+  gradient_to: "VARCHAR(20) DEFAULT '#0d9488'",
+  gradient_direction: "VARCHAR(30) DEFAULT '135deg'",
+  thumbnail_url: "TEXT NULL",
+  custom_labels: "LONGTEXT NULL",
+  default_mark_complete: "INT NOT NULL DEFAULT 1",
+  player_theme: "ENUM('light','dark') NOT NULL DEFAULT 'light'",
+  allow_group_purchase: "TINYINT(1) NOT NULL DEFAULT 1",
+  library_order: "INT NOT NULL DEFAULT 0",
+  publish_domain: "VARCHAR(255) NULL",
+  multi_cohort_mode: "TINYINT(1) NOT NULL DEFAULT 0",
+  waitlist_enabled: "TINYINT(1) NOT NULL DEFAULT 0",
+  waitlist_heading: "VARCHAR(500) NULL",
+  waitlist_body: "LONGTEXT NULL",
+  waitlist_cta_label: "VARCHAR(255) NULL",
+  waitlist_cta_url: "VARCHAR(2048) NULL",
+  waitlist_redirect_url: "VARCHAR(2048) NULL",
+  waitlist_success_message: "LONGTEXT NULL",
+  presale_welcome_heading: "VARCHAR(500) NULL",
+  presale_welcome_body: "LONGTEXT NULL",
+  presale_welcome_media_url: "TEXT NULL",
+  presale_welcome_cta_label: "VARCHAR(255) NULL",
+  presale_welcome_cta_url: "VARCHAR(2048) NULL",
+  player_sidebar_blocks: "LONGTEXT NULL",
+  purchase_terms_text: "TEXT NULL",
+  purchase_terms_link_text_1: "VARCHAR(255) NULL",
+  purchase_terms_link_url_1: "VARCHAR(2048) NULL",
+  purchase_terms_link_text_2: "VARCHAR(255) NULL",
+  purchase_terms_link_url_2: "VARCHAR(2048) NULL",
+};
+
+const MODIFY_STATEMENTS = [
+  "ALTER TABLE `lms_courses` MODIFY COLUMN `status` ENUM('draft','public','hidden','private','archived','enrollment_closed','waitlist','presale') NOT NULL DEFAULT 'draft'",
+  "ALTER TABLE `lms_courses` MODIFY COLUMN `type` ENUM('course','quiz','download','cohort','workshop') NOT NULL DEFAULT 'course'",
+  "ALTER TABLE `lms_courses` MODIFY COLUMN `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00",
+] as const;
+
+function formatSqlError(err: unknown): string {
+  if (err instanceof Error) {
+    const cause = (err as Error & { cause?: unknown }).cause;
+    if (cause instanceof Error) return `${err.message} | ${cause.message}`;
+    return err.message;
+  }
+  return String(err);
+}
+
+function isBenignAlterError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("duplicate column") || lower.includes("duplicate column name");
+}
+
 async function listTableColumns(db: Db, tableName: string): Promise<Set<string>> {
   const rows = await db.execute(
     sql`SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
@@ -182,80 +267,35 @@ export async function ensureLmsCoursesSchema(db: Db | null | undefined): Promise
     };
   }
 
-  const alterStatements = [
-    "ALTER TABLE `lms_courses` MODIFY COLUMN `status` ENUM('draft','public','hidden','private','archived','enrollment_closed','waitlist','presale') NOT NULL DEFAULT 'draft'",
-    "ALTER TABLE `lms_courses` MODIFY COLUMN `type` ENUM('course','quiz','download','cohort','workshop') NOT NULL DEFAULT 'course'",
-    "ALTER TABLE `lms_courses` MODIFY COLUMN `price` DECIMAL(10,2) NOT NULL DEFAULT 0.00",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `enrollment_close_date` TIMESTAMP NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `bundle_only` TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `meta_keywords` TEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `certificate_template_id` INT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `credit_hours` VARCHAR(16) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `certificate_title_override` VARCHAR(512) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `show_instructor` TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `hide_progress` TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `show_in_library` TINYINT(1) NOT NULL DEFAULT 1",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `course_overview_top_blocks` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `course_overview_blocks` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `course_overview_bottom_blocks` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `send_enrollment_email` TINYINT(1) NOT NULL DEFAULT 1",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `custom_thank_you_enabled` TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `custom_thank_you_blocks` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `post_purchase_redirect_url` VARCHAR(1024) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `welcome_email_enabled` TINYINT(1) NOT NULL DEFAULT 1",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `welcome_email_subject` VARCHAR(500) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `welcome_email_body` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `hide_pricing_options` TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `upsell_enabled` TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `upsell_course_id` INT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `upsell_product_type` VARCHAR(20) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `upsell_product_id` INT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `upsell_headline` VARCHAR(500) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `upsell_description` TEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `completion_redirect_url` VARCHAR(1024) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `completion_email_enabled` TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `completion_email_subject` VARCHAR(500) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `completion_email_body` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `primary_color` VARCHAR(20) DEFAULT '#179ca3'",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `accent_color` VARCHAR(20) DEFAULT '#0d9488'",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `gradient_from` VARCHAR(20) DEFAULT '#179ca3'",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `gradient_to` VARCHAR(20) DEFAULT '#0d9488'",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `gradient_direction` VARCHAR(30) DEFAULT '135deg'",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `thumbnail_url` TEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `custom_labels` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `default_mark_complete` INT NOT NULL DEFAULT 1",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `player_theme` ENUM('light','dark') NOT NULL DEFAULT 'light'",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `allow_group_purchase` TINYINT(1) NOT NULL DEFAULT 1",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `library_order` INT NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `publish_domain` VARCHAR(255) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `multi_cohort_mode` TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `waitlist_enabled` TINYINT(1) NOT NULL DEFAULT 0",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `waitlist_heading` VARCHAR(500) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `waitlist_body` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `waitlist_cta_label` VARCHAR(255) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `waitlist_cta_url` VARCHAR(2048) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `waitlist_redirect_url` VARCHAR(2048) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `waitlist_success_message` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `presale_welcome_heading` VARCHAR(500) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `presale_welcome_body` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `presale_welcome_media_url` TEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `presale_welcome_cta_label` VARCHAR(255) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `presale_welcome_cta_url` VARCHAR(2048) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `player_sidebar_blocks` LONGTEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `purchase_terms_text` TEXT NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `purchase_terms_link_text_1` VARCHAR(255) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `purchase_terms_link_url_1` VARCHAR(2048) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `purchase_terms_link_text_2` VARCHAR(255) NULL",
-    "ALTER TABLE `lms_courses` ADD COLUMN IF NOT EXISTS `purchase_terms_link_url_2` VARCHAR(2048) NULL",
-  ];
+  let existingColumns = await listTableColumns(db, "lms_courses");
 
-  for (const statement of alterStatements) {
+  for (const statement of MODIFY_STATEMENTS) {
     try {
       await runAlter(db, statement);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = formatSqlError(err);
+      if (!isBenignAlterError(message)) {
+        errors.push(message);
+        console.error("[ensureLmsCoursesSchema] MODIFY failed:", statement.slice(0, 80), message);
+      }
+    }
+  }
+
+  for (const column of LMS_COURSES_REQUIRED_COLUMNS) {
+    if (existingColumns.has(column)) continue;
+    const definition = LMS_COURSES_COLUMN_DEFS[column];
+    const statement = `ALTER TABLE \`lms_courses\` ADD COLUMN \`${column}\` ${definition}`;
+    try {
+      await runAlter(db, statement);
+      existingColumns.add(column);
+    } catch (err) {
+      const message = formatSqlError(err);
+      if (isBenignAlterError(message)) {
+        existingColumns.add(column);
+        continue;
+      }
       errors.push(message);
-      console.error("[ensureLmsCoursesSchema] Statement failed:", statement.slice(0, 80), message);
+      console.error("[ensureLmsCoursesSchema] ADD failed:", column, message);
     }
   }
 

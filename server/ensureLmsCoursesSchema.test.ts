@@ -21,6 +21,15 @@ describe("ensureLmsCoursesSchema", () => {
       fs.readFile(new URL("../drizzle/railway_lms_courses_schema_sync.sql", import.meta.url), "utf8"),
     );
     expect(sql).toContain("bundle_only");
-    expect(sql).toContain("ADD COLUMN IF NOT EXISTS");
+    expect(sql).toContain("ADD COLUMN `bundle_only`");
+    expect(sql).not.toContain("IF NOT EXISTS");
+  });
+
+  it("adds missing columns via INFORMATION_SCHEMA checks", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(new URL("./lib/ensureLmsCoursesSchema.ts", import.meta.url), "utf8"),
+    );
+    expect(source).toContain("LMS_COURSES_COLUMN_DEFS");
+    expect(source).toContain("existingColumns.has(column)");
   });
 });
