@@ -69,8 +69,8 @@
 - [x] Design independent Railway authentication and a deterministic Manus-to-Railway user-ID mapping that excludes managed credentials and authentication tokens.
 - [x] Create a complete read-only dependency, schema, conflict, and batch inventory for the remaining Manus-only tables.
 - [x] Create verified pre-write Railway backups and apply only approved additive schema foundations.
-- [ ] Migrate remaining authorized platform data in dependency-ordered, guarded, insert-only batches.
-- [ ] Reconcile all completed migration batches and document any deliberate exclusions or pending integrations.
+- [x] Migrate remaining authorized platform data in dependency-ordered, guarded, insert-only batches.
+- [x] Reconcile all completed migration batches and document any deliberate exclusions or pending integrations.
 - [ ] Repair Railway-backed password and magic-link sign-in so it no longer queries managed-only `users` columns or relies on the managed database connection.
 - [x] Add focused authentication regressions for Railway profile lookup, password sign-in, and magic-link issuance without exposing source authentication material.
 - [x] Inventory every Manus-managed runtime dependency, provider integration, environment variable category, and domain route required for a complete Railway cutover.
@@ -89,3 +89,5 @@
 - [x] Inventory and reconcile all user access records, including enrollments, entitlements, memberships, subscriptions, progress, quiz attempts, completions, CME credentials, and access grants.
 - [x] Synchronize verified missing user-access and learning-content records to Railway with parent-to-child, insert-only safeguards and post-sync parity evidence.
 - [x] Complete a bounded primary-key parity sweep for the remaining equal-count learning and user-access tables, retaining any deliberate sensitive exclusions.
+- [x] Verify explicit composite-key parity and the four column-name review tables in the closing Railway audit.
+- [x] Finalize and verify the complete Railway parity document after the composite-key and schema-review evidence is archived.

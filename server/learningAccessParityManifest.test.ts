@@ -19,4 +19,8 @@ describe("learning-access parity manifest", () => {
   it("identifies composite-key quiz metadata as content for count-based zero-row parity handling", () => {
     expect(classifyLearningAccessTable("quiz_question_tags")).toBe("content");
   });
+
+  it("includes the user identity table for ID-preserving Railway reconciliation", () => {
+    expect(classifyLearningAccessTable("users")).toBe("identity");
+  });
 });
