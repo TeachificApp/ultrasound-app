@@ -221,6 +221,23 @@ async function startServer() {
     });
     res.json({ sent: result, to, timestamp: new Date().toISOString() });
   });
+  // Diagnose lms_courses schema (Railway mirror often missing columns)
+  app.get("/api/debug/lms-courses-schema", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { inspectLmsCoursesSchema } = await import("../lib/ensureLmsCoursesSchema");
+    const db = await getDb();
+    const status = await inspectLmsCoursesSchema(db);
+    res.json({ ...status, deployedAt: new Date().toISOString() });
+  });
+  // Manually trigger lms_courses schema sync (same as startup migration)
+  app.post("/api/debug/lms-courses-schema-sync", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { ensureLmsCoursesSchema, inspectLmsCoursesSchema } = await import("../lib/ensureLmsCoursesSchema");
+    const db = await getDb();
+    const result = await ensureLmsCoursesSchema(db);
+    const after = await inspectLmsCoursesSchema(db);
+    res.json({ ...result, after, deployedAt: new Date().toISOString() });
+  });
   // Storage proxy for /manus-storage/* assets
   registerStorageProxy(app);
   // OAuth callback under /api/oauth/callback
@@ -702,6 +719,13 @@ async function startServer() {
         console.error('[Startup] deferred_checkout_sessions migration error:', err?.message ?? err);
       }
     }).catch((err) => console.error('[Startup] deferred_checkout_sessions getDb error:', err));
+    // Ensure lms_courses has all columns expected by the current app (Railway mirror gap)
+    getDb()
+      .then(async (db) => {
+        const { ensureLmsCoursesSchema } = await import("../lib/ensureLmsCoursesSchema");
+        return ensureLmsCoursesSchema(db);
+      })
+      .catch((err) => console.error("[Startup] ensureLmsCoursesSchema error:", err));
     // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
       console.log("[Startup] Durable SCORM queue enabled — pending packages will not be skipped");
