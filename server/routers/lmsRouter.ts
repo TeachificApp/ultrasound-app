@@ -1649,12 +1649,12 @@ export const lmsPublicRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const row = await db
-        .select()
-        .from(lmsCohortGroups)
-        .where(eq(lmsCohortGroups.id, input.cohortGroupId))
-        .then(r => r[0] ?? null);
+      const { getCohortGroupById, getCohortGroupLandingBlocks } = await import("../lib/cohortGroupQuery");
+      const row = await getCohortGroupById(db, input.cohortGroupId);
       if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      const landingBlocks = row.landingBlocks
+        ? (JSON.parse(row.landingBlocks) as unknown[])
+        : await getCohortGroupLandingBlocks(db, input.cohortGroupId);
       // Count current enrollments for sold-out detection
       const [countRow] = await db
         .select({ count: sql<number>`count(*)` })
@@ -1674,7 +1674,7 @@ export const lmsPublicRouter = router({
         enrollmentCount,
         isSoldOut,
         status: row.status,
-        landingBlocks: row.landingBlocks ? JSON.parse(row.landingBlocks) : [],
+        landingBlocks,
       };
     }),
 

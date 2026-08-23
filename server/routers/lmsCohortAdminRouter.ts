@@ -20,6 +20,7 @@ import { getStripeClient } from "../lib/stripeClient";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or } from "drizzle-orm";
+import { listCohortGroupsForAdmin } from "../lib/cohortGroupQuery";
 import { enrichCohortResources } from "../lib/cohortResources";
 import { expandCohortRecurrence } from "../lib/cohortRecurrence";
 import { randomBytes } from "crypto";
@@ -958,11 +959,7 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const groups = await db
-        .select()
-        .from(lmsCohortGroups)
-        .where(eq(lmsCohortGroups.courseId, input.courseId))
-        .orderBy(asc(lmsCohortGroups.startDate), asc(lmsCohortGroups.sortOrder), asc(lmsCohortGroups.createdAt));
+      const groups = await listCohortGroupsForAdmin(db, input.courseId);
       const counts = await db
         .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId, count: sql<number>`count(*)` })
         .from(lmsCohortGroupEnrollments)
@@ -1799,13 +1796,15 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [group] = await db
-        .select({ id: lmsCohortGroups.id, courseId: lmsCohortGroups.courseId, name: lmsCohortGroups.name, landingBlocks: lmsCohortGroups.landingBlocks })
-        .from(lmsCohortGroups)
-        .where(eq(lmsCohortGroups.id, input.cohortGroupId))
-        .limit(1);
+      const { getCohortGroupById } = await import("../lib/cohortGroupQuery");
+      const group = await getCohortGroupById(db, input.cohortGroupId);
       if (!group) throw new TRPCError({ code: "NOT_FOUND" });
-      return group;
+      return {
+        id: group.id,
+        courseId: group.courseId,
+        name: group.name,
+        landingBlocks: group.landingBlocks,
+      };
     }),
   saveCohortGroupLandingBlocks: protectedProcedure
     .input(z.object({ cohortGroupId: z.number(), blocks: z.string() }))
