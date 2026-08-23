@@ -1,21 +1,133 @@
 /**
  * sendgridSuppressions.ts
  *
- * Helpers for managing SendGrid's Global Unsubscribe (suppression) list.
+ * Helpers for managing SendGrid suppression lists.
  *
- * When a user unsubscribes in either UltrasoundAssist or iHeartEcho, their
- * email is added to SendGrid's global suppression list. SendGrid will then
- * automatically block delivery to that address for ALL sends from this
- * SendGrid account — regardless of which app triggers the send.
+ * When a user unsubscribes, bounces, or marks mail as spam, SendGrid adds the
+ * address to a suppression list. The Mail Send API may still return 202 Accepted
+ * while silently skipping delivery — which looks like "emailSent: true" in app logs.
  *
  * API reference:
- *   POST https://api.sendgrid.com/v3/asm/suppressions/global
- *   GET  https://api.sendgrid.com/v3/asm/suppressions/global/{email}
- *   DELETE https://api.sendgrid.com/v3/asm/suppressions/global/{email}
+ *   Global unsubscribes: POST/GET/DELETE /v3/asm/suppressions/global[/{email}]
+ *   Bounces/blocks/etc.: GET/DELETE /v3/suppression/{type}/{email}
  */
 
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ?? "";
 const SENDGRID_API_BASE = "https://api.sendgrid.com/v3";
+
+function getSendGridApiKey(): string {
+  return process.env.SENDGRID_API_KEY ?? "";
+}
+
+export const SENDGRID_SUPPRESSION_LISTS = [
+  "global_unsubscribe",
+  "bounces",
+  "blocks",
+  "spam_reports",
+  "invalid_emails",
+] as const;
+
+export type SendGridSuppressionList = (typeof SENDGRID_SUPPRESSION_LISTS)[number];
+
+export type SendGridSuppressionStatus = Record<SendGridSuppressionList, boolean>;
+
+function normalizeEmail(email: string): string {
+  return email.toLowerCase().trim();
+}
+
+function suppressionPath(list: SendGridSuppressionList, email: string): string {
+  const encoded = encodeURIComponent(normalizeEmail(email));
+  switch (list) {
+    case "global_unsubscribe":
+      return `${SENDGRID_API_BASE}/asm/suppressions/global/${encoded}`;
+    case "bounces":
+    case "blocks":
+    case "spam_reports":
+    case "invalid_emails":
+      return `${SENDGRID_API_BASE}/suppression/${list}/${encoded}`;
+  }
+}
+
+async function isOnSuppressionList(
+  list: SendGridSuppressionList,
+  email: string,
+): Promise<boolean> {
+  if (!getSendGridApiKey()) return false;
+  try {
+    const res = await fetch(suppressionPath(list, email), {
+      headers: { Authorization: `Bearer ${getSendGridApiKey()}` },
+    });
+    if (res.status === 200) return true;
+    if (res.status === 404) return false;
+    console.warn(
+      `[SendGridSuppressions] Unexpected status checking ${list} for ${email}: HTTP ${res.status}`,
+    );
+    return false;
+  } catch (err) {
+    console.error(`[SendGridSuppressions] Error checking ${list} for ${email}:`, err);
+    return false;
+  }
+}
+
+async function removeFromSuppressionList(
+  list: SendGridSuppressionList,
+  email: string,
+): Promise<{ removed: boolean; status: number }> {
+  if (!getSendGridApiKey()) return { removed: false, status: 0 };
+  try {
+    const res = await fetch(suppressionPath(list, email), {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${getSendGridApiKey()}` },
+    });
+    if (res.ok || res.status === 404) {
+      if (res.status !== 404) {
+        console.log(`[SendGridSuppressions] Removed ${email} from ${list}`);
+      }
+      return { removed: res.status !== 404, status: res.status };
+    }
+    console.error(
+      `[SendGridSuppressions] Failed to remove ${email} from ${list}: HTTP ${res.status}`,
+    );
+    return { removed: false, status: res.status };
+  } catch (err) {
+    console.error(`[SendGridSuppressions] Error removing ${email} from ${list}:`, err);
+    return { removed: false, status: 0 };
+  }
+}
+
+export async function getSendGridSuppressionStatus(
+  email: string,
+): Promise<SendGridSuppressionStatus> {
+  const normalized = normalizeEmail(email);
+  const entries = await Promise.all(
+    SENDGRID_SUPPRESSION_LISTS.map(async (list) => [list, await isOnSuppressionList(list, normalized)] as const),
+  );
+  return Object.fromEntries(entries) as SendGridSuppressionStatus;
+}
+
+export function isSendGridDeliveryBlocked(status: SendGridSuppressionStatus): boolean {
+  return SENDGRID_SUPPRESSION_LISTS.some((list) => status[list]);
+}
+
+/**
+ * Remove an address from all SendGrid suppression lists so transactional mail can deliver.
+ * Use when the user explicitly requests magic-link or password-reset email.
+ */
+export async function clearSendGridSuppressionLists(
+  email: string,
+  lists: readonly SendGridSuppressionList[] = SENDGRID_SUPPRESSION_LISTS,
+): Promise<Record<SendGridSuppressionList, { removed: boolean; status: number }>> {
+  const normalized = normalizeEmail(email);
+  const results = await Promise.all(
+    lists.map(async (list) => {
+      const result = await removeFromSuppressionList(list, normalized);
+      return [list, result] as const;
+    }),
+  );
+  return Object.fromEntries(results) as Record<
+    SendGridSuppressionList,
+    { removed: boolean; status: number }
+  >;
+}
 
 /**
  * Add one or more email addresses to SendGrid's Global Unsubscribe list.
@@ -23,20 +135,19 @@ const SENDGRID_API_BASE = "https://api.sendgrid.com/v3";
  * Fails silently (logs error) so it never blocks the main unsubscribe flow.
  */
 export async function addToSendGridGlobalUnsubscribes(emails: string[]): Promise<void> {
-  if (!SENDGRID_API_KEY) {
+  if (!getSendGridApiKey()) {
     console.warn("[SendGridSuppressions] SENDGRID_API_KEY not set — skipping global unsubscribe.");
     return;
   }
   if (emails.length === 0) return;
 
-  // Normalise: lowercase, trim, deduplicate
-  const normalised = Array.from(new Set(emails.map((e) => e.toLowerCase().trim()).filter(Boolean)));
+  const normalised = Array.from(new Set(emails.map(normalizeEmail).filter(Boolean)));
 
   try {
     const res = await fetch(`${SENDGRID_API_BASE}/asm/suppressions/global`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${SENDGRID_API_KEY}`,
+        Authorization: `Bearer ${getSendGridApiKey()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ recipient_emails: normalised }),
@@ -45,11 +156,11 @@ export async function addToSendGridGlobalUnsubscribes(emails: string[]): Promise
     if (!res.ok) {
       const body = await res.text();
       console.error(
-        `[SendGridSuppressions] Failed to add ${normalised.length} email(s) to global unsubscribes: HTTP ${res.status} — ${body}`
+        `[SendGridSuppressions] Failed to add ${normalised.length} email(s) to global unsubscribes: HTTP ${res.status} — ${body}`,
       );
     } else {
       console.log(
-        `[SendGridSuppressions] Added ${normalised.length} email(s) to SendGrid global unsubscribe list.`
+        `[SendGridSuppressions] Added ${normalised.length} email(s) to SendGrid global unsubscribe list.`,
       );
     }
   } catch (err) {
@@ -57,43 +168,13 @@ export async function addToSendGridGlobalUnsubscribes(emails: string[]): Promise
   }
 }
 
-/**
- * Check if an email is on SendGrid's Global Unsubscribe list.
- * Returns true if suppressed, false if not (or if API unavailable).
- */
+/** @deprecated Use getSendGridSuppressionStatus(email).global_unsubscribe */
 export async function isOnSendGridGlobalUnsubscribes(email: string): Promise<boolean> {
-  if (!SENDGRID_API_KEY) return false;
-  const encoded = encodeURIComponent(email.toLowerCase().trim());
-  try {
-    const res = await fetch(`${SENDGRID_API_BASE}/asm/suppressions/global/${encoded}`, {
-      headers: { Authorization: `Bearer ${SENDGRID_API_KEY}` },
-    });
-    if (res.status === 200) return true;
-    if (res.status === 404) return false;
-    return false;
-  } catch {
-    return false;
-  }
+  const status = await getSendGridSuppressionStatus(email);
+  return status.global_unsubscribe;
 }
 
-/**
- * Remove an email from SendGrid's Global Unsubscribe list (re-subscribe).
- * Use with caution — only call when user explicitly opts back in.
- */
+/** @deprecated Use clearSendGridSuppressionLists(email, ["global_unsubscribe"]) */
 export async function removeFromSendGridGlobalUnsubscribes(email: string): Promise<void> {
-  if (!SENDGRID_API_KEY) return;
-  const encoded = encodeURIComponent(email.toLowerCase().trim());
-  try {
-    const res = await fetch(`${SENDGRID_API_BASE}/asm/suppressions/global/${encoded}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${SENDGRID_API_KEY}` },
-    });
-    if (!res.ok && res.status !== 404) {
-      console.error(`[SendGridSuppressions] Failed to remove ${email} from global unsubscribes: HTTP ${res.status}`);
-    } else {
-      console.log(`[SendGridSuppressions] Removed ${email} from SendGrid global unsubscribe list.`);
-    }
-  } catch (err) {
-    console.error("[SendGridSuppressions] Network error removing from global unsubscribes:", err);
-  }
+  await clearSendGridSuppressionLists(email, ["global_unsubscribe"]);
 }
