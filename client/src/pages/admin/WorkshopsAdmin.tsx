@@ -5,7 +5,7 @@
  *
  * Tabs: Settings | Instances | Resources | Curriculum | Landing Page | Enrollments
  */
-import { useState, useEffect, useRef } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,8 @@ import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowE
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import { formatWorkshopDollars } from "../../../../shared/workshopPricing";
 import { formatScheduledInput, PLATFORM_TIMEZONE } from "@shared/platformTime";
+import { UnassignedStudentsAssignPanel } from "@/components/cohort/UnassignedStudentsAssignPanel";
+import { User, UserPlus, X } from "lucide-react";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 function fmtDate(ts: number | Date | null | undefined) {
@@ -280,6 +282,176 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
   );
 }
 
+function WorkshopInstanceStudentsPanel({
+  workshopId,
+  instanceId,
+  instanceTitle,
+}: {
+  workshopId: number;
+  instanceId: number;
+  instanceTitle: string;
+}) {
+  const utils = trpc.useUtils();
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 400);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  const { data: instanceStudents = [], isLoading, refetch: refetchInstanceStudents } =
+    trpc.workshopAdmin.listWorkshopInstanceStudents.useQuery({ workshopId, instanceId });
+  const { data: unassignedStudents = [], refetch: refetchUnassigned } =
+    trpc.workshopAdmin.listUnassignedWorkshopStudents.useQuery({ workshopId });
+  const { data: searchResults } = trpc.lmsAdmin.searchUsers.useQuery(
+    { query: debouncedQuery },
+    { enabled: debouncedQuery.length >= 2 },
+  );
+
+  const assignStudent = trpc.workshopAdmin.assignStudentToWorkshopInstance.useMutation({
+    onSuccess: () => {
+      toast.success("Student assigned to instance");
+      refetchInstanceStudents();
+      refetchUnassigned();
+      utils.workshopAdmin.getById.invalidate({ id: workshopId });
+      utils.workshopAdmin.listEnrollments.invalidate({ workshopId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const revokeEnrollment = trpc.workshopAdmin.revokeEnrollment.useMutation({
+    onSuccess: () => {
+      toast.success("Enrollment revoked");
+      refetchInstanceStudents();
+      refetchUnassigned();
+      utils.workshopAdmin.getById.invalidate({ id: workshopId });
+      utils.workshopAdmin.listEnrollments.invalidate({ workshopId });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleAddSelectedUser = () => {
+    if (!selectedUser) return;
+    assignStudent.mutate(
+      { workshopId, instanceId, userId: selectedUser.id },
+      {
+        onSuccess: () => {
+          setAddDialogOpen(false);
+          setSelectedUser(null);
+          setQuery("");
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="mt-4 border-t pt-4 space-y-4">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <div className="text-sm font-medium text-gray-700">Students in this instance</div>
+          <div className="text-xs text-gray-400">{instanceStudents.length} assigned</div>
+        </div>
+        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7" onClick={() => setAddDialogOpen(true)}>
+          <Plus className="w-3.5 h-3.5 mr-1" /> Add Student
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-sm text-gray-400">Loading students...</div>
+      ) : instanceStudents.length === 0 ? (
+        <div className="text-sm text-gray-400 italic">No students assigned yet</div>
+      ) : (
+        <div className="divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden">
+          {instanceStudents.map((student) => (
+            <div key={student.enrollmentId} className="flex items-center justify-between px-3 py-2 bg-white hover:bg-gray-50">
+              <div>
+                <span className="text-sm font-medium text-gray-800">{student.userName}</span>
+                <span className="text-xs text-gray-400 ml-2">{student.userEmail}</span>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs text-red-500 hover:text-red-700 h-6 px-2"
+                onClick={() => {
+                  if (confirm(`Revoke access for ${student.userName ?? student.userEmail}?`)) {
+                    revokeEnrollment.mutate({ enrollmentId: student.enrollmentId });
+                  }
+                }}
+              >
+                Remove
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <UnassignedStudentsAssignPanel
+        students={unassignedStudents}
+        onAssign={(userId) => assignStudent.mutate({ workshopId, instanceId, userId })}
+        isAssigning={assignStudent.isPending}
+        description="These students have workshop access but are not assigned to a current instance yet."
+        emptyMessage="No unassigned workshop students available."
+      />
+
+      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Student to {instanceTitle}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm">Search by name or email</Label>
+              <Input
+                value={query}
+                onChange={(e) => { setQuery(e.target.value); setSelectedUser(null); }}
+                placeholder="Type at least 2 characters..."
+                className="mt-1"
+              />
+            </div>
+            {searchResults && searchResults.length > 0 && !selectedUser && (
+              <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                {searchResults.map((user: any) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => { setSelectedUser(user); setQuery(user.displayName || user.name || user.email); }}
+                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors"
+                  >
+                    <p className="text-sm font-medium text-gray-900">{user.displayName || user.name}</p>
+                    <p className="text-xs text-gray-400">{user.email}</p>
+                  </button>
+                ))}
+              </div>
+            )}
+            {selectedUser && (
+              <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-teal-200 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4 text-teal-700" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{selectedUser.displayName || selectedUser.name}</p>
+                  <p className="text-xs text-gray-500">{selectedUser.email}</p>
+                </div>
+                <button type="button" onClick={() => { setSelectedUser(null); setQuery(""); }} className="text-gray-400 hover:text-gray-700">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!selectedUser || assignStudent.isPending} onClick={handleAddSelectedUser}>
+              {assignStudent.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add to Instance"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // ── WorkshopEditor ─────────────────────────────────────────────────────────────
 function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { workshopId: number; onBack: () => void; onTypeChangedFromWorkshop?: (newCourseId: number, newType: string) => void }) {
   const utils = trpc.useUtils();
@@ -353,6 +525,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
   const [grantDialogOpen, setGrantDialogOpen] = useState(false);
   const [grantEmail, setGrantEmail] = useState("");
   const [grantInstanceId, setGrantInstanceId] = useState<number | "">("");
+  const [selectedInstanceIdForStudents, setSelectedInstanceIdForStudents] = useState<number | null>(null);
 
   useEffect(() => {
     if (!data) return;
@@ -832,7 +1005,8 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
           ) : (
             <div className="space-y-3">
               {instances.map((inst: any) => (
-                <Card key={inst.id} className="overflow-hidden">
+                <Fragment key={inst.id}>
+                <Card className="overflow-hidden">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -881,6 +1055,19 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          variant={selectedInstanceIdForStudents === inst.id ? "default" : "outline"}
+                          className="h-7 px-2 text-xs"
+                          onClick={() =>
+                            setSelectedInstanceIdForStudents(
+                              selectedInstanceIdForStudents === inst.id ? null : inst.id,
+                            )
+                          }
+                        >
+                          <Users className="w-3.5 h-3.5 mr-1" />
+                          {selectedInstanceIdForStudents === inst.id ? "Hide Students" : "Manage Students"}
+                        </Button>
                         <Button size="sm" variant="outline" className="h-7 px-2 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
                           onClick={() => window.open(`/admin/workshops/${workshopId}/instances/${inst.id}/page-builder`, "_blank")}>
                           Edit Page
@@ -902,9 +1089,17 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
                         </Button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+                </CardContent>
+              </Card>
+              {selectedInstanceIdForStudents === inst.id && (
+                <WorkshopInstanceStudentsPanel
+                  workshopId={workshopId}
+                  instanceId={inst.id}
+                  instanceTitle={inst.title || `Instance #${inst.id}`}
+                />
+              )}
+              </Fragment>
+            ))}
             </div>
           )}
         </TabsContent>
