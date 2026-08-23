@@ -36,10 +36,10 @@ describe("ensureLmsCohortGroupsSchema", () => {
     expect(source).toContain("extractExecuteRows");
   });
 
-  it("admin listCohortGroups uses full-table select", async () => {
+  it("admin listCohortGroups uses resilient query helper", async () => {
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(new URL("./routers/lmsCohortAdminRouter.ts", import.meta.url), "utf8"),
     );
-    expect(source).toMatch(/listCohortGroups:[\s\S]*?\.from\(lmsCohortGroups\)/);
+    expect(source).toContain("listCohortGroupsForAdmin");
   });
 });
