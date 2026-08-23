@@ -10,9 +10,11 @@ export function evaluateInlineLessonQuizScore(score: number, passingScore: numbe
 
 export function shouldRestoreMissingCourseCertificate(input: {
   courseHasCertificate: boolean | number | null;
-  courseHasCmeCredit: boolean;
+  courseHasCmeCredit?: boolean;
   enrollmentCompletedAt: Date | null | undefined;
   hasCertificateRecord: boolean;
 }) {
-  return Boolean(input.courseHasCertificate) && input.courseHasCmeCredit && Boolean(input.enrollmentCompletedAt) && !input.hasCertificateRecord;
+  return Boolean(input.courseHasCertificate)
+    && Boolean(input.enrollmentCompletedAt)
+    && !input.hasCertificateRecord;
 }

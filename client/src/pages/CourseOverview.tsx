@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
+import { lessonRequiresExplicitCompletion } from "../../../shared/cmeLessonCompletion";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -171,6 +172,8 @@ export default function CourseOverview() {
   const completedIds = new Set(
     (progress ?? []).filter((p: any) => p.completedAt).map((p: any) => p.lessonId)
   );
+  const openedIds = new Set((progress ?? []).map((p: any) => p.lessonId));
+  const courseDefaultMarkComplete = course.defaultMarkComplete !== 0;
 
   const enrolledAt = data.enrollment?.enrolledAt ? new Date(data.enrollment.enrolledAt) : new Date();
   const daysSinceEnroll = Math.floor((Date.now() - enrolledAt.getTime()) / (1000 * 60 * 60 * 24));
@@ -231,31 +234,20 @@ export default function CourseOverview() {
     return unlockDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  // Build set of prerequisite-locked lesson IDs using new isPrerequisite gate logic:
-  // A lesson marked isPrerequisite=true gates ALL subsequent lessons until it is completed (or opened if no markComplete).
+  // Build set of prerequisite-locked lesson IDs — mirrors CoursePlayer gate logic.
   const prereqLockedIds = (() => {
     const locked = new Set<number>();
-    let gating = false;
-    let gatingLesson: any = null;
+    let gateActive = false;
     for (const lesson of allLessons) {
-      if (gating) {
-        // Check if the gate lesson is satisfied
-        const gateSatisfied = completedIds.has(gatingLesson.id) ||
-          (!gatingLesson.showMarkComplete && /* opened = any progress */ false);
-        if (gateSatisfied) {
-          gating = false;
-          gatingLesson = null;
-        } else {
-          locked.add(lesson.id);
-        }
+      if (gateActive) {
+        locked.add(lesson.id);
       }
-      // After processing lock status, check if this lesson itself is a new gate
       if (lesson.isPrerequisite) {
-        const satisfied = completedIds.has(lesson.id);
-        if (!satisfied) {
-          gating = true;
-          gatingLesson = lesson;
-        }
+        const hasExplicitCompletion = lessonRequiresExplicitCompletion(lesson, courseDefaultMarkComplete);
+        const gateSatisfied = hasExplicitCompletion
+          ? completedIds.has(lesson.id)
+          : openedIds.has(lesson.id) || completedIds.has(lesson.id);
+        gateActive = !gateSatisfied;
       }
     }
     return locked;
