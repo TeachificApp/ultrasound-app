@@ -19,7 +19,8 @@ export async function resolveSessionFromCookies(
   verifySession: (value: string) => Promise<VerifiedSession | null>,
 ): Promise<{ session: VerifiedSession; cookieValue: string } | null> {
   const candidates: string[] = [];
-  for (const name of [COOKIE_NAME, LAX_COOKIE_NAME]) {
+  // Prefer lax (host-only magic-link cookie) before legacy domain-scoped primary cookie.
+  for (const name of [LAX_COOKIE_NAME, COOKIE_NAME]) {
     const value = cookies.get(name);
     if (value && !candidates.includes(value)) {
       candidates.push(value);
@@ -34,4 +35,13 @@ export async function resolveSessionFromCookies(
   }
 
   return null;
+}
+
+/** True when the request carries session cookies (possibly stale Manus-era JWTs). */
+export function requestHasSessionCookies(cookieHeader: string | undefined): boolean {
+  if (!cookieHeader) return false;
+  return (
+    cookieHeader.includes(`${COOKIE_NAME}=`) ||
+    cookieHeader.includes(`${LAX_COOKIE_NAME}=`)
+  );
 }

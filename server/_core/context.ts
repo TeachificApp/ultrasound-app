@@ -5,6 +5,8 @@ import { parse as parseCookieHeader } from "cookie";
 import { jwtVerify } from "jose";
 import { ENV } from "./env";
 import { DEMO_COOKIE_NAME } from "@shared/const";
+import { clearSessionCookies } from "./cookies";
+import { requestHasSessionCookies } from "../lib/resolveSessionCookie";
 import { type Brand, type BrandMode, detectBrandMode } from "@shared/brands";
 
 export type { Brand, BrandMode };
@@ -96,9 +98,13 @@ export async function createContext(
   if (!demoMode) {
     try {
       user = await sdk.authenticateRequest(opts.req);
-    } catch (error) {
+    } catch {
       // Authentication is optional for public procedures.
       user = null;
+    }
+    // Drop Manus-era JWT cookies signed with the old secret so magic-link login can stick.
+    if (!user && requestHasSessionCookies(opts.req.headers.cookie)) {
+      clearSessionCookies(opts.res, opts.req);
     }
   }
 
