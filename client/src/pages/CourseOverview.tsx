@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
-import { lessonRequiresExplicitCompletion } from "../../../shared/cmeLessonCompletion";
+import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -234,24 +234,14 @@ export default function CourseOverview() {
     return unlockDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  // Build set of prerequisite-locked lesson IDs — mirrors CoursePlayer gate logic.
-  const prereqLockedIds = (() => {
-    const locked = new Set<number>();
-    let gateActive = false;
-    for (const lesson of allLessons) {
-      if (gateActive) {
-        locked.add(lesson.id);
-      }
-      if (lesson.isPrerequisite) {
-        const hasExplicitCompletion = lessonRequiresExplicitCompletion(lesson, courseDefaultMarkComplete);
-        const gateSatisfied = hasExplicitCompletion
-          ? completedIds.has(lesson.id)
-          : openedIds.has(lesson.id) || completedIds.has(lesson.id);
-        gateActive = !gateSatisfied;
-      }
-    }
-    return locked;
-  })();
+  // Build set of prerequisite-locked lesson IDs — shared with CoursePlayer.
+  const prereqLockedIds = buildPrereqLockedIds({
+    allLessons,
+    completedIds,
+    openedIds,
+    courseDefaultMarkComplete,
+    dripBypassed,
+  });
 
   const isPrereqLocked = (lesson: any) => prereqLockedIds.has(lesson.id);
 

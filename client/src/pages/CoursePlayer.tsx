@@ -23,7 +23,8 @@ import {
   User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse, lessonRequiresExplicitCompletion } from "../../../shared/cmeLessonCompletion";
+import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse } from "../../../shared/cmeLessonCompletion";
+import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
@@ -1528,6 +1529,7 @@ export default function CoursePlayer() {
   );
 
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<number>>(new Set());
+  const [optimisticOpened, setOptimisticOpened] = useState<Set<number>>(new Set());
   const markComplete = trpc.lmsLearner.markLessonComplete.useMutation({
     onSuccess: () => {
       utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
@@ -1537,6 +1539,12 @@ export default function CoursePlayer() {
       // Roll back optimistic update on server error
       setOptimisticCompleted(prev => { const next = new Set(prev); next.delete(vars.lessonId); return next; });
       toast.error(`Could not save progress: ${e.message}`);
+    },
+  });
+  const recordLessonOpened = trpc.lmsLearner.recordLessonOpened.useMutation({
+    onSuccess: (_result, vars) => {
+      setOptimisticOpened((prev) => new Set([...prev, vars.lessonId]));
+      utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
     },
   });
   const saveNote = trpc.lmsLearner.saveNote.useMutation({
@@ -1827,32 +1835,24 @@ export default function CoursePlayer() {
   //     the lesson must be in completedIds (i.e. explicitly marked complete).
   //   - Otherwise (no explicit completion mechanism): the gate is satisfied when
   //     the student has OPENED the lesson (i.e. it exists in progress, even without completedAt).
-  const openedIds = new Set(progress.map((p: any) => p.lessonId));
+  const openedIds = new Set([
+    ...progress.map((p: any) => p.lessonId),
+    ...optimisticOpened,
+    ...(selectedLessonId ? [selectedLessonId] : []),
+  ]);
   // Drip bypass: must be declared BEFORE prereqLockedIds which uses it
   const showStudentView = adminPreviewStudent || !isAdmin;
   const dripBypassed = isAdmin && !showStudentView;
-  // Prerequisite gating is independent of drip — always applies (admins bypass via dripBypassed)
-  const prereqLockedIds = new Set<number>();
   const courseDefaultMarkComplete = data?.course?.defaultMarkComplete !== 0;
-  if (!dripBypassed) {
-    let gateActive = false;
-    for (const lesson of allLessons) {
-      if (gateActive) {
-        prereqLockedIds.add(lesson.id);
-      }
-      if (lesson.isPrerequisite) {
-        const hasExplicitCompletion = lessonRequiresExplicitCompletion(lesson, courseDefaultMarkComplete);
-        const gateSatisfied = hasExplicitCompletion
-          ? completedIds.has(lesson.id)
-          : openedIds.has(lesson.id) || completedIds.has(lesson.id);
-        if (!gateSatisfied) {
-          gateActive = true;
-        } else {
-          gateActive = false;
-        }
-      }
-    }
-  }
+  const prereqLockedIds = dripBypassed
+    ? new Set<number>()
+    : buildPrereqLockedIds({
+      allLessons,
+      completedIds,
+      openedIds,
+      courseDefaultMarkComplete,
+      dripBypassed,
+    });
   // ────────────────────────────────────────────────────────────────────────────
 
   const isEnrolled = !!data.enrollment;
@@ -1886,6 +1886,12 @@ export default function CoursePlayer() {
       return;
     }
     setSelectedLessonId(lessonId);
+    setOptimisticOpened((prev) => new Set([...prev, lessonId]));
+    recordLessonOpened.mutate({
+      lessonId,
+      courseSlug: slug!,
+      isAdminPreview: data?.isAdminPreview ?? false,
+    });
   };
 
   const currentIdx = allLessons.findIndex((l: any) => l.id === selectedLessonId);

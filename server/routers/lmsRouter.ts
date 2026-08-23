@@ -27,6 +27,7 @@ import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or, gte } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { evaluateInlineLessonQuizScore, shouldRestoreMissingCourseCertificate } from "../../shared/inlineLessonQuizCompletion";
+import { lessonHasAssessmentContent } from "../../shared/lessonAccessGating";
 import { resolvePresaleWelcome } from "../../shared/contentAvailability";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -2117,6 +2118,7 @@ export const lmsLearnerRouter = router({
           effectBannerDuration: lmsLessons.effectBannerDuration,
           lessonStatus: lmsLessons.lessonStatus,
           countTowardCompletion: lmsLessons.countTowardCompletion,
+          contentBlocks: lmsLessons.contentBlocks,
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
         }).from(lmsLessons).where(
@@ -2124,15 +2126,23 @@ export const lmsLearnerRouter = router({
           and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
         ).orderBy(asc(lmsLessons.position)),
       ]);
+      const toSidebarLesson = (lesson: (typeof allCourseLessons)[number]) => {
+        const { contentBlocks, ...rest } = lesson;
+        return {
+          ...rest,
+          hasAssessmentContent: lessonHasAssessmentContent({ type: lesson.type, contentBlocks }),
+        };
+      };
       // Group lessons by sectionId in JS — no extra round-trips
-      const lessonsBySectionId = new Map<number, typeof allCourseLessons>();
-      const topLevelLessons: typeof allCourseLessons = [];
+      const lessonsBySectionId = new Map<number, ReturnType<typeof toSidebarLesson>[]>();
+      const topLevelLessons: ReturnType<typeof toSidebarLesson>[] = [];
       for (const lesson of allCourseLessons) {
+        const sidebarLesson = toSidebarLesson(lesson);
         if (lesson.sectionId) {
           if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
-          lessonsBySectionId.get(lesson.sectionId)!.push(lesson);
+          lessonsBySectionId.get(lesson.sectionId)!.push(sidebarLesson);
         } else {
-          topLevelLessons.push(lesson);
+          topLevelLessons.push(sidebarLesson);
         }
       }
       // For non-admin-preview, filter out sections that have no published lessons
@@ -2302,6 +2312,44 @@ export const lmsLearnerRouter = router({
       }
 
       return { ...lesson, quiz };
+    }),
+
+  /** Record that a learner opened a lesson (for prerequisite gates that unlock on view). */
+  recordLessonOpened: protectedProcedure
+    .input(z.object({ lessonId: z.number(), courseSlug: z.string(), isAdminPreview: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      let [enrollment] = await db.select().from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+      if (!enrollment && input.isAdminPreview && ctx.user.role === "admin") {
+        await db.insert(lmsEnrollments).values({
+          userId: ctx.user.id,
+          courseId: course.id,
+          enrollmentType: "admin_preview",
+          enrolledAt: new Date(),
+          progressPct: 0,
+        });
+        const [newEnrollment] = await db.select().from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+        enrollment = newEnrollment;
+      }
+      if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const [existing] = await db.select({ id: lmsLessonProgress.id })
+        .from(lmsLessonProgress)
+        .where(and(eq(lmsLessonProgress.enrollmentId, enrollment.id), eq(lmsLessonProgress.lessonId, input.lessonId)))
+        .limit(1);
+      if (!existing) {
+        await db.insert(lmsLessonProgress).values({
+          enrollmentId: enrollment.id,
+          lessonId: input.lessonId,
+          completedAt: null,
+        });
+      }
+      return { success: true };
     }),
 
   /** Mark a lesson complete */
@@ -3730,16 +3778,19 @@ export const lmsLearnerRouter = router({
           sectionId: lmsLessons.sectionId,
           title: lmsLessons.title,
           slug: lmsLessons.slug,
+          type: lmsLessons.type,
           position: lmsLessons.position,
-          lessonType: lmsLessons.lessonType,
           lessonStatus: lmsLessons.lessonStatus,
           countTowardCompletion: lmsLessons.countTowardCompletion,
           requireManualComplete: lmsLessons.requireManualComplete,
+          requireVideoCompletion: lmsLessons.requireVideoCompletion,
+          isPrerequisite: lmsLessons.isPrerequisite,
           previewMode: lmsLessons.previewMode,
           dripDays: lmsLessons.dripDays,
           dripOutDays: lmsLessons.dripOutDays,
           dripDate: lmsLessons.dripDate,
           prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
+          contentBlocks: lmsLessons.contentBlocks,
           thumbnailUrl: lmsLessons.thumbnailUrl,
           estimatedMinutes: lmsLessons.estimatedMinutes,
           createdAt: lmsLessons.createdAt,
@@ -3749,14 +3800,22 @@ export const lmsLearnerRouter = router({
           and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
         ).orderBy(asc(lmsLessons.position)),
       ]);
-      const lessonsBySectionId = new Map<number, typeof allLessons>();
-      const topLevelLessons: typeof allLessons = [];
+      const toOverviewLesson = (lesson: (typeof allLessons)[number]) => {
+        const { contentBlocks, ...rest } = lesson;
+        return {
+          ...rest,
+          hasAssessmentContent: lessonHasAssessmentContent({ type: lesson.type, contentBlocks }),
+        };
+      };
+      const lessonsBySectionId = new Map<number, ReturnType<typeof toOverviewLesson>[]>();
+      const topLevelLessons: ReturnType<typeof toOverviewLesson>[] = [];
       for (const lesson of allLessons) {
+        const overviewLesson = toOverviewLesson(lesson);
         if (lesson.sectionId) {
           if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
-          lessonsBySectionId.get(lesson.sectionId)!.push(lesson);
+          lessonsBySectionId.get(lesson.sectionId)!.push(overviewLesson);
         } else {
-          topLevelLessons.push(lesson);
+          topLevelLessons.push(overviewLesson);
         }
       }
       // For non-admin-preview, filter out sections that have no published lessons

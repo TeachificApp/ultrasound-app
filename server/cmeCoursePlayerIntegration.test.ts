@@ -10,7 +10,7 @@ describe("CME course player video gate", () => {
     expect(coursePlayer).toContain("hasReachedCmeVideoCompletionThreshold");
     expect(coursePlayer).toContain("shouldAutoCompleteCmeLessonOnAdvance");
     expect(coursePlayer).toContain("isCertificateCourse");
-    expect(coursePlayer).toContain("lessonRequiresExplicitCompletion");
+    expect(coursePlayer).toContain("buildPrereqLockedIds");
     expect(coursePlayer).toContain("onTimeUpdate={(event) => {");
     expect(coursePlayer).toContain("hasReachedCmeVideoCompletionThreshold(video.currentTime, video.duration)");
     expect(coursePlayer).toContain("setVideoWatched(true)");
