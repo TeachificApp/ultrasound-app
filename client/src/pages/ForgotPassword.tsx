@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Heart, CheckCircle2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -28,7 +29,7 @@ export default function ForgotPassword() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    forgotMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
+    forgotMutation.mutate({ email: normalizeAuthEmail(email), origin: window.location.origin });
   };
 
   return (

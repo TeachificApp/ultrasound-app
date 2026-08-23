@@ -370,7 +370,14 @@ export async function getUserByEmail(email: string) {
     .from(userEmailAliases)
     .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`)
     .limit(1);
-  if (!aliasRows[0]) return undefined;
+  if (!aliasRows[0]) {
+    const openIdRows = await db
+      .select()
+      .from(users)
+      .where(eq(users.openId, `email:${normalised}`))
+      .limit(1);
+    return openIdRows[0];
+  }
   const primaryRows = await db.select().from(users).where(eq(users.id, aliasRows[0].userId)).limit(1);
   return primaryRows[0];
 }
@@ -2156,7 +2163,14 @@ export async function findUserByEmail(email: string) {
     .from(userEmailAliases)
     .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`)
     .limit(1);
-  if (!aliasRows[0]) return undefined;
+  if (!aliasRows[0]) {
+    const openIdRows = await db
+      .select()
+      .from(users)
+      .where(eq(users.openId, `email:${normalised}`))
+      .limit(1);
+    return openIdRows[0] ?? undefined;
+  }
   const primaryRows = await db.select().from(users).where(eq(users.id, aliasRows[0].userId)).limit(1);
   return primaryRows[0] ?? undefined;
 }

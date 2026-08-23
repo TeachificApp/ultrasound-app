@@ -21,7 +21,7 @@
 
 import type { Express, Request, Response } from "express";
 import * as bcrypt from "bcryptjs";
-import { getDb, ensureUserRole } from "../db";
+import { getDb, ensureUserRole, getUserByEmail } from "../db";
 import { users, accessTokenUses, ipSecurityFlags } from "../../drizzle/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { resolveAuthHostname } from "../_core/cookies";
@@ -29,6 +29,7 @@ import { sdk } from "../_core/sdk";
 import { ONE_YEAR_MS } from "@shared/const";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
+import { normalizeAuthEmail } from "../../shared/normalizeAuthEmail";
 
 export function registerAuthLoginRoute(app: Express) {
   /**
@@ -49,21 +50,22 @@ export function registerAuthLoginRoute(app: Express) {
         return res.status(503).json({ error: "Service temporarily unavailable." });
       }
 
-      const normalizedEmail = String(email).toLowerCase().trim();
+      const normalizedEmail = normalizeAuthEmail(String(email));
 
-      const result = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, normalizedEmail))
-        .limit(1);
-
-      const user = result[0];
+      const user = await getUserByEmail(normalizedEmail);
 
       // Generic error to prevent email enumeration
       const invalidError = { error: "Invalid email or password." };
 
-      if (!user || !user.passwordHash) {
+      if (!user) {
         return res.status(401).json(invalidError);
+      }
+
+      if (!user.passwordHash) {
+        return res.status(401).json({
+          error:
+            "This account uses magic link sign-in. Use Forgot Password to set a password, or request a magic link.",
+        });
       }
 
       const passwordMatch = await bcrypt.compare(String(password), user.passwordHash);

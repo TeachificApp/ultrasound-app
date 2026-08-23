@@ -24,6 +24,7 @@ import { publicProcedure, router } from "../_core/trpc";
 import { getDb, ensureUserRole } from "../db";
 import { sendEmail, buildWelcomeEmail, buildVerificationEmail, buildPasswordResetEmail } from "../_core/email";
 import { type BrandMode, detectBrandMode, getBrandDisplayConfig, BRAND_DOMAINS } from "@shared/brands";
+import { authEmailField } from "@shared/authEmailField";
 import { users, userEmailAliases } from "../../drizzle/schema";
 import { eq, or } from "drizzle-orm";
 
@@ -390,37 +391,15 @@ export const emailAuthRouter = router({
    * Request a password reset email.
    */
   forgotPassword: publicProcedure
-    .input(z.object({ email: z.string().email(), origin: z.string().url().optional() }))
+    .input(z.object({ email: authEmailField, origin: z.string().url().optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      const email = input.email.toLowerCase().trim();
-
-      // Look up user by primary email OR by alias email
-      const result = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-      let user = result[0] as typeof result[0] | undefined;
-
-      // If not found by primary email, check alias emails
-      if (!user) {
-        const aliasRows = await db
-          .select({ userId: userEmailAliases.userId })
-          .from(userEmailAliases)
-          .where(eq(userEmailAliases.email, email))
-          .limit(1);
-        if (aliasRows[0]) {
-          const aliasUserResult = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, aliasRows[0].userId))
-            .limit(1);
-          user = aliasUserResult[0];
-        }
-      }
+      const email = input.email;
+      const { getUserByEmail } = await import("../db");
+      const { resolveAuthDeliveryEmail } = await import("../lib/authEmailDelivery");
+      const user = await getUserByEmail(email);
 
       // Always return success to avoid email enumeration
       // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)
@@ -434,24 +413,10 @@ export const emailAuthRouter = router({
           .where(eq(users.id, user.id));
         const firstName = (user.name ?? "").split(" ")[0] ?? "there";
         const bm = detectBrandMode(ctx.req.hostname || "");
+        const deliveryEmail = resolveAuthDeliveryEmail(user, email);
 
-        // Send to the address they typed (primary or alias)
-        await sendPasswordResetEmail(email, resetToken, firstName, bm, input.origin);
-
-        // Also send to all other alias emails so they receive it regardless of which address they used
-        const allAliases = await db
-          .select({ email: userEmailAliases.email })
-          .from(userEmailAliases)
-          .where(eq(userEmailAliases.userId, user.id));
-        for (const alias of allAliases) {
-          if (alias.email && alias.email.toLowerCase() !== email) {
-            sendPasswordResetEmail(alias.email, resetToken, firstName, bm, input.origin).catch(() => {});
-          }
-        }
-
-        // Also send to primary email if they typed an alias
-        if (user.email && user.email.toLowerCase() !== email) {
-          sendPasswordResetEmail(user.email, resetToken, firstName, bm, input.origin).catch(() => {});
+        if (deliveryEmail) {
+          await sendPasswordResetEmail(deliveryEmail, resetToken, firstName, bm, input.origin);
         }
       }
 
