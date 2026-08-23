@@ -449,6 +449,21 @@ async function startServer() {
     const after = await inspectLmsCoursesSchema(db);
     res.json({ ...result, after, deployedAt: new Date().toISOString() });
   });
+  app.get("/api/debug/lms-cohort-groups-schema", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { inspectLmsCohortGroupsSchema } = await import("../lib/ensureLmsCohortGroupsSchema");
+    const db = await getDb();
+    const status = await inspectLmsCohortGroupsSchema(db);
+    res.json({ ...status, deployedAt: new Date().toISOString() });
+  });
+  app.post("/api/debug/lms-cohort-groups-schema-sync", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { ensureLmsCohortGroupsSchema, inspectLmsCohortGroupsSchema } = await import("../lib/ensureLmsCohortGroupsSchema");
+    const db = await getDb();
+    const result = await ensureLmsCohortGroupsSchema(db);
+    const after = await inspectLmsCohortGroupsSchema(db);
+    res.json({ ...result, after, deployedAt: new Date().toISOString() });
+  });
   // User identity + entitlement accounting (Railway post-migration)
   app.get("/api/debug/user-access-audit", async (_req, res) => {
     const { getDb } = await import("../db");
@@ -997,6 +1012,13 @@ async function startServer() {
         return ensureLmsCoursesSchema(db);
       })
       .catch((err) => console.error("[Startup] ensureLmsCoursesSchema error:", err));
+    // Ensure lms_cohort_groups has all columns expected by admin cohort queries
+    getDb()
+      .then(async (db) => {
+        const { ensureLmsCohortGroupsSchema } = await import("../lib/ensureLmsCohortGroupsSchema");
+        return ensureLmsCohortGroupsSchema(db);
+      })
+      .catch((err) => console.error("[Startup] ensureLmsCohortGroupsSchema error:", err));
     // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
       console.log("[Startup] Durable SCORM queue enabled — pending packages will not be skipped");
