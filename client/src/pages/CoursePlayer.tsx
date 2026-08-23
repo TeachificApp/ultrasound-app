@@ -23,7 +23,8 @@ import {
   User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance } from "../../../shared/cmeLessonCompletion";
+import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse } from "../../../shared/cmeLessonCompletion";
+import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
@@ -1528,6 +1529,7 @@ export default function CoursePlayer() {
   );
 
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<number>>(new Set());
+  const [optimisticOpened, setOptimisticOpened] = useState<Set<number>>(new Set());
   const markComplete = trpc.lmsLearner.markLessonComplete.useMutation({
     onSuccess: () => {
       utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
@@ -1537,6 +1539,12 @@ export default function CoursePlayer() {
       // Roll back optimistic update on server error
       setOptimisticCompleted(prev => { const next = new Set(prev); next.delete(vars.lessonId); return next; });
       toast.error(`Could not save progress: ${e.message}`);
+    },
+  });
+  const recordLessonOpened = trpc.lmsLearner.recordLessonOpened.useMutation({
+    onSuccess: (_result, vars) => {
+      setOptimisticOpened((prev) => new Set([...prev, vars.lessonId]));
+      utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
     },
   });
   const saveNote = trpc.lmsLearner.saveNote.useMutation({
@@ -1827,34 +1835,24 @@ export default function CoursePlayer() {
   //     the lesson must be in completedIds (i.e. explicitly marked complete).
   //   - Otherwise (no explicit completion mechanism): the gate is satisfied when
   //     the student has OPENED the lesson (i.e. it exists in progress, even without completedAt).
-  const openedIds = new Set(progress.map((p: any) => p.lessonId));
+  const openedIds = new Set([
+    ...progress.map((p: any) => p.lessonId),
+    ...optimisticOpened,
+    ...(selectedLessonId ? [selectedLessonId] : []),
+  ]);
   // Drip bypass: must be declared BEFORE prereqLockedIds which uses it
   const showStudentView = adminPreviewStudent || !isAdmin;
   const dripBypassed = isAdmin && !showStudentView;
-  // Prerequisite gating is independent of drip — always applies (admins bypass via dripBypassed)
-  const prereqLockedIds = new Set<number>();
-  if (!dripBypassed) {
-    let gateActive = false;
-    for (const lesson of allLessons) {
-      if (gateActive) {
-        prereqLockedIds.add(lesson.id);
-      }
-      if (lesson.isPrerequisite) {
-        // Gate is satisfied if:
-        // - lesson has explicit completion (video required OR mark-complete button shown) → must be in completedIds
-        // - otherwise (no explicit mechanism) → satisfied if lesson has been opened at all
-        const hasExplicitCompletion = lesson.requireVideoCompletion === 1 || lesson.showMarkComplete === 1;
-        const gateSatisfied = hasExplicitCompletion
-          ? completedIds.has(lesson.id)
-          : openedIds.has(lesson.id) || completedIds.has(lesson.id);
-        if (!gateSatisfied) {
-          gateActive = true;
-        } else {
-          gateActive = false; // this gate cleared; next prerequisite may re-activate
-        }
-      }
-    }
-  }
+  const courseDefaultMarkComplete = data?.course?.defaultMarkComplete !== 0;
+  const prereqLockedIds = dripBypassed
+    ? new Set<number>()
+    : buildPrereqLockedIds({
+      allLessons,
+      completedIds,
+      openedIds,
+      courseDefaultMarkComplete,
+      dripBypassed,
+    });
   // ────────────────────────────────────────────────────────────────────────────
 
   const isEnrolled = !!data.enrollment;
@@ -1888,6 +1886,12 @@ export default function CoursePlayer() {
       return;
     }
     setSelectedLessonId(lessonId);
+    setOptimisticOpened((prev) => new Set([...prev, lessonId]));
+    recordLessonOpened.mutate({
+      lessonId,
+      courseSlug: slug!,
+      isAdminPreview: data?.isAdminPreview ?? false,
+    });
   };
 
   const currentIdx = allLessons.findIndex((l: any) => l.id === selectedLessonId);
@@ -1922,7 +1926,6 @@ export default function CoursePlayer() {
   const currentNote = selectedLessonId ? notesByLesson.get(selectedLessonId) : null;
   const requireVideoCompletion = lessonData?.requireVideoCompletion === 1;
   // Resolve effective Mark Complete: lesson override (0/1) → course default → fallback ON
-  const courseDefaultMarkComplete = data?.course?.defaultMarkComplete !== 0; // true unless explicitly 0
   const requireManualComplete = lessonData?.requireManualComplete === null || lessonData?.requireManualComplete === undefined
     ? courseDefaultMarkComplete  // inherit from course
     : lessonData.requireManualComplete === 1; // explicit lesson override
@@ -1938,12 +1941,14 @@ export default function CoursePlayer() {
     catch { return []; }
   })();
   const hasInlineLessonQuiz = contentBlocks.some((block) => block.type === "lesson_quiz");
-  const isCmeCourse = Boolean(data?.course?.hasCertificate && Number(data?.course?.creditHours ?? 0) > 0);
+  const hasSdmsCmeModule = contentBlocks.some((block) => block.type === "sdms_cme_module");
+  const isCmeCourse = isCertificateCourse(data?.course);
   const shouldAutoCompleteOnAdvance = shouldAutoCompleteCmeLessonOnAdvance({
     isCmeCourse,
     lessonType: lessonData?.type,
     requiresVideoCompletion: requireVideoCompletion,
     hasInlineQuiz: hasInlineLessonQuiz,
+    hasSdmsCmeModule,
     isCompleted,
   });
   const learningObjectives: string[] = (() => {
@@ -2747,7 +2752,23 @@ export default function CoursePlayer() {
                     const EmbeddedQuizPlayer = lazy(() => import("@/components/EmbeddedQuizPlayer"));
                     return (
                       <Suspense fallback={<div className="flex items-center justify-center py-10 text-gray-400 gap-2"><svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Loading quiz…</div>}>
-                        <EmbeddedQuizPlayer quizId={Number((lessonData as any).standaloneQuizId)} showHeader={true} />
+                        <EmbeddedQuizPlayer
+                          quizId={Number((lessonData as any).standaloneQuizId)}
+                          showHeader={true}
+                          onComplete={(score, passed) => {
+                            if (!passed || !selectedLessonId) return;
+                            markComplete.mutate(
+                              { lessonId: selectedLessonId, courseSlug: slug!, isAdminPreview: data?.isAdminPreview ?? false },
+                              {
+                                onSuccess: () => {
+                                  fireLessonCompleteEffect();
+                                  utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
+                                  setTimeout(() => utils.lmsLearner.getCourseCertificate.invalidate({ courseSlug: slug! }), 3000);
+                                },
+                              },
+                            );
+                          }}
+                        />
                       </Suspense>
                     );
                   })()}
@@ -2811,6 +2832,11 @@ export default function CoursePlayer() {
                             key={block.id}
                             activityType={(block.data as any).activityType ?? resolveLmsActivityType(data?.course?.type ?? "course")}
                             activityId={(block.data as any).activityId ?? data?.course?.id ?? 0}
+                            onFormComplete={() => {
+                              fireLessonCompleteEffect();
+                              utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
+                              setTimeout(() => utils.lmsLearner.getCourseCertificate.invalidate({ courseSlug: slug! }), 3000);
+                            }}
                           />
                         ) : (
                           <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-lg">

@@ -14,6 +14,8 @@ import { toast } from "sonner";
 type Props = {
   activityType: "course" | "cohort" | "webinar" | "replay_course" | "live_event" | "standalone_cme";
   activityId: number;
+  /** Called after a CME form submission (pass or fail) so the course player can refresh progress. */
+  onFormComplete?: () => void;
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -33,7 +35,7 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge className={cfg.className}>{cfg.label}</Badge>;
 }
 
-export function SdmsCmeLearnerModule({ activityType, activityId }: Props) {
+export function SdmsCmeLearnerModule({ activityType, activityId, onFormComplete }: Props) {
   const utils = trpc.useUtils();
   const { data: module, isLoading } = trpc.sdmsCme.getLearnerModule.useQuery({ activityType, activityId });
 
@@ -125,7 +127,10 @@ export function SdmsCmeLearnerModule({ activityType, activityId }: Props) {
         <SdmsCmeInlineForm
           configId={module.configId}
           formSlug={module.formSlug}
-          onComplete={() => utils.sdmsCme.getLearnerModule.invalidate({ activityType, activityId })}
+          onComplete={() => {
+            utils.sdmsCme.getLearnerModule.invalidate({ activityType, activityId });
+            onFormComplete?.();
+          }}
         />
       )}
 

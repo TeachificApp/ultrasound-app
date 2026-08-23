@@ -15,28 +15,24 @@ describe("built-in lesson quiz completion for CME", () => {
     expect(evaluateInlineLessonQuizScore(-20, 70)).toEqual({ score: 0, passingScore: 70, passed: false });
   });
 
-  it("restores a missing certificate only for a completed certificate-enabled CME enrollment", () => {
+  it("restores a missing certificate for any completed certificate-enabled enrollment", () => {
     expect(shouldRestoreMissingCourseCertificate({
       courseHasCertificate: true,
-      courseHasCmeCredit: true,
       enrollmentCompletedAt: new Date(),
       hasCertificateRecord: false,
     })).toBe(true);
     expect(shouldRestoreMissingCourseCertificate({
       courseHasCertificate: true,
-      courseHasCmeCredit: true,
       enrollmentCompletedAt: null,
       hasCertificateRecord: false,
     })).toBe(false);
     expect(shouldRestoreMissingCourseCertificate({
       courseHasCertificate: true,
-      courseHasCmeCredit: true,
       enrollmentCompletedAt: new Date(),
       hasCertificateRecord: true,
     })).toBe(false);
     expect(shouldRestoreMissingCourseCertificate({
-      courseHasCertificate: true,
-      courseHasCmeCredit: false,
+      courseHasCertificate: false,
       enrollmentCompletedAt: new Date(),
       hasCertificateRecord: false,
     })).toBe(false);
