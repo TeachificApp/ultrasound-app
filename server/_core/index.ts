@@ -293,6 +293,51 @@ async function startServer() {
       timestamp: new Date().toISOString(),
     });
   });
+  app.post("/api/debug/clear-all-email-suppressions", async (req, res) => {
+    const ownerEmail = String(
+      req.query.ownerEmail ?? (req.body as { ownerEmail?: string })?.ownerEmail ?? "",
+    )
+      .trim()
+      .toLowerCase();
+    const confirm = String(req.query.confirm ?? (req.body as { confirm?: string })?.confirm ?? "");
+    if (!ownerEmail) {
+      return res.status(400).json({ error: "Pass ?ownerEmail=platform-owner@example.com&confirm=yes" });
+    }
+    if (confirm !== "yes") {
+      return res.status(400).json({ error: "Pass confirm=yes to wipe all SendGrid suppression lists" });
+    }
+    const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+    if (!isPlatformOwnerEmail(ownerEmail)) {
+      return res.status(403).json({ error: "ownerEmail is not in the platform owner allowlist" });
+    }
+    const { clearAllSendGridSuppressionLists } = await import("../lib/sendgridSuppressions");
+    const { getDb } = await import("../db");
+    const { users } = await import("../../drizzle/schema");
+    const { isNotNull } = await import("drizzle-orm");
+    const sendGrid = await clearAllSendGridSuppressionLists();
+    let dbUnsubscribesCleared = 0;
+    const db = await getDb();
+    if (db) {
+      const rows = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(isNotNull(users.unsubscribedAt));
+      if (rows.length > 0) {
+        await db.update(users).set({ unsubscribedAt: null }).where(isNotNull(users.unsubscribedAt));
+        dbUnsubscribesCleared = rows.length;
+      }
+    }
+    const laraStatus = await import("../lib/sendgridSuppressions").then((m) =>
+      m.getSendGridSuppressionStatus("larawilliams0501@gmail.com"),
+    );
+    res.json({
+      ownerEmail,
+      sendGrid,
+      dbUnsubscribesCleared,
+      lara: laraStatus,
+      timestamp: new Date().toISOString(),
+    });
+  });
   app.get("/api/debug/test-password-reset", async (req, res) => {
     const to = String(req.query.to ?? "").trim().toLowerCase();
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
@@ -344,6 +389,7 @@ async function startServer() {
       htmlBody: emailPayload.htmlBody,
       previewText: emailPayload.previewText,
       brandMode,
+      bypassSuppressions: true,
     });
     res.json({
       userFound: true,
@@ -394,6 +440,7 @@ async function startServer() {
       htmlBody: emailPayload.htmlBody,
       previewText: emailPayload.previewText,
       brandMode,
+      bypassSuppressions: true,
     });
     res.json({
       userFound: true,

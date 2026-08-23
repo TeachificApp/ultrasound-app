@@ -509,6 +509,7 @@ export const appRouter = router({
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
           brandMode,
+          bypassSuppressions: true,
         });
         if (!emailSent) {
           console.error(`[auth] Password reset email was not accepted by SendGrid for user ${user.id} (${deliveryEmail})`);
@@ -628,6 +629,7 @@ export const appRouter = router({
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
           brandMode,
+          bypassSuppressions: true,
         });
         if (!deliveryAccepted) {
           console.error(`[auth] Magic-link delivery was not accepted for user ${user.id}`);

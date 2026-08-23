@@ -8,14 +8,22 @@
  * while silently skipping delivery — which looks like "emailSent: true" in app logs.
  *
  * API reference:
- *   Global unsubscribes: POST/GET/DELETE /v3/asm/suppressions/global[/{email}]
- *   Bounces/blocks/etc.: GET/DELETE /v3/suppression/{type}/{email}
+ *   Global unsubscribes: GET/DELETE /v3/asm/suppressions/global[/{email}]
+ *   Bounces/blocks/etc.: GET/DELETE /v3/suppression/{type}[/{email}]
  */
 
 const SENDGRID_API_BASE = "https://api.sendgrid.com/v3";
 
 function getSendGridApiKey(): string {
   return process.env.SENDGRID_API_KEY ?? "";
+}
+
+function authHeaders(json = false): Record<string, string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${getSendGridApiKey()}`,
+  };
+  if (json) headers["Content-Type"] = "application/json";
+  return headers;
 }
 
 export const SENDGRID_SUPPRESSION_LISTS = [
@@ -29,6 +37,11 @@ export const SENDGRID_SUPPRESSION_LISTS = [
 export type SendGridSuppressionList = (typeof SENDGRID_SUPPRESSION_LISTS)[number];
 
 export type SendGridSuppressionStatus = Record<SendGridSuppressionList, boolean>;
+
+export type ClearAllSuppressionsResult = Record<
+  SendGridSuppressionList,
+  { cleared: boolean; status: number; count?: number; error?: string }
+>;
 
 function normalizeEmail(email: string): string {
   return email.toLowerCase().trim();
@@ -47,6 +60,22 @@ function suppressionPath(list: SendGridSuppressionList, email: string): string {
   }
 }
 
+function bulkSuppressionPath(list: Exclude<SendGridSuppressionList, "global_unsubscribe">): string {
+  return `${SENDGRID_API_BASE}/suppression/${list}`;
+}
+
+function parseSuppressionPresence(
+  list: SendGridSuppressionList,
+  body: unknown,
+): boolean {
+  if (list === "global_unsubscribe") {
+    if (!body || typeof body !== "object") return false;
+    const recipient = (body as { recipient_email?: unknown }).recipient_email;
+    return typeof recipient === "string" && recipient.trim().length > 0;
+  }
+  return Array.isArray(body) && body.length > 0;
+}
+
 async function isOnSuppressionList(
   list: SendGridSuppressionList,
   email: string,
@@ -54,14 +83,17 @@ async function isOnSuppressionList(
   if (!getSendGridApiKey()) return false;
   try {
     const res = await fetch(suppressionPath(list, email), {
-      headers: { Authorization: `Bearer ${getSendGridApiKey()}` },
+      headers: authHeaders(),
     });
-    if (res.status === 200) return true;
     if (res.status === 404) return false;
-    console.warn(
-      `[SendGridSuppressions] Unexpected status checking ${list} for ${email}: HTTP ${res.status}`,
-    );
-    return false;
+    if (res.status !== 200) {
+      console.warn(
+        `[SendGridSuppressions] Unexpected status checking ${list} for ${email}: HTTP ${res.status}`,
+      );
+      return false;
+    }
+    const body = await res.json().catch(() => null);
+    return parseSuppressionPresence(list, body);
   } catch (err) {
     console.error(`[SendGridSuppressions] Error checking ${list} for ${email}:`, err);
     return false;
@@ -76,8 +108,13 @@ async function removeFromSuppressionList(
   try {
     const res = await fetch(suppressionPath(list, email), {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${getSendGridApiKey()}` },
+      headers: authHeaders(),
     });
+    // Global unsubscribe DELETE returns 204 even when already absent.
+    if (list === "global_unsubscribe" && res.status === 204) {
+      const after = await isOnSuppressionList(list, email);
+      return { removed: !after, status: res.status };
+    }
     if (res.ok || res.status === 404) {
       if (res.status !== 404) {
         console.log(`[SendGridSuppressions] Removed ${email} from ${list}`);
@@ -94,12 +131,65 @@ async function removeFromSuppressionList(
   }
 }
 
+async function listAllGlobalUnsubscribes(): Promise<string[]> {
+  const emails: string[] = [];
+  let offset = 0;
+  const limit = 500;
+
+  while (true) {
+    const res = await fetch(
+      `${SENDGRID_API_BASE}/asm/suppressions/global?limit=${limit}&offset=${offset}`,
+      { headers: authHeaders() },
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Failed to list global suppressions: HTTP ${res.status} ${text}`);
+    }
+    const body = (await res.json()) as Array<{ recipient_email?: string }>;
+    if (!Array.isArray(body) || body.length === 0) break;
+    for (const row of body) {
+      if (row.recipient_email) emails.push(normalizeEmail(row.recipient_email));
+    }
+    if (body.length < limit) break;
+    offset += limit;
+  }
+
+  return emails;
+}
+
+async function clearBulkSuppressionList(
+  list: Exclude<SendGridSuppressionList, "global_unsubscribe">,
+): Promise<{ cleared: boolean; status: number; error?: string }> {
+  if (!getSendGridApiKey()) return { cleared: false, status: 0, error: "missing_api_key" };
+  try {
+    const res = await fetch(bulkSuppressionPath(list), {
+      method: "DELETE",
+      headers: authHeaders(true),
+      body: JSON.stringify({ delete_all: true }),
+    });
+    if (res.status === 204 || res.ok) {
+      console.log(`[SendGridSuppressions] Cleared all entries from ${list}`);
+      return { cleared: true, status: res.status };
+    }
+    const text = await res.text();
+    return { cleared: false, status: res.status, error: text };
+  } catch (err) {
+    return {
+      cleared: false,
+      status: 0,
+      error: err instanceof Error ? err.message : "unknown",
+    };
+  }
+}
+
 export async function getSendGridSuppressionStatus(
   email: string,
 ): Promise<SendGridSuppressionStatus> {
   const normalized = normalizeEmail(email);
   const entries = await Promise.all(
-    SENDGRID_SUPPRESSION_LISTS.map(async (list) => [list, await isOnSuppressionList(list, normalized)] as const),
+    SENDGRID_SUPPRESSION_LISTS.map(
+      async (list) => [list, await isOnSuppressionList(list, normalized)] as const,
+    ),
   );
   return Object.fromEntries(entries) as SendGridSuppressionStatus;
 }
@@ -110,7 +200,6 @@ export function isSendGridDeliveryBlocked(status: SendGridSuppressionStatus): bo
 
 /**
  * Remove an address from all SendGrid suppression lists so transactional mail can deliver.
- * Use when the user explicitly requests magic-link or password-reset email.
  */
 export async function clearSendGridSuppressionLists(
   email: string,
@@ -130,10 +219,45 @@ export async function clearSendGridSuppressionLists(
 }
 
 /**
- * Add one or more email addresses to SendGrid's Global Unsubscribe list.
- * Safe to call multiple times — SendGrid deduplicates automatically.
- * Fails silently (logs error) so it never blocks the main unsubscribe flow.
+ * Wipe every SendGrid suppression list for this account.
+ * Global unsubscribes must be deleted one-by-one; other lists support delete_all.
  */
+export async function clearAllSendGridSuppressionLists(): Promise<ClearAllSuppressionsResult> {
+  const result: Partial<ClearAllSuppressionsResult> = {};
+
+  const bulkLists = ["bounces", "blocks", "spam_reports", "invalid_emails"] as const;
+  for (const list of bulkLists) {
+    result[list] = await clearBulkSuppressionList(list);
+  }
+
+  if (!getSendGridApiKey()) {
+    result.global_unsubscribe = { cleared: false, status: 0, error: "missing_api_key" };
+    return result as ClearAllSuppressionsResult;
+  }
+
+  try {
+    const emails = await listAllGlobalUnsubscribes();
+    let removed = 0;
+    for (const email of emails) {
+      const { removed: wasRemoved } = await removeFromSuppressionList("global_unsubscribe", email);
+      if (wasRemoved) removed += 1;
+    }
+    result.global_unsubscribe = {
+      cleared: true,
+      status: 204,
+      count: removed,
+    };
+  } catch (err) {
+    result.global_unsubscribe = {
+      cleared: false,
+      status: 0,
+      error: err instanceof Error ? err.message : "unknown",
+    };
+  }
+
+  return result as ClearAllSuppressionsResult;
+}
+
 export async function addToSendGridGlobalUnsubscribes(emails: string[]): Promise<void> {
   if (!getSendGridApiKey()) {
     console.warn("[SendGridSuppressions] SENDGRID_API_KEY not set — skipping global unsubscribe.");
@@ -146,10 +270,7 @@ export async function addToSendGridGlobalUnsubscribes(emails: string[]): Promise
   try {
     const res = await fetch(`${SENDGRID_API_BASE}/asm/suppressions/global`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${getSendGridApiKey()}`,
-        "Content-Type": "application/json",
-      },
+      headers: authHeaders(true),
       body: JSON.stringify({ recipient_emails: normalised }),
     });
 
