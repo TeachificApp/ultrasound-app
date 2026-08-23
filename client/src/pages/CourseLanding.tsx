@@ -30,13 +30,14 @@ import { CohortSessionsCalendar } from "@/components/CohortSessionsCalendar";
 import type { Block } from "@/components/BlockPreview";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { SUBSCRIPTION_RESUME_LABEL } from "@/lib/accessCta";
-import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview } from "@/components/BlockPreview";
+import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview, TickerBlock } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
 import { PublicLandingBlock } from "@/components/PublicLandingBlock";
 import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 import { getFirstPublishedPreviewLesson, isPublishedPreviewLesson } from "@shared/coursePreviewEligibility";
+import { shouldRouteWorkshopCtaToCheckout } from "@shared/workshopPricing";
 import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from "@shared/availabilityPresentation";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
@@ -61,6 +62,11 @@ export function handleCtaBtnClick(
   e.preventDefault();
   e.stopPropagation();
   const action = target.dataset.action ?? "url";
+  if (shouldRouteWorkshopCtaToCheckout(action, target.textContent ?? undefined)) {
+    if (onCheckoutPage) onCheckoutPage(undefined);
+    else onEnroll?.();
+    return;
+  }
   // Sold-out override: if the button has a soldout-override URL and we're in
   // sold-out/waitlist mode (caller provides onSoldOutOverride), use it.
   const soldOutOverrideUrl = target.dataset.soldoutOverride;
@@ -244,8 +250,13 @@ function resolveBtnAction(
   freeEnrollProductType?: string,
   freeEnrollProductId?: number | null,
   onFreeEnroll?: (productType: string, productId: number) => void,
+  ctaLabel?: string,
 ): () => void {
   const b = behavior ?? (link ? "url" : "");
+  if (shouldRouteWorkshopCtaToCheckout(b, ctaLabel)) {
+    if (onCheckoutPage) return () => onCheckoutPage(pricingOptionId);
+    return onEnroll;
+  }
   if (b === "url" && link) return () => window.open(link, "_blank", "noopener,noreferrer");
   if (b === "send_email" && emailAddress) return () => { window.location.href = `mailto:${emailAddress}`; };
   if (b === "scroll_to_section" && scrollAnchor) return () => { const el = document.getElementById(scrollAnchor.replace(/^#/, "")); if (el) el.scrollIntoView({ behavior: "smooth" }); };
@@ -357,7 +368,7 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
                   const isEnrollBtn = enrollActions.has((btn as any).behavior ?? "");
                   return (
                   <div key={i} className="flex flex-col items-center gap-1">
-                    <button onClick={isDraft && isEnrollBtn ? undefined : resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, freePreviewAction, onCheckoutPage, (btn as any).freeEnrollProductType, (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null, onFreeEnroll)}
+                    <button onClick={isDraft && isEnrollBtn ? undefined : resolveBtnAction((btn as any).behavior, btn.link, (btn as any).emailAddress, (btn as any).scrollAnchor, (btn as any).popupUrl, (btn as any).downloadUrl, onEnroll, onEnrollWithOption, (btn as any).pricingOptionId ? Number((btn as any).pricingOptionId) : undefined, freePreviewAction, onCheckoutPage, (btn as any).freeEnrollProductType, (btn as any).freeEnrollProductId ? Number((btn as any).freeEnrollProductId) : null, onFreeEnroll, btn.text)}
                       disabled={isDraft && isEnrollBtn}
                       className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto transition-opacity hover:opacity-90 disabled:opacity-60 ${(btn as any).animation && (btn as any).animation !== "none" ? `animate-${(btn as any).animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
@@ -660,25 +671,8 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
           <CountdownTimer mode={d.mode} durationMinutes={d.durationMinutes} targetDate={d.targetDate} textColor={d.textColor ?? "#fff"} />
         </div>
       );
-    case "ticker": {
-      const tickerItems: string[] = d.items ?? ["Welcome!"];
-      const sep = d.separator ?? " ✦ ";
-      const content = [...tickerItems, ...tickerItems].join(sep);
-      const speed = d.speed ?? 30;
-      const dir = d.direction === "right" ? "ticker-right" : "ticker-left";
-      const fontSizeMap: Record<string, string> = { xs: "0.75rem", sm: "0.875rem", base: "1rem", lg: "1.125rem", xl: "1.25rem" };
-      const fontWeightMap: Record<string, string> = { normal: "400", medium: "500", semibold: "600", bold: "700" };
-      const letterSpacingMap: Record<string, string> = { tighter: "-0.05em", normal: "0", wide: "0.025em", wider: "0.05em", widest: "0.1em" };
-      return (
-        <div className={`overflow-hidden ${d.padding ?? "py-2"}`} style={{ backgroundColor: d.bgColor ?? "#0f766e" }}>
-          <style>{`@keyframes ticker-left{from{transform:translateX(0)}to{transform:translateX(-50%)}} @keyframes ticker-right{from{transform:translateX(-50%)}to{transform:translateX(0)}}`}</style>
-          <div style={{ display: "flex", whiteSpace: "nowrap", animation: `${dir} ${speed}s linear infinite`, willChange: "transform", color: d.textColor ?? "#ffffff", fontSize: fontSizeMap[d.fontSize ?? "sm"] ?? "0.875rem", fontWeight: fontWeightMap[d.fontWeight ?? "normal"] ?? "400", letterSpacing: letterSpacingMap[d.letterSpacing ?? "normal"] ?? "0", textTransform: (d.textTransform === "none" ? "none" : d.textTransform) as any }}>
-            <span style={{ paddingRight: "4rem" }}>{content}</span>
-            <span style={{ paddingRight: "4rem" }}>{content}</span>
-          </div>
-        </div>
-      );
-    }
+    case "ticker":
+      return <TickerBlock data={d} />;
     case "countdown_v2": {
       return <CountdownV2Block data={d} />;
     }
@@ -725,7 +719,7 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
           )}
           {(d.showStrikethrough && d.strikethroughPrice) && <p className="text-lg text-gray-400 line-through mb-1">{d.strikethroughPrice}</p>}
           {d.displayPrice && <p className="text-3xl font-bold mb-4" style={{ color: d.ctaColor ?? "#179ca3" }}>{d.displayPrice}</p>}
-                    <button onClick={isDraft ? undefined : resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={isDraft || enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
+                    <button onClick={isDraft ? undefined : resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll, isCtaOverridden ? ctaText : (d.ctaText ?? ctaText))} disabled={isDraft || enrolling} className={`px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {isDraft ? "Enrollment Closed" : enrolling ? "Processing…" : (isCtaOverridden ? ctaText : (d.ctaText ?? ctaText))}
           </button>
           {isDraft && (
@@ -754,7 +748,7 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
           <CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
-          <button onClick={isDraft ? undefined : resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll)} disabled={isDraft || enrolling}
+          <button onClick={isDraft ? undefined : resolveBtnAction(d.ctaBehavior, d.ctaLink, d.emailAddress, d.scrollAnchor, d.popupUrl, d.downloadUrl, onEnroll, onEnrollWithOption, d.ctaPricingOptionId ? Number(d.ctaPricingOptionId) : undefined, undefined, onCheckoutPage, d.freeEnrollProductType, d.freeEnrollProductId ? Number(d.freeEnrollProductId) : null, onFreeEnroll, isCtaOverridden ? ctaText : (d.ctaText ?? ctaText))} disabled={isDraft || enrolling}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow disabled:opacity-60 transition-opacity hover:opacity-90 ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`} style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}>
             {isDraft ? "Enrollment Closed" : isCtaOverridden ? ctaText : (d.ctaText ?? ctaText)}
           </button>
@@ -910,6 +904,7 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
                 (opt as any).freeEnrollProductType,
                 (opt as any).freeEnrollProductId ? Number((opt as any).freeEnrollProductId) : null,
                 onFreeEnroll,
+                opt.ctaText ?? opt.label,
               );
               const isExternalAction = cardBehavior && ["url", "send_email", "download_file", "open_popup", "scroll_to_section"].includes(cardBehavior);
               const handleCardClick = () => { if (isExternalAction) { cardCtaAction(); } else { onSelectPricingOption?.(opt.id); } };
@@ -1023,6 +1018,7 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
                   groupId={embedGroupIdP}
                   accentColor={accentColor}
                   onEnroll={() => onOpenGroupDetail?.(embedGroupIdP)}
+                  onCheckoutPage={onCheckoutPage}
                   enrollNowText={enrollNowTextP}
                   showEnrollNow={showEnrollNowP && !hideCourseEnrollmentPresentation}
                   hideEnrollmentPresentation={hideCourseEnrollmentPresentation}
@@ -1303,6 +1299,7 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
                   groupId={embedGroupId}
                   accentColor={accentColorCICA}
                   onEnroll={() => onOpenGroupDetail?.(embedGroupId)}
+                  onCheckoutPage={onCheckoutPage}
                   enrollNowText={enrollNowTextCICA}
                   showEnrollNow={showEnrollNowCICA}
                 />
@@ -1312,6 +1309,7 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
                   instanceId={embedInstanceId}
                   accentColor={accentColorCICA}
                   onEnroll={() => onCheckoutPage?.()}
+                  onCheckoutPage={onCheckoutPage}
                   enrollNowText={enrollNowTextCICA}
                   showEnrollNow={showEnrollNowCICA}
                 />
@@ -1604,6 +1602,14 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
       }
       return hideCourseEnrollmentPresentation ? null : <RemainingSeatsBlock data={rsData} />;
     }
+    case "urgency_offer":
+      return (
+        <BlockPreview
+          block={block}
+          onEnroll={onEnroll}
+          onCheckoutPage={onCheckoutPage}
+        />
+      );
     default:
       return null;
   }
@@ -2989,7 +2995,13 @@ function CohortGroupDetailModal({
                 /* Render landing blocks with live data for remaining_seats */
                 <div>
                   {(data.landingBlocks as any[]).map((block: any) => (
-                    <PublicLandingBlock key={block.id} block={block} context={{ cohortGroupId: groupId }} />
+                    <PublicLandingBlock
+                      key={block.id}
+                      block={block}
+                      context={{ cohortGroupId: cohortGroupId! }}
+                      onEnroll={onEnroll}
+                      onCheckoutPage={onEnroll}
+                    />
                   ))}
                 </div>
               )}
@@ -3037,14 +3049,18 @@ function CohortGroupEmbedSection({
   groupId,
   accentColor,
   onEnroll,
+  onCheckoutPage,
   enrollNowText,
   showEnrollNow,
+  hideEnrollmentPresentation,
 }: {
   groupId: number;
   accentColor: string;
   onEnroll: () => void;
+  onCheckoutPage?: (pricingOptionId?: number) => void;
   enrollNowText: string;
   showEnrollNow: boolean;
+  hideEnrollmentPresentation?: boolean;
 }) {
   const { data, isLoading, error } = trpc.lms.getCohortGroupPage.useQuery({ cohortGroupId: groupId });
   const [waitlistOpen, setWaitlistOpen] = useState(false);
@@ -3164,7 +3180,13 @@ function CohortGroupEmbedSection({
       ) : (
         <div>
           {(data.landingBlocks as any[]).map((block: any) => (
-            <PublicLandingBlock key={block.id} block={block} context={{ cohortGroupId: groupId }} />
+            <PublicLandingBlock
+              key={block.id}
+              block={block}
+              context={{ cohortGroupId: groupId }}
+              onEnroll={onEnroll}
+              onCheckoutPage={onCheckoutPage ?? onEnroll}
+            />
           ))}
           {showEnrollNow && !isSoldOutCG && !hideGroupEnrollmentPresentation && (
             <div className="text-center py-6">
@@ -3360,12 +3382,14 @@ function WorkshopInstanceEmbedSection({
   instanceId,
   accentColor,
   onEnroll,
+  onCheckoutPage,
   enrollNowText,
   showEnrollNow,
 }: {
   instanceId: number;
   accentColor: string;
   onEnroll: () => void;
+  onCheckoutPage?: (pricingOptionId?: number) => void;
   enrollNowText: string;
   showEnrollNow: boolean;
 }) {
@@ -3473,7 +3497,13 @@ function WorkshopInstanceEmbedSection({
         {(data.landingBlocks as any[])?.length > 0 && (
           <div>
             {(data.landingBlocks as any[]).map((block: any) => (
-              <PublicLandingBlock key={block.id} block={block} context={{ workshopInstanceId: instanceId }} />
+              <PublicLandingBlock
+                key={block.id}
+                block={block}
+                context={{ workshopInstanceId: instanceId }}
+                onEnroll={onEnroll}
+                onCheckoutPage={onCheckoutPage ?? onEnroll}
+              />
             ))}
           </div>
         )}

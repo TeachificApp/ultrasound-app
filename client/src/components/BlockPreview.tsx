@@ -726,6 +726,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       );
     }
     case "urgency_offer": {
+      if (onEnroll || onCheckoutPage) {
+        return <UrgencyOfferLiveBlock d={d} onEnroll={onEnroll} onCheckoutPage={onCheckoutPage} />;
+      }
       const cMode = d.countdownMode ?? "on_load";
       const cUnits = cMode === "event" ? ["Days", "Hours", "Minutes", "Seconds"] : ["Hours", "Minutes", "Seconds"];
       const cPlaceholders = cMode === "event" ? ["00", "00", "00", "00"] : [String(Math.floor((d.countdownMinutes ?? 90) / 60)).padStart(2, "0"), String((d.countdownMinutes ?? 90) % 60).padStart(2, "0"), "00"];
@@ -2099,6 +2102,158 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
 }
 
 
+// ─── Countdown helpers ────────────────────────────────────────────────────────
+
+function normalizeCountdownV2Mode(mode: string | undefined): "duration" | "target_date" {
+  if (mode === "target_date" || mode === "event") return "target_date";
+  return "duration";
+}
+
+function computeCountdownV2EndTime(d: Record<string, any>): number {
+  const mode = normalizeCountdownV2Mode(d.mode);
+  if (mode === "target_date" && d.targetDate) {
+    const targetMs = new Date(d.targetDate).getTime();
+    if (!Number.isNaN(targetMs) && targetMs > Date.now()) return targetMs;
+  }
+  const h = Math.max(0, Number(d.durationHours ?? 1));
+  const m = Math.max(0, Number(d.durationMinutes ?? 30));
+  const totalMinutes = Math.max(1, h * 60 + m);
+  const storageKey = `countdown_v2_${d.targetDate ?? "duration"}_${h}_${m}`;
+  if (typeof sessionStorage !== "undefined") {
+    const stored = sessionStorage.getItem(storageKey);
+    if (stored) {
+      const parsed = Number(stored);
+      if (!Number.isNaN(parsed) && parsed > Date.now()) return parsed;
+    }
+    const end = Date.now() + totalMinutes * 60 * 1000;
+    sessionStorage.setItem(storageKey, String(end));
+    return end;
+  }
+  return Date.now() + totalMinutes * 60 * 1000;
+}
+
+function useUrgencyCountdown(
+  mode: "on_load" | "event",
+  durationMinutes: number,
+  targetDate?: string,
+) {
+  const endRef = useRef<number | null>(null);
+  const [remaining, setRemaining] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    if (mode === "event" && targetDate) {
+      const targetMs = new Date(targetDate).getTime();
+      if (!Number.isNaN(targetMs) && targetMs > Date.now()) {
+        endRef.current = targetMs;
+      }
+    }
+    if (!endRef.current) {
+      const storageKey = `urgency_countdown_${mode}_${durationMinutes}_${targetDate ?? ""}`;
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored) {
+        endRef.current = Number(stored);
+      } else {
+        const minutes = Math.max(1, durationMinutes || 90);
+        const end = Date.now() + minutes * 60 * 1000;
+        endRef.current = end;
+        sessionStorage.setItem(storageKey, String(end));
+      }
+    }
+
+    const tick = () => {
+      if (!endRef.current) return;
+      const diff = Math.max(0, endRef.current - Date.now());
+      const totalSec = Math.floor(diff / 1000);
+      setRemaining({
+        days: Math.floor(totalSec / 86400),
+        hours: Math.floor((totalSec % 86400) / 3600),
+        minutes: Math.floor((totalSec % 3600) / 60),
+        seconds: totalSec % 60,
+      });
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [mode, durationMinutes, targetDate]);
+
+  return remaining;
+}
+
+function UrgencyOfferLiveBlock({
+  d,
+  onEnroll,
+  onCheckoutPage,
+}: {
+  d: Record<string, any>;
+  onEnroll?: () => void;
+  onCheckoutPage?: (pricingOptionId?: number) => void;
+}) {
+  const countdownMode: "on_load" | "event" = d.countdownMode === "event" ? "event" : "on_load";
+  const targetDate = d.countdownTargetDate || d.targetDate;
+  const { days, hours, minutes, seconds } = useUrgencyCountdown(
+    countdownMode,
+    d.countdownMinutes ?? 90,
+    targetDate,
+  );
+  const units = countdownMode === "event"
+    ? [{ label: "Days", value: days }, { label: "Hours", value: hours }, { label: "Minutes", value: minutes }, { label: "Seconds", value: seconds }]
+    : [{ label: "Hours", value: hours }, { label: "Minutes", value: minutes }, { label: "Seconds", value: seconds }];
+  const ctaBehavior = d.ctaBehavior ?? "direct_checkout";
+
+  return (
+    <div
+      className={`px-8 py-10 ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`}
+      style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.accentColor ?? "#179ca3") : undefined }}
+      onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}
+    >
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          {d.countdownHeadline && <h3 className="text-lg font-bold uppercase tracking-wide mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.countdownHeadline}</h3>}
+          <div className="flex justify-center items-center gap-3">
+            {units.map((unit, i) => (
+              <div key={unit.label} className="flex items-center gap-3">
+                <div className="text-center">
+                  <div className="text-5xl font-black tracking-tight">{String(unit.value).padStart(2, "0")}</div>
+                  <div className="text-xs font-medium mt-1 opacity-70">{unit.label}</div>
+                </div>
+                {i < units.length - 1 && <span className="text-4xl font-bold opacity-40 -mt-4">:</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+        {d.headline && <h2 className="text-2xl md:text-3xl font-black text-center mb-6 whitespace-pre-line leading-tight" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+        {d.description && <p className="italic text-lg mb-4 text-center" style={{ color: d.accentColor ?? "#179ca3" }}>{d.description}</p>}
+        {d.bodyHtml && <div className="prose prose-lg max-w-none mb-6" dangerouslySetInnerHTML={{ __html: d.bodyHtml }} />}
+        {(d.showStrikethrough && d.strikethroughPrice) && (
+          <p className="text-xl text-gray-400 line-through text-center mt-4">{d.strikethroughPrice}</p>
+        )}
+        {d.displayPrice && <p className="text-3xl font-bold text-center mt-1" style={{ color: d.accentColor ?? "#179ca3" }}>{d.displayPrice}</p>}
+        {d.ctaText && (
+          <div className="text-center mt-6">
+            <button
+              data-cta-btn="1"
+              data-action={ctaBehavior}
+              data-link={ctaBehavior === "url" ? (d.ctaLink ?? "") : undefined}
+              data-anchor={ctaBehavior === "scroll_to_section" ? (d.ctaScrollAnchor ?? "") : undefined}
+              data-email={ctaBehavior === "send_email" ? (d.ctaEmailAddress ?? "") : undefined}
+              data-popup={ctaBehavior === "open_popup" ? (d.ctaPopupUrl ?? "") : undefined}
+              data-download={ctaBehavior === "download_file" ? (d.ctaDownloadUrl ?? "") : undefined}
+              data-pricing-option={ctaBehavior === "pricing_option" && d.ctaPricingOptionId ? String(d.ctaPricingOptionId) : undefined}
+              className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-bold text-lg shadow-lg cursor-pointer"
+              style={{ backgroundColor: d.ctaColor ?? d.accentColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
+            >
+              {d.ctaEmoji && <span>{d.ctaEmoji}</span>}
+              {d.ctaText}
+            </button>
+            {ctaBehavior === "direct_checkout" && <p className="text-[10px] text-teal-600 mt-1">→ Stripe Checkout</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Ticker / Marquee Block ───────────────────────────────────────────────────
 
 /**
@@ -2187,17 +2342,7 @@ function TickerBlockPreview({ d }: { d: Record<string, any> }) {
  * and target-date mode (count down to a specific date/time).
  */
 export function CountdownV2Block({ data: d }: { data: Record<string, any> }) {
-  const mode: "duration" | "target_date" = d.mode ?? "duration";
-
-  // Compute end time once on mount
-  const [endTime] = useState<number>(() => {
-    if (mode === "target_date" && d.targetDate) {
-      return new Date(d.targetDate).getTime();
-    }
-    const h = Number(d.durationHours ?? 1);
-    const m = Number(d.durationMinutes ?? 30);
-    return Date.now() + (h * 3600 + m * 60) * 1000;
-  });
+  const [endTime] = useState<number>(() => computeCountdownV2EndTime(d));
 
   const calcRemaining = () => Math.max(0, endTime - Date.now());
   const [remaining, setRemaining] = useState(calcRemaining);
