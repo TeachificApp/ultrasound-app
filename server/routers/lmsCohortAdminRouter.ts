@@ -21,6 +21,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or } from "drizzle-orm";
 import { listCohortGroupsForAdmin, cohortCourseContentWhere } from "../lib/cohortGroupQuery";
+import { filterUnassignedCohortEnrollments } from "../lib/unassignedCohortStudents";
 import { enrichCohortResources } from "../lib/cohortResources";
 import { expandCohortRecurrence } from "../lib/cohortRecurrence";
 import { randomBytes } from "crypto";
@@ -1126,20 +1127,28 @@ export const lmsCohortAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const enrolled = await db
-        .select({ userId: lmsEnrollments.userId, userName: users.name, userEmail: users.email, userAvatar: users.avatarUrl, enrollmentId: lmsEnrollments.id })
+        .select({
+          userId: lmsEnrollments.userId,
+          userName: users.name,
+          userEmail: users.email,
+          userAvatar: users.avatarUrl,
+          enrollmentId: lmsEnrollments.id,
+        })
         .from(lmsEnrollments)
         .innerJoin(users, eq(users.id, lmsEnrollments.userId))
         .where(and(
           eq(lmsEnrollments.courseId, input.courseId),
-          eq(lmsEnrollments.status, "active"),
           sql`${users.name} NOT LIKE '[Merged into #%'`,  // exclude merged placeholder accounts
         ));
       const assigned = await db
-        .select({ userId: lmsCohortGroupEnrollments.userId })
+        .select({ enrollmentId: lmsCohortGroupEnrollments.enrollmentId })
         .from(lmsCohortGroupEnrollments)
+        .innerJoin(lmsCohortGroups, eq(lmsCohortGroupEnrollments.cohortGroupId, lmsCohortGroups.id))
         .where(eq(lmsCohortGroupEnrollments.courseId, input.courseId));
-      const assignedIds = new Set(assigned.map(a => a.userId));
-      return enrolled.filter(e => !assignedIds.has(e.userId));
+      return filterUnassignedCohortEnrollments(
+        enrolled,
+        assigned.map((row) => row.enrollmentId).filter((id) => id > 0),
+      );
     }),
 
   /** Assign a student to a cohort group (moves from any existing group) */
