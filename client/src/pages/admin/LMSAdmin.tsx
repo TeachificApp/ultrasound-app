@@ -11753,13 +11753,16 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [groupEnrollDialogOpen, setGroupEnrollDialogOpen] = useState(false);
   const [groupEnrollGroupId, setGroupEnrollGroupId] = useState<number | null>(null);
   const { data: groupStudents = [], isLoading: groupStudentsLoading, refetch: refetchGroupStudents } = trpc.lmsAdmin.listCohortGroupStudents.useQuery({ cohortGroupId: selectedGroupId ?? 0 }, { enabled: !!selectedGroupId });
-  const { data: unassignedStudents = [], refetch: refetchUnassigned } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery({ courseId }, { enabled: activeTab === "groups" });
+  const { data: unassignedStudents = [], isLoading: unassignedLoading, refetch: refetchUnassigned } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery(
+    { courseId },
+    { enabled: activeTab === "groups" },
+  );
   const assignStudent = trpc.lmsAdmin.assignStudentToCohortGroup.useMutation({
     onSuccess: () => { refetchGroupStudents(); refetchGroups(); refetchUnassigned(); toast.success("Student assigned"); },
     onError: (e) => toast.error(e.message),
   });
   const removeStudent = trpc.lmsAdmin.removeStudentFromCohortGroup.useMutation({
-    onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student removed"); },
+    onSuccess: () => { refetchGroupStudents(); refetchGroups(); refetchUnassigned(); toast.success("Student removed"); },
     onError: (e) => toast.error(e.message),
   });
   const [bulkSelected, setBulkSelected] = useState<number[]>([]);
@@ -13058,12 +13061,15 @@ function CohortTab({ courseId }: { courseId: number }) {
 
                       <UnassignedStudentsAssignPanel
                         students={unassignedStudents}
+                        isLoading={unassignedLoading}
                         onAssign={(userId) => assignStudent.mutate({ cohortGroupId: group.id, userId, courseId })}
                         onBulkAssign={(userIds) => bulkAssign.mutate({ cohortGroupId: group.id, courseId, userIds })}
                         isAssigning={assignStudent.isPending}
                         isBulkAssigning={bulkAssign.isPending}
+                        title="Add unassigned students to this group"
                         description="These students are enrolled in the course but not assigned to any cohort group yet."
-                        emptyMessage="No unassigned students available for this course."
+                        emptyMessage="No unassigned students for this course. Use Add Student to enroll someone new."
+                        assignLabel="Add to group"
                       />
 
                       {/* Discussion thread button */}

@@ -32,7 +32,7 @@ describe("Unassigned students — cohort group management", () => {
   it("shows unassigned students in per-group manage panel", () => {
     expect(lmsAdmin).toContain("UnassignedStudentsAssignPanel");
     expect(lmsAdmin).toContain("listUnassignedCohortStudents.useQuery");
-    expect(lmsAdmin).toContain("These students are enrolled in the course but not assigned to any cohort group yet.");
+    expect(lmsAdmin).toContain("Add unassigned students to this group");
     expect(lmsAdmin).toContain("lockGroupSelection={!!groupEnrollGroupId}");
   });
 });
@@ -56,8 +56,9 @@ describe("Unassigned students — workshop instance management", () => {
 
 describe("UnassignedStudentsAssignPanel", () => {
   it("supports single and bulk assign actions", () => {
-    expect(panel).toContain("Available to assign");
+    expect(panel).toContain("Unassigned students");
     expect(panel).toContain("onBulkAssign");
     expect(panel).toContain("Add ${bulkSelected.length} selected");
+    expect(panel).toContain("isLoading");
   });
 });
