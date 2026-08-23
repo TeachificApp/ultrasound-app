@@ -464,6 +464,33 @@ async function startServer() {
     const after = await inspectLmsCohortGroupsSchema(db);
     res.json({ ...result, after, deployedAt: new Date().toISOString() });
   });
+  app.get("/api/debug/cohort-data-audit", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { sql } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) {
+      res.status(503).json({ error: "Database unavailable" });
+      return;
+    }
+    const [cohortCourses, groupCounts, recordingCounts, resourceCounts, messageCounts, sessionCounts] = await Promise.all([
+      db.execute(sql`SELECT id, title, slug, multi_cohort_mode AS multiCohortMode FROM lms_courses WHERE type = 'cohort' ORDER BY id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS groupCount FROM lms_cohort_groups GROUP BY course_id ORDER BY course_id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS total, SUM(cohort_group_id IS NULL) AS sharedCount FROM lms_cohort_recordings GROUP BY course_id ORDER BY course_id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS total, SUM(cohort_group_id IS NULL) AS sharedCount FROM lms_cohort_resources GROUP BY course_id ORDER BY course_id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS messageCount FROM lms_cohort_messages GROUP BY course_id ORDER BY course_id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS total, SUM(cohort_group_id IS NULL) AS sharedCount FROM lms_cohort_sessions GROUP BY course_id ORDER BY course_id`),
+    ]);
+    const rows = (result: unknown) => (Array.isArray(result) ? result[0] : (result as { rows?: unknown[] }).rows) ?? result;
+    res.json({
+      cohortCourses: rows(cohortCourses),
+      groupCounts: rows(groupCounts),
+      recordingCounts: rows(recordingCounts),
+      resourceCounts: rows(resourceCounts),
+      messageCounts: rows(messageCounts),
+      sessionCounts: rows(sessionCounts),
+      deployedAt: new Date().toISOString(),
+    });
+  });
   // User identity + entitlement accounting (Railway post-migration)
   app.get("/api/debug/user-access-audit", async (_req, res) => {
     const { getDb } = await import("../db");
