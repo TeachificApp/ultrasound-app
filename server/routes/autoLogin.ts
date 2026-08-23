@@ -11,12 +11,14 @@
 
 import type { Express, Request, Response } from "express";
 import * as crypto from "crypto";
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
-import { getSessionCookieOptions } from "../_core/cookies";
+import { ONE_YEAR_MS } from "@shared/const";
+import { resolveAuthHostname } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
-import { getDb } from "../db";
+import { getDb, ensureUserRole } from "../db";
 import { autoLoginTokens, users } from "../../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
+import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
+import { sendAuthRedirectHtml, withAuthPending } from "../lib/sendAuthRedirectHtml";
 
 /** Generate a cryptographically secure random token */
 function randomToken(): string {
@@ -109,15 +111,15 @@ export function registerAutoLoginRoute(app: Express) {
       // Email/password users use synthetic openId; OAuth users use their real openId
       const openId = user.openId ?? emailOpenId(user.email ?? `user_${user.id}`);
 
-      // Issue session cookie
       const sessionToken = await sdk.createSessionToken(openId, {
         name: user.name ?? user.email ?? "",
         expiresInMs: ONE_YEAR_MS,
       });
-      // Use the host param encoded in the auto-login URL for cookie domain scoping.
-      // Cloudflare rewrites the Host header to the internal Cloud Run hostname.
-      const cookieOptions = getSessionCookieOptions(req, hostParam || undefined);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+      const cookieHostname = resolveAuthHostname(req, hostParam || undefined);
+      setAuthSessionCookies(req, res, sessionToken, cookieHostname);
+
+      await ensureUserRole(user.id);
 
       // Update last signed in
       await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
@@ -126,11 +128,14 @@ export function registerAutoLoginRoute(app: Express) {
       const { ipAddress, userAgent } = getRequestClientInfo(req);
       await recordUserLogin(db, { userId: user.id, ipAddress, userAgent, method: "auto_login" });
 
-      console.log(`[AutoLogin] User ${user.id} (${user.email}) auto-logged in via purchase token`);
-
-      // Redirect to the destination page
       const destination = record.redirectUrl ?? "/";
-      return res.redirect(destination);
+      const redirectUrl = withAuthPending(destination);
+
+      console.log(
+        `[AutoLogin] User ${user.id} (${user.email}) auto-logged in, host=${cookieHostname ?? hostParam ?? "auto"}, redirecting to ${redirectUrl}`,
+      );
+
+      return sendAuthRedirectHtml(res, redirectUrl);
     } catch (err) {
       console.error("[AutoLogin] Error processing token:", err);
       return res.redirect("/?error=auto_login_failed");

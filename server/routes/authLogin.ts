@@ -29,6 +29,7 @@ import { sdk } from "../_core/sdk";
 import { ONE_YEAR_MS } from "@shared/const";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
+import { sendAuthRedirectHtml, withAuthPending } from "../lib/sendAuthRedirectHtml";
 import { normalizeAuthEmail } from "../../shared/normalizeAuthEmail";
 
 export function registerAuthLoginRoute(app: Express) {
@@ -156,18 +157,7 @@ export function registerAuthLoginRoute(app: Express) {
       const cookieHostname = resolveAuthHostname(req, hostParam);
       setAuthSessionCookies(req, res, sessionToken, cookieHostname);
 
-      // IMPORTANT: Return a 200 HTML page instead of a 302 redirect.
-      // Cloudflare strips Set-Cookie headers from 302 redirect responses on some configurations,
-      // even with Cache-Control: no-store. A 200 response with inline JS redirect is immune to this.
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-
-      // Add auth_pending=1 so the dashboard retries auth.me before redirecting to login
-      const redirectUrl =
-        successRedirect +
-        (successRedirect.includes("?") ? "&" : "?") +
-        "auth_pending=1";
+      const redirectUrl = withAuthPending(successRedirect);
 
       console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, host=${cookieHostname ?? hostParam ?? "auto"}, redirecting to ${redirectUrl}`);
       // Track login event via recordUserLogin
@@ -175,28 +165,7 @@ export function registerAuthLoginRoute(app: Express) {
       const { ipAddress: mlIp, userAgent: mlUa } = getRequestClientInfo(req);
       await recordUserLogin(db, { userId: user.id, ipAddress: mlIp, userAgent: mlUa, method: "magic_link" });
 
-      // IMPORTANT: Return a 200 HTML page instead of a 302 redirect.
-      // Cloudflare strips Set-Cookie headers from 302 redirect responses on some configurations,
-      // even with Cache-Control: no-store. A 200 response with inline JS redirect is immune to this.
-      // Escape the redirect path for safe HTML embedding
-      const safeRedirect = redirectUrl.replace(/[<>"'&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] ?? c));
-      return res.status(200).send(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Signing you in…</title>
-  <meta http-equiv="refresh" content="0;url=${safeRedirect}">
-  <style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0e1e2e;font-family:sans-serif;color:#fff}</style>
-</head>
-<body>
-  <div style="text-align:center">
-    <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,.2);border-top-color:#189aa1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
-    <p style="color:#4ad9e0;font-size:14px">Signing you in…</p>
-  </div>
-  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-  <script>window.location.replace(${JSON.stringify(redirectUrl)});<\/script>
-</body>
-</html>`);
+      return sendAuthRedirectHtml(res, redirectUrl);
     } catch (err) {
       console.error("[magic-verify GET] Error:", err);
       return res.redirect(`/auth/magic-error?reason=server_error`);
