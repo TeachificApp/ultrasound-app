@@ -269,7 +269,10 @@ class SDKServer {
         name: resolvedName,
       };
     } catch (error) {
-      console.warn("[Auth] Session verification failed", String(error));
+      const message = String(error);
+      if (!message.includes("JWSSignatureVerificationFailed")) {
+        console.warn("[Auth] Session verification failed", message);
+      }
       return null;
     }
   }

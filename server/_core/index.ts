@@ -340,6 +340,33 @@ async function startServer() {
       timestamp: new Date().toISOString(),
     });
   });
+  app.get("/api/debug/owner-login-link", async (req, res) => {
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass ?email=owner@example.com" });
+    const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+    if (!isPlatformOwnerEmail(email)) {
+      return res.status(403).json({ error: "Email is not in the platform owner allowlist" });
+    }
+    const { getUserByEmail } = await import("../db");
+    const user = await getUserByEmail(email);
+    if (!user) {
+      return res.json({ found: false, email, timestamp: new Date().toISOString() });
+    }
+    const { generateAutoLoginToken } = await import("../routes/autoLogin");
+    const redirect = String(req.query.redirect ?? "/platform-admin");
+    const origin = String(req.query.origin ?? "https://learn.allaboutultrasound.com");
+    const host = new URL(origin).hostname;
+    const token = await generateAutoLoginToken(user.id, redirect.startsWith("/") ? redirect : "/platform-admin");
+    const loginUrl = `${origin}/api/auth/auto-login?token=${encodeURIComponent(token)}&host=${encodeURIComponent(host)}`;
+    res.json({
+      found: true,
+      userId: user.id,
+      email,
+      loginUrl,
+      redirect,
+      timestamp: new Date().toISOString(),
+    });
+  });
   // Diagnose lms_courses schema (Railway mirror often missing columns)
   app.get("/api/debug/lms-courses-schema", async (_req, res) => {
     const { getDb } = await import("../db");

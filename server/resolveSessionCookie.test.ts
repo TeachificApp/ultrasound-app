@@ -20,8 +20,8 @@ describe("resolveSessionFromCookies", () => {
 
     expect(result?.cookieValue).toBe("fresh-lax");
     expect(result?.session.openId).toBe("email:user@example.com");
-    expect(verify).toHaveBeenCalledWith("stale-primary");
-    expect(verify).toHaveBeenCalledWith("fresh-lax");
+    expect(verify.mock.calls[0]?.[0]).toBe("fresh-lax");
+    expect(verify).toHaveBeenCalledTimes(1);
   });
 
   it("returns null when every candidate fails verification", async () => {
@@ -48,5 +48,14 @@ describe("resolveSessionFromCookies", () => {
 
     await resolveSessionFromCookies(cookies, verify);
     expect(verify).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("requestHasSessionCookies", () => {
+  it("detects session cookie names in the header", async () => {
+    const { requestHasSessionCookies } = await import("./lib/resolveSessionCookie");
+    expect(requestHasSessionCookies("app_session_id=abc")).toBe(true);
+    expect(requestHasSessionCookies("app_session_lax=abc")).toBe(true);
+    expect(requestHasSessionCookies("other=value")).toBe(false);
   });
 });

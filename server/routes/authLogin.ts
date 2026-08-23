@@ -33,6 +33,17 @@ import { normalizeAuthEmail } from "../../shared/normalizeAuthEmail";
 
 export function registerAuthLoginRoute(app: Express) {
   /**
+   * GET /api/auth/clear-session
+   * Clears stale Manus-era JWT session cookies so magic-link login can succeed.
+   */
+  app.get("/api/auth/clear-session", async (req: Request, res: Response) => {
+    const { clearSessionCookies } = await import("../_core/cookies");
+    clearSessionCookies(res, req);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ cleared: true });
+  });
+
+  /**
    * POST /api/auth/login
    * Body: { email: string, password: string }
    * Returns: { success: true, emailVerified: boolean, name: string } | { error: string }

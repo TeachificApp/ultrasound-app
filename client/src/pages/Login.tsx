@@ -105,6 +105,11 @@ export default function Login() {
     );
   }, []);
 
+  // Clear stale Manus-era JWT cookies so magic-link sessions can stick after Railway migration.
+  useEffect(() => {
+    fetch("/api/auth/clear-session", { method: "GET", credentials: "include" }).catch(() => {});
+  }, []);
+
   // Redirect if already signed in (but NOT if user just clicked logout)
   useEffect(() => {
     if (isPostLogout) return; // User explicitly logged out — stay on login page
