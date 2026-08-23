@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { COOKIE_NAME, DEMO_COOKIE_NAME, TWO_HOURS_MS } from "@shared/const";
+import { authEmailField } from "@shared/authEmailField";
 import { clearSessionCookies, getSessionCookieOptions, resolveAuthHostname } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -463,14 +464,15 @@ export const appRouter = router({
 
        requestPasswordReset: publicProcedure
       .input(z.object({
-        email: z.string().email().max(320),
+        email: authEmailField,
         origin: z.string().url().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setPasswordResetToken } = await import('./db');
         const { sendEmail, buildPasswordResetEmail } = await import('./_core/email');
+        const { resolveAuthDeliveryEmail } = await import('./lib/authEmailDelivery');
         const crypto = await import('crypto');
-        const email = input.email.trim().toLowerCase();
+        const email = input.email;
         const user = await getUserByEmail(email);
         // Always return success to prevent email enumeration
         // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)
@@ -478,9 +480,19 @@ export const appRouter = router({
         if (!user) {
           return { success: true };
         }
+        const deliveryEmail = resolveAuthDeliveryEmail(user, email);
+        if (!deliveryEmail) {
+          console.error(`[auth] Password reset skipped: user ${user.id} has no deliverable email`);
+          return { success: true };
+        }
         const token = crypto.randomBytes(48).toString('hex');
         const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-        await setPasswordResetToken(user.id, token, expiry);
+        try {
+          await setPasswordResetToken(user.id, token, expiry);
+        } catch (err) {
+          console.error(`[auth] Failed to store password reset token for user ${user.id}:`, err);
+          return { success: true };
+        }
         // Use the origin the user is actually on for the reset URL so the link works on any domain
         const { detectBrandMode: dbm2 } = await import('@shared/brands');
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
@@ -489,13 +501,16 @@ export const appRouter = router({
         const resetUrl = `${appUrlReset}/reset-password?token=${token}`;
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
-        await sendEmail({
-          to: { name: firstName, email: user.email! },
+        const emailSent = await sendEmail({
+          to: { name: firstName, email: deliveryEmail },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
           brandMode,
         });
+        if (!emailSent) {
+          console.error(`[auth] Password reset email was not accepted by SendGrid for user ${user.id} (${deliveryEmail})`);
+        }
         return { success: true };
       }),
 
@@ -527,16 +542,17 @@ export const appRouter = router({
 
     requestMagicLink: publicProcedure
       .input(z.object({
-        email: z.string().email().max(320),
+        email: authEmailField,
         origin: z.string().url().optional(),
         returnTo: z.string().max(500).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setMagicLinkToken, upsertUser } = await import('./db');
         const { sendEmail, buildMagicLinkEmail } = await import('./_core/email');
+        const { resolveAuthDeliveryEmail } = await import('./lib/authEmailDelivery');
         const crypto = await import('crypto');
 
-        const email = input.email.trim().toLowerCase();
+        const email = input.email;
         let user = await getUserByEmail(email);
 
         // Passwordless sign-in also provides a safe account-creation path. This
@@ -597,8 +613,13 @@ export const appRouter = router({
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });
+        const deliveryEmail = resolveAuthDeliveryEmail(user, email);
+        if (!deliveryEmail) {
+          console.error(`[auth] Magic-link delivery skipped: user ${user.id} has no deliverable email`);
+          return { success: true };
+        }
         const deliveryAccepted = await sendEmail({
-          to: { name: firstName, email: user.email! },
+          to: { name: firstName, email: deliveryEmail },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
@@ -619,7 +640,7 @@ export const appRouter = router({
 
     loginWithPassword: publicProcedure
       .input(z.object({
-        email: z.string().email().max(320),
+        email: authEmailField,
         password: z.string().min(1).max(128),
       }))
       .mutation(async ({ ctx, input }) => {
@@ -629,7 +650,7 @@ export const appRouter = router({
         const { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } = await import('./_core/cookies');
         const bcrypt = await import('bcryptjs');
 
-        const email = input.email.trim().toLowerCase();
+        const email = input.email;
         const user = await getUserByEmail(email);
 
         // Generic error to prevent user enumeration
@@ -689,7 +710,7 @@ export const appRouter = router({
 
     registerWithPassword: publicProcedure
       .input(z.object({
-        email: z.string().email().max(320),
+        email: authEmailField,
         password: z.string().min(8).max(128),
         firstName: z.string().min(1, "First name is required").max(100),
         lastName: z.string().min(1, "Last name is required").max(100),
@@ -703,7 +724,7 @@ export const appRouter = router({
         const { eq } = await import('drizzle-orm');
         const bcrypt = await import('bcryptjs');
 
-        const email = input.email.trim().toLowerCase();
+        const email = input.email;
         const existing = await getUserByEmail(email);
         // Resolve hostname once for correct cookie scoping on iheartecho.com vs allaboutultrasound.com
         const regHostname = resolveRegHostname(ctx.req);

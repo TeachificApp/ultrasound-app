@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { authEmailField } from "@shared/authEmailField";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
   getUserRoles,
@@ -182,7 +183,7 @@ export const platformAdminRouter = router({
    * Used by the "Add user by email" flow in Platform Admin.
    */
   findUserByEmail: protectedProcedure
-    .input(z.object({ email: z.string().email("Please enter a valid email address") }))
+    .input(z.object({ email: authEmailField }))
     .mutation(async ({ ctx, input }) => {
       const myRoles = await getUserRoles(ctx.user.id);
       if (ctx.user.role !== "admin" && !myRoles.includes("platform_admin")) {

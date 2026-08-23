@@ -20,6 +20,7 @@ import { isCombinedBrandingDomain, isIHeartEchoDomain, isLearnDomain, MEMBERS_AP
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import MaintenanceBanner from "@/components/MaintenanceBanner";
 import { toast } from "sonner";
+import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 const IHE_LOGO = "/manus-storage/iheartecho-logo_f9d91cd4.webp";
@@ -132,14 +133,14 @@ export default function Login() {
 
   const handleMagicSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
+    const trimmed = normalizeAuthEmail(email);
     if (!trimmed || requestMutation.isPending) return;
     requestMutation.mutate({ email: trimmed, origin: window.location.origin, returnTo });
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
+    const trimmed = normalizeAuthEmail(email);
     if (!trimmed || !password || passwordLoading) return;
     setPasswordLoading(true);
     setPasswordError(null);
@@ -177,7 +178,7 @@ export default function Login() {
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
+    const trimmed = normalizeAuthEmail(email);
     if (!trimmed || !password || registerMutation.isPending) return;
     if (password.length < 8) {
       toast.error("Password must be at least 8 characters.");
