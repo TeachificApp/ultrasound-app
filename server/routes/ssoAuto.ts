@@ -39,6 +39,7 @@ import { redeemSsoTokenAndSetCookies } from "../lib/ssoExchange";
 import { resolveUserFromSessionOpenId } from "../lib/resolveUserFromSession";
 import { resolveSessionFromCookies } from "../lib/resolveSessionCookie";
 import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
+import { sendAuthRedirectHtml, withAuthPending } from "../lib/sendAuthRedirectHtml";
 
 // 1×1 transparent GIF — used as the response body so <img> tags can trigger this
 const TRANSPARENT_GIF = Buffer.from(
@@ -245,18 +246,12 @@ export function registerSsoAutoRoute(app: Express) {
         return res.redirect(`/login?sso_failed=1&returnTo=${encodeURIComponent(successRedirect)}`);
       }
 
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
-      res.setHeader("Pragma", "no-cache");
-
-      const redirectUrl =
-        successRedirect +
-        (successRedirect.includes("?") ? "&" : "?") +
-        "auth_pending=1";
+      const redirectUrl = withAuthPending(successRedirect);
 
       console.log(
         `[SsoExchange] User ${result.userId} signed in | host=${hostParam ?? "auto"} | redirect=${redirectUrl}`,
       );
-      return res.redirect(redirectUrl);
+      return sendAuthRedirectHtml(res, redirectUrl);
     } catch (err) {
       console.error("[SsoExchange] Error:", err);
       return res.redirect(`/login?sso_failed=1&returnTo=${encodeURIComponent(successRedirect)}`);
