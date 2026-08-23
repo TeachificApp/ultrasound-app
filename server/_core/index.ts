@@ -234,6 +234,65 @@ async function startServer() {
       timestamp: new Date().toISOString(),
     });
   });
+  app.get("/api/debug/email-suppression", async (req, res) => {
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass ?email=your@email.com" });
+    const { getSendGridSuppressionStatus, isSendGridDeliveryBlocked } = await import(
+      "../lib/sendgridSuppressions"
+    );
+    const { getUserByEmail } = await import("../db");
+    const sendGrid = await getSendGridSuppressionStatus(email);
+    const user = await getUserByEmail(email);
+    res.json({
+      email,
+      sendGrid,
+      blocked: isSendGridDeliveryBlocked(sendGrid),
+      user: user
+        ? {
+            id: user.id,
+            unsubscribedAt: user.unsubscribedAt,
+          }
+        : null,
+      timestamp: new Date().toISOString(),
+    });
+  });
+  app.post("/api/debug/clear-email-suppression", async (req, res) => {
+    const email = String(req.query.email ?? (req.body as { email?: string })?.email ?? "")
+      .trim()
+      .toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass ?email=owner@example.com" });
+    const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+    if (!isPlatformOwnerEmail(email)) {
+      return res.status(403).json({ error: "Email is not in the platform owner allowlist" });
+    }
+    const { getSendGridSuppressionStatus, clearSendGridSuppressionLists } = await import(
+      "../lib/sendgridSuppressions"
+    );
+    const { getUserByEmail } = await import("../db");
+    const { users } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const { getDb } = await import("../db");
+    const before = await getSendGridSuppressionStatus(email);
+    const cleared = await clearSendGridSuppressionLists(email);
+    const after = await getSendGridSuppressionStatus(email);
+    const user = await getUserByEmail(email);
+    let dbUnsubscribeCleared = false;
+    if (user?.unsubscribedAt) {
+      const db = await getDb();
+      if (db) {
+        await db.update(users).set({ unsubscribedAt: null }).where(eq(users.id, user.id));
+        dbUnsubscribeCleared = true;
+      }
+    }
+    res.json({
+      email,
+      before,
+      cleared,
+      after,
+      dbUnsubscribeCleared,
+      timestamp: new Date().toISOString(),
+    });
+  });
   app.get("/api/debug/test-password-reset", async (req, res) => {
     const to = String(req.query.to ?? "").trim().toLowerCase();
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
@@ -258,6 +317,8 @@ async function startServer() {
         timestamp: new Date().toISOString(),
       });
     }
+    const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
+    const deliveryPrep = await ensureTransactionalEmailDelivery(deliveryEmail);
     const token = crypto.randomBytes(48).toString("hex");
     const expiry = new Date(Date.now() + 60 * 60 * 1000);
     try {
@@ -288,6 +349,7 @@ async function startServer() {
       userFound: true,
       userId: user.id,
       deliveryEmail,
+      deliveryPrep,
       emailSent,
       to,
       timestamp: new Date().toISOString(),
@@ -317,6 +379,8 @@ async function startServer() {
         timestamp: new Date().toISOString(),
       });
     }
+    const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
+    const deliveryPrep = await ensureTransactionalEmailDelivery(deliveryEmail);
     const token = crypto.randomBytes(48).toString("hex");
     const expiry = new Date(Date.now() + 15 * 60 * 1000);
     await setMagicLinkToken(user.id, token, expiry);
@@ -335,6 +399,7 @@ async function startServer() {
       userFound: true,
       userId: user.id,
       deliveryEmail,
+      deliveryPrep,
       emailSent,
       to,
       timestamp: new Date().toISOString(),

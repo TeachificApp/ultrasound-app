@@ -485,6 +485,8 @@ export const appRouter = router({
           console.error(`[auth] Password reset skipped: user ${user.id} has no deliverable email`);
           return { success: true };
         }
+        const { ensureTransactionalEmailDelivery } = await import('./lib/ensureTransactionalEmailDelivery');
+        await ensureTransactionalEmailDelivery(deliveryEmail);
         const token = crypto.randomBytes(48).toString('hex');
         const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
         try {
@@ -618,6 +620,8 @@ export const appRouter = router({
           console.error(`[auth] Magic-link delivery skipped: user ${user.id} has no deliverable email`);
           return { success: true };
         }
+        const { ensureTransactionalEmailDelivery } = await import('./lib/ensureTransactionalEmailDelivery');
+        await ensureTransactionalEmailDelivery(deliveryEmail);
         const deliveryAccepted = await sendEmail({
           to: { name: firstName, email: deliveryEmail },
           subject: emailPayload.subject,
