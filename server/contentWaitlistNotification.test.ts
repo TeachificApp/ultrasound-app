@@ -1,17 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, it, expect } from "vitest";
 import { buildContentWaitlistAdminNotification } from "./lib/contentWaitlistNotification";
+import { DEFAULT_PLATFORM_ADMIN_EMAIL } from "../shared/platformAdminEmail";
 
-describe("shared content Waitlist notification", () => {
-  it("routes a new signup's name and email to the approved platform administrator", () => {
+describe("content waitlist admin notification", () => {
+  it("routes a new signup to the platform admin inbox", () => {
     const message = buildContentWaitlistAdminNotification({
       title: "Adult Echo Workshop",
       productType: "workshop_instance",
       name: "Avery Sonographer",
       email: "avery@example.com",
     });
-    expect(message.to).toBe("admin@allaboutultrasound.com");
+    expect(message.to.email).toBe(DEFAULT_PLATFORM_ADMIN_EMAIL);
     expect(message.subject).toContain("Adult Echo Workshop");
-    expect(message.text).toContain("Avery Sonographer");
-    expect(message.text).toContain("avery@example.com");
+    expect(message.htmlBody).toContain("Avery Sonographer");
+    expect(message.htmlBody).toContain("avery@example.com");
   });
 });

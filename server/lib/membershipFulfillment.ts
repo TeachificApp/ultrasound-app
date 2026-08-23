@@ -751,7 +751,8 @@ export async function cancelDuplicateStripeSubscriptions(opts: {
       console.warn(`[MembershipFulfillment] Duplicate subscription detected: ${sub.id} (active alongside ${opts.keepSubscriptionId}) — admin notified, no auto-cancel`);
     }
     if (duplicates.length > 0) {
-      const adminEmail = process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com";
+      const { getPlatformAdminRecipient } = await import("./platformAdminNotification");
+      const adminRecipient = getPlatformAdminRecipient("Platform Admin");
       const keepLink = `https://dashboard.stripe.com/subscriptions/${opts.keepSubscriptionId}`;
       const dupLinks = duplicates.map(id => `<a href="https://dashboard.stripe.com/subscriptions/${id}">${id}</a>`).join("<br>");
       // In-app notification
@@ -762,7 +763,7 @@ export async function cancelDuplicateStripeSubscriptions(opts: {
       // Admin email with instructions
       const { sendEmail } = await import("../_core/email");
       await sendEmail({
-        to: { name: "Platform Admin", email: adminEmail },
+        to: adminRecipient,
         subject: `⚠️ Duplicate Stripe Subscription — Action Required`,
         htmlBody: `
           <h2 style="color:#b91c1c;">Duplicate Stripe Subscription Detected</h2>

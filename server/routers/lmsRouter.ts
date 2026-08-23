@@ -116,6 +116,7 @@ import {
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
 import { generateDisclosurePdf } from "../lib/disclosurePdf";
 import { notifyOwner } from "../_core/notification";
+import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -1632,10 +1633,9 @@ export const lmsPublicRouter = router({
       // Notify admin of new waitlist signup
       try {
         await sendEmail({
-          to: "admin@allaboutultrasound.com",
+          to: getPlatformAdminRecipient(),
           subject: `New Waitlist Signup — Course Cohort Group #${input.cohortGroupId}`,
-          html: `<h2>New Cohort Waitlist Lead</h2><p><strong>Name:</strong> ${input.name}</p><p><strong>Email:</strong> ${input.email}</p>${input.phone ? `<p><strong>Phone:</strong> ${input.phone}</p>` : ""}<p><strong>Course ID:</strong> ${input.courseId}</p><p><strong>Cohort Group ID:</strong> ${input.cohortGroupId}</p>${input.message ? `<p><strong>Message:</strong> ${input.message}</p>` : ""}<p><em>Signed up at ${new Date().toUTCString()}</em></p>`,
-          text: `New Cohort Waitlist Lead\nName: ${input.name}\nEmail: ${input.email}${input.phone ? `\nPhone: ${input.phone}` : ""}\nCourse ID: ${input.courseId}\nCohort Group ID: ${input.cohortGroupId}${input.message ? `\nMessage: ${input.message}` : ""}`,
+          htmlBody: `<h2>New Cohort Waitlist Lead</h2><p><strong>Name:</strong> ${input.name}</p><p><strong>Email:</strong> ${input.email}</p>${input.phone ? `<p><strong>Phone:</strong> ${input.phone}</p>` : ""}<p><strong>Course ID:</strong> ${input.courseId}</p><p><strong>Cohort Group ID:</strong> ${input.cohortGroupId}</p>${input.message ? `<p><strong>Message:</strong> ${input.message}</p>` : ""}<p><em>Signed up at ${new Date().toUTCString()}</em></p>`,
         });
       } catch (e) {
         console.error("[waitlist] Failed to send admin notification:", e);
@@ -1866,7 +1866,7 @@ export const lmsDisclosurePublicRouter = router({
 
       // Send notification emails to admin and CardioServ defaults
       const notifyEmails = [
-        { email: "admin@allaboutultrasound.com", name: "Admin" },
+        getPlatformAdminRecipient(),
         { email: "don@cardioserv.net", name: "Don Gerig" },
         { email: "j.buckland@cardioserv.net", name: "Judith Buckland" },
       ];
@@ -1959,7 +1959,7 @@ export const lmsDisclosurePublicRouter = router({
       }
 
       const notifyEmails = [
-        { email: "admin@allaboutultrasound.com", name: "Admin" },
+        getPlatformAdminRecipient(),
         { email: "don@cardioserv.net", name: "Don Gerig" },
         { email: "j.buckland@cardioserv.net", name: "Judith Buckland" },
       ];

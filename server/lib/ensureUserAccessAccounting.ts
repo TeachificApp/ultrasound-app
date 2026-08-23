@@ -2,6 +2,9 @@ import { sql } from "drizzle-orm";
 import type { getDb } from "../db";
 import { ENV } from "../_core/env";
 import { PLATFORM_OWNER_EMAILS } from "../../shared/platformOwnerAccess";
+import {
+  platformAdminAccountEmailSqlList,
+} from "../../shared/platformAdminAccess";
 import { extractExecuteRows } from "./ensureLmsCoursesSchema";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -53,6 +56,81 @@ function platformOwnerMatchClause(): ReturnType<typeof sql> {
     );
   }
   return sql.raw(`LOWER(u.email) IN (${emailList})`);
+}
+
+function platformAdminAccountMatchClause(): ReturnType<typeof sql> {
+  return sql.raw(`LOWER(u.email) IN (${platformAdminAccountEmailSqlList()})`);
+}
+
+/** Idempotent: platform admin inbox accounts always get users.role=admin and platform_admin. */
+export async function ensurePlatformAdminAccountAccess(
+  db: Db | null | undefined,
+): Promise<{ adminFlagsSet: number; adminRolesBackfilled: number; usersEnsured: number }> {
+  if (!db) return { adminFlagsSet: 0, adminRolesBackfilled: 0, usersEnsured: 0 };
+
+  const { upsertUser, getUserByEmail } = await import("../db");
+  const { PLATFORM_ADMIN_ACCOUNT_EMAILS } = await import("../../shared/platformAdminAccess");
+  let usersEnsured = 0;
+  for (const email of PLATFORM_ADMIN_ACCOUNT_EMAILS) {
+    let user = await getUserByEmail(email);
+    if (!user) {
+      await upsertUser({
+        openId: `email:${email}`,
+        email,
+        name: "Platform Admin",
+        loginMethod: "email",
+        lastSignedIn: new Date(),
+      });
+      user = await getUserByEmail(email);
+      if (user) usersEnsured += 1;
+    }
+  }
+
+  const adminMatch = platformAdminAccountMatchClause();
+  const beforeMissingAdmin = await scalarCount(
+    db,
+    sql`SELECT COUNT(*) AS c FROM users u
+        WHERE ${adminMatch}
+          AND NOT EXISTS (
+            SELECT 1 FROM userRoles ur
+            WHERE ur.userId = u.id AND ur.role = 'platform_admin'
+          )`,
+  );
+
+  const adminUpdate = await db.execute(sql`
+    UPDATE users u
+    SET role = 'admin'
+    WHERE ${adminMatch}
+      AND (u.role IS NULL OR u.role != 'admin')
+  `);
+  const adminFlagsSet = Number((adminUpdate as { affectedRows?: number }).affectedRows ?? 0);
+
+  await db.execute(sql`
+    INSERT INTO userRoles (userId, role, assignedByUserId, createdAt)
+    SELECT u.id, 'platform_admin', u.id, NOW()
+    FROM users u
+    WHERE ${adminMatch}
+      AND NOT EXISTS (
+        SELECT 1 FROM userRoles ur
+        WHERE ur.userId = u.id AND ur.role = 'platform_admin'
+      )
+  `);
+
+  const afterMissingAdmin = await scalarCount(
+    db,
+    sql`SELECT COUNT(*) AS c FROM users u
+        WHERE ${adminMatch}
+          AND NOT EXISTS (
+            SELECT 1 FROM userRoles ur
+            WHERE ur.userId = u.id AND ur.role = 'platform_admin'
+          )`,
+  );
+
+  return {
+    adminFlagsSet,
+    adminRolesBackfilled: Math.max(0, beforeMissingAdmin - afterMissingAdmin),
+    usersEnsured,
+  };
 }
 
 /** Idempotent: platform/site owners always get users.role=admin, platform_owner, and platform_admin. */
@@ -309,6 +387,7 @@ export async function ensureUserAccessAccounting(
   }
 
   const ownerAccess = await ensurePlatformOwnerAccess(db);
+  const platformAdminAccess = await ensurePlatformAdminAccountAccess(db);
 
   const { backfillUserOpenIds } = await import("./backfillUserOpenIds");
   const openIdResult = await backfillUserOpenIds(db);
@@ -319,10 +398,13 @@ export async function ensureUserAccessAccounting(
     ownerAccess.ownerRolesBackfilled > 0 ||
     ownerAccess.adminRolesBackfilled > 0 ||
     ownerAccess.adminFlagsSet > 0 ||
+    platformAdminAccess.adminRolesBackfilled > 0 ||
+    platformAdminAccess.adminFlagsSet > 0 ||
+    platformAdminAccess.usersEnsured > 0 ||
     openIdResult.updated > 0
   ) {
     console.log(
-      `[ensureUserAccessAccounting] baseRoles=${baseRolesBackfilled}, platformAdmin=${platformAdminRolesBackfilled}, platformOwner=${ownerAccess.ownerRolesBackfilled}, ownerPlatformAdmin=${ownerAccess.adminRolesBackfilled}, ownerAdminFlags=${ownerAccess.adminFlagsSet}, openIds=${openIdResult.updated}`,
+      `[ensureUserAccessAccounting] baseRoles=${baseRolesBackfilled}, platformAdmin=${platformAdminRolesBackfilled}, platformOwner=${ownerAccess.ownerRolesBackfilled}, ownerPlatformAdmin=${ownerAccess.adminRolesBackfilled}, ownerAdminFlags=${ownerAccess.adminFlagsSet}, platformAdminAccounts=${platformAdminAccess.adminRolesBackfilled}, platformAdminUsersEnsured=${platformAdminAccess.usersEnsured}, openIds=${openIdResult.updated}`,
     );
   }
 

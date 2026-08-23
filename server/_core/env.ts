@@ -1,3 +1,5 @@
+import { resolvePlatformAdminEmail } from "../../shared/platformAdminEmail";
+
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? process.env.APP_ID ?? "ultrasound-app",
   appUrl: process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com",
@@ -19,7 +21,7 @@ export const ENV = {
   thinkificAdminEmail: process.env.THINKIFIC_ADMIN_EMAIL ?? "",
   thinkificAdminPassword: process.env.THINKIFIC_ADMIN_PASSWORD ?? "",
   thinkificGraphqlJwt: process.env.THINKIFIC_GRAPHQL_JWT ?? "",
-  platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com",
+  platformAdminEmail: resolvePlatformAdminEmail(process.env.PLATFORM_ADMIN_EMAIL),
   printfulApiKey: process.env.PRINTFUL_API_KEY ?? "",
   printfulDefaultStoreId: process.env.PRINTFUL_DEFAULT_STORE_ID ?? "",
   printfulShippingMethod: process.env.PRINTFUL_SHIPPING_METHOD ?? "STANDARD",

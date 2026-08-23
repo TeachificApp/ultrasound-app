@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { ENV } from "./env";
 import { logAdminNotification } from "../lib/logAdminNotification";
+import { getPlatformAdminNotificationEmail, getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 
 export type NotificationPayload = {
   title: string;
@@ -49,7 +50,7 @@ export async function sendAdminAlert(title: string, content: string): Promise<vo
   const fromName = process.env.SENDGRID_FROM_NAME || "All About Ultrasound";
   // PLATFORM_ADMIN_EMAIL is the single source of truth for who receives admin alerts.
   // Set this env var to the client's email address for consulting projects.
-  const adminEmail = ENV.platformAdminEmail || "admin@allaboutultrasound.com";
+  const adminEmail = getPlatformAdminNotificationEmail();
 
   if (!sendgridKey) {
     console.warn("[Notification] SENDGRID_API_KEY not set — admin alert email skipped.");
@@ -74,7 +75,7 @@ export async function sendAdminAlert(title: string, content: string): Promise<vo
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        personalizations: [{ to: [{ email: adminEmail, name: "Admin" }] }],
+        personalizations: [{ to: [getPlatformAdminRecipient("Admin")] }],
         from: { email: fromEmail, name: fromName },
         subject: `[Admin Alert] ${title}`,
         content: [{ type: "text/html", value: htmlBody }],
