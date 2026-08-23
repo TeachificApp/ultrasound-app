@@ -3816,37 +3816,46 @@ export const lmsLearnerRouter = router({
         .limit(1);
       let myGroup = null;
       if (myGroupEnrollment) {
-        const [g] = await db.select().from(lmsCohortGroups).where(eq(lmsCohortGroups.id, myGroupEnrollment.cohortGroupId)).limit(1);
-        myGroup = g ?? null;
+        const { getCohortGroupById } = await import("../lib/cohortGroupQuery");
+        myGroup = await getCohortGroupById(db, myGroupEnrollment.cohortGroupId);
       }
       // When multi-cohort mode is on, filter content by the student's group
       const groupId = course.multiCohortMode && myGroup ? myGroup.id : null;
-      const resourceWhere = groupId
-        ? and(
-            eq(lmsCohortResources.courseId, input.courseId),
-            eq(lmsCohortResources.status, "published"),
-            or(isNull(lmsCohortResources.cohortGroupId), eq(lmsCohortResources.cohortGroupId, groupId)),
-          )
-        : and(
-            eq(lmsCohortResources.courseId, input.courseId),
-            eq(lmsCohortResources.status, "published"),
-          );
+      const { cohortCourseContentWhere } = await import("../lib/cohortGroupQuery");
+      const resourceWhere = cohortCourseContentWhere(
+        lmsCohortResources.courseId,
+        lmsCohortResources.cohortGroupId,
+        input.courseId,
+        groupId ?? undefined,
+        eq(lmsCohortResources.status, "published"),
+      );
       const [sessions, assignments, recordings, resourceRows, mySubmissions] = await Promise.all([
         db.select().from(lmsCohortSessions)
-          .where(groupId
-            ? and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.cohortGroupId, groupId))
-            : eq(lmsCohortSessions.courseId, input.courseId))
+          .where(cohortCourseContentWhere(
+            lmsCohortSessions.courseId,
+            lmsCohortSessions.cohortGroupId,
+            input.courseId,
+            groupId ?? undefined,
+          ))
           .orderBy(asc(lmsCohortSessions.sessionDate)),
         db.select().from(lmsCohortAssignments)
-          .where(groupId
-            ? and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published"), eq(lmsCohortAssignments.cohortGroupId, groupId))
-            : and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published")))
+          .where(cohortCourseContentWhere(
+            lmsCohortAssignments.courseId,
+            lmsCohortAssignments.cohortGroupId,
+            input.courseId,
+            groupId ?? undefined,
+            eq(lmsCohortAssignments.status, "published"),
+          ))
           .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.dueDate)),
         (async () => {
           const recs = await db.select().from(lmsCohortRecordings)
-            .where(groupId
-              ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published"), eq(lmsCohortRecordings.cohortGroupId, groupId))
-              : and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published")))
+            .where(cohortCourseContentWhere(
+              lmsCohortRecordings.courseId,
+              lmsCohortRecordings.cohortGroupId,
+              input.courseId,
+              groupId ?? undefined,
+              eq(lmsCohortRecordings.status, "published"),
+            ))
             .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt));
           // Enrich recordings that have a sessionId with the linked session's title and date
           const sessionIds = recs.map(r => r.sessionId).filter((id): id is number => id != null);
@@ -3884,8 +3893,8 @@ export const lmsLearnerRouter = router({
         .where(and(eq(lmsCohortGroupEnrollments.userId, ctx.user.id), eq(lmsCohortGroupEnrollments.courseId, input.courseId)))
         .limit(1);
       if (!groupEnrollment) return null;
-      const [group] = await db.select().from(lmsCohortGroups).where(eq(lmsCohortGroups.id, groupEnrollment.cohortGroupId)).limit(1);
-      return group ?? null;
+      const { getCohortGroupById } = await import("../lib/cohortGroupQuery");
+      return getCohortGroupById(db, groupEnrollment.cohortGroupId);
     }),
 
   submitCohortAssignment: protectedProcedure

@@ -1,8 +1,34 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, and, eq, isNull, or, type SQL } from "drizzle-orm";
 import { lmsCohortGroups } from "../../drizzle/schema";
 import type { getDb } from "../db";
+import type { AnyColumn } from "drizzle-orm";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+/**
+ * When a cohort group is selected, include both group-specific rows and course-wide
+ * rows (cohort_group_id IS NULL). Manus-era content was often stored at course scope.
+ */
+export function cohortGroupScopeFilter(
+  cohortGroupIdColumn: AnyColumn,
+  cohortGroupId: number | undefined,
+): SQL | undefined {
+  if (!cohortGroupId) return undefined;
+  return or(isNull(cohortGroupIdColumn), eq(cohortGroupIdColumn, cohortGroupId));
+}
+
+export function cohortCourseContentWhere(
+  courseIdColumn: AnyColumn,
+  cohortGroupIdColumn: AnyColumn,
+  courseId: number,
+  cohortGroupId?: number,
+  extra?: SQL,
+): SQL {
+  const base = cohortGroupId
+    ? and(eq(courseIdColumn, courseId), cohortGroupScopeFilter(cohortGroupIdColumn, cohortGroupId))
+    : eq(courseIdColumn, courseId);
+  return extra ? and(base, extra) : base;
+}
 
 /** Columns present in the original Manus/Railway mirror (0007 migration). */
 export const cohortGroupBaseSelect = {
