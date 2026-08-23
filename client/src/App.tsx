@@ -793,6 +793,7 @@ function MembersRouter() {
           <Suspense fallback={pageFallback}>
             <Switch>
               <Route path="/my-dashboard" component={StudentDashboardPage} />
+              <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/teach" component={TeachDashboard} />
@@ -984,6 +985,7 @@ function LMSRouter() {
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/memberships/:slug">{() => <Suspense fallback={pageFallback}><MembershipPage /></Suspense>}</Route>
@@ -1268,7 +1270,7 @@ function IHeartEchoRouter() {
 /** Single-segment paths that are app routes, never funnel slugs (/:slug catch-all guard). */
 const RESERVED_FUNNEL_SLUGS = new Set([
   "platform-admin", "login", "register", "logout", "admin", "premium", "profile",
-  "enrolled", "upgrade-success", "my-dashboard", "my-team", "my-downloads",
+  "enrolled", "upgrade-success", "my-dashboard", "my-quizzes", "my-team", "my-downloads",
   "education-library", "downloads", "courses", "products", "forms", "community",
   "career-network", "careernetwork", "employer", "accreditation", "lab-admin",
   "diy-member", "diy-register", "magic-link", "verify-email", "forgot-password",
