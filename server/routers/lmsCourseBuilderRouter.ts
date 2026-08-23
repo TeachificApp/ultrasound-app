@@ -20,7 +20,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
@@ -316,7 +316,7 @@ export const lmsCourseBuilderRouter = router({
               const courseTitle = course?.title ?? `Course #${id}`;
               const courseUrl = course?.slug ? `https://learn.allaboutultrasound.com/courses/${course.slug}` : "";
               await sendEmail({
-                to: { name: "Admin", email: process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com" },
+                to: getPlatformAdminRecipient(),
                 subject: `[Action Required] ${waitlist.length} waitlisted visitor${waitlist.length !== 1 ? "s" : ""} for "${courseTitle}" — course is now live`,
                 htmlBody: `<p>The course <strong>${courseTitle}</strong> has been published.</p>
 <p><strong>${waitlist.length} visitor${waitlist.length !== 1 ? "s" : ""}</strong> signed up to be notified when enrollment opens:</p>

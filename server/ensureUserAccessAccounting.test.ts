@@ -20,7 +20,16 @@ describe("ensureUserAccessAccounting", () => {
     expect(source).toContain("platform_admin");
     expect(source).toContain("platform_owner");
     expect(source).toContain("ensurePlatformOwnerAccess");
+    expect(source).toContain("ensurePlatformAdminAccountAccess");
     expect(source).toContain("backfillUserOpenIds");
+  });
+
+  it("includes platform admin account allowlist", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(new URL("../shared/platformAdminAccess.ts", import.meta.url), "utf8"),
+    );
+    expect(source).toContain("DEFAULT_PLATFORM_ADMIN_EMAIL");
+    expect(source).toContain("PLATFORM_ADMIN_ACCOUNT_EMAILS");
   });
 
   it("includes platform owner email allowlist", async () => {

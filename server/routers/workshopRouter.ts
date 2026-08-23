@@ -1652,11 +1652,11 @@ export const workshopWaitlistRouter = router({
       // Notify admin of new waitlist signup
       try {
         const { sendEmail } = await import("../_core/email");
+        const { getPlatformAdminRecipient } = await import("../lib/platformAdminNotification");
         await sendEmail({
-          to: "admin@allaboutultrasound.com",
+          to: getPlatformAdminRecipient(),
           subject: `New Waitlist Signup — Workshop #${input.workshopId}`,
-          html: `<h2>New Workshop Waitlist Lead</h2><p><strong>Name:</strong> ${input.name}</p><p><strong>Email:</strong> ${input.email}</p>${input.phone ? `<p><strong>Phone:</strong> ${input.phone}</p>` : ""}<p><strong>Workshop ID:</strong> ${input.workshopId}</p>${input.message ? `<p><strong>Message:</strong> ${input.message}</p>` : ""}<p><em>Signed up at ${new Date().toUTCString()}</em></p>`,
-          text: `New Workshop Waitlist Lead\nName: ${input.name}\nEmail: ${input.email}${input.phone ? `\nPhone: ${input.phone}` : ""}\nWorkshop ID: ${input.workshopId}${input.message ? `\nMessage: ${input.message}` : ""}`,
+          htmlBody: `<h2>New Workshop Waitlist Lead</h2><p><strong>Name:</strong> ${input.name}</p><p><strong>Email:</strong> ${input.email}</p>${input.phone ? `<p><strong>Phone:</strong> ${input.phone}</p>` : ""}<p><strong>Workshop ID:</strong> ${input.workshopId}</p>${input.message ? `<p><strong>Message:</strong> ${input.message}</p>` : ""}<p><em>Signed up at ${new Date().toUTCString()}</em></p>`,
         });
       } catch (e) {
         console.error("[waitlist] Failed to send admin notification:", e);

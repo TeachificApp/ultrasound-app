@@ -1,3 +1,5 @@
+import { getPlatformAdminRecipient } from "./platformAdminNotification";
+
 export function buildContentWaitlistAdminNotification({
   title,
   productType,
@@ -10,9 +12,8 @@ export function buildContentWaitlistAdminNotification({
   email: string;
 }) {
   return {
-    to: "admin@allaboutultrasound.com",
+    to: getPlatformAdminRecipient(),
     subject: `New Waitlist Signup — ${title}`,
-    html: `<h2>New Waitlist Signup</h2><p><strong>Product:</strong> ${title}</p><p><strong>Type:</strong> ${productType}</p><p><strong>Name:</strong> ${name}</p><p><strong>Email:</strong> ${email}</p>`,
-    text: `New Waitlist Signup\nProduct: ${title}\nType: ${productType}\nName: ${name}\nEmail: ${email}`,
+    htmlBody: `<h2>New Waitlist Signup</h2><p><strong>Product:</strong> ${title}</p><p><strong>Type:</strong> ${productType}</p><p><strong>Name:</strong> ${name}</p><p><strong>Email:</strong> ${email}</p>`,
   };
 }
