@@ -321,6 +321,7 @@ export default function Login() {
                 <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-700 leading-relaxed space-y-1">
                   <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>
+                  <p>Didn't request this? Someone may have entered your email by mistake — you can ignore the message.</p>
                   <p>&#128236; <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder &mdash; the email comes from <span className="font-medium">{BRAND_NAME}</span>.</p>
                 </div>
               </div>
