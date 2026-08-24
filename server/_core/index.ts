@@ -518,6 +518,25 @@ async function startServer() {
     const after = await auditUserAccess(db);
     res.json({ before, reconcile, after, deployedAt: new Date().toISOString() });
   });
+  app.get("/api/debug/email-alias-audit", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { auditEmailAliasIntegrity } = await import("../lib/ensureEmailAliasIntegrity");
+    const db = await getDb();
+    const audit = await auditEmailAliasIntegrity(db);
+    res.json({ audit, deployedAt: new Date().toISOString() });
+  });
+  app.post("/api/debug/email-alias-reconcile", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const {
+      auditEmailAliasIntegrity,
+      ensureEmailAliasIntegrity,
+    } = await import("../lib/ensureEmailAliasIntegrity");
+    const db = await getDb();
+    const before = await auditEmailAliasIntegrity(db);
+    const reconcile = await ensureEmailAliasIntegrity(db);
+    const after = await auditEmailAliasIntegrity(db);
+    res.json({ before, reconcile, after, deployedAt: new Date().toISOString() });
+  });
   app.get("/api/debug/user-by-email", async (req, res) => {
     const email = String(req.query.email ?? "").trim().toLowerCase();
     if (!email) {
@@ -969,7 +988,9 @@ async function startServer() {
       .then(async (db) => {
         if (!db) return;
         const { ensureUserAccessAccounting } = await import("../lib/ensureUserAccessAccounting");
-        return ensureUserAccessAccounting(db);
+        const { ensureEmailAliasIntegrity } = await import("../lib/ensureEmailAliasIntegrity");
+        await ensureUserAccessAccounting(db);
+        return ensureEmailAliasIntegrity(db);
       })
       .catch((err) => console.error("[ensureUserAccessAccounting] Error:", err));
     // Auto-create manualInvoices table if it doesn't exist (production DB migration)
