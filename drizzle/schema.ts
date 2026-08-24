@@ -6257,7 +6257,8 @@ export type InsertEmailSendLog = typeof emailSendLog.$inferInsert;
 // ─── User Email Aliases ───────────────────────────────────────────────────────
 // Allows a user to log in with multiple email addresses.
 // The primary email is always stored on users.email; aliases are secondary.
-// Magic links are ALWAYS sent to users.email (primary), never to an alias.
+// Auth emails (magic link, password reset) are sent to the address the user typed,
+// whether primary or alias — never redirected to users.email alone.
 export const userEmailAliases = mysqlTable("user_email_aliases", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("user_id").notNull(),
