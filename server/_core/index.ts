@@ -210,6 +210,8 @@ async function startServer() {
   });
   // Temporary debug endpoint to test sending an email via SendGrid
   app.get("/api/debug/test-email", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const to = req.query.to as string;
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
     const { sendEmail } = await import("./email");
@@ -257,6 +259,8 @@ async function startServer() {
     });
   });
   app.post("/api/debug/clear-email-suppression", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const email = String(req.query.email ?? (req.body as { email?: string })?.email ?? "")
       .trim()
       .toLowerCase();
@@ -294,6 +298,8 @@ async function startServer() {
     });
   });
   app.get("/api/debug/test-password-reset", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const to = String(req.query.to ?? "").trim().toLowerCase();
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
     const origin = String(req.query.origin ?? "https://learn.allaboutultrasound.com");
@@ -356,6 +362,8 @@ async function startServer() {
     });
   });
   app.get("/api/debug/test-magic-link", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const to = String(req.query.to ?? "").trim().toLowerCase();
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
     const origin = String(req.query.origin ?? "https://learn.allaboutultrasound.com");
@@ -406,6 +414,8 @@ async function startServer() {
     });
   });
   app.get("/api/debug/owner-login-link", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const email = String(req.query.email ?? "").trim().toLowerCase();
     if (!email) return res.status(400).json({ error: "Pass ?email=owner@example.com" });
     const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
