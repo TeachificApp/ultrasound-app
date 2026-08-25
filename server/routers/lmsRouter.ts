@@ -941,6 +941,7 @@ export const lmsRouter = router({
 });
 
 export const lmsAdminRouter = router({
+  ...lmsRouter._def.procedures,
   ...lmsCourseBuilderRouter._def.procedures,
   ...lmsQuizLandingRouter._def.procedures,
   ...lmsEnrollmentAdminRouter._def.procedures,
