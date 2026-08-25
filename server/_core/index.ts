@@ -208,6 +208,11 @@ async function startServer() {
     const fromName = process.env.SENDGRID_FROM_NAME || "NOT SET";
     res.json({ hasSendGridKey, keyPrefix, fromEmail, fromName, deployedAt: new Date().toISOString() });
   });
+  // Diagnose AI / OpenAI env vars (prefixes only — never full secrets)
+  app.get("/api/debug/ai-status", async (_req, res) => {
+    const { getAiEnvDiagnostics } = await import("../lib/openAiConfig");
+    res.json({ ...getAiEnvDiagnostics(), deployedAt: new Date().toISOString() });
+  });
   // Temporary debug endpoint to test sending an email via SendGrid
   app.get("/api/debug/test-email", async (req, res) => {
     const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
