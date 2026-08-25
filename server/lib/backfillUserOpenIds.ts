@@ -1,12 +1,12 @@
 /**
  * One-time / idempotent backfill: assign stable openId to users missing it.
  *
- * Required for SSO bridge + magic link when legacy rows have openId = NULL.
- * Matches server/lib/ensureUserOpenId.ts: email:{lowercase-email} or user:{id}.
+ * Required for SSO bridge + magic link when legacy rows have openId = NULL
+ * or stale pending_* stub ids from admin pre-registration.
  */
-import { eq, isNull, or, sql } from "drizzle-orm";
+import { eq, isNull, or, sql, like } from "drizzle-orm";
 import { users } from "../../drizzle/schema";
-import { emailOpenId } from "./ensureUserOpenId";
+import { emailOpenId, isStaleSyntheticOpenId } from "./ensureUserOpenId";
 
 export type BackfillUserOpenIdsResult = {
   updated: number;
@@ -24,6 +24,7 @@ export async function backfillUserOpenIds(
       or(
         isNull(users.openId),
         sql`${users.openId} = ''`,
+        like(users.openId, "pending_%"),
       ),
     );
 
@@ -35,6 +36,16 @@ export async function backfillUserOpenIds(
     const targetOpenId = user.email?.trim()
       ? emailOpenId(user.email)
       : `user:${user.id}`;
+
+    if (user.openId === targetOpenId) {
+      skipped++;
+      continue;
+    }
+
+    if (user.openId && !isStaleSyntheticOpenId(user.openId) && user.openId !== targetOpenId) {
+      skipped++;
+      continue;
+    }
 
     try {
       const [conflict] = await db
