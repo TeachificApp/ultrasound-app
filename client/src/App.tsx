@@ -44,6 +44,7 @@ import ResetPassword from "./pages/ResetPassword";
 import MagicLinkRequest from "./pages/MagicLinkRequest";
 import MagicLinkCallback from "./pages/MagicLinkCallback";
 import MagicLinkError from "./pages/MagicLinkError";
+import AccessLinkError from "./pages/AccessLinkError";
 import AccessLinkCallback from "./pages/AccessLinkCallback";
 import Enrolled from "./pages/Enrolled";
 import Unsubscribe from "./pages/Unsubscribe";
@@ -388,6 +389,7 @@ function Router() {
         <Route path="/auth/magic" component={MagicLinkCallback} />
         {/* /auth/magic-error is shown when the server-side GET verify fails */}
         <Route path="/auth/magic-error" component={MagicLinkError} />
+        <Route path="/auth/access-error" component={AccessLinkError} />
         {/* /auth/access is used in purchase/access emails — persistent reusable token */}
         <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />
@@ -1047,6 +1049,7 @@ function IHeartEchoRouter() {
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/auth/magic-error" component={MagicLinkError} />
+        <Route path="/auth/access-error" component={AccessLinkError} />
         <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />

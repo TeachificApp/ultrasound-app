@@ -1517,7 +1517,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         }
         // Build access URL — clicking this auto-signs the user in
         const accessUrl = accessTokenForEmail
-          ? `${baseUrl}/auth/access?token=${accessTokenForEmail}&next=${encodeURIComponent(baseUrl)}`
+          ? buildPersistentAccessUrl(baseUrl, accessTokenForEmail)
           : setPasswordUrl;
         // Send welcome + set-password email
         try {

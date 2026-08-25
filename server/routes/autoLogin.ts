@@ -19,6 +19,8 @@ import { autoLoginTokens, users } from "../../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
 import { sendAuthRedirectHtml, withAuthPending } from "../lib/sendAuthRedirectHtml";
+import { ensureUserOpenId } from "../lib/ensureUserOpenId";
+import { resolveAccessRedirectUrl } from "../lib/accessTokenVerify";
 
 /** Generate a cryptographically secure random token */
 function randomToken(): string {
@@ -62,7 +64,7 @@ export async function generateAutoLoginToken(
  */
 export function registerAutoLoginRoute(app: Express) {
   app.get("/api/auth/auto-login", async (req: Request, res: Response) => {
-    const { token, host: hostParam } = req.query as Record<string, string>;
+    const { token, host: hostParam, next: nextParam } = req.query as Record<string, string>;
 
     if (!token) {
       return res.redirect("/?error=missing_token");
@@ -99,7 +101,7 @@ export function registerAutoLoginRoute(app: Express) {
           return res.redirect("/?error=token_expired&message=Please+sign+in+to+access+your+content");
         }
 
-        const openId = accessUser.openId ?? emailOpenId(accessUser.email ?? `user_${accessUser.id}`);
+        const openId = await ensureUserOpenId(db, accessUser);
         const sessionToken = await sdk.createSessionToken(openId, {
           name: accessUser.name ?? accessUser.email ?? "",
           expiresInMs: ONE_YEAR_MS,
@@ -118,7 +120,7 @@ export function registerAutoLoginRoute(app: Express) {
           method: "auto_login",
         });
 
-        const redirectUrl = withAuthPending("/my-dashboard");
+        const redirectUrl = resolveAccessRedirectUrl(nextParam || "/my-dashboard");
         console.log(
           `[AutoLogin] User ${accessUser.id} (${accessUser.email}) auto-logged in via persistent accessToken fallback`,
         );
