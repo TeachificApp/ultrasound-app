@@ -25,8 +25,7 @@
  * });
  * ```
  */
-import { ENV } from "./env";
-import { getOpenAiApiKey, openAiV1Url } from "../lib/openAiConfig";
+import { getOpenAiApiKey, getOpenAiApiRoot, openAiV1Url } from "../lib/openAiConfig";
 
 export type TranscribeOptions = {
   audioUrl: string; // URL to the audio file (e.g., S3 URL)
@@ -76,18 +75,16 @@ export async function transcribeAudio(
 ): Promise<TranscriptionResponse | TranscriptionError> {
   try {
     // Step 1: Validate environment configuration
-    if (!ENV.forgeApiUrl) {
+    try {
+      getOpenAiApiRoot();
+      getOpenAiApiKey();
+    } catch (err) {
+      const details =
+        err instanceof Error ? err.message : "AI API credentials are not configured";
       return {
         error: "Voice transcription service is not configured",
         code: "SERVICE_ERROR",
-        details: "BUILT_IN_FORGE_API_URL is not set"
-      };
-    }
-    if (!ENV.forgeApiKey) {
-      return {
-        error: "Voice transcription service authentication is missing",
-        code: "SERVICE_ERROR",
-        details: "BUILT_IN_FORGE_API_KEY is not set"
+        details,
       };
     }
 
