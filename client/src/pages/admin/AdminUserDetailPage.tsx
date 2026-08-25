@@ -18,7 +18,7 @@ import {
   RefreshCw, Loader2, ChevronRight, ChevronLeft, ShoppingCart,
   UserCog, PlusCircle, Trash2, Shield, ShieldOff, BadgeCheck,
   ClipboardCheck, RotateCcw, DollarSign, Edit3, GitMerge, Mail, X,
-  Users2, Users, Building2, Star, Layers, KeyRound, Eye, EyeOff, Calendar,
+  Users2, Users, Building2, Star, Layers, KeyRound, Eye, EyeOff, Calendar, ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -227,6 +227,13 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: (res) => toast.success(`Password reset email sent to ${res.email}`),
     onError: (e) => toast.error(e.message),
   });
+  const repairUserAccess = trpc.adminUser.repairUserAccess.useMutation({
+    onSuccess: (res) =>
+      toast.success(
+        `Access repaired for ${res.email} — ${res.enrollmentEmailsSent} enrollment email(s) sent.`,
+      ),
+    onError: (e) => toast.error(e.message),
+  });
   const setPasswordMutation = trpc.adminUser.setPassword.useMutation({
     onSuccess: (res) => { toast.success(`Password updated for ${res.email}`); setSetPwOpen(false); setNewPassword(""); },
     onError: (e) => toast.error(e.message),
@@ -293,6 +300,19 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
               <div className="flex gap-2 flex-shrink-0">
                 <Button size="sm" variant="outline" onClick={handleEditOpen} className="gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50">
                   <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => repairUserAccess.mutate({ userId })}
+                  disabled={repairUserAccess.isPending}
+                  className="gap-1.5 text-teal-800 border-teal-300 hover:bg-teal-50"
+                  title="Clear email blocks, fix login identity, regenerate access link, and resend enrollment emails"
+                >
+                  {repairUserAccess.isPending
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <ShieldCheck className="w-3.5 h-3.5" />}
+                  Repair Access
                 </Button>
                 <Button
                   size="sm"
