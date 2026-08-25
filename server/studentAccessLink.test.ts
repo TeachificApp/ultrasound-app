@@ -59,6 +59,6 @@ describe("student access link fixes", () => {
       fs.readFile(new URL("./_core/index.ts", import.meta.url), "utf8"),
     );
     expect(source).toContain("/api/debug/repair-user-access");
-    expect(source).toContain("regenerateAccessToken");
+    expect(source).toContain("repairUserAccess");
   });
 });

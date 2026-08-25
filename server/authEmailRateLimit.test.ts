@@ -81,4 +81,20 @@ describe("checkAuthEmailRateLimit", () => {
     });
     expect(result).toEqual({ allowed: true });
   });
+
+  it("allows sends when Drizzle wraps a missing auth_email_send_log table error", async () => {
+    mockWhere.mockRejectedValueOnce(
+      new Error(
+        "Failed query: select count(*) from `auth_email_send_log` where (`auth_email_send_log`.`email` = ?)",
+      ),
+    );
+
+    const { checkAuthEmailRateLimit } = await import("./lib/authEmailRateLimit");
+    const result = await checkAuthEmailRateLimit({
+      email: "user@example.com",
+      type: "magic_link",
+      ipAddress: "1.2.3.4",
+    });
+    expect(result).toEqual({ allowed: true });
+  });
 });

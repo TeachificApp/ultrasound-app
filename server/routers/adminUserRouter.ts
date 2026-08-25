@@ -3057,6 +3057,9 @@ export const adminUserRouter = router({
 
       if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
+      const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
+      await ensureTransactionalEmailDelivery(user.email);
+
       // Generate a secure reset token (valid for 24 hours for admin-initiated resets)
       const resetToken = crypto.randomBytes(32).toString("hex");
       const resetExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -3122,6 +3125,33 @@ export const adminUserRouter = router({
         })
         .where(eq(users.id, user.id));
       return { success: true, email: user.email };
+    }),
+
+  /** Clear SendGrid blocks, fix openId, regenerate access token, resend all enrollment emails. */
+  repairUserAccess: protectedProcedure
+    .input(z.object({ userId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [user] = await db
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+
+      if (!user?.email) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "User not found or has no email" });
+      }
+
+      const { repairUserAccess } = await import("../lib/repairUserAccess");
+      try {
+        return await repairUserAccess(user.email);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Repair failed";
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      }
     }),
 
   /** Resend the enrollment welcome / access email for a specific enrollment */

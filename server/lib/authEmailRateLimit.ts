@@ -12,13 +12,23 @@ import { getDb } from "../db";
 
 const HOUR_MS = 60 * 60 * 1000;
 
+function formatSqlError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = (error as Error & { cause?: unknown }).cause;
+  const parts = [error.message];
+  if (cause instanceof Error) parts.push(cause.message);
+  return parts.join(" | ");
+}
+
 /** Gracefully allow sends when the log table is missing (pre-migration). */
 function isMissingAuthEmailLogTable(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes("auth_email_send_log") && (
+  const message = formatSqlError(error).toLowerCase();
+  if (!message.includes("auth_email_send_log")) return false;
+  return (
     message.includes("doesn't exist")
-    || message.includes("Unknown table")
-    || message.includes("ER_NO_SUCH_TABLE")
+    || message.includes("unknown table")
+    || message.includes("er_no_such_table")
+    || message.includes("failed query")
   );
 }
 
