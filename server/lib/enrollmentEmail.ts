@@ -96,8 +96,13 @@ async function deliverEmail(opts: {
   subject: string;
   htmlBody: string;
 }): Promise<boolean> {
-  // Use the shared sendEmail() so all enrollment emails go through the verified
-  // SendGrid sender (SENDGRID_FROM_EMAIL) and are logged to email_send_log.
+  try {
+    const { ensureTransactionalEmailDelivery } = await import("./ensureTransactionalEmailDelivery");
+    await ensureTransactionalEmailDelivery(opts.to.email);
+  } catch (err) {
+    console.warn("[enrollmentEmail] Suppression clear failed (non-fatal):", err);
+  }
+
   return sendEmail({
     to: opts.to,
     subject: opts.subject,
