@@ -62,7 +62,7 @@ import { storagePut } from "../storage";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail, emailWrapper } from "../_core/email";
-import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail } from "../lib/enrollmentEmail";
+import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail, buildPersistentAccessUrl } from "../lib/enrollmentEmail";
 import { getOrCreateAccessToken } from "../db";
 import { getBrandDisplayConfig } from "../../shared/brands";
 import { generateAutoLoginToken } from "../routes/autoLogin";
@@ -3261,7 +3261,9 @@ export const adminUserRouter = router({
       let accessToken: string | null = null;
       try { accessToken = await getOrCreateAccessToken(input.userId); } catch { /* non-fatal */ }
       const baseUrl = "https://app.allaboutultrasound.com";
-      const accessUrl = accessToken ? `${baseUrl}/api/auth/auto-login?token=${accessToken}` : `${baseUrl}/dashboard`;
+      const accessUrl = accessToken
+        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessToken)
+        : `${baseUrl}/dashboard`;
 
       const htmlBody = emailWrapper(`
         <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>

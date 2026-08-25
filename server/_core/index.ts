@@ -545,6 +545,7 @@ async function startServer() {
     }
     const { getDb, getUserByEmail, getUserRoles } = await import("../db");
     const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+    const { diagnoseUserAccess } = await import("../lib/userAccessDiagnosis");
     const db = await getDb();
     const user = await getUserByEmail(email);
     if (!user) {
@@ -557,6 +558,7 @@ async function startServer() {
       roles.includes("platform_admin") ||
       hasPlatformOwner ||
       user.role === "admin";
+    const diagnosis = db ? await diagnoseUserAccess(db, email, user.accessToken) : null;
     res.json({
       found: true,
       email,
@@ -568,11 +570,63 @@ async function startServer() {
         isPending: user.isPending,
         name: user.name,
         loginMethod: user.loginMethod,
+        hasAccessToken: Boolean(user.accessToken),
       },
       roles,
       hasPlatformOwner,
       hasPlatformAdmin,
       isPlatformOwnerEmail: isPlatformOwnerEmail(user.email),
+      diagnosis,
+      deployedAt: new Date().toISOString(),
+    });
+  });
+  app.post("/api/debug/repair-user-access", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
+    const email = String(req.query.email ?? (req.body as { email?: string })?.email ?? "")
+      .trim()
+      .toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass email in JSON body or ?email=" });
+
+    const { getDb, getUserByEmail, regenerateAccessToken } = await import("../db");
+    const { diagnoseUserAccess } = await import("../lib/userAccessDiagnosis");
+    const { sendEnrollmentEmailForUser } = await import("../lib/enrollmentEmail");
+    const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
+    const { clearSendGridSuppressionLists } = await import("../lib/sendgridSuppressions");
+    const { ensureUserOpenId } = await import("../lib/ensureUserOpenId");
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+
+    const user = await getUserByEmail(email);
+    if (!user) return res.status(404).json({ error: "User not found", email });
+
+    await clearSendGridSuppressionLists(email);
+    const deliveryPrep = await ensureTransactionalEmailDelivery(email);
+    await ensureUserOpenId(db, user);
+    const accessToken = await regenerateAccessToken(user.id);
+
+    const resendEnrollment = (req.body as { resendEnrollment?: boolean })?.resendEnrollment !== false;
+    let enrollmentEmailsSent = 0;
+    if (resendEnrollment) {
+      const beforeDiagnosis = await diagnoseUserAccess(db, email, accessToken);
+      for (const enrollment of beforeDiagnosis.enrollments) {
+        const sent = await sendEnrollmentEmailForUser({
+          userId: user.id,
+          courseId: enrollment.courseId,
+          db,
+        });
+        if (sent) enrollmentEmailsSent += 1;
+      }
+    }
+
+    const diagnosis = await diagnoseUserAccess(db, email, accessToken);
+    res.json({
+      email,
+      userId: user.id,
+      accessTokenRegenerated: true,
+      deliveryPrep,
+      enrollmentEmailsSent,
+      diagnosis,
       deployedAt: new Date().toISOString(),
     });
   });

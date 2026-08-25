@@ -87,9 +87,42 @@ export function registerAutoLoginRoute(app: Express) {
         .limit(1);
 
       if (!record) {
-        console.warn("[AutoLogin] Token not found, already used, or expired:", token.substring(0, 12) + "...");
-        // Redirect to login page with a helpful message
-        return res.redirect("/?error=token_expired&message=Please+sign+in+to+access+your+content");
+        // Back-compat: some emails used users.accessToken with /api/auth/auto-login by mistake.
+        const [accessUser] = await db
+          .select()
+          .from(users)
+          .where(eq(users.accessToken, token))
+          .limit(1);
+
+        if (!accessUser) {
+          console.warn("[AutoLogin] Token not found, already used, or expired:", token.substring(0, 12) + "...");
+          return res.redirect("/?error=token_expired&message=Please+sign+in+to+access+your+content");
+        }
+
+        const openId = accessUser.openId ?? emailOpenId(accessUser.email ?? `user_${accessUser.id}`);
+        const sessionToken = await sdk.createSessionToken(openId, {
+          name: accessUser.name ?? accessUser.email ?? "",
+          expiresInMs: ONE_YEAR_MS,
+        });
+        const cookieHostname = resolveAuthHostname(req, hostParam || undefined);
+        setAuthSessionCookies(req, res, sessionToken, cookieHostname);
+        await ensureUserRole(accessUser.id);
+        await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, accessUser.id));
+
+        const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
+        const { ipAddress, userAgent } = getRequestClientInfo(req);
+        await recordUserLogin(db, {
+          userId: accessUser.id,
+          ipAddress,
+          userAgent,
+          method: "auto_login",
+        });
+
+        const redirectUrl = withAuthPending("/my-dashboard");
+        console.log(
+          `[AutoLogin] User ${accessUser.id} (${accessUser.email}) auto-logged in via persistent accessToken fallback`,
+        );
+        return sendAuthRedirectHtml(res, redirectUrl);
       }
 
       // Look up the user
