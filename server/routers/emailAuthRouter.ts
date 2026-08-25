@@ -102,6 +102,7 @@ async function sendPasswordResetEmail(to: string, token: string, name: string, b
   if (!sent) {
     console.warn(`[EmailAuth] Password reset email to ${to} could not be sent (SendGrid unavailable)`);
   }
+  return sent;
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -399,6 +400,17 @@ export const emailAuthRouter = router({
       const email = input.email;
       const { getUserByEmail } = await import("../db");
       const { resolveAuthDeliveryEmail } = await import("../lib/authEmailDelivery");
+      const { shouldSendAuthEmail, markAuthEmailSent } = await import("../lib/authEmailRateLimit");
+      const { getRequestClientInfo } = await import("../lib/recordUserLogin");
+      const { ipAddress } = getRequestClientInfo(ctx.req);
+      const rateLimit = await shouldSendAuthEmail({
+        email,
+        type: "password_reset",
+        ipAddress,
+      });
+      if (!rateLimit.allowed) {
+        return { success: true };
+      }
       const user = await getUserByEmail(email);
 
       // Always return success to avoid email enumeration
@@ -416,7 +428,15 @@ export const emailAuthRouter = router({
         const deliveryEmail = resolveAuthDeliveryEmail(user, email);
 
         if (deliveryEmail) {
-          await sendPasswordResetEmail(deliveryEmail, resetToken, firstName, bm, input.origin);
+          const sent = await sendPasswordResetEmail(deliveryEmail, resetToken, firstName, bm, input.origin);
+          if (sent) {
+            await markAuthEmailSent({
+              email: deliveryEmail,
+              type: "password_reset",
+              ipAddress,
+              userId: user.id,
+            });
+          }
         }
       }
 

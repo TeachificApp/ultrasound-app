@@ -210,6 +210,8 @@ async function startServer() {
   });
   // Temporary debug endpoint to test sending an email via SendGrid
   app.get("/api/debug/test-email", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const to = req.query.to as string;
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
     const { sendEmail } = await import("./email");
@@ -257,6 +259,8 @@ async function startServer() {
     });
   });
   app.post("/api/debug/clear-email-suppression", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const email = String(req.query.email ?? (req.body as { email?: string })?.email ?? "")
       .trim()
       .toLowerCase();
@@ -294,6 +298,8 @@ async function startServer() {
     });
   });
   app.get("/api/debug/test-password-reset", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const to = String(req.query.to ?? "").trim().toLowerCase();
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
     const origin = String(req.query.origin ?? "https://learn.allaboutultrasound.com");
@@ -356,6 +362,8 @@ async function startServer() {
     });
   });
   app.get("/api/debug/test-magic-link", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const to = String(req.query.to ?? "").trim().toLowerCase();
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
     const origin = String(req.query.origin ?? "https://learn.allaboutultrasound.com");
@@ -406,6 +414,8 @@ async function startServer() {
     });
   });
   app.get("/api/debug/owner-login-link", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const email = String(req.query.email ?? "").trim().toLowerCase();
     if (!email) return res.status(400).json({ error: "Pass ?email=owner@example.com" });
     const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
@@ -508,6 +518,25 @@ async function startServer() {
     const after = await auditUserAccess(db);
     res.json({ before, reconcile, after, deployedAt: new Date().toISOString() });
   });
+  app.get("/api/debug/email-alias-audit", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { auditEmailAliasIntegrity } = await import("../lib/ensureEmailAliasIntegrity");
+    const db = await getDb();
+    const audit = await auditEmailAliasIntegrity(db);
+    res.json({ audit, deployedAt: new Date().toISOString() });
+  });
+  app.post("/api/debug/email-alias-reconcile", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const {
+      auditEmailAliasIntegrity,
+      ensureEmailAliasIntegrity,
+    } = await import("../lib/ensureEmailAliasIntegrity");
+    const db = await getDb();
+    const before = await auditEmailAliasIntegrity(db);
+    const reconcile = await ensureEmailAliasIntegrity(db);
+    const after = await auditEmailAliasIntegrity(db);
+    res.json({ before, reconcile, after, deployedAt: new Date().toISOString() });
+  });
   app.get("/api/debug/user-by-email", async (req, res) => {
     const email = String(req.query.email ?? "").trim().toLowerCase();
     if (!email) {
@@ -516,6 +545,7 @@ async function startServer() {
     }
     const { getDb, getUserByEmail, getUserRoles } = await import("../db");
     const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+    const { diagnoseUserAccess } = await import("../lib/userAccessDiagnosis");
     const db = await getDb();
     const user = await getUserByEmail(email);
     if (!user) {
@@ -528,6 +558,7 @@ async function startServer() {
       roles.includes("platform_admin") ||
       hasPlatformOwner ||
       user.role === "admin";
+    const diagnosis = db ? await diagnoseUserAccess(db, email, user.accessToken) : null;
     res.json({
       found: true,
       email,
@@ -539,11 +570,63 @@ async function startServer() {
         isPending: user.isPending,
         name: user.name,
         loginMethod: user.loginMethod,
+        hasAccessToken: Boolean(user.accessToken),
       },
       roles,
       hasPlatformOwner,
       hasPlatformAdmin,
       isPlatformOwnerEmail: isPlatformOwnerEmail(user.email),
+      diagnosis,
+      deployedAt: new Date().toISOString(),
+    });
+  });
+  app.post("/api/debug/repair-user-access", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
+    const email = String(req.query.email ?? (req.body as { email?: string })?.email ?? "")
+      .trim()
+      .toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass email in JSON body or ?email=" });
+
+    const { getDb, getUserByEmail, regenerateAccessToken } = await import("../db");
+    const { diagnoseUserAccess } = await import("../lib/userAccessDiagnosis");
+    const { sendEnrollmentEmailForUser } = await import("../lib/enrollmentEmail");
+    const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
+    const { clearSendGridSuppressionLists } = await import("../lib/sendgridSuppressions");
+    const { ensureUserOpenId } = await import("../lib/ensureUserOpenId");
+    const db = await getDb();
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+
+    const user = await getUserByEmail(email);
+    if (!user) return res.status(404).json({ error: "User not found", email });
+
+    await clearSendGridSuppressionLists(email);
+    const deliveryPrep = await ensureTransactionalEmailDelivery(email);
+    await ensureUserOpenId(db, user);
+    const accessToken = await regenerateAccessToken(user.id);
+
+    const resendEnrollment = (req.body as { resendEnrollment?: boolean })?.resendEnrollment !== false;
+    let enrollmentEmailsSent = 0;
+    if (resendEnrollment) {
+      const beforeDiagnosis = await diagnoseUserAccess(db, email, accessToken);
+      for (const enrollment of beforeDiagnosis.enrollments) {
+        const sent = await sendEnrollmentEmailForUser({
+          userId: user.id,
+          courseId: enrollment.courseId,
+          db,
+        });
+        if (sent) enrollmentEmailsSent += 1;
+      }
+    }
+
+    const diagnosis = await diagnoseUserAccess(db, email, accessToken);
+    res.json({
+      email,
+      userId: user.id,
+      accessTokenRegenerated: true,
+      deliveryPrep,
+      enrollmentEmailsSent,
+      diagnosis,
       deployedAt: new Date().toISOString(),
     });
   });
@@ -959,7 +1042,9 @@ async function startServer() {
       .then(async (db) => {
         if (!db) return;
         const { ensureUserAccessAccounting } = await import("../lib/ensureUserAccessAccounting");
-        return ensureUserAccessAccounting(db);
+        const { ensureEmailAliasIntegrity } = await import("../lib/ensureEmailAliasIntegrity");
+        await ensureUserAccessAccounting(db);
+        return ensureEmailAliasIntegrity(db);
       })
       .catch((err) => console.error("[ensureUserAccessAccounting] Error:", err));
     // Auto-create manualInvoices table if it doesn't exist (production DB migration)

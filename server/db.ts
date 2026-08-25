@@ -2277,6 +2277,13 @@ export async function getOrCreateAccessToken(userId: number): Promise<string> {
   const result = await db.select({ accessToken: users.accessToken }).from(users).where(eq(users.id, userId)).limit(1);
   const existing = result[0]?.accessToken;
   if (existing) return existing;
+  return regenerateAccessToken(userId);
+}
+
+/** Issue a fresh persistent access token (e.g. after revocation or a broken email link). */
+export async function regenerateAccessToken(userId: number): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
   const { randomBytes } = await import("crypto");
   const token = randomBytes(32).toString("hex");
   await db.update(users).set({ accessToken: token }).where(eq(users.id, userId));

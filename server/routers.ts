@@ -471,8 +471,19 @@ export const appRouter = router({
         const { getUserByEmail, setPasswordResetToken } = await import('./db');
         const { sendEmail, buildPasswordResetEmail } = await import('./_core/email');
         const { resolveAuthDeliveryEmail } = await import('./lib/authEmailDelivery');
+        const { shouldSendAuthEmail, markAuthEmailSent } = await import('./lib/authEmailRateLimit');
+        const { getRequestClientInfo } = await import('./lib/recordUserLogin');
         const crypto = await import('crypto');
         const email = input.email;
+        const { ipAddress } = getRequestClientInfo(ctx.req);
+        const rateLimit = await shouldSendAuthEmail({
+          email,
+          type: "password_reset",
+          ipAddress,
+        });
+        if (!rateLimit.allowed) {
+          return { success: true };
+        }
         const user = await getUserByEmail(email);
         // Always return success to prevent email enumeration
         // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)
@@ -512,6 +523,13 @@ export const appRouter = router({
         });
         if (!emailSent) {
           console.error(`[auth] Password reset email was not accepted by SendGrid for user ${user.id} (${deliveryEmail})`);
+        } else {
+          await markAuthEmailSent({
+            email: deliveryEmail,
+            type: "password_reset",
+            ipAddress,
+            userId: user.id,
+          });
         }
         return { success: true };
       }),
@@ -552,9 +570,20 @@ export const appRouter = router({
         const { getUserByEmail, setMagicLinkToken, upsertUser } = await import('./db');
         const { sendEmail, buildMagicLinkEmail } = await import('./_core/email');
         const { resolveAuthDeliveryEmail } = await import('./lib/authEmailDelivery');
+        const { shouldSendAuthEmail, markAuthEmailSent } = await import('./lib/authEmailRateLimit');
+        const { getRequestClientInfo } = await import('./lib/recordUserLogin');
         const crypto = await import('crypto');
 
         const email = input.email;
+        const { ipAddress } = getRequestClientInfo(ctx.req);
+        const rateLimit = await shouldSendAuthEmail({
+          email,
+          type: "magic_link",
+          ipAddress,
+        });
+        if (!rateLimit.allowed) {
+          return { success: true };
+        }
         let user = await getUserByEmail(email);
 
         // Passwordless sign-in also provides a safe account-creation path. This
@@ -636,6 +665,13 @@ export const appRouter = router({
             message: 'We could not send your sign-in email. Please try again shortly or contact support.',
           });
         }
+
+        await markAuthEmailSent({
+          email: deliveryEmail,
+          type: "magic_link",
+          ipAddress,
+          userId: user.id,
+        });
 
         return { success: true };
       }),

@@ -62,7 +62,7 @@ import { storagePut } from "../storage";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail, emailWrapper } from "../_core/email";
-import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail } from "../lib/enrollmentEmail";
+import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail, buildPersistentAccessUrl } from "../lib/enrollmentEmail";
 import { getOrCreateAccessToken } from "../db";
 import { getBrandDisplayConfig } from "../../shared/brands";
 import { generateAutoLoginToken } from "../routes/autoLogin";
@@ -2463,6 +2463,23 @@ export const adminUserRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const normalised = input.email.trim().toLowerCase();
+      const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+      const { isProtectedAccountEmail } = await import("../../shared/protectedAccountEmails");
+      const [targetUser] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (
+        isPlatformOwnerEmail(targetUser?.email) &&
+        !isProtectedAccountEmail(normalised)
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Cannot add learner emails as aliases on the platform owner account. Merge the learner account instead, or use their primary email.",
+        });
+      }
       // Check not already a primary email
       const [existingPrimary] = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = ${normalised} LIMIT 1`) as any;
       if (Array.isArray(existingPrimary) && existingPrimary.length > 0) {
@@ -2498,7 +2515,7 @@ export const adminUserRouter = router({
    * - All data from `sourceUserId` is re-pointed to `targetUserId`.
    * - The source user's email is added as an alias on the target account.
    * - The source user account is soft-deleted (isPending=true, email cleared).
-   * Magic links always go to the target (primary) user's email.
+   * Auth emails are delivered to the address the user typed (primary or alias).
    */
   mergeUsers: protectedProcedure
     .input(z.object({
@@ -2520,6 +2537,18 @@ export const adminUserRouter = router({
       ]);
       if (!targetRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
       if (!sourceRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Source user not found." });
+      const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+      const { isProtectedAccountEmail } = await import("../../shared/protectedAccountEmails");
+      if (
+        isPlatformOwnerEmail(targetRows[0].email) &&
+        !isProtectedAccountEmail(sourceRows[0].email)
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Cannot merge a learner account into the platform owner account. Keep learner access on the learner's own user row.",
+        });
+      }
       const sourceEmail = sourceRows[0].email;
 
       // Tables to re-point userId from source → target
@@ -3232,7 +3261,9 @@ export const adminUserRouter = router({
       let accessToken: string | null = null;
       try { accessToken = await getOrCreateAccessToken(input.userId); } catch { /* non-fatal */ }
       const baseUrl = "https://app.allaboutultrasound.com";
-      const accessUrl = accessToken ? `${baseUrl}/api/auth/auto-login?token=${accessToken}` : `${baseUrl}/dashboard`;
+      const accessUrl = accessToken
+        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessToken)
+        : `${baseUrl}/dashboard`;
 
       const htmlBody = emailWrapper(`
         <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>

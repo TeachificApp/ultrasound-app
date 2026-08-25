@@ -50,6 +50,9 @@ export default function ForgotPassword() {
             <p className="text-gray-500 text-sm mb-6 leading-relaxed">
               If <strong>{email}</strong> is registered, you'll receive a password reset link shortly.
             </p>
+            <p className="text-xs text-gray-400 mb-6 leading-relaxed">
+              Didn't request this? Someone may have entered your email by mistake. You can ignore the message — your password won't change unless you click the link.
+            </p>
             <Link href="/login">
               <Button variant="outline" className="w-full">
                 <ArrowLeft className="w-4 h-4 mr-2" />

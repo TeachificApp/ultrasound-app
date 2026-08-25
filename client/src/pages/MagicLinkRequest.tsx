@@ -157,6 +157,9 @@ export default function MagicLinkRequest() {
                     </p>
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
+                    Didn't request this? Someone may have entered your email by mistake. You can ignore the message — your account stays secure.
+                  </p>
+                  <p className="text-xs text-gray-400 mt-2">
                     Can't find it? Check your spam or junk folder for an email from All About Ultrasound™.
                   </p>
                 </div>
