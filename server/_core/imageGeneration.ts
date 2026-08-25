@@ -1,9 +1,13 @@
 /**
  * Image generation — OpenAI DALL-E (Railway) or legacy Manus Forge ImageService.
  */
-import { storagePut } from "server/storage";
 import { ENV } from "./env";
-import { getOpenAiApiKey, isOpenAiBackend, openAiV1Url } from "../lib/openAiConfig";
+import {
+  getOpenAiApiKey,
+  getOpenAiApiRoot,
+  isOpenAiBackend,
+  openAiV1Url,
+} from "../lib/openAiConfig";
 
 export type GenerateImageOptions = {
   prompt: string;
@@ -116,12 +120,8 @@ async function generateImageViaForge(
 export async function generateImage(
   options: GenerateImageOptions
 ): Promise<GenerateImageResponse> {
-  if (!ENV.forgeApiUrl) {
-    throw new Error("BUILT_IN_FORGE_API_URL is not configured");
-  }
-  if (!ENV.forgeApiKey) {
-    throw new Error("BUILT_IN_FORGE_API_KEY is not configured");
-  }
+  getOpenAiApiRoot();
+  getOpenAiApiKey();
 
   if (isOpenAiBackend()) {
     return generateImageViaOpenAi(options);

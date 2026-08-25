@@ -1,4 +1,5 @@
 import { resolvePlatformAdminEmail } from "../../shared/platformAdminEmail";
+import { resolveForgeApiKey, resolveForgeApiUrl } from "../lib/openAiConfig";
 
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? process.env.APP_ID ?? "ultrasound-app",
@@ -14,8 +15,8 @@ export const ENV = {
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  forgeApiUrl: resolveForgeApiUrl() ?? "",
+  forgeApiKey: resolveForgeApiKey() ?? "",
   thinkificApiKey: process.env.THINKIFIC_API_KEY ?? "",
   thinkificSubdomain: process.env.THINKIFIC_SUBDOMAIN ?? "",
   thinkificAdminEmail: process.env.THINKIFIC_ADMIN_EMAIL ?? "",
