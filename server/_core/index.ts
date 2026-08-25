@@ -474,6 +474,24 @@ async function startServer() {
     const after = await inspectLmsCohortGroupsSchema(db);
     res.json({ ...result, after, deployedAt: new Date().toISOString() });
   });
+  app.get("/api/debug/auth-email-send-log-schema", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { inspectAuthEmailSendLogSchema } = await import("../lib/ensureAuthEmailSendLogSchema");
+    const db = await getDb();
+    const status = await inspectAuthEmailSendLogSchema(db);
+    res.json({ ...status, deployedAt: new Date().toISOString() });
+  });
+  app.post("/api/debug/auth-email-send-log-schema-sync", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const {
+      ensureAuthEmailSendLogSchema,
+      inspectAuthEmailSendLogSchema,
+    } = await import("../lib/ensureAuthEmailSendLogSchema");
+    const db = await getDb();
+    const result = await ensureAuthEmailSendLogSchema(db);
+    const after = await inspectAuthEmailSendLogSchema(db);
+    res.json({ ...result, after, deployedAt: new Date().toISOString() });
+  });
   app.get("/api/debug/cohort-data-audit", async (_req, res) => {
     const { getDb } = await import("../db");
     const { sql } = await import("drizzle-orm");
@@ -1105,6 +1123,12 @@ async function startServer() {
         return ensureLmsCohortGroupsSchema(db);
       })
       .catch((err) => console.error("[Startup] ensureLmsCohortGroupsSchema error:", err));
+    getDb()
+      .then(async (db) => {
+        const { ensureAuthEmailSendLogSchema } = await import("../lib/ensureAuthEmailSendLogSchema");
+        return ensureAuthEmailSendLogSchema(db);
+      })
+      .catch((err) => console.error("[Startup] ensureAuthEmailSendLogSchema error:", err));
     // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
       console.log("[Startup] Durable SCORM queue enabled — pending packages will not be skipped");
