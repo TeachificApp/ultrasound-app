@@ -16,7 +16,7 @@ import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
-import { isInteractiveMediaPackage, mediaRepoScormUrl, mediaRepoServeUrl } from "@/lib/mediaRepoDisplay";
+import { isInteractiveMediaPackage, mediaRepoScormUrl, mediaRepoDownloadUrl } from "@shared/mediaRepoDisplay";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { MathContent } from "@/components/MathContent";
 
@@ -1211,7 +1211,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       // - download_library: use stored fileUrl directly (S3 URL from digital product files)
       // - upload: use stored fileUrl (S3 URL from page media upload)
       const fileUrl = d.source === "media_repo"
-        ? (d.mediaAssetUrl || d.fileUrl || (slug ? mediaRepoServeUrl(slug, mediaType, d.fileName) : ""))
+        ? (isInteractiveRepoAsset
+          ? mediaRepoScormUrl(slug)
+          : (d.mediaAssetUrl || d.fileUrl || (slug ? mediaRepoDownloadUrl(slug) : "")))
         : (d.fileUrl || "");
       const displayMode = d.displayMode ?? "card";
       if (displayMode === "inline" && fileUrl) {

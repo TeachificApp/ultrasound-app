@@ -23,6 +23,7 @@ import { Router, Request, Response } from "express";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { getDb } from "../db";
 import { findScormLaunchFile, needsScormExtraction, pickScormPlaybackMode, encodeStorageFetchUrl, isScormPackageMediaType, resolveScormServePlans } from "../lib/scormPackage";
+import { isInteractiveMediaPackage } from "../../shared/mediaRepoDisplay";
 import { isR2ScormExtractionPlayable } from "../lib/scormR2Probe";
 import {
   getScormZipCachePaths,
@@ -900,6 +901,16 @@ router.get(slugPath, async (req: Request, res: Response) => {
   const mimeType = version.mimeType ?? asset.mimeType ?? "application/octet-stream";
   const fileName = version.fileName ?? asset.title;
   const safeFileName = encodeURIComponent(fileName);
+
+  // SCORM/ZIP/LMS packages are not downloadable — redirect to the interactive viewer.
+  if (isInteractiveMediaPackage(asset.mediaType, fileName)) {
+    const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    const prefix = req.path.includes("/api/media/")
+      ? `/api/media/${asset.slug}/scorm/`
+      : `/media/${asset.slug}/scorm/`;
+    res.redirect(302, `${prefix}${q}`);
+    return;
+  }
 
   // Record view event (fire-and-forget)
   recordView(asset.id, "direct", req);
