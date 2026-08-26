@@ -2689,7 +2689,7 @@ export default function CoursePlayer() {
                     const isMediaRepo =
                       lessonData.embedUrl.includes("/api/media/") || lessonData.embedUrl.includes("/media/");
                     const embedSrc = isMediaRepo
-                      ? lessonData.embedUrl.replace(/\/embed\/?(\?|$)/, "/scorm$1")
+                      ? lessonData.embedUrl.replace(/\/embed\/?(\?.*|$)/, "/scorm/$1")
                       : lessonData.embedUrl;
                     return (
                       <div className="mb-5">
