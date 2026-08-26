@@ -134,10 +134,25 @@ async function recordView(
 type MediaAuthQuery = { token?: string; access?: string };
 
 function readMediaAuth(req: Request): MediaAuthQuery {
-  return {
+  const fromQuery = {
     token: (req.query.token as string) || undefined,
     access: (req.query.access as string) || undefined,
   };
+  if (fromQuery.access || fromQuery.token) return fromQuery;
+
+  // SCORM/iSpring sub-resources (data/*.js, fonts, images) load without ?access=
+  // on the URL. Inherit the signed token from the launch page Referer.
+  const referer = (req.headers.referer as string) || "";
+  if (!referer) return fromQuery;
+  try {
+    const ref = new URL(referer);
+    const access = ref.searchParams.get("access") ?? undefined;
+    const token = ref.searchParams.get("token") ?? undefined;
+    if (access || token) return { access, token };
+  } catch {
+    /* ignore malformed referer */
+  }
+  return fromQuery;
 }
 
 async function resolveMedia(slug: string, auth?: MediaAuthQuery) {
@@ -605,8 +620,9 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     const zipStreamPlan = plans.find((p) => p.kind === "r2_zip_stream");
     if (zipStreamPlan?.kind === "r2_zip_stream") {
       const zipUrl = encodeStorageFetchUrl(zipStreamPlan.zipUrl);
+      const scormBaseUrl = publicMediaUrl(req, `${routePrefix}/`);
       try {
-        const served = await serveScormFileFromZip(zipUrl, relativePath, res);
+        const served = await serveScormFileFromZip(zipUrl, relativePath, res, { scormBaseUrl });
         if (served) return;
         // If zip stream fails (e.g., 403 on R2), fall through to other strategies
         console.warn(`[ScormServe] r2_zip_stream failed for ${asset.slug}, falling back to other strategies`);
@@ -977,7 +993,7 @@ router.get(slugPath, async (req: Request, res: Response) => {
     // Always route SCORM through the authenticated /scorm proxy (never redirect to
     // a public R2 CDN URL — the bucket is private and CDN paths can go stale).
     const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
-    const scormRelPath = req.path.replace(/\/embed\/?$/, "/scorm") + q;
+    const scormRelPath = req.path.replace(/\/embed\/?$/, "/scorm/") + q;
     sendHtmlRedirect(publicMediaUrl(req, scormRelPath));
     return;
   }
@@ -1152,25 +1168,22 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
           }
         })();
       </script>`;
-  } else if (mediaType === "html" || mimeType === "text/html") {
+  } else if (isZipFile || isScormPackageMediaType(mediaType)) {
     needsMobileBanner = true;
-    // Serve HTML content in an iframe WITHOUT sandbox — sandbox with allow-same-origin
-    // blocks cross-origin content (e.g. CloudFront CDN assets) even with allow-same-origin.
-    // Cross-origin iframes already can't navigate the parent by default, so sandbox is
-    // not needed for security here.
-    contentHtml = `
-      ${mobileBanner}
-      <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
-              allow="autoplay; fullscreen"
-              title="${escHtml(asset.title)}"></iframe>`;
-  } else if (isZipFile) {
-    needsMobileBanner = true;
-    // SCORM/LMS/ZIP content: always render in an iframe via the scorm-launch route.
-    // The server extracts the ZIP, parses imsmanifest.xml, and serves the HTML entry point.
-    const iframeSrc = `/api/media/${escHtml(slug)}/scorm${escHtml(tokenParam)}`;
+    const scormAuthQuery = tokenParam
+      ? (tokenParam.startsWith("?") ? tokenParam : `?${tokenParam}`)
+      : "";
+    const iframeSrc = `/api/media/${escHtml(slug)}/scorm/${escHtml(scormAuthQuery)}`;
     contentHtml = `
       ${mobileBanner}
       <iframe src="${iframeSrc}" style="width:100%;height:100%;border:none;"
+              allow="autoplay; fullscreen"
+              title="${escHtml(asset.title)}"></iframe>`;
+  } else if (mediaType === "html" || mimeType === "text/html") {
+    needsMobileBanner = true;
+    contentHtml = `
+      ${mobileBanner}
+      <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
               allow="autoplay; fullscreen"
               title="${escHtml(asset.title)}"></iframe>`;
   } else {

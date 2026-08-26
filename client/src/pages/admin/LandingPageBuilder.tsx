@@ -46,6 +46,7 @@ import RichTextEditor from "@/components/RichTextEditor";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
 import { BlockPreview } from "@/components/BlockPreview";
+import { isInteractiveMediaPackage, mediaRepoServeUrl } from "@/lib/mediaRepoDisplay";
 import { resolveRelatedProductsSelectionMode } from "@shared/relatedProductsBlock";
 import {
   ArrowLeft, ArrowRight, Save, Eye, Plus, Trash2, GripVertical, Type, Image, ImageIcon, Video,
@@ -9267,8 +9268,11 @@ function FileDownloadBlockSettings({ d, set, setMany, uploading, setUploading, u
 
   const selectMediaAsset = (asset: any) => {
     const slug = asset.slug ?? "";
-    const url = slug ? `/api/media/${slug}/download` : (asset.currentVersion?.s3Url ?? "");
-    const title = asset.title ?? asset.currentVersion?.fileName ?? "File";
+    const mediaType = asset.mediaType ?? "";
+    const assetFileName = asset.currentVersion?.fileName ?? asset.title ?? "";
+    const interactive = isInteractiveMediaPackage(mediaType, assetFileName);
+    const url = slug ? mediaRepoServeUrl(slug, mediaType, assetFileName) : (asset.currentVersion?.s3Url ?? "");
+    const title = asset.title ?? assetFileName ?? "File";
     const size = asset.currentVersion?.fileSize
       ? asset.currentVersion.fileSize > 1024 * 1024
         ? `${(asset.currentVersion.fileSize / (1024 * 1024)).toFixed(1)} MB`
@@ -9279,10 +9283,12 @@ function FileDownloadBlockSettings({ d, set, setMany, uploading, setUploading, u
       mediaAssetId: asset.id,
       mediaAssetSlug: slug,
       mediaAssetTitle: title,
+      mediaAssetMediaType: mediaType,
       mediaAssetUrl: url,
       fileUrl: url,
       fileName: asset.currentVersion?.fileName ?? title,
       fileSize: size,
+      ...(interactive ? { displayMode: "inline" } : {}),
       ...(!d.label ? { label: title } : {}),
     });
     setShowPicker(false);

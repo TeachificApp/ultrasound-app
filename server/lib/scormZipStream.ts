@@ -28,6 +28,7 @@ import zlib from "zlib";
 import { createHash } from "crypto";
 import type { Response } from "express";
 import { findScormLaunchFile } from "./scormPackage";
+import { injectScormLaunchHtml } from "./scormLaunchHtml";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -558,6 +559,20 @@ function resolveEntryPath(dir: ZipDirectory, launchFile: string, relativePath: s
   return null;
 }
 
+export type ServeScormZipOptions = {
+  /** Public /scorm/ URL (with trailing slash) used to rewrite launch HTML for folder-prefixed packages. */
+  scormBaseUrl?: string;
+};
+
+function isLaunchHtmlRequest(relativePath: string, launchFile: string, entryName: string): boolean {
+  const servesLaunch = relativePath === "" || relativePath === launchFile;
+  return servesLaunch && /\.html?$/i.test(entryName);
+}
+
+async function readZipEntryBuffer(zipUrl: string, entry: ZipEntry): Promise<Buffer> {
+  return readZipEntry(zipUrl, entry);
+}
+
 /**
  * Serve a SCORM sub-file directly from the ZIP on R2.
  *
@@ -569,7 +584,8 @@ function resolveEntryPath(dir: ZipDirectory, launchFile: string, relativePath: s
 export async function serveScormFileFromZip(
   zipUrl: string,
   relativePath: string,
-  res: Response
+  res: Response,
+  options: ServeScormZipOptions = {},
 ): Promise<boolean> {
   try {
     const dir = await loadZipDirectory(zipUrl);
@@ -587,6 +603,23 @@ export async function serveScormFileFromZip(
     const contentType = guessMime(entry.name);
     res.setHeader("Content-Type", contentType);
     res.setHeader("Cache-Control", "public, max-age=3600");
+
+    const rewriteLaunchHtml =
+      options.scormBaseUrl &&
+      isLaunchHtmlRequest(relativePath, dir.launchFile, entry.name);
+
+    if (rewriteLaunchHtml) {
+      const rawHtml = (await readZipEntryBuffer(zipUrl, entry)).toString("utf8");
+      const html = injectScormLaunchHtml(rawHtml, {
+        scormBaseUrl: options.scormBaseUrl!,
+        launchFile: dir.launchFile,
+      });
+      const body = Buffer.from(html, "utf8");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Content-Length", body.length);
+      res.end(body);
+      return true;
+    }
 
     if (entry.method === 0) {
       // Stored — stream directly without decompression
