@@ -16,6 +16,7 @@ import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
+import { isInteractiveMediaPackage, mediaRepoScormUrl, mediaRepoServeUrl } from "@/lib/mediaRepoDisplay";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { MathContent } from "@/components/MathContent";
 
@@ -1179,14 +1180,39 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       );
     }
     case "file_download": {
+      const slug = d.mediaAssetSlug ?? "";
+      const mediaType = d.mediaAssetMediaType ?? d.mediaType ?? "";
+      const fileName = d.source === "media_repo"
+        ? (d.mediaAssetTitle || d.fileName || "")
+        : (d.fileName || "");
+      const isInteractiveRepoAsset =
+        d.source === "media_repo" &&
+        !!slug &&
+        isInteractiveMediaPackage(mediaType, d.fileName ?? fileName);
+
+      if (isInteractiveRepoAsset) {
+        const height = d.inlineHeight ?? d.height ?? 600;
+        return (
+          <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
+            {d.label && <h3 className="text-lg font-semibold text-gray-800 mb-2">{d.label}</h3>}
+            {d.description && <p className="text-sm text-gray-500 mb-3">{d.description}</p>}
+            <MediaEmbedIframe
+              src={mediaRepoScormUrl(slug)}
+              courseId={courseId}
+              title={d.mediaAssetTitle || d.label || "Interactive Content"}
+              style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+            />
+          </CC></div>
+        );
+      }
+
       // Resolve file URL based on source type:
       // - media_repo: use stored mediaAssetUrl or slug-based serve endpoint
       // - download_library: use stored fileUrl directly (S3 URL from digital product files)
       // - upload: use stored fileUrl (S3 URL from page media upload)
       const fileUrl = d.source === "media_repo"
-        ? (d.mediaAssetUrl || d.fileUrl || (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}/download` : ""))
+        ? (d.mediaAssetUrl || d.fileUrl || (slug ? mediaRepoServeUrl(slug, mediaType, d.fileName) : ""))
         : (d.fileUrl || "");
-      const fileName = d.source === "media_repo" ? (d.mediaAssetTitle || d.fileName || "File") : (d.fileName || "File");
       const displayMode = d.displayMode ?? "card";
       if (displayMode === "inline" && fileUrl) {
         const ext = fileName.split(".").pop()?.toLowerCase() ?? "";

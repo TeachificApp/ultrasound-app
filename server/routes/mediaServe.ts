@@ -993,7 +993,7 @@ router.get(slugPath, async (req: Request, res: Response) => {
     // Always route SCORM through the authenticated /scorm proxy (never redirect to
     // a public R2 CDN URL — the bucket is private and CDN paths can go stale).
     const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
-    const scormRelPath = req.path.replace(/\/embed\/?$/, "/scorm") + q;
+    const scormRelPath = req.path.replace(/\/embed\/?$/, "/scorm/") + q;
     sendHtmlRedirect(publicMediaUrl(req, scormRelPath));
     return;
   }
@@ -1168,21 +1168,8 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
           }
         })();
       </script>`;
-  } else if (mediaType === "html" || mimeType === "text/html") {
+  } else if (isZipFile || isScormPackageMediaType(mediaType)) {
     needsMobileBanner = true;
-    // Serve HTML content in an iframe WITHOUT sandbox — sandbox with allow-same-origin
-    // blocks cross-origin content (e.g. CloudFront CDN assets) even with allow-same-origin.
-    // Cross-origin iframes already can't navigate the parent by default, so sandbox is
-    // not needed for security here.
-    contentHtml = `
-      ${mobileBanner}
-      <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
-              allow="autoplay; fullscreen"
-              title="${escHtml(asset.title)}"></iframe>`;
-  } else if (isZipFile) {
-    needsMobileBanner = true;
-    // SCORM/LMS/ZIP content: always render in an iframe via the scorm-launch route.
-    // The server extracts the ZIP, parses imsmanifest.xml, and serves the HTML entry point.
     const scormAuthQuery = tokenParam
       ? (tokenParam.startsWith("?") ? tokenParam : `?${tokenParam}`)
       : "";
@@ -1190,6 +1177,13 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
     contentHtml = `
       ${mobileBanner}
       <iframe src="${iframeSrc}" style="width:100%;height:100%;border:none;"
+              allow="autoplay; fullscreen"
+              title="${escHtml(asset.title)}"></iframe>`;
+  } else if (mediaType === "html" || mimeType === "text/html") {
+    needsMobileBanner = true;
+    contentHtml = `
+      ${mobileBanner}
+      <iframe src="${escHtml(fileUrl)}" style="width:100%;height:100%;border:none;"
               allow="autoplay; fullscreen"
               title="${escHtml(asset.title)}"></iframe>`;
   } else {
