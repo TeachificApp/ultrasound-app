@@ -9736,7 +9736,7 @@ function ScormEmbedBlockSettings({ d, set, dataRef, onChangeRef }: {
       {/* Embed URL preview */}
       {d.mediaAssetSlug && (
         <div className="text-[10px] text-gray-400 bg-gray-50 rounded p-2 font-mono break-all">
-          /api/media/{d.mediaAssetSlug}/embed
+          {mediaRepoScormUrl(d.mediaAssetSlug)}
         </div>
       )}
     </div>

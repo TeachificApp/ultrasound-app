@@ -33,7 +33,8 @@ export function MediaEmbedIframe({
 }: MediaEmbedIframeProps) {
   const { user } = useAuth();
   const parsed = useMemo(() => (src.startsWith("/") ? parseMediaRepoUrl(src) : null), [src]);
-  const isScormPath = parsed?.path === "scorm";
+  // Display blocks on Manus used /embed; both /embed and /scorm need signed SCORM playback.
+  const isScormPath = parsed?.path === "scorm" || parsed?.path === "embed";
 
   const { data: scormData, isLoading: scormLoading, isError: scormError } =
     trpc.mediaRepo.getScormZipUrl.useQuery(

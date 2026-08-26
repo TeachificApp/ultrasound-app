@@ -16,7 +16,13 @@ import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
-import { isInteractiveMediaPackage, mediaRepoScormUrl, mediaRepoDownloadUrl } from "@shared/mediaRepoDisplay";
+import {
+  isInteractiveMediaPackage,
+  mediaRepoScormUrl,
+  mediaRepoDownloadUrl,
+  resolveScormEmbedSlug,
+} from "@shared/mediaRepoDisplay";
+import { isMediaRepoScormViewerPath, parseMediaRepoUrl } from "@/lib/mediaEmbedUrl";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { MathContent } from "@/components/MathContent";
 
@@ -1267,10 +1273,10 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       );
     }
     case "scorm_embed": {
-      const slug = d.mediaAssetSlug ?? "";
+      const slug = resolveScormEmbedSlug(d);
       const title = d.mediaAssetTitle ?? "Interactive Content";
       const height = d.height ?? 600;
-      const embedUrl = slug ? `/api/media/${slug}/scorm/` : "";
+      const embedUrl = slug ? mediaRepoScormUrl(slug) : "";
       const scormAlign = d.align ?? "center";
       const scormJustify = scormAlign === "left" ? "flex-start" : scormAlign === "right" ? "flex-end" : "center";
       const scormMaxWidth = d.maxWidth ?? "100%";
@@ -1304,6 +1310,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const height = d.height ?? 600;
       const embedTitle = d.title ?? "Embedded Content";
       const url = urlEmbedSrc || d.url || "";
+      const mediaRepoParsed = url.startsWith("/") ? parseMediaRepoUrl(url) : null;
+      const useSignedMediaEmbed = !!mediaRepoParsed && isMediaRepoScormViewerPath(url);
+      const mediaEmbedSrc = useSignedMediaEmbed && mediaRepoParsed
+        ? mediaRepoScormUrl(mediaRepoParsed.slug)
+        : "";
       const urlAlign = d.align ?? "center";
       const urlJustify = urlAlign === "left" ? "flex-start" : urlAlign === "right" ? "flex-end" : "center";
       const urlMaxWidth = d.maxWidth ?? "100%";
@@ -1312,6 +1323,14 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           <div style={{ width: urlMaxWidth, maxWidth: "100%" }}>
             {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
             {url ? (
+              useSignedMediaEmbed && mediaEmbedSrc ? (
+                <MediaEmbedIframe
+                  src={mediaEmbedSrc}
+                  courseId={courseId}
+                  title={embedTitle}
+                  style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+                />
+              ) : (
               <iframe
                 src={url}
                 style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
@@ -1320,6 +1339,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                 allowFullScreen
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-top-navigation-by-user-activation"
               />
+              )
             ) : (
               <div
                 className="w-full bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3 text-gray-400"

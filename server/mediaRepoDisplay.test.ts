@@ -6,6 +6,8 @@ import {
   mediaRepoScormUrl,
   mediaRepoServeUrl,
   mediaRepoDownloadUrl,
+  parseMediaRepoSlug,
+  resolveScormEmbedSlug,
 } from "../shared/mediaRepoDisplay";
 
 describe("mediaRepoDisplay", () => {
@@ -42,6 +44,26 @@ describe("mediaRepoDisplay", () => {
     expect(mediaRepoServeUrl("study-guide", "document", "guide.pdf")).toBe(
       "/api/media/study-guide/download",
     );
+  });
+
+  it("parses slug from Manus-era embed and download URLs", () => {
+    expect(parseMediaRepoSlug("/api/media/acs-flashcards/embed")).toBe("acs-flashcards");
+    expect(parseMediaRepoSlug("/media/acs-flashcards/scorm/")).toBe("acs-flashcards");
+    expect(parseMediaRepoSlug("/api/media/acs-flashcards/download?access=x")).toBe("acs-flashcards");
+  });
+
+  it("resolves SCORM display block slug from legacy stored URLs", () => {
+    expect(
+      resolveScormEmbedSlug({
+        mediaAssetUrl: "/api/media/acs-flashcards/embed",
+        mediaAssetTitle: "ACS Flashcards",
+      }),
+    ).toBe("acs-flashcards");
+    expect(
+      resolveScormEmbedSlug({
+        mediaAssetSlug: "acs-flashcards",
+      }),
+    ).toBe("acs-flashcards");
   });
 });
 
