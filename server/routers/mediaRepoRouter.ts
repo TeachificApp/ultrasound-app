@@ -1101,7 +1101,7 @@ export const mediaRepoRouter = router({
       if (strategy.mode === "server") {
         return {
           mode: "server" as const,
-          embedUrl: `/api/media/${asset.slug}/scorm${authQuery}`,
+          embedUrl: `/api/media/${asset.slug}/scorm/${authQuery}`,
           title: asset.title,
         };
       }

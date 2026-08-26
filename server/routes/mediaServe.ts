@@ -134,10 +134,25 @@ async function recordView(
 type MediaAuthQuery = { token?: string; access?: string };
 
 function readMediaAuth(req: Request): MediaAuthQuery {
-  return {
+  const fromQuery = {
     token: (req.query.token as string) || undefined,
     access: (req.query.access as string) || undefined,
   };
+  if (fromQuery.access || fromQuery.token) return fromQuery;
+
+  // SCORM/iSpring sub-resources (data/*.js, fonts, images) load without ?access=
+  // on the URL. Inherit the signed token from the launch page Referer.
+  const referer = (req.headers.referer as string) || "";
+  if (!referer) return fromQuery;
+  try {
+    const ref = new URL(referer);
+    const access = ref.searchParams.get("access") ?? undefined;
+    const token = ref.searchParams.get("token") ?? undefined;
+    if (access || token) return { access, token };
+  } catch {
+    /* ignore malformed referer */
+  }
+  return fromQuery;
 }
 
 async function resolveMedia(slug: string, auth?: MediaAuthQuery) {
@@ -605,8 +620,9 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     const zipStreamPlan = plans.find((p) => p.kind === "r2_zip_stream");
     if (zipStreamPlan?.kind === "r2_zip_stream") {
       const zipUrl = encodeStorageFetchUrl(zipStreamPlan.zipUrl);
+      const scormBaseUrl = publicMediaUrl(req, `${routePrefix}/`);
       try {
-        const served = await serveScormFileFromZip(zipUrl, relativePath, res);
+        const served = await serveScormFileFromZip(zipUrl, relativePath, res, { scormBaseUrl });
         if (served) return;
         // If zip stream fails (e.g., 403 on R2), fall through to other strategies
         console.warn(`[ScormServe] r2_zip_stream failed for ${asset.slug}, falling back to other strategies`);
@@ -1167,7 +1183,10 @@ function buildEmbedPage(opts: EmbedPageOptions): string {
     needsMobileBanner = true;
     // SCORM/LMS/ZIP content: always render in an iframe via the scorm-launch route.
     // The server extracts the ZIP, parses imsmanifest.xml, and serves the HTML entry point.
-    const iframeSrc = `/api/media/${escHtml(slug)}/scorm${escHtml(tokenParam)}`;
+    const scormAuthQuery = tokenParam
+      ? (tokenParam.startsWith("?") ? tokenParam : `?${tokenParam}`)
+      : "";
+    const iframeSrc = `/api/media/${escHtml(slug)}/scorm/${escHtml(scormAuthQuery)}`;
     contentHtml = `
       ${mobileBanner}
       <iframe src="${iframeSrc}" style="width:100%;height:100%;border:none;"

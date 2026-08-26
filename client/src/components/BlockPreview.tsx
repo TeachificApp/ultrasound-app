@@ -1242,7 +1242,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const slug = d.mediaAssetSlug ?? "";
       const title = d.mediaAssetTitle ?? "Interactive Content";
       const height = d.height ?? 600;
-      const embedUrl = slug ? `/api/media/${slug}/scorm` : "";
+      const embedUrl = slug ? `/api/media/${slug}/scorm/` : "";
       const scormAlign = d.align ?? "center";
       const scormJustify = scormAlign === "left" ? "flex-start" : scormAlign === "right" ? "flex-end" : "center";
       const scormMaxWidth = d.maxWidth ?? "100%";
