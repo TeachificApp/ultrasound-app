@@ -23,10 +23,9 @@ import { SiteNavHeaderLinks, SiteNavProfileLinks } from "@/components/SiteNavLin
 import NameCollectionModal from "@/components/NameCollectionModal";
 import UserAvatar from "@/components/UserAvatar";
 import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
+import { AAUS_BRAND_LOGO_URL } from "@shared/brands";
 
-const AAUS_LOGO = resolveAssetUrl(
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp",
-)!;
+const AAUS_LOGO = AAUS_BRAND_LOGO_URL;
 
 const AAUS_APP_URL = "https://app.allaboutultrasound.com";
 const IHE_APP_URL = "https://app.iheartecho.com";

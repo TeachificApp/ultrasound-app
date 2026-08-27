@@ -20,9 +20,7 @@ import { isCombinedBrandingDomain, isIHeartEchoDomain, isLearnDomain, MEMBERS_AP
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import { toast } from "sonner";
 import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
-
-const LOGO = import.meta.env.VITE_APP_LOGO as string;
-const IHE_LOGO = "/manus-storage/iheartecho-logo_f9d91cd4.webp";
+import { getAuthPageBrandName, getAuthPageLogoUrl } from "@/lib/authPageBrand";
 
 type LoginMode = "magic" | "password" | "register";
 
@@ -30,11 +28,8 @@ export default function Login() {
   // Evaluate at render time so these reflect the actual hostname (not module-load hostname)
   const isCombined = isCombinedBrandingDomain();
   const isIHE = isIHeartEchoDomain();
-  const BRAND_NAME = isIHE
-    ? "iHeartEcho™"
-    : isCombined
-    ? "All About Ultrasound™ | iHeartEcho™"
-    : "All About Ultrasound™";
+  const LOGO = getAuthPageLogoUrl();
+  const BRAND_NAME = getAuthPageBrandName();
   const BRAND_SUBTITLE = isIHE
     ? "Expert Echocardiography Education & CME"
     : isCombined
@@ -240,13 +235,9 @@ export default function Login() {
         {/* Logo */}
         <div className="relative flex items-center gap-3">
           <div className="flex items-center gap-1">
-            {isIHE
-              ? <img src={IHE_LOGO} alt="iHeartEcho™" className="w-16 h-16 object-contain drop-shadow-lg" />
-              : LOGO
-              ? <img src={LOGO} alt="All About Ultrasound™" className="w-16 h-16 object-contain drop-shadow-lg" />
-              : null
-            }
-            {!LOGO && !isCombined && !isIHE && (
+            {LOGO ? (
+              <img src={LOGO} alt={BRAND_NAME} className="w-16 h-16 object-contain drop-shadow-lg" />
+            ) : (
               <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ background: "rgba(24,154,161,0.3)" }}>
                 <Stethoscope className="w-10 h-10 text-white" />
               </div>
@@ -292,12 +283,11 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            {isIHE
-              ? <img src={IHE_LOGO} alt="iHeartEcho™" className="w-10 h-10 object-contain" />
-              : LOGO
-              ? <img src={LOGO} alt="All About Ultrasound™" className="w-10 h-10 object-contain" />
-              : <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#189aa1" }}><Stethoscope className="w-5 h-5 text-white" /></div>
-            }
+            {LOGO ? (
+              <img src={LOGO} alt={BRAND_NAME} className="w-10 h-10 object-contain" />
+            ) : (
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#189aa1" }}><Stethoscope className="w-5 h-5 text-white" /></div>
+            )}
             <div className="text-xl font-black" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>{BRAND_NAME}</div>
           </div>
 
