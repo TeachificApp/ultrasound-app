@@ -237,7 +237,7 @@ function CertificatePreviewLearner({
   const { data: cert, isLoading: certLoading } =
     trpc.lmsLearner.getCourseCertificate.useQuery(
       { courseSlug: courseSlug ?? "" },
-      { enabled: !!courseSlug && (!gateEnabled || quizStatus?.passed === true) }
+      { enabled: !!courseSlug }
     );
 
   if (!courseSlug) return null;
@@ -255,8 +255,8 @@ function CertificatePreviewLearner({
     );
   }
 
-  // Quiz gate not met
-  if (gateEnabled && !quizStatus?.passed) {
+  // Quiz gate not met — only block when no certificate has been issued yet
+  if (gateEnabled && !quizStatus?.passed && !cert?.certificateUrl) {
     return (
       <div
         className="rounded-2xl border border-amber-200 p-6 flex flex-col items-center gap-3 text-center"

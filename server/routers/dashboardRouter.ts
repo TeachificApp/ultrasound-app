@@ -47,12 +47,13 @@ import {
   manualInvoices,
   deferredCheckoutSessions,
 } from "../../drizzle/schema";
-import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, sql, or, isNotNull, gte } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
 import {
   THINKIFIC_LEGACY_BILLING_URL,
   isActiveThinkificMembership,
 } from "../../shared/thinkificLegacy";
+import { restoreMissingCourseCertificate } from "./lmsHelpers";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1067,6 +1068,25 @@ export const dashboardRouter = router({
   getMyCertificates: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+    const completedCertificateEnrollments = await db.select({
+      courseId: lmsEnrollments.courseId,
+      hasCertificate: lmsCourses.hasCertificate,
+    })
+      .from(lmsEnrollments)
+      .innerJoin(lmsCourses, eq(lmsCourses.id, lmsEnrollments.courseId))
+      .where(and(
+        eq(lmsEnrollments.userId, ctx.user.id),
+        eq(lmsCourses.hasCertificate, true),
+        or(
+          isNotNull(lmsEnrollments.completedAt),
+          gte(lmsEnrollments.progressPct, 100),
+        ),
+      ));
+
+    for (const row of completedCertificateEnrollments) {
+      await restoreMissingCourseCertificate(db, ctx.user.id, row.courseId, row.hasCertificate);
+    }
 
     const certs = await db
       .select({

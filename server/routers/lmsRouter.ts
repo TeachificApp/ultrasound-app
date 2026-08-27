@@ -26,7 +26,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or, gte } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import { evaluateInlineLessonQuizScore, shouldRestoreMissingCourseCertificate } from "../../shared/inlineLessonQuizCompletion";
+import { evaluateInlineLessonQuizScore } from "../../shared/inlineLessonQuizCompletion";
 import { lessonHasAssessmentContent } from "../../shared/lessonAccessGating";
 import { resolvePresaleWelcome } from "../../shared/contentAvailability";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
@@ -119,7 +119,7 @@ import { notifyOwner } from "../_core/notification";
 import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
+import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled, restoreMissingCourseCertificate } from "./lmsHelpers";
 import { cmeActivityFormRouter } from "./cmeActivityFormRouter";
 import { lmsCourseBuilderRouter } from "./lmsCourseBuilderRouter";
 import { lmsQuizLandingRouter } from "./lmsQuizLandingRouter";
@@ -3483,36 +3483,10 @@ export const lmsLearnerRouter = router({
       let [cert] = await db.select().from(lmsCertificates)
         .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.id))).limit(1);
 
-      // Certificate creation normally happens when progress reaches 100%. If the
-      // asynchronous issuance step was interrupted, repair it when the eligible
-      // learner opens the certificate block instead of leaving the block locked.
       if (!cert && course.hasCertificate) {
-        const [enrollment] = await db.select({
-          id: lmsEnrollments.id,
-          enrollmentType: lmsEnrollments.enrollmentType,
-          completedAt: lmsEnrollments.completedAt,
-          progressPct: lmsEnrollments.progressPct,
-        }).from(lmsEnrollments).where(and(
-          eq(lmsEnrollments.userId, ctx.user.id),
-          eq(lmsEnrollments.courseId, course.id),
-        )).limit(1);
-        if (enrollment && shouldRestoreMissingCourseCertificate({
-          courseHasCertificate: course.hasCertificate,
-          courseHasCmeCredit: Boolean(course.creditHours),
-          enrollmentCompletedAt: enrollment.completedAt,
-          enrollmentProgressPct: enrollment.progressPct,
-          hasCertificateRecord: Boolean(cert),
-        })) {
-          if (!enrollment.completedAt && Number(enrollment.progressPct ?? 0) >= 100) {
-            await db.update(lmsEnrollments).set({ completedAt: new Date() })
-              .where(eq(lmsEnrollments.id, enrollment.id));
-          }
-          await issueCertificateIfEnabled(db, enrollment.id, ctx.user.id, course.id, enrollment.enrollmentType ?? undefined, {
-            completedCmeRecovery: true,
-          });
-          [cert] = await db.select().from(lmsCertificates)
-            .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.id))).limit(1);
-        }
+        await restoreMissingCourseCertificate(db, ctx.user.id, course.id, course.hasCertificate);
+        [cert] = await db.select().from(lmsCertificates)
+          .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.id))).limit(1);
       }
       return cert ?? null;
     }),
