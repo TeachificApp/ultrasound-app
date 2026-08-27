@@ -12,7 +12,7 @@
  *   Analytics    — overview stats
  */
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { cn } from "@/lib/utils";
+import { cn, stripHtml } from "@/lib/utils";
 import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
 import { formatScheduledInput, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import {
@@ -10947,6 +10947,8 @@ function QuestionBankAdmin() {
   const [scormFolderId, setScormFolderId] = useState<number | null>(null);
   const [scormNewFolderName, setScormNewFolderName] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
+  const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState("");
 
   async function handleExportZip() {
     setExportLoading(true);
@@ -11003,8 +11005,9 @@ function QuestionBankAdmin() {
   const { data: foldersData, refetch: refetchFolders } = trpc.questionBank.listFolders.useQuery();
   const folders = foldersData ?? [];
   const createFolder = trpc.questionBank.createFolder.useMutation({ onSuccess: () => refetchFolders() });
-  const updateFolder = trpc.questionBank.updateFolder.useMutation({ onSuccess: () => refetchFolders() });
+  const updateFolder = trpc.questionBank.updateFolder.useMutation({ onSuccess: () => { refetchFolders(); setEditingFolderId(null); setEditingFolderName(""); } });
   const deleteFolder = trpc.questionBank.deleteFolder.useMutation({ onSuccess: () => refetchFolders() });
+  const reorderFolders = trpc.questionBank.reorderFolders.useMutation({ onSuccess: () => refetchFolders() });
   const scormPreviewMut = trpc.questionBank.previewScormImport.useMutation({
     onSuccess: (data) => { setScormPreview(data); setScormSelectedGroups(new Set(data.groups.map((g: any) => g.id))); },
     onError: (e) => alert(`Preview failed: ${e.message}`),
@@ -11034,6 +11037,27 @@ function QuestionBankAdmin() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  const moveFolder = (folderId: number, direction: "up" | "down") => {
+    const idx = folders.findIndex((f: { id: number }) => f.id === folderId);
+    if (idx < 0) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= folders.length) return;
+    const reordered = [...folders];
+    [reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]];
+    reorderFolders.mutate({ folderIds: reordered.map((f: { id: number }) => f.id) });
+  };
+
+  const startEditFolder = (folder: { id: number; name: string }) => {
+    setEditingFolderId(folder.id);
+    setEditingFolderName(folder.name);
+  };
+
+  const saveEditFolder = () => {
+    const name = editingFolderName.trim();
+    if (!editingFolderId || !name) return;
+    updateFolder.mutate({ id: editingFolderId, name });
   };
 
   return (
@@ -11066,10 +11090,31 @@ function QuestionBankAdmin() {
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {folders.length === 0 && <p className="text-xs text-purple-600">No folders yet. Create one below.</p>}
-            {folders.map((f: any) => (
-              <div key={f.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-purple-200">
-                <span className="text-sm text-gray-800 flex items-center gap-2"><FolderOpen className="w-3.5 h-3.5 text-purple-500" />{f.name}</span>
-                <button onClick={() => { if (confirm(`Delete folder "\${f.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: f.id }); }} className="text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+            {folders.map((f: any, index: number) => (
+              <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-purple-200">
+                <div className="flex flex-col gap-0.5">
+                  <button type="button" disabled={index === 0 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "up")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
+                  <button type="button" disabled={index === folders.length - 1 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "down")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
+                </div>
+                <FolderOpen className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                {editingFolderId === f.id ? (
+                  <Input value={editingFolderName} onChange={e => setEditingFolderName(e.target.value)} className="h-8 text-sm flex-1 bg-white border-purple-200" onKeyDown={e => { if (e.key === "Enter") saveEditFolder(); if (e.key === "Escape") { setEditingFolderId(null); setEditingFolderName(""); } }} autoFocus />
+                ) : (
+                  <span className="text-sm text-gray-800 flex-1">{f.name}{f.questionCount ? <span className="text-xs text-gray-400 ml-2">({f.questionCount})</span> : null}</span>
+                )}
+                <div className="flex items-center gap-1">
+                  {editingFolderId === f.id ? (
+                    <>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600" onClick={saveEditFolder} disabled={!editingFolderName.trim() || updateFolder.isPending}><CheckCircle className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setEditingFolderId(null); setEditingFolderName(""); }}><X className="w-3.5 h-3.5" /></Button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => startEditFolder(f)} className="text-gray-400 hover:text-purple-700 p-1"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button type="button" onClick={() => { if (confirm(`Delete folder "${f.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: f.id }); }} className="text-red-400 hover:text-red-600 p-1"><X className="w-3.5 h-3.5" /></button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -11368,8 +11413,8 @@ function QuestionBankAdmin() {
                 <tr key={q.id} className={cn("hover:bg-gray-50 transition-colors", selectedIds.has(q.id) && "bg-teal-50")}>
                   <td className="px-3 py-2.5"><input type="checkbox" checked={selectedIds.has(q.id)} onChange={() => toggleSelect(q.id)} className="rounded" /></td>
                   <td className="px-3 py-2.5">
-                    <p className="font-medium text-gray-800 line-clamp-2">{q.question}</p>
-                    {q.explanation && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">Explanation: {q.explanation}</p>}
+                    <p className="font-medium text-gray-800 line-clamp-2">{stripHtml(q.question)}</p>
+                    {q.explanation && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">Explanation: {stripHtml(q.explanation)}</p>}
                     {q.isPreset && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200 mt-0.5">⭐ Preset{q.presetCategory ? ` · ${q.presetCategory}` : ""}</span>}
                   </td>
                   <td className="px-3 py-2.5">
