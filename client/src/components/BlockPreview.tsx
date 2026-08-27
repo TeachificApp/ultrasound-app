@@ -23,6 +23,11 @@ import {
   resolveScormEmbedSlug,
 } from "@shared/mediaRepoDisplay";
 import { isMediaRepoScormViewerPath, parseMediaRepoUrl } from "@/lib/mediaEmbedUrl";
+import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
+
+function assetUrl(url?: string | null): string {
+  return resolveAssetUrl(url ?? undefined) ?? url ?? "";
+}
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { MathContent } from "@/components/MathContent";
 
@@ -240,9 +245,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             {hasInlineMedia && (
               <div className={isHorizontal ? "w-full sm:flex-1 sm:max-w-xs mt-6 sm:mt-0" : "mt-6 max-w-sm mx-auto w-full"}>
                 {d.inlineMediaType === "video" ? (
-                  <video autoPlay muted loop playsInline className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`}><source src={d.inlineMediaUrl} /></video>
+                  <video autoPlay muted loop playsInline className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`}><source src={assetUrl(d.inlineMediaUrl)} /></video>
                 ) : (
-                  <img src={d.inlineMediaUrl} alt="" className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`} />
+                  <img src={assetUrl(d.inlineMediaUrl)} alt="" className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`} />
                 )}
               </div>
             )}
@@ -270,7 +275,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const mw = d.maxWidth ?? "auto";
       const imgStyle: React.CSSProperties = { maxWidth: mw === "auto" ? "100%" : mw, width: mw === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
       const imgEl = d.url
-        ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyle} />
+        ? <img src={assetUrl(d.url)} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyle} />
         : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>;
       return (
         <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor || undefined }}>
@@ -373,7 +378,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${Math.floor(100 / (d.columns ?? 3))}%), 1fr))` }}>
             {(d.images ?? []).map((img: any, i: number) => (
               <div key={i} className="rounded-lg overflow-hidden shadow">
-                {img.url ? <img src={img.url} alt={img.caption ?? ""} className="w-full h-40 object-cover" /> : <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400"><Image size={24} /></div>}
+                {img.url ? <img src={assetUrl(img.url)} alt={img.caption ?? ""} className="w-full h-40 object-cover" /> : <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400"><Image size={24} /></div>}
                 {img.caption && <p className="text-xs text-gray-500 p-2 text-center">{img.caption}</p>}
               </div>
             ))}
@@ -472,7 +477,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             )}
             <div className="flex items-center justify-center gap-3">
               {d.avatarUrl && (
-                <img src={d.avatarUrl} alt={d.author} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+                <img src={assetUrl(d.avatarUrl)} alt={d.author} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
               )}
               <span className="font-semibold text-gray-900">{d.author}</span>
             </div>
@@ -492,7 +497,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                 <p className="text-gray-700 mb-3 italic">"{r.text}"</p>
                 <div className="flex items-center gap-3 mt-3">
                   {r.avatarUrl && (
-                    <img src={r.avatarUrl} alt={r.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-white shadow-sm" />
+                    <img src={assetUrl(r.avatarUrl)} alt={r.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-white shadow-sm" />
                   )}
                   <p className="text-sm font-semibold text-gray-900">{r.name}</p>
                 </div>
@@ -507,7 +512,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex flex-wrap items-center justify-center gap-8">
             {(d.logos ?? []).map((logo: any, i: number) => (
-              logo.url ? <img key={i} src={logo.url} alt={logo.alt ?? ""} className="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity" />
+              logo.url ? <img key={i} src={assetUrl(logo.url)} alt={logo.alt ?? ""} className="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity" />
                 : <div key={i} className="h-10 w-24 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400">{logo.alt || "Logo"}</div>
             ))}
           </div>
@@ -707,7 +712,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const items: Array<{ text: string; price: string }> = d.items ?? [];
       return (
         <div className={`px-8 py-10 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`} style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.borderColor ?? "#1a5f7a") : undefined }}>
-          {d.imageUrl && <img src={d.imageUrl} alt="" className="w-full max-w-lg mx-auto rounded-lg mb-6 object-cover" />}
+          {d.imageUrl && <img src={assetUrl(d.imageUrl)} alt="" className="w-full max-w-lg mx-auto rounded-lg mb-6 object-cover" />}
           {d.headline && <h2 className="text-2xl md:text-3xl font-black uppercase mb-6 whitespace-pre-line" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {items.length > 0 && (
             <div className="space-y-2 mb-8 max-w-md mx-auto text-left">
@@ -1031,7 +1036,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         <div className="py-4 px-6" style={{ backgroundColor: d.bgColor ?? "#ffffff", padding: d.padding ?? "16px 0" }}>
           <div className={`flex ${align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center"}`}>
             {d.logoUrl ? (
-              <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" />
+              <img src={assetUrl(d.logoUrl)} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" />
             ) : (
               <div className="border-2 border-dashed border-gray-300 rounded-lg px-8 py-4 text-gray-400 text-sm flex items-center gap-2">
                 <Image size={16} /> Add your logo
@@ -1048,7 +1053,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }}>
           {d.logoUrl && (
             <div className="flex justify-center mb-4">
-              <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" />
+              <img src={assetUrl(d.logoUrl)} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" />
             </div>
           )}
           {links.length > 0 && (
@@ -1854,7 +1859,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         </div>
       );
       const avatar = d.avatarUrl
-        ? <img src={d.avatarUrl} alt={d.name ?? "Host"} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4" style={{ borderColor: `${whb_accentColor}40` }} />
+        ? <img src={assetUrl(d.avatarUrl)} alt={d.name ?? "Host"} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4" style={{ borderColor: `${whb_accentColor}40` }} />
         : <div className="w-24 h-24 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${whb_accentColor}20` }}><Users size={32} style={{ color: whb_accentColor }} /></div>;
       return (
         <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}><CC>
@@ -2121,7 +2126,7 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
       <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
         <div className="text-center">
           {avatarUrl
-            ? <img src={avatarUrl} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100" />
+            ? <img src={assetUrl(avatarUrl)} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100" />
             : <div className="w-28 h-28 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4"><Users size={40} className="text-teal-600" /></div>}
           <h3 className="text-2xl font-bold mb-1" style={{ color: headlineColor }}>{name}</h3>
           {title && <p className="font-semibold mb-3" style={{ color: titleColor }}>{title}</p>}
@@ -2136,7 +2141,7 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
     <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
       <div className="flex gap-6 items-start">
         {avatarUrl
-          ? <img src={avatarUrl} alt={name} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4 border-teal-100" />
+          ? <img src={assetUrl(avatarUrl)} alt={name} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4 border-teal-100" />
           : <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0"><Users size={32} className="text-teal-600" /></div>}
         <div className="min-w-0">
           <h3 className="text-xl font-bold" style={{ color: headlineColor }}>{name}</h3>
@@ -3183,7 +3188,7 @@ function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
       )}
       <div className="flex gap-4 items-start">
         {imageUrl && (
-          <img src={imageUrl} alt="" className="w-20 h-20 rounded-xl object-cover flex-shrink-0 shadow-sm" />
+          <img src={assetUrl(imageUrl)} alt="" className="w-20 h-20 rounded-xl object-cover flex-shrink-0 shadow-sm" />
         )}
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1" dangerouslySetInnerHTML={{ __html: headline }} />

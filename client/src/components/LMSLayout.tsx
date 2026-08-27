@@ -16,8 +16,12 @@ import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import NameCollectionModal from "@/components/NameCollectionModal";
+import UserAvatar from "@/components/UserAvatar";
+import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
 
-const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
+const AAUS_LOGO = resolveAssetUrl(
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp",
+)!;
 const MEMBERS_URL = "https://members.allaboutultrasound.com";
 import { getAdminUrl, APP_URL } from "@/hooks/useSubdomain";
 import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
@@ -208,13 +212,13 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                   onClick={() => { setAccountOpen(!accountOpen); setMobileMenuOpen(false); }}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  {(user as any)?.avatarUrl ? (
-                    <img src={(user as any).avatarUrl} alt="Avatar" className="w-7 h-7 rounded-full object-cover shrink-0 border border-[#189aa1]/30" />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}>
-                      {((user as any)?.displayName || (user as any)?.name || "U").charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  <UserAvatar
+                    avatarUrl={(user as any)?.avatarUrl}
+                    name={(user as any)?.name}
+                    displayName={(user as any)?.displayName}
+                    className="w-7 h-7 rounded-full object-cover shrink-0 border border-[#189aa1]/30"
+                    fallbackClassName="w-7 h-7"
+                  />
                   <span className="hidden sm:block text-sm text-gray-700 max-w-[120px] truncate">
                     {(user as any)?.displayName || (user as any)?.name || (user as any)?.email || "Account"}
                   </span>

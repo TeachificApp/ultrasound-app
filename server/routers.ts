@@ -6,6 +6,7 @@ import { clearSessionCookies, getSessionCookieOptions, resolveAuthHostname } fro
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
+import { resolveAssetUrl } from "./lib/resolveAssetUrl";
 import { runMirrorSync, getLastSyncResult, isSyncRunning } from "./jobs/mirrorSync";
 import { platformAdminRouter, labSeatsRouter, adminRouter } from "./routers/adminRouter";
 import { cmeRouter } from "./routers/cmeRouter";
@@ -245,7 +246,7 @@ export const appRouter = router({
         ...opts.ctx.user,
         // Override with fresh DB values so profile updates reflect immediately
         displayName: fullUser?.displayName ?? opts.ctx.user.displayName ?? null,
-        avatarUrl: fullUser?.avatarUrl ?? opts.ctx.user.avatarUrl ?? null,
+        avatarUrl: resolveAssetUrl(fullUser?.avatarUrl ?? opts.ctx.user.avatarUrl ?? null),
         name: fullUser?.name ?? opts.ctx.user.name ?? null,
         firstName: fullUser?.firstName ?? (opts.ctx.user as any).firstName ?? null,
         lastName: fullUser?.lastName ?? (opts.ctx.user as any).lastName ?? null,

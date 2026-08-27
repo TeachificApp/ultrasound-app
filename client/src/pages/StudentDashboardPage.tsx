@@ -34,6 +34,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Layout from "@/components/Layout";
+import UserAvatar from "@/components/UserAvatar";
 import { isMembersDomain, isLearnDomain, LEARN_APP_URL, APP_URL, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 import { formatInTimeZone, isInstantExpired, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
@@ -274,14 +275,13 @@ function ProfileTab() {
       {/* Avatar */}
       <div className="flex items-center gap-6">
         <div className="relative">
-          {profile.avatarUrl ? (
-            <img src={profile.avatarUrl} alt="Avatar" className="w-24 h-24 rounded-full object-cover border-4 border-[#189aa1]/20 shadow" />
-          ) : (
-            <div className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow"
-              style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}>
-              {(profile.displayName ?? profile.name ?? "?").charAt(0).toUpperCase()}
-            </div>
-          )}
+          <UserAvatar
+            avatarUrl={profile.avatarUrl}
+            name={profile.name}
+            displayName={profile.displayName}
+            className="w-24 h-24 rounded-full object-cover border-4 border-[#189aa1]/20 shadow"
+            fallbackClassName="w-24 h-24 text-3xl"
+          />
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadAvatar.isPending}

@@ -25,6 +25,7 @@ import { isLearnDomain, isMembersDomain, isAccreditationDomain } from "@/hooks/u
 import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
 import { SiteNavProfileLinks } from "@/components/SiteNavLinks";
 import GetAppBanner from "@/components/GetAppBanner";
+import UserAvatar from "@/components/UserAvatar";
 
 /** Badge showing the count of echo cases pending admin review */
 function CasePendingBadge() {
@@ -422,20 +423,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   onClick={() => setAccountOpen(o => !o)}
                   className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-[#f0fbfc] transition-all border border-transparent hover:border-[#189aa1]/20"
                 >
-                  {(user as any).avatarUrl ? (
-                    <img
-                      src={(user as any).avatarUrl}
-                      alt="Avatar"
-                      className="w-7 h-7 rounded-full object-cover flex-shrink-0 border border-[#189aa1]/30"
-                    />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}>
-                      <span className="text-xs font-bold text-white">
-                        {(user?.displayName || user?.name || "?").charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
+                  <UserAvatar
+                    avatarUrl={(user as any).avatarUrl}
+                    name={user?.name}
+                    displayName={user?.displayName}
+                    className="w-7 h-7 rounded-full object-cover flex-shrink-0 border border-[#189aa1]/30"
+                    fallbackClassName="w-7 h-7"
+                  />
                   <span className="text-xs font-semibold text-gray-700 hidden lg:block max-w-[100px] truncate">
                     {user?.displayName || user?.name || "Account"}
                   </span>
@@ -473,20 +467,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <div className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                       {/* User info header */}
                       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-[#f0fbfc] to-white">
-                        {(user as any).avatarUrl ? (
-                          <img
-                            src={(user as any).avatarUrl}
-                            alt="Avatar"
-                            className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-[#189aa1]/30"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}>
-                            <span className="text-base font-bold text-white">
-                              {(user?.displayName || user?.name || "?").charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                        )}
+                        <UserAvatar
+                          avatarUrl={(user as any).avatarUrl}
+                          name={user?.name}
+                          displayName={user?.displayName}
+                          className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-[#189aa1]/30"
+                          fallbackClassName="w-10 h-10"
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm md:text-base font-semibold text-gray-800 truncate flex items-center gap-1.5">
                             {user?.displayName || user?.name || "Account"}
