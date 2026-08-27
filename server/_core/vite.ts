@@ -179,7 +179,7 @@ export function serveStatic(app: Express) {
     res.sendFile(path.resolve(distPath, "sw-clear.html"));
   });
 
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { index: false }));
 
   // Use regex route so /media/* paths are structurally excluded — they can NEVER
   // be caught by this fallback, regardless of route registration order.
