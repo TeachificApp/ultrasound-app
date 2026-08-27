@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./trpc";
+import { verifyManusApiConnection } from "../lib/manusApiClient";
 
 export const systemRouter = router({
   health: publicProcedure
@@ -28,6 +29,16 @@ export const systemRouter = router({
         success: delivered,
       } as const;
     }),
+
+  verifyManusAi: adminProcedure.mutation(async () => {
+    try {
+      await verifyManusApiConnection();
+      return { connected: true } as const;
+    } catch (error) {
+      console.warn("[ManusAPI] Railway connection check failed", error instanceof Error ? error.message : "unknown error");
+      return { connected: false } as const;
+    }
+  }),
 
   /**
    * requestAccess — called by authenticated users who land on the Access Required page.
