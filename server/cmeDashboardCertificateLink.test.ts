@@ -14,12 +14,13 @@ describe("dashboard course certificate link", () => {
 });
 
 describe("course overview enrollment access", () => {
-  it("uses resolveEnrollmentForCourse and only enables admin preview on explicit preview", () => {
+  it("uses slug-joined resolveEnrollmentByCourseSlug aligned with dashboard My Content", () => {
     const router = readFileSync(resolve(process.cwd(), "server/routers/lmsRouter.ts"), "utf8");
+    const access = readFileSync(resolve(process.cwd(), "server/lib/enrollmentAccess.ts"), "utf8");
     const page = readFileSync(resolve(process.cwd(), "client/src/pages/CourseOverview.tsx"), "utf8");
-    expect(router).toContain("resolveEnrollmentForCourse");
-    expect(router).toContain("input.preview && isAdminByRole && !enrollmentAccess");
-    expect(page).toContain("preview: isAdmin && !isStudentPreview");
+    expect(access).toContain("resolveEnrollmentByCourseSlug");
+    expect(router).toContain("resolveEnrollmentByCourseSlug");
+    expect(router).toContain("inArray(lmsLessons.sectionId, sectionIds)");
     expect(page).toContain('error.data?.code === "FORBIDDEN"');
   });
 });
