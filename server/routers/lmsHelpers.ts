@@ -68,7 +68,7 @@ import {
   mediaUploadResponses,
 } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
-import { getActiveEnrollment } from "../lib/enrollmentAccess";
+import { getActiveEnrollment, resolveEnrollmentForCourse } from "../lib/enrollmentAccess";
 import { shouldRestoreMissingCourseCertificate } from "../../shared/inlineLessonQuizCompletion";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -201,7 +201,7 @@ export async function restoreMissingCourseCertificate(
     .where(and(eq(lmsCertificates.userId, userId), eq(lmsCertificates.courseId, courseId))).limit(1);
   if (existing) return false;
 
-  const enrollment = await getActiveEnrollment(db, userId, courseId);
+  const enrollment = await resolveEnrollmentForCourse(db, userId, courseId);
   if (!enrollment) return false;
 
   if (!shouldRestoreMissingCourseCertificate({

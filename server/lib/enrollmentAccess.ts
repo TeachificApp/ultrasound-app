@@ -2,7 +2,7 @@
  * Enrollment access helpers — expiry-aware active enrollment checks.
  */
 
-import { and, eq, or, isNull, gt, inArray, isNotNull, gte } from "drizzle-orm";
+import { and, eq, or, isNull, gt, inArray, isNotNull, gte, desc } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
 import {
@@ -50,6 +50,27 @@ export function isEnrollmentAccessActive(enrollment: {
   if (enrollment.enrollmentType === "free_preview") return true;
   if (!enrollment.accessExpiresAt) return true;
   return enrollment.accessExpiresAt.getTime() > Date.now();
+}
+
+/** Resolve the enrollment row that should grant course player/overview access. */
+export async function resolveEnrollmentForCourse(
+  db: MySql2Database<typeof schema>,
+  userId: number,
+  courseId: number,
+): Promise<EnrollmentRow | null> {
+  const active = await getActiveEnrollment(db, userId, courseId);
+  if (active) return active;
+
+  const rows = await db
+    .select(enrollmentSelect)
+    .from(lmsEnrollments)
+    .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId)))
+    .orderBy(desc(lmsEnrollments.enrolledAt));
+
+  for (const row of rows) {
+    if (isEnrollmentCompleted(row) || isEnrollmentAccessActive(row)) return row;
+  }
+  return null;
 }
 
 export function activeEnrollmentCondition() {

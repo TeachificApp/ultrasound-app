@@ -23,3 +23,10 @@ describe("enrollmentAccess completion", () => {
     expect(isEnrollmentCompleted({ completedAt: new Date(), progressPct: 50 })).toBe(true);
   });
 });
+
+describe("resolveEnrollmentForCourse", () => {
+  it("is exported for course overview/player access checks", async () => {
+    const { resolveEnrollmentForCourse } = await import("./lib/enrollmentAccess");
+    expect(typeof resolveEnrollmentForCourse).toBe("function");
+  });
+});

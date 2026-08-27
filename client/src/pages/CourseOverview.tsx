@@ -102,9 +102,9 @@ export default function CourseOverview() {
   const [selectedInstructor, setSelectedInstructor] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "cohort" | "calendar">("overview");
 
-  const { data, isLoading, refetch } = trpc.lmsLearner.getCourseOverview.useQuery(
-    { slug: slug!, preview: isAdmin }, // always pass isAdmin for data access
-    { enabled: !!slug && !!user }
+  const { data, isLoading, isFetching, isError, error, refetch } = trpc.lmsLearner.getCourseOverview.useQuery(
+    { slug: slug!, preview: isAdmin && !isStudentPreview },
+    { enabled: !!slug && !!user, retry: 1 }
   );
 
   // Cohort schedule query — only runs when course is a cohort type
@@ -128,7 +128,7 @@ export default function CourseOverview() {
     }
   }, [data?.sections?.length]);
 
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || (isFetching && !data)) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-4xl mx-auto space-y-4">
@@ -142,6 +142,26 @@ export default function CourseOverview() {
   }
 
   if (!user) { navigate("/login"); return null; }
+
+  if (isError) {
+    const forbidden = error.data?.code === "FORBIDDEN";
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <Lock className="w-12 h-12 mx-auto mb-3 text-teal-500" />
+          <p className="text-lg font-medium text-gray-800">
+            {forbidden ? "You are not enrolled in this course" : "We couldn't load this course overview"}
+          </p>
+          {!forbidden && (
+            <p className="text-sm text-gray-500 mt-2">{error.message}</p>
+          )}
+          <Button className="mt-4 bg-teal-600 hover:bg-teal-700 text-white" onClick={() => forbidden ? navigate(`/courses/${slug}`) : refetch()}>
+            {forbidden ? "View Course Details" : "Try Again"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!data) {
     return (

@@ -143,6 +143,7 @@ export const dashboardRouter = router({
         courseBrand: lmsCourses.brand,
         courseThumbnail: lmsCourses.thumbnailUrl,
         courseStatus: lmsCourses.status,
+        hasCertificate: lmsCourses.hasCertificate,
       })
       .from(lmsEnrollments)
       .innerJoin(lmsCourses, eq(lmsEnrollments.courseId, lmsCourses.id))
@@ -312,6 +313,39 @@ export const dashboardRouter = router({
     const courses = enrichedEnrollments.filter(e => e.courseType === "course" || e.courseType === "cohort");
     const quizzes = enrichedEnrollments.filter(e => e.courseType === "quiz");
     const downloads = enrichedEnrollments.filter(e => e.courseType === "download");
+
+    const certRows = await db.select({
+      courseId: lmsCertificates.courseId,
+      certificateUrl: lmsCertificates.certificateUrl,
+    }).from(lmsCertificates).where(eq(lmsCertificates.userId, ctx.user.id));
+    let certByCourseId = new Map(certRows.map((row) => [row.courseId, row.certificateUrl]));
+
+    for (const course of courses) {
+      if (!course.enrollmentId || !course.hasCertificate) continue;
+      if (!isEnrollmentCompleted({ completedAt: course.completedAt, progressPct: course.progressPct })) continue;
+      if (certByCourseId.has(course.courseId)) continue;
+      const restored = await restoreMissingCourseCertificate(
+        db,
+        ctx.user.id,
+        course.courseId,
+        course.hasCertificate,
+      );
+      if (restored) {
+        const [cert] = await db.select({ certificateUrl: lmsCertificates.certificateUrl })
+          .from(lmsCertificates)
+          .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.courseId)))
+          .limit(1);
+        if (cert?.certificateUrl) certByCourseId.set(course.courseId, cert.certificateUrl);
+      }
+    }
+
+    const attachCertificateUrl = <T extends { courseId: number }>(items: T[]) =>
+      items.map((item) => ({
+        ...item,
+        certificateUrl: certByCourseId.get(item.courseId) ?? null,
+      }));
+
+    const coursesWithCerts = attachCertificateUrl(courses);
 
     // ── 9. Items from active membership subscriptions ─────────────────────────
     const activeMembershipSubs = await db
@@ -665,7 +699,7 @@ export const dashboardRouter = router({
     }));
 
     return resolveAssetUrls({
-      courses: [...courses, ...membershipCourses, ...bundleCourses],
+      courses: [...coursesWithCerts, ...membershipCourses, ...bundleCourses],
       quizzes: [...quizzes, ...membershipQuizzes, ...bundleQuizzes],
       downloads: [
         ...downloads,
