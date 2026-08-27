@@ -97,6 +97,7 @@ import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
+import { resendCertificateEmail } from "../lib/certificateResend";
 import { processStripeSessionById } from "../webhooks/stripe";
 
 /**
@@ -3582,6 +3583,7 @@ CRITICAL REQUIREMENTS:
     .input(z.object({
       enrollmentId: z.number().int().positive(),
       forceReissue: z.boolean().optional().default(false),
+      resendEmailOnly: z.boolean().optional().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -3598,19 +3600,25 @@ CRITICAL REQUIREMENTS:
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
       if (!course.hasCertificate) throw new TRPCError({ code: "BAD_REQUEST", message: "This course does not have certificates enabled" });
 
+      const [existing] = await db.select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
+        .from(lmsCertificates)
+        .where(and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId)))
+        .limit(1);
+
+      if (existing && input.resendEmailOnly) {
+        const result = await resendCertificateEmail(enrollment.userId, enrollment.courseId);
+        if (!result.sent) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Certificate email could not be sent" });
+        }
+        return { success: true, alreadyExisted: true, emailResent: true, certificateUrl: existing.certificateUrl };
+      }
+
       // If forceReissue, delete any existing certificate first
       if (input.forceReissue) {
         await db.delete(lmsCertificates).where(
           and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId))
         );
-      }
-
-      // Check if certificate already exists (after potential deletion)
-      const [existing] = await db.select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
-        .from(lmsCertificates)
-        .where(and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId)))
-        .limit(1);
-      if (existing) {
+      } else if (existing) {
         return { success: true, alreadyExisted: true, certificateUrl: existing.certificateUrl };
       }
 

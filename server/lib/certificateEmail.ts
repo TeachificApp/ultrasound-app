@@ -3,6 +3,7 @@
  * Builds and sends the certificate of completion email via SendGrid.
  * The PDF is attached as a base64 encoded attachment.
  */
+import { logEmail } from "./emailLogger";
 
 const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 const brandColor = "#189aa1";
@@ -56,13 +57,24 @@ export async function sendCertificateEmail(opts: {
   certificateUrl: string;
   pdfBuffer: Buffer;
   issuedAt: Date;
+  userId?: number;
 }): Promise<boolean> {
   const apiKey = process.env.SENDGRID_API_KEY;
   const senderEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@allaboutultrasound.com";
   const senderName = process.env.SENDGRID_FROM_NAME || "All About Ultrasound™";
+  const subject = `🎓 Your Certificate of Completion — ${opts.courseTitle}`;
 
   if (!apiKey) {
     console.warn("[certificate-email] SENDGRID_API_KEY not set — skipping email");
+    void logEmail({
+      userId: opts.userId,
+      recipientEmail: opts.to.email,
+      recipientName: opts.to.name,
+      emailType: "certificate",
+      subject,
+      status: "failed",
+      metadata: { reason: "missing_sendgrid_api_key", courseTitle: opts.courseTitle },
+    });
     return false;
   }
 
@@ -102,7 +114,7 @@ export async function sendCertificateEmail(opts: {
     personalizations: [
       {
         to: [{ name: opts.to.name, email: opts.to.email }],
-        subject: `🎓 Your Certificate of Completion — ${opts.courseTitle}`,
+        subject,
       },
     ],
     from: { name: senderName, email: senderEmail },
@@ -135,13 +147,43 @@ export async function sendCertificateEmail(opts: {
     if (!res.ok) {
       const text = await res.text();
       console.error(`[certificate-email] SendGrid error ${res.status}: ${text}`);
+      void logEmail({
+        userId: opts.userId,
+        recipientEmail: opts.to.email,
+        recipientName: opts.to.name,
+        emailType: "certificate",
+        subject,
+        status: "failed",
+        metadata: { courseTitle: opts.courseTitle, sendgridStatus: res.status, sendgridBody: text.slice(0, 500) },
+      });
       return false;
     }
 
     console.log(`[certificate-email] Sent certificate for "${opts.courseTitle}" to ${opts.to.email}`);
+    void logEmail({
+      userId: opts.userId,
+      recipientEmail: opts.to.email,
+      recipientName: opts.to.name,
+      emailType: "certificate",
+      subject,
+      status: "sent",
+      metadata: { courseTitle: opts.courseTitle, certificateUrl: opts.certificateUrl },
+    });
     return true;
   } catch (err) {
     console.error("[certificate-email] Failed:", err);
+    void logEmail({
+      userId: opts.userId,
+      recipientEmail: opts.to.email,
+      recipientName: opts.to.name,
+      emailType: "certificate",
+      subject,
+      status: "failed",
+      metadata: {
+        courseTitle: opts.courseTitle,
+        error: err instanceof Error ? err.message : String(err),
+      },
+    });
     return false;
   }
 }

@@ -302,13 +302,17 @@ export async function issueCertificateIfEnabled(
   // Send email — skip for admin_preview enrollments (test runs should not send real emails)
   if (enrollmentType !== "admin_preview") {
     const certTitleForEmail = (course.certificateTitleOverride && course.certificateTitleOverride.trim()) ? course.certificateTitleOverride.trim() : course.title;
-    await sendCertificateEmail({
+    const emailSent = await sendCertificateEmail({
       to: { name: learnerName, email: user.email },
       courseTitle: certTitleForEmail,
       certificateUrl,
       pdfBuffer,
       issuedAt,
+      userId,
     });
+    if (!emailSent) {
+      console.error(`[certificate] Certificate saved for user ${userId}, course ${courseId}, but email delivery failed`);
+    }
   }
 
   console.log(`[certificate] Issued certificate for user ${userId}, course ${courseId}${enrollmentType === "admin_preview" ? " (admin preview — email suppressed)" : ""}`);

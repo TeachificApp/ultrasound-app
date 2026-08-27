@@ -9916,8 +9916,10 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
   const [certTarget, setCertTarget] = useState<{ enrollmentId: number; name: string; hasCert: boolean } | null>(null);
   const manualIssueCertificate = trpc.lmsEnrollmentAdmin.manualIssueCertificate.useMutation({
     onSuccess: (result) => {
-      if (result.alreadyExisted) {
-        toast.info("Certificate already existed — no change made.");
+      if (result.emailResent) {
+        toast.success("Certificate email resent to student.");
+      } else if (result.alreadyExisted) {
+        toast.info("Certificate already existed — use Resend Email to deliver again.");
       } else {
         toast.success("Certificate issued successfully!");
       }
@@ -10101,14 +10103,24 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setCertTarget(null)}>Cancel</Button>
             {certTarget?.hasCert && (
-              <Button
-                variant="outline"
-                className="border-amber-400 text-amber-700 hover:bg-amber-50"
-                onClick={() => certTarget && manualIssueCertificate.mutate({ enrollmentId: certTarget.enrollmentId, forceReissue: true })}
-                disabled={manualIssueCertificate.isPending}
-              >
-                {manualIssueCertificate.isPending ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Re-issuing...</> : "Re-issue Certificate"}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  className="border-teal-300 text-teal-700 hover:bg-teal-50"
+                  onClick={() => certTarget && manualIssueCertificate.mutate({ enrollmentId: certTarget.enrollmentId, resendEmailOnly: true })}
+                  disabled={manualIssueCertificate.isPending}
+                >
+                  {manualIssueCertificate.isPending ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Sending...</> : "Resend Email"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                  onClick={() => certTarget && manualIssueCertificate.mutate({ enrollmentId: certTarget.enrollmentId, forceReissue: true })}
+                  disabled={manualIssueCertificate.isPending}
+                >
+                  {manualIssueCertificate.isPending ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Re-issuing...</> : "Re-issue Certificate"}
+                </Button>
+              </>
             )}
             {!certTarget?.hasCert && (
               <Button

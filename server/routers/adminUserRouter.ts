@@ -58,9 +58,8 @@ import {
   workshops,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
-import { storagePut } from "../storage";
-import { generateCertificatePdf } from "../lib/certificateGenerator";
-import { sendCertificateEmail } from "../lib/certificateEmail";
+import { issueCertificateIfEnabled } from "./lmsHelpers";
+import { resendCertificateEmail as deliverCertificateEmail } from "../lib/certificateResend";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail, emailWrapper } from "../_core/email";
 import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail, buildPersistentAccessUrl } from "../lib/enrollmentEmail";
 import { getOrCreateAccessToken } from "../db";
@@ -755,48 +754,53 @@ export const adminUserRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // Check if already issued
       const [existing] = await db
-        .select({ id: lmsCertificates.id })
+        .select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
         .from(lmsCertificates)
         .where(and(eq(lmsCertificates.userId, input.userId), eq(lmsCertificates.courseId, input.courseId)))
         .limit(1);
-      if (existing) return { certificateId: existing.id, alreadyIssued: true };
-
-      // Get user and course info
-      const [user] = await db.select({ name: users.name, displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
-      const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
-      if (!user || !course) throw new TRPCError({ code: "NOT_FOUND", message: "User or course not found" });
-
-      // Generate PDF
-      const recipientName = user.displayName || user.name || "Student";
-      const pdfBuffer = await generateCertificatePdf({
-        recipientName,
-        courseTitle: course.title,
-        completionDate: new Date(),
-      });
-
-      const suffix = Date.now();
-      const fileKey = `certificates/cert-${input.userId}-${input.courseId}-${suffix}.pdf`;
-      const { url: certificateUrl } = await storagePut(fileKey, pdfBuffer, "application/pdf");
-
-      const [result] = await db.insert(lmsCertificates).values({
-        userId: input.userId,
-        courseId: input.courseId,
-        enrollmentId: input.enrollmentId,
-        certificateUrl,
-      }).$returningId();
-
-      // Send email if user has one
-      if (user.email) {
-        await sendCertificateEmail({
-          to: { name: recipientName, email: user.email },
-          courseTitle: course.title,
-          certificateUrl,
-        }).catch(e => console.error("[adminUser] Certificate email failed:", e));
+      if (existing) {
+        return { certificateId: existing.id, certificateUrl: existing.certificateUrl, alreadyIssued: true };
       }
 
-      return { certificateId: result.id, certificateUrl, alreadyIssued: false };
+      const [enrollment] = await db
+        .select({ enrollmentType: lmsEnrollments.enrollmentType })
+        .from(lmsEnrollments)
+        .where(eq(lmsEnrollments.id, input.enrollmentId))
+        .limit(1);
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+
+      await issueCertificateIfEnabled(
+        db,
+        input.enrollmentId,
+        input.userId,
+        input.courseId,
+        enrollment.enrollmentType ?? undefined,
+        { adminBypass: true },
+      );
+
+      const [newCert] = await db
+        .select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
+        .from(lmsCertificates)
+        .where(and(eq(lmsCertificates.userId, input.userId), eq(lmsCertificates.courseId, input.courseId)))
+        .limit(1);
+      if (!newCert) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Certificate could not be issued — check course certificate settings" });
+      }
+
+      return { certificateId: newCert.id, certificateUrl: newCert.certificateUrl, alreadyIssued: false };
+    }),
+
+  /** Resend certificate email for an existing certificate */
+  resendCertificateEmail: protectedProcedure
+    .input(z.object({ userId: z.number().int(), courseId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const result = await deliverCertificateEmail(input.userId, input.courseId);
+      if (!result.sent) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Certificate email could not be sent — check SendGrid configuration and server logs" });
+      }
+      return { success: true, certificateUrl: result.certificateUrl };
     }),
 
   /** Remove a certificate by certificate ID */

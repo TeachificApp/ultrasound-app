@@ -90,6 +90,7 @@ export const dashboardRouter = router({
         website: users.website,
         loginMethod: users.loginMethod,
         emailVerified: users.emailVerified,
+        thinkificEnrolledAt: users.thinkificEnrolledAt,
         createdAt: users.createdAt,
         passwordHash: users.passwordHash,
       })

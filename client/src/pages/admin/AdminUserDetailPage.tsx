@@ -2884,6 +2884,11 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
     onError: (e) => toast.error(e.message),
   });
 
+  const resendCertEmail = trpc.adminUser.resendCertificateEmail.useMutation({
+    onSuccess: () => toast.success("Certificate email resent to student."),
+    onError: (e) => toast.error(e.message),
+  });
+
   const removeCert = trpc.adminUser.removeCertificate.useMutation({
     onSuccess: () => { toast.success("Certificate removed."); refetch(); setRemoveConfirm(null); },
     onError: (e) => toast.error(e.message),
@@ -2925,6 +2930,13 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
                   >
                     <Download className="w-3 h-3" /> Download
                   </a>
+                  <button
+                    onClick={() => resendCertEmail.mutate({ userId, courseId: cert.courseId })}
+                    disabled={resendCertEmail.isPending}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+                  >
+                    {resendCertEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
+                  </button>
                   <button
                     onClick={() => setRemoveConfirm(cert.id)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
