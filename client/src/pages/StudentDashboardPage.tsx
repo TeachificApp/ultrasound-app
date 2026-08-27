@@ -34,6 +34,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Layout from "@/components/Layout";
+import { THINKIFIC_LEGACY_BILLING_LABEL } from "@shared/thinkificLegacy";
+import UserAvatar from "@/components/UserAvatar";
 import { isMembersDomain, isLearnDomain, LEARN_APP_URL, APP_URL, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 import { formatInTimeZone, isInstantExpired, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
@@ -274,14 +276,13 @@ function ProfileTab() {
       {/* Avatar */}
       <div className="flex items-center gap-6">
         <div className="relative">
-          {profile.avatarUrl ? (
-            <img src={profile.avatarUrl} alt="Avatar" className="w-24 h-24 rounded-full object-cover border-4 border-[#189aa1]/20 shadow" />
-          ) : (
-            <div className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow"
-              style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}>
-              {(profile.displayName ?? profile.name ?? "?").charAt(0).toUpperCase()}
-            </div>
-          )}
+          <UserAvatar
+            avatarUrl={profile.avatarUrl}
+            name={profile.name}
+            displayName={profile.displayName}
+            className="w-24 h-24 rounded-full object-cover border-4 border-[#189aa1]/20 shadow"
+            fallbackClassName="w-24 h-24 text-3xl"
+          />
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadAvatar.isPending}
@@ -827,7 +828,8 @@ function CommunityProfileSection({ userId }: { userId: number }) {
 type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "workshops" | "products" | "bundles" | "memberships" | "communities";
 
 function MyContentTab() {
-  const { data, isLoading } = trpc.dashboard.getMyContent.useQuery();
+  const { data: profile } = trpc.dashboard.getProfile.useQuery();
+  const { data, isLoading, isError, error, refetch } = trpc.dashboard.getMyContent.useQuery();
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
   const [autoTabSet, setAutoTabSet] = useState(false);
 
@@ -854,6 +856,24 @@ function MyContentTab() {
   }, [data, autoTabSet]);
 
   if (isLoading) return <LoadingSpinner />;
+
+  if (isError) {
+    const message = error.message === "Database unavailable"
+      ? "We couldn't load your content right now. Please try again."
+      : error.message;
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center space-y-3">
+        <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
+        <p className="font-semibold text-red-900">We couldn&apos;t load your content</p>
+        <p className="text-sm text-red-700">{message}</p>
+        <Button variant="outline" onClick={() => refetch()} className="border-red-300 text-red-700 hover:bg-red-100">
+          <RefreshCw className="w-4 h-4 mr-2" /> Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  const showLegacyThinkificLink = Boolean(profile?.thinkificEnrolledAt) && (data?.courses.length ?? 0) === 0;
 
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: data?.courses.length ?? 0 },
@@ -899,7 +919,27 @@ function MyContentTab() {
       {contentTab === "courses" && (
         <div>
           {(data?.courses.length ?? 0) === 0 ? (
-            <EmptyState icon={BookOpen} title="No courses yet" description="Enroll in a course to see it here." />
+            showLegacyThinkificLink ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center space-y-4">
+                <BookOpen className="w-10 h-10 text-amber-600 mx-auto" />
+                <div>
+                  <p className="font-semibold text-amber-950">Looking for recorded CME classes?</p>
+                  <p className="text-sm text-amber-900 mt-2 max-w-lg mx-auto">
+                    Your recorded classes may be on our legacy learning platform. Sign in with the same email address to access them.
+                  </p>
+                </div>
+                <a
+                  href="https://member.allaboutultrasound.com/enrollments"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold transition-colors"
+                >
+                  Open Legacy Recorded Classes <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            ) : (
+              <EmptyState icon={BookOpen} title="No courses yet" description="Enroll in a course to see it here." />
+            )
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {data?.courses.map((c, i) => (
@@ -1542,7 +1582,7 @@ function SubscriptionsTab() {
                               )}
                               {isThinkific && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
-                                  Thinkific
+                                  Legacy billing
                                 </span>
                               )}
                             </div>
@@ -1574,7 +1614,7 @@ function SubscriptionsTab() {
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200"
                               >
-                                Manage on Thinkific <ExternalLink className="w-3.5 h-3.5" />
+                                {THINKIFIC_LEGACY_BILLING_LABEL} <ExternalLink className="w-3.5 h-3.5" />
                               </a>
                             ) : sub.stripeSubscriptionId ? (
                               isCancelPending ? (
@@ -1863,7 +1903,7 @@ function CertificatesTab() {
       <EmptyState
         icon={Award}
         title="No certificates yet"
-        description="Complete a course to earn your certificate of completion."
+        description="Complete a course to earn your certificate — download it here anytime."
         action={{ label: "Browse Courses", href: "/education-library" }}
       />
     );

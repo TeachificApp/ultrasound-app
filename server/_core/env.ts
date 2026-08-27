@@ -1,3 +1,6 @@
+import { resolvePlatformAdminEmail } from "../../shared/platformAdminEmail";
+import { resolveForgeApiKey, resolveForgeApiUrl } from "../lib/openAiConfig";
+
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? process.env.APP_ID ?? "ultrasound-app",
   appUrl: process.env.VITE_APP_URL ?? "https://app.allaboutultrasound.com",
@@ -12,8 +15,8 @@ export const ENV = {
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  forgeApiUrl: resolveForgeApiUrl() ?? "",
+  forgeApiKey: resolveForgeApiKey() ?? "",
   manusApiKey: process.env.MANUS_API_KEY ?? "",
   manusApiBaseUrl: process.env.MANUS_API_BASE_URL ?? "https://api.manus.ai",
   manusApiTimeoutMs: Number(process.env.MANUS_API_TIMEOUT_MS ?? "240000"),
@@ -22,7 +25,7 @@ export const ENV = {
   thinkificAdminEmail: process.env.THINKIFIC_ADMIN_EMAIL ?? "",
   thinkificAdminPassword: process.env.THINKIFIC_ADMIN_PASSWORD ?? "",
   thinkificGraphqlJwt: process.env.THINKIFIC_GRAPHQL_JWT ?? "",
-  platformAdminEmail: process.env.PLATFORM_ADMIN_EMAIL ?? "admin@allaboutultrasound.com",
+  platformAdminEmail: resolvePlatformAdminEmail(process.env.PLATFORM_ADMIN_EMAIL),
   printfulApiKey: process.env.PRINTFUL_API_KEY ?? "",
   printfulDefaultStoreId: process.env.PRINTFUL_DEFAULT_STORE_ID ?? "",
   printfulShippingMethod: process.env.PRINTFUL_SHIPPING_METHOD ?? "STANDARD",

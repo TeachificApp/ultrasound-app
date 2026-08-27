@@ -15,6 +15,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { resolveAssetUrl, resolveAssetUrls } from "../lib/resolveAssetUrl";
 import {
   users,
   lmsEnrollments,
@@ -48,19 +49,17 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
+import {
+  THINKIFIC_LEGACY_BILLING_URL,
+  isActiveThinkificMembership,
+} from "../../shared/thinkificLegacy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Map brand to Thinkific membership management URLs */
+/** Legacy Thinkific subscribers manage billing on the member site. */
 const THINKIFIC_MANAGE_URLS: Record<string, string> = {
-  aaus: "https://allaboutultrasound.thinkific.com/users/sign_in",
-  iheartecho: "https://iheartecho.thinkific.com/users/sign_in",
-};
-
-/** Map brand to Thinkific site base URL */
-const THINKIFIC_SITE_URLS: Record<string, string> = {
-  aaus: "https://allaboutultrasound.thinkific.com",
-  iheartecho: "https://iheartecho.thinkific.com",
+  aaus: THINKIFIC_LEGACY_BILLING_URL,
+  iheartecho: THINKIFIC_LEGACY_BILLING_URL,
 };
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -90,6 +89,7 @@ export const dashboardRouter = router({
         website: users.website,
         loginMethod: users.loginMethod,
         emailVerified: users.emailVerified,
+        thinkificEnrolledAt: users.thinkificEnrolledAt,
         createdAt: users.createdAt,
         passwordHash: users.passwordHash,
       })
@@ -99,9 +99,22 @@ export const dashboardRouter = router({
 
     if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
+    const thinkificMemberships = await db
+      .select({
+        source: brandMemberships.source,
+        status: brandMemberships.status,
+        expiresAt: brandMemberships.expiresAt,
+      })
+      .from(brandMemberships)
+      .where(eq(brandMemberships.userId, ctx.user.id));
+
+    const hasActiveThinkificSubscription = thinkificMemberships.some(isActiveThinkificMembership);
+
     return {
       ...user,
+      avatarUrl: resolveAssetUrl(user.avatarUrl),
       hasPassword: !!user.passwordHash,
+      hasActiveThinkificSubscription,
       passwordHash: undefined, // never expose hash
     };
   }),
@@ -630,10 +643,12 @@ export const dashboardRouter = router({
       iheartecho: { premium: "EchoAssist™ Premium", free: "EchoAssist™ Free", basic: "EchoAssist™ Basic" },
     };
     const BRAND_COVER_IMAGES: Record<string, string> = {
-      // aaus: UltrasoundAssist™ — teal probe hero banner
-      aaus: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp",
-      // iheartecho: EchoAssist™ — teal heart hero banner
-      iheartecho: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp",
+      aaus: resolveAssetUrl(
+        "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp",
+      )!,
+      iheartecho: resolveAssetUrl(
+        "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp",
+      )!,
     };
     const brandMembershipCards = brandMembershipRows.map(m => ({
       type: "brand" as const,
@@ -647,7 +662,7 @@ export const dashboardRouter = router({
       expiresAt: m.expiresAt,
     }));
 
-    return {
+    return resolveAssetUrls({
       courses: [...courses, ...membershipCourses, ...bundleCourses],
       quizzes: [...quizzes, ...membershipQuizzes, ...bundleQuizzes],
       downloads: [
@@ -663,7 +678,7 @@ export const dashboardRouter = router({
       communities: [...communityRegs, ...membershipCommunities],
       funnelPurchases: funnelPurchaseRows,
       memberships: [...membershipCards, ...brandMembershipCards],
-    };
+    });
   }),
 
   // ── Subscriptions ─────────────────────────────────────────────────────────────
@@ -708,8 +723,8 @@ export const dashboardRouter = router({
           }
         }
 
-        // Determine if this is a Thinkific-sourced membership
-        const isThinkific = m.source === "thinkific";
+        // Active legacy Thinkific subscription — billing managed on member site
+        const isThinkific = isActiveThinkificMembership(m);
         const thinkificManageUrl = THINKIFIC_MANAGE_URLS[m.brand] ?? THINKIFIC_MANAGE_URLS.aaus;
 
         return {
@@ -1069,7 +1084,7 @@ export const dashboardRouter = router({
       .where(eq(lmsCertificates.userId, ctx.user.id))
       .orderBy(desc(lmsCertificates.issuedAt));
 
-    return certs;
+    return resolveAssetUrls(certs);
   }),
 
   // ── Purchases (all one-time transactions + subscription invoice payments) ────

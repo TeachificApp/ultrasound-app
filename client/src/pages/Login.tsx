@@ -18,8 +18,8 @@ import { Label } from "@/components/ui/label";
 import { Mail, Loader2, Stethoscope, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft, GraduationCap, Award, Users, Eye, EyeOff, Lock, UserPlus, KeyRound } from "lucide-react";
 import { isCombinedBrandingDomain, isIHeartEchoDomain, isLearnDomain, MEMBERS_APP_URL } from "@/hooks/useSubdomain";
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
-import MaintenanceBanner from "@/components/MaintenanceBanner";
 import { toast } from "sonner";
+import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 const IHE_LOGO = "/manus-storage/iheartecho-logo_f9d91cd4.webp";
@@ -104,6 +104,11 @@ export default function Login() {
     );
   }, []);
 
+  // Clear stale Manus-era JWT cookies so magic-link sessions can stick after Railway migration.
+  useEffect(() => {
+    fetch("/api/auth/clear-session", { method: "GET", credentials: "include" }).catch(() => {});
+  }, []);
+
   // Redirect if already signed in (but NOT if user just clicked logout)
   useEffect(() => {
     if (isPostLogout) return; // User explicitly logged out — stay on login page
@@ -132,14 +137,14 @@ export default function Login() {
 
   const handleMagicSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
+    const trimmed = normalizeAuthEmail(email);
     if (!trimmed || requestMutation.isPending) return;
     requestMutation.mutate({ email: trimmed, origin: window.location.origin, returnTo });
   };
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
+    const trimmed = normalizeAuthEmail(email);
     if (!trimmed || !password || passwordLoading) return;
     setPasswordLoading(true);
     setPasswordError(null);
@@ -177,7 +182,7 @@ export default function Login() {
 
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
+    const trimmed = normalizeAuthEmail(email);
     if (!trimmed || !password || registerMutation.isPending) return;
     if (password.length < 8) {
       toast.error("Password must be at least 8 characters.");
@@ -219,7 +224,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ fontFamily: "Open Sans, sans-serif" }}>
-      <MaintenanceBanner showForUnauthenticated />
       <div className="flex flex-1 flex-col lg:flex-row">
         {/* ── Left panel: branding ── */}
         <div
@@ -315,6 +319,7 @@ export default function Login() {
                 <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-700 leading-relaxed space-y-1">
                   <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>
+                  <p>Didn't request this? Someone may have entered your email by mistake — you can ignore the message.</p>
                   <p>&#128236; <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder &mdash; the email comes from <span className="font-medium">{BRAND_NAME}</span>.</p>
                 </div>
               </div>

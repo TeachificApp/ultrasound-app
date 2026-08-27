@@ -26,6 +26,7 @@ import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
 import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail, emailWrapper } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
+import { buildPersistentAccessUrl } from "../lib/enrollmentEmail";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
 
 // Stripe webhook secret — optional but strongly recommended in production.
@@ -327,7 +328,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
           console.error(`[Stripe] Failed to generate access token for ${customerEmail}:`, atErr);
         }
         const accessUrl = accessTokenForEmail
-          ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}`
+          ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessTokenForEmail)
           : setPasswordUrl;
         try {
           const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
@@ -935,7 +936,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
         accessTokenForEmail = await getOrCreateAccessToken(userId);
       } catch { /* non-fatal */ }
       const accessUrl = accessTokenForEmail
-        ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}`
+        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessTokenForEmail)
         : setPasswordUrl;
       const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
       const emailContent = buildPasswordResetEmail({
@@ -971,7 +972,9 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
       const firstName = (customerName || customerEmail).split(" ")[0] || "there";
       let accessToken: string | null = null;
       try { accessToken = await getOrCreateAccessToken(userId); } catch { /* non-fatal */ }
-      const accessUrl = accessToken ? `${baseUrl}/api/auth/auto-login?token=${accessToken}` : `${baseUrl}/dashboard`;
+      const accessUrl = accessToken
+        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessToken)
+        : `${baseUrl}/dashboard`;
       const brandLabel = brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
       const planLabel = isLifetime ? `${brandLabel} Lifetime Premium Membership` : `${brandLabel} Premium Membership`;
       const htmlBody = emailWrapper(`
@@ -1170,7 +1173,7 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
         accessTokenForEmail = await getOrCreateAccessToken(userId);
       } catch { /* non-fatal */ }
       const accessUrl = accessTokenForEmail
-        ? `${baseUrl}/api/auth/auto-login?token=${accessTokenForEmail}`
+        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessTokenForEmail)
         : setPasswordUrl;
       const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
       const emailContent = buildPasswordResetEmail({
@@ -1206,7 +1209,9 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
       const firstName = (customerName || customerEmail).split(" ")[0] || "there";
       let accessToken: string | null = null;
       try { accessToken = await getOrCreateAccessToken(userId); } catch { /* non-fatal */ }
-      const accessUrl = accessToken ? `${baseUrl}/api/auth/auto-login?token=${accessToken}` : `${baseUrl}/dashboard`;
+      const accessUrl = accessToken
+        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessToken)
+        : `${baseUrl}/dashboard`;
       const planLabel = isLifetime ? "All Access Dual Lifetime Membership" : "All Access Dual Membership";
       const htmlBody = emailWrapper(`
         <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>
@@ -1512,7 +1517,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         }
         // Build access URL — clicking this auto-signs the user in
         const accessUrl = accessTokenForEmail
-          ? `${baseUrl}/auth/access?token=${accessTokenForEmail}&next=${encodeURIComponent(baseUrl)}`
+          ? buildPersistentAccessUrl(baseUrl, accessTokenForEmail)
           : setPasswordUrl;
         // Send welcome + set-password email
         try {

@@ -1,10 +1,12 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { COOKIE_NAME, DEMO_COOKIE_NAME, TWO_HOURS_MS } from "@shared/const";
+import { authEmailField } from "@shared/authEmailField";
 import { clearSessionCookies, getSessionCookieOptions, resolveAuthHostname } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
+import { resolveAssetUrl } from "./lib/resolveAssetUrl";
 import { runMirrorSync, getLastSyncResult, isSyncRunning } from "./jobs/mirrorSync";
 import { platformAdminRouter, labSeatsRouter, adminRouter } from "./routers/adminRouter";
 import { cmeRouter } from "./routers/cmeRouter";
@@ -196,9 +198,20 @@ export const appRouter = router({
       if (!opts.ctx.user) return null;
       // Backfill the base "user" role for any existing user who may be missing it
       await ensureUserRole(opts.ctx.user.id);
-      const roles = await getUserRoles(opts.ctx.user.id);
+      let roles = await getUserRoles(opts.ctx.user.id);
       // Fetch full user row to expose pendingEmail and isPremium for the profile UI
       const fullUser = await getUserById(opts.ctx.user.id);
+      if (fullUser?.email) {
+        const { isPlatformOwnerEmail } = await import("../shared/platformOwnerAccess");
+        if (isPlatformOwnerEmail(fullUser.email)) {
+          const dbConn = await (await import("./db")).getDb();
+          if (dbConn) {
+            const { ensurePlatformOwnerAccess } = await import("./lib/ensureUserAccessAccounting");
+            await ensurePlatformOwnerAccess(dbConn);
+            roles = await getUserRoles(opts.ctx.user.id);
+          }
+        }
+      }
       // Derive isPremium from both the DB flag and role-based premium access
       const PREMIUM_ROLES = new Set(["premium_user", "diy_user", "diy_admin", "platform_admin", "platform_owner"]);
       const isPremiumByRole = roles.some(r => PREMIUM_ROLES.has(r));
@@ -233,7 +246,7 @@ export const appRouter = router({
         ...opts.ctx.user,
         // Override with fresh DB values so profile updates reflect immediately
         displayName: fullUser?.displayName ?? opts.ctx.user.displayName ?? null,
-        avatarUrl: fullUser?.avatarUrl ?? opts.ctx.user.avatarUrl ?? null,
+        avatarUrl: resolveAssetUrl(fullUser?.avatarUrl ?? opts.ctx.user.avatarUrl ?? null),
         name: fullUser?.name ?? opts.ctx.user.name ?? null,
         firstName: fullUser?.firstName ?? (opts.ctx.user as any).firstName ?? null,
         lastName: fullUser?.lastName ?? (opts.ctx.user as any).lastName ?? null,
@@ -452,14 +465,26 @@ export const appRouter = router({
 
        requestPasswordReset: publicProcedure
       .input(z.object({
-        email: z.string().email().max(320),
+        email: authEmailField,
         origin: z.string().url().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setPasswordResetToken } = await import('./db');
         const { sendEmail, buildPasswordResetEmail } = await import('./_core/email');
+        const { resolveAuthDeliveryEmail } = await import('./lib/authEmailDelivery');
+        const { shouldSendAuthEmail, markAuthEmailSent } = await import('./lib/authEmailRateLimit');
+        const { getRequestClientInfo } = await import('./lib/recordUserLogin');
         const crypto = await import('crypto');
-        const email = input.email.trim().toLowerCase();
+        const email = input.email;
+        const { ipAddress } = getRequestClientInfo(ctx.req);
+        const rateLimit = await shouldSendAuthEmail({
+          email,
+          type: "password_reset",
+          ipAddress,
+        });
+        if (!rateLimit.allowed) {
+          return { success: true };
+        }
         const user = await getUserByEmail(email);
         // Always return success to prevent email enumeration
         // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)
@@ -467,9 +492,21 @@ export const appRouter = router({
         if (!user) {
           return { success: true };
         }
+        const deliveryEmail = resolveAuthDeliveryEmail(user, email);
+        if (!deliveryEmail) {
+          console.error(`[auth] Password reset skipped: user ${user.id} has no deliverable email`);
+          return { success: true };
+        }
+        const { ensureTransactionalEmailDelivery } = await import('./lib/ensureTransactionalEmailDelivery');
+        await ensureTransactionalEmailDelivery(deliveryEmail);
         const token = crypto.randomBytes(48).toString('hex');
         const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-        await setPasswordResetToken(user.id, token, expiry);
+        try {
+          await setPasswordResetToken(user.id, token, expiry);
+        } catch (err) {
+          console.error(`[auth] Failed to store password reset token for user ${user.id}:`, err);
+          return { success: true };
+        }
         // Use the origin the user is actually on for the reset URL so the link works on any domain
         const { detectBrandMode: dbm2 } = await import('@shared/brands');
         const originHostname = input.origin ? new URL(input.origin).hostname : (ctx.req.hostname || "");
@@ -478,13 +515,23 @@ export const appRouter = router({
         const resetUrl = `${appUrlReset}/reset-password?token=${token}`;
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
-        await sendEmail({
-          to: { name: firstName, email: user.email! },
+        const emailSent = await sendEmail({
+          to: { name: firstName, email: deliveryEmail },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
           brandMode,
         });
+        if (!emailSent) {
+          console.error(`[auth] Password reset email was not accepted by SendGrid for user ${user.id} (${deliveryEmail})`);
+        } else {
+          await markAuthEmailSent({
+            email: deliveryEmail,
+            type: "password_reset",
+            ipAddress,
+            userId: user.id,
+          });
+        }
         return { success: true };
       }),
 
@@ -516,16 +563,28 @@ export const appRouter = router({
 
     requestMagicLink: publicProcedure
       .input(z.object({
-        email: z.string().email().max(320),
+        email: authEmailField,
         origin: z.string().url().optional(),
         returnTo: z.string().max(500).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const { getUserByEmail, setMagicLinkToken, upsertUser } = await import('./db');
         const { sendEmail, buildMagicLinkEmail } = await import('./_core/email');
+        const { resolveAuthDeliveryEmail } = await import('./lib/authEmailDelivery');
+        const { shouldSendAuthEmail, markAuthEmailSent } = await import('./lib/authEmailRateLimit');
+        const { getRequestClientInfo } = await import('./lib/recordUserLogin');
         const crypto = await import('crypto');
 
-        const email = input.email.trim().toLowerCase();
+        const email = input.email;
+        const { ipAddress } = getRequestClientInfo(ctx.req);
+        const rateLimit = await shouldSendAuthEmail({
+          email,
+          type: "magic_link",
+          ipAddress,
+        });
+        if (!rateLimit.allowed) {
+          return { success: true };
+        }
         let user = await getUserByEmail(email);
 
         // Passwordless sign-in also provides a safe account-creation path. This
@@ -586,8 +645,15 @@ export const appRouter = router({
 
         const firstName = (user.displayName || user.name || 'there').split(' ')[0];
         const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });
+        const deliveryEmail = resolveAuthDeliveryEmail(user, email);
+        if (!deliveryEmail) {
+          console.error(`[auth] Magic-link delivery skipped: user ${user.id} has no deliverable email`);
+          return { success: true };
+        }
+        const { ensureTransactionalEmailDelivery } = await import('./lib/ensureTransactionalEmailDelivery');
+        await ensureTransactionalEmailDelivery(deliveryEmail);
         const deliveryAccepted = await sendEmail({
-          to: { name: firstName, email: user.email! },
+          to: { name: firstName, email: deliveryEmail },
           subject: emailPayload.subject,
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
@@ -601,6 +667,13 @@ export const appRouter = router({
           });
         }
 
+        await markAuthEmailSent({
+          email: deliveryEmail,
+          type: "magic_link",
+          ipAddress,
+          userId: user.id,
+        });
+
         return { success: true };
       }),
 
@@ -608,7 +681,7 @@ export const appRouter = router({
 
     loginWithPassword: publicProcedure
       .input(z.object({
-        email: z.string().email().max(320),
+        email: authEmailField,
         password: z.string().min(1).max(128),
       }))
       .mutation(async ({ ctx, input }) => {
@@ -618,7 +691,7 @@ export const appRouter = router({
         const { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } = await import('./_core/cookies');
         const bcrypt = await import('bcryptjs');
 
-        const email = input.email.trim().toLowerCase();
+        const email = input.email;
         const user = await getUserByEmail(email);
 
         // Generic error to prevent user enumeration
@@ -678,7 +751,7 @@ export const appRouter = router({
 
     registerWithPassword: publicProcedure
       .input(z.object({
-        email: z.string().email().max(320),
+        email: authEmailField,
         password: z.string().min(8).max(128),
         firstName: z.string().min(1, "First name is required").max(100),
         lastName: z.string().min(1, "Last name is required").max(100),
@@ -692,7 +765,7 @@ export const appRouter = router({
         const { eq } = await import('drizzle-orm');
         const bcrypt = await import('bcryptjs');
 
-        const email = input.email.trim().toLowerCase();
+        const email = input.email;
         const existing = await getUserByEmail(email);
         // Resolve hostname once for correct cookie scoping on iheartecho.com vs allaboutultrasound.com
         const regHostname = resolveRegHostname(ctx.req);

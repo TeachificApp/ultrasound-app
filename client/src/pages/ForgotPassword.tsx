@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Heart, CheckCircle2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -28,7 +29,7 @@ export default function ForgotPassword() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    forgotMutation.mutate({ email: email.trim().toLowerCase(), origin: window.location.origin });
+    forgotMutation.mutate({ email: normalizeAuthEmail(email), origin: window.location.origin });
   };
 
   return (
@@ -48,6 +49,9 @@ export default function ForgotPassword() {
             <h2 className="text-2xl font-black mb-3" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>Check your email</h2>
             <p className="text-gray-500 text-sm mb-6 leading-relaxed">
               If <strong>{email}</strong> is registered, you'll receive a password reset link shortly.
+            </p>
+            <p className="text-xs text-gray-400 mb-6 leading-relaxed">
+              Didn't request this? Someone may have entered your email by mistake. You can ignore the message — your password won't change unless you click the link.
             </p>
             <Link href="/login">
               <Button variant="outline" className="w-full">

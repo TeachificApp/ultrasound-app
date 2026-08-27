@@ -1,5 +1,11 @@
 import { ENV } from "./env";
 import { createManusTask, waitForManusTask } from "../lib/manusApiClient";
+import {
+  getOpenAiApiKey,
+  isOpenAiBackend,
+  resolveLlmChatCompletionsUrl,
+  resolveLlmChatModel,
+} from "../lib/openAiConfig";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -58,6 +64,8 @@ export type ToolChoice =
 
 export type InvokeParams = {
   messages: Message[];
+  /** Override default model (gpt-4o-mini on OpenAI, gemini-2.5-flash on Forge). */
+  model?: string;
   tools?: Tool[];
   toolChoice?: ToolChoice;
   tool_choice?: ToolChoice;
@@ -210,15 +218,8 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
-
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
+  getOpenAiApiKey();
 };
 
 function serializeForManusTask(messages: Message[]): string {
@@ -309,6 +310,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   const {
     messages,
+    model,
     tools,
     toolChoice,
     tool_choice,
@@ -316,10 +318,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     output_schema,
     responseFormat,
     response_format,
+    maxTokens,
+    max_tokens,
   } = params;
 
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: resolveLlmChatModel(model),
     messages: messages.map(normalizeMessage),
   };
 
@@ -335,9 +339,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
+  if (isOpenAiBackend()) {
+    payload.max_tokens = max_tokens ?? maxTokens ?? 16384;
+  } else {
+    payload.max_tokens = max_tokens ?? maxTokens ?? 32768;
+    payload.thinking = {
+      budget_tokens: 128,
+    };
   }
 
   const normalizedResponseFormat = normalizeResponseFormat({
@@ -351,11 +359,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveApiUrl(), {
+  const response = await fetch(resolveLlmChatCompletionsUrl(), {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${getOpenAiApiKey()}`,
     },
     body: JSON.stringify(payload),
   });

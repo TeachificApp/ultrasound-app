@@ -24,11 +24,18 @@ export type ContentType = "course" | "download" | "bundle" | "quiz";
  * Format: /auth/access?token=<accessToken>&next=<destination>
  * Falls back to the destination URL if no token is provided.
  */
-function buildAccessUrl(destination: string, accessToken?: string | null): string {
+export function buildPersistentAccessUrl(
+  destination: string,
+  accessToken?: string | null,
+): string {
   if (!accessToken) return destination;
   const encoded = encodeURIComponent(destination);
   // Use learn subdomain for LMS auto-login so the session cookie is scoped correctly
   return `https://learn.allaboutultrasound.com/auth/access?token=${accessToken}&next=${encoded}`;
+}
+
+function buildAccessUrl(destination: string, accessToken?: string | null): string {
+  return buildPersistentAccessUrl(destination, accessToken);
 }
 
 function emailWrapper(content: string): string {
@@ -89,8 +96,13 @@ async function deliverEmail(opts: {
   subject: string;
   htmlBody: string;
 }): Promise<boolean> {
-  // Use the shared sendEmail() so all enrollment emails go through the verified
-  // SendGrid sender (SENDGRID_FROM_EMAIL) and are logged to email_send_log.
+  try {
+    const { ensureTransactionalEmailDelivery } = await import("./ensureTransactionalEmailDelivery");
+    await ensureTransactionalEmailDelivery(opts.to.email);
+  } catch (err) {
+    console.warn("[enrollmentEmail] Suppression clear failed (non-fatal):", err);
+  }
+
   return sendEmail({
     to: opts.to,
     subject: opts.subject,

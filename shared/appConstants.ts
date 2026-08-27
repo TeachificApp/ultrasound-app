@@ -1,4 +1,8 @@
-export const AAUS_LOGO_URL = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_8a52a6c6.webp";
+import { resolveAssetUrl } from "./resolveAssetUrl";
+
+export const AAUS_LOGO_URL = resolveAssetUrl(
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_8a52a6c6.webp",
+)!;
 
 export const THINKIFIC_LINKS = {
   freeMembership: "https://member.allaboutultrasound.com/bundles/ultrasoundassist-app-free-member-access",

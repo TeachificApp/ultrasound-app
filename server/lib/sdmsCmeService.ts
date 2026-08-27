@@ -12,6 +12,8 @@ import {
   type SdmsCmeCreditCategory,
 } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { markLessonCompleteForUser } from "./cmeLessonProgress";
+import { isLmsCurriculumActivity } from "./sdmsCmeCurriculum";
 import {
   buildSdmsPayload,
   formatSdmsDate,
@@ -462,6 +464,18 @@ export async function processFormSubmissionForCme(opts: {
         submitted = true;
       } catch (err) {
         console.error("[SDMS CME] Auto-submit failed:", err instanceof Error ? err.message : err);
+      }
+    }
+
+    if (config.cmeLessonId && isLmsCurriculumActivity(config.activityType)) {
+      try {
+        await markLessonCompleteForUser({
+          userId: opts.userId,
+          courseId: config.activityId,
+          lessonId: config.cmeLessonId,
+        });
+      } catch (err) {
+        console.error("[SDMS CME] Failed to mark CME curriculum lesson complete:", err instanceof Error ? err.message : err);
       }
     }
   }

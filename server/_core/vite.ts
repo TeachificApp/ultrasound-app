@@ -6,6 +6,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 import { getPageSeoForRequest, injectPageSeoIntoHtml } from "../routes/funnelOgMeta";
+import { resolveAssetUrl } from "../lib/resolveAssetUrl";
 
 /** Helper: look up per-page SEO and inject it into the HTML if found. */
 async function injectPageSeo(html: string, req: Request): Promise<string> {
@@ -80,12 +81,13 @@ function injectBrandMeta(html: string, host: string): string {
   const brandKey = Object.keys(BRAND_META).find(k => host.includes(k));
   if (!brandKey) return html;
   const m = BRAND_META[brandKey];
+  const ogImage = resolveAssetUrl(m.ogImage) ?? m.ogImage;
   let result = html
     .replace(/<title>[^<]*<\/title>/, `<title>${m.title}</title>`)
     .replace(/(<meta\s+name="description"\s+content=")[^"]*(")/, `$1${m.description}$2`)
     .replace(/(<meta\s+property="og:title"\s+content=")[^"]*(")/, `$1${m.ogTitle}$2`)
     .replace(/(<meta\s+property="og:description"\s+content=")[^"]*(")/, `$1${m.ogDescription}$2`)
-    .replace(/(<meta\s+property="og:image"\s+content=")[^"]*(")/, `$1${m.ogImage}$2`)
+    .replace(/(<meta\s+property="og:image"\s+content=")[^"]*(")/, `$1${ogImage}$2`)
     .replace(/(<meta\s+name="theme-color"\s+content=")[^"]*(")/, `$1${m.themeColor}$2`)
     .replace(/(<meta\s+name="apple-mobile-web-app-title"\s+content=")[^"]*(")/, `$1${m.appTitle}$2`);
   // Inject or replace og:url — insert after og:type if present, otherwise before </head>
@@ -177,7 +179,7 @@ export function serveStatic(app: Express) {
     res.sendFile(path.resolve(distPath, "sw-clear.html"));
   });
 
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { index: false }));
 
   // Use regex route so /media/* paths are structurally excluded — they can NEVER
   // be caught by this fallback, regardless of route registration order.

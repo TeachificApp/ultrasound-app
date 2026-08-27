@@ -20,6 +20,8 @@ import { getStripeClient } from "../lib/stripeClient";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or } from "drizzle-orm";
+import { listCohortGroupsForAdmin, cohortCourseContentWhere } from "../lib/cohortGroupQuery";
+import { filterUnassignedCohortEnrollments } from "../lib/unassignedCohortStudents";
 import { enrichCohortResources } from "../lib/cohortResources";
 import { expandCohortRecurrence } from "../lib/cohortRecurrence";
 import { randomBytes } from "crypto";
@@ -29,7 +31,6 @@ import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
-import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
@@ -100,9 +101,12 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const whereClause = input.cohortGroupId
-        ? and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.cohortGroupId, input.cohortGroupId))
-        : eq(lmsCohortSessions.courseId, input.courseId);
+      const whereClause = cohortCourseContentWhere(
+        lmsCohortSessions.courseId,
+        lmsCohortSessions.cohortGroupId,
+        input.courseId,
+        input.cohortGroupId,
+      );
       const sessions = await db.select().from(lmsCohortSessions)
         .where(whereClause)
         .orderBy(asc(lmsCohortSessions.sessionDate));
@@ -245,9 +249,12 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const whereClause = input.cohortGroupId
-        ? and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.cohortGroupId, input.cohortGroupId))
-        : eq(lmsCohortAssignments.courseId, input.courseId);
+      const whereClause = cohortCourseContentWhere(
+        lmsCohortAssignments.courseId,
+        lmsCohortAssignments.cohortGroupId,
+        input.courseId,
+        input.cohortGroupId,
+      );
       const assignments = await db.select().from(lmsCohortAssignments)
         .where(whereClause)
         .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.createdAt));
@@ -395,9 +402,12 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const whereClause = input.cohortGroupId
-        ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.cohortGroupId, input.cohortGroupId))
-        : eq(lmsCohortRecordings.courseId, input.courseId);
+      const whereClause = cohortCourseContentWhere(
+        lmsCohortRecordings.courseId,
+        lmsCohortRecordings.cohortGroupId,
+        input.courseId,
+        input.cohortGroupId,
+      );
       return db.select().from(lmsCohortRecordings)
         .where(whereClause)
         .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt));
@@ -517,9 +527,12 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const whereClause = input.cohortGroupId
-        ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.cohortGroupId, input.cohortGroupId))
-        : eq(lmsCohortRecordings.courseId, input.courseId);
+      const whereClause = cohortCourseContentWhere(
+        lmsCohortRecordings.courseId,
+        lmsCohortRecordings.cohortGroupId,
+        input.courseId,
+        input.cohortGroupId,
+      );
       // Fetch all recordings for this course/group
       const recs = await db.select().from(lmsCohortRecordings).where(whereClause);
       // Fetch all sessions for this course so we can look up sessionDate by id
@@ -958,11 +971,7 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const groups = await db
-        .select()
-        .from(lmsCohortGroups)
-        .where(eq(lmsCohortGroups.courseId, input.courseId))
-        .orderBy(asc(lmsCohortGroups.startDate), asc(lmsCohortGroups.sortOrder), asc(lmsCohortGroups.createdAt));
+      const groups = await listCohortGroupsForAdmin(db, input.courseId);
       const counts = await db
         .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId, count: sql<number>`count(*)` })
         .from(lmsCohortGroupEnrollments)
@@ -1117,20 +1126,28 @@ export const lmsCohortAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const enrolled = await db
-        .select({ userId: lmsEnrollments.userId, userName: users.name, userEmail: users.email, userAvatar: users.avatarUrl, enrollmentId: lmsEnrollments.id })
+        .select({
+          userId: lmsEnrollments.userId,
+          userName: users.name,
+          userEmail: users.email,
+          userAvatar: users.avatarUrl,
+          enrollmentId: lmsEnrollments.id,
+        })
         .from(lmsEnrollments)
         .innerJoin(users, eq(users.id, lmsEnrollments.userId))
         .where(and(
           eq(lmsEnrollments.courseId, input.courseId),
-          eq(lmsEnrollments.status, "active"),
           sql`${users.name} NOT LIKE '[Merged into #%'`,  // exclude merged placeholder accounts
         ));
       const assigned = await db
-        .select({ userId: lmsCohortGroupEnrollments.userId })
+        .select({ enrollmentId: lmsCohortGroupEnrollments.enrollmentId })
         .from(lmsCohortGroupEnrollments)
+        .innerJoin(lmsCohortGroups, eq(lmsCohortGroupEnrollments.cohortGroupId, lmsCohortGroups.id))
         .where(eq(lmsCohortGroupEnrollments.courseId, input.courseId));
-      const assignedIds = new Set(assigned.map(a => a.userId));
-      return enrolled.filter(e => !assignedIds.has(e.userId));
+      return filterUnassignedCohortEnrollments(
+        enrolled,
+        assigned.map((row) => row.enrollmentId).filter((id) => id > 0),
+      );
     }),
 
   /** Assign a student to a cohort group (moves from any existing group) */
@@ -1799,13 +1816,15 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [group] = await db
-        .select({ id: lmsCohortGroups.id, courseId: lmsCohortGroups.courseId, name: lmsCohortGroups.name, landingBlocks: lmsCohortGroups.landingBlocks })
-        .from(lmsCohortGroups)
-        .where(eq(lmsCohortGroups.id, input.cohortGroupId))
-        .limit(1);
+      const { getCohortGroupById } = await import("../lib/cohortGroupQuery");
+      const group = await getCohortGroupById(db, input.cohortGroupId);
       if (!group) throw new TRPCError({ code: "NOT_FOUND" });
-      return group;
+      return {
+        id: group.id,
+        courseId: group.courseId,
+        name: group.name,
+        landingBlocks: group.landingBlocks,
+      };
     }),
   saveCohortGroupLandingBlocks: protectedProcedure
     .input(z.object({ cohortGroupId: z.number(), blocks: z.string() }))

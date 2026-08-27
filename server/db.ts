@@ -370,7 +370,14 @@ export async function getUserByEmail(email: string) {
     .from(userEmailAliases)
     .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`)
     .limit(1);
-  if (!aliasRows[0]) return undefined;
+  if (!aliasRows[0]) {
+    const openIdRows = await db
+      .select()
+      .from(users)
+      .where(eq(users.openId, `email:${normalised}`))
+      .limit(1);
+    return openIdRows[0];
+  }
   const primaryRows = await db.select().from(users).where(eq(users.id, aliasRows[0].userId)).limit(1);
   return primaryRows[0];
 }
@@ -2156,7 +2163,14 @@ export async function findUserByEmail(email: string) {
     .from(userEmailAliases)
     .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`)
     .limit(1);
-  if (!aliasRows[0]) return undefined;
+  if (!aliasRows[0]) {
+    const openIdRows = await db
+      .select()
+      .from(users)
+      .where(eq(users.openId, `email:${normalised}`))
+      .limit(1);
+    return openIdRows[0] ?? undefined;
+  }
   const primaryRows = await db.select().from(users).where(eq(users.id, aliasRows[0].userId)).limit(1);
   return primaryRows[0] ?? undefined;
 }
@@ -2263,6 +2277,13 @@ export async function getOrCreateAccessToken(userId: number): Promise<string> {
   const result = await db.select({ accessToken: users.accessToken }).from(users).where(eq(users.id, userId)).limit(1);
   const existing = result[0]?.accessToken;
   if (existing) return existing;
+  return regenerateAccessToken(userId);
+}
+
+/** Issue a fresh persistent access token (e.g. after revocation or a broken email link). */
+export async function regenerateAccessToken(userId: number): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
   const { randomBytes } = await import("crypto");
   const token = randomBytes(32).toString("hex");
   await db.update(users).set({ accessToken: token }).where(eq(users.id, userId));

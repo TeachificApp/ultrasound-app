@@ -43,6 +43,7 @@ import { notifyOwner } from "../_core/notification";
 import { createPatchedFetch } from "../_core/patchedFetch";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
+import { getOpenAiApiKey, getOpenAiApiRoot } from "../lib/openAiConfig";
 
 // ─── Admin guard ─────────────────────────────────────────────────────────────
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -1099,13 +1100,17 @@ export const caseLibraryRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const forgeBaseUrl = (process.env.BUILT_IN_FORGE_API_URL ?? "").replace(/\/+$/, "");
-      const forgeApiKey = process.env.BUILT_IN_FORGE_API_KEY ?? "";
-
-      if (!forgeBaseUrl || !forgeApiKey) {
+      let forgeBaseUrl: string;
+      let forgeApiKey: string;
+      try {
+        forgeBaseUrl = getOpenAiApiRoot();
+        forgeApiKey = getOpenAiApiKey();
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "AI API key is not configured";
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "AI service not configured. Missing Forge API credentials.",
+          message,
         });
       }
 

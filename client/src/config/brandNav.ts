@@ -3,6 +3,7 @@
  * Each brand has its own sidebar nav groups, hidden nav items, logo, and branding.
  */
 import type { Brand } from "@/hooks/useBrand";
+import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
 import {
   Heart, Calculator, ClipboardList, Activity,
   BookOpen, Stethoscope, Zap, ExternalLink, MessageCircle, Award, Shield, GraduationCap,
@@ -276,7 +277,9 @@ export function getBrandNavConfig(brand: Brand): BrandNavConfig {
   return {
     navGroups: AAUS_NAV_GROUPS,
     hiddenNavItems: AAUS_HIDDEN_NAV,
-    logoUrl: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp",
+    logoUrl: resolveAssetUrl(
+      "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp",
+    )!,
     logoAlt: "All About Ultrasound\u2122",
     title: "All About Ultrasound\u2122",
     subtitle: "UltrasoundAssist\u2122 Clinical Intelligence",

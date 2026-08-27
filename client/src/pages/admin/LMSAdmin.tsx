@@ -72,6 +72,7 @@ import BundlesAdmin from "./BundlesAdmin";
 import MembershipsAdmin from "./MembershipsAdmin";
 import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 import { CohortResourcesAdminSection } from "@/components/cohort/CohortResourcesAdminSection";
+import { UnassignedStudentsAssignPanel } from "@/components/cohort/UnassignedStudentsAssignPanel";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import { CourseWaitlistTab } from "@/components/CourseWaitlistTab";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
@@ -9916,9 +9917,9 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
   const manualIssueCertificate = trpc.lmsEnrollmentAdmin.manualIssueCertificate.useMutation({
     onSuccess: (result) => {
       if (result.alreadyExisted) {
-        toast.info("Certificate already existed — no change made.");
+        toast.info("Certificate already exists for this student.");
       } else {
-        toast.success("Certificate issued successfully!");
+        toast.success("Certificate issued — student can download from their dashboard.");
       }
       setCertTarget(null);
       refetch();
@@ -10093,7 +10094,7 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
             )}
             {!certTarget?.hasCert && (
               <p className="text-xs text-gray-400 mt-2">
-                A new certificate PDF will be generated and emailed to the student.
+                A new certificate PDF will be generated for download in the student dashboard and course player.
               </p>
             )}
           </div>
@@ -10154,7 +10155,7 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
   );
 }
 
-function EnrollStudentDialog({ open, courseId, cohortGroups = [], onClose, onEnrolled }: { open: boolean; courseId: number; cohortGroups?: any[]; onClose: () => void; onEnrolled: () => void }) {
+function EnrollStudentDialog({ open, courseId, cohortGroups = [], defaultGroupId, lockGroupSelection = false, onClose, onEnrolled }: { open: boolean; courseId: number; cohortGroups?: any[]; defaultGroupId?: number; lockGroupSelection?: boolean; onClose: () => void; onEnrolled: () => void }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -10169,6 +10170,12 @@ function EnrollStudentDialog({ open, courseId, cohortGroups = [], onClose, onEnr
     const t = setTimeout(() => setDebouncedQuery(query), 400);
     return () => clearTimeout(t);
   }, [query]);
+
+  useEffect(() => {
+    if (open && defaultGroupId) {
+      setSelectedGroupId(String(defaultGroupId));
+    }
+  }, [open, defaultGroupId]);
 
   const { data: searchResults } = trpc.lmsAdmin.searchUsers.useQuery(
     { query: debouncedQuery },
@@ -10342,7 +10349,7 @@ function EnrollStudentDialog({ open, courseId, cohortGroups = [], onClose, onEnr
         )}
 
         {/* Cohort group picker — shown when cohortGroups are available */}
-        {cohortGroups.length > 0 && (
+        {cohortGroups.length > 0 && !lockGroupSelection && (
           <div className="border-t border-gray-100 pt-3">
             <Label className="text-sm">Assign to Cohort Group <span className="text-gray-400 font-normal">(optional)</span></Label>
             <select
@@ -10355,6 +10362,11 @@ function EnrollStudentDialog({ open, courseId, cohortGroups = [], onClose, onEnr
                 <option key={g.id} value={String(g.id)}>{g.name}</option>
               ))}
             </select>
+          </div>
+        )}
+        {lockGroupSelection && defaultGroupId && (
+          <div className="border-t border-gray-100 pt-3 text-sm text-gray-600">
+            Assigning to: <span className="font-medium text-gray-900">{cohortGroups.find((g: any) => g.id === defaultGroupId)?.name ?? `Group #${defaultGroupId}`}</span>
           </div>
         )}
 
@@ -11738,14 +11750,19 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [groupDialog, setGroupDialog] = useState<{ open: boolean; group?: any }>({ open: false });
   const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "waitlist" | "presale" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false, accessDurationDays: "", presaleWelcomeHeading: "", presaleWelcomeBody: "", presaleWelcomeMediaUrl: "", presaleWelcomeCtaLabel: "", presaleWelcomeCtaUrl: "" });
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [groupEnrollDialogOpen, setGroupEnrollDialogOpen] = useState(false);
+  const [groupEnrollGroupId, setGroupEnrollGroupId] = useState<number | null>(null);
   const { data: groupStudents = [], isLoading: groupStudentsLoading, refetch: refetchGroupStudents } = trpc.lmsAdmin.listCohortGroupStudents.useQuery({ cohortGroupId: selectedGroupId ?? 0 }, { enabled: !!selectedGroupId });
-  const { data: unassignedStudents = [], refetch: refetchUnassigned } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery({ courseId }, { enabled: activeTab === "groups" });
+  const { data: unassignedStudents = [], isLoading: unassignedLoading, refetch: refetchUnassigned } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery(
+    { courseId },
+    { enabled: activeTab === "groups" },
+  );
   const assignStudent = trpc.lmsAdmin.assignStudentToCohortGroup.useMutation({
     onSuccess: () => { refetchGroupStudents(); refetchGroups(); refetchUnassigned(); toast.success("Student assigned"); },
     onError: (e) => toast.error(e.message),
   });
   const removeStudent = trpc.lmsAdmin.removeStudentFromCohortGroup.useMutation({
-    onSuccess: () => { refetchGroupStudents(); refetchGroups(); toast.success("Student removed"); },
+    onSuccess: () => { refetchGroupStudents(); refetchGroups(); refetchUnassigned(); toast.success("Student removed"); },
     onError: (e) => toast.error(e.message),
   });
   const [bulkSelected, setBulkSelected] = useState<number[]>([]);
@@ -13001,10 +13018,19 @@ function CohortTab({ courseId }: { courseId: number }) {
 
                   {/* Student management panel */}
                   {selectedGroupId === group.id && (
-                    <div className="mt-4 border-t pt-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-gray-700">Students in this group</span>
-                        <span className="text-xs text-gray-400">{groupStudents.length} assigned</span>
+                    <div className="mt-4 border-t pt-4 space-y-4">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div>
+                          <span className="text-sm font-medium text-gray-700">Students in this group</span>
+                          <span className="text-xs text-gray-400 ml-2">{groupStudents.length} assigned</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7"
+                          onClick={() => { setGroupEnrollGroupId(group.id); setGroupEnrollDialogOpen(true); }}
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" /> Add Student
+                        </Button>
                       </div>
                       {groupStudentsLoading ? (
                         <div className="text-sm text-gray-400">Loading...</div>
@@ -13032,6 +13058,19 @@ function CohortTab({ courseId }: { courseId: number }) {
                           ))}
                         </div>
                       )}
+
+                      <UnassignedStudentsAssignPanel
+                        students={unassignedStudents}
+                        isLoading={unassignedLoading}
+                        onAssign={(userId) => assignStudent.mutate({ cohortGroupId: group.id, userId, courseId })}
+                        onBulkAssign={(userIds) => bulkAssign.mutate({ cohortGroupId: group.id, courseId, userIds })}
+                        isAssigning={assignStudent.isPending}
+                        isBulkAssigning={bulkAssign.isPending}
+                        title="Add unassigned students to this group"
+                        description="These students are enrolled in the course but not assigned to any cohort group yet."
+                        emptyMessage="No unassigned students for this course. Use Add Student to enroll someone new."
+                        assignLabel="Add to group"
+                      />
 
                       {/* Discussion thread button */}
                       <div className="mt-3 flex justify-end">
@@ -13108,32 +13147,6 @@ function CohortTab({ courseId }: { courseId: number }) {
                                 {postMessage.isPending ? "Posting..." : "Post"}
                               </Button>
                             </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Unassigned students */}
-                      {unassignedStudents.length > 0 && (
-                        <div className="mt-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-gray-700">Unassigned students ({unassignedStudents.length})</span>
-                            {bulkSelected.length > 0 && (
-                              <Button size="sm" onClick={() => bulkAssign.mutate({ cohortGroupId: group.id, courseId, userIds: bulkSelected })} className="text-xs bg-teal-600 hover:bg-teal-700 text-white h-7">
-                                Assign {bulkSelected.length} selected
-                              </Button>
-                            )}
-                          </div>
-                          <div className="divide-y divide-gray-100 rounded-lg border border-gray-100 overflow-hidden max-h-48 overflow-y-auto">
-                            {unassignedStudents.map((s: any) => (
-                              <div key={s.userId} className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-gray-50">
-                                <input type="checkbox" checked={bulkSelected.includes(s.userId)} onChange={e => setBulkSelected(prev => e.target.checked ? [...prev, s.userId] : prev.filter(id => id !== s.userId))} className="w-3.5 h-3.5 accent-teal-600" />
-                                <div className="flex-1 min-w-0">
-                                  <span className="text-sm font-medium text-gray-800">{s.userName}</span>
-                                  <span className="text-xs text-gray-400 ml-2">{s.userEmail}</span>
-                                </div>
-                                <Button size="sm" variant="ghost" onClick={() => assignStudent.mutate({ cohortGroupId: group.id, userId: s.userId, courseId })} className="text-xs text-teal-600 hover:text-teal-800 h-6 px-2">Assign</Button>
-                              </div>
-                            ))}
                           </div>
                         </div>
                       )}
@@ -13601,6 +13614,21 @@ function CohortTab({ courseId }: { courseId: number }) {
           </div>
         </div>
       )}
+      <EnrollStudentDialog
+        open={groupEnrollDialogOpen}
+        courseId={courseId}
+        cohortGroups={cohortGroups as any[]}
+        defaultGroupId={groupEnrollGroupId ?? undefined}
+        lockGroupSelection={!!groupEnrollGroupId}
+        onClose={() => { setGroupEnrollDialogOpen(false); setGroupEnrollGroupId(null); }}
+        onEnrolled={() => {
+          refetchGroupStudents();
+          refetchGroups();
+          refetchUnassigned();
+          setGroupEnrollDialogOpen(false);
+          setGroupEnrollGroupId(null);
+        }}
+      />
     </div>
   );
 }

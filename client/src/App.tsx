@@ -14,7 +14,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import DemoModeBanner from "./components/DemoModeBanner";
 import GetAppBanner from "./components/GetAppBanner";
 import ProfileNameBanner from "./components/ProfileNameBanner";
-import MaintenanceBanner from "./components/MaintenanceBanner";
 import LegacyPasswordSetupRedirect from "./components/LegacyPasswordSetupRedirect";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -44,6 +43,7 @@ import ResetPassword from "./pages/ResetPassword";
 import MagicLinkRequest from "./pages/MagicLinkRequest";
 import MagicLinkCallback from "./pages/MagicLinkCallback";
 import MagicLinkError from "./pages/MagicLinkError";
+import AccessLinkError from "./pages/AccessLinkError";
 import AccessLinkCallback from "./pages/AccessLinkCallback";
 import Enrolled from "./pages/Enrolled";
 import Unsubscribe from "./pages/Unsubscribe";
@@ -388,6 +388,7 @@ function Router() {
         <Route path="/auth/magic" component={MagicLinkCallback} />
         {/* /auth/magic-error is shown when the server-side GET verify fails */}
         <Route path="/auth/magic-error" component={MagicLinkError} />
+        <Route path="/auth/access-error" component={AccessLinkError} />
         {/* /auth/access is used in purchase/access emails — persistent reusable token */}
         <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />
@@ -793,6 +794,7 @@ function MembersRouter() {
           <Suspense fallback={pageFallback}>
             <Switch>
               <Route path="/my-dashboard" component={StudentDashboardPage} />
+              <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/teach" component={TeachDashboard} />
@@ -984,6 +986,7 @@ function LMSRouter() {
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/instructor-portal" component={InstructorPortal} />
         <Route path="/memberships/:slug">{() => <Suspense fallback={pageFallback}><MembershipPage /></Suspense>}</Route>
@@ -1045,6 +1048,7 @@ function IHeartEchoRouter() {
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/auth/magic-error" component={MagicLinkError} />
+        <Route path="/auth/access-error" component={AccessLinkError} />
         <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
@@ -1268,7 +1272,7 @@ function IHeartEchoRouter() {
 /** Single-segment paths that are app routes, never funnel slugs (/:slug catch-all guard). */
 const RESERVED_FUNNEL_SLUGS = new Set([
   "platform-admin", "login", "register", "logout", "admin", "premium", "profile",
-  "enrolled", "upgrade-success", "my-dashboard", "my-team", "my-downloads",
+  "enrolled", "upgrade-success", "my-dashboard", "my-quizzes", "my-team", "my-downloads",
   "education-library", "downloads", "courses", "products", "forms", "community",
   "career-network", "careernetwork", "employer", "accreditation", "lab-admin",
   "diy-member", "diy-register", "magic-link", "verify-email", "forgot-password",
@@ -1471,7 +1475,6 @@ function App() {
         <TooltipProvider>
           <MetaPixel />
           <Toaster />
-          <MaintenanceBanner />
           <LegacyPasswordSetupRedirect />
           {onMarketingStaging ? (
             <MarketingSiteRouter />

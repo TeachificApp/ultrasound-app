@@ -21,16 +21,33 @@
 
 import type { Express, Request, Response } from "express";
 import * as bcrypt from "bcryptjs";
-import { getDb, ensureUserRole } from "../db";
-import { users, accessTokenUses, ipSecurityFlags } from "../../drizzle/schema";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { getDb, ensureUserRole, getUserByEmail } from "../db";
+import { users } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
 import { resolveAuthHostname } from "../_core/cookies";
 import { sdk } from "../_core/sdk";
 import { ONE_YEAR_MS } from "@shared/const";
 import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
+import { sendAuthRedirectHtml, withAuthPending } from "../lib/sendAuthRedirectHtml";
+import { normalizeAuthEmail } from "../../shared/normalizeAuthEmail";
+import {
+  completeAccessTokenLogin,
+  resolveAccessRedirectUrl,
+} from "../lib/accessTokenVerify";
 
 export function registerAuthLoginRoute(app: Express) {
+  /**
+   * GET /api/auth/clear-session
+   * Clears stale Manus-era JWT session cookies so magic-link login can succeed.
+   */
+  app.get("/api/auth/clear-session", async (req: Request, res: Response) => {
+    const { clearSessionCookies } = await import("../_core/cookies");
+    clearSessionCookies(res, req);
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ cleared: true });
+  });
+
   /**
    * POST /api/auth/login
    * Body: { email: string, password: string }
@@ -49,21 +66,22 @@ export function registerAuthLoginRoute(app: Express) {
         return res.status(503).json({ error: "Service temporarily unavailable." });
       }
 
-      const normalizedEmail = String(email).toLowerCase().trim();
+      const normalizedEmail = normalizeAuthEmail(String(email));
 
-      const result = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, normalizedEmail))
-        .limit(1);
-
-      const user = result[0];
+      const user = await getUserByEmail(normalizedEmail);
 
       // Generic error to prevent email enumeration
       const invalidError = { error: "Invalid email or password." };
 
-      if (!user || !user.passwordHash) {
+      if (!user) {
         return res.status(401).json(invalidError);
+      }
+
+      if (!user.passwordHash) {
+        return res.status(401).json({
+          error:
+            "This account uses magic link sign-in. Use Forgot Password to set a password, or request a magic link.",
+        });
       }
 
       const passwordMatch = await bcrypt.compare(String(password), user.passwordHash);
@@ -143,18 +161,7 @@ export function registerAuthLoginRoute(app: Express) {
       const cookieHostname = resolveAuthHostname(req, hostParam);
       setAuthSessionCookies(req, res, sessionToken, cookieHostname);
 
-      // IMPORTANT: Return a 200 HTML page instead of a 302 redirect.
-      // Cloudflare strips Set-Cookie headers from 302 redirect responses on some configurations,
-      // even with Cache-Control: no-store. A 200 response with inline JS redirect is immune to this.
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-
-      // Add auth_pending=1 so the dashboard retries auth.me before redirecting to login
-      const redirectUrl =
-        successRedirect +
-        (successRedirect.includes("?") ? "&" : "?") +
-        "auth_pending=1";
+      const redirectUrl = withAuthPending(successRedirect);
 
       console.log(`[magic-verify GET] User ${user.id} (${user.email}) signed in, host=${cookieHostname ?? hostParam ?? "auto"}, redirecting to ${redirectUrl}`);
       // Track login event via recordUserLogin
@@ -162,28 +169,7 @@ export function registerAuthLoginRoute(app: Express) {
       const { ipAddress: mlIp, userAgent: mlUa } = getRequestClientInfo(req);
       await recordUserLogin(db, { userId: user.id, ipAddress: mlIp, userAgent: mlUa, method: "magic_link" });
 
-      // IMPORTANT: Return a 200 HTML page instead of a 302 redirect.
-      // Cloudflare strips Set-Cookie headers from 302 redirect responses on some configurations,
-      // even with Cache-Control: no-store. A 200 response with inline JS redirect is immune to this.
-      // Escape the redirect path for safe HTML embedding
-      const safeRedirect = redirectUrl.replace(/[<>"'&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '&': '&amp;' }[c] ?? c));
-      return res.status(200).send(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Signing you in…</title>
-  <meta http-equiv="refresh" content="0;url=${safeRedirect}">
-  <style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0e1e2e;font-family:sans-serif;color:#fff}</style>
-</head>
-<body>
-  <div style="text-align:center">
-    <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,.2);border-top-color:#189aa1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px"></div>
-    <p style="color:#4ad9e0;font-size:14px">Signing you in…</p>
-  </div>
-  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-  <script>window.location.replace(${JSON.stringify(redirectUrl)});<\/script>
-</body>
-</html>`);
+      return sendAuthRedirectHtml(res, redirectUrl);
     } catch (err) {
       console.error("[magic-verify GET] Error:", err);
       return res.redirect(`/auth/magic-error?reason=server_error`);
@@ -261,6 +247,36 @@ export function registerAuthLoginRoute(app: Express) {
   });
 
   /**
+   * GET /api/auth/access-verify?token=...&next=...
+   * Server-side redirect flow — Cloudflare-safe (mirrors magic-verify GET).
+   */
+  app.get("/api/auth/access-verify", async (req: Request, res: Response) => {
+    const { token, next, host: hostParam } = req.query as Record<string, string>;
+    if (!token) {
+      return res.redirect("/auth/access-error?reason=missing_token");
+    }
+    try {
+      const status = await completeAccessTokenLogin(req, res, String(token), hostParam);
+      if (status === "revoked") {
+        return res.redirect("/auth/access-error?reason=revoked");
+      }
+      if (status === "invalid") {
+        return res.redirect("/auth/access-error?reason=invalid");
+      }
+      if (status === "db_unavailable") {
+        return res.redirect("/auth/access-error?reason=db_unavailable");
+      }
+
+      const redirectUrl = resolveAccessRedirectUrl(next);
+      console.log(`[access-verify GET] Signed in via access token, redirecting to ${redirectUrl}`);
+      return sendAuthRedirectHtml(res, redirectUrl);
+    } catch (err) {
+      console.error("[access-verify GET] Error:", err);
+      return res.redirect("/auth/access-error?reason=server_error");
+    }
+  });
+
+  /**
    * POST /api/auth/access-verify
    * Body: { token: string }
    * Persistent access token from purchase/access emails.
@@ -274,96 +290,23 @@ export function registerAuthLoginRoute(app: Express) {
         return res.status(400).json({ error: "Token is required." });
       }
 
-      const db = await getDb();
-      if (!db) {
-        return res.status(503).json({ error: "Service temporarily unavailable." });
-      }
-
-      // Look up user by access token
-      const result = await db
-        .select()
-        .from(users)
-        .where(eq(users.accessToken, String(token)))
-        .limit(1);
-
-      const user = result[0];
-      if (!user) {
-        return res.status(401).json({ error: "This access link is invalid. Please contact support." });
-      }
-
-      // Get client IP
-      const ip = (
-        (req.headers["cf-connecting-ip"] as string) ||
-        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-        req.socket.remoteAddress ||
-        "unknown"
-      );
-      const userAgent = (req.headers["user-agent"] as string) || "";
-
-      // Record this use
-      await db.insert(accessTokenUses).values({
-        userId: user.id,
-        ipAddress: ip,
-        userAgent,
-      });
-
-      // IP abuse check: count distinct IPs in the last 24 hours
-      const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const recentUses = await db
-        .select({ ip: accessTokenUses.ipAddress })
-        .from(accessTokenUses)
-        .where(
-          and(
-            eq(accessTokenUses.userId, user.id),
-            gte(accessTokenUses.usedAt, since24h)
-          )
-        );
-
-      const distinctIps = new Set(recentUses.map(r => r.ip));
-
-      if (distinctIps.size > 3) {
-        // Revoke the access token
-        await db.update(users).set({ accessToken: null }).where(eq(users.id, user.id));
-
-        // Create IP security flag
-        await db.insert(ipSecurityFlags).values({
-          userId: user.id,
-          flagType: "access_token_ip_abuse",
-          details: JSON.stringify({
-            distinctIps: Array.from(distinctIps),
-            windowStart: since24h.toISOString(),
-            windowEnd: new Date().toISOString(),
-            triggerIp: ip,
-          }),
-        });
-
-        console.warn(`[access-verify] IP abuse detected for user ${user.id} (${user.email}) — ${distinctIps.size} distinct IPs in 24h. Token revoked.`);
-
+      const status = await completeAccessTokenLogin(req, res, String(token));
+      if (status === "revoked") {
         return res.status(403).json({
-          error: "This access link has been disabled due to unusual activity. Please sign in directly or contact support.",
+          error:
+            "This access link has been disabled due to unusual activity. Please sign in directly or contact support.",
           revoked: true,
         });
       }
-
-      // All good — issue session cookie
-      const openId = await ensureUserOpenId(db, user);
-      if (user.isPending) {
-        await db.update(users).set({ isPending: false, emailVerified: true }).where(eq(users.id, user.id));
+      if (status === "invalid") {
+        return res.status(401).json({
+          error: "This access link is invalid. Please contact support.",
+        });
+      }
+      if (status === "db_unavailable") {
+        return res.status(503).json({ error: "Service temporarily unavailable." });
       }
 
-      await ensureUserRole(user.id);
-
-      const sessionToken = await sdk.createSessionToken(openId, {
-        name: user.name ?? user.email ?? "User",
-        expiresInMs: ONE_YEAR_MS,
-      });
-      // Use X-App-Hostname for cookie domain scoping on access-verify too
-      const accessHostname = resolveAuthHostname(req);
-      setAuthSessionCookies(req, res, sessionToken, accessHostname);
-
-      const { getRequestClientInfo, recordUserLogin } = await import("../lib/recordUserLogin");
-      const { ipAddress: atIp, userAgent: atUa } = getRequestClientInfo(req);
-      await recordUserLogin(db, { userId: user.id, ipAddress: atIp, userAgent: atUa, method: "access_token" });
       return res.status(200).json({ success: true });
     } catch (err) {
       console.error("[access-verify] Error:", err);

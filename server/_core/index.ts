@@ -38,11 +38,11 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { detectBrandFromHostname, detectBrandMode } from "../../shared/brands";
+import { resolveAssetUrls } from "../lib/resolveAssetUrl";
 import { startChallengeCron } from "../jobs/challengeCron";
 import { startMediaPurgeCron } from "../jobs/mediaPurgeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
 import { backfillAllContacts } from "../lib/emailListHelper";
-import { backfillUserOpenIds } from "../lib/backfillUserOpenIds";
 import { getDb } from "../db";
 import { sql as drizzleSql } from "drizzle-orm";
 import { initSonoQuizHub } from "../sonoQuizHub";
@@ -153,7 +153,7 @@ async function startServer() {
 
     res.setHeader("Content-Type", "application/manifest+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
-    res.json(manifest);
+    res.json(resolveAssetUrls(manifest));
   });
 
   // Debug endpoint to check brand detection from hostname
@@ -211,6 +211,8 @@ async function startServer() {
   });
   // Temporary debug endpoint to test sending an email via SendGrid
   app.get("/api/debug/test-email", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const to = req.query.to as string;
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
     const { sendEmail } = await import("./email");
@@ -220,6 +222,226 @@ async function startServer() {
       htmlBody: "<h2>Email is working!</h2><p>If you see this, SendGrid is correctly configured.</p>",
     });
     res.json({ sent: result, to, timestamp: new Date().toISOString() });
+  });
+  app.get("/api/debug/password-reset-lookup", async (req, res) => {
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass ?email=your@email.com" });
+    const { getUserByEmail } = await import("../db");
+    const { resolveAuthDeliveryEmail } = await import("../lib/authEmailDelivery");
+    const user = await getUserByEmail(email);
+    res.json({
+      userFound: !!user,
+      userId: user?.id ?? null,
+      hasPasswordHash: !!user?.passwordHash,
+      deliveryEmail: user ? resolveAuthDeliveryEmail(user, email) : null,
+      timestamp: new Date().toISOString(),
+    });
+  });
+  app.get("/api/debug/email-suppression", async (req, res) => {
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass ?email=your@email.com" });
+    const { getSendGridSuppressionStatus, isSendGridDeliveryBlocked } = await import(
+      "../lib/sendgridSuppressions"
+    );
+    const { getUserByEmail } = await import("../db");
+    const sendGrid = await getSendGridSuppressionStatus(email);
+    const user = await getUserByEmail(email);
+    res.json({
+      email,
+      sendGrid,
+      blocked: isSendGridDeliveryBlocked(sendGrid),
+      user: user
+        ? {
+            id: user.id,
+            unsubscribedAt: user.unsubscribedAt,
+          }
+        : null,
+      timestamp: new Date().toISOString(),
+    });
+  });
+  app.post("/api/debug/clear-email-suppression", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
+    const email = String(req.query.email ?? (req.body as { email?: string })?.email ?? "")
+      .trim()
+      .toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass ?email=owner@example.com" });
+    const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+    if (!isPlatformOwnerEmail(email)) {
+      return res.status(403).json({ error: "Email is not in the platform owner allowlist" });
+    }
+    const { getSendGridSuppressionStatus, clearSendGridSuppressionLists } = await import(
+      "../lib/sendgridSuppressions"
+    );
+    const { getUserByEmail } = await import("../db");
+    const { users } = await import("../../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const { getDb } = await import("../db");
+    const before = await getSendGridSuppressionStatus(email);
+    const cleared = await clearSendGridSuppressionLists(email);
+    const after = await getSendGridSuppressionStatus(email);
+    const user = await getUserByEmail(email);
+    let dbUnsubscribeCleared = false;
+    if (user?.unsubscribedAt) {
+      const db = await getDb();
+      if (db) {
+        await db.update(users).set({ unsubscribedAt: null }).where(eq(users.id, user.id));
+        dbUnsubscribeCleared = true;
+      }
+    }
+    res.json({
+      email,
+      before,
+      cleared,
+      after,
+      dbUnsubscribeCleared,
+      timestamp: new Date().toISOString(),
+    });
+  });
+  app.get("/api/debug/test-password-reset", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
+    const to = String(req.query.to ?? "").trim().toLowerCase();
+    if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
+    const origin = String(req.query.origin ?? "https://learn.allaboutultrasound.com");
+    const { getUserByEmail, setPasswordResetToken } = await import("../db");
+    const { sendEmail, buildPasswordResetEmail } = await import("./email");
+    const { resolveAuthDeliveryEmail } = await import("../lib/authEmailDelivery");
+    const { detectBrandMode } = await import("@shared/brands");
+    const crypto = await import("crypto");
+    const user = await getUserByEmail(to);
+    if (!user) {
+      return res.json({ userFound: false, emailSent: false, to, timestamp: new Date().toISOString() });
+    }
+    const deliveryEmail = resolveAuthDeliveryEmail(user, to);
+    if (!deliveryEmail) {
+      return res.json({
+        userFound: true,
+        userId: user.id,
+        emailSent: false,
+        reason: "no_delivery_email",
+        to,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
+    const deliveryPrep = await ensureTransactionalEmailDelivery(deliveryEmail);
+    const token = crypto.randomBytes(48).toString("hex");
+    const expiry = new Date(Date.now() + 60 * 60 * 1000);
+    try {
+      await setPasswordResetToken(user.id, token, expiry);
+    } catch (err) {
+      return res.json({
+        userFound: true,
+        userId: user.id,
+        emailSent: false,
+        reason: "token_store_failed",
+        error: err instanceof Error ? err.message : "unknown",
+        to,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    const brandMode = detectBrandMode(new URL(origin).hostname);
+    const resetUrl = `${origin}/reset-password?token=${token}`;
+    const firstName = (user.displayName || user.name || "there").split(" ")[0];
+    const emailPayload = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
+    const emailSent = await sendEmail({
+      to: { name: firstName, email: deliveryEmail },
+      subject: emailPayload.subject,
+      htmlBody: emailPayload.htmlBody,
+      previewText: emailPayload.previewText,
+      brandMode,
+    });
+    res.json({
+      userFound: true,
+      userId: user.id,
+      deliveryEmail,
+      deliveryPrep,
+      emailSent,
+      to,
+      timestamp: new Date().toISOString(),
+    });
+  });
+  app.get("/api/debug/test-magic-link", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
+    const to = String(req.query.to ?? "").trim().toLowerCase();
+    if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
+    const origin = String(req.query.origin ?? "https://learn.allaboutultrasound.com");
+    const { getUserByEmail, setMagicLinkToken } = await import("../db");
+    const { sendEmail, buildMagicLinkEmail } = await import("./email");
+    const { resolveAuthDeliveryEmail } = await import("../lib/authEmailDelivery");
+    const { detectBrandMode } = await import("@shared/brands");
+    const crypto = await import("crypto");
+    const user = await getUserByEmail(to);
+    if (!user) {
+      return res.json({ userFound: false, emailSent: false, to, timestamp: new Date().toISOString() });
+    }
+    const deliveryEmail = resolveAuthDeliveryEmail(user, to);
+    if (!deliveryEmail) {
+      return res.json({
+        userFound: true,
+        userId: user.id,
+        emailSent: false,
+        reason: "no_delivery_email",
+        to,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
+    const deliveryPrep = await ensureTransactionalEmailDelivery(deliveryEmail);
+    const token = crypto.randomBytes(48).toString("hex");
+    const expiry = new Date(Date.now() + 15 * 60 * 1000);
+    await setMagicLinkToken(user.id, token, expiry);
+    const brandMode = detectBrandMode(new URL(origin).hostname);
+    const magicUrl = `${origin}/api/auth/magic-verify?token=${token}&returnTo=${encodeURIComponent("/my-dashboard")}&host=${encodeURIComponent(new URL(origin).hostname)}`;
+    const firstName = (user.displayName || user.name || "there").split(" ")[0];
+    const emailPayload = buildMagicLinkEmail({ firstName, magicUrl, brandMode });
+    const emailSent = await sendEmail({
+      to: { name: firstName, email: deliveryEmail },
+      subject: emailPayload.subject,
+      htmlBody: emailPayload.htmlBody,
+      previewText: emailPayload.previewText,
+      brandMode,
+    });
+    res.json({
+      userFound: true,
+      userId: user.id,
+      deliveryEmail,
+      deliveryPrep,
+      emailSent,
+      to,
+      timestamp: new Date().toISOString(),
+    });
+  });
+  app.get("/api/debug/owner-login-link", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass ?email=owner@example.com" });
+    const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+    if (!isPlatformOwnerEmail(email)) {
+      return res.status(403).json({ error: "Email is not in the platform owner allowlist" });
+    }
+    const { getUserByEmail } = await import("../db");
+    const user = await getUserByEmail(email);
+    if (!user) {
+      return res.json({ found: false, email, timestamp: new Date().toISOString() });
+    }
+    const { generateAutoLoginToken } = await import("../routes/autoLogin");
+    const redirect = String(req.query.redirect ?? "/platform-admin");
+    const origin = String(req.query.origin ?? "https://learn.allaboutultrasound.com");
+    const host = new URL(origin).hostname;
+    const token = await generateAutoLoginToken(user.id, redirect.startsWith("/") ? redirect : "/platform-admin");
+    const loginUrl = `${origin}/api/auth/auto-login?token=${encodeURIComponent(token)}&host=${encodeURIComponent(host)}`;
+    res.json({
+      found: true,
+      userId: user.id,
+      email,
+      loginUrl,
+      redirect,
+      timestamp: new Date().toISOString(),
+    });
   });
   // Diagnose lms_courses schema (Railway mirror often missing columns)
   app.get("/api/debug/lms-courses-schema", async (_req, res) => {
@@ -237,6 +459,169 @@ async function startServer() {
     const result = await ensureLmsCoursesSchema(db);
     const after = await inspectLmsCoursesSchema(db);
     res.json({ ...result, after, deployedAt: new Date().toISOString() });
+  });
+  app.get("/api/debug/lms-cohort-groups-schema", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { inspectLmsCohortGroupsSchema } = await import("../lib/ensureLmsCohortGroupsSchema");
+    const db = await getDb();
+    const status = await inspectLmsCohortGroupsSchema(db);
+    res.json({ ...status, deployedAt: new Date().toISOString() });
+  });
+  app.post("/api/debug/lms-cohort-groups-schema-sync", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { ensureLmsCohortGroupsSchema, inspectLmsCohortGroupsSchema } = await import("../lib/ensureLmsCohortGroupsSchema");
+    const db = await getDb();
+    const result = await ensureLmsCohortGroupsSchema(db);
+    const after = await inspectLmsCohortGroupsSchema(db);
+    res.json({ ...result, after, deployedAt: new Date().toISOString() });
+  });
+  app.get("/api/debug/auth-email-send-log-schema", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { inspectAuthEmailSendLogSchema } = await import("../lib/ensureAuthEmailSendLogSchema");
+    const db = await getDb();
+    const status = await inspectAuthEmailSendLogSchema(db);
+    res.json({ ...status, deployedAt: new Date().toISOString() });
+  });
+  app.post("/api/debug/auth-email-send-log-schema-sync", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const {
+      ensureAuthEmailSendLogSchema,
+      inspectAuthEmailSendLogSchema,
+    } = await import("../lib/ensureAuthEmailSendLogSchema");
+    const db = await getDb();
+    const result = await ensureAuthEmailSendLogSchema(db);
+    const after = await inspectAuthEmailSendLogSchema(db);
+    res.json({ ...result, after, deployedAt: new Date().toISOString() });
+  });
+  app.get("/api/debug/cohort-data-audit", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { sql } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) {
+      res.status(503).json({ error: "Database unavailable" });
+      return;
+    }
+    const [cohortCourses, groupCounts, recordingCounts, resourceCounts, messageCounts, sessionCounts] = await Promise.all([
+      db.execute(sql`SELECT id, title, slug, multi_cohort_mode AS multiCohortMode FROM lms_courses WHERE type = 'cohort' ORDER BY id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS groupCount FROM lms_cohort_groups GROUP BY course_id ORDER BY course_id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS total, SUM(cohort_group_id IS NULL) AS sharedCount FROM lms_cohort_recordings GROUP BY course_id ORDER BY course_id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS total, SUM(cohort_group_id IS NULL) AS sharedCount FROM lms_cohort_resources GROUP BY course_id ORDER BY course_id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS messageCount FROM lms_cohort_messages GROUP BY course_id ORDER BY course_id`),
+      db.execute(sql`SELECT course_id AS courseId, COUNT(*) AS total, SUM(cohort_group_id IS NULL) AS sharedCount FROM lms_cohort_sessions GROUP BY course_id ORDER BY course_id`),
+    ]);
+    const rows = (result: unknown) => (Array.isArray(result) ? result[0] : (result as { rows?: unknown[] }).rows) ?? result;
+    res.json({
+      cohortCourses: rows(cohortCourses),
+      groupCounts: rows(groupCounts),
+      recordingCounts: rows(recordingCounts),
+      resourceCounts: rows(resourceCounts),
+      messageCounts: rows(messageCounts),
+      sessionCounts: rows(sessionCounts),
+      deployedAt: new Date().toISOString(),
+    });
+  });
+  // User identity + entitlement accounting (Railway post-migration)
+  app.get("/api/debug/user-access-audit", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { auditUserAccess } = await import("../lib/ensureUserAccessAccounting");
+    const db = await getDb();
+    const audit = await auditUserAccess(db);
+    res.json({ audit, deployedAt: new Date().toISOString() });
+  });
+  app.post("/api/debug/user-access-reconcile", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { ensureUserAccessAccounting, auditUserAccess } = await import("../lib/ensureUserAccessAccounting");
+    const db = await getDb();
+    const before = await auditUserAccess(db);
+    const reconcile = await ensureUserAccessAccounting(db);
+    const after = await auditUserAccess(db);
+    res.json({ before, reconcile, after, deployedAt: new Date().toISOString() });
+  });
+  app.get("/api/debug/email-alias-audit", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const { auditEmailAliasIntegrity } = await import("../lib/ensureEmailAliasIntegrity");
+    const db = await getDb();
+    const audit = await auditEmailAliasIntegrity(db);
+    res.json({ audit, deployedAt: new Date().toISOString() });
+  });
+  app.post("/api/debug/email-alias-reconcile", async (_req, res) => {
+    const { getDb } = await import("../db");
+    const {
+      auditEmailAliasIntegrity,
+      ensureEmailAliasIntegrity,
+    } = await import("../lib/ensureEmailAliasIntegrity");
+    const db = await getDb();
+    const before = await auditEmailAliasIntegrity(db);
+    const reconcile = await ensureEmailAliasIntegrity(db);
+    const after = await auditEmailAliasIntegrity(db);
+    res.json({ before, reconcile, after, deployedAt: new Date().toISOString() });
+  });
+  app.get("/api/debug/user-by-email", async (req, res) => {
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email) {
+      res.status(400).json({ error: "email query param required" });
+      return;
+    }
+    const { getDb, getUserByEmail, getUserRoles } = await import("../db");
+    const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+    const { diagnoseUserAccess } = await import("../lib/userAccessDiagnosis");
+    const db = await getDb();
+    const user = await getUserByEmail(email);
+    if (!user) {
+      res.json({ found: false, email, deployedAt: new Date().toISOString() });
+      return;
+    }
+    const roles = await getUserRoles(user.id);
+    const hasPlatformOwner = roles.includes("platform_owner");
+    const hasPlatformAdmin =
+      roles.includes("platform_admin") ||
+      hasPlatformOwner ||
+      user.role === "admin";
+    const diagnosis = db ? await diagnoseUserAccess(db, email, user.accessToken) : null;
+    res.json({
+      found: true,
+      email,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        openId: user.openId,
+        isPending: user.isPending,
+        name: user.name,
+        loginMethod: user.loginMethod,
+        hasAccessToken: Boolean(user.accessToken),
+      },
+      roles,
+      hasPlatformOwner,
+      hasPlatformAdmin,
+      isPlatformOwnerEmail: isPlatformOwnerEmail(user.email),
+      diagnosis,
+      deployedAt: new Date().toISOString(),
+    });
+  });
+  app.post("/api/debug/repair-user-access", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
+    const email = String(req.query.email ?? (req.body as { email?: string })?.email ?? "")
+      .trim()
+      .toLowerCase();
+    if (!email) return res.status(400).json({ error: "Pass email in JSON body or ?email=" });
+
+    try {
+      const { repairUserAccess } = await import("../lib/repairUserAccess");
+      const { diagnoseUserAccess } = await import("../lib/userAccessDiagnosis");
+      const { getDb, getUserByEmail } = await import("../db");
+      const result = await repairUserAccess(email);
+      const db = await getDb();
+      const user = db ? await getUserByEmail(email) : null;
+      const diagnosis =
+        db && user ? await diagnoseUserAccess(db, email, user.accessToken) : null;
+      res.json({ ...result, diagnosis, deployedAt: new Date().toISOString() });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Repair failed";
+      const status = message.includes("not found") ? 404 : 500;
+      res.status(status).json({ error: message });
+    }
   });
   // Storage proxy for /manus-storage/* assets
   registerStorageProxy(app);
@@ -645,10 +1030,16 @@ async function startServer() {
     startSharingMonitor();
     // Backfill all existing users into the "All Contacts" email list (safe to run on every startup)
     backfillAllContacts().catch((err) => console.error("[backfillAllContacts] Error:", err));
-    // Backfill missing user.openId for legacy accounts (SSO / magic link session lookup)
+    // Backfill user openId + base roles so migrated users can sign in with correct access
     getDb()
-      .then((db) => (db ? backfillUserOpenIds(db) : null))
-      .catch((err) => console.error("[backfillUserOpenIds] Error:", err));
+      .then(async (db) => {
+        if (!db) return;
+        const { ensureUserAccessAccounting } = await import("../lib/ensureUserAccessAccounting");
+        const { ensureEmailAliasIntegrity } = await import("../lib/ensureEmailAliasIntegrity");
+        await ensureUserAccessAccounting(db);
+        return ensureEmailAliasIntegrity(db);
+      })
+      .catch((err) => console.error("[ensureUserAccessAccounting] Error:", err));
     // Auto-create manualInvoices table if it doesn't exist (production DB migration)
     getDb().then(async (db) => {
       if (!db) return;
@@ -726,6 +1117,19 @@ async function startServer() {
         return ensureLmsCoursesSchema(db);
       })
       .catch((err) => console.error("[Startup] ensureLmsCoursesSchema error:", err));
+    // Ensure lms_cohort_groups has all columns expected by admin cohort queries
+    getDb()
+      .then(async (db) => {
+        const { ensureLmsCohortGroupsSchema } = await import("../lib/ensureLmsCohortGroupsSchema");
+        return ensureLmsCohortGroupsSchema(db);
+      })
+      .catch((err) => console.error("[Startup] ensureLmsCohortGroupsSchema error:", err));
+    getDb()
+      .then(async (db) => {
+        const { ensureAuthEmailSendLogSchema } = await import("../lib/ensureAuthEmailSendLogSchema");
+        return ensureAuthEmailSendLogSchema(db);
+      })
+      .catch((err) => console.error("[Startup] ensureAuthEmailSendLogSchema error:", err));
     // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
       console.log("[Startup] Durable SCORM queue enabled — pending packages will not be skipped");

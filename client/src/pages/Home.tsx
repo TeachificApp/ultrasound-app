@@ -10,6 +10,11 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 import { getThinkificPremiumMonthlyUrl } from "@/const";
+import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
+
+const HERO_BG = resolveAssetUrl(
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp",
+)!;
 
 /** Animates a number from 0 to `target` over `duration` ms */
 function useCountUp(target: number, duration = 1800) {
@@ -175,7 +180,7 @@ export default function Home() {
         <div
           className="absolute inset-0 opacity-20"
           style={{
-            backgroundImage: `url("https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp")`,
+            backgroundImage: `url("${HERO_BG}")`,
             backgroundSize: "cover",
             backgroundPosition: "center right",
           }}

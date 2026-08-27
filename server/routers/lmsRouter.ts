@@ -27,6 +27,7 @@ import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or, gte } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { evaluateInlineLessonQuizScore, shouldRestoreMissingCourseCertificate } from "../../shared/inlineLessonQuizCompletion";
+import { lessonHasAssessmentContent } from "../../shared/lessonAccessGating";
 import { resolvePresaleWelcome } from "../../shared/contentAvailability";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -34,7 +35,6 @@ import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
-import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
@@ -116,6 +116,7 @@ import {
 import { sendEmail, buildFreePreviewConfirmationEmail, emailWrapper } from "../_core/email";
 import { generateDisclosurePdf } from "../lib/disclosurePdf";
 import { notifyOwner } from "../_core/notification";
+import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -939,6 +940,7 @@ export const lmsRouter = router({
 });
 
 export const lmsAdminRouter = router({
+  ...lmsRouter._def.procedures,
   ...lmsCourseBuilderRouter._def.procedures,
   ...lmsQuizLandingRouter._def.procedures,
   ...lmsEnrollmentAdminRouter._def.procedures,
@@ -1115,7 +1117,21 @@ export const lmsPublicRouter = router({
   listFeatured: publicProcedure.query(async () => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const courses = await db.select().from(lmsCourses)
+    // Select only listing/card columns so partial Railway mirror schemas still work.
+    const courses = await db.select({
+      id: lmsCourses.id,
+      slug: lmsCourses.slug,
+      title: lmsCourses.title,
+      subtitle: lmsCourses.subtitle,
+      coverImageUrl: lmsCourses.coverImageUrl,
+      status: lmsCourses.status,
+      type: lmsCourses.type,
+      brand: lmsCourses.brand,
+      price: lmsCourses.price,
+      isFree: lmsCourses.isFree,
+      isFeatured: lmsCourses.isFeatured,
+      updatedAt: lmsCourses.updatedAt,
+    }).from(lmsCourses)
       .where(and(eq(lmsCourses.status, "public"), eq(lmsCourses.isFeatured, true)))
       .orderBy(desc(lmsCourses.updatedAt))
       .limit(8);
@@ -1618,10 +1634,9 @@ export const lmsPublicRouter = router({
       // Notify admin of new waitlist signup
       try {
         await sendEmail({
-          to: "admin@allaboutultrasound.com",
+          to: getPlatformAdminRecipient(),
           subject: `New Waitlist Signup — Course Cohort Group #${input.cohortGroupId}`,
-          html: `<h2>New Cohort Waitlist Lead</h2><p><strong>Name:</strong> ${input.name}</p><p><strong>Email:</strong> ${input.email}</p>${input.phone ? `<p><strong>Phone:</strong> ${input.phone}</p>` : ""}<p><strong>Course ID:</strong> ${input.courseId}</p><p><strong>Cohort Group ID:</strong> ${input.cohortGroupId}</p>${input.message ? `<p><strong>Message:</strong> ${input.message}</p>` : ""}<p><em>Signed up at ${new Date().toUTCString()}</em></p>`,
-          text: `New Cohort Waitlist Lead\nName: ${input.name}\nEmail: ${input.email}${input.phone ? `\nPhone: ${input.phone}` : ""}\nCourse ID: ${input.courseId}\nCohort Group ID: ${input.cohortGroupId}${input.message ? `\nMessage: ${input.message}` : ""}`,
+          htmlBody: `<h2>New Cohort Waitlist Lead</h2><p><strong>Name:</strong> ${input.name}</p><p><strong>Email:</strong> ${input.email}</p>${input.phone ? `<p><strong>Phone:</strong> ${input.phone}</p>` : ""}<p><strong>Course ID:</strong> ${input.courseId}</p><p><strong>Cohort Group ID:</strong> ${input.cohortGroupId}</p>${input.message ? `<p><strong>Message:</strong> ${input.message}</p>` : ""}<p><em>Signed up at ${new Date().toUTCString()}</em></p>`,
         });
       } catch (e) {
         console.error("[waitlist] Failed to send admin notification:", e);
@@ -1635,12 +1650,12 @@ export const lmsPublicRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const row = await db
-        .select()
-        .from(lmsCohortGroups)
-        .where(eq(lmsCohortGroups.id, input.cohortGroupId))
-        .then(r => r[0] ?? null);
+      const { getCohortGroupById, getCohortGroupLandingBlocks } = await import("../lib/cohortGroupQuery");
+      const row = await getCohortGroupById(db, input.cohortGroupId);
       if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      const landingBlocks = row.landingBlocks
+        ? (JSON.parse(row.landingBlocks) as unknown[])
+        : await getCohortGroupLandingBlocks(db, input.cohortGroupId);
       // Count current enrollments for sold-out detection
       const [countRow] = await db
         .select({ count: sql<number>`count(*)` })
@@ -1660,7 +1675,7 @@ export const lmsPublicRouter = router({
         enrollmentCount,
         isSoldOut,
         status: row.status,
-        landingBlocks: row.landingBlocks ? JSON.parse(row.landingBlocks) : [],
+        landingBlocks,
       };
     }),
 
@@ -1852,7 +1867,7 @@ export const lmsDisclosurePublicRouter = router({
 
       // Send notification emails to admin and CardioServ defaults
       const notifyEmails = [
-        { email: "admin@allaboutultrasound.com", name: "Admin" },
+        getPlatformAdminRecipient(),
         { email: "don@cardioserv.net", name: "Don Gerig" },
         { email: "j.buckland@cardioserv.net", name: "Judith Buckland" },
       ];
@@ -1945,7 +1960,7 @@ export const lmsDisclosurePublicRouter = router({
       }
 
       const notifyEmails = [
-        { email: "admin@allaboutultrasound.com", name: "Admin" },
+        getPlatformAdminRecipient(),
         { email: "don@cardioserv.net", name: "Don Gerig" },
         { email: "j.buckland@cardioserv.net", name: "Judith Buckland" },
       ];
@@ -2103,6 +2118,7 @@ export const lmsLearnerRouter = router({
           effectBannerDuration: lmsLessons.effectBannerDuration,
           lessonStatus: lmsLessons.lessonStatus,
           countTowardCompletion: lmsLessons.countTowardCompletion,
+          contentBlocks: lmsLessons.contentBlocks,
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
         }).from(lmsLessons).where(
@@ -2110,15 +2126,23 @@ export const lmsLearnerRouter = router({
           and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
         ).orderBy(asc(lmsLessons.position)),
       ]);
+      const toSidebarLesson = (lesson: (typeof allCourseLessons)[number]) => {
+        const { contentBlocks, ...rest } = lesson;
+        return {
+          ...rest,
+          hasAssessmentContent: lessonHasAssessmentContent({ type: lesson.type, contentBlocks }),
+        };
+      };
       // Group lessons by sectionId in JS — no extra round-trips
-      const lessonsBySectionId = new Map<number, typeof allCourseLessons>();
-      const topLevelLessons: typeof allCourseLessons = [];
+      const lessonsBySectionId = new Map<number, ReturnType<typeof toSidebarLesson>[]>();
+      const topLevelLessons: ReturnType<typeof toSidebarLesson>[] = [];
       for (const lesson of allCourseLessons) {
+        const sidebarLesson = toSidebarLesson(lesson);
         if (lesson.sectionId) {
           if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
-          lessonsBySectionId.get(lesson.sectionId)!.push(lesson);
+          lessonsBySectionId.get(lesson.sectionId)!.push(sidebarLesson);
         } else {
-          topLevelLessons.push(lesson);
+          topLevelLessons.push(sidebarLesson);
         }
       }
       // For non-admin-preview, filter out sections that have no published lessons
@@ -2288,6 +2312,44 @@ export const lmsLearnerRouter = router({
       }
 
       return { ...lesson, quiz };
+    }),
+
+  /** Record that a learner opened a lesson (for prerequisite gates that unlock on view). */
+  recordLessonOpened: protectedProcedure
+    .input(z.object({ lessonId: z.number(), courseSlug: z.string(), isAdminPreview: z.boolean().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      let [enrollment] = await db.select().from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+      if (!enrollment && input.isAdminPreview && ctx.user.role === "admin") {
+        await db.insert(lmsEnrollments).values({
+          userId: ctx.user.id,
+          courseId: course.id,
+          enrollmentType: "admin_preview",
+          enrolledAt: new Date(),
+          progressPct: 0,
+        });
+        const [newEnrollment] = await db.select().from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+        enrollment = newEnrollment;
+      }
+      if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const [existing] = await db.select({ id: lmsLessonProgress.id })
+        .from(lmsLessonProgress)
+        .where(and(eq(lmsLessonProgress.enrollmentId, enrollment.id), eq(lmsLessonProgress.lessonId, input.lessonId)))
+        .limit(1);
+      if (!existing) {
+        await db.insert(lmsLessonProgress).values({
+          enrollmentId: enrollment.id,
+          lessonId: input.lessonId,
+          completedAt: null,
+        });
+      }
+      return { success: true };
     }),
 
   /** Mark a lesson complete */
@@ -3716,16 +3778,19 @@ export const lmsLearnerRouter = router({
           sectionId: lmsLessons.sectionId,
           title: lmsLessons.title,
           slug: lmsLessons.slug,
+          type: lmsLessons.type,
           position: lmsLessons.position,
-          lessonType: lmsLessons.lessonType,
           lessonStatus: lmsLessons.lessonStatus,
           countTowardCompletion: lmsLessons.countTowardCompletion,
           requireManualComplete: lmsLessons.requireManualComplete,
+          requireVideoCompletion: lmsLessons.requireVideoCompletion,
+          isPrerequisite: lmsLessons.isPrerequisite,
           previewMode: lmsLessons.previewMode,
           dripDays: lmsLessons.dripDays,
           dripOutDays: lmsLessons.dripOutDays,
           dripDate: lmsLessons.dripDate,
           prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
+          contentBlocks: lmsLessons.contentBlocks,
           thumbnailUrl: lmsLessons.thumbnailUrl,
           estimatedMinutes: lmsLessons.estimatedMinutes,
           createdAt: lmsLessons.createdAt,
@@ -3735,14 +3800,22 @@ export const lmsLearnerRouter = router({
           and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
         ).orderBy(asc(lmsLessons.position)),
       ]);
-      const lessonsBySectionId = new Map<number, typeof allLessons>();
-      const topLevelLessons: typeof allLessons = [];
+      const toOverviewLesson = (lesson: (typeof allLessons)[number]) => {
+        const { contentBlocks, ...rest } = lesson;
+        return {
+          ...rest,
+          hasAssessmentContent: lessonHasAssessmentContent({ type: lesson.type, contentBlocks }),
+        };
+      };
+      const lessonsBySectionId = new Map<number, ReturnType<typeof toOverviewLesson>[]>();
+      const topLevelLessons: ReturnType<typeof toOverviewLesson>[] = [];
       for (const lesson of allLessons) {
+        const overviewLesson = toOverviewLesson(lesson);
         if (lesson.sectionId) {
           if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
-          lessonsBySectionId.get(lesson.sectionId)!.push(lesson);
+          lessonsBySectionId.get(lesson.sectionId)!.push(overviewLesson);
         } else {
-          topLevelLessons.push(lesson);
+          topLevelLessons.push(overviewLesson);
         }
       }
       // For non-admin-preview, filter out sections that have no published lessons
@@ -3802,37 +3875,46 @@ export const lmsLearnerRouter = router({
         .limit(1);
       let myGroup = null;
       if (myGroupEnrollment) {
-        const [g] = await db.select().from(lmsCohortGroups).where(eq(lmsCohortGroups.id, myGroupEnrollment.cohortGroupId)).limit(1);
-        myGroup = g ?? null;
+        const { getCohortGroupById } = await import("../lib/cohortGroupQuery");
+        myGroup = await getCohortGroupById(db, myGroupEnrollment.cohortGroupId);
       }
       // When multi-cohort mode is on, filter content by the student's group
       const groupId = course.multiCohortMode && myGroup ? myGroup.id : null;
-      const resourceWhere = groupId
-        ? and(
-            eq(lmsCohortResources.courseId, input.courseId),
-            eq(lmsCohortResources.status, "published"),
-            or(isNull(lmsCohortResources.cohortGroupId), eq(lmsCohortResources.cohortGroupId, groupId)),
-          )
-        : and(
-            eq(lmsCohortResources.courseId, input.courseId),
-            eq(lmsCohortResources.status, "published"),
-          );
+      const { cohortCourseContentWhere } = await import("../lib/cohortGroupQuery");
+      const resourceWhere = cohortCourseContentWhere(
+        lmsCohortResources.courseId,
+        lmsCohortResources.cohortGroupId,
+        input.courseId,
+        groupId ?? undefined,
+        eq(lmsCohortResources.status, "published"),
+      );
       const [sessions, assignments, recordings, resourceRows, mySubmissions] = await Promise.all([
         db.select().from(lmsCohortSessions)
-          .where(groupId
-            ? and(eq(lmsCohortSessions.courseId, input.courseId), eq(lmsCohortSessions.cohortGroupId, groupId))
-            : eq(lmsCohortSessions.courseId, input.courseId))
+          .where(cohortCourseContentWhere(
+            lmsCohortSessions.courseId,
+            lmsCohortSessions.cohortGroupId,
+            input.courseId,
+            groupId ?? undefined,
+          ))
           .orderBy(asc(lmsCohortSessions.sessionDate)),
         db.select().from(lmsCohortAssignments)
-          .where(groupId
-            ? and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published"), eq(lmsCohortAssignments.cohortGroupId, groupId))
-            : and(eq(lmsCohortAssignments.courseId, input.courseId), eq(lmsCohortAssignments.status, "published")))
+          .where(cohortCourseContentWhere(
+            lmsCohortAssignments.courseId,
+            lmsCohortAssignments.cohortGroupId,
+            input.courseId,
+            groupId ?? undefined,
+            eq(lmsCohortAssignments.status, "published"),
+          ))
           .orderBy(asc(lmsCohortAssignments.position), asc(lmsCohortAssignments.dueDate)),
         (async () => {
           const recs = await db.select().from(lmsCohortRecordings)
-            .where(groupId
-              ? and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published"), eq(lmsCohortRecordings.cohortGroupId, groupId))
-              : and(eq(lmsCohortRecordings.courseId, input.courseId), eq(lmsCohortRecordings.status, "published")))
+            .where(cohortCourseContentWhere(
+              lmsCohortRecordings.courseId,
+              lmsCohortRecordings.cohortGroupId,
+              input.courseId,
+              groupId ?? undefined,
+              eq(lmsCohortRecordings.status, "published"),
+            ))
             .orderBy(asc(lmsCohortRecordings.position), asc(lmsCohortRecordings.createdAt));
           // Enrich recordings that have a sessionId with the linked session's title and date
           const sessionIds = recs.map(r => r.sessionId).filter((id): id is number => id != null);
@@ -3870,8 +3952,8 @@ export const lmsLearnerRouter = router({
         .where(and(eq(lmsCohortGroupEnrollments.userId, ctx.user.id), eq(lmsCohortGroupEnrollments.courseId, input.courseId)))
         .limit(1);
       if (!groupEnrollment) return null;
-      const [group] = await db.select().from(lmsCohortGroups).where(eq(lmsCohortGroups.id, groupEnrollment.cohortGroupId)).limit(1);
-      return group ?? null;
+      const { getCohortGroupById } = await import("../lib/cohortGroupQuery");
+      return getCohortGroupById(db, groupEnrollment.cohortGroupId);
     }),
 
   submitCohortAssignment: protectedProcedure

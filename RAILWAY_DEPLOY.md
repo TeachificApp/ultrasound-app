@@ -189,13 +189,13 @@ See `references/cloudflare-proxy-setup.md` for full setup.
 - [ ] Media uploads go to R2 (check new objects in bucket)
 - [ ] SCORM packages play correctly
 - [ ] Stripe test purchase completes
-- [ ] Email delivery works (SendGrid)
+- [ ] `/api/debug/user-access-audit` shows zero missing openIds, base roles, and orphan enrollments
 
 ### 7b. LMS courses schema (Railway mirror gap)
 
 If the learn homepage shows **no featured courses** but downloads work, Railway MySQL likely has the old Manus `lms_courses` table (~30 columns) while the app expects ~90.
 
-**Automatic fix (recommended):** Current app versions run `ensureLmsCoursesSchema` on startup and add missing columns with `ADD COLUMN IF NOT EXISTS`.
+**Automatic fix (recommended):** Current app versions run `ensureLmsCoursesSchema` on startup and add missing columns after checking `INFORMATION_SCHEMA`.
 
 **Manual fallback:** Run `drizzle/railway_lms_courses_schema_sync.sql` in Railway → MySQL-UltrasoundAssist → Connect.
 
@@ -206,6 +206,18 @@ curl https://learn.allaboutultrasound.com/api/debug/lms-courses-schema
 curl -X POST https://learn.allaboutultrasound.com/api/debug/lms-courses-schema-sync
 ```
 
+### 7c. User access accounting (Railway post-migration)
+
+After user/enrollment parity sync, run on deploy (automatic on startup) or manually:
+
+```bash
+curl https://learn.allaboutultrasound.com/api/debug/user-access-audit
+curl -X POST https://learn.allaboutultrasound.com/api/debug/user-access-reconcile
+```
+
+Expect `usersMissingOpenId: 0`, `usersMissingBaseRole: 0`, and `enrollmentsMissingUser: 0` for a healthy Railway database. Platform admins (`users.role = admin`) should have `platform_admin` in `userRoles`.
+
+Legacy `userRoles` rows from Manus were intentionally excluded from mirror sync; startup backfill ensures every active user has the base `user` role and admins retain platform access. Entitlements (`lms_enrollments`, `membership_subscriptions`, `brandMemberships`) are verified by row counts in the audit.
 
 ### 8. Decommission Manus hosting
 

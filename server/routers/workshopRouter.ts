@@ -1237,6 +1237,127 @@ export const workshopAdminRouter = router({
       return rows;
     }),
 
+  /** Students assigned to a specific workshop instance */
+  listWorkshopInstanceStudents: protectedProcedure
+    .input(z.object({ workshopId: z.number(), instanceId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      return db
+        .select({
+          enrollmentId: workshopEnrollments.id,
+          userId: workshopEnrollments.userId,
+          userName: users.name,
+          userEmail: users.email,
+          status: workshopEnrollments.status,
+          accessGrantedAt: workshopEnrollments.accessGrantedAt,
+        })
+        .from(workshopEnrollments)
+        .innerJoin(users, eq(workshopEnrollments.userId, users.id))
+        .where(and(
+          eq(workshopEnrollments.workshopId, input.workshopId),
+          eq(workshopEnrollments.instanceId, input.instanceId),
+          eq(workshopEnrollments.status, "active"),
+          sql`${users.name} NOT LIKE '[Merged into #%'`,
+        ))
+        .orderBy(asc(users.name));
+    }),
+
+  /** Workshop enrollments not linked to any current instance (orphaned/null instance) */
+  listUnassignedWorkshopStudents: protectedProcedure
+    .input(z.object({ workshopId: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const enrolled = await db
+        .select({
+          enrollmentId: workshopEnrollments.id,
+          userId: workshopEnrollments.userId,
+          instanceId: workshopEnrollments.instanceId,
+          userName: users.name,
+          userEmail: users.email,
+        })
+        .from(workshopEnrollments)
+        .innerJoin(users, eq(workshopEnrollments.userId, users.id))
+        .where(and(
+          eq(workshopEnrollments.workshopId, input.workshopId),
+          eq(workshopEnrollments.status, "active"),
+          sql`${users.name} NOT LIKE '[Merged into #%'`,
+        ));
+      const validInstances = await db
+        .select({ id: workshopInstances.id })
+        .from(workshopInstances)
+        .where(eq(workshopInstances.workshopId, input.workshopId));
+      const validIds = new Set(validInstances.map((row) => row.id));
+      return enrolled.filter((row) => row.instanceId == null || !validIds.has(row.instanceId));
+    }),
+
+  /** Assign an unassigned workshop student to a specific instance */
+  assignStudentToWorkshopInstance: protectedProcedure
+    .input(z.object({
+      workshopId: z.number(),
+      instanceId: z.number(),
+      userId: z.number(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [instance] = await db
+        .select({ id: workshopInstances.id, status: workshopInstances.status, enrolledCount: workshopInstances.enrolledCount })
+        .from(workshopInstances)
+        .where(and(eq(workshopInstances.id, input.instanceId), eq(workshopInstances.workshopId, input.workshopId)))
+        .limit(1);
+      if (!instance) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop instance not found" });
+
+      const [existing] = await db
+        .select({
+          id: workshopEnrollments.id,
+          instanceId: workshopEnrollments.instanceId,
+          status: workshopEnrollments.status,
+        })
+        .from(workshopEnrollments)
+        .where(and(
+          eq(workshopEnrollments.workshopId, input.workshopId),
+          eq(workshopEnrollments.userId, input.userId),
+          eq(workshopEnrollments.status, "active"),
+        ))
+        .limit(1);
+
+      if (existing?.instanceId === input.instanceId) {
+        return { success: true, alreadyAssigned: true };
+      }
+
+      if (existing) {
+        const oldInstanceId = existing.instanceId;
+        await db.update(workshopEnrollments)
+          .set({ instanceId: input.instanceId })
+          .where(eq(workshopEnrollments.id, existing.id));
+        if (oldInstanceId && oldInstanceId !== input.instanceId) {
+          await db.update(workshopInstances)
+            .set({ enrolledCount: sql`GREATEST(enrolled_count - 1, 0)` })
+            .where(eq(workshopInstances.id, oldInstanceId));
+        }
+        await db.update(workshopInstances)
+          .set({ enrolledCount: sql`enrolled_count + 1` })
+          .where(eq(workshopInstances.id, input.instanceId));
+        return { success: true, alreadyAssigned: false };
+      }
+
+      await db.insert(workshopEnrollments).values({
+        workshopId: input.workshopId,
+        instanceId: input.instanceId,
+        userId: input.userId,
+        amountPaid: 0,
+        currency: "usd",
+        status: "active",
+        accessLevel: instance.status === "presale" ? "presale" : "full",
+      });
+      await db.update(workshopInstances)
+        .set({ enrolledCount: sql`enrolled_count + 1` })
+        .where(eq(workshopInstances.id, input.instanceId));
+      return { success: true, alreadyAssigned: false };
+    }),
+
   /** Manually grant enrollment */
   grantEnrollment: protectedProcedure
     .input(
@@ -1652,11 +1773,11 @@ export const workshopWaitlistRouter = router({
       // Notify admin of new waitlist signup
       try {
         const { sendEmail } = await import("../_core/email");
+        const { getPlatformAdminRecipient } = await import("../lib/platformAdminNotification");
         await sendEmail({
-          to: "admin@allaboutultrasound.com",
+          to: getPlatformAdminRecipient(),
           subject: `New Waitlist Signup — Workshop #${input.workshopId}`,
-          html: `<h2>New Workshop Waitlist Lead</h2><p><strong>Name:</strong> ${input.name}</p><p><strong>Email:</strong> ${input.email}</p>${input.phone ? `<p><strong>Phone:</strong> ${input.phone}</p>` : ""}<p><strong>Workshop ID:</strong> ${input.workshopId}</p>${input.message ? `<p><strong>Message:</strong> ${input.message}</p>` : ""}<p><em>Signed up at ${new Date().toUTCString()}</em></p>`,
-          text: `New Workshop Waitlist Lead\nName: ${input.name}\nEmail: ${input.email}${input.phone ? `\nPhone: ${input.phone}` : ""}\nWorkshop ID: ${input.workshopId}${input.message ? `\nMessage: ${input.message}` : ""}`,
+          htmlBody: `<h2>New Workshop Waitlist Lead</h2><p><strong>Name:</strong> ${input.name}</p><p><strong>Email:</strong> ${input.email}</p>${input.phone ? `<p><strong>Phone:</strong> ${input.phone}</p>` : ""}<p><strong>Workshop ID:</strong> ${input.workshopId}</p>${input.message ? `<p><strong>Message:</strong> ${input.message}</p>` : ""}<p><em>Signed up at ${new Date().toUTCString()}</em></p>`,
         });
       } catch (e) {
         console.error("[waitlist] Failed to send admin notification:", e);

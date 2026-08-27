@@ -16,6 +16,7 @@
  */
 
 import { useEffect } from "react";
+import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
 
 export interface SeoHeadOptions {
   /** Page title — appended with site name automatically */
@@ -39,7 +40,9 @@ export interface SeoHeadOptions {
 }
 
 const SITE_NAME = "All About Ultrasound™ | iHeartEcho™";
-const DEFAULT_IMAGE = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png";
+const DEFAULT_IMAGE = resolveAssetUrl(
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png",
+)!;
 const DEFAULT_TITLE = "UltrasoundAssist™ — Clinical Ultrasound App";
 const DEFAULT_DESC = "UltrasoundAssist™ by All About Ultrasound — clinical protocols, ScanCoach, Navigator, POCUS-Assist, Fetal Echo, flashcards, and case library for ultrasound professionals.";
 

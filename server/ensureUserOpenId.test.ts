@@ -44,4 +44,17 @@ describe("ensureUserOpenId", () => {
     expect(openId).toBe("user:7");
     expect(set).toHaveBeenCalledWith({ openId: "user:7" });
   });
+
+  it("replaces stale pending_* openId with email-based openId", async () => {
+    const where = vi.fn();
+    const set = vi.fn(() => ({ where }));
+    const db = { update: vi.fn(() => ({ set })) };
+    const openId = await ensureUserOpenId(db as any, {
+      id: 18907,
+      openId: "pending_52330274-225f-4910-aa04-4b2847a1e976",
+      email: "bailee.seay@yahoo.com",
+    });
+    expect(openId).toBe("email:bailee.seay@yahoo.com");
+    expect(set).toHaveBeenCalledWith({ openId: "email:bailee.seay@yahoo.com" });
+  });
 });

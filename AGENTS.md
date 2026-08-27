@@ -40,7 +40,7 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 4. **Environment variables**: See `RAILWAY_DEPLOY.md` for the full list. For local dev, `JWT_SECRET` and `STRIPE_SECRET_KEY` (dummy test key OK) are required to start the server or run tests that load `appRouter`. `DATABASE_URL` (MySQL connection string) is needed for any DB-dependent features.
 
-4b. **User `openId` backfill (SSO)**: Legacy users with `openId IS NULL` break SSO bridge and magic-link sessions. The server runs idempotent `backfillUserOpenIds` on startup when `DATABASE_URL` is set. Manual SQL: `drizzle/backfill-user-openid.sql` (MySQL column is ``openId``, not `open_id`). Platform admins can call `admin.backfillUserOpenIds`.
+4b. **User access accounting (Railway)**: On startup, `ensureUserAccessAccounting` backfills missing `openId`, base `user` roles for all active users, and `platform_admin` for `users.role = admin`. Audit: `GET /api/debug/user-access-audit`; manual reconcile: `POST /api/debug/user-access-reconcile`. Legacy `userRoles` from Manus were not copied — entitlements live in `lms_enrollments`, `membership_subscriptions`, and `brandMemberships` (parity verified). Manual SQL: `drizzle/backfill-user-openid.sql`. Admins can also call `admin.backfillUserOpenIds` and `admin.cleanupUserRoles`.
 
 5. **pnpm build scripts warning**: On fresh `pnpm install`, you'll see a warning about ignored build scripts for `@tailwindcss/oxide`, `core-js`, `esbuild`. These packages still work correctly without running their postinstall scripts in this environment.
 

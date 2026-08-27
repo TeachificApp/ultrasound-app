@@ -9,6 +9,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -22,7 +23,7 @@ export default function MagicLinkRequest() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = email.trim().toLowerCase();
+    const trimmed = normalizeAuthEmail(email);
     if (!trimmed) return;
     requestMutation.mutate({ email: trimmed, origin: window.location.origin });
   };
@@ -155,6 +156,9 @@ export default function MagicLinkRequest() {
                       The link expires in <strong>15 minutes</strong> and can only be used once.
                     </p>
                   </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Didn't request this? Someone may have entered your email by mistake. You can ignore the message — your account stays secure.
+                  </p>
                   <p className="text-xs text-gray-400 mt-2">
                     Can't find it? Check your spam or junk folder for an email from All About Ultrasound™.
                   </p>

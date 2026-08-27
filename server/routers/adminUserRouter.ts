@@ -58,11 +58,9 @@ import {
   workshops,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
-import { storagePut } from "../storage";
-import { generateCertificatePdf } from "../lib/certificateGenerator";
-import { sendCertificateEmail } from "../lib/certificateEmail";
+import { issueCertificateIfEnabled } from "./lmsHelpers";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail, emailWrapper } from "../_core/email";
-import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail } from "../lib/enrollmentEmail";
+import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail, buildPersistentAccessUrl } from "../lib/enrollmentEmail";
 import { getOrCreateAccessToken } from "../db";
 import { getBrandDisplayConfig } from "../../shared/brands";
 import { generateAutoLoginToken } from "../routes/autoLogin";
@@ -755,48 +753,41 @@ export const adminUserRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      // Check if already issued
       const [existing] = await db
-        .select({ id: lmsCertificates.id })
+        .select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
         .from(lmsCertificates)
         .where(and(eq(lmsCertificates.userId, input.userId), eq(lmsCertificates.courseId, input.courseId)))
         .limit(1);
-      if (existing) return { certificateId: existing.id, alreadyIssued: true };
-
-      // Get user and course info
-      const [user] = await db.select({ name: users.name, displayName: users.displayName, email: users.email }).from(users).where(eq(users.id, input.userId)).limit(1);
-      const [course] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
-      if (!user || !course) throw new TRPCError({ code: "NOT_FOUND", message: "User or course not found" });
-
-      // Generate PDF
-      const recipientName = user.displayName || user.name || "Student";
-      const pdfBuffer = await generateCertificatePdf({
-        recipientName,
-        courseTitle: course.title,
-        completionDate: new Date(),
-      });
-
-      const suffix = Date.now();
-      const fileKey = `certificates/cert-${input.userId}-${input.courseId}-${suffix}.pdf`;
-      const { url: certificateUrl } = await storagePut(fileKey, pdfBuffer, "application/pdf");
-
-      const [result] = await db.insert(lmsCertificates).values({
-        userId: input.userId,
-        courseId: input.courseId,
-        enrollmentId: input.enrollmentId,
-        certificateUrl,
-      }).$returningId();
-
-      // Send email if user has one
-      if (user.email) {
-        await sendCertificateEmail({
-          to: { name: recipientName, email: user.email },
-          courseTitle: course.title,
-          certificateUrl,
-        }).catch(e => console.error("[adminUser] Certificate email failed:", e));
+      if (existing) {
+        return { certificateId: existing.id, certificateUrl: existing.certificateUrl, alreadyIssued: true };
       }
 
-      return { certificateId: result.id, certificateUrl, alreadyIssued: false };
+      const [enrollment] = await db
+        .select({ enrollmentType: lmsEnrollments.enrollmentType })
+        .from(lmsEnrollments)
+        .where(eq(lmsEnrollments.id, input.enrollmentId))
+        .limit(1);
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+
+      await issueCertificateIfEnabled(
+        db,
+        input.enrollmentId,
+        input.userId,
+        input.courseId,
+        enrollment.enrollmentType ?? undefined,
+        { adminBypass: true },
+      );
+
+      const [newCert] = await db
+        .select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
+        .from(lmsCertificates)
+        .where(and(eq(lmsCertificates.userId, input.userId), eq(lmsCertificates.courseId, input.courseId)))
+        .limit(1);
+      if (!newCert) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Certificate could not be issued — check course certificate settings" });
+      }
+
+      return { certificateId: newCert.id, certificateUrl: newCert.certificateUrl, alreadyIssued: false };
     }),
 
   /** Remove a certificate by certificate ID */
@@ -2463,6 +2454,23 @@ export const adminUserRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const normalised = input.email.trim().toLowerCase();
+      const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+      const { isProtectedAccountEmail } = await import("../../shared/protectedAccountEmails");
+      const [targetUser] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (
+        isPlatformOwnerEmail(targetUser?.email) &&
+        !isProtectedAccountEmail(normalised)
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Cannot add learner emails as aliases on the platform owner account. Merge the learner account instead, or use their primary email.",
+        });
+      }
       // Check not already a primary email
       const [existingPrimary] = await db.execute(sql`SELECT id FROM users WHERE LOWER(email) = ${normalised} LIMIT 1`) as any;
       if (Array.isArray(existingPrimary) && existingPrimary.length > 0) {
@@ -2498,7 +2506,7 @@ export const adminUserRouter = router({
    * - All data from `sourceUserId` is re-pointed to `targetUserId`.
    * - The source user's email is added as an alias on the target account.
    * - The source user account is soft-deleted (isPending=true, email cleared).
-   * Magic links always go to the target (primary) user's email.
+   * Auth emails are delivered to the address the user typed (primary or alias).
    */
   mergeUsers: protectedProcedure
     .input(z.object({
@@ -2520,6 +2528,18 @@ export const adminUserRouter = router({
       ]);
       if (!targetRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
       if (!sourceRows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Source user not found." });
+      const { isPlatformOwnerEmail } = await import("../../shared/platformOwnerAccess");
+      const { isProtectedAccountEmail } = await import("../../shared/protectedAccountEmails");
+      if (
+        isPlatformOwnerEmail(targetRows[0].email) &&
+        !isProtectedAccountEmail(sourceRows[0].email)
+      ) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Cannot merge a learner account into the platform owner account. Keep learner access on the learner's own user row.",
+        });
+      }
       const sourceEmail = sourceRows[0].email;
 
       // Tables to re-point userId from source → target
@@ -3028,6 +3048,9 @@ export const adminUserRouter = router({
 
       if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
+      const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
+      await ensureTransactionalEmailDelivery(user.email);
+
       // Generate a secure reset token (valid for 24 hours for admin-initiated resets)
       const resetToken = crypto.randomBytes(32).toString("hex");
       const resetExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
@@ -3093,6 +3116,33 @@ export const adminUserRouter = router({
         })
         .where(eq(users.id, user.id));
       return { success: true, email: user.email };
+    }),
+
+  /** Clear SendGrid blocks, fix openId, regenerate access token, resend all enrollment emails. */
+  repairUserAccess: protectedProcedure
+    .input(z.object({ userId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [user] = await db
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+
+      if (!user?.email) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "User not found or has no email" });
+      }
+
+      const { repairUserAccess } = await import("../lib/repairUserAccess");
+      try {
+        return await repairUserAccess(user.email);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Repair failed";
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+      }
     }),
 
   /** Resend the enrollment welcome / access email for a specific enrollment */
@@ -3232,7 +3282,9 @@ export const adminUserRouter = router({
       let accessToken: string | null = null;
       try { accessToken = await getOrCreateAccessToken(input.userId); } catch { /* non-fatal */ }
       const baseUrl = "https://app.allaboutultrasound.com";
-      const accessUrl = accessToken ? `${baseUrl}/api/auth/auto-login?token=${accessToken}` : `${baseUrl}/dashboard`;
+      const accessUrl = accessToken
+        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessToken)
+        : `${baseUrl}/dashboard`;
 
       const htmlBody = emailWrapper(`
         <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>

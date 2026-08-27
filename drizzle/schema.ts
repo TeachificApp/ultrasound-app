@@ -13,6 +13,7 @@ import {
   varchar,
   bigint,
   uniqueIndex,
+  index,
 } from "drizzle-orm/mysql-core";
 
 // ─── Core Auth ────────────────────────────────────────────────────────────────
@@ -101,6 +102,20 @@ export const users = mysqlTable("users", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+/** Audit + rate-limit log for magic-link and password-reset emails */
+export const authEmailSendLog = mysqlTable("auth_email_send_log", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull(),
+  emailType: mysqlEnum("email_type", ["magic_link", "password_reset"]).notNull(),
+  ipAddress: varchar("ip_address", { length: 64 }),
+  userId: int("user_id"),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+}, (t) => ({
+  emailTypeSentIdx: index("idx_auth_email_send_email_type_sent").on(t.email, t.emailType, t.sentAt),
+  ipSentIdx: index("idx_auth_email_send_ip_sent").on(t.ipAddress, t.sentAt),
+}));
+export type AuthEmailSendLog = typeof authEmailSendLog.$inferSelect;
 
 // ─── Accreditation: Peer Reviews ────────────────────────────────────────────
 
@@ -6242,7 +6257,8 @@ export type InsertEmailSendLog = typeof emailSendLog.$inferInsert;
 // ─── User Email Aliases ───────────────────────────────────────────────────────
 // Allows a user to log in with multiple email addresses.
 // The primary email is always stored on users.email; aliases are secondary.
-// Magic links are ALWAYS sent to users.email (primary), never to an alias.
+// Auth emails (magic link, password reset) are sent to the address the user typed,
+// whether primary or alias — never redirected to users.email alone.
 export const userEmailAliases = mysqlTable("user_email_aliases", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("user_id").notNull(),

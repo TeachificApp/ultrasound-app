@@ -16,6 +16,18 @@ import { ButtonSubtext } from "@/lib/ctaSubtext";
 import { handleCtaBtnClick } from "@/pages/CourseLanding";
 import { applyVideoTrim } from "@/lib/videoTrim";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
+import {
+  isInteractiveMediaPackage,
+  mediaRepoScormUrl,
+  mediaRepoDownloadUrl,
+  resolveScormEmbedSlug,
+} from "@shared/mediaRepoDisplay";
+import { isMediaRepoScormViewerPath, parseMediaRepoUrl } from "@/lib/mediaEmbedUrl";
+import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
+
+function assetUrl(url?: string | null): string {
+  return resolveAssetUrl(url ?? undefined) ?? url ?? "";
+}
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { MathContent } from "@/components/MathContent";
 
@@ -233,9 +245,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             {hasInlineMedia && (
               <div className={isHorizontal ? "w-full sm:flex-1 sm:max-w-xs mt-6 sm:mt-0" : "mt-6 max-w-sm mx-auto w-full"}>
                 {d.inlineMediaType === "video" ? (
-                  <video autoPlay muted loop playsInline className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`}><source src={d.inlineMediaUrl} /></video>
+                  <video autoPlay muted loop playsInline className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`}><source src={assetUrl(d.inlineMediaUrl)} /></video>
                 ) : (
-                  <img src={d.inlineMediaUrl} alt="" className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`} />
+                  <img src={assetUrl(d.inlineMediaUrl)} alt="" className={`w-full ${(d.inlineMediaStyle ?? "shadow") === "circle" ? "rounded-full shadow-2xl aspect-square object-cover" : (d.inlineMediaStyle ?? "shadow") === "none" ? "" : "rounded-lg shadow-2xl"}`} />
                 )}
               </div>
             )}
@@ -263,7 +275,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const mw = d.maxWidth ?? "auto";
       const imgStyle: React.CSSProperties = { maxWidth: mw === "auto" ? "100%" : mw, width: mw === "auto" ? undefined : "100%", height: d.height || "auto", objectFit: "cover", borderRadius: d.borderRadius ? `${d.borderRadius}px` : "0.5rem", border: d.noBorder ? "none" : (d.borderWidth ? `${d.borderWidth}px ${d.borderStyle || "solid"} ${d.borderColor || "#e5e7eb"}` : undefined) };
       const imgEl = d.url
-        ? <img src={d.url} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyle} />
+        ? <img src={assetUrl(d.url)} alt={d.alt ?? ""} className={d.showShadow !== false ? "shadow" : ""} style={imgStyle} />
         : <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400"><Image size={32} /></div>;
       return (
         <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor || undefined }}>
@@ -366,7 +378,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${Math.floor(100 / (d.columns ?? 3))}%), 1fr))` }}>
             {(d.images ?? []).map((img: any, i: number) => (
               <div key={i} className="rounded-lg overflow-hidden shadow">
-                {img.url ? <img src={img.url} alt={img.caption ?? ""} className="w-full h-40 object-cover" /> : <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400"><Image size={24} /></div>}
+                {img.url ? <img src={assetUrl(img.url)} alt={img.caption ?? ""} className="w-full h-40 object-cover" /> : <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400"><Image size={24} /></div>}
                 {img.caption && <p className="text-xs text-gray-500 p-2 text-center">{img.caption}</p>}
               </div>
             ))}
@@ -465,7 +477,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             )}
             <div className="flex items-center justify-center gap-3">
               {d.avatarUrl && (
-                <img src={d.avatarUrl} alt={d.author} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+                <img src={assetUrl(d.avatarUrl)} alt={d.author} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
               )}
               <span className="font-semibold text-gray-900">{d.author}</span>
             </div>
@@ -485,7 +497,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                 <p className="text-gray-700 mb-3 italic">"{r.text}"</p>
                 <div className="flex items-center gap-3 mt-3">
                   {r.avatarUrl && (
-                    <img src={r.avatarUrl} alt={r.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-white shadow-sm" />
+                    <img src={assetUrl(r.avatarUrl)} alt={r.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-white shadow-sm" />
                   )}
                   <p className="text-sm font-semibold text-gray-900">{r.name}</p>
                 </div>
@@ -500,7 +512,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           {d.headline && <p className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wider mb-6" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           <div className="flex flex-wrap items-center justify-center gap-8">
             {(d.logos ?? []).map((logo: any, i: number) => (
-              logo.url ? <img key={i} src={logo.url} alt={logo.alt ?? ""} className="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity" />
+              logo.url ? <img key={i} src={assetUrl(logo.url)} alt={logo.alt ?? ""} className="h-10 object-contain opacity-70 hover:opacity-100 transition-opacity" />
                 : <div key={i} className="h-10 w-24 bg-gray-200 rounded flex items-center justify-center text-xs text-gray-400">{logo.alt || "Logo"}</div>
             ))}
           </div>
@@ -700,7 +712,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const items: Array<{ text: string; price: string }> = d.items ?? [];
       return (
         <div className={`px-8 py-10 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`} style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.borderColor ?? "#1a5f7a") : undefined }}>
-          {d.imageUrl && <img src={d.imageUrl} alt="" className="w-full max-w-lg mx-auto rounded-lg mb-6 object-cover" />}
+          {d.imageUrl && <img src={assetUrl(d.imageUrl)} alt="" className="w-full max-w-lg mx-auto rounded-lg mb-6 object-cover" />}
           {d.headline && <h2 className="text-2xl md:text-3xl font-black uppercase mb-6 whitespace-pre-line" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {items.length > 0 && (
             <div className="space-y-2 mb-8 max-w-md mx-auto text-left">
@@ -726,6 +738,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       );
     }
     case "urgency_offer": {
+      if (onEnroll || onCheckoutPage) {
+        return <UrgencyOfferLiveBlock d={d} onEnroll={onEnroll} onCheckoutPage={onCheckoutPage} />;
+      }
       const cMode = d.countdownMode ?? "on_load";
       const cUnits = cMode === "event" ? ["Days", "Hours", "Minutes", "Seconds"] : ["Hours", "Minutes", "Seconds"];
       const cPlaceholders = cMode === "event" ? ["00", "00", "00", "00"] : [String(Math.floor((d.countdownMinutes ?? 90) / 60)).padStart(2, "0"), String((d.countdownMinutes ?? 90) % 60).padStart(2, "0"), "00"];
@@ -1021,7 +1036,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         <div className="py-4 px-6" style={{ backgroundColor: d.bgColor ?? "#ffffff", padding: d.padding ?? "16px 0" }}>
           <div className={`flex ${align === "left" ? "justify-start" : align === "right" ? "justify-end" : "justify-center"}`}>
             {d.logoUrl ? (
-              <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" />
+              <img src={assetUrl(d.logoUrl)} alt="Logo" style={{ maxWidth: d.maxWidth ?? "200px", height: "auto" }} className="object-contain" />
             ) : (
               <div className="border-2 border-dashed border-gray-300 rounded-lg px-8 py-4 text-gray-400 text-sm flex items-center gap-2">
                 <Image size={16} /> Add your logo
@@ -1038,7 +1053,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         <div className="px-4 sm:px-8 py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#0e1e2e", color: d.textColor ?? "#ffffff" }}>
           {d.logoUrl && (
             <div className="flex justify-center mb-4">
-              <img src={d.logoUrl} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" />
+              <img src={assetUrl(d.logoUrl)} alt="Logo" style={{ maxWidth: d.logoMaxWidth ?? "120px" }} className="object-contain" />
             </div>
           )}
           {links.length > 0 && (
@@ -1176,14 +1191,41 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       );
     }
     case "file_download": {
+      const slug = d.mediaAssetSlug ?? "";
+      const mediaType = d.mediaAssetMediaType ?? d.mediaType ?? "";
+      const fileName = d.source === "media_repo"
+        ? (d.mediaAssetTitle || d.fileName || "")
+        : (d.fileName || "");
+      const isInteractiveRepoAsset =
+        d.source === "media_repo" &&
+        !!slug &&
+        isInteractiveMediaPackage(mediaType, d.fileName ?? fileName);
+
+      if (isInteractiveRepoAsset) {
+        const height = d.inlineHeight ?? d.height ?? 600;
+        return (
+          <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
+            {d.label && <h3 className="text-lg font-semibold text-gray-800 mb-2">{d.label}</h3>}
+            {d.description && <p className="text-sm text-gray-500 mb-3">{d.description}</p>}
+            <MediaEmbedIframe
+              src={mediaRepoScormUrl(slug)}
+              courseId={courseId}
+              title={d.mediaAssetTitle || d.label || "Interactive Content"}
+              style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+            />
+          </CC></div>
+        );
+      }
+
       // Resolve file URL based on source type:
       // - media_repo: use stored mediaAssetUrl or slug-based serve endpoint
       // - download_library: use stored fileUrl directly (S3 URL from digital product files)
       // - upload: use stored fileUrl (S3 URL from page media upload)
       const fileUrl = d.source === "media_repo"
-        ? (d.mediaAssetUrl || d.fileUrl || (d.mediaAssetSlug ? `/api/media/${d.mediaAssetSlug}/download` : ""))
+        ? (isInteractiveRepoAsset
+          ? mediaRepoScormUrl(slug)
+          : (d.mediaAssetUrl || d.fileUrl || (slug ? mediaRepoDownloadUrl(slug) : "")))
         : (d.fileUrl || "");
-      const fileName = d.source === "media_repo" ? (d.mediaAssetTitle || d.fileName || "File") : (d.fileName || "File");
       const displayMode = d.displayMode ?? "card";
       if (displayMode === "inline" && fileUrl) {
         const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
@@ -1236,10 +1278,10 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       );
     }
     case "scorm_embed": {
-      const slug = d.mediaAssetSlug ?? "";
+      const slug = resolveScormEmbedSlug(d);
       const title = d.mediaAssetTitle ?? "Interactive Content";
       const height = d.height ?? 600;
-      const embedUrl = slug ? `/api/media/${slug}/scorm` : "";
+      const embedUrl = slug ? mediaRepoScormUrl(slug) : "";
       const scormAlign = d.align ?? "center";
       const scormJustify = scormAlign === "left" ? "flex-start" : scormAlign === "right" ? "flex-end" : "center";
       const scormMaxWidth = d.maxWidth ?? "100%";
@@ -1273,6 +1315,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const height = d.height ?? 600;
       const embedTitle = d.title ?? "Embedded Content";
       const url = urlEmbedSrc || d.url || "";
+      const mediaRepoParsed = url.startsWith("/") ? parseMediaRepoUrl(url) : null;
+      const useSignedMediaEmbed = !!mediaRepoParsed && isMediaRepoScormViewerPath(url);
+      const mediaEmbedSrc = useSignedMediaEmbed && mediaRepoParsed
+        ? mediaRepoScormUrl(mediaRepoParsed.slug)
+        : "";
       const urlAlign = d.align ?? "center";
       const urlJustify = urlAlign === "left" ? "flex-start" : urlAlign === "right" ? "flex-end" : "center";
       const urlMaxWidth = d.maxWidth ?? "100%";
@@ -1281,6 +1328,14 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           <div style={{ width: urlMaxWidth, maxWidth: "100%" }}>
             {d.title && <h3 className="text-lg font-semibold text-gray-800 mb-3">{d.title}</h3>}
             {url ? (
+              useSignedMediaEmbed && mediaEmbedSrc ? (
+                <MediaEmbedIframe
+                  src={mediaEmbedSrc}
+                  courseId={courseId}
+                  title={embedTitle}
+                  style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
+                />
+              ) : (
               <iframe
                 src={url}
                 style={{ width: "100%", height: `${height}px`, border: "none", borderRadius: "8px" }}
@@ -1289,6 +1344,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                 allowFullScreen
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation allow-top-navigation-by-user-activation"
               />
+              )
             ) : (
               <div
                 className="w-full bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-3 text-gray-400"
@@ -1803,7 +1859,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         </div>
       );
       const avatar = d.avatarUrl
-        ? <img src={d.avatarUrl} alt={d.name ?? "Host"} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4" style={{ borderColor: `${whb_accentColor}40` }} />
+        ? <img src={assetUrl(d.avatarUrl)} alt={d.name ?? "Host"} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4" style={{ borderColor: `${whb_accentColor}40` }} />
         : <div className="w-24 h-24 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${whb_accentColor}20` }}><Users size={32} style={{ color: whb_accentColor }} /></div>;
       return (
         <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f8fafc" }}><CC>
@@ -2070,7 +2126,7 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
       <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
         <div className="text-center">
           {avatarUrl
-            ? <img src={avatarUrl} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100" />
+            ? <img src={assetUrl(avatarUrl)} alt={name} className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-teal-100" />
             : <div className="w-28 h-28 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4"><Users size={40} className="text-teal-600" /></div>}
           <h3 className="text-2xl font-bold mb-1" style={{ color: headlineColor }}>{name}</h3>
           {title && <p className="font-semibold mb-3" style={{ color: titleColor }}>{title}</p>}
@@ -2085,7 +2141,7 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
     <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#fff" }}><CC>
       <div className="flex gap-6 items-start">
         {avatarUrl
-          ? <img src={avatarUrl} alt={name} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4 border-teal-100" />
+          ? <img src={assetUrl(avatarUrl)} alt={name} className="w-24 h-24 rounded-full object-cover flex-shrink-0 border-4 border-teal-100" />
           : <div className="w-24 h-24 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0"><Users size={32} className="text-teal-600" /></div>}
         <div className="min-w-0">
           <h3 className="text-xl font-bold" style={{ color: headlineColor }}>{name}</h3>
@@ -2098,6 +2154,158 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
   );
 }
 
+
+// ─── Countdown helpers ────────────────────────────────────────────────────────
+
+function normalizeCountdownV2Mode(mode: string | undefined): "duration" | "target_date" {
+  if (mode === "target_date" || mode === "event") return "target_date";
+  return "duration";
+}
+
+function computeCountdownV2EndTime(d: Record<string, any>): number {
+  const mode = normalizeCountdownV2Mode(d.mode);
+  if (mode === "target_date" && d.targetDate) {
+    const targetMs = new Date(d.targetDate).getTime();
+    if (!Number.isNaN(targetMs) && targetMs > Date.now()) return targetMs;
+  }
+  const h = Math.max(0, Number(d.durationHours ?? 1));
+  const m = Math.max(0, Number(d.durationMinutes ?? 30));
+  const totalMinutes = Math.max(1, h * 60 + m);
+  const storageKey = `countdown_v2_${d.targetDate ?? "duration"}_${h}_${m}`;
+  if (typeof sessionStorage !== "undefined") {
+    const stored = sessionStorage.getItem(storageKey);
+    if (stored) {
+      const parsed = Number(stored);
+      if (!Number.isNaN(parsed) && parsed > Date.now()) return parsed;
+    }
+    const end = Date.now() + totalMinutes * 60 * 1000;
+    sessionStorage.setItem(storageKey, String(end));
+    return end;
+  }
+  return Date.now() + totalMinutes * 60 * 1000;
+}
+
+function useUrgencyCountdown(
+  mode: "on_load" | "event",
+  durationMinutes: number,
+  targetDate?: string,
+) {
+  const endRef = useRef<number | null>(null);
+  const [remaining, setRemaining] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    if (mode === "event" && targetDate) {
+      const targetMs = new Date(targetDate).getTime();
+      if (!Number.isNaN(targetMs) && targetMs > Date.now()) {
+        endRef.current = targetMs;
+      }
+    }
+    if (!endRef.current) {
+      const storageKey = `urgency_countdown_${mode}_${durationMinutes}_${targetDate ?? ""}`;
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored) {
+        endRef.current = Number(stored);
+      } else {
+        const minutes = Math.max(1, durationMinutes || 90);
+        const end = Date.now() + minutes * 60 * 1000;
+        endRef.current = end;
+        sessionStorage.setItem(storageKey, String(end));
+      }
+    }
+
+    const tick = () => {
+      if (!endRef.current) return;
+      const diff = Math.max(0, endRef.current - Date.now());
+      const totalSec = Math.floor(diff / 1000);
+      setRemaining({
+        days: Math.floor(totalSec / 86400),
+        hours: Math.floor((totalSec % 86400) / 3600),
+        minutes: Math.floor((totalSec % 3600) / 60),
+        seconds: totalSec % 60,
+      });
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [mode, durationMinutes, targetDate]);
+
+  return remaining;
+}
+
+function UrgencyOfferLiveBlock({
+  d,
+  onEnroll,
+  onCheckoutPage,
+}: {
+  d: Record<string, any>;
+  onEnroll?: () => void;
+  onCheckoutPage?: (pricingOptionId?: number) => void;
+}) {
+  const countdownMode: "on_load" | "event" = d.countdownMode === "event" ? "event" : "on_load";
+  const targetDate = d.countdownTargetDate || d.targetDate;
+  const { days, hours, minutes, seconds } = useUrgencyCountdown(
+    countdownMode,
+    d.countdownMinutes ?? 90,
+    targetDate,
+  );
+  const units = countdownMode === "event"
+    ? [{ label: "Days", value: days }, { label: "Hours", value: hours }, { label: "Minutes", value: minutes }, { label: "Seconds", value: seconds }]
+    : [{ label: "Hours", value: hours }, { label: "Minutes", value: minutes }, { label: "Seconds", value: seconds }];
+  const ctaBehavior = d.ctaBehavior ?? "direct_checkout";
+
+  return (
+    <div
+      className={`px-8 py-10 ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`}
+      style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.accentColor ?? "#179ca3") : undefined }}
+      onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}
+    >
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          {d.countdownHeadline && <h3 className="text-lg font-bold uppercase tracking-wide mb-4" style={{ color: d.accentColor ?? "#179ca3" }}>{d.countdownHeadline}</h3>}
+          <div className="flex justify-center items-center gap-3">
+            {units.map((unit, i) => (
+              <div key={unit.label} className="flex items-center gap-3">
+                <div className="text-center">
+                  <div className="text-5xl font-black tracking-tight">{String(unit.value).padStart(2, "0")}</div>
+                  <div className="text-xs font-medium mt-1 opacity-70">{unit.label}</div>
+                </div>
+                {i < units.length - 1 && <span className="text-4xl font-bold opacity-40 -mt-4">:</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+        {d.headline && <h2 className="text-2xl md:text-3xl font-black text-center mb-6 whitespace-pre-line leading-tight" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+        {d.description && <p className="italic text-lg mb-4 text-center" style={{ color: d.accentColor ?? "#179ca3" }}>{d.description}</p>}
+        {d.bodyHtml && <div className="prose prose-lg max-w-none mb-6" dangerouslySetInnerHTML={{ __html: d.bodyHtml }} />}
+        {(d.showStrikethrough && d.strikethroughPrice) && (
+          <p className="text-xl text-gray-400 line-through text-center mt-4">{d.strikethroughPrice}</p>
+        )}
+        {d.displayPrice && <p className="text-3xl font-bold text-center mt-1" style={{ color: d.accentColor ?? "#179ca3" }}>{d.displayPrice}</p>}
+        {d.ctaText && (
+          <div className="text-center mt-6">
+            <button
+              data-cta-btn="1"
+              data-action={ctaBehavior}
+              data-link={ctaBehavior === "url" ? (d.ctaLink ?? "") : undefined}
+              data-anchor={ctaBehavior === "scroll_to_section" ? (d.ctaScrollAnchor ?? "") : undefined}
+              data-email={ctaBehavior === "send_email" ? (d.ctaEmailAddress ?? "") : undefined}
+              data-popup={ctaBehavior === "open_popup" ? (d.ctaPopupUrl ?? "") : undefined}
+              data-download={ctaBehavior === "download_file" ? (d.ctaDownloadUrl ?? "") : undefined}
+              data-pricing-option={ctaBehavior === "pricing_option" && d.ctaPricingOptionId ? String(d.ctaPricingOptionId) : undefined}
+              className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-bold text-lg shadow-lg cursor-pointer"
+              style={{ backgroundColor: d.ctaColor ?? d.accentColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
+            >
+              {d.ctaEmoji && <span>{d.ctaEmoji}</span>}
+              {d.ctaText}
+            </button>
+            {ctaBehavior === "direct_checkout" && <p className="text-[10px] text-teal-600 mt-1">→ Stripe Checkout</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Ticker / Marquee Block ───────────────────────────────────────────────────
 
@@ -2187,17 +2395,7 @@ function TickerBlockPreview({ d }: { d: Record<string, any> }) {
  * and target-date mode (count down to a specific date/time).
  */
 export function CountdownV2Block({ data: d }: { data: Record<string, any> }) {
-  const mode: "duration" | "target_date" = d.mode ?? "duration";
-
-  // Compute end time once on mount
-  const [endTime] = useState<number>(() => {
-    if (mode === "target_date" && d.targetDate) {
-      return new Date(d.targetDate).getTime();
-    }
-    const h = Number(d.durationHours ?? 1);
-    const m = Number(d.durationMinutes ?? 30);
-    return Date.now() + (h * 3600 + m * 60) * 1000;
-  });
+  const [endTime] = useState<number>(() => computeCountdownV2EndTime(d));
 
   const calcRemaining = () => Math.max(0, endTime - Date.now());
   const [remaining, setRemaining] = useState(calcRemaining);
@@ -2990,7 +3188,7 @@ function UpgradePromptBlockPreview({ d }: { d: Record<string, any> }) {
       )}
       <div className="flex gap-4 items-start">
         {imageUrl && (
-          <img src={imageUrl} alt="" className="w-20 h-20 rounded-xl object-cover flex-shrink-0 shadow-sm" />
+          <img src={assetUrl(imageUrl)} alt="" className="w-20 h-20 rounded-xl object-cover flex-shrink-0 shadow-sm" />
         )}
         <div className="flex-1 min-w-0">
           <h3 className="font-bold text-gray-900 text-lg leading-tight mb-1" dangerouslySetInnerHTML={{ __html: headline }} />

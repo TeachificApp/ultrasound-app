@@ -14,6 +14,7 @@ import { BlockPreview } from "@/components/BlockPreview";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { toast } from "sonner";
+import { THINKIFIC_LEGACY_BILLING_URL } from "@shared/thinkificLegacy";
 import {
   Award, BookOpen, Download, Users, Globe, Package, Tag, ChevronRight,
   Loader2, Lock, CreditCard, Calendar, RefreshCw, XCircle, CheckCircle2,
@@ -69,6 +70,10 @@ export default function MyMemberships() {
   const { data: memberships, isLoading, refetch } = trpc.membership.myMemberships.useQuery(undefined, {
     enabled: !!user,
   });
+  const { data: dashboardProfile } = trpc.dashboard.getProfile.useQuery(undefined, {
+    enabled: !!user,
+    refetchOnWindowFocus: false,
+  });
 
   if (!user) {
     return (
@@ -109,16 +114,15 @@ export default function MyMemberships() {
       </div>
 
       {/* Legacy Thinkific platform notice */}
-      {(user as any)?.thinkificEnrolledAt && (
+      {dashboardProfile?.hasActiveThinkificSubscription && (
         <div className="mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50 flex items-start gap-3">
           <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-amber-800 mb-0.5">Legacy Platform Account</p>
+            <p className="text-sm font-semibold text-amber-800 mb-0.5">Legacy Subscription Billing</p>
             <p className="text-sm text-amber-700 leading-relaxed">
-              Your account was transferred from our legacy platform. Some billing may still occur from that site.
-              For legacy subscriptions not reflected here, please manage your billing at{" "}
+              You have an active subscription from our legacy platform. Manage billing at{" "}
               <a
-                href="https://member.allaboutultrasound.com/account/billing"
+                href={THINKIFIC_LEGACY_BILLING_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-semibold underline hover:text-amber-900"
