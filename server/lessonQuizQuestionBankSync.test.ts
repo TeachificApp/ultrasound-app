@@ -121,4 +121,12 @@ describe("lesson quiz Question Bank synchronization", () => {
     expect(helperSource).toContain("export async function syncLessonQuizToQuestionBank");
     expect(helperSource).toContain("syncLegacyLessonQuizQuestionsForLesson");
   });
+
+  it("includes a CLI backfill for all existing lesson quiz questions", () => {
+    const backfillSource = readFileSync(resolve(root, "server/lib/backfillLessonQuizQuestionBank.ts"), "utf8");
+    const scriptSource = readFileSync(resolve(root, "scripts/backfill-lesson-quiz-question-bank.mjs"), "utf8");
+    expect(backfillSource).toContain("findLessonIdsWithQuizContent");
+    expect(backfillSource).toContain("syncLessonQuizToQuestionBank");
+    expect(scriptSource).toContain("backfillLessonQuizQuestionBank");
+  });
 });

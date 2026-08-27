@@ -1010,6 +1010,24 @@ export const questionBankRouter = router({
       return { removed: input.questionIds.length * input.tagIds.length };
     }),
 
+  /** Idempotent backfill: sync all existing lesson quiz questions into Lesson Quiz → course folders. */
+  backfillLessonQuizQuestions: protectedProcedure
+    .input(z.object({
+      dryRun: z.boolean().optional(),
+      lessonIds: z.array(z.number().int()).optional(),
+    }).optional())
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { backfillLessonQuizQuestionBank } = await import("../lib/backfillLessonQuizQuestionBank");
+      return backfillLessonQuizQuestionBank(db, {
+        dryRun: input?.dryRun ?? false,
+        lessonIds: input?.lessonIds,
+        adminId: ctx.user.id,
+      });
+    }),
+
   /**
    * listMediaLibraryQuizFiles — browse media library assets that are SCORM/ZIP files
    * so admins can import questions directly from already-uploaded packages.

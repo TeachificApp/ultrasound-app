@@ -1136,6 +1136,13 @@ async function startServer() {
         return ensureQuestionBankLessonSourceSchema(db);
       })
       .catch((err) => console.error("[Startup] ensureQuestionBankLessonSourceSchema error:", err));
+    getDb()
+      .then(async (db) => {
+        if (!db) return;
+        const { backfillLessonQuizQuestionBank } = await import("../lib/backfillLessonQuizQuestionBank");
+        return backfillLessonQuizQuestionBank(db, { adminId: undefined });
+      })
+      .catch((err) => console.error("[Startup] backfillLessonQuizQuestionBank error:", err));
     // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
       console.log("[Startup] Durable SCORM queue enabled — pending packages will not be skipped");
