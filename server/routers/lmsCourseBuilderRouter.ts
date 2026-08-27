@@ -29,7 +29,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
-import { syncLessonQuizBlocksToQuestionBank, syncLessonQuizToQuestionBank } from "../lib/lessonQuizQuestionBankSync";
+import { syncLessonQuizToQuestionBank } from "../lib/lessonQuizQuestionBankSync";
 import {
   lmsCourses,
   lmsSections,
