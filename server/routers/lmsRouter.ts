@@ -2038,9 +2038,8 @@ export const lmsLearnerRouter = router({
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       // Check enrollment first — must happen before isAdminPreview check (expiry-aware)
-      const { getActiveEnrollment } = await import("../lib/enrollmentAccess");
-      const enrollmentAccess = await getActiveEnrollment(db as any, ctx.user.id, course.id);
-      // Fetch the full enrollment row (with progressPct, completedAt, certificateIssuedAt) if access is confirmed
+      const { resolveEnrollmentByCourseSlug } = await import("../lib/enrollmentAccess");
+      const enrollmentAccess = await resolveEnrollmentByCourseSlug(db as any, ctx.user.id, input.slug);
       let enrollment: typeof lmsEnrollments.$inferSelect | null = null;
       if (enrollmentAccess) {
         const [fullRow] = await db.select().from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollmentAccess.id)).limit(1);
@@ -2048,7 +2047,6 @@ export const lmsLearnerRouter = router({
       }
 
       // Admin preview mode: only active when admin is NOT enrolled AND explicitly requested preview.
-      // If the admin IS enrolled, treat them as a regular enrolled user so progress is tracked.
       const isAdminPreview = input.preview && ctx.user.role === "admin" && !enrollment;
 
       // Paid pre-sale enrollment confirms a seat, but course content stays restricted until opening.
@@ -3738,21 +3736,23 @@ export const lmsLearnerRouter = router({
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Check enrollment first — must happen before isAdminPreview check (expiry-aware)
-      const { getActiveEnrollment: getActiveEnrollment2 } = await import("../lib/enrollmentAccess");
-      const enrollment = await getActiveEnrollment2(db as any, ctx.user.id, course.id);
+      // Resolve enrollment the same way as dashboard My Content (user + course slug join).
+      const { resolveEnrollmentByCourseSlug } = await import("../lib/enrollmentAccess");
+      const enrollmentAccess = await resolveEnrollmentByCourseSlug(db as any, ctx.user.id, input.slug);
 
-      // Admin preview mode: active when admin is not enrolled OR when explicitly requested.
-      // If the admin IS enrolled, treat them as a regular enrolled user so progress is tracked.
       const isAdminByRole = ctx.user.role === "admin";
-      const isAdminPreview = (input.preview || isAdminByRole) && isAdminByRole && !enrollment;
-      // Admins always get access (either via enrollment or admin bypass)
-      if (!enrollment && !isAdminByRole) throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
+      const isAdminPreview = input.preview && isAdminByRole && !enrollmentAccess;
+      if (!enrollmentAccess && !isAdminByRole) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
+      }
 
-      // Fetch sections + lessons
-      const [sections, allLessons] = await Promise.all([
-        db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
-        db.select({
+      // Fetch sections + lessons (include section-owned lessons, not only course_id matches)
+      const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
+      const sectionIds = sections.map((s) => s.id);
+      const lessonScope = sectionIds.length > 0
+        ? or(eq(lmsLessons.courseId, course.id), inArray(lmsLessons.sectionId, sectionIds))
+        : eq(lmsLessons.courseId, course.id);
+      const allLessons = await db.select({
           id: lmsLessons.id,
           courseId: lmsLessons.courseId,
           sectionId: lmsLessons.sectionId,
@@ -3776,10 +3776,8 @@ export const lmsLearnerRouter = router({
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
         }).from(lmsLessons).where(
-          // Always filter out draft lessons — never shown to students regardless of admin status
-          and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
-        ).orderBy(asc(lmsLessons.position)),
-      ]);
+          and(lessonScope, eq(lmsLessons.lessonStatus, "published"))
+        ).orderBy(asc(lmsLessons.position));
       const toOverviewLesson = (lesson: (typeof allLessons)[number]) => {
         const { contentBlocks, ...rest } = lesson;
         return {
@@ -3805,7 +3803,7 @@ export const lmsLearnerRouter = router({
 
       // Progress
       let progress: typeof lmsLessonProgress.$inferSelect[] = [];
-      const effectiveEnrollment = enrollment ?? (isAdminPreview ? { id: -1, userId: ctx.user.id, courseId: course.id, enrolledAt: new Date(), progressPct: 0, completedAt: null, lastAccessedAt: new Date(), certificateIssuedAt: null } as any : null);
+      const effectiveEnrollment = enrollmentAccess ?? (isAdminPreview ? { id: -1, userId: ctx.user.id, courseId: course.id, enrolledAt: new Date(), progressPct: 0, completedAt: null, lastAccessedAt: new Date(), certificateIssuedAt: null } as any : null);
       if (effectiveEnrollment && effectiveEnrollment.id !== -1) {
         progress = await db.select().from(lmsLessonProgress).where(eq(lmsLessonProgress.enrollmentId, effectiveEnrollment.id));
       }
@@ -3820,7 +3818,7 @@ export const lmsLearnerRouter = router({
           .where(sql`${lmsInstructors.id} IN (${sql.join(instructorIds.map(id => sql`${id}`), sql`, `)})`);
       }
 
-      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, instructors, isAdminPreview: !!isAdminPreview && !enrollment };
+      return { course, enrollment: effectiveEnrollment, sections: sectionsWithLessons, topLevelLessons, progress, instructors, isAdminPreview: !!isAdminPreview && !enrollmentAccess };
     }),
 
   /** Get cohort schedule (sessions + assignments) for an enrolled student */

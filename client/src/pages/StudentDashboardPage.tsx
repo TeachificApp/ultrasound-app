@@ -942,28 +942,35 @@ function MyContentTab() {
             )
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.courses.map((c, i) => (
+              {data?.courses.map((c, i) => {
+                const completed = Boolean(c.completedAt) || Number(c.progressPct ?? 0) >= 100;
+                const certificateUrl = (c as { certificateUrl?: string | null }).certificateUrl;
+                const actions = [
+                  { label: completed ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${c.courseSlug}/player` },
+                  { label: "Overview", icon: FileText, href: `/courses/${c.courseSlug}/overview`, secondary: true },
+                  ...(completed && certificateUrl
+                    ? [{ label: "Certificate", icon: Award, href: certificateUrl, secondary: true, external: true }]
+                    : []),
+                ];
+                return (
                 <ContentCard
                   key={c.enrollmentId ?? `membership-course-${i}`}
                   thumbnail={c.courseThumbnail}
                   title={c.courseTitle}
                   brand={c.courseBrand}
                   subtitle={(c as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(c.enrolledAt)}`}
-                  badge={(c as any).accessSource ? "Membership" : c.completedAt ? "Completed" : "In Progress"}
-                  badgeColor={(c as any).accessSource ? "teal" : c.completedAt ? "emerald" : "teal"}
+                  badge={(c as any).accessSource ? "Membership" : completed ? "Completed" : "In Progress"}
+                  badgeColor={(c as any).accessSource ? "teal" : completed ? "emerald" : "teal"}
                   progressPct={c.progressPct}
-                  completed={!!c.completedAt}
+                  completed={completed}
                   accessSource={(c as any).accessSource ?? null}
                   expiresAt={(c as any).accessExpiresAt ?? null}
                   cancelAtPeriodEnd={(c as any).cancelAtPeriodEnd ?? false}
                   stripePeriodEnd={(c as any).stripePeriodEnd ?? null}
                   subscriptionCancelledAt={resolveDashboardSubscriptionCancelledAt((c as any).stripeSubscriptionId, (c as any).accessExpiresAt)}
-                  actions={[
-                    { label: c.completedAt ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${c.courseSlug}/player` },
-                    { label: "Overview", icon: FileText, href: `/courses/${c.courseSlug}/overview`, secondary: true },
-                  ]}
+                  actions={actions}
                 />
-              ))}
+              );})}
             </div>
           )}
         </div>
@@ -2004,7 +2011,7 @@ function ContentCard({
   subscriptionCancelledAt?: Date | null;
   cancelAtPeriodEnd?: boolean;
   stripePeriodEnd?: Date | null;
-  actions: { label: string; icon: React.ElementType; href: string; secondary?: boolean }[];
+  actions: { label: string; icon: React.ElementType; href: string; secondary?: boolean; external?: boolean }[];
 }) {
   const colorMap = {
     emerald: "bg-emerald-100 text-emerald-700 border-emerald-200",
@@ -2087,6 +2094,8 @@ function ContentCard({
             <a
               key={a.label}
               href={a.href}
+              target={a.external ? "_blank" : undefined}
+              rel={a.external ? "noopener noreferrer" : undefined}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 a.secondary
                   ? "bg-gray-100 text-gray-600 hover:bg-gray-200"

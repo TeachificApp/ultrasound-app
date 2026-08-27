@@ -2,11 +2,12 @@
  * Enrollment access helpers — expiry-aware active enrollment checks.
  */
 
-import { and, eq, or, isNull, gt, inArray, isNotNull, gte } from "drizzle-orm";
+import { and, eq, or, isNull, gt, inArray, isNotNull, gte, desc } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
 import {
   lmsEnrollments,
+  lmsCourses,
   membershipSubscriptions,
   membershipPlanAccess,
 } from "../../drizzle/schema";
@@ -49,7 +50,68 @@ export function isEnrollmentAccessActive(enrollment: {
 }): boolean {
   if (enrollment.enrollmentType === "free_preview") return true;
   if (!enrollment.accessExpiresAt) return true;
-  return enrollment.accessExpiresAt.getTime() > Date.now();
+  const expiresMs = new Date(enrollment.accessExpiresAt).getTime();
+  if (!Number.isFinite(expiresMs)) return true;
+  return expiresMs > Date.now();
+}
+
+/** True when the learner has dashboard-visible access to a course enrollment row. */
+export function hasCourseEnrollmentAccess(enrollment: {
+  enrollmentType?: string;
+  accessExpiresAt?: Date | null;
+  completedAt?: Date | null;
+  progressPct?: number | null;
+}): boolean {
+  return isEnrollmentAccessActive(enrollment) || isEnrollmentCompleted(enrollment);
+}
+
+/** Resolve the enrollment row that should grant course player/overview access. */
+export async function resolveEnrollmentForCourse(
+  db: MySql2Database<typeof schema>,
+  userId: number,
+  courseId: number,
+): Promise<EnrollmentRow | null> {
+  const active = await getActiveEnrollment(db, userId, courseId);
+  if (active) return active;
+
+  const rows = await db
+    .select(enrollmentSelect)
+    .from(lmsEnrollments)
+    .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId)))
+    .orderBy(desc(lmsEnrollments.enrolledAt));
+
+  for (const row of rows) {
+    if (hasCourseEnrollmentAccess(row)) return row;
+  }
+  return null;
+}
+
+/** Match dashboard My Content: resolve access using the enrolled course slug. */
+export async function resolveEnrollmentByCourseSlug(
+  db: MySql2Database<typeof schema>,
+  userId: number,
+  courseSlug: string,
+): Promise<EnrollmentRow | null> {
+  const rows = await db
+    .select({
+      id: lmsEnrollments.id,
+      userId: lmsEnrollments.userId,
+      courseId: lmsEnrollments.courseId,
+      enrollmentType: lmsEnrollments.enrollmentType,
+      accessExpiresAt: lmsEnrollments.accessExpiresAt,
+      enrolledAt: lmsEnrollments.enrolledAt,
+      completedAt: lmsEnrollments.completedAt,
+      progressPct: lmsEnrollments.progressPct,
+    })
+    .from(lmsEnrollments)
+    .innerJoin(lmsCourses, eq(lmsCourses.id, lmsEnrollments.courseId))
+    .where(and(eq(lmsEnrollments.userId, userId), eq(lmsCourses.slug, courseSlug)))
+    .orderBy(desc(lmsEnrollments.enrolledAt));
+
+  for (const row of rows) {
+    if (hasCourseEnrollmentAccess(row)) return row;
+  }
+  return null;
 }
 
 export function activeEnrollmentCondition() {
