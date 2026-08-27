@@ -5,8 +5,10 @@ import {
   isOpenAiBackend,
   openAiV1Url,
   resolveForgeApiKey,
+  resolveForgeApiKeySource,
   resolveForgeApiUrl,
   resolveLlmChatModel,
+  looksLikeOpenAiKey,
 } from "./openAiConfig";
 
 describe("openAiConfig", () => {
@@ -19,6 +21,7 @@ describe("openAiConfig", () => {
       "OPENAI_API_KEY",
       "OPENAI_BASE_URL",
       "FORGE_API_KEY",
+      "AI_API_KEY",
     ]) {
       saved[key] = process.env[key];
     }
@@ -69,5 +72,19 @@ describe("openAiConfig", () => {
     process.env.OPENAI_API_KEY = "sk-openai-only";
     expect(resolveForgeApiUrl()).toBe("https://api.openai.com");
     expect(resolveLlmChatModel()).toBe("gpt-4o-mini");
+  });
+
+  it("discovers alternate env var names", () => {
+    delete process.env.BUILT_IN_FORGE_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    process.env.AI_API_KEY = "sk-discovered-key";
+    expect(resolveForgeApiKey()).toBe("sk-discovered-key");
+    expect(resolveForgeApiKeySource()).toBe("AI_API_KEY");
+    expect(resolveForgeApiUrl()).toBe("https://api.openai.com");
+  });
+
+  it("does not treat Stripe keys as OpenAI keys", () => {
+    expect(looksLikeOpenAiKey("sk_test_abc123")).toBe(false);
+    expect(looksLikeOpenAiKey("sk-proj-abc123")).toBe(true);
   });
 });
