@@ -226,7 +226,7 @@ export function parseISpringDataBlob(jsonStr: string): ParsedQuiz {
 
   for (const rawGroup of rawGroups) {
     const groupId: string = rawGroup.i ?? String(groups.length);
-    const groupName: string = rawGroup.T ?? `Group ${groups.length + 1}`;
+    const groupName: string = stripHtml(rawGroup.T ?? "") || `Group ${groups.length + 1}`;
     const rawQuestions: any[] = rawGroup.S ?? [];
 
     const questions: ParsedQuestion[] = [];
