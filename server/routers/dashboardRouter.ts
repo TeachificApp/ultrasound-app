@@ -48,19 +48,17 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
+import {
+  THINKIFIC_LEGACY_BILLING_URL,
+  isActiveThinkificMembership,
+} from "../../shared/thinkificLegacy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Map brand to Thinkific membership management URLs */
+/** Legacy Thinkific subscribers manage billing on the member site. */
 const THINKIFIC_MANAGE_URLS: Record<string, string> = {
-  aaus: "https://allaboutultrasound.thinkific.com/users/sign_in",
-  iheartecho: "https://iheartecho.thinkific.com/users/sign_in",
-};
-
-/** Map brand to Thinkific site base URL */
-const THINKIFIC_SITE_URLS: Record<string, string> = {
-  aaus: "https://allaboutultrasound.thinkific.com",
-  iheartecho: "https://iheartecho.thinkific.com",
+  aaus: THINKIFIC_LEGACY_BILLING_URL,
+  iheartecho: THINKIFIC_LEGACY_BILLING_URL,
 };
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -100,9 +98,21 @@ export const dashboardRouter = router({
 
     if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
 
+    const thinkificMemberships = await db
+      .select({
+        source: brandMemberships.source,
+        status: brandMemberships.status,
+        expiresAt: brandMemberships.expiresAt,
+      })
+      .from(brandMemberships)
+      .where(eq(brandMemberships.userId, ctx.user.id));
+
+    const hasActiveThinkificSubscription = thinkificMemberships.some(isActiveThinkificMembership);
+
     return {
       ...user,
       hasPassword: !!user.passwordHash,
+      hasActiveThinkificSubscription,
       passwordHash: undefined, // never expose hash
     };
   }),
@@ -709,8 +719,8 @@ export const dashboardRouter = router({
           }
         }
 
-        // Determine if this is a Thinkific-sourced membership
-        const isThinkific = m.source === "thinkific";
+        // Active legacy Thinkific subscription — billing managed on member site
+        const isThinkific = isActiveThinkificMembership(m);
         const thinkificManageUrl = THINKIFIC_MANAGE_URLS[m.brand] ?? THINKIFIC_MANAGE_URLS.aaus;
 
         return {

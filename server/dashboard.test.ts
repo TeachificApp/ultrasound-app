@@ -159,21 +159,21 @@ describe("dashboardRouter — data shape", () => {
       expect(stripeSubs[0].stripeSubscriptionId).toBe("sub_aaus123");
     });
 
-    it("enriches Thinkific memberships with manage URL", () => {
+    it("enriches active Thinkific memberships with legacy billing URL", () => {
       const THINKIFIC_MANAGE_URLS: Record<string, string> = {
-        aaus: "https://allaboutultrasound.thinkific.com/users/sign_in",
-        iheartecho: "https://iheartecho.thinkific.com/users/sign_in",
+        aaus: "https://member.allaboutultrasound.com/account/billing",
+        iheartecho: "https://member.allaboutultrasound.com/account/billing",
       };
 
       const enriched = mockBrandMemberships.map(m => ({
         ...m,
-        isThinkific: m.source === "thinkific",
+        isThinkific: m.source === "thinkific" && m.status === "active",
         thinkificManageUrl: THINKIFIC_MANAGE_URLS[m.brand] ?? THINKIFIC_MANAGE_URLS.aaus,
       }));
 
       const iheThinkific = enriched.find(m => m.brand === "iheartecho");
       expect(iheThinkific?.isThinkific).toBe(true);
-      expect(iheThinkific?.thinkificManageUrl).toBe("https://iheartecho.thinkific.com/users/sign_in");
+      expect(iheThinkific?.thinkificManageUrl).toBe("https://member.allaboutultrasound.com/account/billing");
 
       const aausStripe = enriched.find(m => m.brand === "aaus");
       expect(aausStripe?.isThinkific).toBe(false);
