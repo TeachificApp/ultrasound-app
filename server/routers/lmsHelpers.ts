@@ -68,6 +68,8 @@ import {
   mediaUploadResponses,
 } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
+import { getActiveEnrollment } from "../lib/enrollmentAccess";
+import { shouldRestoreMissingCourseCertificate } from "../../shared/inlineLessonQuizCompletion";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -176,11 +178,59 @@ export async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enro
     completedAt: pct >= 100 ? (enrollRow.completedAt ?? new Date()) : null,
   }).where(eq(lmsEnrollments.id, enrollmentId));
 
-  // Issue certificate when course is complete — retries if async issuance failed earlier.
+  // Issue certificate when course is complete — await so the learner gets a cert on the last lesson.
   if (pct >= 100) {
-    void issueCertificateIfEnabled(db, enrollmentId, enrollRow.userId, courseId, enrollRow.enrollmentType).catch(e =>
-      console.error("[certificate] Failed to issue certificate:", e)
+    try {
+      await issueCertificateIfEnabled(db, enrollmentId, enrollRow.userId, courseId, enrollRow.enrollmentType);
+    } catch (e) {
+      console.error("[certificate] Failed to issue certificate:", e);
+    }
+  }
+}
+
+/** Issue a missing certificate when the learner is eligible but async issuance failed earlier. */
+export async function restoreMissingCourseCertificate(
+  db: Awaited<ReturnType<typeof getDb>>,
+  userId: number,
+  courseId: number,
+  courseHasCertificate: boolean,
+): Promise<boolean> {
+  if (!db || !courseHasCertificate) return false;
+
+  const [existing] = await db.select({ id: lmsCertificates.id }).from(lmsCertificates)
+    .where(and(eq(lmsCertificates.userId, userId), eq(lmsCertificates.courseId, courseId))).limit(1);
+  if (existing) return false;
+
+  const enrollment = await getActiveEnrollment(db, userId, courseId);
+  if (!enrollment) return false;
+
+  if (!shouldRestoreMissingCourseCertificate({
+    courseHasCertificate,
+    enrollmentCompletedAt: enrollment.completedAt,
+    enrollmentProgressPct: enrollment.progressPct,
+    hasCertificateRecord: false,
+  })) {
+    return false;
+  }
+
+  if (!enrollment.completedAt && Number(enrollment.progressPct ?? 0) >= 100) {
+    await db.update(lmsEnrollments).set({ completedAt: new Date() })
+      .where(eq(lmsEnrollments.id, enrollment.id));
+  }
+
+  try {
+    await issueCertificateIfEnabled(
+      db,
+      enrollment.id,
+      userId,
+      courseId,
+      enrollment.enrollmentType ?? undefined,
+      { completedCmeRecovery: true },
     );
+    return true;
+  } catch (e) {
+    console.error("[certificate] Recovery issuance failed:", e);
+    return false;
   }
 }
 

@@ -7,7 +7,7 @@
  *   pnpm exec tsx scripts/reconcileCmeCertificates.mjs --apply
  */
 import { parseArgs } from "node:util";
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, gte, or, sql } from "drizzle-orm";
 
 const { values } = parseArgs({
   options: {
@@ -44,8 +44,10 @@ const completionCandidates = await db.select({
   .innerJoin(lmsCourses, eq(lmsCourses.id, lmsEnrollments.courseId))
   .where(and(
     eq(lmsCourses.hasCertificate, true),
-    sql`${lmsEnrollments.progressPct} > 0`,
-    isNotNull(lmsEnrollments.completedAt),
+    or(
+      isNotNull(lmsEnrollments.completedAt),
+      gte(lmsEnrollments.progressPct, 100),
+    ),
   ));
 
 let promoted = 0;
@@ -66,7 +68,11 @@ for (const row of completionCandidates) {
     enrollmentType: lmsEnrollments.enrollmentType,
   }).from(lmsEnrollments).where(eq(lmsEnrollments.id, row.enrollmentId)).limit(1);
 
-  if (!enrollment?.completedAt) continue;
+  if (!enrollment?.completedAt && Number(row.progressPct ?? 0) < 100) continue;
+  if (!enrollment?.completedAt && !dryRun) {
+    await db.update(lmsEnrollments).set({ completedAt: new Date() })
+      .where(eq(lmsEnrollments.id, row.enrollmentId));
+  }
   promoted += 1;
 
   const [existingCert] = await db.select({ id: lmsCertificates.id })
