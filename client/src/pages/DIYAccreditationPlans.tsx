@@ -17,6 +17,7 @@ import {
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { DiyAccreditationByline } from "@/components/DiyAccreditationBrandAttribution";
 
 const BRAND = "#189aa1";
 const BRAND_DARK = "#0e4a50";
@@ -208,6 +209,7 @@ export default function DIYAccreditationPlans() {
           <h1 className="text-3xl md:text-4xl font-black text-white mb-3" style={{ fontFamily: "Merriweather, serif" }}>
             DIY Accreditation™ Plans
           </h1>
+          <DiyAccreditationByline variant="hero" className="text-xs text-white/60 mb-3 justify-center flex" />
           <p className="text-white/70 max-w-xl mx-auto text-sm leading-relaxed mb-6">
             Everything your lab needs to prepare for, manage, and submit your IAC accreditation application —
             from structured workflows to expert-guided consulting.
