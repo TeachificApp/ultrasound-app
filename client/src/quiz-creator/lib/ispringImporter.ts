@@ -10,12 +10,14 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
+import {
+  convertDocumentToQuiz as convertDocumentToQuizShared,
+} from "@shared/ispringDocumentToQuiz";
 import type {
   QuizFile,
   QuizQuestion,
   QuestionType,
   QuizMeta,
-  QuizBranding,
   McqData,
   TfData,
   MatchingData,
@@ -29,8 +31,16 @@ import type {
   DropdownData,
   DragDropData,
   HotspotData,
-  ImageChoiceData,
 } from "../types/quiz";
+
+// Re-export shared converter for tests and Visual Builder imports.
+export function convertDocumentToQuiz(
+  doc: any,
+  mediaUrlMap: Map<string, string>,
+  warnings: string[],
+): QuizFile {
+  return convertDocumentToQuizShared(doc, mediaUrlMap, warnings) as QuizFile;
+}
 
 // ─── ZIP Parsing (using JSZip loaded from CDN or bundled) ────────────────────
 
@@ -445,7 +455,7 @@ export async function importISpringQuiz(
 
   // ─── Parse document.json into our QuizFile format ────────────────────────
 
-  const quiz = convertDocumentToQuiz(documentJson, mediaUrlMap, warnings);
+  const quiz = convertDocumentToQuizShared(documentJson, mediaUrlMap, warnings) as QuizFile;
 
   return {
     quiz,
@@ -455,152 +465,7 @@ export async function importISpringQuiz(
   };
 }
 
-export function convertDocumentToQuiz(
-  doc: any,
-  mediaUrlMap: Map<string, string>,
-  warnings: string[]
-): QuizFile {
-  const now = new Date().toISOString();
-
-  // Extract quiz metadata
-  const meta: QuizMeta = {
-    id: uuidv4(),
-    title: doc.title || doc.nm || doc.name || "Imported Quiz",
-    description: extractText(doc.description || doc.desc || ""),
-    author: doc.author || doc.authorName || "",
-    authorEmail: doc.authorEmail || "",
-    createdAt: doc.createdAt || now,
-    updatedAt: now,
-    version: 1,
-    licenseKey: null,
-    teachificOrgId: null,
-    tags: doc.tags || [],
-    passingScore: doc.passingScore ?? doc.passScore ?? 70,
-    timeLimit: doc.timeLimit ?? doc.tl ?? null,
-    shuffleQuestions: doc.shuffleQuestions ?? doc.rnd ?? false,
-    shuffleAnswers: doc.shuffleAnswers ?? doc.rndAns ?? false,
-    showFeedback: doc.showFeedback ?? "immediate",
-    allowRetry: doc.allowRetry ?? true,
-    maxAttempts: doc.maxAttempts ?? 3,
-    allowBackNavigation: doc.allowBackNavigation ?? true,
-    showProgressBar: doc.showProgressBar ?? true,
-  };
-
-  // Extract branding
-  if (doc.branding || doc.theme || doc.design) {
-    const b = doc.branding || doc.theme || doc.design || {};
-    meta.branding = {
-      primaryColor: b.primaryColor || b.accentColor || "#24abbc",
-      backgroundColor: b.backgroundColor || b.bgColor || "#ffffff",
-      textColor: b.textColor,
-      fontFamily: b.fontFamily || b.font,
-      logoUrl: b.logoUrl || b.logo ? (mediaUrlMap.get(b.logoUrl || b.logo) || b.logoUrl || b.logo) : undefined,
-      backgroundImageUrl: b.backgroundImage ? (mediaUrlMap.get(b.backgroundImage) || b.backgroundImage) : undefined,
-      backgroundOverlay: b.backgroundOverlay,
-    };
-  }
-
-  // Extract questions and retain iSpring group boundaries for Visual Builder pools.
-  let rawQuestions: Array<{ question: any; groupId?: string }> = [];
-
-  // iSpring format: data.sl.g[].S[]
-  if (doc.sl?.g) {
-    const groups: NonNullable<QuizMeta["groups"]> = [];
-    for (const [groupIndex, group] of doc.sl.g.entries()) {
-      if (group.S && Array.isArray(group.S)) {
-        const groupId = `ispring-group-${group.id || group.i || groupIndex + 1}`;
-        groups.push({
-          id: groupId,
-          name: extractText(group.nm || group.name || group.title || `Group ${groupIndex + 1}`),
-          color: ["#189aa1", "#4ad9e0", "#0f766e", "#0ea5e9", "#14b8a6"][groupIndex % 5],
-        });
-        rawQuestions.push(...group.S.map((question: any) => ({ question, groupId })));
-      }
-    }
-    if (groups.length > 0) meta.groups = groups;
-  }
-  // Alternative format: data.questions[]
-  else if (doc.questions && Array.isArray(doc.questions)) {
-    rawQuestions = doc.questions.map((question: any) => ({ question }));
-  }
-  // Alternative: data.slides[]
-  else if (doc.slides && Array.isArray(doc.slides)) {
-    rawQuestions = doc.slides.filter((s: any) => s.tp || s.type).map((question: any) => ({ question })); // filter out info slides
-  }
-  // Alternative: flat array at root
-  else if (Array.isArray(doc)) {
-    rawQuestions = doc.map((question: any) => ({ question }));
-  }
-
-  const questions: QuizQuestion[] = rawQuestions.map(({ question: q, groupId }, idx: number) => {
-    const typeStr = q.tp || q.type || "mc";
-    const type = mapQuestionType(typeStr);
-    const stem = extractText(q.D || q.question || q.stem || q.text || "");
-    const stemHtml = extractHtml(q.D || q.question || q.stem || "");
-
-    // Extract question media
-    let image: QuizQuestion["image"] = null;
-    let audio: QuizQuestion["audio"] = null;
-    let video: QuizQuestion["video"] = null;
-
-    if (q.img || q.image) {
-      const imgPath = q.img || q.image;
-      image = { url: mediaUrlMap.get(imgPath) || imgPath, alt: q.imgAlt || "" };
-    }
-    if (q.audio) {
-      const audioPath = typeof q.audio === "string" ? q.audio : q.audio.src;
-      audio = { url: mediaUrlMap.get(audioPath) || audioPath, label: q.audio.label };
-    }
-    if (q.video) {
-      const videoPath = typeof q.video === "string" ? q.video : q.video.src;
-      video = { url: mediaUrlMap.get(videoPath) || videoPath, type: q.video.type };
-    }
-
-    // Extract feedback
-    let feedback: QuizQuestion["feedback"] = undefined;
-    if (q.fb || q.feedback) {
-      const fb = q.fb || q.feedback;
-      feedback = {
-        correct: extractText(fb.correct || fb.right || fb.pass || ""),
-        incorrect: extractText(fb.incorrect || fb.wrong || fb.fail || ""),
-        partial: extractText(fb.partial || ""),
-      };
-    }
-
-    let data;
-    try {
-      data = convertQuestionData(q, type, mediaUrlMap);
-    } catch (e) {
-      warnings.push(`Question ${idx + 1}: Failed to convert data for type "${typeStr}". Using default.`);
-      data = { choices: [{ id: uuidv4(), text: "Option A", correct: true }], multiSelect: false };
-    }
-
-    return {
-      id: uuidv4(),
-      type,
-      order: idx + 1,
-      points: q.points ?? q.score ?? 1,
-      required: q.required ?? true,
-      stem,
-      stemHtml: stemHtml !== `<p>${stem}</p>` ? stemHtml : undefined,
-      image,
-      audio,
-      video,
-      explanation: extractText(q.explanation || q.exp || ""),
-      feedback,
-      backgroundImageUrl: q.bgImage ? (mediaUrlMap.get(q.bgImage) || q.bgImage) : undefined,
-      backgroundColor: q.bgColor,
-      groupId,
-      data,
-    };
-  });
-
-  if (questions.length === 0) {
-    warnings.push("No questions could be extracted from the file.");
-  }
-
-  return { meta, questions };
-}
+// convertDocumentToQuiz is exported above via shared module wrapper.
 
 // ─── Export: detect if a file is an iSpring .quiz file ───────────────────────
 

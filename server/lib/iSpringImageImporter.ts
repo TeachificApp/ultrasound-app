@@ -1,13 +1,13 @@
 import { downloadStorageObject } from "./downloadStorageObject";
 import { storagePut } from "../storage";
 
-type ZipEntry = { entryName: string; getData: () => Buffer };
+export type ZipEntryLike = { entryName: string; getData: () => Buffer };
 
 function normalizeZipPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/^\/+/, "");
 }
 
-function findZipEntry(entries: ZipEntry[], relativePath: string): ZipEntry | undefined {
+function findZipEntry(entries: ZipEntryLike[], relativePath: string): ZipEntryLike | undefined {
   const target = normalizeZipPath(relativePath);
   return entries.find((e) => {
     const name = normalizeZipPath(e.entryName);
@@ -30,7 +30,7 @@ function mimeFromPath(filePath: string): string {
 
 /** Map storage:// refs to uploaded CDN URLs. */
 export async function uploadISpringImagesFromZip(
-  entries: ZipEntry[],
+  entries: ZipEntryLike[],
   imageRefs: string[],
 ): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
@@ -44,7 +44,7 @@ export async function uploadISpringImagesFromZip(
       `data/storage/${withoutScheme}`,
     ];
 
-    let entry: ZipEntry | undefined;
+    let entry: ZipEntryLike | undefined;
     for (const candidate of candidates) {
       entry = findZipEntry(entries, candidate);
       if (entry) break;
