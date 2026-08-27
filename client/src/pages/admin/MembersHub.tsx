@@ -32,6 +32,9 @@ import {
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { getAdminUrl } from "@/hooks/useSubdomain";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { canAssignMemberStaffRoles, canAssignPlatformAdminRole } from "@/lib/roles";
+import type { MemberHubStaffRole } from "@shared/appRoles";
 import { submitMemberAccessGrants, toggleMemberAccessId, toggleMemberAccessProduct, type MemberAccessProduct } from "@/lib/memberAccessCatalog";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -403,6 +406,81 @@ function OverviewPanel() {
 }
 
 // ─── All Members Panel ────────────────────────────────────────────────────────
+function MemberStaffRoleCell({
+  member,
+  canAssign,
+  canAssignPlatformAdmin,
+  onUpdated,
+}: {
+  member: { id: number; role: string; appRoles?: string[] };
+  canAssign: boolean;
+  canAssignPlatformAdmin: boolean;
+  onUpdated: () => void;
+}) {
+  const setStaffRole = trpc.adminUser.setMemberStaffRole.useMutation({
+    onSuccess: () => {
+      toast.success("Staff role updated");
+      onUpdated();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const appRoles = member.appRoles ?? [];
+  const badges: Array<{ key: string; label: string; className: string }> = [];
+  if (member.role === "admin") {
+    badges.push({ key: "owner", label: "Owner", className: "border-violet-200 text-violet-700 bg-violet-50" });
+  }
+  if (appRoles.includes("platform_admin")) {
+    badges.push({ key: "platform_admin", label: "Platform Admin", className: "border-teal-200 text-teal-700 bg-teal-50" });
+  }
+  if (appRoles.includes("customer_support")) {
+    badges.push({ key: "customer_support", label: "Customer Support", className: "border-blue-200 text-blue-700 bg-blue-50" });
+  }
+  if (badges.length === 0) {
+    badges.push({ key: "member", label: "Member", className: "border-slate-200 text-slate-600" });
+  }
+
+  const handleAction = (value: string) => {
+    if (!value || value === "noop") return;
+    const [role, action] = value.split(":") as [MemberHubStaffRole, "grant" | "revoke"];
+    setStaffRole.mutate({ userId: member.id, role, enabled: action === "grant" });
+  };
+
+  return (
+    <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap gap-1">
+        {badges.map((badge) => (
+          <Badge key={badge.key} variant="outline" className={`text-[10px] ${badge.className}`}>
+            {badge.label}
+          </Badge>
+        ))}
+      </div>
+      {canAssign && (
+        <Select value="noop" onValueChange={handleAction} disabled={setStaffRole.isPending}>
+          <SelectTrigger className="h-7 w-[170px] text-[11px] border-slate-200">
+            <SelectValue placeholder="Assign staff role…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="noop" disabled>Assign staff role…</SelectItem>
+            {!appRoles.includes("customer_support") && (
+              <SelectItem value="customer_support:grant">Grant Customer Support</SelectItem>
+            )}
+            {appRoles.includes("customer_support") && (
+              <SelectItem value="customer_support:revoke">Revoke Customer Support</SelectItem>
+            )}
+            {canAssignPlatformAdmin && !appRoles.includes("platform_admin") && (
+              <SelectItem value="platform_admin:grant">Grant Platform Admin</SelectItem>
+            )}
+            {canAssignPlatformAdmin && appRoles.includes("platform_admin") && member.role !== "admin" && (
+              <SelectItem value="platform_admin:revoke">Revoke Platform Admin</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  );
+}
+
 export function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCreateSignal?: number; onCreateConsumed?: () => void }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "inactive">("all");
@@ -420,10 +498,14 @@ export function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCr
     if (openCreateSignal) { setCreateOpen(true); onCreateConsumed?.(); }
   }, [openCreateSignal, onCreateConsumed]);
 
-  const { data, isLoading } = trpc.adminUser.listMembers.useQuery(
+  const { data, isLoading, refetch } = trpc.adminUser.listMembers.useQuery(
     { search: search || undefined, status, page, pageSize: 25 },
     { keepPreviousData: true } as any
   );
+  const { user } = useAuth();
+  const appRoles = ((user as { appRoles?: string[] } | null)?.appRoles) ?? [];
+  const canAssignStaffRoles = canAssignMemberStaffRoles(appRoles, user?.role);
+  const canAssignPlatformAdmin = canAssignPlatformAdminRole(appRoles, user?.role);
 
   const members = data?.members ?? [];
   const total = data?.total ?? 0;
@@ -595,12 +677,12 @@ export function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCr
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge
-                      variant="outline"
-                      className={`text-xs ${m.role === "admin" ? "border-teal-200 text-teal-700 bg-teal-50" : "border-slate-200 text-slate-600"}`}
-                    >
-                      {m.role}
-                    </Badge>
+                    <MemberStaffRoleCell
+                      member={m}
+                      canAssign={canAssignStaffRoles}
+                      canAssignPlatformAdmin={canAssignPlatformAdmin || user?.role === "admin"}
+                      onUpdated={() => { void refetch(); }}
+                    />
                   </td>
                   <td className="px-4 py-3 text-slate-600">{m.enrollmentCount}</td>
                   <td className="px-4 py-3 w-32">

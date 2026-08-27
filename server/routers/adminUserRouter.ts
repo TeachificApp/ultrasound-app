@@ -57,7 +57,7 @@ import {
   workshopInstances,
   workshops,
 } from "../../drizzle/schema";
-import { and, eq, desc, sql, count } from "drizzle-orm";
+import { and, eq, desc, sql, count, inArray } from "drizzle-orm";
 import { issueCertificateIfEnabled } from "./lmsHelpers";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail, emailWrapper } from "../_core/email";
 import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail, buildPersistentAccessUrl } from "../lib/enrollmentEmail";
@@ -67,11 +67,19 @@ import { generateAutoLoginToken } from "../routes/autoLogin";
 import { or, like, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
 
+import {
+  assertCanAssignAppRole,
+  assertMemberHubAccess,
+  assertRoleAssignmentAccess,
+} from "../lib/memberManagementAccess";
+import type { AppRole } from "../../shared/appRoles";
+import { APP_ROLES } from "../../shared/appRoles";
+
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
-  if (ctx.user.role !== "admin") {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
-  }
+  await assertMemberHubAccess(ctx);
 }
+
+const appRoleZodEnum = z.enum(APP_ROLES);
 
 export const adminUserRouter = router({
   /** Full user detail: profile, enrollments, purchases, subscriptions, certificates */
@@ -2003,8 +2011,20 @@ export const adminUserRouter = router({
       `) as any;
       const total = Number(toArr2(countRow)[0]?.total ?? 0);
 
+      const memberRows = toArr2(rows);
+      const memberIds = memberRows.map((r: { id: unknown }) => Number(r.id));
+      const roleRows = memberIds.length > 0
+        ? await db.select().from(userRoles).where(inArray(userRoles.userId, memberIds))
+        : [];
+      const rolesByUserId = new Map<number, AppRole[]>();
+      for (const row of roleRows) {
+        const list = rolesByUserId.get(row.userId) ?? [];
+        list.push(row.role as AppRole);
+        rolesByUserId.set(row.userId, list);
+      }
+
       return {
-        members: toArr2(rows).map((r: any) => ({
+        members: memberRows.map((r: any) => ({
           id: Number(r.id),
           name: r.name ?? r.email ?? 'Unknown',
           email: r.email ?? '',
@@ -2012,6 +2032,7 @@ export const adminUserRouter = router({
           createdAt: r.createdAt,
           lastSignedIn: r.lastSignedIn ?? null,
           role: r.role ?? 'user',
+          appRoles: rolesByUserId.get(Number(r.id)) ?? [],
           enrollmentCount: Number(r.enrollment_count ?? 0),
           completionCount: Number(r.completion_count ?? 0),
           progress: Number(r.enrollment_count ?? 0) > 0 ? Math.round((Number(r.completion_count ?? 0) / Number(r.enrollment_count)) * 100) : 0,
@@ -2700,10 +2721,11 @@ export const adminUserRouter = router({
   grantAppRole: protectedProcedure
     .input(z.object({
       userId: z.number().int(),
-      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager", "education_manager", "education_admin", "education_student", "platform_owner", "platform_moderator", "instructor", "team_admin", "affiliate"]),
+      role: appRoleZodEnum,
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      const access = await assertRoleAssignmentAccess(ctx);
+      assertCanAssignAppRole(access, input.role);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const existing = await db.select().from(userRoles)
@@ -2718,14 +2740,45 @@ export const adminUserRouter = router({
   revokeAppRole: protectedProcedure
     .input(z.object({
       userId: z.number().int(),
-      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager", "education_manager", "education_admin", "education_student", "platform_owner", "platform_moderator", "instructor", "team_admin", "affiliate"]),
+      role: appRoleZodEnum,
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      const access = await assertRoleAssignmentAccess(ctx);
+      assertCanAssignAppRole(access, input.role);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       if (input.role === "user") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot remove the base user role" });
       await db.delete(userRoles).where(and(eq(userRoles.userId, input.userId), eq(userRoles.role, input.role)));
+      return { success: true };
+    }),
+
+  /** Grant or revoke Platform Admin / Customer Support from Members Hub */
+  setMemberStaffRole: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      role: z.enum(["platform_admin", "customer_support"]),
+      enabled: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const access = await assertRoleAssignmentAccess(ctx);
+      assertCanAssignAppRole(access, input.role);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      if (input.enabled) {
+        const existing = await db.select().from(userRoles)
+          .where(and(eq(userRoles.userId, input.userId), eq(userRoles.role, input.role))).limit(1);
+        if (existing.length === 0) {
+          await db.insert(userRoles).values({
+            userId: input.userId,
+            role: input.role,
+            assignedByUserId: ctx.user.id,
+          });
+        }
+      } else {
+        await db.delete(userRoles).where(and(eq(userRoles.userId, input.userId), eq(userRoles.role, input.role)));
+      }
+
       return { success: true };
     }),
 

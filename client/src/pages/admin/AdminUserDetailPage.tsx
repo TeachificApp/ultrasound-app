@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { useRoute, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { canAssignMemberStaffRoles } from "@/lib/roles";
 import { toast } from "sonner";
 import {
   User, BookOpen, CreditCard, Award, ExternalLink, Download, Play,
@@ -107,6 +108,7 @@ const ALL_ROLES = [
   { value: "premium_user",        label: "Premium User",        color: "#189aa1", additive: false, removable: true },
   { value: "platform_owner",      label: "Platform Owner",      color: "#7c3aed", additive: false, removable: true },
   { value: "platform_admin",      label: "Platform Admin",      color: "#dc2626", additive: false, removable: true },
+  { value: "customer_support",    label: "Customer Support",    color: "#2563eb", additive: false, removable: true },
   { value: "platform_moderator",  label: "Platform Moderator",  color: "#0891b2", additive: false, removable: true },
   { value: "accreditation_manager", label: "Accreditation Manager", color: "#d97706", additive: false, removable: true },
   { value: "education_manager",   label: "Education Manager",   color: "#059669", additive: false, removable: true },
@@ -211,6 +213,11 @@ const VALID_TABS: Tab[] = ["profile", "content", "transactions", "subscriptions"
 
 // ─── Profile Tab ──────────────────────────────────────────────────────────────
 function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
+  const { user: currentUser } = useAuth();
+  const canAssignStaffRoles = canAssignMemberStaffRoles(
+    (currentUser as { appRoles?: string[] } | null)?.appRoles,
+    currentUser?.role,
+  );
   const updateRole = trpc.adminUser.updateUserRole.useMutation({
     onSuccess: () => { toast.success("Role updated."); refetch(); },
     onError: (e) => toast.error(e.message),
@@ -366,7 +373,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
       </div>
 
       {/* Platform Roles panel */}
-      <AppRolesPanel userId={userId} refetch={refetch} />
+      {canAssignStaffRoles && <AppRolesPanel userId={userId} refetch={refetch} />}
 
       {/* Brand memberships */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 space-y-4">
