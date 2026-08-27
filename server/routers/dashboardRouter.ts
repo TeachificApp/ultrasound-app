@@ -48,19 +48,14 @@ import {
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
+import { THINKIFIC_BILLING_URL } from "../../shared/appConstants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Map brand to Thinkific membership management URLs */
+/** Legacy Thinkific users manage billing on the member site (no general Thinkific links). */
 const THINKIFIC_MANAGE_URLS: Record<string, string> = {
-  aaus: "https://allaboutultrasound.thinkific.com/users/sign_in",
-  iheartecho: "https://iheartecho.thinkific.com/users/sign_in",
-};
-
-/** Map brand to Thinkific site base URL */
-const THINKIFIC_SITE_URLS: Record<string, string> = {
-  aaus: "https://allaboutultrasound.thinkific.com",
-  iheartecho: "https://iheartecho.thinkific.com",
+  aaus: THINKIFIC_BILLING_URL,
+  iheartecho: THINKIFIC_BILLING_URL,
 };
 
 // ─── Router ───────────────────────────────────────────────────────────────────

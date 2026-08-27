@@ -13,6 +13,7 @@ import {
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { THINKIFIC_BILLING_URL } from "@shared/appConstants";
 
 const ROLE_CONFIG: Record<string, {
   label: string;
@@ -683,7 +684,7 @@ export default function Profile() {
                         Your account was transferred from our legacy platform. Some billing may still occur from that site.
                         For legacy subscriptions not reflected here, please manage your billing at{" "}
                         <a
-                          href="https://member.allaboutultrasound.com/account/billing"
+                          href={THINKIFIC_BILLING_URL}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-semibold underline hover:text-amber-900"

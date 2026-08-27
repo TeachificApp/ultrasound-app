@@ -14,6 +14,7 @@ import { BlockPreview } from "@/components/BlockPreview";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { toast } from "sonner";
+import { THINKIFIC_BILLING_URL } from "@shared/appConstants";
 import {
   Award, BookOpen, Download, Users, Globe, Package, Tag, ChevronRight,
   Loader2, Lock, CreditCard, Calendar, RefreshCw, XCircle, CheckCircle2,
@@ -118,7 +119,7 @@ export default function MyMemberships() {
               Your account was transferred from our legacy platform. Some billing may still occur from that site.
               For legacy subscriptions not reflected here, please manage your billing at{" "}
               <a
-                href="https://member.allaboutultrasound.com/account/billing"
+                href={THINKIFIC_BILLING_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-semibold underline hover:text-amber-900"
