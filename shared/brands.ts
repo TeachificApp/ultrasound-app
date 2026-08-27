@@ -3,6 +3,8 @@
  * This file lives in /shared/ so it can be imported from either side.
  */
 
+import { resolveAssetUrl } from "./resolveAssetUrl";
+
 export type Brand = "aaus" | "iheartecho";
 
 export const BRAND_DOMAINS: Record<string, Brand> = {
@@ -64,8 +66,12 @@ export interface BrandDisplayConfig {
   accentColor: string;
 }
 
-const AAUS_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
-const IHE_LOGO = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp";
+const AAUS_LOGO = resolveAssetUrl(
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp",
+)!;
+const IHE_LOGO = resolveAssetUrl(
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/iheartecho_logo_ring_01cc7ccd.webp",
+)!;
 
 export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
   switch (mode) {
