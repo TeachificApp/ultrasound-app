@@ -99,20 +99,39 @@ Set these in your Railway service's **Variables** tab:
 | `VITE_ANALYTICS_ENDPOINT` | Analytics endpoint URL |
 | `VITE_ANALYTICS_WEBSITE_ID` | Analytics website ID |
 
-### AI (OpenAI on Railway — no Manus Forge)
+### AI (Manus Forge or Manus API v2 on Railway)
 
-Manus Forge is not available on Railway. Use your **own OpenAI API key** server-side:
+Configure **one** of these server-side AI backends:
+
+**Option A — Manus Forge chat completions** (recommended when Manus provides Forge credentials):
+
+| Variable | Value |
+|----------|--------|
+| `BUILT_IN_FORGE_API_URL` | Manus Forge base URL (e.g. `https://forge.manus.ai`) |
+| `BUILT_IN_FORGE_API_KEY` | Forge API key from Manus |
+
+Forge uses the `gemini-2.5-flash` chat model automatically. This powers text AI, Forge image generation, and Whisper when the Forge host supports them.
+
+**Option B — Manus API v2 tasks** (async task API):
+
+| Variable | Value |
+|----------|--------|
+| `MANUS_API_KEY` | Server-only Manus API key |
+
+When `MANUS_API_KEY` is set, it takes priority over Forge for `invokeLLM` workflows. See `docs/railway-manus-api-integration.md`.
+
+**Option C — Direct OpenAI** (no Manus Forge):
 
 | Variable | Value |
 |----------|--------|
 | `BUILT_IN_FORGE_API_URL` | `https://api.openai.com` |
 | `BUILT_IN_FORGE_API_KEY` | Your OpenAI `sk-...` key |
 
-This powers **text AI**, **DALL-E image generation**, and **Whisper voice transcription**.
+Admins can verify connectivity with the server-only `system.verifyAi` procedure (returns configured backend and connection status).
 
 Do **not** set `VITE_FRONTEND_FORGE_*` — those are Manus-managed browser credentials (maps only). Google Maps is optional and unused if you do not need maps.
 
-### Legacy Manus Forge (optional)
+### Legacy Manus Forge browser credentials (optional)
 
 These are only needed if `STORAGE_BACKEND=forge` or during transition on Manus hosting:
 

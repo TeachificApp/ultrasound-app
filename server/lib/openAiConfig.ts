@@ -92,5 +92,34 @@ export function resolveLlmChatCompletionsUrl(): string {
 }
 
 export function aiConfigHelpText(): string {
-  return `Accepted env vars — URL: ${URL_ENV_KEYS.join(", ")}; Key: ${KEY_ENV_KEYS.join(", ")}`;
+  return `Accepted env vars — URL: ${URL_ENV_KEYS.join(", ")}; Key: ${KEY_ENV_KEYS.join(", ")}; or MANUS_API_KEY for Manus API v2 tasks`;
+}
+
+/** True when Manus API v2 or Forge/OpenAI chat credentials are configured. */
+export function isAiConfigured(): boolean {
+  if (process.env.MANUS_API_KEY?.trim()) return true;
+  return !!(resolveForgeApiKey() && resolveForgeApiUrl());
+}
+
+/** Lightweight Forge/OpenAI chat check — does not create Manus tasks. */
+export async function verifyForgeChatConnection(): Promise<boolean> {
+  const response = await fetch(resolveLlmChatCompletionsUrl(), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${getOpenAiApiKey()}`,
+    },
+    body: JSON.stringify({
+      model: resolveLlmChatModel(),
+      messages: [{ role: "user", content: "Reply with the single word OK." }],
+      max_tokens: 8,
+    }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(
+      `Forge chat verification failed (${response.status}): ${detail.slice(0, 200)}`,
+    );
+  }
+  return true;
 }
