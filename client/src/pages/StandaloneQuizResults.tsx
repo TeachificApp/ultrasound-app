@@ -5,7 +5,7 @@
  * Respects quiz result visibility settings:
  *   showOnlyPercentage     — show only the score %, no per-question breakdown
  *   showPerQuestionResult  — show correct/incorrect per question (default true)
- *   showGroupNames         — show question group section headers (default true)
+ *   showGroupNames         — show question bank group section headers (default true)
  */
 import React from "react";
 import { useParams, useLocation } from "wouter";

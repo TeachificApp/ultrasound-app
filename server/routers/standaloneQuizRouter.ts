@@ -103,7 +103,7 @@ const quizSettingsInput = z.object({
   showGroupNames: z.boolean().default(true).optional(),
   showPerQuestionResult: z.boolean().default(true).optional(),
   showOnlyPercentage: z.boolean().default(false).optional(),
-  // Per-category question draw config
+  // Per-group question draw config
   categoryConfig: z.string().nullable().optional(), // JSON: [{folderId, folderName, count}]
   questionsPerAttempt: z.number().int().min(1).nullable().optional(),
 });
@@ -241,7 +241,7 @@ export const standaloneQuizLearnerRouter = router({
         .where(eq(standaloneQuizQuestions.quizId, quiz.id))
         .orderBy(asc(standaloneQuizQuestions.sortOrder));
 
-      // ── Per-category draw: if categoryConfig is set, draw N questions per folder ──
+      // ── Per-group draw: if categoryConfig is set, draw N questions per folder ──
       if (quiz.categoryConfig) {
         try {
           const cats: { folderId: number | null; folderName: string; count: number }[] = JSON.parse(quiz.categoryConfig);
@@ -482,10 +482,28 @@ export const standaloneQuizLearnerRouter = router({
             .from(questionBank)
             .where(inArray(questionBank.id, questionIds));
           const qMap = new Map(qbs.map((q) => [q.id, q]));
-          questionDetails = answers.map((a) => ({
-            ...a,
-            question: qMap.get(a.questionId),
-          }));
+
+          const folderIds = [...new Set(qbs.map((q) => q.folderId).filter((id): id is number => id != null))];
+          const folderRows = folderIds.length > 0
+            ? await db
+                .select({ id: questionBankFolders.id, name: questionBankFolders.name })
+                .from(questionBankFolders)
+                .where(inArray(questionBankFolders.id, folderIds))
+            : [];
+          const folderNameById = new Map(folderRows.map((f) => [f.id, f.name]));
+
+          questionDetails = answers.map((a) => {
+            const qb = qMap.get(a.questionId);
+            const folderId = qb?.folderId ?? null;
+            return {
+              ...a,
+              question: qb,
+              groupId: folderId,
+              groupName: folderId != null
+                ? (folderNameById.get(folderId) ?? "Unknown group")
+                : "Uncategorized",
+            };
+          });
         }
       }
 
