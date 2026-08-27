@@ -34,6 +34,7 @@ import {
   reorderQuestionBankFolders,
   selectQuestionBankFolders,
 } from "../lib/questionBankFolderQueries";
+import { scormImportQuestionTagIds } from "../../shared/questionBankFolders";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -704,9 +705,7 @@ export const questionBankRouter = router({
 
   /**
    * confirmScormImport — commit the parsed quiz to the question bank.
-   * Creates one tag per iSpring group (or reuses existing tag with same name).
-   * Each question is inserted with its group tag attached.
-   * Returns counts of inserted questions per group.
+   * Questions go into the selected folder; optional extraTagIds only (no auto-tags from groups).
    */
   confirmScormImport: protectedProcedure
     .input(z.object({
@@ -715,9 +714,9 @@ export const questionBankRouter = router({
       bufferBase64: z.string().optional(),
       groupIds: z.array(z.string()).optional(),
       extraTagIds: z.array(z.number().int()).optional(),
-      groupPrefix: z.string().optional(),
       folderId: z.number().int().optional(),
       newFolderName: z.string().max(200).optional(),
+      parentFolderId: z.number().int().optional(),
     }).refine(
       (v) => (v.mediaAssetId != null && v.mediaAssetId > 0) || !!v.bufferBase64?.length,
       { message: "Provide mediaAssetId or bufferBase64 for SCORM import" }
@@ -740,6 +739,7 @@ export const questionBankRouter = router({
       if (input.newFolderName?.trim()) {
         resolvedFolderId = await insertQuestionBankFolder(db, {
           name: input.newFolderName.trim(),
+          parentId: input.parentFolderId ?? null,
           createdByAdminId: ctx.user.id,
         });
       } else if (input.folderId) {
@@ -750,29 +750,12 @@ export const questionBankRouter = router({
         ? parsed.groups.filter(g => input.groupIds!.includes(g.id))
         : parsed.groups;
 
-      const results: { groupName: string; inserted: number; tagId: number }[] = [];
+      const tagIds = scormImportQuestionTagIds(input.extraTagIds);
+      const results: { groupName: string; inserted: number }[] = [];
       const questionBankIds: number[] = [];
 
       for (const group of groups) {
-        const rawName = plainTextFromISpring(group.name) || `Group ${results.length + 1}`;
-        const tagName = input.groupPrefix ? `${input.groupPrefix.trim()}_${rawName}` : rawName;
-        let tagId: number;
-        const [existingTag] = await db
-          .select({ id: questionBankTags.id })
-          .from(questionBankTags)
-          .where(eq(questionBankTags.name, tagName))
-          .limit(1);
-        if (existingTag) {
-          tagId = existingTag.id;
-        } else {
-          const [newTag] = await db.insert(questionBankTags).values({
-            name: tagName,
-            color: "#179ca3",
-          }).$returningId();
-          tagId = newTag.id;
-        }
-
-        const allTagIds = [tagId, ...(input.extraTagIds ?? [])];
+        const groupName = plainTextFromISpring(group.name) || `Group ${results.length + 1}`;
         let inserted = 0;
 
         for (const q of group.questions) {
@@ -805,15 +788,17 @@ export const questionBankRouter = router({
             createdByAdminId: ctx.user.id,
           }).$returningId();
 
-          await db.insert(questionBankTagMap).values(
-            allTagIds.map(tid => ({ questionId: result.id, tagId: tid }))
-          );
+          if (tagIds.length > 0) {
+            await db.insert(questionBankTagMap).values(
+              tagIds.map(tid => ({ questionId: result.id, tagId: tid }))
+            );
+          }
 
           questionBankIds.push(result.id);
           inserted++;
         }
 
-        results.push({ groupName: tagName, inserted, tagId });
+        results.push({ groupName, inserted });
       }
 
       const totalInserted = results.reduce((sum, r) => sum + r.inserted, 0);
@@ -842,7 +827,7 @@ export const questionBankRouter = router({
     .input(z.object({
       name: z.string().min(1).max(200),
       description: z.string().max(500).optional(),
-      parentId: z.number().int().optional(),
+      parentId: z.number().int().nullable().optional(),
       color: z.string().max(32).default("#179ca3"),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -885,6 +870,15 @@ export const questionBankRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Unset folder_id on questions in this folder
       await db.update(questionBank).set({ folderId: null }).where(eq(questionBank.folderId, input.id));
+      // Promote child folders to this folder's parent (or root)
+      const [folder] = await db
+        .select({ parentId: questionBankFolders.parentId })
+        .from(questionBankFolders)
+        .where(eq(questionBankFolders.id, input.id))
+        .limit(1);
+      await db.update(questionBankFolders)
+        .set({ parentId: folder?.parentId ?? null })
+        .where(eq(questionBankFolders.parentId, input.id));
       await db.delete(questionBankFolders).where(eq(questionBankFolders.id, input.id));
       return { ok: true };
     }),

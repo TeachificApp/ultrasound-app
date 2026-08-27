@@ -11,8 +11,9 @@
  *   Orders       — order history
  *   Analytics    — overview stats
  */
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { cn, stripHtml } from "@/lib/utils";
+import { flattenQuestionBankFolderTree, questionBankFolderOptionLabel } from "@shared/questionBankFolders";
 import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
 import { formatScheduledInput, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import {
@@ -10944,12 +10945,12 @@ function QuestionBankAdmin() {
   const [scormAssetId, setScormAssetId] = useState<number | null>(null);
   const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
   const [scormExtraTagIds, setScormExtraTagIds] = useState<number[]>([]);
-  const [scormGroupPrefix, setScormGroupPrefix] = useState("");
   const [scormFolderId, setScormFolderId] = useState<number | null>(null);
   const [scormNewFolderName, setScormNewFolderName] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
   const [editingFolderName, setEditingFolderName] = useState("");
+  const [newFolderParentId, setNewFolderParentId] = useState<number | null>(null);
   const [bulkFolderValue, setBulkFolderValue] = useState("");
   const [bulkNewFolderName, setBulkNewFolderName] = useState("");
   const [bulkAddTagIds, setBulkAddTagIds] = useState<number[]>([]);
@@ -11009,12 +11010,14 @@ function QuestionBankAdmin() {
   const deleteTag = trpc.questionBank.deleteTag.useMutation({ onSuccess: () => { refetchTags(); refetch(); setSelectedTagIds([]); } });
   const { data: foldersData, refetch: refetchFolders, error: foldersError } = trpc.questionBank.listFolders.useQuery();
   const folders = foldersData ?? [];
+  const folderTree = useMemo(() => flattenQuestionBankFolderTree(folders), [folders]);
   const createFolder = trpc.questionBank.createFolder.useMutation({
     onSuccess: () => {
       refetchFolders();
       toast.success("Folder created");
       const el = document.getElementById("qb-new-folder-name") as HTMLInputElement | null;
       if (el) el.value = "";
+      setNewFolderParentId(null);
     },
     onError: (e) => toast.error(e.message || "Could not create folder"),
   });
@@ -11076,13 +11079,17 @@ function QuestionBankAdmin() {
   };
 
   const moveFolder = (folderId: number, direction: "up" | "down") => {
-    const idx = folders.findIndex((f: { id: number }) => f.id === folderId);
+    const folder = folders.find((f: { id: number }) => f.id === folderId);
+    if (!folder) return;
+    const parentId = folder.parentId ?? null;
+    const siblings = folderTree.filter((f) => (f.parentId ?? null) === parentId);
+    const idx = siblings.findIndex((f) => f.id === folderId);
     if (idx < 0) return;
     const targetIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= folders.length) return;
-    const reordered = [...folders];
+    if (targetIdx < 0 || targetIdx >= siblings.length) return;
+    const reordered = [...siblings];
     [reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]];
-    reorderFolders.mutate({ folderIds: reordered.map((f: { id: number }) => f.id) });
+    reorderFolders.mutate({ folderIds: reordered.map((f) => f.id) });
   };
 
   const startEditFolder = (folder: { id: number; name: string }) => {
@@ -11151,11 +11158,15 @@ function QuestionBankAdmin() {
               </p>
             )}
             {!foldersError && folders.length === 0 && <p className="text-xs text-purple-600">No folders yet. Create one below.</p>}
-            {folders.map((f: any, index: number) => (
-              <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-purple-200">
+            {folderTree.map((f: any) => {
+              const parentId = f.parentId ?? null;
+              const siblings = folderTree.filter((s: any) => (s.parentId ?? null) === parentId);
+              const siblingIndex = siblings.findIndex((s: any) => s.id === f.id);
+              return (
+              <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-purple-200" style={{ marginLeft: `${f.depth * 16}px` }}>
                 <div className="flex flex-col gap-0.5">
-                  <button type="button" disabled={index === 0 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "up")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
-                  <button type="button" disabled={index === folders.length - 1 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "down")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
+                  <button type="button" disabled={siblingIndex === 0 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "up")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
+                  <button type="button" disabled={siblingIndex === siblings.length - 1 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "down")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
                 </div>
                 <FolderOpen className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
                 {editingFolderId === f.id ? (
@@ -11171,20 +11182,30 @@ function QuestionBankAdmin() {
                     </>
                   ) : (
                     <>
+                      <button type="button" title="Add subfolder" onClick={() => setNewFolderParentId(f.id)} className="text-gray-400 hover:text-purple-700 p-1"><Plus className="w-3.5 h-3.5" /></button>
                       <button type="button" onClick={() => startEditFolder(f)} className="text-gray-400 hover:text-purple-700 p-1"><Pencil className="w-3.5 h-3.5" /></button>
                       <button type="button" onClick={() => { if (confirm(`Delete folder "${f.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: f.id }); }} className="text-red-400 hover:text-red-600 p-1"><X className="w-3.5 h-3.5" /></button>
                     </>
                   )}
                 </div>
               </div>
-            ))}
+            );})}
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-medium text-purple-700">Parent folder <span className="text-gray-400 font-normal">(optional)</span></Label>
+            <select value={newFolderParentId ?? ""} onChange={e => setNewFolderParentId(e.target.value ? Number(e.target.value) : null)} className="w-full h-9 rounded-md border border-purple-200 bg-white px-3 text-sm">
+              <option value="">Top level</option>
+              {folderTree.map((f: any) => (
+                <option key={f.id} value={f.id}>{questionBankFolderOptionLabel(f.name, f.depth)}</option>
+              ))}
+            </select>
           </div>
           <div className="flex gap-2">
             <Input id="qb-new-folder-name" placeholder="New folder name..." className="h-8 text-sm flex-1 bg-white border-purple-200" />
             <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
               const el = document.getElementById("qb-new-folder-name") as HTMLInputElement;
               const val = el?.value?.trim();
-              if (val) createFolder.mutate({ name: val });
+              if (val) createFolder.mutate({ name: val, parentId: newFolderParentId });
             }}>Add Folder</Button>
           </div>
         </div>
@@ -11265,7 +11286,7 @@ function QuestionBankAdmin() {
               <Label className="text-xs font-medium text-teal-700 mb-1 block">Add to Folder (optional)</Label>
               <select value={aiFolderId ?? ""} onChange={e => setAIFolderId(e.target.value ? Number(e.target.value) : null)} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
                 <option value="">— No folder —</option>
-                {folders.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                {folderTree.map((f: any) => <option key={f.id} value={f.id}>{questionBankFolderOptionLabel(f.name, f.depth)}</option>)}
               </select>
             </div>
           <div className="flex justify-end">
@@ -11287,16 +11308,9 @@ function QuestionBankAdmin() {
 
           {!scormPreview ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs font-medium text-orange-700 mb-1 block">Search SCORM Assets</Label>
-                  <Input value={scormSearch} onChange={e => setScormSearch(e.target.value)} placeholder="Search by title..." className="bg-white border-orange-200" />
-                </div>
-                <div>
-                  <Label className="text-xs font-medium text-orange-700 mb-1 block">Group Name Prefix <span className="text-gray-400 font-normal">(optional)</span></Label>
-                  <Input value={scormGroupPrefix} onChange={e => setScormGroupPrefix(e.target.value)} placeholder="e.g. OB-GYN" className="bg-white border-orange-200" />
-                  {scormGroupPrefix && <p className="text-xs text-orange-600 mt-1">Groups will be tagged as: <strong>{scormGroupPrefix}_TRUE-FALSE</strong>, <strong>{scormGroupPrefix}_Image Questions</strong>, etc.</p>}
-                </div>
+              <div>
+                <Label className="text-xs font-medium text-orange-700 mb-1 block">Search SCORM Assets</Label>
+                <Input value={scormSearch} onChange={e => setScormSearch(e.target.value)} placeholder="Search by title..." className="bg-white border-orange-200" />
               </div>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {(scormAssetsData?.assets ?? []).length === 0 && (
@@ -11339,9 +11353,7 @@ function QuestionBankAdmin() {
                       })}>
                       <input type="checkbox" checked={scormSelectedGroups.has(group.id)} readOnly className="w-4 h-4 accent-orange-600" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">
-                          {scormGroupPrefix ? <><span className="text-orange-600">{scormGroupPrefix}_</span>{group.name}</> : group.name}
-                        </p>
+                        <p className="text-sm font-medium text-gray-800">{group.name}</p>
                         <p className="text-xs text-gray-500">{group.questionCount} question{group.questionCount !== 1 ? "s" : ""}</p>
                       </div>
                     </div>
@@ -11374,7 +11386,7 @@ function QuestionBankAdmin() {
                   <Label className="text-xs font-medium text-orange-700 mb-1 block">Save to Folder <span className="text-gray-400 font-normal">(optional)</span></Label>
                   <select value={scormFolderId ?? ""} onChange={e => { setScormFolderId(e.target.value ? Number(e.target.value) : null); setScormNewFolderName(""); }} className="w-full h-8 rounded-md border border-orange-200 bg-white px-2 text-sm">
                     <option value="">No folder (root)</option>
-                    {folders.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                    {folderTree.map((f: any) => <option key={f.id} value={f.id}>{questionBankFolderOptionLabel(f.name, f.depth)}</option>)}
                     <option value="__new__">+ Create new folder...</option>
                   </select>
                   {(scormFolderId as any) === "__new__" && (
@@ -11402,7 +11414,6 @@ function QuestionBankAdmin() {
                     mediaAssetId: scormAssetId!,
                     groupIds: Array.from(scormSelectedGroups),
                     extraTagIds: scormExtraTagIds.length > 0 ? scormExtraTagIds : undefined,
-                    groupPrefix: scormGroupPrefix.trim() || undefined,
                     folderId: (scormFolderId as any) !== "__new__" && scormFolderId ? scormFolderId : undefined,
                     newFolderName: (scormFolderId as any) === "__new__" && scormNewFolderName.trim() ? scormNewFolderName.trim() : undefined,
                   })}>
@@ -11465,7 +11476,7 @@ function QuestionBankAdmin() {
                 <select value={bulkFolderValue} onChange={e => { setBulkFolderValue(e.target.value); if (e.target.value !== "__new__") setBulkNewFolderName(""); }} className="h-9 rounded-md border border-teal-200 bg-white px-3 text-sm flex-1 min-w-[180px]">
                   <option value="">Choose folder...</option>
                   <option value="__none__">No folder (unfiled)</option>
-                  {folders.map((f: { id: number; name: string }) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
+                  {folderTree.map((f: { id: number; name: string; depth: number }) => <option key={f.id} value={String(f.id)}>{questionBankFolderOptionLabel(f.name, f.depth)}</option>)}
                   <option value="__new__">+ Create new folder...</option>
                 </select>
                 {bulkFolderValue === "__new__" && (
