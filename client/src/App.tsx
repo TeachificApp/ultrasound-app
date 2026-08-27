@@ -365,6 +365,7 @@ function LearnAdminRedirect({ rest }: { rest?: string }) {
 function Router() {
   usePageViewTracker();
   useSsoConsumer(); // Exchange ?sso=TOKEN for a session cookie when arriving from another domain
+  useSsoBridge(); // Redirect-based SSO from learn when logged in there but not on app
   useCrossDomainSso(); // Silently sign user into all other domains as free member
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">

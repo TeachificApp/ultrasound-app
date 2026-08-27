@@ -261,9 +261,10 @@ export function registerSsoAutoRoute(app: Express) {
   /**
    * GET /api/sso/bridge?return=<url>
    *
-   * Redirect-based SSO bridge. Called by a secondary domain (e.g. app.iheartecho.com)
-   * when the user is not logged in. The browser is redirected here (to the primary domain
-   * app.allaboutultrasound.com), which checks the session cookie and either:
+   * Redirect-based SSO bridge. Called by a client domain (e.g. app.iheartecho.com or
+   * app.allaboutultrasound.com) when the user is not logged in locally. The browser is
+   * redirected here (typically learn.allaboutultrasound.com first), which checks the
+   * session cookie and either:
    *   - Issues a short-lived SSO token and redirects back to ?return= URL with ?sso=TOKEN appended
    *   - Redirects back to ?return= URL unchanged (no token) if not authenticated
    *
