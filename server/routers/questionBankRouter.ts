@@ -932,16 +932,82 @@ export const questionBankRouter = router({
   moveToFolder: protectedProcedure
     .input(z.object({
       questionIds: z.array(z.number().int()).min(1),
-      folderId: z.number().int().nullable(),
+      folderId: z.number().int().nullable().optional(),
+      newFolderName: z.string().max(200).optional(),
+    }).refine(
+      (v) => v.folderId !== undefined || !!v.newFolderName?.trim(),
+      { message: "Provide folderId (or null to unfile) or newFolderName" },
+    ))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      let resolvedFolderId: number | null = null;
+      if (input.newFolderName?.trim()) {
+        const [{ maxSort }] = await db
+          .select({ maxSort: sql<number>`COALESCE(MAX(${questionBankFolders.sortOrder}), -1)` })
+          .from(questionBankFolders);
+        const [newFolder] = await db.insert(questionBankFolders).values({
+          name: input.newFolderName.trim(),
+          color: "#179ca3",
+          sortOrder: Number(maxSort ?? -1) + 1,
+          createdByAdminId: ctx.user.id,
+        }).$returningId();
+        resolvedFolderId = newFolder.id;
+      } else {
+        resolvedFolderId = input.folderId ?? null;
+      }
+
+      await db.update(questionBank)
+        .set({ folderId: resolvedFolderId })
+        .where(inArray(questionBank.id, input.questionIds));
+      return { moved: input.questionIds.length, folderId: resolvedFolderId };
+    }),
+
+  bulkAddTags: protectedProcedure
+    .input(z.object({
+      questionIds: z.array(z.number().int()).min(1),
+      tagIds: z.array(z.number().int()).min(1),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(questionBank)
-        .set({ folderId: input.folderId })
-        .where(inArray(questionBank.id, input.questionIds));
-      return { moved: input.questionIds.length };
+
+      const existing = await db
+        .select({ questionId: questionBankTagMap.questionId, tagId: questionBankTagMap.tagId })
+        .from(questionBankTagMap)
+        .where(and(
+          inArray(questionBankTagMap.questionId, input.questionIds),
+          inArray(questionBankTagMap.tagId, input.tagIds),
+        ));
+      const existingSet = new Set(existing.map(r => `${r.questionId}:${r.tagId}`));
+      const toInsert = input.questionIds.flatMap(questionId =>
+        input.tagIds
+          .filter(tagId => !existingSet.has(`${questionId}:${tagId}`))
+          .map(tagId => ({ questionId, tagId })),
+      );
+      if (toInsert.length > 0) {
+        await db.insert(questionBankTagMap).values(toInsert);
+      }
+      return { added: toInsert.length };
+    }),
+
+  bulkRemoveTags: protectedProcedure
+    .input(z.object({
+      questionIds: z.array(z.number().int()).min(1),
+      tagIds: z.array(z.number().int()).min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(questionBankTagMap).where(and(
+        inArray(questionBankTagMap.questionId, input.questionIds),
+        inArray(questionBankTagMap.tagId, input.tagIds),
+      ));
+      return { removed: input.questionIds.length * input.tagIds.length };
     }),
 
   /**
