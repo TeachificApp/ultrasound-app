@@ -29,7 +29,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
-import { syncLessonQuizBlocksToQuestionBank } from "../lib/lessonQuizQuestionBankSync";
+import { syncLessonQuizBlocksToQuestionBank, syncLessonQuizToQuestionBank } from "../lib/lessonQuizQuestionBankSync";
 import {
   lmsCourses,
   lmsSections,
@@ -886,6 +886,11 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       const [template] = await db.select().from(lessonTemplates).where(eq(lessonTemplates.id, input.templateId)).limit(1);
       if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
       await db.update(lmsLessons).set({ contentBlocks: template.blocks }).where(eq(lmsLessons.id, input.lessonId));
+      try {
+        await syncLessonQuizToQuestionBank(db, input.lessonId, ctx.user.id);
+      } catch (error) {
+        console.error("[applyLessonTemplate] Question Bank sync failed:", error);
+      }
       return { success: true };
     }),
 
@@ -913,7 +918,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       const sectionId = sectionResult.id;
       for (let i = 0; i < sourceLessons.length; i++) {
         const l = sourceLessons[i];
-        await db.insert(lmsLessons).values({
+        const [newLesson] = await db.insert(lmsLessons).values({
           courseId: input.targetCourseId,
           sectionId,
           title: l.title,
@@ -928,7 +933,12 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
           requireManualComplete: l.requireManualComplete ?? null,
           contentBlocks: l.contentBlocks ?? null,
           learningObjectives: l.learningObjectives ?? null,
-        });
+        }).$returningId();
+        try {
+          await syncLessonQuizToQuestionBank(db, newLesson.id, ctx.user.id);
+        } catch (error) {
+          console.error("[copySectionFromCourse] Question Bank sync failed:", error);
+        }
       }
       return { sectionId, title, lessonCount: sourceLessons.length };
     }),
@@ -1148,7 +1158,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
 
       if (input.contentBlocks !== undefined) {
         try {
-          await syncLessonQuizBlocksToQuestionBank(db, id, input.contentBlocks, ctx.user.id);
+          await syncLessonQuizToQuestionBank(db, id, ctx.user.id);
         } catch (error) {
           console.error("[updateLesson] Question Bank sync failed:", error);
         }
@@ -1320,6 +1330,11 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
           await db.insert(lmsQuizQuestions).values(questions.map(q => { const { id: _qi, quizId: _qqi, ...qr } = q; return { ...qr, quizId: newQuiz.id }; }));
         }
       }
+      try {
+        await syncLessonQuizToQuestionBank(db, result.id, ctx.user.id);
+      } catch (error) {
+        console.error("[copyLesson] Question Bank sync failed:", error);
+      }
       return { id: result.id };
     }),
 
@@ -1362,6 +1377,11 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
           if (questions.length > 0) {
             await db.insert(lmsQuizQuestions).values(questions.map(q => { const { id: _qi, quizId: _qqi, ...qr } = q; return { ...qr, quizId: newQuiz.id }; }));
           }
+        }
+        try {
+          await syncLessonQuizToQuestionBank(db, newLesson.id, ctx.user.id);
+        } catch (error) {
+          console.error("[copyModule] Question Bank sync failed:", error);
         }
       }
       return { id: newSection.id };

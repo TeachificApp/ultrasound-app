@@ -1,5 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { lmsCourses, lmsLessons, lmsQuizQuestions, lmsQuizzes, questionBank, questionBankFolders } from "../../drizzle/schema";
+import { ensureQuestionBankLessonSourceSchema } from "./ensureQuestionBankLessonSourceSchema";
 
 const BANK_TYPES = new Set(["mcq", "truefalse", "multiselect", "hotspot", "matching"]);
 type BankType = "mcq" | "truefalse" | "multiselect" | "hotspot" | "matching";
@@ -34,6 +35,7 @@ async function ensureLessonQuizCourseFolder(db: any, courseId: number, adminId: 
 
 /** Persist page-builder lesson_quiz block questions. Re-saving a lesson updates the same source-keyed bank questions. */
 export async function syncLessonQuizBlocksToQuestionBank(db: any, lessonId: number, contentBlocks: string | null | undefined, adminId: number) {
+  await ensureQuestionBankLessonSourceSchema(db);
   if (!contentBlocks) return { created: 0, updated: 0 };
   let blocks: any[];
   try { blocks = JSON.parse(contentBlocks); } catch { return { created: 0, updated: 0 }; }
@@ -97,4 +99,38 @@ export async function syncLegacyLessonQuizQuestionToBank(db: any, quizQuestionId
   if (existing) { await db.update(questionBank).set(values).where(eq(questionBank.id, existing.id)); return { created: 0, updated: 1 }; }
   await db.insert(questionBank).values(values);
   return { created: 1, updated: 0 };
+}
+
+/** Sync legacy lms_quiz_questions for one lesson into Lesson Quiz → course folder. */
+export async function syncLegacyLessonQuizQuestionsForLesson(db: any, lessonId: number, adminId: number) {
+  await ensureQuestionBankLessonSourceSchema(db);
+  const [quiz] = await db.select({ id: lmsQuizzes.id }).from(lmsQuizzes).where(eq(lmsQuizzes.lessonId, lessonId)).limit(1);
+  if (!quiz) return { created: 0, updated: 0 };
+  const questions = await db.select({ id: lmsQuizQuestions.id }).from(lmsQuizQuestions).where(eq(lmsQuizQuestions.quizId, quiz.id));
+  let created = 0;
+  let updated = 0;
+  for (const question of questions) {
+    const result = await syncLegacyLessonQuizQuestionToBank(db, question.id, adminId);
+    created += result.created;
+    updated += result.updated;
+  }
+  return { created, updated };
+}
+
+/**
+ * Sync all lesson quiz questions (page-builder blocks + legacy quiz) into
+ * Question Bank → Lesson Quiz → {course name}.
+ */
+export async function syncLessonQuizToQuestionBank(db: any, lessonId: number, adminId: number) {
+  const [lesson] = await db
+    .select({ contentBlocks: lmsLessons.contentBlocks })
+    .from(lmsLessons)
+    .where(eq(lmsLessons.id, lessonId))
+    .limit(1);
+  const blocks = await syncLessonQuizBlocksToQuestionBank(db, lessonId, lesson?.contentBlocks, adminId);
+  const legacy = await syncLegacyLessonQuizQuestionsForLesson(db, lessonId, adminId);
+  return {
+    created: blocks.created + legacy.created,
+    updated: blocks.updated + legacy.updated,
+  };
 }
