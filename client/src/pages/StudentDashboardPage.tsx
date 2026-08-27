@@ -827,7 +827,8 @@ function CommunityProfileSection({ userId }: { userId: number }) {
 type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "workshops" | "products" | "bundles" | "memberships" | "communities";
 
 function MyContentTab() {
-  const { data, isLoading } = trpc.dashboard.getMyContent.useQuery();
+  const { data: profile } = trpc.dashboard.getProfile.useQuery();
+  const { data, isLoading, isError, error, refetch } = trpc.dashboard.getMyContent.useQuery();
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
   const [autoTabSet, setAutoTabSet] = useState(false);
 
@@ -854,6 +855,24 @@ function MyContentTab() {
   }, [data, autoTabSet]);
 
   if (isLoading) return <LoadingSpinner />;
+
+  if (isError) {
+    const message = error.message === "Database unavailable"
+      ? "We couldn't load your content right now. Please try again."
+      : error.message;
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center space-y-3">
+        <AlertCircle className="w-10 h-10 text-red-500 mx-auto" />
+        <p className="font-semibold text-red-900">We couldn&apos;t load your content</p>
+        <p className="text-sm text-red-700">{message}</p>
+        <Button variant="outline" onClick={() => refetch()} className="border-red-300 text-red-700 hover:bg-red-100">
+          <RefreshCw className="w-4 h-4 mr-2" /> Try Again
+        </Button>
+      </div>
+    );
+  }
+
+  const showLegacyThinkificLink = Boolean(profile?.thinkificEnrolledAt) && (data?.courses.length ?? 0) === 0;
 
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: data?.courses.length ?? 0 },
@@ -899,7 +918,27 @@ function MyContentTab() {
       {contentTab === "courses" && (
         <div>
           {(data?.courses.length ?? 0) === 0 ? (
-            <EmptyState icon={BookOpen} title="No courses yet" description="Enroll in a course to see it here." />
+            showLegacyThinkificLink ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center space-y-4">
+                <BookOpen className="w-10 h-10 text-amber-600 mx-auto" />
+                <div>
+                  <p className="font-semibold text-amber-950">Looking for recorded CME classes?</p>
+                  <p className="text-sm text-amber-900 mt-2 max-w-lg mx-auto">
+                    Your recorded classes may be on our legacy learning platform. Sign in with the same email address to access them.
+                  </p>
+                </div>
+                <a
+                  href="https://member.allaboutultrasound.com/enrollments"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold transition-colors"
+                >
+                  Open Legacy Recorded Classes <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            ) : (
+              <EmptyState icon={BookOpen} title="No courses yet" description="Enroll in a course to see it here." />
+            )
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {data?.courses.map((c, i) => (
@@ -1863,7 +1902,7 @@ function CertificatesTab() {
       <EmptyState
         icon={Award}
         title="No certificates yet"
-        description="Complete a course to earn your certificate of completion."
+        description="Complete a course to earn your certificate — download it here anytime."
         action={{ label: "Browse Courses", href: "/education-library" }}
       />
     );

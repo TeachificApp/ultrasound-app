@@ -9917,9 +9917,9 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
   const manualIssueCertificate = trpc.lmsEnrollmentAdmin.manualIssueCertificate.useMutation({
     onSuccess: (result) => {
       if (result.alreadyExisted) {
-        toast.info("Certificate already existed — no change made.");
+        toast.info("Certificate already exists for this student.");
       } else {
-        toast.success("Certificate issued successfully!");
+        toast.success("Certificate issued — student can download from their dashboard.");
       }
       setCertTarget(null);
       refetch();
@@ -10094,7 +10094,7 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
             )}
             {!certTarget?.hasCert && (
               <p className="text-xs text-gray-400 mt-2">
-                A new certificate PDF will be generated and emailed to the student.
+                A new certificate PDF will be generated for download in the student dashboard and course player.
               </p>
             )}
           </div>

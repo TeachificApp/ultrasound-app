@@ -14,7 +14,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import DemoModeBanner from "./components/DemoModeBanner";
 import GetAppBanner from "./components/GetAppBanner";
 import ProfileNameBanner from "./components/ProfileNameBanner";
-import MaintenanceBanner from "./components/MaintenanceBanner";
 import LegacyPasswordSetupRedirect from "./components/LegacyPasswordSetupRedirect";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
@@ -1476,7 +1475,6 @@ function App() {
         <TooltipProvider>
           <MetaPixel />
           <Toaster />
-          <MaintenanceBanner />
           <LegacyPasswordSetupRedirect />
           {onMarketingStaging ? (
             <MarketingSiteRouter />

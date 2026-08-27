@@ -31,7 +31,6 @@ import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
-import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";

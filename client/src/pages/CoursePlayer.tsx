@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import {
   Award, BookOpen, Bookmark, BookmarkCheck, CalendarDays, CheckCircle, ChevronLeft, ChevronRight,
-  Download, Eye, FileText, HelpCircle, Lock, Menu, Maximize2, Minimize2, Monitor, PlayCircle, StickyNote, X,
+  Download, Eye, FileText, HelpCircle, Lock, Loader2, Menu, Maximize2, Minimize2, Monitor, PlayCircle, StickyNote, X,
   User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -1158,9 +1158,20 @@ function LessonNoteEditor({ lessonId, courseSlug, initialNote }: { lessonId: num
 }
 
 // ─── Certificate Dialog ───────────────────────────────────────────────────────
-function CertificateDialog({ open, onClose, courseTitle, certificateUrl }: {
-  open: boolean; onClose: () => void; courseTitle: string; certificateUrl?: string;
+function CertificateDialog({ open, onClose, courseTitle, certificateUrl, isLoading }: {
+  open: boolean; onClose: () => void; courseTitle: string; certificateUrl?: string; isLoading?: boolean;
 }) {
+  const [waitedLong, setWaitedLong] = useState(false);
+
+  useEffect(() => {
+    if (!open || certificateUrl) {
+      setWaitedLong(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setWaitedLong(true), 30000);
+    return () => window.clearTimeout(timer);
+  }, [open, certificateUrl]);
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
@@ -1182,8 +1193,22 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl }: {
               className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors">
               <Download className="w-4 h-4" /> Download Certificate
             </a>
+          ) : isLoading ? (
+            <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+              <Loader2 className="w-4 h-4 animate-spin" /> Preparing your certificate…
+            </div>
+          ) : waitedLong ? (
+            <div className="space-y-2 text-sm text-gray-600">
+              <p>Your certificate is taking longer than expected.</p>
+              <p className="text-xs text-gray-400">
+                Return to this course or visit your{" "}
+                <a href="/my-dashboard?tab=certificates" className="text-teal-600 underline">Certificates</a>{" "}
+                tab to download it. If it still does not appear, contact{" "}
+                <a href="mailto:support@allaboutultrasound.com" className="text-teal-600 underline">support@allaboutultrasound.com</a>.
+              </p>
+            </div>
           ) : (
-            <p className="text-xs text-gray-400">Your certificate is being generated and will be emailed to you shortly.</p>
+            <p className="text-xs text-gray-400">Your certificate is being prepared — you&apos;ll be able to download it here shortly.</p>
           )}
         </div>
       </DialogContent>
@@ -1523,9 +1548,16 @@ export default function CoursePlayer() {
     { courseSlug: slug! },
     { enabled: !!slug && !!user }
   );
-  const { data: certData } = trpc.lmsLearner.getCourseCertificate.useQuery(
+  const { data: certData, isFetching: certFetching } = trpc.lmsLearner.getCourseCertificate.useQuery(
     { courseSlug: slug! },
-    { enabled: !!slug && !!user }
+    {
+      enabled: !!slug && !!user,
+      refetchInterval: (query) => {
+        if (!showCertDialog) return false;
+        if (query.state.data?.certificateUrl) return false;
+        return 5000;
+      },
+    },
   );
 
   const [optimisticCompleted, setOptimisticCompleted] = useState<Set<number>>(new Set());
@@ -2176,6 +2208,7 @@ export default function CoursePlayer() {
           onClose={() => setShowCertDialog(false)}
           courseTitle={course.title}
           certificateUrl={certData?.certificateUrl}
+          isLoading={certFetching && !certData?.certificateUrl}
         />
 
         {/* ── Instructor Profile Popup ── */}

@@ -26,7 +26,6 @@ import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
-import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail, sendQuizAccessEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { addToAllContacts } from "../lib/emailListHelper";
@@ -3598,23 +3597,21 @@ CRITICAL REQUIREMENTS:
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
       if (!course.hasCertificate) throw new TRPCError({ code: "BAD_REQUEST", message: "This course does not have certificates enabled" });
 
+      const [existing] = await db.select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
+        .from(lmsCertificates)
+        .where(and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId)))
+        .limit(1);
+
       // If forceReissue, delete any existing certificate first
       if (input.forceReissue) {
         await db.delete(lmsCertificates).where(
           and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId))
         );
-      }
-
-      // Check if certificate already exists (after potential deletion)
-      const [existing] = await db.select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
-        .from(lmsCertificates)
-        .where(and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId)))
-        .limit(1);
-      if (existing) {
+      } else if (existing) {
         return { success: true, alreadyExisted: true, certificateUrl: existing.certificateUrl };
       }
 
-      // Issue certificate (reuse the shared helper — skips email for admin_preview).
+      // Issue certificate (reuse the shared helper).
       // adminBypass=true: admin explicitly requested this, so bypass the CERT_CUTOFF_DATE guard.
       await issueCertificateIfEnabled(db, enrollment.id, enrollment.userId, enrollment.courseId, enrollment.enrollmentType, { forceReissue: false, adminBypass: true });
 

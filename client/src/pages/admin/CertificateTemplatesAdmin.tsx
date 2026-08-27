@@ -667,7 +667,7 @@ export default function CertificateTemplatesAdmin() {
         <TabsContent value="issued" className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold">Issued Certificates</h3>
-            <p className="text-sm text-muted-foreground">All certificates that have been generated and emailed to learners.</p>
+            <p className="text-sm text-muted-foreground">All certificates that have been generated for learners.</p>
           </div>
           {certsLoading ? (
             <div className="text-center py-12 text-muted-foreground">Loading…</div>

@@ -2877,7 +2877,7 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
   const issueCert = trpc.adminUser.issueCertificate.useMutation({
     onSuccess: (res) => {
       if (res.alreadyIssued) toast.info("Certificate already issued for this course.");
-      else toast.success("Certificate issued and emailed to student.");
+      else toast.success("Certificate issued — student can download from their dashboard.");
       refetch();
       setIssueOpen(false);
     },
@@ -2943,7 +2943,7 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Issue Certificate</DialogTitle>
-            <DialogDescription>Select an enrollment to issue a certificate for. A PDF will be generated and emailed to the student.</DialogDescription>
+            <DialogDescription>Select an enrollment to issue a certificate for. The student will download it from their dashboard or course player.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Label>Select Enrollment</Label>

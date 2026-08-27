@@ -18,7 +18,6 @@ import { Label } from "@/components/ui/label";
 import { Mail, Loader2, Stethoscope, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft, GraduationCap, Award, Users, Eye, EyeOff, Lock, UserPlus, KeyRound } from "lucide-react";
 import { isCombinedBrandingDomain, isIHeartEchoDomain, isLearnDomain, MEMBERS_APP_URL } from "@/hooks/useSubdomain";
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
-import MaintenanceBanner from "@/components/MaintenanceBanner";
 import { toast } from "sonner";
 import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
 
@@ -225,7 +224,6 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ fontFamily: "Open Sans, sans-serif" }}>
-      <MaintenanceBanner showForUnauthenticated />
       <div className="flex flex-1 flex-col lg:flex-row">
         {/* ── Left panel: branding ── */}
         <div
