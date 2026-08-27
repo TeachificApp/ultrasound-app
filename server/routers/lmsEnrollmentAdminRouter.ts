@@ -26,7 +26,6 @@ import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
-import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail, sendQuizAccessEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { addToAllContacts } from "../lib/emailListHelper";
@@ -97,7 +96,6 @@ import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
-import { resendCertificateEmail } from "../lib/certificateResend";
 import { processStripeSessionById } from "../webhooks/stripe";
 
 /**
@@ -3583,7 +3581,6 @@ CRITICAL REQUIREMENTS:
     .input(z.object({
       enrollmentId: z.number().int().positive(),
       forceReissue: z.boolean().optional().default(false),
-      resendEmailOnly: z.boolean().optional().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -3605,14 +3602,6 @@ CRITICAL REQUIREMENTS:
         .where(and(eq(lmsCertificates.userId, enrollment.userId), eq(lmsCertificates.courseId, enrollment.courseId)))
         .limit(1);
 
-      if (existing && input.resendEmailOnly) {
-        const result = await resendCertificateEmail(enrollment.userId, enrollment.courseId);
-        if (!result.sent) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Certificate email could not be sent" });
-        }
-        return { success: true, alreadyExisted: true, emailResent: true, certificateUrl: existing.certificateUrl };
-      }
-
       // If forceReissue, delete any existing certificate first
       if (input.forceReissue) {
         await db.delete(lmsCertificates).where(
@@ -3622,7 +3611,7 @@ CRITICAL REQUIREMENTS:
         return { success: true, alreadyExisted: true, certificateUrl: existing.certificateUrl };
       }
 
-      // Issue certificate (reuse the shared helper — skips email for admin_preview).
+      // Issue certificate (reuse the shared helper).
       // adminBypass=true: admin explicitly requested this, so bypass the CERT_CUTOFF_DATE guard.
       await issueCertificateIfEnabled(db, enrollment.id, enrollment.userId, enrollment.courseId, enrollment.enrollmentType, { forceReissue: false, adminBypass: true });
 

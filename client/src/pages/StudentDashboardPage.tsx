@@ -1902,7 +1902,7 @@ function CertificatesTab() {
       <EmptyState
         icon={Award}
         title="No certificates yet"
-        description="Complete a course to earn your certificate of completion."
+        description="Complete a course to earn your certificate — download it here anytime."
         action={{ label: "Browse Courses", href: "/education-library" }}
       />
     );

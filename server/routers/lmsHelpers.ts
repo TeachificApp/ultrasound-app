@@ -20,7 +20,6 @@ import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { overlayLearnerData } from "../lib/certificatePdfOverlay";
-import { sendCertificateEmail } from "../lib/certificateEmail";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
@@ -299,23 +298,7 @@ export async function issueCertificateIfEnabled(
     issuedAt,
   });
 
-  // Send email — skip for admin_preview enrollments (test runs should not send real emails)
-  if (enrollmentType !== "admin_preview") {
-    const certTitleForEmail = (course.certificateTitleOverride && course.certificateTitleOverride.trim()) ? course.certificateTitleOverride.trim() : course.title;
-    const emailSent = await sendCertificateEmail({
-      to: { name: learnerName, email: user.email },
-      courseTitle: certTitleForEmail,
-      certificateUrl,
-      pdfBuffer,
-      issuedAt,
-      userId,
-    });
-    if (!emailSent) {
-      console.error(`[certificate] Certificate saved for user ${userId}, course ${courseId}, but email delivery failed`);
-    }
-  }
-
-  console.log(`[certificate] Issued certificate for user ${userId}, course ${courseId}${enrollmentType === "admin_preview" ? " (admin preview — email suppressed)" : ""}`);
+  console.log(`[certificate] Issued certificate for user ${userId}, course ${courseId} — available for download`);
 }
 
 // ─── Public Router ────────────────────────────────────────────────────────────

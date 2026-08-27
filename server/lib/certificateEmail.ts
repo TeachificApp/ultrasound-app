@@ -1,7 +1,7 @@
 /**
  * certificateEmail.ts
- * Builds and sends the certificate of completion email via SendGrid.
- * The PDF is attached as a base64 encoded attachment.
+ * Legacy utility for one-off certificate email scripts (e.g. reissue-kahoot.ts).
+ * Normal CME certificate delivery is download-only via the course player and dashboard.
  */
 import { logEmail } from "./emailLogger";
 

@@ -1201,13 +1201,14 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl, isLoadi
             <div className="space-y-2 text-sm text-gray-600">
               <p>Your certificate is taking longer than expected.</p>
               <p className="text-xs text-gray-400">
-                Check your email inbox (and spam folder), or contact{" "}
-                <a href="mailto:support@allaboutultrasound.com" className="text-teal-600 underline">support@allaboutultrasound.com</a>{" "}
-                and we will resend it.
+                Return to this course or visit your{" "}
+                <a href="/my-dashboard?tab=certificates" className="text-teal-600 underline">Certificates</a>{" "}
+                tab to download it. If it still does not appear, contact{" "}
+                <a href="mailto:support@allaboutultrasound.com" className="text-teal-600 underline">support@allaboutultrasound.com</a>.
               </p>
             </div>
           ) : (
-            <p className="text-xs text-gray-400">Your certificate is being generated and will be emailed to you shortly.</p>
+            <p className="text-xs text-gray-400">Your certificate is being prepared — you&apos;ll be able to download it here shortly.</p>
           )}
         </div>
       </DialogContent>

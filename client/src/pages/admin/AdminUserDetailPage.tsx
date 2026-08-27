@@ -2877,15 +2877,10 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
   const issueCert = trpc.adminUser.issueCertificate.useMutation({
     onSuccess: (res) => {
       if (res.alreadyIssued) toast.info("Certificate already issued for this course.");
-      else toast.success("Certificate issued and emailed to student.");
+      else toast.success("Certificate issued — student can download from their dashboard.");
       refetch();
       setIssueOpen(false);
     },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const resendCertEmail = trpc.adminUser.resendCertificateEmail.useMutation({
-    onSuccess: () => toast.success("Certificate email resent to student."),
     onError: (e) => toast.error(e.message),
   });
 
@@ -2931,13 +2926,6 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
                     <Download className="w-3 h-3" /> Download
                   </a>
                   <button
-                    onClick={() => resendCertEmail.mutate({ userId, courseId: cert.courseId })}
-                    disabled={resendCertEmail.isPending}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-                  >
-                    {resendCertEmail.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Mail className="w-3 h-3" />} Resend Email
-                  </button>
-                  <button
                     onClick={() => setRemoveConfirm(cert.id)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                   >
@@ -2955,7 +2943,7 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Issue Certificate</DialogTitle>
-            <DialogDescription>Select an enrollment to issue a certificate for. A PDF will be generated and emailed to the student.</DialogDescription>
+            <DialogDescription>Select an enrollment to issue a certificate for. The student will download it from their dashboard or course player.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <Label>Select Enrollment</Label>

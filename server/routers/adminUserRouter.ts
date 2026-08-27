@@ -59,7 +59,6 @@ import {
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { issueCertificateIfEnabled } from "./lmsHelpers";
-import { resendCertificateEmail as deliverCertificateEmail } from "../lib/certificateResend";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail, emailWrapper } from "../_core/email";
 import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail, buildPersistentAccessUrl } from "../lib/enrollmentEmail";
 import { getOrCreateAccessToken } from "../db";
@@ -789,18 +788,6 @@ export const adminUserRouter = router({
       }
 
       return { certificateId: newCert.id, certificateUrl: newCert.certificateUrl, alreadyIssued: false };
-    }),
-
-  /** Resend certificate email for an existing certificate */
-  resendCertificateEmail: protectedProcedure
-    .input(z.object({ userId: z.number().int(), courseId: z.number().int() }))
-    .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
-      const result = await deliverCertificateEmail(input.userId, input.courseId);
-      if (!result.sent) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Certificate email could not be sent — check SendGrid configuration and server logs" });
-      }
-      return { success: true, certificateUrl: result.certificateUrl };
     }),
 
   /** Remove a certificate by certificate ID */
