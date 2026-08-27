@@ -19,7 +19,7 @@ import {
 } from "../../drizzle/schema";
 import { storagePut } from "../storage";
 import { transcribeAudio } from "../_core/voiceTranscription";
-import { ENV } from "../_core/env";
+import { invokeLlmTextPrompt } from "../lib/llmHelpers";
 import { sendEmail, buildMeetingInvitationEmail } from "../_core/email";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -69,22 +69,7 @@ Use clean, professional HTML with <p>, <ul>, <li>, <table>, <tr>, <th>, <td> tag
 Use Arial font. Keep it concise and clinical. Do not include CSS styles inline.`;
 
   try {
-    const response = await fetch(`${ENV.forgeApiUrl}/v1/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${ENV.forgeApiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 3000,
-        temperature: 0.3,
-      }),
-    });
-    if (!response.ok) throw new Error(`LLM API error: ${response.status}`);
-    const json = await response.json() as any;
-    return json.choices?.[0]?.message?.content ?? "<p>Minutes generation failed. Please edit manually.</p>";
+    return await invokeLlmTextPrompt(prompt);
   } catch {
     return `<p><strong>Auto-generated minutes could not be created.</strong> Please edit manually.</p><p>Transcript excerpt:</p><pre>${transcript.slice(0, 2000)}</pre>`;
   }

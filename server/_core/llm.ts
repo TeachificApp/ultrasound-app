@@ -302,6 +302,18 @@ async function invokeManusApi(params: InvokeParams): Promise<InvokeResult> {
   };
 }
 
+export function extractAssistantText(result: InvokeResult): string {
+  const content = result.choices[0]?.message?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((part): part is TextContent => part.type === "text")
+      .map((part) => part.text)
+      .join("\n");
+  }
+  return "";
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (ENV.manusApiKey) {
     return invokeManusApi(params);

@@ -40,10 +40,7 @@ import { eq, and, desc, sql, count, like, or, gte } from "drizzle-orm";
 import { storagePut } from "../storage";
 import { sendEmail, buildCaseApprovedEmail, buildCaseRejectedEmail, buildNewCaseSubmissionAdminEmail } from "../_core/email";
 import { notifyOwner } from "../_core/notification";
-import { createPatchedFetch } from "../_core/patchedFetch";
-import { generateText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
-import { getOpenAiApiKey, getOpenAiApiRoot } from "../lib/openAiConfig";
+import { assertAiConfigured, invokeLlmJsonPrompt } from "../lib/llmHelpers";
 
 // ─── Admin guard ─────────────────────────────────────────────────────────────
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -1100,19 +1097,7 @@ export const caseLibraryRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      let forgeBaseUrl: string;
-      let forgeApiKey: string;
-      try {
-        forgeBaseUrl = getOpenAiApiRoot();
-        forgeApiKey = getOpenAiApiKey();
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : "AI API key is not configured";
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message,
-        });
-      }
+      assertAiConfigured();
 
       const promptText = `You are an expert ultrasound educator creating a ${input.difficulty} ${input.modality} ultrasound case.
 
@@ -1141,20 +1126,7 @@ Guidelines:
 
       let text: string;
       try {
-        const baseURL = forgeBaseUrl.endsWith("/v1") ? forgeBaseUrl : `${forgeBaseUrl}/v1`;
-        const openai = createOpenAI({
-          baseURL,
-          apiKey: forgeApiKey,
-          // Use native fetch (not patched) — patched fetch is for streaming SSE only
-        });
-        const result = await generateText({
-          model: openai.chat("gpt-4o"),
-          messages: [{ role: "user", content: promptText }],
-          temperature: 0.7,
-          maxOutputTokens: 2000,
-        });
-        text = result.text ?? "";
-        if (!text) throw new Error("AI returned empty response");
+        text = await invokeLlmJsonPrompt(promptText);
       } catch (aiErr) {
         const errMsg = aiErr instanceof Error ? aiErr.message : String(aiErr);
         throw new TRPCError({

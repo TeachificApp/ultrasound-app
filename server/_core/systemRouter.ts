@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./trpc";
+import { ENV } from "./env";
 import { verifyManusApiConnection } from "../lib/manusApiClient";
+import { verifyAiConnection } from "../lib/aiConnection";
 
 export const systemRouter = router({
   health: publicProcedure
@@ -37,6 +39,20 @@ export const systemRouter = router({
     } catch (error) {
       console.warn("[ManusAPI] Railway connection check failed", error instanceof Error ? error.message : "unknown error");
       return { connected: false } as const;
+    }
+  }),
+
+  verifyAi: adminProcedure.mutation(async () => {
+    try {
+      const status = await verifyAiConnection();
+      return status;
+    } catch (error) {
+      console.warn("[AI] Connection check failed", error instanceof Error ? error.message : "unknown error");
+      return {
+        configured: true,
+        backend: ENV.manusApiKey ? ("manus-api-v2" as const) : ("forge-chat" as const),
+        connected: false,
+      };
     }
   }),
 

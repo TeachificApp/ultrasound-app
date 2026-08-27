@@ -12,6 +12,7 @@ import type { Express } from "express";
 import { z } from "zod/v4";
 import { ENV } from "./env";
 import { createPatchedFetch } from "./patchedFetch";
+import { resolveLlmChatModel } from "../lib/openAiConfig";
 
 /**
  * Creates an OpenAI-compatible provider with patched fetch.
@@ -102,7 +103,7 @@ export function registerChatRoutes(app: Express) {
       }
 
       const result = streamText({
-        model: openai.chat("gpt-4o"),
+        model: openai.chat(resolveLlmChatModel()),
         system:
           "You are a helpful assistant. You have access to tools for getting weather and doing calculations. Use them when appropriate.",
         messages,
