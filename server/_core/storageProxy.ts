@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { ENV } from "./env";
 import { resolveStorageBackend } from "../lib/storageBackend";
+import { legacyCloudFrontUrlForStorageKey } from "../../shared/resolveAssetUrl";
 
 function buildR2PublicUrl(key: string): string | null {
   const base = process.env.CF_R2_PUBLIC_URL?.replace(/\/+$/, "");
@@ -21,8 +22,16 @@ export function registerStorageProxy(app: Express) {
       if (resolveStorageBackend() === "r2") {
         const r2Url = buildR2PublicUrl(key);
         if (r2Url) {
+          let useR2 = false;
+          try {
+            const head = await fetch(r2Url, { method: "HEAD" });
+            useR2 = head.ok;
+          } catch {
+            useR2 = false;
+          }
+          const target = useR2 ? r2Url : legacyCloudFrontUrlForStorageKey(key);
           res.set("Cache-Control", "public, max-age=3600");
-          res.redirect(307, r2Url);
+          res.redirect(307, target);
           return;
         }
       }

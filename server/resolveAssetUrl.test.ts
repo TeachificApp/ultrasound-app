@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { extractManusStorageKey, resolveAssetUrl } from "../shared/resolveAssetUrl";
+import { extractManusStorageKey, legacyCloudFrontUrlForStorageKey, resolveAssetUrl } from "../shared/resolveAssetUrl";
 
 describe("resolveAssetUrl", () => {
+  it("builds legacy CloudFront URLs from manus-storage keys", () => {
+    expect(legacyCloudFrontUrlForStorageKey("aaus_logo_e47ffb71.png")).toBe(
+      "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png",
+    );
+    expect(legacyCloudFrontUrlForStorageKey("etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png")).toBe(
+      "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png",
+    );
+  });
+
   it("rewrites AAUS CloudFront URLs to manus-storage proxy paths", () => {
     const legacy =
       "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
