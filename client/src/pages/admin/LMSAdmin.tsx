@@ -43,7 +43,7 @@ import {
   Sparkles, Loader2, Eye, EyeOff, Save, X, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
   User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus, UserX, RefreshCw,
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
-  Layout as LayoutTemplate, Database,
+  Layout as LayoutTemplate, Database, FileQuestion,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
   Repeat, Film, CalendarRange, ExternalLink, Link2, Mail, Activity, Briefcase,
   Percent, Search, Presentation,
@@ -8329,6 +8329,7 @@ const LMS_NAV_GROUPS = [
     color: "gray",
     items: [
       { value: "question_bank",     label: "Question Bank",     icon: Database },
+      { value: "quiz_creator",      label: "Quiz Creator",      icon: FileQuestion, href: getAdminUrl("/admin/quiz-creator") },
       { value: "publish_requests",  label: "Publish Requests",  icon: CheckCircle },
       { value: "trash",             label: "Trash",             icon: Trash2, danger: true },
     ],
