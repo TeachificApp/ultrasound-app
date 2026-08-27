@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { createManusTask, waitForManusTask } from "../lib/manusApiClient";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -220,6 +221,18 @@ const assertApiKey = () => {
   }
 };
 
+function serializeForManusTask(messages: Message[]): string {
+  return messages.map((message) => {
+    const content = ensureArray(message.content).map((part) => {
+      if (typeof part === "string") return part;
+      if (part.type === "text") return part.text;
+      if (part.type === "image_url") return `Image reference: ${part.image_url.url}`;
+      return `File reference: ${part.file_url.url}`;
+    }).join("\n");
+    return `${message.role.toUpperCase()}: ${content}`;
+  }).join("\n\n");
+}
+
 const normalizeResponseFormat = ({
   responseFormat,
   response_format,
@@ -265,7 +278,33 @@ const normalizeResponseFormat = ({
   };
 };
 
+async function invokeManusApi(params: InvokeParams): Promise<InvokeResult> {
+  const responseFormat = normalizeResponseFormat(params);
+  const structuredSchema = responseFormat?.type === "json_schema" ? responseFormat.json_schema.schema : undefined;
+  const prompt = [
+    "You are the AI service embedded in Ultrasound Clinical Intelligence. Follow the provided instructions exactly.",
+    structuredSchema
+      ? "Return the requested result through the required structured-output schema. Do not ask a follow-up question."
+      : "Return the requested final answer directly. When the instructions request JSON, return valid JSON only with no Markdown fences.",
+    serializeForManusTask(params.messages),
+  ].join("\n\n");
+  const created = await createManusTask({ prompt, structuredOutputSchema: structuredSchema });
+  const completed = await waitForManusTask(created.task_id);
+  const content = completed.structuredOutput !== undefined
+    ? JSON.stringify(completed.structuredOutput)
+    : completed.assistantText ?? "";
+  return {
+    id: created.task_id,
+    created: Math.floor(Date.now() / 1000),
+    model: "manus-api-v2",
+    choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+  };
+}
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  if (ENV.manusApiKey) {
+    return invokeManusApi(params);
+  }
   assertApiKey();
 
   const {

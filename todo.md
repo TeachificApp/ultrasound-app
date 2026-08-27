@@ -91,3 +91,8 @@
 - [x] Complete a bounded primary-key parity sweep for the remaining equal-count learning and user-access tables, retaining any deliberate sensitive exclusions.
 - [x] Verify explicit composite-key parity and the four column-name review tables in the closing Railway audit.
 - [x] Finalize and verify the complete Railway parity document after the composite-key and schema-review evidence is archived.
+- [x] Verify the supported Manus AI integration option for the Railway-hosted runtime without copying managed Forge credentials.
+- [x] Design and validate a secure Railway server-side integration for the selected Manus AI capability while keeping Railway hosting, MySQL, and GitHub authentication unchanged.
+- [ ] Verify the Railway-held `MANUS_API_KEY` through a server-side health-safe integration path without logging or exposing its value.
+- [x] Add a secure Manus API v2 server client and task lifecycle handling without using managed Forge credentials or exposing keys to browsers.
+- [ ] Connect the selected application AI workflows to the Railway-held Manus API client and validate their success and provider-error states.
