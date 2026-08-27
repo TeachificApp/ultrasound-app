@@ -29,6 +29,11 @@ import os from "os";
 import { buildAiSourceMessage } from "../lib/aiSourceFile";
 import { buildAiQuestionBankInsertValues } from "../lib/aiQuestionBankPersistence";
 import { plainTextFromISpring, plainTextFromISpringContent } from "../lib/questionBankImportSanitize";
+import {
+  insertQuestionBankFolder,
+  reorderQuestionBankFolders,
+  selectQuestionBankFolders,
+} from "../lib/questionBankFolderQueries";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -36,17 +41,6 @@ async function assertAdmin(ctx: { user: { id: number; role: string } }) {
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [u] = await db.select({ role: users.role }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
     if (!u || u.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
-  }
-}
-
-async function ensureQuestionBankFoldersReady(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
-  const { ensureQuestionBankFoldersSchema } = await import("../lib/ensureQuestionBankFoldersSchema");
-  const result = await ensureQuestionBankFoldersSchema(db);
-  if (result.error) {
-    throw new TRPCError({
-      code: "INTERNAL_SERVER_ERROR",
-      message: `Question bank folders schema sync failed: ${result.error}`,
-    });
   }
 }
 
@@ -429,12 +423,10 @@ export const questionBankRouter = router({
       // Resolve or create folder
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {
-        const [newFolder] = await db.insert(questionBankFolders).values({
+        resolvedFolderId = await insertQuestionBankFolder(db, {
           name: input.newFolderName.trim(),
-          color: "#179ca3",
           createdByAdminId: ctx.user.id,
-        }).$returningId();
-        resolvedFolderId = newFolder.id;
+        });
       } else if (input.folderId) {
         resolvedFolderId = input.folderId;
       }
@@ -485,12 +477,10 @@ export const questionBankRouter = router({
       // Resolve or create folder
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {
-        const [newFolder] = await db.insert(questionBankFolders).values({
+        resolvedFolderId = await insertQuestionBankFolder(db, {
           name: input.newFolderName.trim(),
-          color: "#179ca3",
           createdByAdminId: ctx.user.id,
-        }).$returningId();
-        resolvedFolderId = newFolder.id;
+        });
       } else if (input.folderId) {
         resolvedFolderId = input.folderId;
       }
@@ -748,12 +738,10 @@ export const questionBankRouter = router({
 
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {
-        const [newFolder] = await db.insert(questionBankFolders).values({
+        resolvedFolderId = await insertQuestionBankFolder(db, {
           name: input.newFolderName.trim(),
-          color: "#179ca3",
           createdByAdminId: ctx.user.id,
-        }).$returningId();
-        resolvedFolderId = newFolder.id;
+        });
       } else if (input.folderId) {
         resolvedFolderId = input.folderId;
       }
@@ -839,8 +827,7 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await ensureQuestionBankFoldersReady(db);
-      const folders = await db.select().from(questionBankFolders).orderBy(asc(questionBankFolders.sortOrder), asc(questionBankFolders.name));
+      const folders = await selectQuestionBankFolders(db);
       // Get question count per folder
       const counts = await db
         .select({ folderId: questionBank.folderId, count: sql<number>`COUNT(*)` })
@@ -862,19 +849,14 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await ensureQuestionBankFoldersReady(db);
-      const [{ maxSort }] = await db
-        .select({ maxSort: sql<number>`COALESCE(MAX(${questionBankFolders.sortOrder}), -1)` })
-        .from(questionBankFolders);
-      const [result] = await db.insert(questionBankFolders).values({
+      const id = await insertQuestionBankFolder(db, {
         name: input.name,
         description: input.description ?? null,
         parentId: input.parentId ?? null,
         color: input.color,
-        sortOrder: Number(maxSort ?? -1) + 1,
         createdByAdminId: ctx.user.id,
-      }).$returningId();
-      return { id: result.id };
+      });
+      return { id };
     }),
 
   updateFolder: protectedProcedure
@@ -913,12 +895,7 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await ensureQuestionBankFoldersReady(db);
-      await Promise.all(
-        input.folderIds.map((id, index) =>
-          db.update(questionBankFolders).set({ sortOrder: index }).where(eq(questionBankFolders.id, id))
-        )
-      );
+      await reorderQuestionBankFolders(db, input.folderIds);
       return { ok: true };
     }),
 
@@ -928,12 +905,7 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await ensureQuestionBankFoldersReady(db);
-      const folders = await db
-        .select()
-        .from(questionBankFolders)
-        .where(eq(questionBankFolders.sharedInSonoQuiz, true))
-        .orderBy(asc(questionBankFolders.sortOrder), asc(questionBankFolders.name));
+      const folders = await selectQuestionBankFolders(db, { sharedInSonoQuizOnly: true });
       // For each folder, count questions
       const counts = await Promise.all(folders.map(async (f) => {
         const [{ cnt }] = await db
@@ -957,20 +929,12 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await ensureQuestionBankFoldersReady(db);
-
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {
-        const [{ maxSort }] = await db
-          .select({ maxSort: sql<number>`COALESCE(MAX(${questionBankFolders.sortOrder}), -1)` })
-          .from(questionBankFolders);
-        const [newFolder] = await db.insert(questionBankFolders).values({
+        resolvedFolderId = await insertQuestionBankFolder(db, {
           name: input.newFolderName.trim(),
-          color: "#179ca3",
-          sortOrder: Number(maxSort ?? -1) + 1,
           createdByAdminId: ctx.user.id,
-        }).$returningId();
-        resolvedFolderId = newFolder.id;
+        });
       } else {
         resolvedFolderId = input.folderId ?? null;
       }

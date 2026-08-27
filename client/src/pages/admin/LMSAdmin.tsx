@@ -11009,7 +11009,12 @@ function QuestionBankAdmin() {
   const { data: foldersData, refetch: refetchFolders, error: foldersError } = trpc.questionBank.listFolders.useQuery();
   const folders = foldersData ?? [];
   const createFolder = trpc.questionBank.createFolder.useMutation({
-    onSuccess: () => { refetchFolders(); toast.success("Folder created"); },
+    onSuccess: () => {
+      refetchFolders();
+      toast.success("Folder created");
+      const el = document.getElementById("qb-new-folder-name") as HTMLInputElement | null;
+      if (el) el.value = "";
+    },
     onError: (e) => toast.error(e.message || "Could not create folder"),
   });
   const updateFolder = trpc.questionBank.updateFolder.useMutation({
@@ -11178,7 +11183,7 @@ function QuestionBankAdmin() {
             <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => {
               const el = document.getElementById("qb-new-folder-name") as HTMLInputElement;
               const val = el?.value?.trim();
-              if (val) { createFolder.mutate({ name: val }); el.value = ""; }
+              if (val) createFolder.mutate({ name: val });
             }}>Add Folder</Button>
           </div>
         </div>
