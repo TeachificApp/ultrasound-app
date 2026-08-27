@@ -13,6 +13,9 @@ import {
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import {
+  THINKIFIC_LEGACY_BILLING_URL,
+} from "@shared/thinkificLegacy";
 
 const ROLE_CONFIG: Record<string, {
   label: string;
@@ -82,6 +85,10 @@ export default function Profile() {
   });
   const user = meData ?? null;
   const isAuthenticated = !!meData;
+  const { data: dashboardProfile } = trpc.dashboard.getProfile.useQuery(undefined, {
+    enabled: !!user,
+    refetchOnWindowFocus: false,
+  });
   const utils = trpc.useUtils();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -673,17 +680,16 @@ export default function Profile() {
                 )}
               </div>
               {/* Legacy Thinkific platform notice */}
-              {u.thinkificEnrolledAt && (
+              {dashboardProfile?.hasActiveThinkificSubscription && (
                 <div className="mx-5 mb-4 p-3 rounded-lg border border-amber-200 bg-amber-50">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs font-semibold text-amber-800 mb-0.5">Legacy Platform Account</p>
+                      <p className="text-xs font-semibold text-amber-800 mb-0.5">Legacy Subscription Billing</p>
                       <p className="text-xs text-amber-700 leading-relaxed">
-                        Your account was transferred from our legacy platform. Some billing may still occur from that site.
-                        For legacy subscriptions not reflected here, please manage your billing at{" "}
+                        You have an active subscription from our legacy platform. Manage billing at{" "}
                         <a
-                          href="https://member.allaboutultrasound.com/account/billing"
+                          href={THINKIFIC_LEGACY_BILLING_URL}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-semibold underline hover:text-amber-900"

@@ -34,6 +34,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Layout from "@/components/Layout";
+import { THINKIFIC_LEGACY_BILLING_LABEL } from "@shared/thinkificLegacy";
 import UserAvatar from "@/components/UserAvatar";
 import { isMembersDomain, isLearnDomain, LEARN_APP_URL, APP_URL, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 import { formatInTimeZone, isInstantExpired, PLATFORM_TIMEZONE } from "@shared/platformTime";
@@ -1581,7 +1582,7 @@ function SubscriptionsTab() {
                               )}
                               {isThinkific && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
-                                  Thinkific
+                                  Legacy billing
                                 </span>
                               )}
                             </div>
@@ -1613,7 +1614,7 @@ function SubscriptionsTab() {
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200"
                               >
-                                Manage on Thinkific <ExternalLink className="w-3.5 h-3.5" />
+                                {THINKIFIC_LEGACY_BILLING_LABEL} <ExternalLink className="w-3.5 h-3.5" />
                               </a>
                             ) : sub.stripeSubscriptionId ? (
                               isCancelPending ? (
