@@ -285,9 +285,10 @@ export const dashboardRouter = router({
 
     // Separate courses from quiz-type LMS items
     // "cohort" courses are live/scheduled cohort courses — include them alongside regular courses
-    const { isEnrollmentAccessActive } = await import("../lib/enrollmentAccess");
+    const { isEnrollmentAccessActive, isEnrollmentCompleted } = await import("../lib/enrollmentAccess");
     const activeEnrollments = enrollments.filter((e) =>
-      isEnrollmentAccessActive({ enrollmentType: "full", accessExpiresAt: e.accessExpiresAt }),
+      isEnrollmentAccessActive({ enrollmentType: "full", accessExpiresAt: e.accessExpiresAt })
+      || isEnrollmentCompleted({ completedAt: e.completedAt, progressPct: e.progressPct }),
     );
 
     // Enrich enrollments that have a stripeSubscriptionId with live Stripe data (cancelAtPeriodEnd, currentPeriodEnd)

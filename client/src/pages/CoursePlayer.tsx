@@ -22,7 +22,7 @@ import {
   Download, Eye, FileText, HelpCircle, Lock, Loader2, Menu, Maximize2, Minimize2, Monitor, PlayCircle, StickyNote, X,
   User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { formatCmeCreditPhrase } from "@shared/cmeCreditLabel";
 import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse } from "../../../shared/cmeLessonCompletion";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
@@ -2032,7 +2032,12 @@ export default function CoursePlayer() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-gray-600 leading-relaxed">
-              This course awards a <strong>CME certificate of completion</strong>. To unlock your certificate, please follow these steps:
+              {(() => {
+                const creditPhrase = formatCmeCreditPhrase((data as any)?.course?.creditHours);
+                return creditPhrase
+                  ? <>This course awards <strong>{creditPhrase}</strong> and a <strong>CME certificate of completion</strong>. To unlock your certificate, please follow these steps:</>
+                  : <>This course awards a <strong>CME certificate of completion</strong>. To unlock your certificate, please follow these steps:</>;
+              })()}
             </p>
             <div className="rounded-lg border border-teal-100 bg-teal-50 p-4 space-y-3">
               <div className="flex items-start gap-3">

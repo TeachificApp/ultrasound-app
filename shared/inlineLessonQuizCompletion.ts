@@ -11,10 +11,13 @@ export function evaluateInlineLessonQuizScore(score: number, passingScore: numbe
 export function shouldRestoreMissingCourseCertificate(input: {
   courseHasCertificate: boolean | number | null;
   courseHasCmeCredit?: boolean;
-  enrollmentCompletedAt: Date | null | undefined;
+  enrollmentCompletedAt?: Date | null | undefined;
+  enrollmentProgressPct?: number | null | undefined;
   hasCertificateRecord: boolean;
 }) {
+  const completed = Boolean(input.enrollmentCompletedAt)
+    || Number(input.enrollmentProgressPct ?? 0) >= 100;
   return Boolean(input.courseHasCertificate)
-    && Boolean(input.enrollmentCompletedAt)
+    && completed
     && !input.hasCertificateRecord;
 }

@@ -18,6 +18,7 @@
 import PDFDocument from "pdfkit";
 import https from "https";
 import http from "http";
+import { formatCmeCreditLabel } from "../../shared/cmeCreditLabel";
 import { PDFDocument as LibPDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 export interface CertificateTemplate {
@@ -217,7 +218,7 @@ export async function generateCertificatePdf(opts: CertificateOptions): Promise<
     const displayName = ph ? "" : (opts.credentials ? `${opts.learnerName}, ${opts.credentials}` : opts.learnerName);
     const courseTitle = ph ? "" : opts.courseTitle;
     const dateLabel = ph ? "" : `Issued: ${opts.issuedAt.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`;
-    const creditsLabel = ph ? "" : (opts.creditHours ? `${opts.creditHours} CME Credit${parseFloat(opts.creditHours) !== 1 ? "s" : ""}` : "");
+    const creditsLabel = ph ? "" : (formatCmeCreditLabel(opts.creditHours) ?? "");
 
     if (layout === "minimal") {
       doc.moveTo(40, 40).lineTo(W - 40, 40).lineWidth(2).stroke(TEAL);

@@ -23,7 +23,14 @@ describe("built-in lesson quiz completion for CME", () => {
     })).toBe(true);
     expect(shouldRestoreMissingCourseCertificate({
       courseHasCertificate: true,
+      enrollmentProgressPct: 100,
       enrollmentCompletedAt: null,
+      hasCertificateRecord: false,
+    })).toBe(true);
+    expect(shouldRestoreMissingCourseCertificate({
+      courseHasCertificate: true,
+      enrollmentCompletedAt: null,
+      enrollmentProgressPct: 92,
       hasCertificateRecord: false,
     })).toBe(false);
     expect(shouldRestoreMissingCourseCertificate({

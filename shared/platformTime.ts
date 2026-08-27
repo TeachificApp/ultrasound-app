@@ -65,11 +65,19 @@ export function resolveScheduledCountdownTarget(value: string | Date, timeZone =
   return parseScheduledTimestamp(value, timeZone, "end").getTime();
 }
 
+/** True when value parses to a finite epoch (rejects Invalid Date / zero dates). */
+export function isValidInstant(value: unknown): value is Date | string | number {
+  if (value == null || value === "") return false;
+  const t = new Date(value as Date | string | number).getTime();
+  return Number.isFinite(t);
+}
+
 export function formatInTimeZone(
   value: Date | string,
   options: Intl.DateTimeFormatOptions,
   timeZone = PLATFORM_TIMEZONE,
 ): string {
+  if (!isValidInstant(value)) return "—";
   return new Intl.DateTimeFormat("en-US", { ...options, timeZone }).format(new Date(value));
 }
 
