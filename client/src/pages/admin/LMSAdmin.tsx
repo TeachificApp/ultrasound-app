@@ -11006,12 +11006,24 @@ function QuestionBankAdmin() {
   const aiGenerate = trpc.questionBank.aiGenerateToBank.useMutation({ onSuccess: () => { refetch(); setShowAIPanel(false); setAITopic(""); } });
   const createTag = trpc.questionBank.createTag.useMutation({ onSuccess: () => { refetchTags(); refetch(); } });
   const deleteTag = trpc.questionBank.deleteTag.useMutation({ onSuccess: () => { refetchTags(); refetch(); setSelectedTagIds([]); } });
-  const { data: foldersData, refetch: refetchFolders } = trpc.questionBank.listFolders.useQuery();
+  const { data: foldersData, refetch: refetchFolders, error: foldersError } = trpc.questionBank.listFolders.useQuery();
   const folders = foldersData ?? [];
-  const createFolder = trpc.questionBank.createFolder.useMutation({ onSuccess: () => refetchFolders() });
-  const updateFolder = trpc.questionBank.updateFolder.useMutation({ onSuccess: () => { refetchFolders(); setEditingFolderId(null); setEditingFolderName(""); } });
-  const deleteFolder = trpc.questionBank.deleteFolder.useMutation({ onSuccess: () => refetchFolders() });
-  const reorderFolders = trpc.questionBank.reorderFolders.useMutation({ onSuccess: () => refetchFolders() });
+  const createFolder = trpc.questionBank.createFolder.useMutation({
+    onSuccess: () => { refetchFolders(); toast.success("Folder created"); },
+    onError: (e) => toast.error(e.message || "Could not create folder"),
+  });
+  const updateFolder = trpc.questionBank.updateFolder.useMutation({
+    onSuccess: () => { refetchFolders(); setEditingFolderId(null); setEditingFolderName(""); toast.success("Folder updated"); },
+    onError: (e) => toast.error(e.message || "Could not update folder"),
+  });
+  const deleteFolder = trpc.questionBank.deleteFolder.useMutation({
+    onSuccess: () => { refetchFolders(); toast.success("Folder deleted"); },
+    onError: (e) => toast.error(e.message || "Could not delete folder"),
+  });
+  const reorderFolders = trpc.questionBank.reorderFolders.useMutation({
+    onSuccess: () => refetchFolders(),
+    onError: (e) => toast.error(e.message || "Could not reorder folders"),
+  });
   const moveToFolder = trpc.questionBank.moveToFolder.useMutation({
     onSuccess: () => {
       refetch();
@@ -11127,7 +11139,12 @@ function QuestionBankAdmin() {
             <Button size="sm" variant="ghost" onClick={() => setShowFolderManager(false)}><X className="w-3.5 h-3.5" /></Button>
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto">
-            {folders.length === 0 && <p className="text-xs text-purple-600">No folders yet. Create one below.</p>}
+            {foldersError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                Could not load folders: {foldersError.message}
+              </p>
+            )}
+            {!foldersError && folders.length === 0 && <p className="text-xs text-purple-600">No folders yet. Create one below.</p>}
             {folders.map((f: any, index: number) => (
               <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-purple-200">
                 <div className="flex flex-col gap-0.5">

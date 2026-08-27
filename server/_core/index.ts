@@ -1130,6 +1130,12 @@ async function startServer() {
         return ensureAuthEmailSendLogSchema(db);
       })
       .catch((err) => console.error("[Startup] ensureAuthEmailSendLogSchema error:", err));
+    getDb()
+      .then(async (db) => {
+        const { ensureQuestionBankFoldersSchema } = await import("../lib/ensureQuestionBankFoldersSchema");
+        return ensureQuestionBankFoldersSchema(db);
+      })
+      .catch((err) => console.error("[Startup] ensureQuestionBankFoldersSchema error:", err));
     // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
       console.log("[Startup] Durable SCORM queue enabled — pending packages will not be skipped");

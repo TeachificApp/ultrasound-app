@@ -39,6 +39,17 @@ async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   }
 }
 
+async function ensureQuestionBankFoldersReady(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+  const { ensureQuestionBankFoldersSchema } = await import("../lib/ensureQuestionBankFoldersSchema");
+  const result = await ensureQuestionBankFoldersSchema(db);
+  if (result.error) {
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Question bank folders schema sync failed: ${result.error}`,
+    });
+  }
+}
+
 // ─── Shared question input schema ─────────────────────────────────────────────
 const questionInput = z.object({
   question: z.string().min(1),
@@ -828,6 +839,7 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await ensureQuestionBankFoldersReady(db);
       const folders = await db.select().from(questionBankFolders).orderBy(asc(questionBankFolders.sortOrder), asc(questionBankFolders.name));
       // Get question count per folder
       const counts = await db
@@ -850,6 +862,7 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await ensureQuestionBankFoldersReady(db);
       const [{ maxSort }] = await db
         .select({ maxSort: sql<number>`COALESCE(MAX(${questionBankFolders.sortOrder}), -1)` })
         .from(questionBankFolders);
@@ -900,6 +913,7 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await ensureQuestionBankFoldersReady(db);
       await Promise.all(
         input.folderIds.map((id, index) =>
           db.update(questionBankFolders).set({ sortOrder: index }).where(eq(questionBankFolders.id, id))
@@ -914,6 +928,7 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await ensureQuestionBankFoldersReady(db);
       const folders = await db
         .select()
         .from(questionBankFolders)
@@ -942,6 +957,7 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await ensureQuestionBankFoldersReady(db);
 
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {
