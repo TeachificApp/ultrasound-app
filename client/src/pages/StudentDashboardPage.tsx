@@ -827,7 +827,6 @@ function CommunityProfileSection({ userId }: { userId: number }) {
 type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "workshops" | "products" | "bundles" | "memberships" | "communities";
 
 function MyContentTab() {
-  const { data: profile } = trpc.dashboard.getProfile.useQuery();
   const { data, isLoading, isError, error, refetch } = trpc.dashboard.getMyContent.useQuery();
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
   const [autoTabSet, setAutoTabSet] = useState(false);
@@ -871,8 +870,6 @@ function MyContentTab() {
       </div>
     );
   }
-
-  const showLegacyThinkificLink = Boolean(profile?.thinkificEnrolledAt) && (data?.courses.length ?? 0) === 0;
 
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: data?.courses.length ?? 0 },
@@ -918,27 +915,7 @@ function MyContentTab() {
       {contentTab === "courses" && (
         <div>
           {(data?.courses.length ?? 0) === 0 ? (
-            showLegacyThinkificLink ? (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center space-y-4">
-                <BookOpen className="w-10 h-10 text-amber-600 mx-auto" />
-                <div>
-                  <p className="font-semibold text-amber-950">Looking for recorded CME classes?</p>
-                  <p className="text-sm text-amber-900 mt-2 max-w-lg mx-auto">
-                    Your recorded classes may be on our legacy learning platform. Sign in with the same email address to access them.
-                  </p>
-                </div>
-                <a
-                  href="https://member.allaboutultrasound.com/enrollments"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold transition-colors"
-                >
-                  Open Legacy Recorded Classes <ExternalLink className="w-4 h-4" />
-                </a>
-              </div>
-            ) : (
               <EmptyState icon={BookOpen} title="No courses yet" description="Enroll in a course to see it here." />
-            )
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {data?.courses.map((c, i) => (
@@ -1613,7 +1590,7 @@ function SubscriptionsTab() {
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors border border-indigo-200"
                               >
-                                Manage on Thinkific <ExternalLink className="w-3.5 h-3.5" />
+                                Manage billing <ExternalLink className="w-3.5 h-3.5" />
                               </a>
                             ) : sub.stripeSubscriptionId ? (
                               isCancelPending ? (
