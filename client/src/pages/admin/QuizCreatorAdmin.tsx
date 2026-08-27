@@ -1511,7 +1511,7 @@ function QuizList() {
                             const total = cats.reduce((s, c) => s + c.count, 0);
                             return (
                               <span className="text-xs text-teal-600 bg-teal-50 border border-teal-100 rounded px-1.5 py-0.5">
-                                {cats.length} {cats.length === 1 ? "category" : "categories"} · {total} q/attempt
+                                {cats.length} {cats.length === 1 ? "group" : "groups"} · {total} q/attempt
                               </span>
                             );
                           } catch { return null; }
@@ -1864,13 +1864,13 @@ function QuizEditor({ quizId }: { quizId: number }) {
                   </CardContent>
                 </Card>
 
-                {/* Category Draw Config */}
+                {/* Group Draw Config */}
                 <Card className="md:col-span-2 border-teal-200 bg-teal-50/30">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Database className="w-4 h-4 text-teal-600" /> Per-Category Question Draw
+                      <Database className="w-4 h-4 text-teal-600" /> Per-Group Question Draw
                     </CardTitle>
-                    <p className="text-xs text-gray-500 mt-1">Configure how many questions to draw from each question bank folder per attempt. Leave blank to use all questions.</p>
+                    <p className="text-xs text-gray-500 mt-1">Configure how many questions to draw from each question bank group (folder) per attempt. These are the same groups shown in results when &ldquo;Show question group names&rdquo; is enabled. Leave blank to use all questions.</p>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
@@ -1885,8 +1885,8 @@ function QuizEditor({ quizId }: { quizId: number }) {
                       </div>
                     </div>
                     <div>
-                      <Label className="mb-2 block">Category Question Draw</Label>
-                      <p className="text-xs text-gray-400 mb-3">Add folders and set how many questions to draw from each per attempt. Leave empty to draw all questions from all folders.</p>
+                      <Label className="mb-2 block">Group Question Draw</Label>
+                      <p className="text-xs text-gray-400 mb-3">Add question bank groups and set how many questions to draw from each per attempt. Leave empty to draw all questions from all groups.</p>
                       {/* Visual folder-picker rows */}
                       {(() => {
                         let rows: Array<{folderId: number|null, folderName: string, count: number}> = [];
@@ -1981,11 +1981,11 @@ function QuizEditor({ quizId }: { quizId: number }) {
                                 }}
                               >
                                 <SelectTrigger className="flex-1 h-8 text-sm border-dashed border-teal-300 text-teal-600">
-                                  <SelectValue placeholder="+ Add folder category..." />
+                                  <SelectValue placeholder="+ Add question group..." />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {!usedIds.has(null) && (
-                                    <SelectItem value="__uncategorized__">Uncategorized questions</SelectItem>
+                                    <SelectItem value="__uncategorized__">Uncategorized (no group)</SelectItem>
                                   )}
                                   {availableFolders.map((f: any) => (
                                     <SelectItem key={f.id} value={String(f.id)}>{f.name} ({f.questionCount ?? 0} questions)</SelectItem>
@@ -2027,7 +2027,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                     <div className="flex items-center justify-between">
                       <div>
                         <Label className="font-medium">Show question group names</Label>
-                        <p className="text-xs text-gray-500 mt-0.5">Display group section headers in results (e.g., "Group 1: Cardiac")</p>
+                        <p className="text-xs text-gray-500 mt-0.5">Display group section headers in results using question bank group names (e.g., &ldquo;Cardiac&rdquo;)</p>
                       </div>
                       <Switch
                         checked={settings.showGroupNames !== false}
