@@ -1485,12 +1485,23 @@ function QuizList() {
                           </Button>
                         </form>
                       ) : (
-                        <button
-                          onClick={() => navigate(`/admin/quiz-creator/${quiz.id}`)}
-                          className="font-medium text-gray-900 hover:text-teal-700 text-left"
-                        >
-                          {quiz.title}
-                        </button>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <button
+                            onClick={() => navigate(`/admin/quiz-creator/${quiz.id}`)}
+                            className="font-medium text-gray-900 hover:text-teal-700 text-left truncate"
+                          >
+                            {quiz.title}
+                          </button>
+                          <button
+                            type="button"
+                            title="Rename quiz"
+                            aria-label={`Rename ${quiz.title}`}
+                            className="flex-shrink-0 rounded p-0.5 text-gray-400 hover:text-teal-600 hover:bg-teal-50"
+                            onClick={() => { setRenamingId(quiz.id); setRenameValue(quiz.title); }}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       )}
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-xs text-gray-400">{quiz.brand === "aaus" ? "All About Ultrasound" : "iHeartEcho"}</span>
@@ -1535,15 +1546,6 @@ function QuizList() {
                         </Button>
                         <Button size="sm" variant="ghost" title="Edit Quiz" onClick={() => navigate(`/admin/quiz-creator/${quiz.id}`)}>
                           <Edit2 className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          title="Rename Quiz"
-                          className="text-gray-500 hover:text-gray-700"
-                          onClick={() => { setRenamingId(quiz.id); setRenameValue(quiz.title); }}
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
                         </Button>
                         <Button
                           size="sm"
