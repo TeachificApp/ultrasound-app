@@ -858,7 +858,7 @@ function MyContentTab() {
 
   if (isError) {
     const message = error.message === "Database unavailable"
-      ? "Our servers are temporarily unavailable. Please try again in a few minutes."
+      ? "We couldn't load your content right now. Please try again."
       : error.message;
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center space-y-3">
