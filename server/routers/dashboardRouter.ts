@@ -15,6 +15,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { resolveAssetUrl, resolveAssetUrls } from "../lib/resolveAssetUrl";
 import {
   users,
   lmsEnrollments,
@@ -111,6 +112,7 @@ export const dashboardRouter = router({
 
     return {
       ...user,
+      avatarUrl: resolveAssetUrl(user.avatarUrl),
       hasPassword: !!user.passwordHash,
       hasActiveThinkificSubscription,
       passwordHash: undefined, // never expose hash
@@ -641,10 +643,12 @@ export const dashboardRouter = router({
       iheartecho: { premium: "EchoAssist™ Premium", free: "EchoAssist™ Free", basic: "EchoAssist™ Basic" },
     };
     const BRAND_COVER_IMAGES: Record<string, string> = {
-      // aaus: UltrasoundAssist™ — teal probe hero banner
-      aaus: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp",
-      // iheartecho: EchoAssist™ — teal heart hero banner
-      iheartecho: "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp",
+      aaus: resolveAssetUrl(
+        "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp",
+      )!,
+      iheartecho: resolveAssetUrl(
+        "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp",
+      )!,
     };
     const brandMembershipCards = brandMembershipRows.map(m => ({
       type: "brand" as const,
@@ -658,7 +662,7 @@ export const dashboardRouter = router({
       expiresAt: m.expiresAt,
     }));
 
-    return {
+    return resolveAssetUrls({
       courses: [...courses, ...membershipCourses, ...bundleCourses],
       quizzes: [...quizzes, ...membershipQuizzes, ...bundleQuizzes],
       downloads: [
@@ -674,7 +678,7 @@ export const dashboardRouter = router({
       communities: [...communityRegs, ...membershipCommunities],
       funnelPurchases: funnelPurchaseRows,
       memberships: [...membershipCards, ...brandMembershipCards],
-    };
+    });
   }),
 
   // ── Subscriptions ─────────────────────────────────────────────────────────────
@@ -1080,7 +1084,7 @@ export const dashboardRouter = router({
       .where(eq(lmsCertificates.userId, ctx.user.id))
       .orderBy(desc(lmsCertificates.issuedAt));
 
-    return certs;
+    return resolveAssetUrls(certs);
   }),
 
   // ── Purchases (all one-time transactions + subscription invoice payments) ────

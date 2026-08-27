@@ -38,6 +38,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { detectBrandFromHostname, detectBrandMode } from "../../shared/brands";
+import { resolveAssetUrls } from "../lib/resolveAssetUrl";
 import { startChallengeCron } from "../jobs/challengeCron";
 import { startMediaPurgeCron } from "../jobs/mediaPurgeCron";
 import { startEmailCampaignScheduler } from "../routers/emailCampaignRouter";
@@ -152,7 +153,7 @@ async function startServer() {
 
     res.setHeader("Content-Type", "application/manifest+json");
     res.setHeader("Cache-Control", "public, max-age=3600");
-    res.json(manifest);
+    res.json(resolveAssetUrls(manifest));
   });
 
   // Debug endpoint to check brand detection from hostname
