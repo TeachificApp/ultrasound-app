@@ -1227,6 +1227,72 @@ function AllResultsView() {
   );
 }
 
+function BatchScormNativeImportDialog({
+  open,
+  onClose,
+  onComplete,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onComplete: () => void;
+}) {
+  const [replaceExisting, setReplaceExisting] = useState(false);
+  const { data: assets, isLoading } = trpc.quizMaker.listImportableScormQuizAssets.useQuery(
+    { limit: 200 },
+    { enabled: open },
+  );
+  const batchMut = trpc.quizMaker.batchImportScormNativeQuizzes.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Imported ${res.created.length} native quiz(es)`);
+      if (res.skipped.length) toast.message(`${res.skipped.length} skipped (flashcards or already imported)`);
+      if (res.errors.length) toast.error(`${res.errors.length} failed — see console`);
+      console.info("[batchImportScormNativeQuizzes]", res);
+      onComplete();
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Import SCORM/ZIP Quizzes to Native Quiz Creator</DialogTitle>
+          <DialogDescription>
+            Converts each iSpring SCORM/ZIP/.quiz package in the Media Repository into its own native quiz
+            with questions, media, feedback, settings, and branching. Flashcard decks are skipped automatically.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-gray-500"><Loader2 className="w-4 h-4 animate-spin" /> Loading media library…</div>
+          ) : (
+            <p className="text-gray-600">
+              Found <strong>{assets?.length ?? 0}</strong> SCORM/ZIP package(s) eligible for native import.
+              Each package becomes a separate draft quiz in Quiz Creator.
+            </p>
+          )}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={replaceExisting} onChange={(e) => setReplaceExisting(e.target.checked)} />
+            <span>Replace quizzes previously imported from the same media asset</span>
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            className="bg-orange-600 hover:bg-orange-700"
+            disabled={batchMut.isPending || isLoading || !(assets?.length)}
+            onClick={() => batchMut.mutate({ replaceExisting, limit: 200 })}
+          >
+            {batchMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+            Import All to Native Quizzes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function QuizList() {
   const [, navigate] = useLocation();
   const [mainView, setMainView] = useState<"quizzes" | "results">("quizzes");
@@ -1236,6 +1302,7 @@ function QuizList() {
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showBatchScormImport, setShowBatchScormImport] = useState(false);
 
   const { data, isLoading, refetch } = trpc.standaloneQuizAdmin.listQuizzes.useQuery({
     search: search || undefined,
@@ -1297,6 +1364,9 @@ function QuizList() {
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate("/admin/quiz-creator/builder/new")} className="border-teal-300 text-teal-700 hover:bg-teal-50">
               <FileQuestion className="w-4 h-4 mr-2" /> Visual Builder
+            </Button>
+            <Button variant="outline" onClick={() => setShowBatchScormImport(true)} className="border-amber-300 text-amber-800 hover:bg-amber-50">
+              <Database className="w-4 h-4 mr-2" /> Import All SCORM/ZIP
             </Button>
             <Button variant="outline" onClick={() => setShowImport(true)} className="border-orange-300 text-orange-700 hover:bg-orange-50">
               <Upload className="w-4 h-4 mr-2" /> Import Quiz
@@ -1589,6 +1659,11 @@ function QuizList() {
         open={showImport}
         onClose={() => setShowImport(false)}
       onCreated={(quizId) => { navigate(`/admin/quiz-creator/${quizId}`); }}
+      />
+      <BatchScormNativeImportDialog
+        open={showBatchScormImport}
+        onClose={() => setShowBatchScormImport(false)}
+        onComplete={() => refetch()}
       />
       </div>
     </>

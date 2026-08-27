@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { convertDocumentToQuiz } from "../client/src/quiz-creator/lib/ispringImporter";
+import { convertDocumentToQuiz } from "../shared/ispringDocumentToQuiz";
 
 describe("iSpring Visual Builder import", () => {
   it("preserves iSpring group boundaries and media-backed questions", () => {

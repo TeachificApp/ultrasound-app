@@ -9,6 +9,13 @@ export function parseMediaRepoUrl(
   return { slug: decodeURIComponent(match[1]), path };
 }
 
+/** True when a media-repo URL should use the SCORM viewer (display blocks), not /download. */
+export function isMediaRepoScormViewerPath(url: string): boolean {
+  const parsed = parseMediaRepoUrl(url);
+  if (!parsed) return false;
+  return parsed.path === "scorm" || parsed.path === "embed";
+}
+
 export function isMediaRepoEmbedUrl(url: string): boolean {
   return parseMediaRepoUrl(url) != null;
 }

@@ -22,6 +22,12 @@ import {
   type QuizFile,
   type QuizBranding,
 } from "../lib/quizBuilderConfig";
+import {
+  batchImportScormQuizzesToNative,
+  convertMediaAssetToNativeQuiz,
+  importMediaAssetToNativeQuiz,
+  listImportableScormQuizAssets,
+} from "../lib/scormQuizBuilderImport";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -388,5 +394,65 @@ export const quizMakerRouter = router({
         .limit(input.limit)
         .offset(input.offset);
       return { attempts, total: attempts.length };
+    }),
+
+  listImportableScormQuizAssets: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }).optional())
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      return listImportableScormQuizAssets(input?.limit ?? 200);
+    }),
+
+  previewScormNativeImport: protectedProcedure
+    .input(z.object({ mediaAssetId: z.number().int() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const converted = await convertMediaAssetToNativeQuiz(input.mediaAssetId);
+      const meta = converted.quizFile.meta as Record<string, unknown>;
+      return {
+        title: String(meta.title ?? "Imported Quiz"),
+        questionCount: converted.questionCount,
+        mediaCount: converted.mediaCount,
+        groups: (meta.groups as unknown[]) ?? [],
+        branchingEnabled: Boolean(meta.branchingEnabled),
+        passingScore: Number(meta.passingScore ?? 70),
+        warnings: converted.warnings,
+        sampleQuestions: converted.quizFile.questions.slice(0, 3).map((q) => {
+          const question = q as Record<string, unknown>;
+          return {
+            type: question.type,
+            stem: question.stem,
+            hasFeedback: Boolean((question.feedback as Record<string, unknown> | undefined)?.correct),
+            branchRuleCount: Array.isArray(question.branchRules) ? question.branchRules.length : 0,
+          };
+        }),
+      };
+    }),
+
+  importScormNativeQuiz: protectedProcedure
+    .input(z.object({
+      mediaAssetId: z.number().int(),
+      replaceExisting: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      return importMediaAssetToNativeQuiz(input.mediaAssetId, ctx.user.id, {
+        replaceExisting: input.replaceExisting,
+      });
+    }),
+
+  batchImportScormNativeQuizzes: protectedProcedure
+    .input(z.object({
+      mediaAssetIds: z.array(z.number().int()).optional(),
+      replaceExisting: z.boolean().optional(),
+      limit: z.number().int().min(1).max(500).default(200),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      return batchImportScormQuizzesToNative(ctx.user.id, {
+        mediaAssetIds: input.mediaAssetIds,
+        replaceExisting: input.replaceExisting,
+        limit: input.limit,
+      });
     }),
 });
