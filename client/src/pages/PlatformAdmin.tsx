@@ -1875,14 +1875,6 @@ export default function PlatformAdmin() {
     { enabled: !!isAdmin },
   );
 
-  const verifyManusAiMutation = trpc.system.verifyManusAi.useMutation({
-    onSuccess: (data) => {
-      if (data.connected) toast.success("Railway can reach Manus AI. No task was created.");
-      else toast.error("Railway could not verify the Manus AI connection. Check the Railway service logs and variable name.");
-    },
-    onError: (error) => toast.error(`Manus AI verification failed: ${error.message}`),
-  });
-
   const assignRoleMutation = trpc.platformAdmin.assignRole.useMutation({
     onSuccess: () => {
       toast.success("Role assigned successfully.");
@@ -2027,30 +2019,6 @@ export default function PlatformAdmin() {
             </Card>
           ))}
         </div>
-
-        <Card className="mb-8 border border-[#189aa1]/20 shadow-sm">
-          <CardContent className="p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-[#189aa1]/10">
-                <Zap className="w-4 h-4 text-[#189aa1]" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Railway Manus AI connection</p>
-                <p className="text-xs text-gray-500 mt-0.5">Runs a server-only status check. It does not create a Manus task or reveal the API key.</p>
-              </div>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => verifyManusAiMutation.mutate()}
-              disabled={verifyManusAiMutation.isPending}
-              className="bg-[#189aa1] text-white hover:bg-[#117e84]"
-            >
-              {verifyManusAiMutation.isPending ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
-              Verify connection
-            </Button>
-          </CardContent>
-        </Card>
 
         {/* ── Dual App Tools ────────────────────────────────────────── */}
         <div className="mb-8">

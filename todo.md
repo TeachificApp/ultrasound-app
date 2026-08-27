@@ -96,3 +96,5 @@
 - [ ] Verify the Railway-held `MANUS_API_KEY` through a server-side health-safe integration path without logging or exposing its value.
 - [x] Add a secure Manus API v2 server client and task lifecycle handling without using managed Forge credentials or exposing keys to browsers.
 - [ ] Connect the selected application AI workflows to the Railway-held Manus API client and validate their success and provider-error states.
+- [x] Remove the unrequested administrator-facing Manus AI connection control only after receiving explicit approval for that specific rollback.
+- [ ] Present a proposed scope and obtain explicit approval before every future implementation, deployment, or configuration change.
