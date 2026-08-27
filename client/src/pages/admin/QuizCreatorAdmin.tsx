@@ -5,7 +5,8 @@
  *   /admin/quiz-creator          — list all quizzes
  *   /admin/quiz-creator/:quizId  — edit a specific quiz (settings + questions + analytics)
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { flattenQuestionBankFolderTree, questionBankFolderOptionLabel } from "@shared/questionBankFolders";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -76,6 +77,7 @@ function FolderTagPicker({
   accentColor?: "teal" | "orange" | "purple";
 }) {
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const folderTree = useMemo(() => flattenQuestionBankFolderTree(folders), [folders]);
   const accent = {
     teal: { border: "border-teal-200", bg: "bg-teal-50", text: "text-teal-700", label: "text-teal-700" },
     orange: { border: "border-orange-200", bg: "bg-orange-50", text: "text-orange-700", label: "text-orange-700" },
@@ -94,7 +96,7 @@ function FolderTagPicker({
               className={`flex-1 h-9 rounded-md border ${accent.border} bg-white px-3 text-sm`}
             >
               <option value="">— No folder —</option>
-              {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              {folderTree.map(f => <option key={f.id} value={f.id}>{questionBankFolderOptionLabel(f.name, f.depth)}</option>)}
             </select>
             <Button type="button" size="sm" variant="outline" className={`${accent.border} ${accent.text}`} onClick={() => { setShowNewFolder(true); setSelectedFolderId(null); }}>
               <FolderPlus className="w-3.5 h-3.5 mr-1" /> New
@@ -170,7 +172,6 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
   const [uploading, setUploading] = useState(false);
   const [scormPreview, setScormPreview] = useState<any>(null);
   const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
-  const [scormGroupPrefix, setScormGroupPrefix] = useState("");
   const [csvPreview, setCsvPreview] = useState<any>(null);
   const [newQuizTitle, setNewQuizTitle] = useState("");
   const [newQuizType, setNewQuizType] = useState<"quiz" | "mock_exam">("quiz");
@@ -192,7 +193,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
 
   const reset = () => {
     setFile(null); setScormPreview(null); setScormSelectedGroups(new Set());
-    setScormGroupPrefix(""); setCsvPreview(null); setNewQuizTitle("");
+    setCsvPreview(null); setNewQuizTitle("");
     setFolderId(null); setNewFolderName(""); setTagIds([]);
   };
 
@@ -230,7 +231,6 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
           bufferBase64: await fileToBase64(file),
           groupIds: Array.from(scormSelectedGroups),
           extraTagIds: tagIds.length > 0 ? tagIds : undefined,
-          groupPrefix: scormGroupPrefix.trim() || undefined,
           folderId: folderId ?? undefined,
           newFolderName: newFolderName.trim() || undefined,
         });
@@ -345,11 +345,6 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
                     </Button>
                   </div>
 
-                  <div>
-                    <Label className="text-xs font-medium text-orange-700 mb-1 block">Group Name Prefix <span className="text-gray-400 font-normal">(optional)</span></Label>
-                    <Input value={scormGroupPrefix} onChange={e => setScormGroupPrefix(e.target.value)} placeholder="e.g. OB-GYN" className="border-orange-200" />
-                  </div>
-
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-orange-700 block">Select Groups to Import</Label>
                     {scormPreview.groups.map((group: any) => (
@@ -364,9 +359,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
                         >
                           <input type="checkbox" checked={scormSelectedGroups.has(group.id)} readOnly className="w-4 h-4 accent-orange-600" />
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-800">
-                              {scormGroupPrefix ? <><span className="text-orange-600">{scormGroupPrefix}_</span>{group.name}</> : group.name}
-                            </p>
+                            <p className="text-sm font-medium text-gray-800">{group.name}</p>
                             <p className="text-xs text-gray-500">{group.questionCount} question{group.questionCount !== 1 ? "s" : ""}</p>
                           </div>
                         </div>
@@ -537,7 +530,6 @@ export function AddQuestionsDialog({
   const [scormUploading, setScormUploading] = useState(false);
   const [scormPreview, setScormPreview] = useState<any>(null);
   const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
-  const [scormGroupPrefix, setScormGroupPrefix] = useState("");
   const [scormFolderId, setScormFolderId] = useState<number | null>(null);
   const [scormNewFolderName, setScormNewFolderName] = useState("");
   const [scormTagIds, setScormTagIds] = useState<number[]>([]);
@@ -556,7 +548,6 @@ export function AddQuestionsDialog({
   const [mlSelectedAssetId, setMlSelectedAssetId] = useState<number | null>(null);
   const [mlPreview, setMlPreview] = useState<any>(null);
   const [mlSelectedGroups, setMlSelectedGroups] = useState<Set<string>>(new Set());
-  const [mlGroupPrefix, setMlGroupPrefix] = useState("");
   const [mlFolderId, setMlFolderId] = useState<number | null>(null);
   const [mlNewFolderName, setMlNewFolderName] = useState("");
   const [mlTagIds, setMlTagIds] = useState<number[]>([]);
@@ -569,6 +560,7 @@ export function AddQuestionsDialog({
   const { data: foldersData } = trpc.questionBank.listFolders.useQuery(undefined, { enabled: open });
   const { data: tagsData } = trpc.questionBank.listTags.useQuery(undefined, { enabled: open });
   const folders = foldersData ?? [];
+  const folderTree = useMemo(() => flattenQuestionBankFolderTree(folders), [folders]);
   const tags = tagsData ?? [];
   const { data: visualBuilderQuiz } = trpc.quizMaker.getQuiz.useQuery({ quizId }, { enabled: open });
   const aiGroups = (visualBuilderQuiz?.builderConfig as any)?.meta?.groups ?? [];
@@ -639,11 +631,11 @@ export function AddQuestionsDialog({
     setBankFolderId(""); setBankTagId("");
     setAITopic(""); setAIGenerated(null); setAISelectedIds(new Set()); setAITagIds([]);
     setAIFolderId(null); setAINewFolderName(""); setAIGroupId(""); setAiSourceFiles([]); setAiSourceUploading(false);
-    setScormFile(null); setScormPreview(null); setScormSelectedGroups(new Set()); setScormGroupPrefix("");
+    setScormFile(null); setScormPreview(null); setScormSelectedGroups(new Set());
     setScormFolderId(null); setScormNewFolderName(""); setScormTagIds([]);
     setCsvFile(null); setCsvPreview(null); setCsvFolderId(null); setCsvNewFolderName(""); setCsvTagIds([]);
     setMlSearch(""); setMlSelectedAssetId(null); setMlPreview(null); setMlSelectedGroups(new Set());
-    setMlGroupPrefix(""); setMlFolderId(null); setMlNewFolderName(""); setMlTagIds([]); setMlPreviewing(false);
+    setMlFolderId(null); setMlNewFolderName(""); setMlTagIds([]); setMlPreviewing(false);
   };
 
   const handleScormUpload = async (f: File) => {
@@ -711,7 +703,6 @@ export function AddQuestionsDialog({
       bufferBase64: await fileToBase64(scormFile),
       groupIds: Array.from(scormSelectedGroups),
       extraTagIds: scormTagIds.length > 0 ? scormTagIds : undefined,
-      groupPrefix: scormGroupPrefix.trim() || undefined,
       folderId: scormFolderId ?? undefined,
       newFolderName: scormNewFolderName.trim() || undefined,
     });
@@ -752,7 +743,7 @@ export function AddQuestionsDialog({
               </div>
               <select value={bankFolderId} onChange={e => { setBankFolderId(e.target.value); setQPage(1); }} className="h-9 rounded-md border border-gray-200 bg-white px-2 text-sm min-w-[130px]">
                 <option value="">All folders</option>
-                {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                {folderTree.map(f => <option key={f.id} value={f.id}>{questionBankFolderOptionLabel(f.name, f.depth)}</option>)}
               </select>
               <select value={bankTagId} onChange={e => { setBankTagId(e.target.value); setQPage(1); }} className="h-9 rounded-md border border-gray-200 bg-white px-2 text-sm min-w-[110px]">
                 <option value="">All tags</option>
@@ -964,10 +955,6 @@ export function AddQuestionsDialog({
                     </div>
                     <Button size="sm" variant="ghost" onClick={() => { setScormPreview(null); setScormFile(null); }}><X className="w-4 h-4" /></Button>
                   </div>
-                  <div>
-                    <Label className="text-xs font-medium text-orange-700 mb-1 block">Group Name Prefix <span className="text-gray-400 font-normal">(optional)</span></Label>
-                    <Input value={scormGroupPrefix} onChange={e => setScormGroupPrefix(e.target.value)} placeholder="e.g. OB-GYN" className="border-orange-200" />
-                  </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-medium text-orange-700 block">Select Groups to Import</Label>
                     {scormPreview.groups.map((group: any) => (
@@ -976,9 +963,7 @@ export function AddQuestionsDialog({
                           onClick={() => setScormSelectedGroups(prev => { const next = new Set(prev); if (next.has(group.id)) next.delete(group.id); else next.add(group.id); return next; })}>
                           <input type="checkbox" checked={scormSelectedGroups.has(group.id)} readOnly className="w-4 h-4 accent-orange-600" />
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-800">
-                              {scormGroupPrefix ? <><span className="text-orange-600">{scormGroupPrefix}_</span>{group.name}</> : group.name}
-                            </p>
+                            <p className="text-sm font-medium text-gray-800">{group.name}</p>
                             <p className="text-xs text-gray-500">{group.questionCount} question{group.questionCount !== 1 ? "s" : ""}</p>
                           </div>
                         </div>
