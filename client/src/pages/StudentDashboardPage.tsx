@@ -37,7 +37,7 @@ import Layout from "@/components/Layout";
 import { THINKIFIC_LEGACY_BILLING_LABEL } from "@shared/thinkificLegacy";
 import UserAvatar from "@/components/UserAvatar";
 import { isMembersDomain, isLearnDomain, LEARN_APP_URL, APP_URL, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
-import { formatInTimeZone, isInstantExpired, PLATFORM_TIMEZONE } from "@shared/platformTime";
+import { formatInTimeZone, isInstantExpired, isValidInstant, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 export function resolveDashboardSubscriptionCancelledAt(
   stripeSubscriptionId: string | null | undefined,
@@ -80,8 +80,8 @@ function BrandBadge({ brand }: { brand?: string | null }) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDate(date: Date | string | null | undefined): string {
-  if (!date) return "—";
-  return formatInTimeZone(date, { year: "numeric", month: "short", day: "numeric" }, PLATFORM_TIMEZONE);
+  if (!isValidInstant(date)) return "—";
+  return formatInTimeZone(date!, { year: "numeric", month: "short", day: "numeric" }, PLATFORM_TIMEZONE);
 }
 
 function formatCurrency(cents: number, currency = "usd"): string {
@@ -2065,8 +2065,8 @@ function ContentCard({
           <p className={`text-xs mb-1 flex items-center gap-1 ${cancelAtPeriodEnd ? "text-orange-500" : "text-teal-600"}`}>
             {cancelAtPeriodEnd ? <XCircle className="w-3 h-3 flex-shrink-0" /> : <Clock className="w-3 h-3 flex-shrink-0" />}
             {cancelAtPeriodEnd
-              ? `Cancels ${formatInTimeZone(stripePeriodEnd, { month: "short", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)}`
-              : `Renews ${formatInTimeZone(stripePeriodEnd, { month: "short", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)}`
+              ? `Cancels ${formatDate(stripePeriodEnd)}`
+              : `Renews ${formatDate(stripePeriodEnd)}`
             }
           </p>
         )}
@@ -2074,7 +2074,7 @@ function ContentCard({
         {expiresAt && !subscriptionCancelledAt && !stripePeriodEnd && (
           <p className="text-xs text-amber-600 mb-1 flex items-center gap-1">
             <Clock className="w-3 h-3" />
-            Access until {formatInTimeZone(expiresAt, { month: "short", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)}
+            Access until {formatDate(expiresAt)}
           </p>
         )}
         {trackingInfo && (
@@ -2101,7 +2101,7 @@ function ContentCard({
         {subscriptionCancelledAt && (
           <p className="text-xs text-orange-600 mt-2 flex items-center gap-1 font-medium">
             <XCircle className="w-3 h-3 flex-shrink-0" />
-            Subscription cancelled — access ends {formatInTimeZone(subscriptionCancelledAt, { month: "long", day: "numeric", year: "numeric" }, PLATFORM_TIMEZONE)}
+            Subscription cancelled — access ends {formatDate(subscriptionCancelledAt)}
           </p>
         )}
       </div>

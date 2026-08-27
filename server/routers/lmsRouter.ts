@@ -3491,16 +3491,22 @@ export const lmsLearnerRouter = router({
           id: lmsEnrollments.id,
           enrollmentType: lmsEnrollments.enrollmentType,
           completedAt: lmsEnrollments.completedAt,
+          progressPct: lmsEnrollments.progressPct,
         }).from(lmsEnrollments).where(and(
           eq(lmsEnrollments.userId, ctx.user.id),
           eq(lmsEnrollments.courseId, course.id),
         )).limit(1);
-        if (shouldRestoreMissingCourseCertificate({
+        if (enrollment && shouldRestoreMissingCourseCertificate({
           courseHasCertificate: course.hasCertificate,
           courseHasCmeCredit: Boolean(course.creditHours),
-          enrollmentCompletedAt: enrollment?.completedAt,
+          enrollmentCompletedAt: enrollment.completedAt,
+          enrollmentProgressPct: enrollment.progressPct,
           hasCertificateRecord: Boolean(cert),
         })) {
+          if (!enrollment.completedAt && Number(enrollment.progressPct ?? 0) >= 100) {
+            await db.update(lmsEnrollments).set({ completedAt: new Date() })
+              .where(eq(lmsEnrollments.id, enrollment.id));
+          }
           await issueCertificateIfEnabled(db, enrollment.id, ctx.user.id, course.id, enrollment.enrollmentType ?? undefined, {
             completedCmeRecovery: true,
           });

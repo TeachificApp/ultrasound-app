@@ -2,7 +2,7 @@
  * Enrollment access helpers — expiry-aware active enrollment checks.
  */
 
-import { and, eq, or, isNull, gt, inArray } from "drizzle-orm";
+import { and, eq, or, isNull, gt, inArray, isNotNull, gte } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
 import {
@@ -18,7 +18,29 @@ export type EnrollmentRow = {
   enrollmentType: string;
   accessExpiresAt?: Date | null;
   enrolledAt?: Date;
+  completedAt?: Date | null;
+  progressPct?: number | null;
 };
+
+const enrollmentSelect = {
+  id: lmsEnrollments.id,
+  userId: lmsEnrollments.userId,
+  courseId: lmsEnrollments.courseId,
+  enrollmentType: lmsEnrollments.enrollmentType,
+  accessExpiresAt: lmsEnrollments.accessExpiresAt,
+  enrolledAt: lmsEnrollments.enrolledAt,
+  completedAt: lmsEnrollments.completedAt,
+  progressPct: lmsEnrollments.progressPct,
+};
+
+/** True when the learner finished the course (certificate / review access). */
+export function isEnrollmentCompleted(enrollment: {
+  completedAt?: Date | null;
+  progressPct?: number | null;
+}): boolean {
+  if (enrollment.completedAt) return true;
+  return Number(enrollment.progressPct ?? 0) >= 100;
+}
 
 /** True when enrollment grants access right now */
 export function isEnrollmentAccessActive(enrollment: {
@@ -40,15 +62,8 @@ export async function getActiveEnrollment(
   userId: number,
   courseId: number,
 ): Promise<EnrollmentRow | null> {
-  const [row] = await db
-    .select({
-      id: lmsEnrollments.id,
-      userId: lmsEnrollments.userId,
-      courseId: lmsEnrollments.courseId,
-      enrollmentType: lmsEnrollments.enrollmentType,
-      accessExpiresAt: lmsEnrollments.accessExpiresAt,
-      enrolledAt: lmsEnrollments.enrolledAt,
-    })
+  const [activeRow] = await db
+    .select(enrollmentSelect)
     .from(lmsEnrollments)
     .where(
       and(
@@ -58,7 +73,25 @@ export async function getActiveEnrollment(
       ),
     )
     .limit(1);
-  return row ?? null;
+  if (activeRow) return activeRow;
+
+  // Completed learners retain read-only access for overview, player review, and certificates
+  // even when subscription/time-limited access has expired.
+  const [completedRow] = await db
+    .select(enrollmentSelect)
+    .from(lmsEnrollments)
+    .where(
+      and(
+        eq(lmsEnrollments.userId, userId),
+        eq(lmsEnrollments.courseId, courseId),
+        or(
+          isNotNull(lmsEnrollments.completedAt),
+          gte(lmsEnrollments.progressPct, 100),
+        ),
+      ),
+    )
+    .limit(1);
+  return completedRow ?? null;
 }
 
 export async function userHasActiveMembershipPlan(

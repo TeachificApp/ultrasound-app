@@ -170,17 +170,14 @@ export async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enro
     : [{ count: 0 }];
   const completed = Number(completedRows[0]?.count ?? 0);
   const pct = Math.round((completed / total) * 100);
-  const wasCompleted = !!enrollRow.completedAt;
 
   await db.update(lmsEnrollments).set({
     progressPct: pct,
-    completedAt: pct >= 100 ? new Date() : null,
+    completedAt: pct >= 100 ? (enrollRow.completedAt ?? new Date()) : null,
   }).where(eq(lmsEnrollments.id, enrollmentId));
 
-  // Issue certificate if newly completed and course has hasCertificate enabled.
-  // issueCertificateIfEnabled internally checks enrollment.completedAt against CERT_CUTOFF_DATE,
-  // so completions that happened before the cutoff will be silently skipped there.
-  if (pct >= 100 && !wasCompleted) {
+  // Issue certificate when course is complete — retries if async issuance failed earlier.
+  if (pct >= 100) {
     void issueCertificateIfEnabled(db, enrollmentId, enrollRow.userId, courseId, enrollRow.enrollmentType).catch(e =>
       console.error("[certificate] Failed to issue certificate:", e)
     );

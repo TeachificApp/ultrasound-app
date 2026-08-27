@@ -19,6 +19,7 @@
  */
 
 import { PDFDocument, TextAlignment } from "pdf-lib";
+import { formatCmeCreditLabel } from "../../shared/cmeCreditLabel";
 
 export interface OverlayOptions {
   learnerName: string;
@@ -51,9 +52,7 @@ export async function overlayLearnerData(
 
     // Fill each field if it exists — silently skip missing fields so legacy
     // templates (plain-text placeholders) degrade gracefully.
-    const creditsValue = opts.creditHours
-      ? `${opts.creditHours} CME Credit${parseFloat(opts.creditHours) !== 1 ? "s" : ""}`
-      : "";
+    const creditsValue = formatCmeCreditLabel(opts.creditHours) ?? "";
 
     const fieldMap: Record<string, string> = {
       learner_name: opts.learnerName,

@@ -116,6 +116,7 @@ export async function sendEnrollmentEmail(opts: {
   to: { name: string; email: string };
   courseTitle: string;
   courseSlug: string;
+  creditHours?: string | null;
   customSubject?: string | null;
   customIntro?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
@@ -123,8 +124,12 @@ export async function sendEnrollmentEmail(opts: {
   /** For new guest accounts: URL to set a permanent password */
   setPasswordUrl?: string | null;
 }): Promise<boolean> {
+  const { formatCmeCreditLabel } = await import("../../shared/cmeCreditLabel");
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
-  const subject = opts.customSubject || `Welcome to "${opts.courseTitle}" 🎉`;
+  const creditLabel = formatCmeCreditLabel(opts.creditHours);
+  const subject = opts.customSubject || (creditLabel
+    ? `Welcome to "${opts.courseTitle}" — ${creditLabel} 🎉`
+    : `Welcome to "${opts.courseTitle}" 🎉`);
   // Link directly to the course player so the user lands in the course immediately after sign-in
   const courseDestination = `https://learn.allaboutultrasound.com/courses/${opts.courseSlug}/player`;
   const courseUrl = buildAccessUrl(courseDestination, opts.accessToken);
@@ -153,7 +158,9 @@ export async function sendEnrollmentEmail(opts: {
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
         <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
         <li style="margin:4px 0;">Track your progress and complete lessons at your own pace</li>
-        <li style="margin:4px 0;">Earn a certificate of completion when you finish</li>
+        <li style="margin:4px 0;">${creditLabel
+          ? `Earn your certificate of completion (${creditLabel}) when you finish`
+          : "Earn a certificate of completion when you finish"}</li>
       </ul>
     </div>
     ${accessCtaWithFallback(courseUrl, "Start Learning Now")}
@@ -187,7 +194,12 @@ export async function sendEnrollmentEmailForUser(opts: {
 
     // Fetch course flag
     const [course] = await db
-      .select({ title: lmsCourses.title, slug: lmsCourses.slug, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail })
+      .select({
+        title: lmsCourses.title,
+        slug: lmsCourses.slug,
+        creditHours: lmsCourses.creditHours,
+        sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail,
+      })
       .from(lmsCourses)
       .where(eq(lmsCourses.id, opts.courseId))
       .limit(1);
@@ -219,6 +231,7 @@ export async function sendEnrollmentEmailForUser(opts: {
       to: { name: user.name || user.email.split("@")[0], email: user.email },
       courseTitle: course.title,
       courseSlug: course.slug,
+      creditHours: course.creditHours,
       accessToken,
     });
   } catch (err) {
