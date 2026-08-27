@@ -12,7 +12,7 @@
  *   Analytics    — overview stats
  */
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { cn } from "@/lib/utils";
+import { cn, stripHtml } from "@/lib/utils";
 import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
 import { formatScheduledInput, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import {
@@ -10947,6 +10947,12 @@ function QuestionBankAdmin() {
   const [scormFolderId, setScormFolderId] = useState<number | null>(null);
   const [scormNewFolderName, setScormNewFolderName] = useState("");
   const [exportLoading, setExportLoading] = useState(false);
+  const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState("");
+  const [bulkFolderValue, setBulkFolderValue] = useState("");
+  const [bulkNewFolderName, setBulkNewFolderName] = useState("");
+  const [bulkAddTagIds, setBulkAddTagIds] = useState<number[]>([]);
+  const [bulkRemoveTagIds, setBulkRemoveTagIds] = useState<number[]>([]);
 
   async function handleExportZip() {
     setExportLoading(true);
@@ -10983,7 +10989,7 @@ function QuestionBankAdmin() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: tagsData } = trpc.questionBank.listTags.useQuery();
+  const { data: tagsData, refetch: refetchTags } = trpc.questionBank.listTags.useQuery();
   const tags = tagsData ?? [];
 
   const { data, isLoading, refetch } = trpc.questionBank.listQuestions.useQuery({
@@ -10998,13 +11004,28 @@ function QuestionBankAdmin() {
   const deleteQ = trpc.questionBank.deleteQuestion.useMutation({ onSuccess: () => { refetch(); setSelectedIds(new Set()); } });
   const bulkDelete = trpc.questionBank.bulkDeleteQuestions.useMutation({ onSuccess: () => { refetch(); setSelectedIds(new Set()); } });
   const aiGenerate = trpc.questionBank.aiGenerateToBank.useMutation({ onSuccess: () => { refetch(); setShowAIPanel(false); setAITopic(""); } });
-  const createTag = trpc.questionBank.createTag.useMutation({ onSuccess: () => refetch() });
-  const deleteTag = trpc.questionBank.deleteTag.useMutation({ onSuccess: () => refetch() });
+  const createTag = trpc.questionBank.createTag.useMutation({ onSuccess: () => { refetchTags(); refetch(); } });
+  const deleteTag = trpc.questionBank.deleteTag.useMutation({ onSuccess: () => { refetchTags(); refetch(); setSelectedTagIds([]); } });
   const { data: foldersData, refetch: refetchFolders } = trpc.questionBank.listFolders.useQuery();
   const folders = foldersData ?? [];
   const createFolder = trpc.questionBank.createFolder.useMutation({ onSuccess: () => refetchFolders() });
-  const updateFolder = trpc.questionBank.updateFolder.useMutation({ onSuccess: () => refetchFolders() });
+  const updateFolder = trpc.questionBank.updateFolder.useMutation({ onSuccess: () => { refetchFolders(); setEditingFolderId(null); setEditingFolderName(""); } });
   const deleteFolder = trpc.questionBank.deleteFolder.useMutation({ onSuccess: () => refetchFolders() });
+  const reorderFolders = trpc.questionBank.reorderFolders.useMutation({ onSuccess: () => refetchFolders() });
+  const moveToFolder = trpc.questionBank.moveToFolder.useMutation({
+    onSuccess: () => {
+      refetch();
+      refetchFolders();
+      setBulkFolderValue("");
+      setBulkNewFolderName("");
+    },
+  });
+  const bulkAddTags = trpc.questionBank.bulkAddTags.useMutation({
+    onSuccess: () => { refetch(); setBulkAddTagIds([]); },
+  });
+  const bulkRemoveTags = trpc.questionBank.bulkRemoveTags.useMutation({
+    onSuccess: () => { refetch(); setBulkRemoveTagIds([]); },
+  });
   const scormPreviewMut = trpc.questionBank.previewScormImport.useMutation({
     onSuccess: (data) => { setScormPreview(data); setScormSelectedGroups(new Set(data.groups.map((g: any) => g.id))); },
     onError: (e) => alert(`Preview failed: ${e.message}`),
@@ -11036,6 +11057,47 @@ function QuestionBankAdmin() {
     });
   };
 
+  const moveFolder = (folderId: number, direction: "up" | "down") => {
+    const idx = folders.findIndex((f: { id: number }) => f.id === folderId);
+    if (idx < 0) return;
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= folders.length) return;
+    const reordered = [...folders];
+    [reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]];
+    reorderFolders.mutate({ folderIds: reordered.map((f: { id: number }) => f.id) });
+  };
+
+  const startEditFolder = (folder: { id: number; name: string }) => {
+    setEditingFolderId(folder.id);
+    setEditingFolderName(folder.name);
+  };
+
+  const saveEditFolder = () => {
+    const name = editingFolderName.trim();
+    if (!editingFolderId || !name) return;
+    updateFolder.mutate({ id: editingFolderId, name });
+  };
+
+  const selectedQuestionIds = [...selectedIds];
+
+  const applyBulkFolderMove = () => {
+    if (!bulkFolderValue || selectedQuestionIds.length === 0) return;
+    if (bulkFolderValue === "__new__") {
+      const name = bulkNewFolderName.trim();
+      if (!name) return;
+      moveToFolder.mutate({ questionIds: selectedQuestionIds, newFolderName: name });
+      return;
+    }
+    moveToFolder.mutate({
+      questionIds: selectedQuestionIds,
+      folderId: bulkFolderValue === "__none__" ? null : Number(bulkFolderValue),
+    });
+  };
+
+  const tagsOnSelectedQuestions = tags.filter(tag =>
+    questions.some(q => selectedIds.has(q.id) && (q.tags ?? []).some((t: { id: number }) => t.id === tag.id))
+  );
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -11066,10 +11128,31 @@ function QuestionBankAdmin() {
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {folders.length === 0 && <p className="text-xs text-purple-600">No folders yet. Create one below.</p>}
-            {folders.map((f: any) => (
-              <div key={f.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-purple-200">
-                <span className="text-sm text-gray-800 flex items-center gap-2"><FolderOpen className="w-3.5 h-3.5 text-purple-500" />{f.name}</span>
-                <button onClick={() => { if (confirm(`Delete folder "\${f.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: f.id }); }} className="text-red-400 hover:text-red-600"><X className="w-3.5 h-3.5" /></button>
+            {folders.map((f: any, index: number) => (
+              <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-purple-200">
+                <div className="flex flex-col gap-0.5">
+                  <button type="button" disabled={index === 0 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "up")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
+                  <button type="button" disabled={index === folders.length - 1 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "down")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
+                </div>
+                <FolderOpen className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
+                {editingFolderId === f.id ? (
+                  <Input value={editingFolderName} onChange={e => setEditingFolderName(e.target.value)} className="h-8 text-sm flex-1 bg-white border-purple-200" onKeyDown={e => { if (e.key === "Enter") saveEditFolder(); if (e.key === "Escape") { setEditingFolderId(null); setEditingFolderName(""); } }} autoFocus />
+                ) : (
+                  <span className="text-sm text-gray-800 flex-1">{f.name}{f.questionCount ? <span className="text-xs text-gray-400 ml-2">({f.questionCount})</span> : null}</span>
+                )}
+                <div className="flex items-center gap-1">
+                  {editingFolderId === f.id ? (
+                    <>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600" onClick={saveEditFolder} disabled={!editingFolderName.trim() || updateFolder.isPending}><CheckCircle className="w-3.5 h-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setEditingFolderId(null); setEditingFolderName(""); }}><X className="w-3.5 h-3.5" /></Button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => startEditFolder(f)} className="text-gray-400 hover:text-purple-700 p-1"><Pencil className="w-3.5 h-3.5" /></button>
+                      <button type="button" onClick={() => { if (confirm(`Delete folder "${f.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: f.id }); }} className="text-red-400 hover:text-red-600 p-1"><X className="w-3.5 h-3.5" /></button>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -11094,7 +11177,7 @@ function QuestionBankAdmin() {
             {tags.map(tag => (
               <span key={tag.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-white" style={{ backgroundColor: tag.color }}>
                 {tag.name}
-                <button onClick={() => { if (confirm(`Delete tag "${tag.name}"?`)) deleteTag.mutate({ id: tag.id }); }} className="ml-1 hover:opacity-70"><X className="w-3 h-3" /></button>
+                <button onClick={() => { if (confirm(`Delete tag "${tag.name}" from all questions?`)) deleteTag.mutate({ id: tag.id }); }} className="ml-1 hover:opacity-70"><X className="w-3 h-3" /></button>
               </span>
             ))}
           </div>
@@ -11335,12 +11418,85 @@ function QuestionBankAdmin() {
           ))}
         </div>
         {selectedIds.size > 0 && (
-          <Button size="sm" variant="outline" className="border-red-300 text-red-600 hover:bg-red-50 gap-1.5 ml-auto"
-            onClick={() => { if (confirm(`Delete ${selectedIds.size} question(s)?`)) bulkDelete.mutate({ ids: [...selectedIds] }); }}>
-            <Trash2 className="w-3.5 h-3.5" /> Delete {selectedIds.size} selected
+          <Button size="sm" variant="ghost" className="ml-auto text-gray-500" onClick={() => setSelectedIds(new Set())}>
+            Clear selection
           </Button>
         )}
       </div>
+
+      {/* Bulk actions */}
+      {selectedIds.size > 0 && (
+        <div className="border border-teal-200 rounded-xl p-4 bg-teal-50 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-teal-800">{selectedIds.size} question{selectedIds.size !== 1 ? "s" : ""} selected</span>
+            <Button size="sm" variant="outline" className="border-red-300 text-red-600 hover:bg-red-50 gap-1.5"
+              onClick={() => { if (confirm(`Delete ${selectedIds.size} question(s)?`)) bulkDelete.mutate({ ids: selectedQuestionIds }); }}>
+              <Trash2 className="w-3.5 h-3.5" /> Delete
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-teal-700">Move to folder</Label>
+              <div className="flex flex-wrap gap-2">
+                <select value={bulkFolderValue} onChange={e => { setBulkFolderValue(e.target.value); if (e.target.value !== "__new__") setBulkNewFolderName(""); }} className="h-9 rounded-md border border-teal-200 bg-white px-3 text-sm flex-1 min-w-[180px]">
+                  <option value="">Choose folder...</option>
+                  <option value="__none__">No folder (unfiled)</option>
+                  {folders.map((f: { id: number; name: string }) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
+                  <option value="__new__">+ Create new folder...</option>
+                </select>
+                {bulkFolderValue === "__new__" && (
+                  <Input value={bulkNewFolderName} onChange={e => setBulkNewFolderName(e.target.value)} placeholder="New folder name..." className="h-9 text-sm bg-white border-teal-200 flex-1 min-w-[160px]" />
+                )}
+                <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white gap-1.5" disabled={!bulkFolderValue || moveToFolder.isPending || (bulkFolderValue === "__new__" && !bulkNewFolderName.trim())}
+                  onClick={applyBulkFolderMove}>
+                  {moveToFolder.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FolderOpen className="w-3.5 h-3.5" />}
+                  Move
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-teal-700">Add tags</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {tags.map(tag => (
+                  <button key={tag.id} type="button" onClick={() => setBulkAddTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                    className={cn("px-2.5 py-1 rounded-full text-xs font-medium border transition-all", bulkAddTagIds.includes(tag.id) ? "text-white border-transparent" : "bg-white text-gray-600 border-gray-200")}
+                    style={bulkAddTagIds.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color } : {}}>
+                    {tag.name}
+                  </button>
+                ))}
+                {tags.length === 0 && <span className="text-xs text-teal-600">Create tags in the Tags panel first.</span>}
+              </div>
+              <Button size="sm" variant="outline" className="border-teal-300 text-teal-700 hover:bg-teal-100 gap-1.5" disabled={bulkAddTagIds.length === 0 || bulkAddTags.isPending}
+                onClick={() => bulkAddTags.mutate({ questionIds: selectedQuestionIds, tagIds: bulkAddTagIds })}>
+                {bulkAddTags.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Tag className="w-3.5 h-3.5" />}
+                Add {bulkAddTagIds.length > 0 ? bulkAddTagIds.length : ""} tag{bulkAddTagIds.length !== 1 ? "s" : ""}
+              </Button>
+            </div>
+          </div>
+
+          {tagsOnSelectedQuestions.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-teal-700">Remove tags from selection</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {tagsOnSelectedQuestions.map(tag => (
+                  <button key={tag.id} type="button" onClick={() => setBulkRemoveTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                    className={cn("px-2.5 py-1 rounded-full text-xs font-medium border transition-all", bulkRemoveTagIds.includes(tag.id) ? "text-white border-transparent ring-2 ring-red-300" : "bg-white text-gray-600 border-gray-200")}
+                    style={bulkRemoveTagIds.includes(tag.id) ? { backgroundColor: tag.color, borderColor: tag.color } : {}}>
+                    {tag.name}
+                  </button>
+                ))}
+              </div>
+              <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50 gap-1.5" disabled={bulkRemoveTagIds.length === 0 || bulkRemoveTags.isPending}
+                onClick={() => bulkRemoveTags.mutate({ questionIds: selectedQuestionIds, tagIds: bulkRemoveTagIds })}>
+                {bulkRemoveTags.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
+                Remove {bulkRemoveTagIds.length > 0 ? bulkRemoveTagIds.length : ""} tag{bulkRemoveTagIds.length !== 1 ? "s" : ""}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
@@ -11368,8 +11524,8 @@ function QuestionBankAdmin() {
                 <tr key={q.id} className={cn("hover:bg-gray-50 transition-colors", selectedIds.has(q.id) && "bg-teal-50")}>
                   <td className="px-3 py-2.5"><input type="checkbox" checked={selectedIds.has(q.id)} onChange={() => toggleSelect(q.id)} className="rounded" /></td>
                   <td className="px-3 py-2.5">
-                    <p className="font-medium text-gray-800 line-clamp-2">{q.question}</p>
-                    {q.explanation && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">Explanation: {q.explanation}</p>}
+                    <p className="font-medium text-gray-800 line-clamp-2">{stripHtml(q.question)}</p>
+                    {q.explanation && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">Explanation: {stripHtml(q.explanation)}</p>}
                     {q.isPreset && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200 mt-0.5">⭐ Preset{q.presetCategory ? ` · ${q.presetCategory}` : ""}</span>}
                   </td>
                   <td className="px-3 py-2.5">
@@ -11380,7 +11536,10 @@ function QuestionBankAdmin() {
                   <td className="px-3 py-2.5">
                     <div className="flex flex-wrap gap-1">
                       {(q.tags ?? []).map((tag: any) => (
-                        <span key={tag.id} className="px-1.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: tag.color }}>{tag.name}</span>
+                        <span key={tag.id} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: tag.color }}>
+                          {tag.name}
+                          <button type="button" title={`Remove tag "${tag.name}"`} onClick={() => bulkRemoveTags.mutate({ questionIds: [q.id], tagIds: [tag.id] })} className="hover:opacity-70"><X className="w-3 h-3" /></button>
+                        </span>
                       ))}
                     </div>
                   </td>

@@ -28,6 +28,7 @@ import path from "path";
 import os from "os";
 import { buildAiSourceMessage } from "../lib/aiSourceFile";
 import { buildAiQuestionBankInsertValues } from "../lib/aiQuestionBankPersistence";
+import { plainTextFromISpring, plainTextFromISpringContent } from "../lib/questionBankImportSanitize";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -754,7 +755,7 @@ export const questionBankRouter = router({
       const questionBankIds: number[] = [];
 
       for (const group of groups) {
-        const rawName = group.name.trim();
+        const rawName = plainTextFromISpring(group.name) || `Group ${results.length + 1}`;
         const tagName = input.groupPrefix ? `${input.groupPrefix.trim()}_${rawName}` : rawName;
         let tagId: number;
         const [existingTag] = await db
@@ -776,12 +777,24 @@ export const questionBankRouter = router({
         let inserted = 0;
 
         for (const q of group.questions) {
-          const questionText = rewriteStorageRefs(q.questionHtml || q.questionText, imageMap);
+          const questionText = plainTextFromISpringContent(
+            q.questionText,
+            q.questionHtml,
+            (value) => rewriteStorageRefs(value, imageMap),
+          );
           const options = q.answers.map(a => ({
-            text: rewriteStorageRefs(a.html || a.text, imageMap),
+            text: plainTextFromISpringContent(
+              a.text,
+              a.html,
+              (value) => rewriteStorageRefs(value, imageMap),
+            ),
             ...(a.imageRef ? { imageUrl: imageMap.get(a.imageRef) ?? a.imageRef } : {}),
           }));
-          const explanation = rewriteStorageRefs(q.explanationHtml || q.explanationText || "", imageMap) || null;
+          const explanation = plainTextFromISpringContent(
+            q.explanationText,
+            q.explanationHtml,
+            (value) => rewriteStorageRefs(value, imageMap),
+          ) || null;
 
           const [result] = await db.insert(questionBank).values({
             question: questionText,
@@ -815,7 +828,7 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const folders = await db.select().from(questionBankFolders).orderBy(asc(questionBankFolders.name));
+      const folders = await db.select().from(questionBankFolders).orderBy(asc(questionBankFolders.sortOrder), asc(questionBankFolders.name));
       // Get question count per folder
       const counts = await db
         .select({ folderId: questionBank.folderId, count: sql<number>`COUNT(*)` })
@@ -837,11 +850,15 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [{ maxSort }] = await db
+        .select({ maxSort: sql<number>`COALESCE(MAX(${questionBankFolders.sortOrder}), -1)` })
+        .from(questionBankFolders);
       const [result] = await db.insert(questionBankFolders).values({
         name: input.name,
         description: input.description ?? null,
         parentId: input.parentId ?? null,
         color: input.color,
+        sortOrder: Number(maxSort ?? -1) + 1,
         createdByAdminId: ctx.user.id,
       }).$returningId();
       return { id: result.id };
@@ -877,6 +894,20 @@ export const questionBankRouter = router({
       return { ok: true };
     }),
 
+  reorderFolders: protectedProcedure
+    .input(z.object({ folderIds: z.array(z.number().int()).min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await Promise.all(
+        input.folderIds.map((id, index) =>
+          db.update(questionBankFolders).set({ sortOrder: index }).where(eq(questionBankFolders.id, id))
+        )
+      );
+      return { ok: true };
+    }),
+
   /** List folders shared into SonoQuiz (for SonoQuizCreator to use as quiz sources) */
   listSonoQuizSharedFolders: protectedProcedure
     .query(async ({ ctx }) => {
@@ -887,7 +918,7 @@ export const questionBankRouter = router({
         .select()
         .from(questionBankFolders)
         .where(eq(questionBankFolders.sharedInSonoQuiz, true))
-        .orderBy(asc(questionBankFolders.name));
+        .orderBy(asc(questionBankFolders.sortOrder), asc(questionBankFolders.name));
       // For each folder, count questions
       const counts = await Promise.all(folders.map(async (f) => {
         const [{ cnt }] = await db
@@ -901,16 +932,82 @@ export const questionBankRouter = router({
   moveToFolder: protectedProcedure
     .input(z.object({
       questionIds: z.array(z.number().int()).min(1),
-      folderId: z.number().int().nullable(),
+      folderId: z.number().int().nullable().optional(),
+      newFolderName: z.string().max(200).optional(),
+    }).refine(
+      (v) => v.folderId !== undefined || !!v.newFolderName?.trim(),
+      { message: "Provide folderId (or null to unfile) or newFolderName" },
+    ))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      let resolvedFolderId: number | null = null;
+      if (input.newFolderName?.trim()) {
+        const [{ maxSort }] = await db
+          .select({ maxSort: sql<number>`COALESCE(MAX(${questionBankFolders.sortOrder}), -1)` })
+          .from(questionBankFolders);
+        const [newFolder] = await db.insert(questionBankFolders).values({
+          name: input.newFolderName.trim(),
+          color: "#179ca3",
+          sortOrder: Number(maxSort ?? -1) + 1,
+          createdByAdminId: ctx.user.id,
+        }).$returningId();
+        resolvedFolderId = newFolder.id;
+      } else {
+        resolvedFolderId = input.folderId ?? null;
+      }
+
+      await db.update(questionBank)
+        .set({ folderId: resolvedFolderId })
+        .where(inArray(questionBank.id, input.questionIds));
+      return { moved: input.questionIds.length, folderId: resolvedFolderId };
+    }),
+
+  bulkAddTags: protectedProcedure
+    .input(z.object({
+      questionIds: z.array(z.number().int()).min(1),
+      tagIds: z.array(z.number().int()).min(1),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      await db.update(questionBank)
-        .set({ folderId: input.folderId })
-        .where(inArray(questionBank.id, input.questionIds));
-      return { moved: input.questionIds.length };
+
+      const existing = await db
+        .select({ questionId: questionBankTagMap.questionId, tagId: questionBankTagMap.tagId })
+        .from(questionBankTagMap)
+        .where(and(
+          inArray(questionBankTagMap.questionId, input.questionIds),
+          inArray(questionBankTagMap.tagId, input.tagIds),
+        ));
+      const existingSet = new Set(existing.map(r => `${r.questionId}:${r.tagId}`));
+      const toInsert = input.questionIds.flatMap(questionId =>
+        input.tagIds
+          .filter(tagId => !existingSet.has(`${questionId}:${tagId}`))
+          .map(tagId => ({ questionId, tagId })),
+      );
+      if (toInsert.length > 0) {
+        await db.insert(questionBankTagMap).values(toInsert);
+      }
+      return { added: toInsert.length };
+    }),
+
+  bulkRemoveTags: protectedProcedure
+    .input(z.object({
+      questionIds: z.array(z.number().int()).min(1),
+      tagIds: z.array(z.number().int()).min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await db.delete(questionBankTagMap).where(and(
+        inArray(questionBankTagMap.questionId, input.questionIds),
+        inArray(questionBankTagMap.tagId, input.tagIds),
+      ));
+      return { removed: input.questionIds.length * input.tagIds.length };
     }),
 
   /**
