@@ -8,18 +8,18 @@ export type StandaloneQuizVisibilityStatus =
 
 /**
  * Published quizzes retain their ordinary learner access checks. A draft or
- * otherwise unpublished quiz can be opened only when an authenticated admin
- * explicitly requests preview mode. This prevents preview URLs from exposing
+ * otherwise unpublished quiz can be opened only when authenticated staff
+ * explicitly request preview mode. This prevents preview URLs from exposing
  * unfinished content to learners.
  */
 export function canOpenStandaloneQuiz(
   status: StandaloneQuizVisibilityStatus,
-  role: string,
   adminPreview = false,
+  isStaff = false,
 ) {
-  return status === "published" || (adminPreview && role === "admin");
+  return status === "published" || (adminPreview && isStaff);
 }
 
-export function requiresEmbeddedLearnerAccess(role: string, adminPreview = false) {
-  return !(adminPreview && role === "admin");
+export function requiresEmbeddedLearnerAccess(adminPreview = false, isStaff = false) {
+  return !(adminPreview && isStaff);
 }

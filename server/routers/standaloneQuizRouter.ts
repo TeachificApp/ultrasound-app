@@ -10,7 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull, isNotNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
+import { getDb, getUserRoles } from "../db";
 import {
   standaloneQuizzes,
   standaloneQuizQuestions,
@@ -32,6 +32,10 @@ import { builderQuestionFromQuestionBank, mergeCanonicalBuilderQuestion, questio
 import { buildStandaloneLearnerOptions, orderQuestionOptions } from "../lib/questionOptionOrder";
 import { canOpenStandaloneQuiz, requiresEmbeddedLearnerAccess } from "../lib/standaloneQuizPreviewAccess";
 import {
+  isStandaloneQuizStaff,
+  resolveStandaloneQuizAdminPreview,
+} from "../lib/standaloneQuizStaffAccess";
+import {
   buildStandaloneQuizWidgetEmbed,
   createStandaloneQuizWidgetToken,
   DEFAULT_WIDGET_LAUNCH_EXPIRY_DAYS,
@@ -41,10 +45,22 @@ import {
 } from "../lib/standaloneQuizWidgetAccess";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-async function assertAdmin(ctx: { user: { id: number; role: string } }) {
-  if (ctx.user.role !== "admin") {
+async function assertStandaloneQuizStaff(ctx: { user: { id: number; role: string } }) {
+  if (isStandaloneQuizStaff(ctx.user.role)) return;
+  const appRoles = await getUserRoles(ctx.user.id);
+  if (!isStandaloneQuizStaff(ctx.user.role, appRoles)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
   }
+}
+
+async function resolveStandaloneQuizLearnerAccess(
+  ctx: { user: { id: number; role: string } },
+  requestedPreview: boolean,
+) {
+  const appRoles = isStandaloneQuizStaff(ctx.user.role) ? [] : await getUserRoles(ctx.user.id);
+  const isStaff = isStandaloneQuizStaff(ctx.user.role, appRoles);
+  const adminPreview = resolveStandaloneQuizAdminPreview(ctx.user.role, isStaff, requestedPreview);
+  return { isStaff, adminPreview };
 }
 
 /** Quiz Creator content is available through an assigned LMS lesson, not as a public standalone product. */
@@ -239,12 +255,12 @@ export const standaloneQuizLearnerRouter = router({
         .from(standaloneQuizzes)
         .where(eq(standaloneQuizzes.id, input.quizId))
         .limit(1);
-      const adminPreview = ctx.user.role === "admin";
-      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, adminPreview)) {
+      const { isStaff, adminPreview } = await resolveStandaloneQuizLearnerAccess(ctx, input.adminPreview);
+      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], adminPreview, isStaff)) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
       const hasWidgetAccess = await hasActiveWidgetLaunch(db, input.widgetToken, quiz.id);
-      if (requiresEmbeddedLearnerAccess(ctx.user.role, adminPreview) && !hasWidgetAccess) {
+      if (requiresEmbeddedLearnerAccess(adminPreview, isStaff) && !hasWidgetAccess) {
         await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       }
       const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
@@ -278,7 +294,14 @@ export const standaloneQuizLearnerRouter = router({
         quiz.allowRetakes
           ? quiz.maxAttempts === null || attemptCount < quiz.maxAttempts
           : attemptCount === 0;
-      return { ...quiz, questionCount, attemptCount, canAttempt, builderConfig: builderConfig?.meta ?? null };
+      return {
+        ...quiz,
+        questionCount,
+        attemptCount,
+        canAttempt,
+        builderConfig: builderConfig?.meta ?? null,
+        isPreview: adminPreview && quiz.status !== "published",
+      };
     }),
 
   /** Start a new attempt — returns attempt ID and the ordered questions */
@@ -292,12 +315,12 @@ export const standaloneQuizLearnerRouter = router({
         .from(standaloneQuizzes)
       .where(eq(standaloneQuizzes.id, input.quizId))
         .limit(1);
-      const adminPreview = ctx.user.role === "admin";
-      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, adminPreview)) {
+      const { isStaff, adminPreview } = await resolveStandaloneQuizLearnerAccess(ctx, input.adminPreview);
+      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], adminPreview, isStaff)) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
       const hasWidgetAccess = await hasActiveWidgetLaunch(db, input.widgetToken, quiz.id);
-      if (requiresEmbeddedLearnerAccess(ctx.user.role, adminPreview) && !hasWidgetAccess) {
+      if (requiresEmbeddedLearnerAccess(adminPreview, isStaff) && !hasWidgetAccess) {
         await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       }
 
@@ -759,7 +782,7 @@ export const standaloneQuizAdminRouter = router({
       pageSize: z.number().int().min(1).max(100).default(25),
     }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const conditions: any[] = [];
@@ -789,7 +812,7 @@ export const standaloneQuizAdminRouter = router({
   getQuiz: protectedProcedure
     .input(z.object({ id: z.number().int() }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [quiz] = await db
@@ -848,7 +871,7 @@ export const standaloneQuizAdminRouter = router({
       expiresInDays: z.number().int().min(1).max(MAX_WIDGET_LAUNCH_EXPIRY_DAYS).default(DEFAULT_WIDGET_LAUNCH_EXPIRY_DAYS),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [quiz] = await db.select().from(standaloneQuizzes).where(eq(standaloneQuizzes.id, input.quizId)).limit(1);
@@ -887,7 +910,7 @@ export const standaloneQuizAdminRouter = router({
   revokeWidgetLaunch: protectedProcedure
     .input(z.object({ quizId: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const now = new Date();
@@ -904,7 +927,7 @@ export const standaloneQuizAdminRouter = router({
   createQuiz: protectedProcedure
     .input(quizSettingsInput)
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [result] = await db.insert(standaloneQuizzes).values({
@@ -919,7 +942,7 @@ export const standaloneQuizAdminRouter = router({
   updateQuiz: protectedProcedure
     .input(z.object({ id: z.number().int() }).merge(quizSettingsInput.partial()))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, showResultsAfterDate, ...rest } = input;
@@ -935,7 +958,7 @@ export const standaloneQuizAdminRouter = router({
   deleteQuiz: protectedProcedure
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Delete in dependency order
@@ -962,7 +985,7 @@ export const standaloneQuizAdminRouter = router({
       points: z.number().int().min(1).default(1),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Get max sort_order
@@ -987,7 +1010,7 @@ export const standaloneQuizAdminRouter = router({
       points: z.number().int().min(1).default(1),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [{ maxOrder }] = await db
@@ -1019,7 +1042,7 @@ export const standaloneQuizAdminRouter = router({
   removeQuestion: protectedProcedure
     .input(z.object({ standaloneQuizQuestionId: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(standaloneQuizQuestions).where(eq(standaloneQuizQuestions.id, input.standaloneQuizQuestionId));
@@ -1030,7 +1053,7 @@ export const standaloneQuizAdminRouter = router({
   updateQuestionPoints: protectedProcedure
     .input(z.object({ standaloneQuizQuestionId: z.number().int(), points: z.number().int().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(standaloneQuizQuestions)
@@ -1043,7 +1066,7 @@ export const standaloneQuizAdminRouter = router({
   updateQuestionAnswerOrder: protectedProcedure
     .input(z.object({ standaloneQuizQuestionId: z.number().int(), lockAnswerOrder: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.update(standaloneQuizQuestions)
@@ -1059,7 +1082,7 @@ export const standaloneQuizAdminRouter = router({
       orderedIds: z.array(z.number().int()), // standaloneQuizQuestion IDs in new order
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       for (let i = 0; i < input.orderedIds.length; i++) {
@@ -1074,7 +1097,7 @@ export const standaloneQuizAdminRouter = router({
   getAnalytics: protectedProcedure
     .input(z.object({ quizId: z.number().int() }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [quiz] = await db.select().from(standaloneQuizzes).where(eq(standaloneQuizzes.id, input.quizId)).limit(1);
@@ -1154,7 +1177,7 @@ export const standaloneQuizAdminRouter = router({
       pageSize: z.number().int().min(1).max(100).default(25),
     }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const offset = (input.page - 1) * input.pageSize;
@@ -1181,7 +1204,7 @@ export const standaloneQuizAdminRouter = router({
   duplicateQuiz: protectedProcedure
     .input(z.object({ id: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Fetch original quiz
@@ -1233,7 +1256,7 @@ export const standaloneQuizResultsAdminRouter = router({
       pageSize: z.number().int().min(1).max(100).default(25),
     }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const conditions: any[] = [isNotNull(standaloneQuizAttempts.completedAt)];
