@@ -31,6 +31,7 @@ import { ensureUserOpenId } from "../lib/ensureUserOpenId";
 import { setAuthSessionCookies } from "../lib/setAuthSessionCookies";
 import { sendAuthRedirectHtml, withAuthPending } from "../lib/sendAuthRedirectHtml";
 import { normalizeAuthEmail } from "../../shared/normalizeAuthEmail";
+import { resolveMagicLinkReturnPath } from "../lib/magicLinkReturnPath";
 import {
   completeAccessTokenLogin,
   resolveAccessRedirectUrl,
@@ -126,7 +127,7 @@ export function registerAuthLoginRoute(app: Express) {
    */
   app.get("/api/auth/magic-verify", async (req: Request, res: Response) => {
     const { token, returnTo, host: hostParam } = req.query as Record<string, string>;
-    const successRedirect = returnTo && returnTo.startsWith("/") ? returnTo : "/my-dashboard";
+    const successRedirect = resolveMagicLinkReturnPath(returnTo);
     if (!token) {
       return res.redirect(`/auth/magic-error?reason=missing_token`);
     }
