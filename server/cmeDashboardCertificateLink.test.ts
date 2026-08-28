@@ -20,7 +20,7 @@ describe("course overview enrollment access", () => {
     const page = readFileSync(resolve(process.cwd(), "client/src/pages/CourseOverview.tsx"), "utf8");
     expect(access).toContain("resolveEnrollmentByCourseSlug");
     expect(router).toContain("resolveEnrollmentByCourseSlug");
-    expect(router).toContain("inArray(lmsLessons.sectionId, sectionIds)");
+    expect(router).toContain("loadPublishedCourseLessonTree");
     expect(page).toContain('error.data?.code === "FORBIDDEN"');
   });
 
@@ -30,8 +30,6 @@ describe("course overview enrollment access", () => {
     expect(playerStart).toBeGreaterThan(-1);
     const nextProcedure = router.indexOf("\n  /** Get a single lesson", playerStart);
     const playerChunk = router.slice(playerStart, nextProcedure > playerStart ? nextProcedure : playerStart + 8000);
-    expect(playerChunk).toContain("const lessonScope = sectionIds.length > 0");
-    expect(playerChunk).toContain("inArray(lmsLessons.sectionId, sectionIds)");
-    expect(playerChunk).toContain("and(lessonScope, eq(lmsLessons.lessonStatus");
+    expect(playerChunk).toContain("loadPublishedCourseLessonTree");
   });
 });

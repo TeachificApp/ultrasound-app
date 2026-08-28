@@ -1541,7 +1541,7 @@ export default function CoursePlayer() {
       setShowCourseStartModal(true);
     }
   }, [data, slug, isPreviewMode, adminPreviewStudent]);
-  const { data: lessonData, isLoading: lessonLoading, refetch: refetchLesson } = trpc.lmsLearner.getLesson.useQuery(
+  const { data: lessonData, isLoading: lessonLoading, isError: lessonError, error: lessonQueryError, refetch: refetchLesson } = trpc.lmsLearner.getLesson.useQuery(
     { lessonId: selectedLessonId! },
     { enabled: !!selectedLessonId }
   );
@@ -2468,6 +2468,11 @@ export default function CoursePlayer() {
                 </button>
               </div>
             )}
+            {allLessons.length === 0 && (
+              <div className="px-4 py-8 text-center text-xs text-gray-500">
+                No published lessons are available in this course yet.
+              </div>
+            )}
             {/* Top-level lessons */}
             {topLevelLessons.map((lesson: any, idx: number) => {
               const done = completedIds.has(lesson.id);
@@ -2717,6 +2722,13 @@ export default function CoursePlayer() {
               <div className="p-8 space-y-4">
                 <Skeleton className="h-8 w-1/2" />
                 <Skeleton className="h-64 w-full" />
+              </div>
+            ) : lessonError ? (
+              <div className="text-center py-16 px-6 max-w-lg mx-auto">
+                <Lock className="w-10 h-10 mx-auto mb-3 text-amber-500" />
+                <p className="text-base font-semibold text-gray-800 mb-2">This lesson is unavailable</p>
+                <p className="text-sm text-gray-500 mb-4">{lessonQueryError?.message ?? "You may not have access to this lesson yet."}</p>
+                <Button variant="outline" onClick={() => refetchLesson()}>Try Again</Button>
               </div>
             ) : lessonData ? (
               <div className="flex flex-col lg:flex-row min-h-full">

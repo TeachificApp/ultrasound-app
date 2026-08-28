@@ -40,6 +40,7 @@ import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
+import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
   lmsCourses,
@@ -2082,73 +2083,28 @@ export const lmsLearnerRouter = router({
         };
       }
 
-      // Fetch sections, then lessons (include section-owned lessons — many rows have section_id only)
-      // Select only lightweight columns for the sidebar — heavy content is fetched by getLesson.
-      const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
-      const sectionIds = sections.map((section) => section.id);
-      const lessonScope = sectionIds.length > 0
-        ? or(eq(lmsLessons.courseId, course.id), inArray(lmsLessons.sectionId, sectionIds))
-        : eq(lmsLessons.courseId, course.id);
-      const allCourseLessons = await db.select({
-          id: lmsLessons.id,
-          courseId: lmsLessons.courseId,
-          sectionId: lmsLessons.sectionId,
-          title: lmsLessons.title,
-          type: lmsLessons.type,
-          position: lmsLessons.position,
-          isPreview: lmsLessons.isPreview,
-          previewMode: lmsLessons.previewMode,
-          dripDays: lmsLessons.dripDays,
-          dripOutDays: lmsLessons.dripOutDays,
-          durationMinutes: lmsLessons.durationMinutes,
-          requireVideoCompletion: lmsLessons.requireVideoCompletion,
-          requireManualComplete: lmsLessons.requireManualComplete,
-          prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
-          isPrerequisite: lmsLessons.isPrerequisite,
-          showInstructor: lmsLessons.showInstructor,
-          effectEnabled: lmsLessons.effectEnabled,
-          effectTrigger: lmsLessons.effectTrigger,
-          effectBannerText: lmsLessons.effectBannerText,
-          effectBannerBgColor: lmsLessons.effectBannerBgColor,
-          effectBannerTextColor: lmsLessons.effectBannerTextColor,
-          effectSound: lmsLessons.effectSound,
-          effectSoundUrl: lmsLessons.effectSoundUrl,
-          effectConfetti: lmsLessons.effectConfetti,
-          effectConfettiColors: lmsLessons.effectConfettiColors,
-          effectConfettiMode: lmsLessons.effectConfettiMode,
-          effectBannerDuration: lmsLessons.effectBannerDuration,
-          lessonStatus: lmsLessons.lessonStatus,
-          countTowardCompletion: lmsLessons.countTowardCompletion,
-          contentBlocks: lmsLessons.contentBlocks,
-          createdAt: lmsLessons.createdAt,
-          updatedAt: lmsLessons.updatedAt,
-          standaloneQuizId: lmsLessons.standaloneQuizId,
-        }).from(lmsLessons).where(
-          and(lessonScope, eq(lmsLessons.lessonStatus, "published"))
-        ).orderBy(asc(lmsLessons.position));
+      // Fetch sections + lessons via section join (includes section-owned rows with null course_id)
+      const lessonTree = await loadPublishedCourseLessonTree(db as any, course.id, {
+        hideEmptySections: !isAdminPreview,
+      });
+      const allCourseLessons = lessonTree.allLessons;
       const toSidebarLesson = (lesson: (typeof allCourseLessons)[number]) => {
-        const { contentBlocks, ...rest } = lesson;
+        const { contentBlocks, content, embedUrl, videoContent, learningObjectives, ...rest } = lesson as typeof lesson & {
+          content?: string | null;
+          embedUrl?: string | null;
+          videoContent?: string | null;
+          learningObjectives?: string | null;
+        };
         return {
           ...rest,
           hasAssessmentContent: lessonHasAssessmentContent({ type: lesson.type, contentBlocks }),
         };
       };
-      // Group lessons by sectionId in JS — no extra round-trips
-      const lessonsBySectionId = new Map<number, ReturnType<typeof toSidebarLesson>[]>();
-      const topLevelLessons: ReturnType<typeof toSidebarLesson>[] = [];
-      for (const lesson of allCourseLessons) {
-        const sidebarLesson = toSidebarLesson(lesson);
-        if (lesson.sectionId) {
-          if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
-          lessonsBySectionId.get(lesson.sectionId)!.push(sidebarLesson);
-        } else {
-          topLevelLessons.push(sidebarLesson);
-        }
-      }
-      // For non-admin-preview, filter out sections that have no published lessons
-      const sectionsWithLessons = sections
-        .map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }))
-        .filter(s => isAdminPreview || s.lessons.length > 0);
+      const sectionsWithLessons = lessonTree.sections.map((section) => ({
+        ...section,
+        lessons: section.lessons.map(toSidebarLesson),
+      }));
+      const topLevelLessons = lessonTree.topLevelLessons.map(toSidebarLesson);
 
       // Progress
       let progress: typeof lmsLessonProgress.$inferSelect[] = [];
@@ -3748,60 +3704,57 @@ export const lmsLearnerRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment required" });
       }
 
-      // Fetch sections + lessons (include section-owned lessons, not only course_id matches)
-      const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
-      const sectionIds = sections.map((s) => s.id);
-      const lessonScope = sectionIds.length > 0
-        ? or(eq(lmsLessons.courseId, course.id), inArray(lmsLessons.sectionId, sectionIds))
-        : eq(lmsLessons.courseId, course.id);
-      const allLessons = await db.select({
-          id: lmsLessons.id,
-          courseId: lmsLessons.courseId,
-          sectionId: lmsLessons.sectionId,
-          title: lmsLessons.title,
-          slug: lmsLessons.slug,
-          type: lmsLessons.type,
-          position: lmsLessons.position,
-          lessonStatus: lmsLessons.lessonStatus,
-          countTowardCompletion: lmsLessons.countTowardCompletion,
-          requireManualComplete: lmsLessons.requireManualComplete,
-          requireVideoCompletion: lmsLessons.requireVideoCompletion,
-          isPrerequisite: lmsLessons.isPrerequisite,
-          previewMode: lmsLessons.previewMode,
-          dripDays: lmsLessons.dripDays,
-          dripOutDays: lmsLessons.dripOutDays,
-          dripDate: lmsLessons.dripDate,
-          prerequisiteLessonId: lmsLessons.prerequisiteLessonId,
-          contentBlocks: lmsLessons.contentBlocks,
-          thumbnailUrl: lmsLessons.thumbnailUrl,
-          estimatedMinutes: lmsLessons.estimatedMinutes,
-          createdAt: lmsLessons.createdAt,
-          updatedAt: lmsLessons.updatedAt,
-        }).from(lmsLessons).where(
-          and(lessonScope, eq(lmsLessons.lessonStatus, "published"))
-        ).orderBy(asc(lmsLessons.position));
+      if (enrollmentAccess?.enrollmentType === "presale" && !isAdminByRole) {
+        const [presaleGroup] = await db.select({
+          heading: lmsCohortGroups.presaleWelcomeHeading,
+          body: lmsCohortGroups.presaleWelcomeBody,
+          mediaUrl: lmsCohortGroups.presaleWelcomeMediaUrl,
+          ctaLabel: lmsCohortGroups.presaleWelcomeCtaLabel,
+          ctaUrl: lmsCohortGroups.presaleWelcomeCtaUrl,
+        }).from(lmsCohortGroupEnrollments)
+          .innerJoin(lmsCohortGroups, eq(lmsCohortGroups.id, lmsCohortGroupEnrollments.cohortGroupId))
+          .where(eq(lmsCohortGroupEnrollments.enrollmentId, enrollmentAccess.id))
+          .limit(1);
+        return {
+          course,
+          enrollment: enrollmentAccess,
+          sections: [],
+          topLevelLessons: [],
+          progress: [],
+          instructors: [],
+          isAdminPreview: false,
+          isPresale: true,
+          presaleWelcome: resolvePresaleWelcome(presaleGroup, {
+            heading: course.presaleWelcomeHeading,
+            body: course.presaleWelcomeBody,
+            mediaUrl: course.presaleWelcomeMediaUrl,
+            ctaLabel: course.presaleWelcomeCtaLabel,
+            ctaUrl: course.presaleWelcomeCtaUrl,
+          }),
+        };
+      }
+
+      const lessonTree = await loadPublishedCourseLessonTree(db as any, course.id, {
+        hideEmptySections: !isAdminPreview,
+      });
+      const allLessons = lessonTree.allLessons;
       const toOverviewLesson = (lesson: (typeof allLessons)[number]) => {
-        const { contentBlocks, ...rest } = lesson;
+        const { contentBlocks, content, embedUrl, videoContent, learningObjectives, ...rest } = lesson as typeof lesson & {
+          content?: string | null;
+          embedUrl?: string | null;
+          videoContent?: string | null;
+          learningObjectives?: string | null;
+        };
         return {
           ...rest,
           hasAssessmentContent: lessonHasAssessmentContent({ type: lesson.type, contentBlocks }),
         };
       };
-      const lessonsBySectionId = new Map<number, ReturnType<typeof toOverviewLesson>[]>();
-      const topLevelLessons: ReturnType<typeof toOverviewLesson>[] = [];
-      for (const lesson of allLessons) {
-        const overviewLesson = toOverviewLesson(lesson);
-        if (lesson.sectionId) {
-          if (!lessonsBySectionId.has(lesson.sectionId)) lessonsBySectionId.set(lesson.sectionId, []);
-          lessonsBySectionId.get(lesson.sectionId)!.push(overviewLesson);
-        } else {
-          topLevelLessons.push(overviewLesson);
-        }
-      }
-      // For non-admin-preview, filter out sections that have no published lessons
-      const sectionsWithLessons = sections
-        .map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }))
-        .filter(s => isAdminPreview || s.lessons.length > 0);
+      const sectionsWithLessons = lessonTree.sections.map((section) => ({
+        ...section,
+        lessons: section.lessons.map(toOverviewLesson),
+      }));
+      const topLevelLessons = lessonTree.topLevelLessons.map(toOverviewLesson);
 
       // Progress
       let progress: typeof lmsLessonProgress.$inferSelect[] = [];
