@@ -944,15 +944,23 @@ CRITICAL REQUIREMENTS:
         .from(mediaAssets).where(eq(mediaAssets.id, input.mediaAssetId)).limit(1);
       if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
 
+      const [version] = await db
+        .select({ fileName: mediaVersions.fileName })
+        .from(mediaVersions)
+        .where(eq(mediaVersions.assetId, input.mediaAssetId))
+        .orderBy(desc(mediaVersions.versionNumber))
+        .limit(1);
+
       // Map media type to lesson type
       // SCORM/ZIP/LMS packages must render inline in the course player, not as blank downloads.
       const { isInteractiveMediaPackage } = await import("../../shared/mediaRepoDisplay");
       let lessonType: "video" | "text" | "quiz" | "download" | "embed" | "video_text" = "text";
       let embedUrl: string | null = null;
       let content: string | null = null;
+      const archiveFileName = version?.fileName ?? null;
       if (asset.mediaType === "video") lessonType = "video";
       else if (asset.mediaType === "audio") lessonType = "video"; // treat audio as video player
-      else if (isInteractiveMediaPackage(asset.mediaType, null) || asset.mediaType === "html") {
+      else if (isInteractiveMediaPackage(asset.mediaType, archiveFileName) || asset.mediaType === "html") {
         lessonType = "embed";
         embedUrl = `/api/media/${asset.slug}/embed`;
       } else if (asset.mediaType === "document") {

@@ -7,7 +7,7 @@
  *
  * Bump CACHE_VERSION on every SW change so activate deletes legacy caches.
  */
-const CACHE_VERSION = "v9";
+const CACHE_VERSION = "v10";
 const host = self.location.hostname;
 const isIHE = host.indexOf("iheartecho") !== -1;
 const CACHE_NAME = isIHE ? `iheartecho-${CACHE_VERSION}` : `ultrasound-assist-${CACHE_VERSION}`;

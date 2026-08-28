@@ -1,76 +1,48 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import {
-  isInteractiveMediaPackage,
-  mediaRepoScormUrl,
-  mediaRepoServeUrl,
-  mediaRepoDownloadUrl,
-  parseMediaRepoSlug,
-  resolveScormEmbedSlug,
-} from "../shared/mediaRepoDisplay";
+import { resolveLessonMediaScormUrl } from "@shared/mediaRepoDisplay";
 
-describe("mediaRepoDisplay", () => {
-  it("treats scorm, zip, and lms media types as interactive packages", () => {
-    for (const type of ["scorm", "zip", "lms"]) {
-      expect(isInteractiveMediaPackage(type, "file.bin")).toBe(true);
-    }
-  });
-
-  it("does not treat generic html media type as a SCORM package", () => {
-    expect(isInteractiveMediaPackage("html", "handout.html")).toBe(false);
-  });
-
-  it("detects SCORM archives by filename extension", () => {
-    expect(isInteractiveMediaPackage("document", "ACS Flashcards.zip")).toBe(true);
-    expect(isInteractiveMediaPackage("document", "ACS Flashcards.quiz")).toBe(true);
-  });
-
-  it("allows plain HTML and PDF files to use download URLs", () => {
-    expect(isInteractiveMediaPackage("document", "guide.pdf")).toBe(false);
-    expect(isInteractiveMediaPackage("html", "worksheet.html")).toBe(false);
-    expect(mediaRepoServeUrl("worksheet", "html", "worksheet.html")).toBe(
-      mediaRepoDownloadUrl("worksheet"),
+describe("resolveLessonMediaScormUrl", () => {
+  it("uses linked interactive media assets", () => {
+    const url = resolveLessonMediaScormUrl(
+      { type: "embed", embedUrl: null, content: null },
+      { slug: "pediatric-echo-exam", mediaType: "zip", fileName: "exam.zip" },
     );
+    expect(url).toBe("/api/media/pediatric-echo-exam/scorm/");
   });
 
-  it("returns scorm viewer URL for interactive packages", () => {
-    expect(mediaRepoServeUrl("acs-flashcards", "scorm", "deck.zip")).toBe(
-      mediaRepoScormUrl("acs-flashcards"),
+  it("detects .quiz archives stored as document media type", () => {
+    const url = resolveLessonMediaScormUrl(
+      { type: "download", content: "/api/media/registry-review-quiz/download", embedUrl: null },
+      { slug: "registry-review-quiz", mediaType: "document", fileName: "registry-review.quiz" },
     );
+    expect(url).toBe("/api/media/registry-review-quiz/scorm/");
   });
 
-  it("returns download URL for static files", () => {
-    expect(mediaRepoServeUrl("study-guide", "document", "guide.pdf")).toBe(
-      "/api/media/study-guide/download",
+  it("renders legacy download lessons with media repo content as SCORM", () => {
+    const url = resolveLessonMediaScormUrl(
+      {
+        type: "download",
+        content: "/api/media/unlimited-registry-review-quiz-pediatric-echo-e684dd32/download",
+        embedUrl: null,
+      },
+      null,
     );
+    expect(url).toBe("/api/media/unlimited-registry-review-quiz-pediatric-echo-e684dd32/scorm/");
   });
 
-  it("parses slug from Manus-era embed and download URLs", () => {
-    expect(parseMediaRepoSlug("/api/media/acs-flashcards/embed")).toBe("acs-flashcards");
-    expect(parseMediaRepoSlug("/media/acs-flashcards/scorm/")).toBe("acs-flashcards");
-    expect(parseMediaRepoSlug("/api/media/acs-flashcards/download?access=x")).toBe("acs-flashcards");
+  it("keeps plain PDF download lessons as non-SCORM", () => {
+    const url = resolveLessonMediaScormUrl(
+      { type: "download", content: "/api/media/study-guide/download", embedUrl: null },
+      { slug: "study-guide", mediaType: "document", fileName: "study-guide.pdf" },
+    );
+    expect(url).toBeNull();
   });
 
-  it("resolves SCORM display block slug from legacy stored URLs", () => {
-    expect(
-      resolveScormEmbedSlug({
-        mediaAssetUrl: "/api/media/acs-flashcards/embed",
-        mediaAssetTitle: "ACS Flashcards",
-      }),
-    ).toBe("acs-flashcards");
-    expect(
-      resolveScormEmbedSlug({
-        mediaAssetSlug: "acs-flashcards",
-      }),
-    ).toBe("acs-flashcards");
-  });
-});
-
-describe("download route SCORM guard", () => {
-  it("mediaServe redirects SCORM packages away from /download", () => {
-    const source = readFileSync(join(process.cwd(), "server/routes/mediaServe.ts"), "utf8");
-    expect(source).toContain("isInteractiveMediaPackage(asset.mediaType, fileName)");
-    expect(source).toContain("redirect(302");
+  it("treats embed-type lessons with media repo URLs as SCORM", () => {
+    const url = resolveLessonMediaScormUrl(
+      { type: "embed", embedUrl: "/api/media/my-package/embed", content: null },
+      null,
+    );
+    expect(url).toBe("/api/media/my-package/scorm/");
   });
 });

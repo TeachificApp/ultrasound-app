@@ -1,7 +1,7 @@
 /**
  * Enrollment-aware access checks for private media assets embedded in LMS lessons.
  */
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
 import { lmsLessons, lmsSections, mediaAssets, mediaVersions } from "../../drizzle/schema";
@@ -29,17 +29,21 @@ export async function userCanAccessMediaAssetForCourse(
     if (enrollment) return true;
   }
 
+  const slugPattern = `%/media/${asset.slug}/%`;
   const linkedLessons = await db
     .select({
       courseId: lmsLessons.courseId,
       sectionCourseId: lmsSections.courseId,
+      embedUrl: lmsLessons.embedUrl,
+      content: lmsLessons.content,
     })
     .from(lmsLessons)
     .leftJoin(lmsSections, eq(lmsLessons.sectionId, lmsSections.id))
     .where(
       or(
         eq(lmsLessons.mediaAssetId, asset.id),
-        eq(lmsLessons.embedUrl, `/api/media/${asset.slug}/embed`),
+        sql`${lmsLessons.embedUrl} LIKE ${slugPattern}`,
+        sql`${lmsLessons.content} LIKE ${slugPattern}`,
       ),
     );
 
