@@ -2,22 +2,24 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Palette, Type, Image, MessageSquare, Save, Loader2 } from "lucide-react";
 import { useQuizStore } from "../store/quizStore";
+import { CURRENT_QUIZ_PLAYER_PATTERN, isLegacyAquaSolidQuizBranding } from "@shared/quizBrandingPattern";
 
 interface BrandingPanelProps {
   quizId: number | null;
 }
 
 const PRESET_COLORS = [
-  "#24abbc", "#6366f1", "#ec4899", "#f59e0b", "#10b981",
+  "#189aa1", "#4ad9e0", "#24abbc", "#6366f1", "#ec4899", "#f59e0b", "#10b981",
   "#8b5cf6", "#ef4444", "#06b6d4", "#84cc16", "#f97316",
 ];
 
 export default function BrandingPanel({ quizId }: BrandingPanelProps) {
   const updateMeta = useQuizStore((state) => state.updateMeta);
-  const [primaryColor, setPrimaryColor] = useState("#24abbc");
-  const [bgColor, setBgColor] = useState("");
-  const [backgroundMode, setBackgroundMode] = useState<"solid" | "image" | "gradient">("solid");
-  const [backgroundGradient, setBackgroundGradient] = useState("linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)");
+  const [primaryColor, setPrimaryColor] = useState(CURRENT_QUIZ_PLAYER_PATTERN.primaryColor);
+  const [bgColor, setBgColor] = useState(CURRENT_QUIZ_PLAYER_PATTERN.backgroundColor);
+  const [backgroundMode, setBackgroundMode] = useState<"solid" | "image" | "gradient">(CURRENT_QUIZ_PLAYER_PATTERN.backgroundMode);
+  const [backgroundGradient, setBackgroundGradient] = useState(CURRENT_QUIZ_PLAYER_PATTERN.backgroundGradient);
+  const [textColor, setTextColor] = useState(CURRENT_QUIZ_PLAYER_PATTERN.textColor);
   const [logoUrl, setLogoUrl] = useState("");
   const [fontFamily, setFontFamily] = useState("");
   const [completionMessage, setCompletionMessage] = useState("");
@@ -36,10 +38,12 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
   useEffect(() => {
     if (quiz) {
       const branding = (quiz as any).builderConfig?.meta?.branding ?? {};
-      setPrimaryColor(branding.primaryColor || "#24abbc");
-      setBgColor(branding.backgroundMode === "image" ? (branding.backgroundImageUrl || "") : (branding.backgroundColor || ""));
-      setBackgroundMode(branding.backgroundMode || (branding.backgroundImageUrl ? "image" : "solid"));
-      setBackgroundGradient(branding.backgroundGradient || "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)");
+      const normalizeLegacySolidAqua = isLegacyAquaSolidQuizBranding(branding);
+      setPrimaryColor(branding.primaryColor || CURRENT_QUIZ_PLAYER_PATTERN.primaryColor);
+      setBgColor(branding.backgroundMode === "image" ? (branding.backgroundImageUrl || "") : (normalizeLegacySolidAqua ? CURRENT_QUIZ_PLAYER_PATTERN.backgroundColor : (branding.backgroundColor || CURRENT_QUIZ_PLAYER_PATTERN.backgroundColor)));
+      setBackgroundMode(normalizeLegacySolidAqua ? "gradient" : (branding.backgroundMode || (branding.backgroundImageUrl ? "image" : CURRENT_QUIZ_PLAYER_PATTERN.backgroundMode)));
+      setBackgroundGradient(normalizeLegacySolidAqua ? CURRENT_QUIZ_PLAYER_PATTERN.backgroundGradient : (branding.backgroundGradient || CURRENT_QUIZ_PLAYER_PATTERN.backgroundGradient));
+      setTextColor(branding.textColor || CURRENT_QUIZ_PLAYER_PATTERN.textColor);
       setLogoUrl(branding.logoUrl || "");
       setFontFamily(branding.fontFamily || "");
       setCompletionMessage((quiz as any).completionMessage || "");
@@ -49,11 +53,12 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
   const handleSave = () => {
     if (!quizId) return;
     const branding = {
-      primaryColor: primaryColor || "#24abbc",
-      backgroundColor: backgroundMode === "image" ? "#0d1f3c" : (bgColor || "#f0fdfa"),
+      primaryColor: primaryColor || CURRENT_QUIZ_PLAYER_PATTERN.primaryColor,
+      backgroundColor: backgroundMode === "image" ? "#0d1f3c" : (bgColor || CURRENT_QUIZ_PLAYER_PATTERN.backgroundColor),
       backgroundImageUrl: backgroundMode === "image" ? (bgColor || undefined) : undefined,
       backgroundMode,
       backgroundGradient: backgroundMode === "gradient" ? backgroundGradient : undefined,
+      textColor: textColor || CURRENT_QUIZ_PLAYER_PATTERN.textColor,
       fontFamily: fontFamily || undefined,
       logoUrl: logoUrl || undefined,
     };
@@ -63,6 +68,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
         brandBgColor: bgColor || null,
         backgroundMode,
         backgroundGradient: backgroundMode === "gradient" ? backgroundGradient : null,
+        brandTextColor: textColor || null,
       brandLogoUrl: logoUrl || null,
       brandFontFamily: fontFamily || null,
       completionMessage: completionMessage || null,
@@ -123,7 +129,8 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
 
       {/* Background Design */}
       <div className="space-y-2">
-        <label className="text-xs font-medium text-gray-600">Background Design</label>
+        <label className="text-xs font-medium text-gray-600">Player Background Pattern</label>
+        <p className="text-[11px] text-gray-400">Current pattern: aqua center glow fading into dark navy.</p>
         <select
           value={backgroundMode}
           onChange={(event) => { setBackgroundMode(event.target.value as "solid" | "image" | "gradient"); setDirty(true); }}
@@ -136,7 +143,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
         {backgroundMode === "solid" && <div className="flex items-center gap-2">
           <input
             type="color"
-            value={bgColor || "#f0fdfa"}
+            value={bgColor || CURRENT_QUIZ_PLAYER_PATTERN.backgroundColor}
             onChange={(e) => { setBgColor(e.target.value); setDirty(true); }}
             className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200"
           />
@@ -144,7 +151,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
             type="text"
             value={bgColor}
             onChange={(e) => { setBgColor(e.target.value); setDirty(true); }}
-            placeholder="#f0fdfa (default teal gradient)"
+            placeholder={CURRENT_QUIZ_PLAYER_PATTERN.backgroundColor}
             className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
           />
           {bgColor && (
@@ -158,7 +165,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
             type="text"
             value={backgroundGradient}
             onChange={(event) => { setBackgroundGradient(event.target.value); setDirty(true); }}
-            placeholder="linear-gradient(135deg, #189aa1, #4ad9e0)"
+            placeholder={CURRENT_QUIZ_PLAYER_PATTERN.backgroundGradient}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
           />
         )}
@@ -171,6 +178,24 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
           />
         )}
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-gray-600">Player Text Color</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={textColor}
+            onChange={(event) => { setTextColor(event.target.value); setDirty(true); }}
+            className="w-8 h-8 rounded-lg cursor-pointer border border-gray-200"
+          />
+          <input
+            type="text"
+            value={textColor}
+            onChange={(event) => { setTextColor(event.target.value); setDirty(true); }}
+            className="flex-1 px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
+          />
+        </div>
       </div>
 
       {/* Logo URL */}
@@ -236,7 +261,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
       {/* Preview */}
       <div className="border-t border-gray-100 pt-4">
         <p className="text-xs font-medium text-gray-600 mb-2">Preview</p>
-        <div className="rounded-xl p-4 text-center" style={{ background: backgroundMode === "gradient" ? backgroundGradient : backgroundMode === "image" && bgColor ? `url(${bgColor}) center/cover` : (bgColor || "#f0fdfa") }}>
+        <div className="rounded-xl p-4 text-center" style={{ background: backgroundMode === "gradient" ? backgroundGradient : backgroundMode === "image" && bgColor ? `url(${bgColor}) center/cover` : (bgColor || CURRENT_QUIZ_PLAYER_PATTERN.backgroundColor), color: textColor }}>
           {logoUrl ? (
             <img src={logoUrl} alt="Logo" className="h-8 mx-auto mb-2 object-contain" onError={(e) => (e.currentTarget.style.display = "none")} />
           ) : (
@@ -244,7 +269,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
               <span className="text-white text-sm font-bold">Q</span>
             </div>
           )}
-          <p className="text-sm font-bold text-gray-800" style={{ fontFamily: fontFamily || undefined }}>
+          <p className="text-sm font-bold" style={{ fontFamily: fontFamily || undefined }}>
             Sample Quiz Title
           </p>
           <button className="mt-2 px-4 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: primaryColor }}>

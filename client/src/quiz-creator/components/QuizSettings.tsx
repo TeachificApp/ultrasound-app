@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuizStore } from "../store/quizStore";
 import { X, Upload, Trash2, Plus, Palette } from "lucide-react";
 import type { QuestionGroup, DrawConfig, GroupDrawConfig } from "../types/quiz";
+import { CURRENT_QUIZ_PLAYER_PATTERN } from "@shared/quizBrandingPattern";
 
 interface Props {
   onClose: () => void;
@@ -25,6 +26,13 @@ export function QuizSettings({ onClose }: Props) {
   ];
 
   const GROUP_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#a855f7", "#ec4899"];
+  const playerBranding = {
+    ...CURRENT_QUIZ_PLAYER_PATTERN,
+    ...(m.branding ?? {}),
+  };
+  const updatePlayerBranding = (patch: Partial<typeof playerBranding>) => {
+    updateMeta({ branding: { ...playerBranding, ...patch } });
+  };
 
   const addGroup = () => {
     const groups = m.groups || [];
@@ -259,38 +267,38 @@ export function QuizSettings({ onClose }: Props) {
 
           {tab === "branding" && (
             <div className="space-y-5">
-              <p className="text-xs text-gray-500">Customize the look and feel of your quiz player.</p>
+              <p className="text-xs text-gray-500">Current player pattern: aqua center glow fading into dark navy, with white text and teal actions.</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Primary Color</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={m.branding?.primaryColor || "#24abbc"}
-                      onChange={(e) => updateMeta({ branding: { ...m.branding, primaryColor: e.target.value, backgroundColor: m.branding?.backgroundColor || "#ffffff" } })}
+                      value={playerBranding.primaryColor}
+                      onChange={(e) => updatePlayerBranding({ primaryColor: e.target.value })}
                       className="w-8 h-8 rounded border border-gray-200 cursor-pointer"
                     />
                     <input
                       type="text"
-                      value={m.branding?.primaryColor || "#24abbc"}
-                      onChange={(e) => updateMeta({ branding: { ...m.branding, primaryColor: e.target.value, backgroundColor: m.branding?.backgroundColor || "#ffffff" } })}
+                      value={playerBranding.primaryColor}
+                      onChange={(e) => updatePlayerBranding({ primaryColor: e.target.value })}
                       className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400/50"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Background Color</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Aqua Center Color</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={m.branding?.backgroundColor || "#ffffff"}
-                      onChange={(e) => updateMeta({ branding: { ...m.branding, backgroundColor: e.target.value, primaryColor: m.branding?.primaryColor || "#24abbc" } })}
+                      value={playerBranding.backgroundColor}
+                      onChange={(e) => updatePlayerBranding({ backgroundColor: e.target.value, backgroundMode: "gradient" })}
                       className="w-8 h-8 rounded border border-gray-200 cursor-pointer"
                     />
                     <input
                       type="text"
-                      value={m.branding?.backgroundColor || "#ffffff"}
-                      onChange={(e) => updateMeta({ branding: { ...m.branding, backgroundColor: e.target.value, primaryColor: m.branding?.primaryColor || "#24abbc" } })}
+                      value={playerBranding.backgroundColor}
+                      onChange={(e) => updatePlayerBranding({ backgroundColor: e.target.value, backgroundMode: "gradient" })}
                       className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400/50"
                     />
                   </div>
@@ -302,14 +310,14 @@ export function QuizSettings({ onClose }: Props) {
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={m.branding?.textColor || "#1a1a1a"}
-                      onChange={(e) => updateMeta({ branding: { ...m.branding, textColor: e.target.value, primaryColor: m.branding?.primaryColor || "#24abbc", backgroundColor: m.branding?.backgroundColor || "#ffffff" } })}
+                      value={playerBranding.textColor}
+                      onChange={(e) => updatePlayerBranding({ textColor: e.target.value })}
                       className="w-8 h-8 rounded border border-gray-200 cursor-pointer"
                     />
                     <input
                       type="text"
-                      value={m.branding?.textColor || "#1a1a1a"}
-                      onChange={(e) => updateMeta({ branding: { ...m.branding, textColor: e.target.value, primaryColor: m.branding?.primaryColor || "#24abbc", backgroundColor: m.branding?.backgroundColor || "#ffffff" } })}
+                      value={playerBranding.textColor}
+                      onChange={(e) => updatePlayerBranding({ textColor: e.target.value })}
                       className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400/50"
                     />
                   </div>
@@ -318,7 +326,7 @@ export function QuizSettings({ onClose }: Props) {
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Font Family</label>
                   <select
                     value={m.branding?.fontFamily || ""}
-                    onChange={(e) => updateMeta({ branding: { ...m.branding, fontFamily: e.target.value || undefined, primaryColor: m.branding?.primaryColor || "#24abbc", backgroundColor: m.branding?.backgroundColor || "#ffffff" } })}
+                    onChange={(e) => updatePlayerBranding({ fontFamily: e.target.value || undefined })}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400/50"
                   >
                     <option value="">Default (Inter)</option>

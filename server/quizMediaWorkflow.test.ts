@@ -53,10 +53,13 @@ describe("all-quiz media workflow", () => {
       message: "Correct answer feedback",
       imageUrl: "https://media.example/feedback.png",
       videoUrl: "https://media.example/feedback.mp4",
-      onClose: () => undefined,
+      onAdvance: () => undefined,
+      advanceLabel: "Next",
     }));
     expect(markup).toContain('src="https://media.example/feedback.png"');
     expect(markup).toContain('src="https://media.example/feedback.mp4"');
+    expect(markup).toContain(">Next<");
+    expect(markup).not.toContain(">OK<");
   });
 
   it("renders question and feedback image/video on standalone quiz result review", () => {

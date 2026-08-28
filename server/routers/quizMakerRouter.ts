@@ -282,6 +282,7 @@ export const quizMakerRouter = router({
         brandBgColor: z.string().nullable().optional(),
         backgroundMode: z.enum(["solid", "image", "gradient"]).optional(),
         backgroundGradient: z.string().nullable().optional(),
+        brandTextColor: z.string().nullable().optional(),
         brandLogoUrl: z.string().nullable().optional(),
         brandFontFamily: z.string().nullable().optional(),
         completionMessage: z.string().nullable().optional(),
@@ -305,6 +306,7 @@ export const quizMakerRouter = router({
           : config.meta.branding?.backgroundImageUrl,
         backgroundMode,
         backgroundGradient: input.backgroundGradient ?? config.meta.branding?.backgroundGradient,
+        textColor: input.brandTextColor ?? config.meta.branding?.textColor ?? "#ffffff",
         fontFamily: input.brandFontFamily ?? config.meta.branding?.fontFamily,
         logoUrl: input.brandLogoUrl ?? config.meta.branding?.logoUrl,
       };

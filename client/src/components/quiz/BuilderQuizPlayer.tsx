@@ -38,13 +38,15 @@ export function FeedbackPopup({
   message,
   imageUrl,
   videoUrl,
-  onClose,
+  onAdvance,
+  advanceLabel = "Next",
 }: {
   type: "correct" | "incorrect" | "partial";
   message: string;
   imageUrl?: string | null;
   videoUrl?: string | null;
-  onClose: () => void;
+  onAdvance: () => void;
+  advanceLabel?: string;
 }) {
   const headerColor = type === "correct" ? "#22c55e" : type === "incorrect" ? "#ef4444" : "#f59e0b";
   const label = type === "correct" ? "Correct" : type === "incorrect" ? "Incorrect" : "Partial";
@@ -52,9 +54,8 @@ export function FeedbackPopup({
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center pb-24 px-4 bg-black/30">
       <div className="w-full max-w-2xl rounded-lg overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4">
-        <div className="flex items-center justify-between px-4 py-2 text-white font-semibold" style={{ background: headerColor }}>
+        <div className="flex items-center px-4 py-2 text-white font-semibold" style={{ background: headerColor }}>
           <span>{label}</span>
-          <button type="button" onClick={onClose} className="text-white/80 hover:text-white text-lg leading-none">▾</button>
         </div>
         <div className="bg-white px-5 py-4 text-sm text-gray-800 leading-relaxed max-h-[60vh] overflow-y-auto">
           {message}
@@ -64,10 +65,10 @@ export function FeedbackPopup({
       </div>
       <button
         type="button"
-        onClick={onClose}
+        onClick={onAdvance}
         className="fixed bottom-6 right-6 px-6 py-2 border-2 border-white text-white font-semibold rounded hover:bg-white/10 transition-colors"
       >
-        OK
+        {advanceLabel}
       </button>
     </div>
   );

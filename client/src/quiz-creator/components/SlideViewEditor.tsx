@@ -1,5 +1,6 @@
 import { useQuizStore } from "../store/quizStore";
 import type { McqData, QuizQuestion } from "../types/quiz";
+import { resolveQuizBackground } from "@shared/quizBackground";
 
 function SlideFrame({ children, question }: { children: React.ReactNode; question?: QuizQuestion }) {
   const { quiz } = useQuizStore();
@@ -18,7 +19,7 @@ function SlideFrame({ children, question }: { children: React.ReactNode; questio
         style={{
           background: bgImage
             ? `linear-gradient(rgba(0,0,0,${branding?.backgroundOverlay ?? 0.3}), rgba(0,0,0,${branding?.backgroundOverlay ?? 0.3})), url(${bgImage}) center/cover`
-            : `radial-gradient(ellipse at center, ${bg} 0%, #000 100%)`,
+            : resolveQuizBackground({ ...branding, backgroundColor: bg }, question),
           color: textColor,
           fontFamily: branding?.fontFamily,
         }}

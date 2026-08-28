@@ -524,34 +524,19 @@ export const standaloneQuizLearnerRouter = router({
       };
     }),
 
-  /** List all published quizzes available to this user, with their best score */
+  /**
+   * Quiz Creator quizzes are not a direct learner catalog. Publishing makes a
+   * quiz eligible for an assigned course lesson or approved HTML widget only.
+   * Returning an empty list prevents standalone discovery outside those routes.
+   */
   listAvailableQuizzes: protectedProcedure
     .query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const quizzes = await db
-        .select()
-        .from(standaloneQuizzes)
-        .where(eq(standaloneQuizzes.status, "published"))
-        .orderBy(asc(standaloneQuizzes.title));
-      const results = await Promise.all(
-        quizzes.map(async (quiz) => {
-          const attempts = await db
-            .select({ score: standaloneQuizAttempts.score, passed: standaloneQuizAttempts.passed })
-            .from(standaloneQuizAttempts)
-            .where(and(
-              eq(standaloneQuizAttempts.quizId, quiz.id),
-              eq(standaloneQuizAttempts.userId, ctx.user.id),
-              isNotNull(standaloneQuizAttempts.completedAt),
-            ));
-          const bestScore = attempts.length > 0
-            ? Math.max(...attempts.map((a) => Number(a.score ?? 0)))
-            : null;
-          const lastPassed = attempts.some((a) => a.passed);
-          return { quiz, attemptCount: attempts.length, bestScore, lastPassed };
-        })
-      );
-      return results;
+      // Keep the query context initialized consistently with other protected
+      // procedures, but intentionally do not enumerate published quizzes.
+      void ctx;
+      return [];
     }),
 
   /** Get all completed attempts for this user (for My Quizzes history tab) */

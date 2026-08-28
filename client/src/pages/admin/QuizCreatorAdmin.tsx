@@ -1761,7 +1761,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
             onClick={() => updateMutation.mutate({ id: quiz.id, status: quiz.status === "published" ? "draft" : "published" })}
           >
             {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-            {quiz.status === "published" ? "Unpublish" : "Publish quiz"}
+            {quiz.status === "published" ? "Unpublish" : "Publish for modules & widgets"}
           </Button>
         </div>
 
@@ -1823,6 +1823,9 @@ function QuizEditor({ quizId }: { quizId: number }) {
                         navigator.clipboard.writeText(code).then(() => toast.success("Quiz HTML widget copied")).catch(() => toast.error("Could not copy the embed code"));
                       }}
                     />
+                    <p className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-900">
+                      <strong>Publication scope:</strong> Publishing makes this quiz available only through an assigned learning module or approved HTML widget. It does not create direct enrollment, checkout, catalog, search, or learner-facing listing access.
+                    </p>
                   </CardContent>
                 </Card>
 

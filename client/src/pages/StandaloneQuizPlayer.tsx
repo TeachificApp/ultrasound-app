@@ -159,6 +159,15 @@ export default function StandaloneQuizPlayer() {
     }
   }
 
+  function handleFeedbackAdvance() {
+    setFeedbackPopup(null);
+    if (currentIdx < questions.length - 1) {
+      handleNext();
+      return;
+    }
+    handleSubmit();
+  }
+
   function handlePrev() {
     if (currentIdx > 0) {
       setCurrentIdx((i) => i - 1);
@@ -318,7 +327,14 @@ export default function StandaloneQuizPlayer() {
     return (
       <>
         {feedbackPopup && (
-          <FeedbackPopup type={feedbackPopup.type} message={feedbackPopup.message} imageUrl={q.feedbackImageUrl} videoUrl={q.feedbackVideoUrl} onClose={() => setFeedbackPopup(null)} />
+          <FeedbackPopup
+            type={feedbackPopup.type}
+            message={feedbackPopup.message}
+            imageUrl={q.feedbackImageUrl}
+            videoUrl={q.feedbackVideoUrl}
+            onAdvance={handleFeedbackAdvance}
+            advanceLabel={currentIdx < questions.length - 1 ? "Next" : "Finish quiz"}
+          />
         )}
         <BuilderQuestionFrame branding={branding} question={q} footer={
           <div className="flex items-center gap-3 w-full justify-between pt-4">
