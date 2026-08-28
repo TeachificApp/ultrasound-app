@@ -2241,8 +2241,8 @@ export const lmsLearnerRouter = router({
       }
       const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
       if (pm !== "preview" && !isAdmin) {
-        const { getActiveEnrollment: getActiveEnrollmentLesson } = await import("../lib/enrollmentAccess");
-        const enrollment = await getActiveEnrollmentLesson(db as any, ctx.user.id, resolvedCourseId);
+        const { resolveEnrollmentForCourse } = await import("../lib/enrollmentAccess");
+        const enrollment = await resolveEnrollmentForCourse(db as any, ctx.user.id, resolvedCourseId);
         // Block expired lessons (drip-out): lesson is unavailable after dripOutDays from enrollment
         if ((lesson as any).dripOutDays != null && enrollment?.enrolledAt) {
           const daysSinceEnroll = Math.floor((Date.now() - new Date(enrollment.enrolledAt).getTime()) / 86400000);

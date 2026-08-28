@@ -59,3 +59,71 @@ export function mediaRepoServeUrl(
     ? mediaRepoScormUrl(slug)
     : mediaRepoDownloadUrl(slug);
 }
+
+export type LessonScormSource = {
+  type?: string | null;
+  embedUrl?: string | null;
+  content?: string | null;
+};
+
+export type LinkedLessonMediaRef = {
+  slug: string;
+  mediaType?: string | null;
+  fileName?: string | null;
+} | null;
+
+function isPlainDocumentAsset(
+  mediaType?: string | null,
+  fileName?: string | null,
+): boolean {
+  return (
+    mediaType === "document" &&
+    !!fileName &&
+    !isInteractiveMediaPackage(mediaType, fileName)
+  );
+}
+
+/**
+ * Resolve the SCORM player URL for an LMS lesson that references the media repo.
+ * Handles legacy rows imported as download lessons with /download content URLs.
+ */
+export function resolveLessonMediaScormUrl(
+  lesson: LessonScormSource,
+  linked: LinkedLessonMediaRef,
+): string | null {
+  const slug =
+    linked?.slug ??
+    (lesson.embedUrl ? parseMediaRepoSlug(lesson.embedUrl) : null) ??
+    (lesson.content ? parseMediaRepoSlug(lesson.content) : null);
+
+  if (!slug) return null;
+
+  const mediaType = linked?.mediaType ?? null;
+  const fileName = linked?.fileName ?? null;
+
+  if (linked && isInteractiveMediaPackage(mediaType, fileName)) {
+    return mediaRepoScormUrl(slug);
+  }
+
+  if (lesson.type === "embed") {
+    return mediaRepoScormUrl(slug);
+  }
+
+  if (
+    lesson.embedUrl &&
+    (lesson.embedUrl.includes("/api/media/") || lesson.embedUrl.includes("/media/"))
+  ) {
+    return mediaRepoScormUrl(slug);
+  }
+
+  if (lesson.content && parseMediaRepoSlug(lesson.content)) {
+    if (linked?.slug === slug && !isPlainDocumentAsset(mediaType, fileName)) {
+      return mediaRepoScormUrl(slug);
+    }
+    if (lesson.type === "download" && !isPlainDocumentAsset(mediaType, fileName)) {
+      return mediaRepoScormUrl(slug);
+    }
+  }
+
+  return null;
+}

@@ -20,9 +20,9 @@ describe("production build safety", () => {
     expect(out).not.toMatch(UMAMI_ANALYTICS_SCRIPT_RE);
   });
 
-  it("source sw.js uses v9 cache and has no fetch handler", () => {
+  it("source sw.js uses v10 cache and has no fetch handler", () => {
     const sw = fs.readFileSync(path.join(ROOT, "client/public/sw.js"), "utf8");
-    expect(sw).toContain('CACHE_VERSION = "v9"');
+    expect(sw).toContain('CACHE_VERSION = "v10"');
     expect(sw).not.toContain('addEventListener("fetch"');
   });
 

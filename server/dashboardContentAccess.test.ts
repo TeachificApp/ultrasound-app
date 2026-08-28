@@ -20,6 +20,7 @@ describe("learner content access", () => {
     expect(blocks).toContain("isInteractiveMediaPackage(mediaType, d.fileName ?? fileName)");
     expect(blocks).toContain("src={mediaRepoScormUrl(slug)}");
     expect(player).toContain("linkedMediaAsset");
-    expect(player).toContain("lessonMediaRepoScormSrc");
+    expect(player).toContain("resolveLessonMediaScormUrl");
+    expect(player).toContain("showLessonLevelScorm");
   });
 });

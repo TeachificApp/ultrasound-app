@@ -32,8 +32,7 @@ import { MathContent } from "@/components/MathContent";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 import {
   isInteractiveMediaPackage,
-  mediaRepoScormUrl,
-  parseMediaRepoSlug,
+  resolveLessonMediaScormUrl,
 } from "@shared/mediaRepoDisplay";
 
 import LessonCommentSection from "@/components/LessonCommentSection";
@@ -1980,25 +1979,33 @@ export default function CoursePlayer() {
   })();
   const lessonMediaRepoScormSrc = useMemo(() => {
     if (!lessonData) return null;
-    const linked = (lessonData as { linkedMediaAsset?: { slug: string; mediaType: string | null; fileName: string | null } | null }).linkedMediaAsset;
-    if (linked && isInteractiveMediaPackage(linked.mediaType, linked.fileName)) {
-      return mediaRepoScormUrl(linked.slug);
-    }
-    if (lessonData.embedUrl) {
-      const isMediaRepo = lessonData.embedUrl.includes("/api/media/") || lessonData.embedUrl.includes("/media/");
-      if (isMediaRepo) {
-        return lessonData.embedUrl.replace(/\/embed\/?(\?.*|$)/, "/scorm/$1");
-      }
-    }
-    if (lessonData.content) {
-      const slug = parseMediaRepoSlug(lessonData.content);
-      const fileName = linked?.fileName ?? lessonData.content.split("?")[0]?.split("/").pop() ?? "";
-      if (slug && isInteractiveMediaPackage(linked?.mediaType ?? "document", fileName)) {
-        return mediaRepoScormUrl(slug);
-      }
-    }
-    return null;
+    const linked = (lessonData as {
+      linkedMediaAsset?: { slug: string; mediaType: string | null; fileName: string | null } | null;
+      type?: string | null;
+      embedUrl?: string | null;
+      content?: string | null;
+    }).linkedMediaAsset ?? null;
+    return resolveLessonMediaScormUrl(
+      {
+        type: lessonData.type,
+        embedUrl: lessonData.embedUrl,
+        content: lessonData.content,
+      },
+      linked,
+    );
   }, [lessonData]);
+  const hasScormContentBlock = contentBlocks.some((block) => {
+    if (block.type === "scorm_embed") return true;
+    if (block.type === "file_download") {
+      const d = block.data as Record<string, unknown>;
+      const mediaType = (d.mediaAssetMediaType ?? d.mediaType ?? "") as string;
+      const fileName = (d.fileName ?? d.mediaAssetTitle ?? "") as string;
+      const slug = (d.mediaAssetSlug ?? "") as string;
+      return !!slug && isInteractiveMediaPackage(mediaType, fileName);
+    }
+    return false;
+  });
+  const showLessonLevelScorm = !!lessonMediaRepoScormSrc && !hasScormContentBlock;
   const lessonExternalEmbedUrl = useMemo(() => {
     if (!lessonData?.embedUrl || lessonMediaRepoScormSrc) return null;
     const isMediaRepo = lessonData.embedUrl.includes("/api/media/") || lessonData.embedUrl.includes("/media/");
@@ -2755,7 +2762,7 @@ export default function CoursePlayer() {
                   )}
 
                   {/* ── SCORM / ZIP lesson modules from media library ── */}
-                  {lessonMediaRepoScormSrc && contentBlocks.length === 0 && (
+                  {showLessonLevelScorm && lessonMediaRepoScormSrc && (
                     <div className="mb-5">
                       <div className="bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 min-h-[600px] h-[75vh]">
                         <MediaEmbedIframe
@@ -2770,7 +2777,7 @@ export default function CoursePlayer() {
                   )}
 
                   {/* ── External embed lesson ── */}
-                  {lessonExternalEmbedUrl && contentBlocks.length === 0 && (
+                  {lessonExternalEmbedUrl && contentBlocks.length === 0 && !showLessonLevelScorm && (
                     <div className="mb-5">
                       <div className="bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 aspect-video">
                         <iframe
