@@ -141,3 +141,5 @@
 - [x] Add explicit Visual Builder revision choices to update the linked Question Bank record or create a new linked Question Bank record for the revised quiz question.
 - [x] Repair magic-link URL generation and completion routing so valid learner links on learn.allaboutultrasound.com never land on an inactive funnel page, without resending email unless separately approved.
 - [x] Repair the learner content-access page runtime error “Can’t find variable: cn” without changing enrollment, entitlement, or content data.
+- [x] Repair the authorized RPhS quiz launch path that currently shows “Quiz not found,” while retaining standalone quiz non-discovery rules.
+- [x] Restore the user-confirmed Published status for RPhS Test & Learn Quiz after its unexpected reversal to Draft, without enabling any public discovery surface.
