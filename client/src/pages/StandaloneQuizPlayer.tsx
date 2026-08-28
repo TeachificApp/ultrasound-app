@@ -90,9 +90,10 @@ export default function StandaloneQuizPlayer() {
 
   const qId = parseInt(quizId, 10);
   const isEmbedWidget = new URLSearchParams(window.location.search).get("embed") === "1";
+  const isAdminPreview = new URLSearchParams(window.location.search).get("adminPreview") === "1";
 
   const { data: quizInfo, isLoading: infoLoading } = trpc.standaloneQuizLearner.getQuizInfo.useQuery(
-    { quizId: qId },
+    { quizId: qId, adminPreview: isAdminPreview },
     { enabled: !!user && !isNaN(qId) }
   );
 
@@ -125,7 +126,7 @@ export default function StandaloneQuizPlayer() {
 
   function handleStart() {
     startMutation.mutate(
-      { quizId: qId },
+      { quizId: qId, adminPreview: isAdminPreview },
       {
         onSuccess: (res) => {
           setAttemptId(res.attemptId);

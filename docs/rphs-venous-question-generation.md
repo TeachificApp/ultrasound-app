@@ -25,3 +25,9 @@ The generated source set passed its required structure, answer, feedback, link, 
 An independent source-grounding review flagged 99 questions for possible weak grounding, ambiguity, or duplicate concepts. With explicit approval, only those 99 Question Bank records and their matching Quiz Creator builder entries were replaced. The correction first backed up the 99 target records and the existing builder configuration to a protected local recovery artifact.
 
 The replacement candidates were iteratively checked for four distinct options, an exact option-to-answer match, editable feedback, duplicate stems, and direct source support. The final factual review approved all 99 replacements. The closing Railway verification found **99 corrected records**, **500 RPhs folder questions**, **400 RPhS Quiz links**, **400 builder questions**, **99 matching builder entries**, and **zero field mismatches**. No question link/order, learner, enrollment, access, user, or unrelated content record changed.
+
+## Reference-free wording cleanup
+
+The user requested that PDF-derived questions remain clinically grounded in the uploaded document but never refer to the guide, PDF, source document, or transcript. A read-only audit found direct provenance language in **313 questions** and **676 fields**. The approved cleanup rewrote the affected wording without altering answer options, correct answers, question order, quiz links, or clinical intent.
+
+The final cleanup updated **316 Question Bank records** and their **316 matching RPhS Quiz builder entries** because three additional records contained a direct reference in a field outside the original audit pattern. A targeted encrypted local recovery artifact was created before the transaction. Closing Railway verification confirmed **350 reference-free questions**, **zero prohibited direct references**, **500 folder questions**, **400 quiz links**, and **400 builder questions**.

@@ -104,3 +104,14 @@
 - [x] Complete source-traceability and clinical-quality validation for the 350 questions beyond structural answer, feedback, duplicate-stem, count, and attachment checks.
 - [x] Replace only the 99 RPhS questions rejected by the source-grounding quality review, preserving all existing folder and quiz counts and order.
 - [x] Re-run the factual-quality, Question Bank, and Quiz Creator attachment checks after the approved 99-question correction.
+- [ ] Perform a read-only audit of current learner login, session, content-access, email-delivery, and domain-routing failures before recommending a hosting decision.
+- [ ] Compare evidence-supported Railway remediation against a controlled Manus rollback, with no configuration or data changes until explicitly approved.
+- [ ] Continue the read-only production audit of learner login, session, content-access, email-delivery, and domain-routing failures and report evidence before proposing changes.
+- [x] Inspect the standalone-quiz publishing status, missing control, and learner-assignment behavior for the RPhS Quiz.
+- [x] Present a scoped standalone-quiz publishing and learner-availability remediation before making any UI or status change.
+- [x] Inspect and diagnose the RPhS administrator preview route that rejects the draft quiz as not found.
+- [x] Add a clear standalone-quiz publish or unpublish status control in Quiz Creator and make administrator preview work for draft quizzes without exposing drafts to learners.
+- [x] Audit the RPhS PDF-derived questions for direct guide, PDF, source-document, or similar provenance references in question text or feedback.
+- [x] Present the exact affected RPhS records and obtain explicit approval before changing any source-reference language.
+- [x] Remove direct source-document wording from the 313 audited RPhS PDF-derived questions while preserving their clinical facts, answers, feedback, links, and order.
+- [x] Verify zero direct PDF/guide/source/transcript references remain in the RPhS generated set after the approved cleanup.

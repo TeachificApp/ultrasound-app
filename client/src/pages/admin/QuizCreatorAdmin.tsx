@@ -1749,9 +1749,19 @@ function QuizEditor({ quizId }: { quizId: number }) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => window.open(`/quizzes/${quiz.id}`, "_blank")}
+            onClick={() => window.open(`/quizzes/${quiz.id}?adminPreview=1`, "_blank")}
           >
             <Eye className="w-4 h-4 mr-1" /> Preview
+          </Button>
+          <Button
+            size="sm"
+            variant={quiz.status === "published" ? "outline" : "default"}
+            disabled={updateMutation.isPending}
+            className={quiz.status === "published" ? "border-gray-300 text-gray-700 hover:bg-gray-50" : "bg-teal-600 hover:bg-teal-700 text-white"}
+            onClick={() => updateMutation.mutate({ id: quiz.id, status: quiz.status === "published" ? "draft" : "published" })}
+          >
+            {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+            {quiz.status === "published" ? "Unpublish" : "Publish quiz"}
           </Button>
         </div>
 

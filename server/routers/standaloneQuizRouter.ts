@@ -28,6 +28,7 @@ import {
 import { drawQuestionsFromBuilder, parseBuilderConfig } from "../lib/quizBuilderConfig";
 import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
 import { buildStandaloneLearnerOptions, orderQuestionOptions } from "../lib/questionOptionOrder";
+import { canOpenStandaloneQuiz, requiresEmbeddedLearnerAccess } from "../lib/standaloneQuizPreviewAccess";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
@@ -122,17 +123,21 @@ export const standaloneQuizPublicRouter = router({
 export const standaloneQuizLearnerRouter = router({
   /** Get quiz info + question count for the take-quiz page */
   getQuizInfo: protectedProcedure
-    .input(z.object({ quizId: z.number().int() }))
+    .input(z.object({ quizId: z.number().int(), adminPreview: z.boolean().optional().default(false) }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [quiz] = await db
         .select()
         .from(standaloneQuizzes)
-        .where(and(eq(standaloneQuizzes.id, input.quizId), eq(standaloneQuizzes.status, "published")))
+        .where(eq(standaloneQuizzes.id, input.quizId))
         .limit(1);
-      if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
+      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, input.adminPreview)) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      if (requiresEmbeddedLearnerAccess(ctx.user.role, input.adminPreview)) {
+        await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
+      }
       const builderConfig = parseBuilderConfig(quiz.builderConfig);
       const [{ count }] = await db
         .select({ count: sql<number>`count(*)` })
@@ -165,17 +170,21 @@ export const standaloneQuizLearnerRouter = router({
 
   /** Start a new attempt — returns attempt ID and the ordered questions */
   startAttempt: protectedProcedure
-    .input(z.object({ quizId: z.number().int() }))
+    .input(z.object({ quizId: z.number().int(), adminPreview: z.boolean().optional().default(false) }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [quiz] = await db
         .select()
         .from(standaloneQuizzes)
-      .where(and(eq(standaloneQuizzes.id, input.quizId), eq(standaloneQuizzes.status, "published")))
+      .where(eq(standaloneQuizzes.id, input.quizId))
         .limit(1);
-      if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
-      await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
+      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, input.adminPreview)) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      if (requiresEmbeddedLearnerAccess(ctx.user.role, input.adminPreview)) {
+        await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
+      }
 
       const builderConfig = parseBuilderConfig(quiz.builderConfig);
 
