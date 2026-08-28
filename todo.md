@@ -125,3 +125,4 @@
 - [x] Audit all stored quiz questions and feedback for direct transcript, source, document, guide, PDF, or analogous provenance references, then remove only those references while preserving clinical content and learner data.
 - [x] Add URL-based source input to Question Bank and Quiz Creator question generation, with server-side retrieval, secure URL validation, and source-blind question/feedback wording that never cites the source page, document, transcript, PDF, or URL.
 - [x] Replace every RPhS quiz reference to “Greater Saphenous Vein” with the correct “Great Saphenous Vein” nomenclature while preserving questions, answers, feedback, and order.
+- [x] Trace and remove every remaining learner-visible “the source” reference in the RPhS quiz across Question Bank, visual-builder configuration, and rendered answer/feedback data while preserving clinical content and assessment behavior.
