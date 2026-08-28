@@ -146,3 +146,4 @@
 - [ ] Trace and repair the RPhS publish control or persistence path so administrator-selected Published status remains active and the protected learner launch recognizes it.
 - [ ] Trace and repair the deployment handoff so approved project updates reach the Railway-hosted live site and the live version can be verified.
 - [x] Republish the current workspace through the built-in hosted deployment at the user’s request.
+- [ ] Create a GitHub pull request containing the current verified project revision for Railway deployment review.
