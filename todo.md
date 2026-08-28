@@ -140,3 +140,4 @@
 - [x] Implement the approved canonical Question Bank synchronization for Visual Builder loads and saves, while retaining an explicit quiz-only find-and-replace override.
 - [x] Add explicit Visual Builder revision choices to update the linked Question Bank record or create a new linked Question Bank record for the revised quiz question.
 - [x] Repair magic-link URL generation and completion routing so valid learner links on learn.allaboutultrasound.com never land on an inactive funnel page, without resending email unless separately approved.
+- [x] Repair the learner content-access page runtime error “Can’t find variable: cn” without changing enrollment, entitlement, or content data.

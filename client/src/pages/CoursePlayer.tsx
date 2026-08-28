@@ -9,6 +9,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useParams, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { cn } from "@/lib/utils";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
