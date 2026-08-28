@@ -145,4 +145,4 @@
 - [x] Restore the user-confirmed Published status for RPhS Test & Learn Quiz after its unexpected reversal to Draft, without enabling any public discovery surface.
 - [ ] Trace and repair the RPhS publish control or persistence path so administrator-selected Published status remains active and the protected learner launch recognizes it.
 - [ ] Trace and repair the deployment handoff so approved project updates reach the Railway-hosted live site and the live version can be verified.
-- [ ] Republish the current workspace through the built-in hosted deployment at the user’s request.
+- [x] Republish the current workspace through the built-in hosted deployment at the user’s request.
