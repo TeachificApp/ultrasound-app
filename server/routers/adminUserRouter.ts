@@ -3200,6 +3200,7 @@ export const adminUserRouter = router({
         sent = await sendQuizAccessEmail({
           to: { name: String(enrollment.userName), email: String(enrollment.userEmail) },
           quizTitle: String(enrollment.courseTitle),
+          courseSlug: String(enrollment.courseSlug),
           customSubject: settings?.enrollmentEmailSubject,
           customIntro: settings?.enrollmentEmailIntro,
           accessToken,

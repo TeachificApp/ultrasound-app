@@ -32,6 +32,7 @@ import PlatformAdmin from "./pages/PlatformAdmin";
 import { perBrandAdminRouteElements, perBrandUserRouteElements } from "./routes/perBrandRouteHelpers";
 import { getSitePageDomain } from "@/lib/sitePageDomain";
 import { RESERVED_SITE_SLUGS } from "@shared/sitePagesConstants";
+import LegacyStudentDashboardRedirect from "./pages/LegacyStudentDashboardRedirect";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
 import Home from "./pages/Home";
@@ -398,6 +399,8 @@ function Router() {
         <Route path="/upgrade-success" component={UpgradeSuccess} />
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
+        <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
+        <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
@@ -794,6 +797,8 @@ function MembersRouter() {
         <MembersLayout>
           <Suspense fallback={pageFallback}>
             <Switch>
+              <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
+              <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
               <Route path="/my-dashboard" component={StudentDashboardPage} />
               <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
@@ -986,6 +991,8 @@ function LMSRouter() {
         <Route path="/register" component={Register} />
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
+        <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
+        <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
         <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
@@ -1056,6 +1063,8 @@ function IHeartEchoRouter() {
         <Route path="/upgrade-success" component={UpgradeSuccess} />
                 <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
+        <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
+        <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />

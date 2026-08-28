@@ -9,6 +9,10 @@
  */
 
 import { buildTransactionalEmailCta, sendEmail } from "../_core/email";
+import {
+  buildQuizCoursePlayerUrl,
+  buildStudentDashboardUrl,
+} from "../../shared/studentDashboardUrls";
 const brandColor = "#0d9488";
 const brandDark = "#0e4a50";
 
@@ -326,6 +330,7 @@ export async function sendBundleAccessEmail(opts: {
 export async function sendQuizAccessEmail(opts: {
   to: { name: string; email: string };
   quizTitle: string;
+  courseSlug?: string | null;
   customSubject?: string | null;
   customIntro?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
@@ -335,8 +340,10 @@ export async function sendQuizAccessEmail(opts: {
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your access to "${opts.quizTitle}" is ready 🎯`;
-  const appDestination = `https://app.allaboutultrasound.com/dashboard/my-content?tab=quizzes`;
-  const appUrl = buildAccessUrl(appDestination, opts.accessToken);
+  const destination = opts.courseSlug
+    ? buildQuizCoursePlayerUrl(opts.courseSlug)
+    : buildStudentDashboardUrl({ contentTab: "quizzes" });
+  const appUrl = buildAccessUrl(destination, opts.accessToken);
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
     : "";
@@ -360,11 +367,11 @@ export async function sendQuizAccessEmail(opts: {
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">How to access:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
         <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
-        <li style="margin:4px 0;">Go to My Dashboard → My Content → Quizzes</li>
+        <li style="margin:4px 0;">${opts.courseSlug ? "Start the quiz right away in your course player" : "Go to My Dashboard → My Content → Quizzes"}</li>
         <li style="margin:4px 0;">Start the quiz at any time during your access period</li>
       </ul>
     </div>
-    ${accessCtaWithFallback(appUrl, "Access My Quiz")}
+    ${accessCtaWithFallback(appUrl, opts.courseSlug ? "Start Quiz Now" : "Access My Quiz")}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
       If you have any questions, reply to this email or visit our help center.
     </p>

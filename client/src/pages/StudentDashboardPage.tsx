@@ -38,6 +38,10 @@ import { THINKIFIC_LEGACY_BILLING_LABEL } from "@shared/thinkificLegacy";
 import UserAvatar from "@/components/UserAvatar";
 import { isMembersDomain, isLearnDomain, LEARN_APP_URL, APP_URL, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 import { formatInTimeZone, isInstantExpired, isValidInstant, PLATFORM_TIMEZONE } from "@shared/platformTime";
+import {
+  STUDENT_DASHBOARD_CONTENT_TABS,
+  type StudentDashboardContentTab,
+} from "@shared/studentDashboardUrls";
 
 export function resolveDashboardSubscriptionCancelledAt(
   stripeSubscriptionId: string | null | undefined,
@@ -825,13 +829,38 @@ function CommunityProfileSection({ userId }: { userId: number }) {
 
 // ─── My Content Tab ───────────────────────────────────────────────────────────
 
-type ContentSubTab = "courses" | "quizzes" | "downloads" | "webinars" | "workshops" | "products" | "bundles" | "memberships" | "communities";
+type ContentSubTab = StudentDashboardContentTab;
 
-function MyContentTab() {
+function parseDashboardTabs(search: string): { initialTab: Tab; initialContentTab?: ContentSubTab } {
+  const params = new URLSearchParams(search);
+  const rawTab = params.get("tab");
+  const rawContentTab = params.get("contentTab");
+
+  let initialContentTab: ContentSubTab | undefined;
+  if (rawContentTab && STUDENT_DASHBOARD_CONTENT_TABS.has(rawContentTab as ContentSubTab)) {
+    initialContentTab = rawContentTab as ContentSubTab;
+  }
+
+  if (rawTab && VALID_TABS.includes(rawTab as Tab)) {
+    return { initialTab: rawTab as Tab, initialContentTab };
+  }
+
+  if (rawTab === "cohorts") {
+    return { initialTab: "content", initialContentTab: initialContentTab ?? "courses" };
+  }
+
+  if (rawTab && STUDENT_DASHBOARD_CONTENT_TABS.has(rawTab as ContentSubTab)) {
+    return { initialTab: "content", initialContentTab: rawTab as ContentSubTab };
+  }
+
+  return { initialTab: "content", initialContentTab };
+}
+
+function MyContentTab({ initialContentTab }: { initialContentTab?: ContentSubTab }) {
   const { data: profile } = trpc.dashboard.getProfile.useQuery();
   const { data, isLoading, isError, error, refetch } = trpc.dashboard.getMyContent.useQuery();
-  const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
-  const [autoTabSet, setAutoTabSet] = useState(false);
+  const [contentTab, setContentTab] = useState<ContentSubTab>(initialContentTab ?? "courses");
+  const [autoTabSet, setAutoTabSet] = useState(Boolean(initialContentTab));
 
   // Auto-select first non-empty tab once data loads
   useEffect(() => {
@@ -2582,9 +2611,8 @@ export default function StudentDashboardPage() {
     ...(isPartner ? [{ key: "revenue_partner" as Tab, label: "Revenue", icon: DollarSign }] : []),
   ];
 
-  // Parse ?tab= from URL
-  const urlTab = new URLSearchParams(search).get("tab") as Tab | null;
-  const initialTab: Tab = urlTab && VALID_TABS.includes(urlTab) ? urlTab : "content";
+  // Parse ?tab= / ?contentTab= from URL
+  const { initialTab, initialContentTab } = parseDashboardTabs(search);
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   // Fresh login via magic link / SSO exchange — drop stale SSO locks and cached auth
@@ -2673,6 +2701,10 @@ export default function StudentDashboardPage() {
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab") as Tab | null;
     if (t && VALID_TABS.includes(t) && t !== activeTab) setActiveTab(t);
+    const contentTabParam = new URLSearchParams(window.location.search).get("contentTab");
+    if (contentTabParam && STUDENT_DASHBOARD_CONTENT_TABS.has(contentTabParam as ContentSubTab) && activeTab !== "content") {
+      setActiveTab("content");
+    }
   }, [search]);
 
       // On members/learn subdomains the outer router already provides a layout wrapper.
@@ -2749,7 +2781,7 @@ export default function StudentDashboardPage() {
 
           {/* Tab Content */}
           {activeTab === "profile"       && <ProfileTab />}
-          {activeTab === "content"       && <MyContentTab />}
+          {activeTab === "content"       && <MyContentTab initialContentTab={initialContentTab} />}
           {activeTab === "subscriptions" && <SubscriptionsTab />}
           {activeTab === "purchases"     && <PurchasesTab />}
           {activeTab === "certificates"  && <CertificatesTab />}

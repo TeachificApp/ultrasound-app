@@ -166,6 +166,7 @@ export const lmsEnrollmentAdminRouter = router({
             await sendQuizAccessEmail({
               to: { name: user.displayName || user.name || "Student", email: user.email },
               quizTitle: course.title,
+              courseSlug: course.slug,
               customSubject: settings?.enrollmentEmailSubject,
               customIntro: settings?.enrollmentEmailIntro,
               accessToken,
@@ -1803,6 +1804,7 @@ CRITICAL REQUIREMENTS:
             await sendQuizAccessEmail({
               to: { name: input.name, email: input.email },
               quizTitle: course.title,
+              courseSlug: course.slug,
               customSubject: settings?.enrollmentEmailSubject,
               customIntro: settings?.enrollmentEmailIntro,
               accessToken: accessToken2,
