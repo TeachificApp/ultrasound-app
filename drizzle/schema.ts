@@ -5633,6 +5633,8 @@ export const questionBank = mysqlTable("question_bank", {
   /** Feedback media */
   feedbackImageUrl: text("feedback_image_url"),
   feedbackVideoUrl: text("feedback_video_url"),
+  /** Complete non-presentational Visual Builder question payload for linked standalone quizzes. */
+  builderQuestionPayload: longtext("builder_question_payload"),
   // Source tracking
   sourceQuizId: int("source_quiz_id"), // FK → lms_quizzes.id (if created via quiz builder)
   sourceQuizQuestionId: int("source_quiz_question_id"), // FK → lms_quiz_questions.id

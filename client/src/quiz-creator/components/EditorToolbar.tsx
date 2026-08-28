@@ -38,7 +38,11 @@ export function EditorToolbar({ onPreview, onSettings, onCloudOpen }: Props) {
         settingsJson: JSON.stringify(quiz.meta),
         quizId: (quiz.meta as any).cloudId || undefined,
       });
-      useQuizStore.getState().updateMeta({ cloudId: result.id } as any);
+      if (result.builderConfig) {
+        loadQuiz(result.builderConfig as QuizFile, quiz.meta.title);
+      } else {
+        useQuizStore.getState().updateMeta({ cloudId: result.id } as any);
+      }
       utils.quizMaker.listQuizzes.invalidate();
       markSaved(quiz.meta.title + " (cloud)");
     } catch (err) {

@@ -36,6 +36,7 @@ import {
   selectQuestionBankFolders,
 } from "../lib/questionBankFolderQueries";
 import { scormImportQuestionTagIds } from "../../shared/questionBankFolders";
+import { applyQuestionBankUpdateToBuilderPayload } from "../lib/visualBuilderQuestionBankSync";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -280,6 +281,9 @@ export const questionBankRouter = router({
       if (options !== undefined) updates.options = JSON.stringify(options);
       if (correctAnswers !== undefined) updates.correctAnswers = correctAnswers ? JSON.stringify(correctAnswers) : null;
       if (Object.keys(updates).length > 0) {
+        const [current] = await db.select({ builderQuestionPayload: questionBank.builderQuestionPayload }).from(questionBank).where(eq(questionBank.id, id)).limit(1);
+        const builderQuestionPayload = applyQuestionBankUpdateToBuilderPayload(current?.builderQuestionPayload ?? null, { ...rest, options, correctAnswers });
+        if (builderQuestionPayload) updates.builderQuestionPayload = builderQuestionPayload;
         await db.update(questionBank).set(updates).where(eq(questionBank.id, id));
       }
       if (tagIds !== undefined) {

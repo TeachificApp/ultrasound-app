@@ -29,6 +29,12 @@ import {
   listImportableScormQuizAssets,
 } from "../lib/scormQuizBuilderImport";
 import { replaceQuizQuestionText } from "../lib/quizTextReplacement";
+import {
+  builderQuestionFromQuestionBank,
+  mergeCanonicalBuilderQuestion,
+  questionBankIdFromBuilderId,
+  questionBankValuesFromBuilderQuestion,
+} from "../lib/visualBuilderQuestionBankSync";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -63,47 +69,77 @@ function parseJson<T>(value: string | null, fallback: T): T {
 }
 
 export function standaloneQuestionToBuilderQuestion(row: { sqq: typeof standaloneQuizQuestions.$inferSelect; qb: typeof questionBank.$inferSelect }) {
-  const options = parseJson<{ text?: string; imageUrl?: string; videoUrl?: string; feedback?: string }[]>(row.qb.options, []);
-  const correctAnswer = String(row.qb.correctAnswer ?? "0");
-  const correctAnswers = parseJson<number[]>(row.qb.correctAnswers, []);
-  const normalizedCorrectAnswer = correctAnswer.trim().toLocaleLowerCase();
-  const correctChoiceIndex = /^\d+$/.test(correctAnswer)
-    ? Number(correctAnswer)
-    : options.findIndex((option) => (option.text ?? "").trim().toLocaleLowerCase() === normalizedCorrectAnswer);
-  const base = {
-    id: `bank-${row.qb.id}`,
-    order: row.sqq.sortOrder + 1,
-    points: row.sqq.points,
-    stem: row.qb.question,
-    required: true,
-    shuffleAnswerOptions: row.sqq.shuffleAnswerOptions,
-    lockAnswerOrder: row.sqq.lockAnswerOrder ?? false,
-    explanation: row.qb.explanation ?? "",
-    feedback: {
-      correct: row.qb.correctFeedback ?? row.qb.explanation ?? "",
-      incorrect: row.qb.incorrectFeedback ?? row.qb.explanation ?? "",
-    },
-    image: row.qb.questionImageUrl ? { url: row.qb.questionImageUrl, alt: "Question media" } : null,
-    video: row.qb.questionVideoUrl ? { url: row.qb.questionVideoUrl, type: "file" } : null,
-    feedbackImage: row.qb.feedbackImageUrl ? { url: row.qb.feedbackImageUrl, alt: "Feedback media" } : null,
-    feedbackVideo: row.qb.feedbackVideoUrl ? { url: row.qb.feedbackVideoUrl, type: "file" } : null,
-    branchRules: [],
-  };
+  return builderQuestionFromQuestionBank(row);
+}
 
-  if (row.qb.type === "truefalse") return { ...base, type: "tf", data: { correct: correctAnswer === "true" || correctAnswer === "0" } };
-  if (row.qb.type === "matching") return { ...base, type: "matching", data: { pairs: parseJson(row.qb.matchingPairs, []) } };
-  if (row.qb.type === "hotspot") return { ...base, type: "hotspot", data: { markers: parseJson(row.qb.hotspotMarkers, []) } };
+async function hydrateBuilderQuestionsFromBank(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  quizId: number,
+  config: QuizFile,
+) {
+  const bankIds = config.questions
+    .map((question) => questionBankIdFromBuilderId(question.id))
+    .filter((id): id is number => id !== null);
+  if (bankIds.length === 0) return config;
+  const linked = await db
+    .select({ sqq: standaloneQuizQuestions, qb: questionBank })
+    .from(standaloneQuizQuestions)
+    .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
+    .where(and(eq(standaloneQuizQuestions.quizId, quizId), inArray(standaloneQuizQuestions.questionBankId, bankIds)));
+  const canonicalById = new Map(linked.map((row) => [`bank-${row.qb.id}`, standaloneQuestionToBuilderQuestion(row)]));
   return {
-    ...base,
-    type: "mcq",
-    data: {
-      multiple: row.qb.type === "multiselect",
-      choices: options.map((option, index) => ({
-        id: String(index), text: option.text ?? "", imageUrl: option.imageUrl, videoUrl: option.videoUrl, feedback: option.feedback ?? "",
-        correct: row.qb.type === "multiselect" ? correctAnswers.includes(index) : index === correctChoiceIndex,
-      })),
-    },
-  };
+    ...config,
+    questions: config.questions.map((question) => {
+      const canonical = canonicalById.get(question.id);
+      return canonical ? mergeCanonicalBuilderQuestion(question as Record<string, unknown>, canonical) : question;
+    }),
+  } as QuizFile;
+}
+
+async function synchronizeBuilderQuestionsToBank(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  quizId: number,
+  questions: QuizFile["questions"],
+  adminId: number,
+) {
+  const links = await db
+    .select({ sqq: standaloneQuizQuestions, qb: questionBank })
+    .from(standaloneQuizQuestions)
+    .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
+    .where(eq(standaloneQuizQuestions.quizId, quizId));
+  const linkedByBankId = new Map(links.map((row) => [row.qb.id, row]));
+  const synchronized: QuizFile["questions"] = [];
+  let created = 0;
+  let updated = 0;
+
+  for (const [index, question] of questions.entries()) {
+    const originalBankId = questionBankIdFromBuilderId(question.id);
+    const existing = originalBankId ? linkedByBankId.get(originalBankId) : undefined;
+    const values = questionBankValuesFromBuilderQuestion(question as Record<string, unknown>);
+    let bankId: number;
+    if (existing) {
+      bankId = existing.qb.id;
+      if (question.questionBankOverride !== true) {
+        await db.update(questionBank).set(values).where(eq(questionBank.id, bankId));
+        updated += 1;
+      }
+      await db.update(standaloneQuizQuestions).set({ sortOrder: index, points: question.points ?? 1, shuffleAnswerOptions: question.shuffleAnswerOptions ?? false, lockAnswerOrder: question.lockAnswerOrder ?? false }).where(eq(standaloneQuizQuestions.id, existing.sqq.id));
+    } else {
+      const [createdQuestion] = await db.insert(questionBank).values({ ...values, createdByAdminId: adminId }).$returningId();
+      bankId = createdQuestion.id;
+      await db.insert(standaloneQuizQuestions).values({
+        quizId,
+        questionBankId: bankId,
+        sortOrder: index,
+        points: question.points ?? 1,
+        shuffleAnswerOptions: question.shuffleAnswerOptions ?? false,
+        lockAnswerOrder: question.lockAnswerOrder ?? false,
+      });
+      created += 1;
+    }
+    synchronized.push({ ...question, id: `bank-${bankId}`, order: index + 1 });
+  }
+  return { questions: synchronized, created, updated };
 }
 
 export function assignBuilderQuestionGroup<T extends Record<string, unknown>>(questions: T[], groupId?: string): Array<T & { groupId?: string }> {
@@ -169,9 +205,8 @@ export const quizMakerRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const quiz = await getQuizOrThrow(db, input.quizId);
-      const savedConfig = parseBuilderConfig(quiz.builderConfig);
       let config = builderConfigFromQuizRow(quiz, ctx.user);
-      if (!savedConfig || config.questions.length === 0) {
+      if (config.questions.length === 0) {
         const linkedQuestions = await db
           .select({ sqq: standaloneQuizQuestions, qb: questionBank })
           .from(standaloneQuizQuestions)
@@ -183,6 +218,8 @@ export const quizMakerRouter = router({
           await db.update(standaloneQuizzes).set({ builderConfig: serializeBuilderConfig(config) }).where(eq(standaloneQuizzes.id, quiz.id));
         }
       }
+      config = await hydrateBuilderQuestionsFromBank(db, quiz.id, config);
+      await db.update(standaloneQuizzes).set({ builderConfig: serializeBuilderConfig(config) }).where(eq(standaloneQuizzes.id, quiz.id));
       const branding = config.meta.branding;
       return {
         ...quiz,
@@ -210,14 +247,15 @@ export const quizMakerRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      let questions: unknown[];
+      let questions: QuizFile["questions"];
       let meta: QuizFile["meta"];
       try {
-        questions = JSON.parse(input.questionsJson);
+        questions = JSON.parse(input.questionsJson) as QuizFile["questions"];
         meta = JSON.parse(input.settingsJson) as QuizFile["meta"];
       } catch {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid quiz JSON" });
       }
+      if (!Array.isArray(questions)) throw new TRPCError({ code: "BAD_REQUEST", message: "Questions must be an array" });
 
       meta.updatedAt = new Date().toISOString();
       const builderConfig: QuizFile = { meta, questions };
@@ -226,14 +264,15 @@ export const quizMakerRouter = router({
       if (input.quizId) {
         const quiz = await getQuizOrThrow(db, input.quizId);
         meta.cloudId = quiz.id;
+        const synchronized = await synchronizeBuilderQuestionsToBank(db, quiz.id, questions, ctx.user.id);
         await db
           .update(standaloneQuizzes)
           .set({
             ...settings,
-            builderConfig: serializeBuilderConfig({ meta, questions }),
+            builderConfig: serializeBuilderConfig({ meta, questions: synchronized.questions }),
           })
           .where(eq(standaloneQuizzes.id, input.quizId));
-        return { id: input.quizId };
+        return { id: input.quizId, builderConfig: { meta, questions: synchronized.questions }, createdQuestionBankRecords: synchronized.created, updatedQuestionBankRecords: synchronized.updated };
       }
 
       const [result] = await db.insert(standaloneQuizzes).values({
@@ -244,16 +283,17 @@ export const quizMakerRouter = router({
         brand: "aaus",
         showResultsImmediately: true,
         showExplanations: true,
-        builderConfig: serializeBuilderConfig(builderConfig),
+        builderConfig: serializeBuilderConfig({ ...builderConfig, questions: [] }),
         createdByUserId: ctx.user.id,
       });
       const id = (result as { insertId: number }).insertId;
       meta.cloudId = id;
+      const synchronized = await synchronizeBuilderQuestionsToBank(db, id, questions, ctx.user.id);
       await db
         .update(standaloneQuizzes)
-        .set({ builderConfig: serializeBuilderConfig({ meta, questions }) })
+        .set({ builderConfig: serializeBuilderConfig({ meta, questions: synchronized.questions }) })
         .where(eq(standaloneQuizzes.id, id));
-      return { id };
+      return { id, builderConfig: { meta, questions: synchronized.questions }, createdQuestionBankRecords: synchronized.created, updatedQuestionBankRecords: synchronized.updated };
     }),
 
   findAndReplaceText: protectedProcedure
@@ -261,43 +301,52 @@ export const quizMakerRouter = router({
       quizId: z.number().int().positive(),
       find: z.string().min(1).max(500),
       replace: z.string().max(500),
-      updateQuestionBank: z.boolean(),
+      questionBankAction: z.enum(["quiz_only", "update_linked", "create_linked"]),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const quiz = await getQuizOrThrow(db, input.quizId);
-      const config = builderConfigFromQuizRow(quiz, ctx.user);
+      const config = await hydrateBuilderQuestionsFromBank(db, quiz.id, builderConfigFromQuizRow(quiz, ctx.user));
       const updatedQuestions = config.questions.map((question) => replaceQuizQuestionText(question as Record<string, unknown>, input.find, input.replace));
       const replacementCount = updatedQuestions.reduce((total, result) => total + result.replacements, 0);
-      config.questions = updatedQuestions.map((result) => result.value) as QuizFile["questions"];
+      config.questions = updatedQuestions.map((result) => result.replacements > 0 && input.questionBankAction === "quiz_only"
+        ? { ...result.value, questionBankOverride: true }
+        : result.value) as QuizFile["questions"];
       config.meta.updatedAt = new Date().toISOString();
 
-      const questionBankIds = config.questions
-        .map((question) => /^bank-(\d+)$/.exec(String(question.id))?.[1])
-        .filter((id): id is string => Boolean(id))
-        .map(Number);
       let updatedQuestionBankRecords = 0;
-      if (input.updateQuestionBank && questionBankIds.length > 0) {
-        const linkedQuestionBankIds = await db
-          .select({ questionBankId: standaloneQuizQuestions.questionBankId })
-          .from(standaloneQuizQuestions)
-          .where(and(eq(standaloneQuizQuestions.quizId, input.quizId), inArray(standaloneQuizQuestions.questionBankId, questionBankIds)));
-        const ids = linkedQuestionBankIds.map((row) => row.questionBankId);
-        if (ids.length > 0) {
-          await db.update(questionBank).set({
-            question: sql`REPLACE(${questionBank.question}, ${input.find}, ${input.replace})`,
-            options: sql`REPLACE(${questionBank.options}, ${input.find}, ${input.replace})`,
-            explanation: sql`REPLACE(${questionBank.explanation}, ${input.find}, ${input.replace})`,
-            correctFeedback: sql`REPLACE(${questionBank.correctFeedback}, ${input.find}, ${input.replace})`,
-            incorrectFeedback: sql`REPLACE(${questionBank.incorrectFeedback}, ${input.find}, ${input.replace})`,
-          }).where(inArray(questionBank.id, ids));
-          updatedQuestionBankRecords = ids.length;
+      let createdQuestionBankRecords = 0;
+      if (input.questionBankAction === "update_linked") {
+        const questionsForBankUpdate = config.questions.map((question) => ({ ...question, questionBankOverride: false }));
+        const synchronized = await synchronizeBuilderQuestionsToBank(db, quiz.id, questionsForBankUpdate, ctx.user.id);
+        config.questions = synchronized.questions;
+        updatedQuestionBankRecords = synchronized.updated;
+        createdQuestionBankRecords = synchronized.created;
+      } else if (input.questionBankAction === "create_linked") {
+        const existingLinks = await db.select().from(standaloneQuizQuestions).where(eq(standaloneQuizQuestions.quizId, quiz.id));
+        const linkByBankId = new Map(existingLinks.map((link) => [link.questionBankId, link]));
+        for (const [index, result] of updatedQuestions.entries()) {
+          if (result.replacements === 0) continue;
+          const updatedQuestion = result.value as QuizFile["questions"][number];
+          const oldBankId = questionBankIdFromBuilderId(updatedQuestion.id);
+          const [newQuestion] = await db.insert(questionBank).values({
+            ...questionBankValuesFromBuilderQuestion(updatedQuestion as Record<string, unknown>),
+            createdByAdminId: ctx.user.id,
+          }).$returningId();
+          const oldLink = oldBankId ? linkByBankId.get(oldBankId) : undefined;
+          if (oldLink) {
+            await db.update(standaloneQuizQuestions).set({ questionBankId: newQuestion.id, sortOrder: index }).where(eq(standaloneQuizQuestions.id, oldLink.id));
+          } else {
+            await db.insert(standaloneQuizQuestions).values({ quizId: quiz.id, questionBankId: newQuestion.id, sortOrder: index, points: updatedQuestion.points ?? 1 });
+          }
+          config.questions[index] = { ...updatedQuestion, id: `bank-${newQuestion.id}`, questionBankOverride: false };
+          createdQuestionBankRecords += 1;
         }
       }
       await db.update(standaloneQuizzes).set({ builderConfig: serializeBuilderConfig(config), updatedAt: new Date() }).where(eq(standaloneQuizzes.id, input.quizId));
-      return { builderConfig: config, replacementCount, updatedQuestionBankRecords };
+      return { builderConfig: config, replacementCount, updatedQuestionBankRecords, createdQuestionBankRecords };
     }),
 
   deleteQuiz: protectedProcedure

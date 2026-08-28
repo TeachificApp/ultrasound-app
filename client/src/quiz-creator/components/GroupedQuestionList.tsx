@@ -25,13 +25,18 @@ export function GroupedQuestionList() {
   const [findText, setFindText] = useState("");
   const [replaceText, setReplaceText] = useState("");
   const [showReplace, setShowReplace] = useState(false);
-  const [replaceScope, setReplaceScope] = useState<"quiz" | "questionBank">("quiz");
+  const [replaceScope, setReplaceScope] = useState<"quiz_only" | "update_linked" | "create_linked">("update_linked");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const findAndReplace = trpc.quizMaker.findAndReplaceText.useMutation({
     onSuccess: (result) => {
       loadQuiz(result.builderConfig as QuizFile, quiz.meta.title);
       setSearch("");
-      alert(`${result.replacementCount} replacement${result.replacementCount === 1 ? "" : "s"} applied${result.updatedQuestionBankRecords ? ` and ${result.updatedQuestionBankRecords} linked Question Bank record${result.updatedQuestionBankRecords === 1 ? "" : "s"} synchronized` : " to this quiz only"}.`);
+      const bankSummary = result.createdQuestionBankRecords
+        ? ` and ${result.createdQuestionBankRecords} new linked Question Bank record${result.createdQuestionBankRecords === 1 ? "" : "s"} created`
+        : result.updatedQuestionBankRecords
+          ? ` and ${result.updatedQuestionBankRecords} linked Question Bank record${result.updatedQuestionBankRecords === 1 ? "" : "s"} updated`
+          : " to this quiz only";
+      alert(`${result.replacementCount} replacement${result.replacementCount === 1 ? "" : "s"} applied${bankSummary}.`);
     },
     onError: (error) => alert(error.message),
   });
@@ -64,9 +69,9 @@ export function GroupedQuestionList() {
       alert("Enter the word or phrase to find.");
       return;
     }
-    const scopeLabel = replaceScope === "questionBank" ? "this quiz and its linked Question Bank records" : "this quiz only";
+    const scopeLabel = replaceScope === "update_linked" ? "this quiz and its linked Question Bank records" : replaceScope === "create_linked" ? "this quiz and new linked Question Bank records" : "this quiz only";
     if (!window.confirm(`Replace every exact occurrence of “${findText}” with “${replaceText}” in ${scopeLabel}? This cannot be undone automatically.`)) return;
-    findAndReplace.mutate({ quizId, find: findText, replace: replaceText, updateQuestionBank: replaceScope === "questionBank" });
+    findAndReplace.mutate({ quizId, find: findText, replace: replaceText, questionBankAction: replaceScope });
   };
 
   const addGroup = () => {
@@ -122,7 +127,7 @@ export function GroupedQuestionList() {
           <div className="mt-2 space-y-2 rounded-lg border border-teal-200 bg-teal-50 p-2.5">
             <input value={findText} onChange={(event) => setFindText(event.target.value)} placeholder="Find exact word or phrase" className="w-full rounded border border-teal-200 bg-white px-2 py-1.5 text-xs text-gray-900 outline-none focus:ring-1 focus:ring-teal-500" />
             <input value={replaceText} onChange={(event) => setReplaceText(event.target.value)} placeholder="Replace with" className="w-full rounded border border-teal-200 bg-white px-2 py-1.5 text-xs text-gray-900 outline-none focus:ring-1 focus:ring-teal-500" />
-            <fieldset className="space-y-1 text-xs text-gray-700"><legend className="mb-1 font-medium text-teal-900">Apply replacements to</legend><label className="flex items-start gap-1.5"><input type="radio" checked={replaceScope === "quiz"} onChange={() => setReplaceScope("quiz")} /> <span><strong>This quiz only</strong><br /><span className="text-gray-500">Keeps linked Question Bank records unchanged.</span></span></label><label className="flex items-start gap-1.5"><input type="radio" checked={replaceScope === "questionBank"} onChange={() => setReplaceScope("questionBank")} /> <span><strong>This quiz and linked Question Bank records</strong><br /><span className="text-gray-500">Synchronizes exact replacements to this quiz’s linked bank questions.</span></span></label></fieldset>
+            <fieldset className="space-y-1 text-xs text-gray-700"><legend className="mb-1 font-medium text-teal-900">Apply replacements to</legend><label className="flex items-start gap-1.5"><input type="radio" checked={replaceScope === "update_linked"} onChange={() => setReplaceScope("update_linked")} /> <span><strong>Update linked Question Bank questions</strong><br /><span className="text-gray-500">Keeps this quiz and its linked bank records synchronized.</span></span></label><label className="flex items-start gap-1.5"><input type="radio" checked={replaceScope === "create_linked"} onChange={() => setReplaceScope("create_linked")} /> <span><strong>Create new linked Question Bank questions</strong><br /><span className="text-gray-500">Preserves the original bank records and links this revised quiz content to new records.</span></span></label><label className="flex items-start gap-1.5"><input type="radio" checked={replaceScope === "quiz_only"} onChange={() => setReplaceScope("quiz_only")} /> <span><strong>This quiz only</strong><br /><span className="text-gray-500">Creates an intentional quiz-specific override without changing Question Bank.</span></span></label></fieldset>
             <button type="button" disabled={findAndReplace.isPending || !findText} onClick={handleFindAndReplace} className="w-full rounded bg-teal-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50">{findAndReplace.isPending ? "Replacing…" : "Replace in selected scope"}</button>
           </div>
         )}

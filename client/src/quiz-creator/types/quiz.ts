@@ -231,6 +231,8 @@ export interface QuizQuestion {
   // Per-question appearance
   backgroundImageUrl?: string;
   backgroundColor?: string;
+  /** Intentional quiz-only text override; canonical Question Bank hydration does not replace it. */
+  questionBankOverride?: boolean;
   // Branching / conditional logic
   branchRules?: BranchRule[];
   // Group assignment

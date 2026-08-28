@@ -28,6 +28,7 @@ import {
 } from "../../drizzle/schema";
 import { drawQuestionsFromBuilder, parseBuilderConfig } from "../lib/quizBuilderConfig";
 import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
+import { builderQuestionFromQuestionBank, mergeCanonicalBuilderQuestion, questionBankIdFromBuilderId } from "../lib/visualBuilderQuestionBankSync";
 import { buildStandaloneLearnerOptions, orderQuestionOptions } from "../lib/questionOptionOrder";
 import { canOpenStandaloneQuiz, requiresEmbeddedLearnerAccess } from "../lib/standaloneQuizPreviewAccess";
 import {
@@ -95,6 +96,27 @@ async function hasActiveWidgetLaunch(db: any, rawToken: string | undefined, quiz
     ))
     .limit(1);
   return Boolean(launch);
+}
+
+/** Hydrate linked builder questions from their canonical Question Bank record before learner delivery or grading. */
+async function hydrateBuilderConfigFromQuestionBank(db: any, quizId: number, config: NonNullable<ReturnType<typeof parseBuilderConfig>>) {
+  const bankIds = config.questions
+    .map((question: any) => questionBankIdFromBuilderId(question.id))
+    .filter((id: number | null): id is number => id !== null);
+  if (bankIds.length === 0) return config;
+  const links = await db
+    .select({ sqq: standaloneQuizQuestions, qb: questionBank })
+    .from(standaloneQuizQuestions)
+    .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
+    .where(and(eq(standaloneQuizQuestions.quizId, quizId), inArray(standaloneQuizQuestions.questionBankId, bankIds)));
+  const canonicalById = new Map(links.map((row: any) => [`bank-${row.qb.id}`, builderQuestionFromQuestionBank(row)]));
+  return {
+    ...config,
+    questions: config.questions.map((question: any) => {
+      const canonical = canonicalById.get(question.id);
+      return canonical ? mergeCanonicalBuilderQuestion(question, canonical) : question;
+    }),
+  };
 }
 
 export function getConfiguredAttemptQuestionCount(
@@ -224,7 +246,10 @@ export const standaloneQuizLearnerRouter = router({
       if (requiresEmbeddedLearnerAccess(ctx.user.role, input.adminPreview) && !hasWidgetAccess) {
         await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       }
-      const builderConfig = parseBuilderConfig(quiz.builderConfig);
+      const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
+      const builderConfig = parsedBuilderConfig
+        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig)
+        : null;
       const linkedQuestionFolders = await db
         .select({ folderId: questionBank.folderId })
         .from(standaloneQuizQuestions)
@@ -274,7 +299,10 @@ export const standaloneQuizLearnerRouter = router({
         await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       }
 
-      const builderConfig = parseBuilderConfig(quiz.builderConfig);
+      const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
+      const builderConfig = parsedBuilderConfig
+        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig)
+        : null;
 
       // Check attempt limits
       if (!quiz.allowRetakes || quiz.maxAttempts) {
@@ -445,7 +473,10 @@ export const standaloneQuizLearnerRouter = router({
         .limit(1);
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
 
-      const builderConfig = parseBuilderConfig(quiz.builderConfig);
+      const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
+      const builderConfig = parsedBuilderConfig
+        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig)
+        : null;
       const isBuilderMode = !!(builderConfig && builderConfig.questions.length > 0);
 
       let earnedPoints = 0;
@@ -571,7 +602,10 @@ export const standaloneQuizLearnerRouter = router({
       const canSeeResults =
         quiz.showResultsImmediately ||
         (quiz.showResultsAfterDate && now >= new Date(quiz.showResultsAfterDate));
-      const builderConfig = parseBuilderConfig(quiz.builderConfig);
+      const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
+      const builderConfig = parsedBuilderConfig
+        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig)
+        : null;
       const builderReviewEnabled = builderConfig?.meta.showPerQuestionResult
         ?? ((builderConfig?.meta.resultSlide as { showReviewButton?: boolean } | undefined)?.showReviewButton)
         ?? quiz.showPerQuestionResult;

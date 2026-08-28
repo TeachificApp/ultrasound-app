@@ -135,3 +135,7 @@
 - [x] Trace and remove any remaining active RPhS learner-path source-language, including content cached in attempt records or result payloads, then verify the rendered review data is source-blind.
 - [x] Repair the learner My Content runtime error caused by an undefined isEnrollmentCompleted reference, restoring access to assigned quiz content without changing enrollment data.
 - [x] Restore quiz and flashcard display for supported SCORM ZIP lesson content and add focused regression coverage for the affected learner rendering path.
+- [x] Remove all direct source, transcript, source-guidance, and source question/answer locator wording from the full active RPhS visual-builder question set and feedback, preserving clinical facts and answer keys.
+- [x] Audit and propose a single canonical Question Bank source of truth for Visual Builder questions so question text, answers, and feedback remain synchronized before any existing records are migrated or changed.
+- [x] Implement the approved canonical Question Bank synchronization for Visual Builder loads and saves, while retaining an explicit quiz-only find-and-replace override.
+- [x] Add explicit Visual Builder revision choices to update the linked Question Bank record or create a new linked Question Bank record for the revised quiz question.
