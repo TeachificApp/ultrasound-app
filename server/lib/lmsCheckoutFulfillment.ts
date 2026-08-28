@@ -609,6 +609,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
           const quizEmailOk = await sendQuizAccessEmail({
             to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
             quizTitle: course.title,
+            courseSlug: course.slug,
             accessToken,
             setPasswordUrl,
           });

@@ -14,6 +14,10 @@ import { trpc } from "@/lib/trpc";
 import { CheckCircle2, XCircle, Clock, ArrowRight, BookOpen, Award, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import {
+  buildQuizCoursePlayerUrl,
+  buildStudentDashboardUrl,
+} from "@shared/studentDashboardUrls";
 
 export default function CheckoutComplete() {
   const [, navigate] = useLocation();
@@ -30,13 +34,15 @@ export default function CheckoutComplete() {
   // Map content type to the correct My Content tab
   const getMyContentUrl = (contentType: string, slug?: string | null) => {
     switch (contentType) {
-      case "quiz": return "/my-dashboard/my-content?tab=quizzes";
+      case "quiz":
+        return slug ? buildQuizCoursePlayerUrl(slug) : buildStudentDashboardUrl({ origin: "relative", contentTab: "quizzes" });
       case "download": return `/downloads/${slug}/files`;
-      case "cohort": return "/my-dashboard/my-content?tab=cohorts";
-      case "workshop": return "/my-dashboard/my-content?tab=workshops";
-      case "webinar": return "/my-dashboard/my-content?tab=webinars";
+      case "cohort": return buildStudentDashboardUrl({ origin: "relative", contentTab: "courses" });
+      case "workshop": return buildStudentDashboardUrl({ origin: "relative", contentTab: "workshops" });
+      case "webinar": return buildStudentDashboardUrl({ origin: "relative", contentTab: "webinars" });
       case "course":
-      default: return slug ? `/courses/${slug}/player` : "/my-dashboard/my-content?tab=courses";
+      default:
+        return slug ? `/courses/${slug}/player` : buildStudentDashboardUrl({ origin: "relative", contentTab: "courses" });
     }
   };
 

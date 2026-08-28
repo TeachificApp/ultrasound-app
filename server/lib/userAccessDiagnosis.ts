@@ -3,6 +3,7 @@ import type { getDb } from "../db";
 import { users, userEmailAliases, ipSecurityFlags } from "../../drizzle/schema";
 import { extractExecuteRows } from "./ensureLmsCoursesSchema";
 import { buildPersistentAccessUrl } from "./enrollmentEmail";
+import { buildQuizCoursePlayerUrl, buildStudentDashboardUrl } from "../../shared/studentDashboardUrls";
 import { getSendGridSuppressionStatus, isSendGridDeliveryBlocked } from "./sendgridSuppressions";
 
 type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
@@ -145,7 +146,9 @@ export async function diagnoseUserAccess(
       ).map((row) => {
         const destination =
           row.courseType === "quiz"
-            ? "https://app.allaboutultrasound.com/dashboard/my-content?tab=quizzes"
+            ? (row.courseSlug
+              ? buildQuizCoursePlayerUrl(row.courseSlug)
+              : buildStudentDashboardUrl({ contentTab: "quizzes" }))
             : `https://learn.allaboutultrasound.com/courses/${row.courseSlug}/player`;
         return {
           ...row,

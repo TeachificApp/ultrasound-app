@@ -61,4 +61,12 @@ describe("student access link fixes", () => {
     expect(source).toContain("/api/debug/repair-user-access");
     expect(source).toContain("repairUserAccess");
   });
+
+  it("quiz access emails avoid the removed /dashboard/my-content path", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(new URL("./lib/enrollmentEmail.ts", import.meta.url), "utf8"),
+    );
+    expect(source).toContain("buildQuizCoursePlayerUrl");
+    expect(source).not.toContain("/dashboard/my-content");
+  });
 });
