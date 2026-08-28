@@ -9,9 +9,10 @@ describe("standalone quiz administrator preview access", () => {
     expect(requiresEmbeddedLearnerAccess("user", true)).toBe(true);
   });
 
-  it("permits explicit administrators to preview draft content without making it public", () => {
+  it("permits administrators to preview every quiz status without making content public", () => {
     expect(canOpenStandaloneQuiz("draft", "admin", true)).toBe(true);
     expect(canOpenStandaloneQuiz("waitlist", "admin", true)).toBe(true);
+    expect(canOpenStandaloneQuiz("archived", "admin", true)).toBe(true);
     expect(requiresEmbeddedLearnerAccess("admin", true)).toBe(false);
   });
 });

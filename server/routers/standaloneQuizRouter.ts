@@ -239,11 +239,12 @@ export const standaloneQuizLearnerRouter = router({
         .from(standaloneQuizzes)
         .where(eq(standaloneQuizzes.id, input.quizId))
         .limit(1);
-      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, input.adminPreview)) {
+      const adminPreview = ctx.user.role === "admin";
+      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, adminPreview)) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
       const hasWidgetAccess = await hasActiveWidgetLaunch(db, input.widgetToken, quiz.id);
-      if (requiresEmbeddedLearnerAccess(ctx.user.role, input.adminPreview) && !hasWidgetAccess) {
+      if (requiresEmbeddedLearnerAccess(ctx.user.role, adminPreview) && !hasWidgetAccess) {
         await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       }
       const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
@@ -291,11 +292,12 @@ export const standaloneQuizLearnerRouter = router({
         .from(standaloneQuizzes)
       .where(eq(standaloneQuizzes.id, input.quizId))
         .limit(1);
-      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, input.adminPreview)) {
+      const adminPreview = ctx.user.role === "admin";
+      if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, adminPreview)) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
       const hasWidgetAccess = await hasActiveWidgetLaunch(db, input.widgetToken, quiz.id);
-      if (requiresEmbeddedLearnerAccess(ctx.user.role, input.adminPreview) && !hasWidgetAccess) {
+      if (requiresEmbeddedLearnerAccess(ctx.user.role, adminPreview) && !hasWidgetAccess) {
         await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       }
 

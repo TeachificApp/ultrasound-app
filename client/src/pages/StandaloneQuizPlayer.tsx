@@ -90,7 +90,7 @@ export default function StandaloneQuizPlayer() {
 
   const qId = parseInt(quizId, 10);
   const isEmbedWidget = new URLSearchParams(window.location.search).get("embed") === "1";
-  const isAdminPreview = new URLSearchParams(window.location.search).get("adminPreview") === "1";
+  const isAdminPreview = user?.role === "admin" || new URLSearchParams(window.location.search).get("adminPreview") === "1";
   const widgetToken = new URLSearchParams(window.location.search).get("widget") ?? undefined;
 
   const { data: quizInfo, isLoading: infoLoading } = trpc.standaloneQuizLearner.getQuizInfo.useQuery(
