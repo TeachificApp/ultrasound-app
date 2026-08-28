@@ -1674,6 +1674,19 @@ function QuizEditor({ quizId }: { quizId: number }) {
     onSuccess: () => { toast.success("Saved"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const createWidgetLaunchMutation = trpc.standaloneQuizAdmin.createWidgetLaunch.useMutation({
+    onSuccess: ({ embedCode, expiresAt }) => {
+      navigator.clipboard.writeText(embedCode)
+        .then(() => toast.success(`Secure quiz HTML widget copied; it expires ${new Date(expiresAt).toLocaleDateString()}.`))
+        .catch(() => toast.error("The widget was created, but it could not be copied. Please use Replace & copy to create a new credential."));
+      refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const revokeWidgetLaunchMutation = trpc.standaloneQuizAdmin.revokeWidgetLaunch.useMutation({
+    onSuccess: () => { toast.success("Active quiz HTML widget revoked"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const removeQMutation = trpc.standaloneQuizAdmin.removeQuestion.useMutation({
     onSuccess: () => { toast.success("Question removed"); refetch(); },
@@ -1815,13 +1828,13 @@ function QuizEditor({ quizId }: { quizId: number }) {
                     </div>
                     <EmbeddedQuizAssignmentCard
                       assignments={assignments}
-                      widgetSrc={`${window.location.origin}/quizzes/${quiz.id}?embed=1`}
+                      widgetLaunch={data.widgetLaunch ?? null}
+                      widgetEnabled={quiz.status === "published"}
+                      isWidgetActionPending={createWidgetLaunchMutation.isPending || revokeWidgetLaunchMutation.isPending}
                       onManageAssignments={() => navigate(getAdminUrl("/lms-admin"))}
                       onOpenCourse={() => navigate(getAdminUrl("/lms-admin"))}
-                      onCopyWidget={() => {
-                        const code = `<iframe src="${window.location.origin}/quizzes/${quiz.id}?embed=1" width="100%" height="720" frameborder="0" style="border:0;border-radius:12px" title="${quiz.title.replace(/"/g, "&quot;")}"></iframe>`;
-                        navigator.clipboard.writeText(code).then(() => toast.success("Quiz HTML widget copied")).catch(() => toast.error("Could not copy the embed code"));
-                      }}
+                      onCopyWidget={() => createWidgetLaunchMutation.mutate({ quizId: quiz.id, origin: window.location.origin })}
+                      onRevokeWidget={() => revokeWidgetLaunchMutation.mutate({ quizId: quiz.id })}
                     />
                     <p className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-xs leading-5 text-teal-900">
                       <strong>Publication scope:</strong> Publishing makes this quiz available only through an assigned learning module or approved HTML widget. It does not create direct enrollment, checkout, catalog, search, or learner-facing listing access.

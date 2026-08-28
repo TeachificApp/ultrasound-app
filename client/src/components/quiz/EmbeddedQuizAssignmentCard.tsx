@@ -13,19 +13,25 @@ export type EmbeddedQuizAssignment = {
 
 export function EmbeddedQuizAssignmentCard({
   assignments,
-  widgetSrc,
+  widgetLaunch,
+  widgetEnabled,
+  isWidgetActionPending,
   onManageAssignments,
   onOpenCourse,
   onCopyWidget,
+  onRevokeWidget,
 }: {
   assignments: EmbeddedQuizAssignment[];
-  widgetSrc: string;
+  widgetLaunch: { expiresAt: Date | string; label: string | null } | null;
+  widgetEnabled: boolean;
+  isWidgetActionPending: boolean;
   onManageAssignments: () => void;
   onOpenCourse: (assignment: EmbeddedQuizAssignment) => void;
   onCopyWidget: () => void;
+  onRevokeWidget: () => void;
 }) {
   return (
-    <div className="space-y-2" data-embed-src={widgetSrc}>
+    <div className="space-y-2">
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
         <div className="flex items-center justify-between gap-3">
           <Label className="text-xs font-semibold text-slate-800">Assigned learning experiences</Label>
@@ -48,9 +54,13 @@ export function EmbeddedQuizAssignmentCard({
       <div className="rounded-lg border border-teal-100 bg-teal-50/50 p-3 space-y-2">
         <div className="flex items-center justify-between gap-2">
           <Label className="text-xs font-semibold text-teal-800">HTML widget embed</Label>
-          <Button type="button" size="sm" variant="outline" className="h-7 border-teal-300 text-teal-700" onClick={onCopyWidget}><Copy className="mr-1 h-3.5 w-3.5" />Copy widget</Button>
+          <div className="flex items-center gap-2">
+            {widgetLaunch && <Button type="button" size="sm" variant="outline" className="h-7 border-gray-300 text-gray-700" disabled={isWidgetActionPending} onClick={onRevokeWidget}>Revoke widget</Button>}
+            <Button type="button" size="sm" variant="outline" className="h-7 border-teal-300 text-teal-700" disabled={!widgetEnabled || isWidgetActionPending} onClick={onCopyWidget}><Copy className="mr-1 h-3.5 w-3.5" />{widgetLaunch ? "Replace & copy" : "Copy widget"}</Button>
+          </div>
         </div>
-        <p className="text-xs text-teal-800/80">Use this in an approved HTML widget. Learners must sign in and have access through an assigned learning experience.</p>
+        <p className="text-xs text-teal-800/80">{widgetEnabled ? "Generating a widget creates an access-bearing, sign-in-required launch credential. It bypasses LMS assignment only for this published quiz, expires after 30 days, and replaces any prior active widget." : "Publish this quiz before generating an approved HTML widget."}</p>
+        {widgetLaunch && <p className="text-xs text-teal-800/70">Active widget expires {new Date(widgetLaunch.expiresAt).toLocaleString()}. It remains non-discoverable and can be revoked here at any time.</p>}
       </div>
     </div>
   );
