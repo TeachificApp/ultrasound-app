@@ -2081,12 +2081,10 @@ export const lmsLearnerRouter = router({
         };
       }
 
-      // Fetch sections + ALL lessons for this course in 2 parallel queries (avoids N+1)
-      // Select only lightweight columns for the sidebar — heavy content (contentBlocks, content, videoContent)
-      // is fetched on-demand by getLesson when the student opens a specific lesson.
-      const [sections, allCourseLessons] = await Promise.all([
-        db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
-        db.select({
+      // Fetch sections + ALL lessons for this course (includes section-only lessons missing course_id)
+      const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
+      const sectionIds = sections.map((section) => section.id);
+      const allCourseLessons = await db.select({
           id: lmsLessons.id,
           courseId: lmsLessons.courseId,
           sectionId: lmsLessons.sectionId,
@@ -2119,11 +2117,16 @@ export const lmsLearnerRouter = router({
           contentBlocks: lmsLessons.contentBlocks,
           createdAt: lmsLessons.createdAt,
           updatedAt: lmsLessons.updatedAt,
+          standaloneQuizId: lmsLessons.standaloneQuizId,
         }).from(lmsLessons).where(
-          // Always filter out draft lessons — draft lessons are never shown in the course player sidebar
-          and(eq(lmsLessons.courseId, course.id), eq(lmsLessons.lessonStatus, "published"))
-        ).orderBy(asc(lmsLessons.position)),
-      ]);
+          and(
+            eq(lmsLessons.lessonStatus, "published"),
+            or(
+              eq(lmsLessons.courseId, course.id),
+              sectionIds.length > 0 ? inArray(lmsLessons.sectionId, sectionIds) : sql`FALSE`,
+            ),
+          ),
+        ).orderBy(asc(lmsLessons.position));
       const toSidebarLesson = (lesson: (typeof allCourseLessons)[number]) => {
         const { contentBlocks, ...rest } = lesson;
         return {
