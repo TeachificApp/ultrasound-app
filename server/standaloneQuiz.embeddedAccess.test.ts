@@ -1,19 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { assertEmbeddedQuizAccess } from "./routers/standaloneQuizRouter";
+import { assertEmbeddedQuizAccess } from "./lib/embeddedQuizCourseAccess";
 
-function mockDatabase(assignments: Array<{ lessonId: number }>, previewAssignments: Array<{ lessonId: number }> = []) {
+function mockDatabase(
+  directAssignments: Array<{ lessonId: number }>,
+  sectionAssignments: Array<{ lessonId: number }> = [],
+  previewAssignments: Array<{ lessonId: number }> = [],
+) {
+  let selectCall = 0;
   return {
     select: () => ({
-      from: () => ({
-        innerJoin: () => ({
+      from: () => {
+        selectCall += 1;
+        if (selectCall === 1) {
+          return {
+            innerJoin: () => ({
+              where: () => ({
+                limit: async () => directAssignments,
+              }),
+            }),
+          };
+        }
+        if (selectCall === 2) {
+          return {
+            innerJoin: () => ({
+              innerJoin: () => ({
+                where: () => ({
+                  limit: async () => sectionAssignments,
+                }),
+              }),
+            }),
+          };
+        }
+        return {
           where: () => ({
-            limit: async () => assignments,
+            limit: async () => previewAssignments,
           }),
-        }),
-        where: () => ({
-          limit: async () => previewAssignments,
-        }),
-      }),
+        };
+      },
     }),
   };
 }
@@ -30,7 +53,7 @@ describe("embedded Quiz Creator access", () => {
   });
 
   it("allows a logged-in learner when the assigned lesson is configured as a free preview", async () => {
-    await expect(assertEmbeddedQuizAccess(mockDatabase([], [{ lessonId: 43 }]), { id: 7, role: "user" }, 30001)).resolves.toBeUndefined();
+    await expect(assertEmbeddedQuizAccess(mockDatabase([], [], [{ lessonId: 43 }]), { id: 7, role: "user" }, 30001)).resolves.toBeUndefined();
   });
 
   it("allows an administrator to preview embedded quiz content without an enrollment", async () => {

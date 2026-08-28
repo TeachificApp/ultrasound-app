@@ -63,6 +63,8 @@ function OptionButton({
 // ─── Props ────────────────────────────────────────────────────────────────────
 interface EmbeddedQuizPlayerProps {
   quizId: number;
+  /** Parent course slug when rendered inside /courses/:slug/player */
+  courseSlug?: string;
   /** When true, shows a compact header. Default: true */
   showHeader?: boolean;
   /** Called when the attempt is completed */
@@ -70,11 +72,11 @@ interface EmbeddedQuizPlayerProps {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function EmbeddedQuizPlayer({ quizId, showHeader = true, onComplete }: EmbeddedQuizPlayerProps) {
+export default function EmbeddedQuizPlayer({ quizId, courseSlug, showHeader = true, onComplete }: EmbeddedQuizPlayerProps) {
   const { user, isLoading: authLoading } = useAuth();
 
   const { data: quizInfo, isLoading: infoLoading } = trpc.standaloneQuizLearner.getQuizInfo.useQuery(
-    { quizId },
+    { quizId, courseSlug },
     { enabled: !!user && !isNaN(quizId) }
   );
 
@@ -122,7 +124,7 @@ export default function EmbeddedQuizPlayer({ quizId, showHeader = true, onComple
 
   function handleStart() {
     startMutation.mutate(
-      { quizId },
+      { quizId, courseSlug },
       {
         onSuccess: (res) => {
           setAttemptId(res.attemptId);
@@ -185,7 +187,7 @@ export default function EmbeddedQuizPlayer({ quizId, showHeader = true, onComple
   if (!quizInfo) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-center text-sm text-gray-500">
-        Quiz not available.
+        Quiz not available. If you just enrolled, make sure the quiz is published and linked to this course lesson.
       </div>
     );
   }

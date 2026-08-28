@@ -36,6 +36,9 @@ import {
   resolveStandaloneQuizAdminPreview,
 } from "../lib/standaloneQuizStaffAccess";
 import {
+  assertStandaloneQuizLearnerAccess,
+} from "../lib/embeddedQuizCourseAccess";
+import {
   buildStandaloneQuizWidgetEmbed,
   createStandaloneQuizWidgetToken,
   DEFAULT_WIDGET_LAUNCH_EXPIRY_DAYS,
@@ -64,37 +67,7 @@ async function resolveStandaloneQuizLearnerAccess(
 }
 
 /** Quiz Creator content is available through an assigned LMS lesson, not as a public standalone product. */
-export async function assertEmbeddedQuizAccess(db: any, user: { id: number; role: string }, quizId: number) {
-  if (user.role === "admin") return;
-  const [assignment] = await db
-    .select({ lessonId: lmsLessons.id })
-    .from(lmsLessons)
-    .innerJoin(lmsEnrollments, and(
-      eq(lmsEnrollments.courseId, lmsLessons.courseId),
-      eq(lmsEnrollments.userId, user.id),
-      or(isNull(lmsEnrollments.accessExpiresAt), gte(lmsEnrollments.accessExpiresAt, new Date())),
-    ))
-    .where(and(
-      eq(lmsLessons.type, "standalone_quiz"),
-      eq(lmsLessons.standaloneQuizId, quizId),
-    ))
-    .limit(1);
-  if (assignment) return;
-  const [previewAssignment] = await db
-    .select({ lessonId: lmsLessons.id })
-    .from(lmsLessons)
-    .where(and(
-      eq(lmsLessons.type, "standalone_quiz"),
-      eq(lmsLessons.standaloneQuizId, quizId),
-      or(
-        eq(lmsLessons.previewMode, "preview"),
-        eq(lmsLessons.previewMode, "preview_hide_after_purchase"),
-      ),
-    ))
-    .limit(1);
-  if (previewAssignment) return;
-  throw new TRPCError({ code: "FORBIDDEN", message: "This quiz is available through its assigned learning experience." });
-}
+export { assertEmbeddedQuizAccess } from "../lib/embeddedQuizCourseAccess";
 
 /** A widget credential substitutes only for an LMS assignment, never authentication or published status. */
 async function hasActiveWidgetLaunch(db: any, rawToken: string | undefined, quizId: number): Promise<boolean> {
@@ -230,6 +203,8 @@ const learnerQuizAccessInput = z.object({
   quizId: z.number().int(),
   adminPreview: z.boolean().optional().default(false),
   widgetToken: z.string().min(1).max(512).optional(),
+  /** When opened from /courses/:slug/player, trust active course enrollment for access. */
+  courseSlug: z.string().min(1).max(255).optional(),
 });
 
 // ─── Public Router ────────────────────────────────────────────────────────────
@@ -261,7 +236,12 @@ export const standaloneQuizLearnerRouter = router({
       }
       const hasWidgetAccess = await hasActiveWidgetLaunch(db, input.widgetToken, quiz.id);
       if (requiresEmbeddedLearnerAccess(adminPreview, isStaff) && !hasWidgetAccess) {
-        await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
+        await assertStandaloneQuizLearnerAccess(db, ctx.user, quiz.id, {
+          adminPreview,
+          isStaff,
+          widgetToken: input.widgetToken,
+          courseSlug: input.courseSlug,
+        }, hasActiveWidgetLaunch);
       }
       const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
       const builderConfig = parsedBuilderConfig
@@ -321,7 +301,12 @@ export const standaloneQuizLearnerRouter = router({
       }
       const hasWidgetAccess = await hasActiveWidgetLaunch(db, input.widgetToken, quiz.id);
       if (requiresEmbeddedLearnerAccess(adminPreview, isStaff) && !hasWidgetAccess) {
-        await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
+        await assertStandaloneQuizLearnerAccess(db, ctx.user, quiz.id, {
+          adminPreview,
+          isStaff,
+          widgetToken: input.widgetToken,
+          courseSlug: input.courseSlug,
+        }, hasActiveWidgetLaunch);
       }
 
       const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
