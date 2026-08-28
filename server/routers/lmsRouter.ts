@@ -39,6 +39,7 @@ import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollme
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
+import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
   lmsCourses,
@@ -2309,7 +2310,7 @@ export const lmsLearnerRouter = router({
         }
       }
 
-      return { ...lesson, quiz };
+      return { ...lesson, quiz, linkedMediaAsset: await loadLinkedLessonMediaAsset(db as any, lesson.mediaAssetId) };
     }),
 
   /** Record that a learner opened a lesson (for prerequisite gates that unlock on view). */
