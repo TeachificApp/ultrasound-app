@@ -97,16 +97,33 @@ async function hasActiveWidgetLaunch(db: any, rawToken: string | undefined, quiz
   return Boolean(launch);
 }
 
-function getConfiguredAttemptQuestionCount(
+export function getConfiguredAttemptQuestionCount(
   quiz: typeof standaloneQuizzes.$inferSelect,
   builderConfig: ReturnType<typeof parseBuilderConfig>,
-  linkedQuestionCount: number,
+  linkedQuestionFolderIds: Array<number | null>,
 ): number {
-  const available = builderConfig
-    ? (builderConfig.meta.drawConfig?.enabled
-        ? builderConfig.meta.drawConfig.totalQuestions
-        : builderConfig.questions.length)
-    : linkedQuestionCount;
+  if (builderConfig && builderConfig.questions.length > 0) {
+    const available = drawQuestionsFromBuilder(builderConfig).length;
+    return quiz.questionsPerAttempt
+      ? Math.min(available, quiz.questionsPerAttempt)
+      : available;
+  }
+
+  let available = linkedQuestionFolderIds.length;
+  if (quiz.categoryConfig) {
+    try {
+      const categories = JSON.parse(quiz.categoryConfig) as Array<{ folderId: number | null; count?: number }>;
+      if (Array.isArray(categories)) {
+        available = categories.reduce((total, category) => {
+          const poolSize = linkedQuestionFolderIds.filter((folderId) => folderId === category.folderId).length;
+          const requested = Number.isFinite(category.count) ? Math.max(0, Number(category.count)) : poolSize;
+          return total + Math.min(poolSize, requested);
+        }, 0);
+      }
+    } catch {
+      // Keep the full linked-question count to match startAttempt's parse fallback.
+    }
+  }
   return quiz.questionsPerAttempt
     ? Math.min(available, quiz.questionsPerAttempt)
     : available;
@@ -188,11 +205,16 @@ export const standaloneQuizLearnerRouter = router({
         await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       }
       const builderConfig = parseBuilderConfig(quiz.builderConfig);
-      const [{ count }] = await db
-        .select({ count: sql<number>`count(*)` })
+      const linkedQuestionFolders = await db
+        .select({ folderId: questionBank.folderId })
         .from(standaloneQuizQuestions)
+        .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
         .where(eq(standaloneQuizQuestions.quizId, quiz.id));
-      const questionCount = getConfiguredAttemptQuestionCount(quiz, builderConfig, Number(count));
+      const questionCount = getConfiguredAttemptQuestionCount(
+        quiz,
+        builderConfig,
+        linkedQuestionFolders.map((question) => question.folderId),
+      );
       // Check attempt limits
       let attemptCount = 0;
       if (!quiz.allowRetakes || quiz.maxAttempts) {
