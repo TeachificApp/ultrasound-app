@@ -30,6 +30,11 @@ import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/Lesso
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
+import {
+  isInteractiveMediaPackage,
+  mediaRepoScormUrl,
+  parseMediaRepoSlug,
+} from "@shared/mediaRepoDisplay";
 
 import LessonCommentSection from "@/components/LessonCommentSection";
 import CertificatePreviewBlock from "@/components/CertificatePreviewBlock";
@@ -1973,6 +1978,32 @@ export default function CoursePlayer() {
     try { return lessonData?.contentBlocks ? JSON.parse(lessonData.contentBlocks) : []; }
     catch { return []; }
   })();
+  const lessonMediaRepoScormSrc = useMemo(() => {
+    if (!lessonData) return null;
+    const linked = (lessonData as { linkedMediaAsset?: { slug: string; mediaType: string | null; fileName: string | null } | null }).linkedMediaAsset;
+    if (linked && isInteractiveMediaPackage(linked.mediaType, linked.fileName)) {
+      return mediaRepoScormUrl(linked.slug);
+    }
+    if (lessonData.embedUrl) {
+      const isMediaRepo = lessonData.embedUrl.includes("/api/media/") || lessonData.embedUrl.includes("/media/");
+      if (isMediaRepo) {
+        return lessonData.embedUrl.replace(/\/embed\/?(\?.*|$)/, "/scorm/$1");
+      }
+    }
+    if (lessonData.content) {
+      const slug = parseMediaRepoSlug(lessonData.content);
+      const fileName = linked?.fileName ?? lessonData.content.split("?")[0]?.split("/").pop() ?? "";
+      if (slug && isInteractiveMediaPackage(linked?.mediaType ?? "document", fileName)) {
+        return mediaRepoScormUrl(slug);
+      }
+    }
+    return null;
+  }, [lessonData]);
+  const lessonExternalEmbedUrl = useMemo(() => {
+    if (!lessonData?.embedUrl || lessonMediaRepoScormSrc) return null;
+    const isMediaRepo = lessonData.embedUrl.includes("/api/media/") || lessonData.embedUrl.includes("/media/");
+    return isMediaRepo ? null : lessonData.embedUrl;
+  }, [lessonData, lessonMediaRepoScormSrc]);
   const hasInlineLessonQuiz = contentBlocks.some((block) => block.type === "lesson_quiz");
   const hasSdmsCmeModule = contentBlocks.some((block) => block.type === "sdms_cme_module");
   const isCmeCourse = isCertificateCourse(data?.course);
@@ -2723,41 +2754,39 @@ export default function CoursePlayer() {
                     </div>
                   )}
 
-                  {/* ── Embed lesson — only show if no content blocks override ── */}
-                  {lessonData.type === "embed" && lessonData.embedUrl && contentBlocks.length === 0 && (() => {
-                    const isMediaRepo =
-                      lessonData.embedUrl.includes("/api/media/") || lessonData.embedUrl.includes("/media/");
-                    const embedSrc = isMediaRepo
-                      ? lessonData.embedUrl.replace(/\/embed\/?(\?.*|$)/, "/scorm/$1")
-                      : lessonData.embedUrl;
-                    return (
-                      <div className="mb-5">
-                        <div className={`bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 ${isMediaRepo ? "min-h-[600px] h-[75vh]" : "aspect-video"}`}>
-                          {isMediaRepo ? (
-                            <MediaEmbedIframe
-                              src={embedSrc}
-                              courseId={data?.course?.id}
-                              title={lessonData.title}
-                              className="w-full h-full"
-                              style={{ border: "none", minHeight: "600px" }}
-                            />
-                          ) : (
-                            <iframe
-                              src={embedSrc.startsWith("/") ? `${window.location.origin}${embedSrc}` : embedSrc}
-                              className="w-full h-full"
-                              allowFullScreen
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                              title={lessonData.title}
-                              style={{ border: "none" }}
-                            />
-                          )}
-                        </div>
+                  {/* ── SCORM / ZIP lesson modules from media library ── */}
+                  {lessonMediaRepoScormSrc && contentBlocks.length === 0 && (
+                    <div className="mb-5">
+                      <div className="bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 min-h-[600px] h-[75vh]">
+                        <MediaEmbedIframe
+                          src={lessonMediaRepoScormSrc}
+                          courseId={data?.course?.id}
+                          title={lessonData.title}
+                          className="w-full h-full"
+                          style={{ border: "none", minHeight: "600px" }}
+                        />
                       </div>
-                    );
-                  })()}
+                    </div>
+                  )}
+
+                  {/* ── External embed lesson ── */}
+                  {lessonExternalEmbedUrl && contentBlocks.length === 0 && (
+                    <div className="mb-5">
+                      <div className="bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 aspect-video">
+                        <iframe
+                          src={lessonExternalEmbedUrl.startsWith("/") ? `${window.location.origin}${lessonExternalEmbedUrl}` : lessonExternalEmbedUrl}
+                          className="w-full h-full"
+                          allowFullScreen
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                          title={lessonData.title}
+                          style={{ border: "none" }}
+                        />
+                      </div>
+                    </div>
+                  )}
 
                   {/* ── Download lesson — only show if no content blocks override ── */}
-                  {lessonData.type === "download" && lessonData.content && contentBlocks.length === 0 && (
+                  {lessonData.type === "download" && lessonData.content && !lessonMediaRepoScormSrc && contentBlocks.length === 0 && (
                     <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 mb-5 flex items-center gap-4">
                       <Download className="w-8 h-8" style={{ color: primaryColor }} />
                       <div>

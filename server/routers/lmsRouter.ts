@@ -39,6 +39,7 @@ import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollme
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
+import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
   lmsCourses,
@@ -2081,9 +2082,13 @@ export const lmsLearnerRouter = router({
         };
       }
 
-      // Fetch sections + ALL lessons for this course (includes section-only lessons missing course_id)
+      // Fetch sections, then lessons (include section-owned lessons — many rows have section_id only)
+      // Select only lightweight columns for the sidebar — heavy content is fetched by getLesson.
       const sections = await db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position));
       const sectionIds = sections.map((section) => section.id);
+      const lessonScope = sectionIds.length > 0
+        ? or(eq(lmsLessons.courseId, course.id), inArray(lmsLessons.sectionId, sectionIds))
+        : eq(lmsLessons.courseId, course.id);
       const allCourseLessons = await db.select({
           id: lmsLessons.id,
           courseId: lmsLessons.courseId,
@@ -2119,13 +2124,7 @@ export const lmsLearnerRouter = router({
           updatedAt: lmsLessons.updatedAt,
           standaloneQuizId: lmsLessons.standaloneQuizId,
         }).from(lmsLessons).where(
-          and(
-            eq(lmsLessons.lessonStatus, "published"),
-            or(
-              eq(lmsLessons.courseId, course.id),
-              sectionIds.length > 0 ? inArray(lmsLessons.sectionId, sectionIds) : sql`FALSE`,
-            ),
-          ),
+          and(lessonScope, eq(lmsLessons.lessonStatus, "published"))
         ).orderBy(asc(lmsLessons.position));
       const toSidebarLesson = (lesson: (typeof allCourseLessons)[number]) => {
         const { contentBlocks, ...rest } = lesson;
@@ -2312,7 +2311,7 @@ export const lmsLearnerRouter = router({
         }
       }
 
-      return { ...lesson, quiz };
+      return { ...lesson, quiz, linkedMediaAsset: await loadLinkedLessonMediaAsset(db as any, lesson.mediaAssetId) };
     }),
 
   /** Record that a learner opened a lesson (for prerequisite gates that unlock on view). */

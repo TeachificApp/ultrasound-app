@@ -945,17 +945,20 @@ CRITICAL REQUIREMENTS:
       if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
 
       // Map media type to lesson type
-      // scorm and html are interactive content that must be viewed in an iframe embed, NOT downloaded
+      // SCORM/ZIP/LMS packages must render inline in the course player, not as blank downloads.
+      const { isInteractiveMediaPackage } = await import("../../shared/mediaRepoDisplay");
       let lessonType: "video" | "text" | "quiz" | "download" | "embed" | "video_text" = "text";
       let embedUrl: string | null = null;
+      let content: string | null = null;
       if (asset.mediaType === "video") lessonType = "video";
-      else if (["scorm", "html"].includes(asset.mediaType ?? "")) {
-        lessonType = "embed";
-        // Build the embed URL using the media serve route — the player will render this in an iframe
-        embedUrl = `/api/media/${asset.slug}/embed`;
-      }
-      else if (["document", "zip"].includes(asset.mediaType ?? "")) lessonType = "download";
       else if (asset.mediaType === "audio") lessonType = "video"; // treat audio as video player
+      else if (isInteractiveMediaPackage(asset.mediaType, null) || asset.mediaType === "html") {
+        lessonType = "embed";
+        embedUrl = `/api/media/${asset.slug}/embed`;
+      } else if (asset.mediaType === "document") {
+        lessonType = "download";
+        content = `/api/media/${asset.slug}/download`;
+      }
 
       const [result] = await db.insert(lmsLessons).values({
         courseId: input.courseId,
@@ -963,7 +966,7 @@ CRITICAL REQUIREMENTS:
         title: input.title,
         type: lessonType,
         position: input.position,
-        content: null,
+        content,
         embedUrl,
         mediaAssetId: input.mediaAssetId,
         durationMinutes: null,
