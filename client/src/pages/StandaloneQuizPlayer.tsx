@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, AlertTriangle, BookOpen } from "lucide-react";
+import { Loader2, Clock, CheckCircle, XCircle, ChevronLeft, ChevronRight, AlertTriangle, BookOpen, Flag, ListChecks } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { StandaloneQuestionMedia } from "@/components/quiz/StandaloneQuestionMedia";
 import { getLoginUrl } from "@/const";
@@ -112,10 +112,13 @@ export default function StandaloneQuizPlayer() {
   const [qStartTime, setQStartTime] = useState(Date.now());
   const [quizData, setQuizData] = useState<any>(null);
   const [feedbackPopup, setFeedbackPopup] = useState<{ type: "correct" | "incorrect" | "partial"; message: string } | null>(null);
+  const [flaggedQuestions, setFlaggedQuestions] = useState<Record<number, boolean>>({});
+  const [showMockExamReview, setShowMockExamReview] = useState(false);
 
   const builderMeta = (quizInfo as any)?.builderConfig ?? quizData?.builderMeta ?? null;
   const branding = builderMeta?.branding ?? null;
   const isBuilderMode = !!(quizData?.builderMode || builderMeta);
+  const currentQuestion = phase === "started" ? questions[currentIdx] : null;
 
   const limitSeconds = quizInfo?.timeLimitMinutes ? quizInfo.timeLimitMinutes * 60 : null;
 
@@ -124,6 +127,19 @@ export default function StandaloneQuizPlayer() {
   }, [phase, answers, attemptId]);
 
   const { elapsed, display: timerDisplay } = useTimer(phase === "started" ? limitSeconds : null, handleExpire);
+
+  useEffect(() => {
+    if (!currentQuestion || !isBuilderMode || quizData?.type !== "quiz") {
+      setFeedbackPopup(null);
+      return;
+    }
+    const priorAnswer = answers[currentQuestion.questionBankId];
+    if (priorAnswer !== undefined && revealed[currentQuestion.questionBankId]) {
+      setFeedbackPopup(getFeedbackMessage(currentQuestion, priorAnswer));
+    } else {
+      setFeedbackPopup(null);
+    }
+  }, [currentIdx, currentQuestion?.questionBankId, isBuilderMode, quizData?.type, answers, revealed]);
 
   function handleStart() {
     startMutation.mutate(
@@ -174,6 +190,20 @@ export default function StandaloneQuizPlayer() {
       setCurrentIdx((i) => i - 1);
       setQStartTime(Date.now());
     }
+  }
+
+  function toggleQuestionFlag(questionBankId: number) {
+    setFlaggedQuestions((current) => ({ ...current, [questionBankId]: !current[questionBankId] }));
+  }
+
+  function goToReviewQuestion(index: number) {
+    setCurrentIdx(index);
+    setQStartTime(Date.now());
+    setShowMockExamReview(false);
+  }
+
+  function handleMockExamSubmitRequest() {
+    setShowMockExamReview(true);
   }
 
   function handleSubmit() {
@@ -280,7 +310,8 @@ export default function StandaloneQuizPlayer() {
   }
 
   // ── Quiz in progress ──
-  const q = questions[currentIdx];
+  const q = currentQuestion;
+
   if (!q) return null;
 
   let options: { text: string; imageUrl?: string; feedback?: string }[] = [];
@@ -306,6 +337,14 @@ export default function StandaloneQuizPlayer() {
 
   const progress = ((currentIdx + 1) / questions.length) * 100;
   const answeredCount = Object.keys(answers).length;
+  const isMockExam = quizData?.type === "mock_exam";
+  const isFlagged = Boolean(flaggedQuestions[q.questionBankId]);
+  const flaggedReviewItems = questions
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => flaggedQuestions[question.questionBankId]);
+  const unansweredReviewItems = questions
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => answers[question.questionBankId] === undefined);
 
   // ── Builder mode (iSpring-style themed player) ──
   if (isBuilderMode && (q.type === "mcq" || q.type === "image_choice" || q.type === "tf")) {
@@ -355,7 +394,7 @@ export default function StandaloneQuizPlayer() {
             ) : (
               <button
                 type="button"
-                onClick={() => { if (isQuizMode && !isRevealed) handleBuilderSubmit(); else handleSubmit(); }}
+                onClick={() => { if (isQuizMode && !isRevealed) handleBuilderSubmit(); else if (isMockExam) handleMockExamSubmitRequest(); else handleSubmit(); }}
                 className="px-6 py-2 font-semibold text-white rounded"
                 style={{ background: primary }}
               >
@@ -366,7 +405,10 @@ export default function StandaloneQuizPlayer() {
         }>
           <div className="flex items-center justify-between text-xs opacity-60 mb-4">
             <span>Question {currentIdx + 1} of {questions.length}</span>
-            <span>{answeredCount} answered</span>
+            <div className="flex items-center gap-3">
+              <span>{answeredCount} answered</span>
+              {isMockExam && <button type="button" onClick={() => toggleQuestionFlag(q.questionBankId)} className="inline-flex items-center gap-1 font-medium hover:opacity-100"><Flag className={`h-3.5 w-3.5 ${isFlagged ? "fill-current" : ""}`} /> {isFlagged ? "Flagged" : "Flag"}</button>}
+            </div>
           </div>
           <p className="text-lg font-medium mb-6 leading-relaxed">{q.question}</p>
           <div className="flex gap-8">
@@ -422,6 +464,11 @@ export default function StandaloneQuizPlayer() {
               {timerDisplay}
             </div>
           )}
+          {isMockExam && (
+            <Button variant="outline" size="sm" onClick={() => setShowMockExamReview(true)} className="border-teal-200 text-teal-700 hover:bg-teal-50">
+              <ListChecks className="w-4 h-4 mr-1" /> Review {flaggedReviewItems.length > 0 ? `(${flaggedReviewItems.length})` : ""}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -430,6 +477,11 @@ export default function StandaloneQuizPlayer() {
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-4">
           <StandaloneQuestionMedia questionImageUrl={q.questionImageUrl} questionVideoUrl={q.questionVideoUrl} />
           <p className="text-gray-900 text-base font-medium leading-relaxed mb-6">{q.question}</p>
+          {isMockExam && (
+            <button type="button" onClick={() => toggleQuestionFlag(q.questionBankId)} className={`mb-5 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${isFlagged ? "border-amber-300 bg-amber-50 text-amber-800" : "border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-700"}`}>
+              <Flag className={`h-4 w-4 ${isFlagged ? "fill-current" : ""}`} /> {isFlagged ? "Question flagged for review" : "Flag question for review"}
+            </button>
+          )}
 
           {/* MCQ / truefalse options */}
           {(q.type === "mcq" || q.type === "truefalse") && options.length > 0 && (
@@ -532,6 +584,10 @@ export default function StandaloneQuizPlayer() {
           ) : (
             <Button
               onClick={() => {
+                if (isMockExam) {
+                  handleMockExamSubmitRequest();
+                  return;
+                }
                 const unanswered = questions.filter((q) => answers[q.questionBankId] === undefined).length;
                 if (unanswered > 0 && !confirm(`You have ${unanswered} unanswered question(s). Submit anyway?`)) return;
                 handleSubmit();
@@ -556,12 +612,41 @@ export default function StandaloneQuizPlayer() {
                 answers[q2.questionBankId] !== undefined ? "bg-teal-100 text-teal-700" :
                 "bg-gray-100 text-gray-500 hover:bg-gray-200"
               }`}
+              aria-label={`${flaggedQuestions[q2.questionBankId] ? "Flagged " : ""}Question ${i + 1}`}
             >
-              {i + 1}
+              {flaggedQuestions[q2.questionBankId] ? <Flag className="mx-auto h-3.5 w-3.5 fill-current" /> : i + 1}
             </button>
           ))}
         </div>
       </div>
+
+      {isMockExam && showMockExamReview && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="Review mock exam">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Review mock exam</h2>
+                <p className="mt-1 text-sm text-gray-600">Select any flagged or unanswered question to answer or revise it before scoring.</p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowMockExamReview(false)}>Close</Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-6">
+              <section>
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800"><Flag className="h-4 w-4 fill-current" /> Flagged questions ({flaggedReviewItems.length})</h3>
+                {flaggedReviewItems.length === 0 ? <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-500">No questions are flagged. You can flag any question while taking the mock exam.</p> : <div className="space-y-2">{flaggedReviewItems.map(({ question, index }) => <button key={question.questionBankId} type="button" onClick={() => goToReviewQuestion(index)} className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-left text-sm text-amber-950 hover:border-amber-400"><span className="mr-2 font-semibold">Question {index + 1}</span>{question.question || "Untitled question"}</button>)}</div>}
+              </section>
+              <section>
+                <h3 className="mb-2 text-sm font-semibold text-gray-800">Unanswered questions ({unansweredReviewItems.length})</h3>
+                {unansweredReviewItems.length === 0 ? <p className="rounded-lg bg-teal-50 p-3 text-sm text-teal-800">All questions have an answer.</p> : <div className="space-y-2">{unansweredReviewItems.map(({ question, index }) => <button key={question.questionBankId} type="button" onClick={() => goToReviewQuestion(index)} className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm text-gray-800 hover:border-teal-400 hover:bg-teal-50"><span className="mr-2 font-semibold">Question {index + 1}</span>{question.question || "Untitled question"}</button>)}</div>}
+              </section>
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-gray-100 p-5 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setShowMockExamReview(false)}>Continue reviewing</Button>
+              <Button onClick={handleSubmit} disabled={submitMutation.isPending} className="bg-teal-600 hover:bg-teal-700">{submitMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />} Submit for scoring</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

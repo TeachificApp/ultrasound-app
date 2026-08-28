@@ -28,6 +28,7 @@ import {
   importMediaAssetToNativeQuiz,
   listImportableScormQuizAssets,
 } from "../lib/scormQuizBuilderImport";
+import { replaceQuizQuestionText } from "../lib/quizTextReplacement";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
@@ -251,6 +252,50 @@ export const quizMakerRouter = router({
         .set({ builderConfig: serializeBuilderConfig({ meta, questions }) })
         .where(eq(standaloneQuizzes.id, id));
       return { id };
+    }),
+
+  findAndReplaceText: protectedProcedure
+    .input(z.object({
+      quizId: z.number().int().positive(),
+      find: z.string().min(1).max(500),
+      replace: z.string().max(500),
+      updateQuestionBank: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const quiz = await getQuizOrThrow(db, input.quizId);
+      const config = builderConfigFromQuizRow(quiz, ctx.user);
+      const updatedQuestions = config.questions.map((question) => replaceQuizQuestionText(question as Record<string, unknown>, input.find, input.replace));
+      const replacementCount = updatedQuestions.reduce((total, result) => total + result.replacements, 0);
+      config.questions = updatedQuestions.map((result) => result.value) as QuizFile["questions"];
+      config.meta.updatedAt = new Date().toISOString();
+
+      const questionBankIds = config.questions
+        .map((question) => /^bank-(\d+)$/.exec(String(question.id))?.[1])
+        .filter((id): id is string => Boolean(id))
+        .map(Number);
+      let updatedQuestionBankRecords = 0;
+      if (input.updateQuestionBank && questionBankIds.length > 0) {
+        const linkedQuestionBankIds = await db
+          .select({ questionBankId: standaloneQuizQuestions.questionBankId })
+          .from(standaloneQuizQuestions)
+          .where(and(eq(standaloneQuizQuestions.quizId, input.quizId), inArray(standaloneQuizQuestions.questionBankId, questionBankIds)));
+        const ids = linkedQuestionBankIds.map((row) => row.questionBankId);
+        if (ids.length > 0) {
+          await db.update(questionBank).set({
+            question: sql`REPLACE(${questionBank.question}, ${input.find}, ${input.replace})`,
+            options: sql`REPLACE(${questionBank.options}, ${input.find}, ${input.replace})`,
+            explanation: sql`REPLACE(${questionBank.explanation}, ${input.find}, ${input.replace})`,
+            correctFeedback: sql`REPLACE(${questionBank.correctFeedback}, ${input.find}, ${input.replace})`,
+            incorrectFeedback: sql`REPLACE(${questionBank.incorrectFeedback}, ${input.find}, ${input.replace})`,
+          }).where(inArray(questionBank.id, ids));
+          updatedQuestionBankRecords = ids.length;
+        }
+      }
+      await db.update(standaloneQuizzes).set({ builderConfig: serializeBuilderConfig(config), updatedAt: new Date() }).where(eq(standaloneQuizzes.id, input.quizId));
+      return { builderConfig: config, replacementCount, updatedQuestionBankRecords };
     }),
 
   deleteQuiz: protectedProcedure

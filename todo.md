@@ -127,3 +127,7 @@
 - [x] Replace every RPhS quiz reference to “Greater Saphenous Vein” with the correct “Great Saphenous Vein” nomenclature while preserving questions, answers, feedback, and order.
 - [x] Trace and remove every remaining learner-visible “the source” reference in the RPhS quiz across Question Bank, visual-builder configuration, and rendered answer/feedback data while preserving clinical content and assessment behavior.
 - [x] Trace and remove every RPhS learner-visible reference to a transcript, source material, source page, document, guide, PDF, file, passage, reading, or supplied material across Question Bank and visual-builder content while preserving assessment behavior.
+- [x] Add Visual Builder question-text search and find-and-replace, requiring an administrator to choose between updating the quiz only or also synchronizing its linked Question Bank records.
+- [x] Restore a learner’s prior instant-feedback panel when they return to an already answered standalone quiz question.
+- [x] Add mock-exam question flags, a pre-submission flagged-question review list, and direct navigation for answering or revising responses before scoring.
+- [x] Remove RPhS learner-visible “source-specified” language and any feedback that identifies source-document numbers or letters, preserving clinical content, answers, scoring, and order.

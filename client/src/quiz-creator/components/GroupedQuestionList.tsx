@@ -1,15 +1,40 @@
 import { useState } from "react";
+import { trpc } from "@/lib/trpc";
 import { useQuizStore } from "../store/quizStore";
 import { QuestionList } from "./QuestionList";
 import type { QuestionGroup } from "../types/quiz";
-import { LayoutList, Presentation, Search, Shuffle, ChevronDown, ChevronRight, PlayCircle, Trophy, XCircle } from "lucide-react";
+import type { QuizFile } from "../types/quiz";
+import { LayoutList, Presentation, Search, Shuffle, ChevronDown, ChevronRight, PlayCircle, Trophy, XCircle, Replace } from "lucide-react";
 
 const GROUP_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#a855f7", "#ec4899"];
 
+function questionSearchText(question: Record<string, unknown>) {
+  return JSON.stringify({
+    stem: question.stem,
+    stemHtml: question.stemHtml,
+    explanation: question.explanation,
+    explanationHtml: question.explanationHtml,
+    feedback: question.feedback,
+    data: question.data,
+  }).toLowerCase();
+}
+
 export function GroupedQuestionList() {
-  const { quiz, updateMeta, activeSlide, setActiveSlide, setEditorViewMode } = useQuizStore();
+  const { quiz, updateMeta, activeSlide, setActiveSlide, setEditorViewMode, loadQuiz } = useQuizStore();
   const [search, setSearch] = useState("");
+  const [findText, setFindText] = useState("");
+  const [replaceText, setReplaceText] = useState("");
+  const [showReplace, setShowReplace] = useState(false);
+  const [replaceScope, setReplaceScope] = useState<"quiz" | "questionBank">("quiz");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const findAndReplace = trpc.quizMaker.findAndReplaceText.useMutation({
+    onSuccess: (result) => {
+      loadQuiz(result.builderConfig as QuizFile, quiz.meta.title);
+      setSearch("");
+      alert(`${result.replacementCount} replacement${result.replacementCount === 1 ? "" : "s"} applied${result.updatedQuestionBankRecords ? ` and ${result.updatedQuestionBankRecords} linked Question Bank record${result.updatedQuestionBankRecords === 1 ? "" : "s"} synchronized` : " to this quiz only"}.`);
+    },
+    onError: (error) => alert(error.message),
+  });
   const viewMode = quiz.meta.editorViewMode ?? "form";
   const groups = quiz.meta.groups ?? [];
   const drawConfig = quiz.meta.drawConfig;
@@ -26,8 +51,23 @@ export function GroupedQuestionList() {
   };
 
   const filteredQuestions = search.trim()
-    ? quiz.questions.filter((q) => q.stem.toLowerCase().includes(search.toLowerCase()))
+    ? quiz.questions.filter((q) => questionSearchText(q as unknown as Record<string, unknown>).includes(search.toLowerCase()))
     : null;
+
+  const handleFindAndReplace = () => {
+    const quizId = Number((quiz.meta as { cloudId?: number }).cloudId);
+    if (!quizId) {
+      alert("Save this quiz to the database before using find and replace.");
+      return;
+    }
+    if (!findText) {
+      alert("Enter the word or phrase to find.");
+      return;
+    }
+    const scopeLabel = replaceScope === "questionBank" ? "this quiz and its linked Question Bank records" : "this quiz only";
+    if (!window.confirm(`Replace every exact occurrence of “${findText}” with “${replaceText}” in ${scopeLabel}? This cannot be undone automatically.`)) return;
+    findAndReplace.mutate({ quizId, find: findText, replace: replaceText, updateQuestionBank: replaceScope === "questionBank" });
+  };
 
   const addGroup = () => {
     const newGroup: QuestionGroup = {
@@ -74,6 +114,18 @@ export function GroupedQuestionList() {
             className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-teal-400"
           />
         </div>
+        {search.trim() && <p className="mt-1.5 text-xs text-gray-500">{filteredQuestions?.length ?? 0} matching question{filteredQuestions?.length === 1 ? "" : "s"}</p>}
+        <button type="button" onClick={() => setShowReplace((current) => !current)} className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-teal-700 hover:text-teal-900">
+          <Replace className="h-3.5 w-3.5" /> Find and replace
+        </button>
+        {showReplace && (
+          <div className="mt-2 space-y-2 rounded-lg border border-teal-200 bg-teal-50 p-2.5">
+            <input value={findText} onChange={(event) => setFindText(event.target.value)} placeholder="Find exact word or phrase" className="w-full rounded border border-teal-200 bg-white px-2 py-1.5 text-xs text-gray-900 outline-none focus:ring-1 focus:ring-teal-500" />
+            <input value={replaceText} onChange={(event) => setReplaceText(event.target.value)} placeholder="Replace with" className="w-full rounded border border-teal-200 bg-white px-2 py-1.5 text-xs text-gray-900 outline-none focus:ring-1 focus:ring-teal-500" />
+            <fieldset className="space-y-1 text-xs text-gray-700"><legend className="mb-1 font-medium text-teal-900">Apply replacements to</legend><label className="flex items-start gap-1.5"><input type="radio" checked={replaceScope === "quiz"} onChange={() => setReplaceScope("quiz")} /> <span><strong>This quiz only</strong><br /><span className="text-gray-500">Keeps linked Question Bank records unchanged.</span></span></label><label className="flex items-start gap-1.5"><input type="radio" checked={replaceScope === "questionBank"} onChange={() => setReplaceScope("questionBank")} /> <span><strong>This quiz and linked Question Bank records</strong><br /><span className="text-gray-500">Synchronizes exact replacements to this quiz’s linked bank questions.</span></span></label></fieldset>
+            <button type="button" disabled={findAndReplace.isPending || !findText} onClick={handleFindAndReplace} className="w-full rounded bg-teal-600 px-2 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50">{findAndReplace.isPending ? "Replacing…" : "Replace in selected scope"}</button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -91,9 +143,10 @@ export function GroupedQuestionList() {
 
         {/* Groups */}
         {filteredQuestions ? (
-          <div className="p-2">
+          <div className="p-2 space-y-0.5">
+            {filteredQuestions.length === 0 && <p className="px-3 py-4 text-center text-xs text-gray-500">No question content matches this search.</p>}
             {filteredQuestions.map((q) => (
-              <div key={q.id} className="px-3 py-2 text-sm text-gray-600 truncate">{q.order}. {q.stem || "Untitled"}</div>
+              <button type="button" key={q.id} onClick={() => useQuizStore.getState().setActiveQuestion(q.id)} className="w-full rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-teal-50 truncate">{q.order}. {q.stem || "Untitled"}</button>
             ))}
           </div>
         ) : (
@@ -141,9 +194,7 @@ export function GroupedQuestionList() {
         )}
 
         {/* Question list (flat, with DnD) */}
-        <div className="flex-1 min-h-0">
-          <QuestionList compact />
-        </div>
+        {!filteredQuestions && <div className="flex-1 min-h-0"><QuestionList compact /></div>}
 
         {/* Result slides */}
         <div className="px-2 py-2 space-y-0.5 border-t border-gray-100">
