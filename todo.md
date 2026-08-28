@@ -98,3 +98,9 @@
 - [ ] Connect the selected application AI workflows to the Railway-held Manus API client and validate their success and provider-error states.
 - [x] Remove the unrequested administrator-facing Manus AI connection control only after receiving explicit approval for that specific rollback.
 - [ ] Present a proposed scope and obtain explicit approval before every future implementation, deployment, or configuration change.
+- [x] Diagnose and repair the PDF-driven bulk question-generation error for Chronic Venous Insufficiency and Venous Disease.
+- [x] Run a factual source-grounding QA pass on the 350 generated questions and correct any clinically inaccurate, weakly grounded, or duplicate-concept items.
+- [x] Save the 350 questions to the RPhS Question Bank folder and add them to the RPhS Quiz in Quiz Creator.
+- [x] Complete source-traceability and clinical-quality validation for the 350 questions beyond structural answer, feedback, duplicate-stem, count, and attachment checks.
+- [x] Replace only the 99 RPhS questions rejected by the source-grounding quality review, preserving all existing folder and quiz counts and order.
+- [x] Re-run the factual-quality, Question Bank, and Quiz Creator attachment checks after the approved 99-question correction.

@@ -36,4 +36,20 @@ describe("Railway Manus API client", () => {
     expect(result.choices[0].message.content).toBe("answer");
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.manus.ai/v2/task.create");
   });
+
+  it("passes PDF sources to the Manus task as file attachments instead of URL-only prompt text", async () => {
+    process.env.MANUS_API_KEY = "server-only-test-key";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, task_id: "task123" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, task: { id: "task123", status: "stopped" } }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, messages: [{ type: "assistant_message", assistant_message: { content: "answer" } }] }), { status: 200 }));
+    global.fetch = fetchMock as typeof fetch;
+    const { invokeLLM } = await import("./_core/llm");
+    await invokeLLM({ messages: [{ role: "user", content: [{ type: "text", text: "Use this source" }, { type: "file_url", file_url: { url: "https://files.example/source.pdf", mime_type: "application/pdf" } }] }] });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.message.content).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "text" }),
+      expect.objectContaining({ type: "file", file_url: "https://files.example/source.pdf", mime_type: "application/pdf" }),
+    ]));
+  });
 });

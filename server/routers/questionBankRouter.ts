@@ -317,7 +317,7 @@ export const questionBankRouter = router({
   aiGenerateToBank: protectedProcedure
     .input(z.object({
       topic: z.string().min(1),
-      count: z.number().int().min(1).max(250).default(10),
+      count: z.number().int().min(1).max(350).default(10),
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
       questionType: z.enum(["mcq", "truefalse", "multiselect", "matching", "hotspot", "mixed"]).default("mcq"),
       tagIds: z.array(z.number().int()).optional(),

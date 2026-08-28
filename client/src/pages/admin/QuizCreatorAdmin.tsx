@@ -815,9 +815,9 @@ export function AddQuestionsDialog({
                     <div>
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Number of Questions</Label>
                       <select value={aiCount} onChange={e => setAICount(Number(e.target.value))} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
-                        {[5, 10, 15, 20, 25, 30, 50, 100, 150, 200, 250].map(n => <option key={n} value={n}>{n} questions</option>)}
+                        {[5, 10, 15, 20, 25, 30, 50, 100, 150, 200, 250, 350].map(n => <option key={n} value={n}>{n} questions</option>)}
                       </select>
-                      <p className="mt-1 text-xs text-gray-500">Large sets are generated in batches of 50, then available to add directly to this quiz.</p>
+                      <p className="mt-1 text-xs text-gray-500">Generate up to 350 questions in batches of 50, then add them directly to this quiz.</p>
                     </div>
                     <div>
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Difficulty</Label>

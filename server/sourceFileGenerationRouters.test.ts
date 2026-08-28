@@ -57,18 +57,18 @@ describe("source-file generation routers", () => {
     expect(JSON.parse(values.options)).toEqual(expect.arrayContaining([{ text: "A", feedback: "A no" }, { text: "B", feedback: "B yes" }]));
   });
 
-  it("creates a 250-question source set in five 50-question batches that can be added to the active quiz", async () => {
+  it("creates a 350-question source set in seven 50-question batches that can be added to the active quiz", async () => {
     const batchQuestions = Array.from({ length: 50 }, (_, index) => ({ question: `Large-set question ${index + 1}`, type: "mcq", options: ["A", "B", "C", "D"], correctAnswer: "B", correctAnswers: [], optionFeedback: ["A no", "B yes", "C no", "D no"], matchingPairs: [], explanation: "B is correct" }));
     mocks.invokeLLM.mockClear();
     mocks.invokeLLM.mockResolvedValue({ choices: [{ message: { content: JSON.stringify({ questions: batchQuestions }) } }] });
     const db = createInsertDb();
     mocks.getDb.mockResolvedValueOnce(db);
     const caller = questionBankRouter.createCaller(adminContext);
-    const result = await caller.aiGenerateToBank({ topic: "Large source set", count: 250, sourceFiles: [sourceFile] });
-    expect(result.inserted).toBe(250);
-    expect(result.ids).toHaveLength(250);
-    expect(mocks.invokeLLM).toHaveBeenCalledTimes(5);
+    const result = await caller.aiGenerateToBank({ topic: "Large source set", count: 350, sourceFiles: [sourceFile] });
+    expect(result.inserted).toBe(350);
+    expect(result.ids).toHaveLength(350);
+    expect(mocks.invokeLLM).toHaveBeenCalledTimes(7);
     expect(mocks.invokeLLM.mock.calls.every(([call]) => call.messages[1].content[0].text.includes("Generate 50 unique questions"))).toBe(true);
-    expect(db.writes).toHaveLength(250);
+    expect(db.writes).toHaveLength(350);
   });
 });

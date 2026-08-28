@@ -1,5 +1,5 @@
 import { ENV } from "./env";
-import { createManusTask, waitForManusTask } from "../lib/manusApiClient";
+import { createManusTask, waitForManusTask, type ManusTaskContentPart } from "../lib/manusApiClient";
 import {
   getOpenAiApiKey,
   isOpenAiBackend,
@@ -234,6 +234,30 @@ function serializeForManusTask(messages: Message[]): string {
   }).join("\n\n");
 }
 
+function buildManusTaskContent(messages: Message[], prompt: string): string | ManusTaskContentPart[] {
+  const files: ManusTaskContentPart[] = [];
+  for (const message of messages) {
+    for (const part of ensureArray(message.content)) {
+      if (typeof part === "string" || part.type === "text") continue;
+      if (part.type === "file_url") {
+        files.push({
+          type: "file",
+          file_url: part.file_url.url,
+          filename: "source.pdf",
+          mime_type: part.file_url.mime_type,
+        });
+      } else if (part.type === "image_url") {
+        files.push({
+          type: "file",
+          file_url: part.image_url.url,
+          filename: "source-image",
+        });
+      }
+    }
+  }
+  return files.length > 0 ? [{ type: "text", text: prompt }, ...files] : prompt;
+}
+
 const normalizeResponseFormat = ({
   responseFormat,
   response_format,
@@ -289,7 +313,11 @@ async function invokeManusApi(params: InvokeParams): Promise<InvokeResult> {
       : "Return the requested final answer directly. When the instructions request JSON, return valid JSON only with no Markdown fences.",
     serializeForManusTask(params.messages),
   ].join("\n\n");
-  const created = await createManusTask({ prompt, structuredOutputSchema: structuredSchema });
+  const created = await createManusTask({
+    prompt,
+    content: buildManusTaskContent(params.messages, prompt),
+    structuredOutputSchema: structuredSchema,
+  });
   const completed = await waitForManusTask(created.task_id);
   const content = completed.structuredOutput !== undefined
     ? JSON.stringify(completed.structuredOutput)

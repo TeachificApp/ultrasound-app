@@ -30,6 +30,10 @@ export type ManusTaskMessageResponse = ManusApiEnvelope & {
 
 export type ManusStructuredSchema = Record<string, unknown>;
 
+export type ManusTaskContentPart =
+  | { type: "text"; text: string }
+  | { type: "file"; file_url: string; filename?: string; mime_type?: string };
+
 const DEFAULT_BASE_URL = "https://api.manus.ai";
 const DEFAULT_POLL_INTERVAL_MS = 2_000;
 const DEFAULT_TIMEOUT_MS = 240_000;
@@ -74,9 +78,10 @@ export async function createManusTask(input: {
   prompt: string;
   title?: string;
   structuredOutputSchema?: ManusStructuredSchema;
+  content?: string | ManusTaskContentPart[];
 }): Promise<Required<Pick<ManusTaskCreateResponse, "task_id">> & ManusTaskCreateResponse> {
   const payload = {
-    message: { content: input.prompt },
+    message: { content: input.content ?? input.prompt },
     title: input.title,
     locale: "en",
     interactive_mode: false,
