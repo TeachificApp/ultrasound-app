@@ -26,7 +26,8 @@ import * as XLSX from "xlsx";
 import fs from "fs";
 import path from "path";
 import os from "os";
-import { buildAiSourceMessage } from "../lib/aiSourceFile";
+import { AI_SOURCE_BLIND_WRITING_RULE, buildAiSourceMessage, hasDirectAiSourceReference } from "../lib/aiSourceFile";
+import { fetchAiGenerationSourceUrl } from "../lib/aiWebSource";
 import { buildAiQuestionBankInsertValues } from "../lib/aiQuestionBankPersistence";
 import { plainTextFromISpring, plainTextFromISpringContent } from "../lib/questionBankImportSanitize";
 import {
@@ -335,6 +336,7 @@ export const questionBankRouter = router({
         mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
         name: z.string().min(1).max(255),
       })).min(1).max(3).optional(),
+      sourceUrl: z.string().url().max(2048).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -354,6 +356,18 @@ export const questionBankRouter = router({
                 : "All questions must be multiple choice with 4 options.";
 
       const sourceFiles = input.sourceFiles?.length ? input.sourceFiles : input.sourceFile ? [input.sourceFile] : [];
+      let webSource: Awaited<ReturnType<typeof fetchAiGenerationSourceUrl>> | null = null;
+      if (input.sourceUrl) {
+        try {
+          webSource = await fetchAiGenerationSourceUrl(input.sourceUrl);
+        } catch (error) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "The web page could not be used as a question source." });
+        }
+      }
+      const hasSourceInput = sourceFiles.length > 0 || Boolean(webSource);
+      const sourceBlindWebContext = webSource
+        ? `\n\nThe following public web-page text is for silent factual grounding. Do not reproduce its URL or identify it in learner-facing text.\n--- BEGIN SOURCE MATERIAL ---\n${webSource.text}\n--- END SOURCE MATERIAL ---\n${AI_SOURCE_BLIND_WRITING_RULE}`
+        : "";
       const responseFormat = {
           type: "json_schema",
           json_schema: {
@@ -401,10 +415,10 @@ export const questionBankRouter = router({
       for (let offset = 0; offset < input.count; offset += batchSize) {
         const batchCount = Math.min(batchSize, input.count - offset);
         const response = await invokeLLM({
-          model: sourceFiles.length ? "gemini-3-flash-preview" : undefined,
+          model: hasSourceInput ? "gemini-3-flash-preview" : undefined,
           messages: [
-            { role: "system", content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, return: (1) explanation, a concise rationale for why the correct answer is correct; (2) correctFeedback, a shared question-based rationale shown after a correct response; (3) incorrectFeedback, a shared question-based rationale shown after an incorrect response that explains the correct concept without referring to a particular selected option; and (4) optionFeedback, one explanation for every option describing why that specific answer is correct or incorrect. Return JSON only.` },
-            { role: "user", content: buildAiSourceMessage(`Generate ${batchCount} unique questions about: ${input.topic}. This is batch ${Math.floor(offset / batchSize) + 1}; do not repeat questions from earlier batches.`, sourceFiles) as any },
+            { role: "system", content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, return: (1) explanation, a concise rationale for why the correct answer is correct; (2) correctFeedback, a shared question-based rationale shown after a correct response; (3) incorrectFeedback, a shared question-based rationale shown after an incorrect response that explains the correct concept without referring to a particular selected option; and (4) optionFeedback, one explanation for every option describing why that specific answer is correct or incorrect. ${hasSourceInput ? AI_SOURCE_BLIND_WRITING_RULE : ""} Return JSON only.` },
+            { role: "user", content: buildAiSourceMessage(`Generate ${batchCount} unique questions about: ${input.topic}. This is batch ${Math.floor(offset / batchSize) + 1}; do not repeat questions from earlier batches.${sourceBlindWebContext}`, sourceFiles) as any },
           ],
           response_format: responseFormat,
         });
@@ -419,6 +433,9 @@ export const questionBankRouter = router({
       }
       if (questions.length === 0) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The AI did not return any questions. Please generate again." });
+      }
+      if (hasSourceInput && hasDirectAiSourceReference(questions)) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The generated wording referred to its source and was not saved. Please generate again." });
       }
 
       // Resolve or create folder

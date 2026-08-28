@@ -523,6 +523,7 @@ export function AddQuestionsDialog({
   const [aiSelectedIds, setAISelectedIds] = useState<Set<number>>(new Set());
   const [aiGroupId, setAIGroupId] = useState("");
   const [aiSourceFiles, setAiSourceFiles] = useState<{ url: string; mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; name: string }[]>([]);
+  const [aiSourceUrl, setAiSourceUrl] = useState("");
   const [aiSourceUploading, setAiSourceUploading] = useState(false);
 
 // --- SCORM Import ---
@@ -630,7 +631,7 @@ export function AddQuestionsDialog({
     setTab("bank"); setQSearch(""); setQPage(1); setSelectedBankIds(new Set());
     setBankFolderId(""); setBankTagId("");
     setAITopic(""); setAIGenerated(null); setAISelectedIds(new Set()); setAITagIds([]);
-    setAIFolderId(null); setAINewFolderName(""); setAIGroupId(""); setAiSourceFiles([]); setAiSourceUploading(false);
+    setAIFolderId(null); setAINewFolderName(""); setAIGroupId(""); setAiSourceFiles([]); setAiSourceUrl(""); setAiSourceUploading(false);
     setScormFile(null); setScormPreview(null); setScormSelectedGroups(new Set());
     setScormFolderId(null); setScormNewFolderName(""); setScormTagIds([]);
     setCsvFile(null); setCsvPreview(null); setCsvFolderId(null); setCsvNewFolderName(""); setCsvTagIds([]);
@@ -811,7 +812,7 @@ export function AddQuestionsDialog({
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Topic *</Label>
                       <Input value={aiTopic} onChange={e => setAITopic(e.target.value)} placeholder="e.g. Doppler physics, DVT diagnosis, Normal fetal echo anatomy" className="bg-white border-teal-200" />
                     </div>
-                    <div className="md:col-span-2"><AiSourceFileReview sourceFiles={aiSourceFiles} isUploading={aiSourceUploading} onFiles={handleAiSourceUpload} onRemove={index => setAiSourceFiles(current => current.filter((_, sourceIndex) => sourceIndex !== index))} description="Drop up to three PDF, JPG, PNG, or WebP files here, or upload files up to 50 MB each. Generated questions include explanations and answer-level feedback." /></div>
+                    <div className="md:col-span-2"><AiSourceFileReview sourceFiles={aiSourceFiles} isUploading={aiSourceUploading} onFiles={handleAiSourceUpload} onRemove={index => setAiSourceFiles(current => current.filter((_, sourceIndex) => sourceIndex !== index))} sourceUrl={aiSourceUrl} onSourceUrlChange={setAiSourceUrl} description="Drop up to three PDF, JPG, PNG, or WebP files here, upload files up to 50 MB each, or use one public web-page URL. Generated questions include explanations and answer-level feedback." /></div>
                     <div>
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Number of Questions</Label>
                       <select value={aiCount} onChange={e => setAICount(Number(e.target.value))} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
@@ -868,8 +869,8 @@ export function AddQuestionsDialog({
                     accentColor="teal"
                   />
                   <div className="flex justify-end">
-                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={(!aiTopic.trim() && aiSourceFiles.length === 0) || aiGenerateMut.isPending || aiSourceUploading}
-                      onClick={() => aiGenerateMut.mutate({ topic: aiTopic.trim() || `Sources: ${aiSourceFiles.map(source => source.name).join(", ")}`, count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined, newFolderName: aiNewFolderName.trim() || undefined, sourceFiles: aiSourceFiles.length > 0 ? aiSourceFiles : undefined })}>
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={(!aiTopic.trim() && aiSourceFiles.length === 0 && !aiSourceUrl.trim()) || aiGenerateMut.isPending || aiSourceUploading}
+                      onClick={() => aiGenerateMut.mutate({ topic: aiTopic.trim() || "the provided clinical material", count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined, newFolderName: aiNewFolderName.trim() || undefined, sourceFiles: aiSourceFiles.length > 0 ? aiSourceFiles : undefined, sourceUrl: aiSourceUrl.trim() || undefined })}>
                       {aiGenerateMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate Questions</>}
                     </Button>
                   </div>

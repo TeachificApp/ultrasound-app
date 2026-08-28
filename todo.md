@@ -123,3 +123,5 @@
 - [x] Verify zero direct PDF/guide/source/transcript references remain in the RPhS generated set after the approved cleanup.
 - [x] Correct standalone quiz progress counters so they display only the active attempt’s selected-question count, never the full linked question-bank count.
 - [x] Audit all stored quiz questions and feedback for direct transcript, source, document, guide, PDF, or analogous provenance references, then remove only those references while preserving clinical content and learner data.
+- [x] Add URL-based source input to Question Bank and Quiz Creator question generation, with server-side retrieval, secure URL validation, and source-blind question/feedback wording that never cites the source page, document, transcript, PDF, or URL.
+- [x] Replace every RPhS quiz reference to “Greater Saphenous Vein” with the correct “Great Saphenous Vein” nomenclature while preserving questions, answers, feedback, and order.
