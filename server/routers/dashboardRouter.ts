@@ -54,6 +54,7 @@ import {
   isActiveThinkificMembership,
 } from "../../shared/thinkificLegacy";
 import { restoreMissingCourseCertificate } from "./lmsHelpers";
+import { isEnrollmentCompleted } from "../lib/enrollmentAccess";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

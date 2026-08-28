@@ -133,3 +133,5 @@
 - [x] Remove RPhS learner-visible “source-specified” language and any feedback that identifies source-document numbers or letters, preserving clinical content, answers, scoring, and order.
 - [x] Restore post-attempt question review when quiz settings allow it and suppress the learner-facing Uncategorized header unless question grouping is explicitly enabled.
 - [x] Trace and remove any remaining active RPhS learner-path source-language, including content cached in attempt records or result payloads, then verify the rendered review data is source-blind.
+- [x] Repair the learner My Content runtime error caused by an undefined isEnrollmentCompleted reference, restoring access to assigned quiz content without changing enrollment data.
+- [x] Restore quiz and flashcard display for supported SCORM ZIP lesson content and add focused regression coverage for the affected learner rendering path.
