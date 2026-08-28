@@ -20,9 +20,15 @@ describe("production build safety", () => {
     expect(out).not.toMatch(UMAMI_ANALYTICS_SCRIPT_RE);
   });
 
-  it("source sw.js uses v8 cache and has no fetch handler", () => {
+  it("source sw.js uses v9 cache and has no fetch handler", () => {
     const sw = fs.readFileSync(path.join(ROOT, "client/public/sw.js"), "utf8");
-    expect(sw).toContain('CACHE_VERSION = "v8"');
+    expect(sw).toContain('CACHE_VERSION = "v9"');
     expect(sw).not.toContain('addEventListener("fetch"');
+  });
+
+  it("ErrorBoundary treats Safari Can't find variable as stale bundle recovery", () => {
+    const boundary = fs.readFileSync(path.join(ROOT, "client/src/components/ErrorBoundary.tsx"), "utf8");
+    expect(boundary).toContain("Can't find variable:");
+    expect(boundary).toContain("isStaleReferenceError");
   });
 });

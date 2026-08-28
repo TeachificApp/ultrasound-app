@@ -19,12 +19,19 @@ interface State {
  * Covers: Vite/webpack chunk load failures AND ReferenceErrors from renamed/removed
  * identifiers in a newer build (e.g. "setCmeDirty is not defined").
  */
+function isStaleReferenceError(error: Error): boolean {
+  const msg = error?.message ?? "";
+  if (!(error instanceof ReferenceError)) return false;
+  // Chrome/Firefox: "cn is not defined"
+  // Safari/iOS WebKit: "Can't find variable: cn"
+  return msg.includes("is not defined") || msg.includes("Can't find variable:");
+}
+
 function isChunkLoadError(error: Error): boolean {
   const msg = error?.message ?? "";
   if (isStaleAssetError(error)) return true;
-  // ReferenceErrors where an identifier "is not defined" — these indicate a stale
-  // cached JS bundle referencing a variable that was renamed or removed in a newer build.
-  if (error instanceof ReferenceError && msg.includes("is not defined")) return true;
+  // ReferenceErrors from mismatched cached JS bundles (common on mobile Safari).
+  if (isStaleReferenceError(error)) return true;
   return false;
 }
 

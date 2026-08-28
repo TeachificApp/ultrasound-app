@@ -38,6 +38,7 @@ import {
 import { initialScormExtractionStatus, needsScormExtraction, queueScormExtractionIfNeeded, pickScormPlaybackMode } from "../lib/scormPackage";
 import { extractAndUploadScormVersion } from "../routes/scormExtractor";
 import { buildMediaAuthQuery, signMediaViewerToken } from "../lib/mediaEmbedAccess";
+import { userCanAccessMediaAssetForCourse } from "../lib/mediaAssetCourseAccess";
 import { summarizeScormExtractionStatuses } from "../../shared/scormExtractionWorkflow";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -53,6 +54,34 @@ async function assertPlatformAdmin(ctx: { user: { id: number; role: string } }) 
     .limit(1);
   if (!user || (user.role !== "admin" && user.openId !== ownerId)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
+  }
+}
+
+async function isPlatformAdmin(ctx: { user: { id: number; role: string } }): Promise<boolean> {
+  try {
+    await assertPlatformAdmin(ctx);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function assertMediaAssetCourseAccess(
+  ctx: { user: { id: number; role: string } },
+  asset: { id: number; slug: string; access: string },
+  courseId?: number,
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+  const allowed = await userCanAccessMediaAssetForCourse(
+    db as any,
+    ctx.user.id,
+    asset,
+    courseId,
+    await isPlatformAdmin(ctx),
+  );
+  if (!allowed) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "No access to this media asset" });
   }
 }
 
@@ -1008,27 +1037,7 @@ export const mediaRepoRouter = router({
         return { url: basePath, isPublic: true as const };
       }
 
-      let allowed = false;
-      try {
-        await assertPlatformAdmin(ctx);
-        allowed = true;
-      } catch {
-        if (input.courseId) {
-          const [enrollment] = await db
-            .select({ id: lmsEnrollments.id })
-            .from(lmsEnrollments)
-            .where(and(
-              eq(lmsEnrollments.userId, ctx.user.id),
-              eq(lmsEnrollments.courseId, input.courseId)
-            ))
-            .limit(1);
-          allowed = !!enrollment;
-        }
-      }
-
-      if (!allowed) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "No access to this media asset" });
-      }
+      await assertMediaAssetCourseAccess(ctx, asset, input.courseId);
 
       const access = signMediaViewerToken(asset.slug, ctx.user.id, input.courseId ?? null);
       const authQuery = buildMediaAuthQuery({ access });
@@ -1054,27 +1063,7 @@ export const mediaRepoRouter = router({
         .where(and(eq(mediaAssets.slug, input.slug), isNull(mediaAssets.deletedAt)))
         .limit(1);
       if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Media asset not found" });
-      // Access check
-      let allowed = false;
-      try {
-        await assertPlatformAdmin(ctx);
-        allowed = true;
-      } catch {
-        if (asset.access === "public") {
-          allowed = true;
-        } else if (input.courseId) {
-          const [enrollment] = await db
-            .select({ id: lmsEnrollments.id })
-            .from(lmsEnrollments)
-            .where(and(
-              eq(lmsEnrollments.userId, ctx.user.id),
-              eq(lmsEnrollments.courseId, input.courseId)
-            ))
-            .limit(1);
-          allowed = !!enrollment;
-        }
-      }
-      if (!allowed) throw new TRPCError({ code: "FORBIDDEN", message: "No access to this media asset" });
+      await assertMediaAssetCourseAccess(ctx, asset, input.courseId);
       const versions = await db
         .select({
           id: mediaVersions.id,

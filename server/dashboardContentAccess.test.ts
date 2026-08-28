@@ -14,9 +14,12 @@ describe("learner content access", () => {
   it("routes authenticated SCORM ZIP course blocks to the protected interactive player", () => {
     const iframe = read("client/src/components/MediaEmbedIframe.tsx");
     const blocks = read("client/src/components/BlockPreview.tsx");
+    const player = read("client/src/pages/CoursePlayer.tsx");
     expect(iframe).toContain("trpc.mediaRepo.getScormZipUrl.useQuery");
     expect(iframe).toContain("<ScormPlayer");
     expect(blocks).toContain("isInteractiveMediaPackage(mediaType, d.fileName ?? fileName)");
     expect(blocks).toContain("src={mediaRepoScormUrl(slug)}");
+    expect(player).toContain("linkedMediaAsset");
+    expect(player).toContain("lessonMediaRepoScormSrc");
   });
 });
