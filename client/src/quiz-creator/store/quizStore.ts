@@ -147,6 +147,8 @@ function defaultMeta(): QuizMeta {
     shuffleQuestions: false,
     shuffleAnswers: false,
     showFeedback: "immediate",
+    showPerQuestionResult: true,
+    showGroupNames: false,
     allowRetry: true,
     maxAttempts: 3,
     allowBackNavigation: true,

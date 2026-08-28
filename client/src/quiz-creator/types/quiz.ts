@@ -317,6 +317,8 @@ export interface QuizMeta {
   shuffleQuestions: boolean;
   shuffleAnswers: boolean;
   showFeedback: "immediate" | "deferred" | "never";
+  showPerQuestionResult?: boolean;
+  showGroupNames?: boolean;
   allowRetry: boolean;
   maxAttempts: number;
   // Enhanced features

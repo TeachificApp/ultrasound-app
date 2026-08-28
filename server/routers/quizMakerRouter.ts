@@ -52,6 +52,8 @@ function metaToQuizSettings(meta: QuizFile["meta"]) {
     shuffleAnswers: meta.shuffleAnswers,
     allowRetakes: meta.allowRetry,
     maxAttempts: meta.maxAttempts > 0 ? meta.maxAttempts : null,
+    showPerQuestionResult: meta.showPerQuestionResult ?? (meta.resultSlide?.showReviewButton !== false),
+    showGroupNames: meta.showGroupNames === true,
   };
 }
 

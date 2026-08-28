@@ -66,20 +66,19 @@ export default function StandaloneQuizResults() {
     );
   }
 
-  const { attempt, quiz, canSeeResults, answers } = data;
+  const { attempt, quiz, canSeeResults, canReviewAnswers, showGroupNames, answers } = data;
   const score = Number(attempt.score ?? 0);
   const passed = !!attempt.passed;
 
   // Visibility settings — default to showing everything if not set
   const showOnlyPercentage = !!(quiz as any).showOnlyPercentage;
-  const showPerQuestionResult = showOnlyPercentage ? false : (quiz as any).showPerQuestionResult !== false;
-  const showGroupNames = (quiz as any).showGroupNames !== false;
+  const showPerQuestionResult = showOnlyPercentage ? false : canReviewAnswers;
 
   // Group answers by groupId when showGroupNames is on
   type AnswerWithGroup = typeof answers[number] & { groupId?: number | null; groupName?: string | null };
-  const groupedAnswers: { groupId: number | null; groupName: string | null; items: AnswerWithGroup[] }[] = [];
+  const groupedAnswers: { groupId: string | number | null; groupName: string | null; items: AnswerWithGroup[] }[] = [];
   if (showGroupNames && answers.length > 0) {
-    const seen = new Map<number | null, number>();
+    const seen = new Map<string | number | null, number>();
     for (const a of answers as AnswerWithGroup[]) {
       const gid = a.groupId ?? null;
       if (!seen.has(gid)) {

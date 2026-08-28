@@ -129,6 +129,26 @@ export function getConfiguredAttemptQuestionCount(
     : available;
 }
 
+export function builderQuestionToReviewQuestion(builderQuestion: any) {
+  const choices = Array.isArray(builderQuestion?.data?.choices)
+    ? builderQuestion.data.choices.map((choice: any) => ({ text: choice.text ?? choice.label ?? "" }))
+    : [];
+  const correctChoiceIndex = Array.isArray(builderQuestion?.data?.choices)
+    ? builderQuestion.data.choices.findIndex((choice: any) => choice.correct)
+    : -1;
+  return {
+    id: `builder-${builderQuestion.id}`,
+    question: builderQuestion.stem ?? "",
+    options: JSON.stringify(choices),
+    correctAnswer: correctChoiceIndex >= 0 ? String(correctChoiceIndex) : "",
+    explanation: builderQuestion.explanation ?? builderQuestion.feedback?.correct ?? null,
+    questionImageUrl: builderQuestion.image?.url ?? null,
+    questionVideoUrl: builderQuestion.video?.url ?? null,
+    feedbackImageUrl: builderQuestion.feedbackImage?.url ?? null,
+    feedbackVideoUrl: builderQuestion.feedbackVideo?.url ?? null,
+  };
+}
+
 /** Shuffle an array in-place using Fisher-Yates */
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -545,11 +565,20 @@ export const standaloneQuizLearnerRouter = router({
         .limit(1);
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // Check if results should be shown
+      // Check whether the score is released. Per-question review is a separately
+      // configured learner permission for visual-builder quizzes.
       const now = new Date();
       const canSeeResults =
         quiz.showResultsImmediately ||
         (quiz.showResultsAfterDate && now >= new Date(quiz.showResultsAfterDate));
+      const builderConfig = parseBuilderConfig(quiz.builderConfig);
+      const builderReviewEnabled = builderConfig?.meta.showPerQuestionResult
+        ?? ((builderConfig?.meta.resultSlide as { showReviewButton?: boolean } | undefined)?.showReviewButton)
+        ?? quiz.showPerQuestionResult;
+      const canReviewAnswers = Boolean(canSeeResults && builderReviewEnabled !== false);
+      const showGroupNames = builderConfig
+        ? builderConfig.meta.showGroupNames === true
+        : quiz.showGroupNames === true;
 
       const answers = await db
         .select()
@@ -557,7 +586,7 @@ export const standaloneQuizLearnerRouter = router({
         .where(eq(standaloneQuizAttemptAnswers.attemptId, input.attemptId));
 
       let questionDetails: any[] = [];
-      if (canSeeResults) {
+      if (canReviewAnswers) {
         const questionIds = answers.map((a) => a.questionId);
         if (questionIds.length > 0) {
           const qbs = await db
@@ -565,6 +594,12 @@ export const standaloneQuizLearnerRouter = router({
             .from(questionBank)
             .where(inArray(questionBank.id, questionIds));
           const qMap = new Map(qbs.map((q) => [q.id, q]));
+          const builderQuestionByAttemptId = new Map(
+            (builderConfig?.questions ?? []).map((question: any) => [stableBuilderQuestionId(String(question.id)), question])
+          );
+          const builderGroupNameById = new Map(
+            (builderConfig?.meta.groups ?? []).map((group: { id: string; name: string }) => [group.id, group.name])
+          );
 
           const folderIds = [...new Set(qbs.map((q) => q.folderId).filter((id): id is number => id != null))];
           const folderRows = folderIds.length > 0
@@ -576,15 +611,17 @@ export const standaloneQuizLearnerRouter = router({
           const folderNameById = new Map(folderRows.map((f) => [f.id, f.name]));
 
           questionDetails = answers.map((a) => {
-            const qb = qMap.get(a.questionId);
-            const folderId = qb?.folderId ?? null;
+            const builderQuestion = builderQuestionByAttemptId.get(a.questionId);
+            const qb = builderQuestion ? undefined : qMap.get(a.questionId);
+            const folderId = qb?.folderId ?? builderQuestion?.groupId ?? null;
+            const groupName = qb?.folderId != null
+              ? (folderNameById.get(qb.folderId) ?? null)
+              : (builderQuestion?.groupId ? (builderGroupNameById.get(builderQuestion.groupId) ?? null) : null);
             return {
               ...a,
-              question: qb,
+              question: qb ?? (builderQuestion ? builderQuestionToReviewQuestion(builderQuestion) : null),
               groupId: folderId,
-              groupName: folderId != null
-                ? (folderNameById.get(folderId) ?? "Unknown group")
-                : "Uncategorized",
+              groupName,
             };
           });
         }
@@ -594,7 +631,9 @@ export const standaloneQuizLearnerRouter = router({
         attempt,
         quiz,
         canSeeResults: !!canSeeResults,
-        answers: canSeeResults ? questionDetails : [],
+        canReviewAnswers,
+        showGroupNames,
+        answers: canReviewAnswers ? questionDetails : [],
       };
     }),
 

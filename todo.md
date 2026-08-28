@@ -131,3 +131,5 @@
 - [x] Restore a learner’s prior instant-feedback panel when they return to an already answered standalone quiz question.
 - [x] Add mock-exam question flags, a pre-submission flagged-question review list, and direct navigation for answering or revising responses before scoring.
 - [x] Remove RPhS learner-visible “source-specified” language and any feedback that identifies source-document numbers or letters, preserving clinical content, answers, scoring, and order.
+- [x] Restore post-attempt question review when quiz settings allow it and suppress the learner-facing Uncategorized header unless question grouping is explicitly enabled.
+- [x] Trace and remove any remaining active RPhS learner-path source-language, including content cached in attempt records or result payloads, then verify the rendered review data is source-blind.

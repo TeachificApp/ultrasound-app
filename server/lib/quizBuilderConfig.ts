@@ -44,6 +44,8 @@ export interface QuizFileMeta {
   shuffleQuestions: boolean;
   shuffleAnswers: boolean;
   showFeedback: "immediate" | "deferred" | "never";
+  showPerQuestionResult?: boolean;
+  showGroupNames?: boolean;
   allowRetry: boolean;
   maxAttempts: number;
   branding?: QuizBranding;
@@ -144,6 +146,8 @@ export function builderConfigFromQuizRow(
       shuffleQuestions: quiz.shuffleQuestions,
       shuffleAnswers: quiz.shuffleAnswers,
       showFeedback: "immediate",
+      showPerQuestionResult: true,
+      showGroupNames: false,
       allowRetry: quiz.allowRetakes,
       maxAttempts: quiz.maxAttempts ?? 3,
       branding: defaultBrandingForBrand(quiz.brand),

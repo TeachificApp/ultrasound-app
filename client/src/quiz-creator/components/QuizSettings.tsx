@@ -733,6 +733,15 @@ export function QuizSettings({ onClose }: Props) {
                       </label>
                     ))}
                   </div>
+                  <label className="flex items-start gap-3 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={m.showGroupNames === true}
+                      onChange={(e) => updateMeta({ showGroupNames: e.target.checked })}
+                      className="accent-teal-500 w-4 h-4 mt-0.5"
+                    />
+                    <span className="text-sm text-gray-700"><span className="font-medium">Show group headers in question review</span><span className="block text-xs text-gray-500 mt-0.5">Off by default. When enabled, only named groups are shown; ungrouped questions have no header.</span></span>
+                  </label>
                 </>
               )}
             </div>
