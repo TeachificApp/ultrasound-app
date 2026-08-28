@@ -6,7 +6,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
+import { getDb, getUserRoles } from "../db";
 import {
   standaloneQuizzes,
   standaloneQuizQuestions,
@@ -35,9 +35,12 @@ import {
   questionBankIdFromBuilderId,
   questionBankValuesFromBuilderQuestion,
 } from "../lib/visualBuilderQuestionBankSync";
+import { isStandaloneQuizStaff } from "../lib/standaloneQuizStaffAccess";
 
-async function assertAdmin(ctx: { user: { id: number; role: string } }) {
-  if (ctx.user.role !== "admin") {
+async function assertStandaloneQuizStaff(ctx: { user: { id: number; role: string } }) {
+  if (isStandaloneQuizStaff(ctx.user.role)) return;
+  const appRoles = await getUserRoles(ctx.user.id);
+  if (!isStandaloneQuizStaff(ctx.user.role, appRoles)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
   }
 }
@@ -154,7 +157,7 @@ export const quizMakerRouter = router({
       groupId: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const quiz = await getQuizOrThrow(db, input.quizId);
@@ -187,7 +190,7 @@ export const quizMakerRouter = router({
     }),
 
   listQuizzes: protectedProcedure.query(async ({ ctx }) => {
-    await assertAdmin(ctx);
+    await assertStandaloneQuizStaff(ctx);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const quizzes = await db
@@ -201,7 +204,7 @@ export const quizMakerRouter = router({
   getQuiz: protectedProcedure
     .input(z.object({ quizId: z.number().int() }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const quiz = await getQuizOrThrow(db, input.quizId);
@@ -243,7 +246,7 @@ export const quizMakerRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -304,7 +307,7 @@ export const quizMakerRouter = router({
       questionBankAction: z.enum(["quiz_only", "update_linked", "create_linked"]),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const quiz = await getQuizOrThrow(db, input.quizId);
@@ -352,7 +355,7 @@ export const quizMakerRouter = router({
   deleteQuiz: protectedProcedure
     .input(z.object({ quizId: z.number().int() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const attempts = await db
@@ -385,7 +388,7 @@ export const quizMakerRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const quiz = await getQuizOrThrow(db, input.quizId);
@@ -423,7 +426,7 @@ export const quizMakerRouter = router({
   getQuizAnalytics: protectedProcedure
     .input(z.object({ quizId: z.number().int() }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [overall] = await db
@@ -444,7 +447,7 @@ export const quizMakerRouter = router({
   getQuestionAnalytics: protectedProcedure
     .input(z.object({ quizId: z.number().int() }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const stats = await db
@@ -476,7 +479,7 @@ export const quizMakerRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const attempts = await db
@@ -497,14 +500,14 @@ export const quizMakerRouter = router({
   listImportableScormQuizAssets: protectedProcedure
     .input(z.object({ limit: z.number().int().min(1).max(500).default(200) }).optional())
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       return listImportableScormQuizAssets(input?.limit ?? 200);
     }),
 
   previewScormNativeImport: protectedProcedure
     .input(z.object({ mediaAssetId: z.number().int() }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       const converted = await convertMediaAssetToNativeQuiz(input.mediaAssetId);
       const meta = converted.quizFile.meta as Record<string, unknown>;
       return {
@@ -533,7 +536,7 @@ export const quizMakerRouter = router({
       replaceExisting: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       return importMediaAssetToNativeQuiz(input.mediaAssetId, ctx.user.id, {
         replaceExisting: input.replaceExisting,
       });
@@ -546,7 +549,7 @@ export const quizMakerRouter = router({
       limit: z.number().int().min(1).max(500).default(200),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertStandaloneQuizStaff(ctx);
       return batchImportScormQuizzesToNative(ctx.user.id, {
         mediaAssetIds: input.mediaAssetIds,
         replaceExisting: input.replaceExisting,

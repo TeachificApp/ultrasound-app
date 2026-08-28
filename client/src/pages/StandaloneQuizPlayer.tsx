@@ -82,6 +82,16 @@ function OptionButton({
   );
 }
 
+// ─── Admin preview banner ─────────────────────────────────────────────────────
+function AdminPreviewBanner({ status }: { status: string }) {
+  if (status === "published") return null;
+  return (
+    <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-center text-sm text-amber-900">
+      <strong>Admin preview</strong> — This quiz is <span className="capitalize">{status.replace(/_/g, " ")}</span> and is not visible to learners yet.
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function StandaloneQuizPlayer() {
   const { quizId } = useParams<{ quizId: string }>();
@@ -90,7 +100,13 @@ export default function StandaloneQuizPlayer() {
 
   const qId = parseInt(quizId, 10);
   const isEmbedWidget = new URLSearchParams(window.location.search).get("embed") === "1";
-  const isAdminPreview = user?.role === "admin" || new URLSearchParams(window.location.search).get("adminPreview") === "1";
+  const appRoles = (user as { appRoles?: string[] } | null)?.appRoles ?? [];
+  const isQuizStaff =
+    user?.role === "admin" ||
+    appRoles.includes("platform_admin") ||
+    appRoles.includes("platform_owner");
+  const urlAdminPreview = new URLSearchParams(window.location.search).get("adminPreview") === "1";
+  const isAdminPreview = isQuizStaff && (user?.role === "admin" || urlAdminPreview);
   const widgetToken = new URLSearchParams(window.location.search).get("widget") ?? undefined;
 
   const { data: quizInfo, isLoading: infoLoading } = trpc.standaloneQuizLearner.getQuizInfo.useQuery(
@@ -253,7 +269,9 @@ export default function StandaloneQuizPlayer() {
   if (phase === "idle") {
     if (builderMeta) {
       return (
-        <BuilderIntroScreen
+        <>
+          {isAdminPreview ? <AdminPreviewBanner status={quizInfo.status} /> : null}
+          <BuilderIntroScreen
           intro={builderMeta.introSlide}
           branding={branding}
           quizTitle={quizInfo.title}
@@ -264,9 +282,12 @@ export default function StandaloneQuizPlayer() {
           disabled={!quizInfo.canAttempt}
           loading={startMutation.isPending}
         />
+        </>
       );
     }
     return (
+      <>
+        {isAdminPreview ? <AdminPreviewBanner status={quizInfo.status} /> : null}
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 max-w-lg w-full p-8">
           {quizInfo.coverImageUrl && (
@@ -306,6 +327,7 @@ export default function StandaloneQuizPlayer() {
           </Button>
         </div>
       </div>
+      </>
     );
   }
 
