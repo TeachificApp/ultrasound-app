@@ -91,9 +91,10 @@ export default function StandaloneQuizPlayer() {
   const qId = parseInt(quizId, 10);
   const isEmbedWidget = new URLSearchParams(window.location.search).get("embed") === "1";
   const isAdminPreview = new URLSearchParams(window.location.search).get("adminPreview") === "1";
+  const widgetToken = new URLSearchParams(window.location.search).get("widget") ?? undefined;
 
   const { data: quizInfo, isLoading: infoLoading } = trpc.standaloneQuizLearner.getQuizInfo.useQuery(
-    { quizId: qId, adminPreview: isAdminPreview },
+    { quizId: qId, adminPreview: isAdminPreview, widgetToken },
     { enabled: !!user && !isNaN(qId) }
   );
 
@@ -126,7 +127,7 @@ export default function StandaloneQuizPlayer() {
 
   function handleStart() {
     startMutation.mutate(
-      { quizId: qId, adminPreview: isAdminPreview },
+      { quizId: qId, adminPreview: isAdminPreview, widgetToken },
       {
         onSuccess: (res) => {
           setAttemptId(res.attemptId);
@@ -201,7 +202,7 @@ export default function StandaloneQuizPlayer() {
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-4">
         <BookOpen className="w-12 h-12 text-teal-600" />
         <h2 className="text-xl font-bold">Sign in to take this quiz</h2>
-        <Button onClick={() => window.location.href = getLoginUrl(`/quizzes/${qId}${isEmbedWidget ? "?embed=1" : ""}`)} className="bg-teal-600 hover:bg-teal-700">Sign In</Button>
+        <Button onClick={() => window.location.href = getLoginUrl(`/quizzes/${qId}${window.location.search}`)} className="bg-teal-600 hover:bg-teal-700">Sign In</Button>
       </div>
     );
   }

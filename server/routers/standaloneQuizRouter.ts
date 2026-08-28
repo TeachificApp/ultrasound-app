@@ -8,13 +8,14 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, asc, desc, eq, gte, inArray, like, lte, or, sql, isNull, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull, isNotNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import {
   standaloneQuizzes,
   standaloneQuizQuestions,
   standaloneQuizAttempts,
+  standaloneQuizWidgetLaunches,
   standaloneQuizAttemptAnswers,
   questionBank,
   questionBankFolders,
@@ -29,6 +30,14 @@ import { drawQuestionsFromBuilder, parseBuilderConfig } from "../lib/quizBuilder
 import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
 import { buildStandaloneLearnerOptions, orderQuestionOptions } from "../lib/questionOptionOrder";
 import { canOpenStandaloneQuiz, requiresEmbeddedLearnerAccess } from "../lib/standaloneQuizPreviewAccess";
+import {
+  buildStandaloneQuizWidgetEmbed,
+  createStandaloneQuizWidgetToken,
+  DEFAULT_WIDGET_LAUNCH_EXPIRY_DAYS,
+  hashStandaloneQuizWidgetToken,
+  MAX_WIDGET_LAUNCH_EXPIRY_DAYS,
+  normalizeWidgetOrigin,
+} from "../lib/standaloneQuizWidgetAccess";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
@@ -70,6 +79,39 @@ export async function assertEmbeddedQuizAccess(db: any, user: { id: number; role
   throw new TRPCError({ code: "FORBIDDEN", message: "This quiz is available through its assigned learning experience." });
 }
 
+/** A widget credential substitutes only for an LMS assignment, never authentication or published status. */
+async function hasActiveWidgetLaunch(db: any, rawToken: string | undefined, quizId: number): Promise<boolean> {
+  if (!rawToken || rawToken.length > 512) return false;
+  const tokenHash = hashStandaloneQuizWidgetToken(rawToken);
+  const [launch] = await db
+    .select({ id: standaloneQuizWidgetLaunches.id })
+    .from(standaloneQuizWidgetLaunches)
+    .where(and(
+      eq(standaloneQuizWidgetLaunches.quizId, quizId),
+      eq(standaloneQuizWidgetLaunches.tokenHash, tokenHash),
+      eq(standaloneQuizWidgetLaunches.isActive, true),
+      gt(standaloneQuizWidgetLaunches.expiresAt, new Date()),
+      isNull(standaloneQuizWidgetLaunches.revokedAt),
+    ))
+    .limit(1);
+  return Boolean(launch);
+}
+
+function getConfiguredAttemptQuestionCount(
+  quiz: typeof standaloneQuizzes.$inferSelect,
+  builderConfig: ReturnType<typeof parseBuilderConfig>,
+  linkedQuestionCount: number,
+): number {
+  const available = builderConfig
+    ? (builderConfig.meta.drawConfig?.enabled
+        ? builderConfig.meta.drawConfig.totalQuestions
+        : builderConfig.questions.length)
+    : linkedQuestionCount;
+  return quiz.questionsPerAttempt
+    ? Math.min(available, quiz.questionsPerAttempt)
+    : available;
+}
+
 /** Shuffle an array in-place using Fisher-Yates */
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -109,6 +151,12 @@ const quizSettingsInput = z.object({
   questionsPerAttempt: z.number().int().min(1).nullable().optional(),
 });
 
+const learnerQuizAccessInput = z.object({
+  quizId: z.number().int(),
+  adminPreview: z.boolean().optional().default(false),
+  widgetToken: z.string().min(1).max(512).optional(),
+});
+
 // ─── Public Router ────────────────────────────────────────────────────────────
 export const standaloneQuizPublicRouter = router({
   /** Public metadata is disabled; Quiz Creator content is embedded in assigned learning experiences. */
@@ -123,7 +171,7 @@ export const standaloneQuizPublicRouter = router({
 export const standaloneQuizLearnerRouter = router({
   /** Get quiz info + question count for the take-quiz page */
   getQuizInfo: protectedProcedure
-    .input(z.object({ quizId: z.number().int(), adminPreview: z.boolean().optional().default(false) }))
+    .input(learnerQuizAccessInput)
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -135,7 +183,8 @@ export const standaloneQuizLearnerRouter = router({
       if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, input.adminPreview)) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
-      if (requiresEmbeddedLearnerAccess(ctx.user.role, input.adminPreview)) {
+      const hasWidgetAccess = await hasActiveWidgetLaunch(db, input.widgetToken, quiz.id);
+      if (requiresEmbeddedLearnerAccess(ctx.user.role, input.adminPreview) && !hasWidgetAccess) {
         await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       }
       const builderConfig = parseBuilderConfig(quiz.builderConfig);
@@ -143,11 +192,7 @@ export const standaloneQuizLearnerRouter = router({
         .select({ count: sql<number>`count(*)` })
         .from(standaloneQuizQuestions)
         .where(eq(standaloneQuizQuestions.quizId, quiz.id));
-      const questionCount = builderConfig
-        ? (builderConfig.meta.drawConfig?.enabled
-            ? builderConfig.meta.drawConfig.totalQuestions
-            : builderConfig.questions.length)
-        : Number(count);
+      const questionCount = getConfiguredAttemptQuestionCount(quiz, builderConfig, Number(count));
       // Check attempt limits
       let attemptCount = 0;
       if (!quiz.allowRetakes || quiz.maxAttempts) {
@@ -170,7 +215,7 @@ export const standaloneQuizLearnerRouter = router({
 
   /** Start a new attempt — returns attempt ID and the ordered questions */
   startAttempt: protectedProcedure
-    .input(z.object({ quizId: z.number().int(), adminPreview: z.boolean().optional().default(false) }))
+    .input(learnerQuizAccessInput)
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -182,7 +227,8 @@ export const standaloneQuizLearnerRouter = router({
       if (!quiz || !canOpenStandaloneQuiz(quiz.status as Parameters<typeof canOpenStandaloneQuiz>[0], ctx.user.role, input.adminPreview)) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
-      if (requiresEmbeddedLearnerAccess(ctx.user.role, input.adminPreview)) {
+      const hasWidgetAccess = await hasActiveWidgetLaunch(db, input.widgetToken, quiz.id);
+      if (requiresEmbeddedLearnerAccess(ctx.user.role, input.adminPreview) && !hasWidgetAccess) {
         await assertEmbeddedQuizAccess(db, ctx.user, quiz.id);
       }
 
@@ -216,7 +262,13 @@ export const standaloneQuizLearnerRouter = router({
 
       // ── Visual builder mode: questions from builderConfig JSON ──
       if (builderConfig && builderConfig.questions.length > 0) {
-        const drawn = drawQuestionsFromBuilder(builderConfig) as typeof builderConfig.questions;
+        let drawn = drawQuestionsFromBuilder(builderConfig) as typeof builderConfig.questions;
+        // The standalone quiz-level cap applies to visual-builder quizzes too.
+        // Every visible counter therefore reflects the selected attempt set,
+        // never the full builder or question-bank pool.
+        if (quiz.questionsPerAttempt && drawn.length > quiz.questionsPerAttempt) {
+          drawn = shuffle(drawn).slice(0, quiz.questionsPerAttempt) as typeof builderConfig.questions;
+        }
         const totalPoints = drawn.reduce((s, q) => s + ((q as { points?: number }).points ?? 1), 0);
         const [result] = await db.insert(standaloneQuizAttempts).values({
           quizId: quiz.id,
@@ -672,7 +724,83 @@ export const standaloneQuizAdminRouter = router({
           eq(lmsLessons.type, "standalone_quiz"),
           eq(lmsLessons.standaloneQuizId, quiz.id),
         ));
-      return { quiz, questions, assignments };
+      const [widgetLaunch] = await db
+        .select({
+          id: standaloneQuizWidgetLaunches.id,
+          label: standaloneQuizWidgetLaunches.label,
+          expiresAt: standaloneQuizWidgetLaunches.expiresAt,
+        })
+        .from(standaloneQuizWidgetLaunches)
+        .where(and(
+          eq(standaloneQuizWidgetLaunches.quizId, quiz.id),
+          eq(standaloneQuizWidgetLaunches.isActive, true),
+          gt(standaloneQuizWidgetLaunches.expiresAt, new Date()),
+          isNull(standaloneQuizWidgetLaunches.revokedAt),
+        ))
+        .orderBy(desc(standaloneQuizWidgetLaunches.createdAt))
+        .limit(1);
+      return { quiz, questions, assignments, widgetLaunch: widgetLaunch ?? null };
+    }),
+
+  /** Creates an opaque credential for one published quiz and revokes its prior active widget. */
+  createWidgetLaunch: protectedProcedure
+    .input(z.object({
+      quizId: z.number().int(),
+      origin: z.string().min(1).max(500),
+      label: z.string().trim().min(1).max(120).optional(),
+      expiresInDays: z.number().int().min(1).max(MAX_WIDGET_LAUNCH_EXPIRY_DAYS).default(DEFAULT_WIDGET_LAUNCH_EXPIRY_DAYS),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [quiz] = await db.select().from(standaloneQuizzes).where(eq(standaloneQuizzes.id, input.quizId)).limit(1);
+      if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
+      if (quiz.status !== "published") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Publish this quiz before generating an HTML widget." });
+      }
+      let origin: string;
+      try {
+        origin = normalizeWidgetOrigin(input.origin);
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A valid application origin is required." });
+      }
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + input.expiresInDays * 24 * 60 * 60 * 1000);
+      const token = createStandaloneQuizWidgetToken();
+      await db.transaction(async (tx) => {
+        await tx.update(standaloneQuizWidgetLaunches)
+          .set({ isActive: false, revokedAt: now })
+          .where(and(
+            eq(standaloneQuizWidgetLaunches.quizId, quiz.id),
+            eq(standaloneQuizWidgetLaunches.isActive, true),
+          ));
+        await tx.insert(standaloneQuizWidgetLaunches).values({
+          quizId: quiz.id,
+          tokenHash: hashStandaloneQuizWidgetToken(token),
+          label: input.label ?? null,
+          createdByUserId: ctx.user.id,
+          expiresAt,
+        });
+      });
+      return { ...buildStandaloneQuizWidgetEmbed({ origin, quizId: quiz.id, quizTitle: quiz.title, token }), expiresAt };
+    }),
+
+  /** Immediately disables the active HTML-widget credential without changing LMS lesson assignments. */
+  revokeWidgetLaunch: protectedProcedure
+    .input(z.object({ quizId: z.number().int() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const now = new Date();
+      await db.update(standaloneQuizWidgetLaunches)
+        .set({ isActive: false, revokedAt: now })
+        .where(and(
+          eq(standaloneQuizWidgetLaunches.quizId, input.quizId),
+          eq(standaloneQuizWidgetLaunches.isActive, true),
+        ));
+      return { success: true };
     }),
 
   /** Create a new quiz */
@@ -723,6 +851,7 @@ export const standaloneQuizAdminRouter = router({
           .where(inArray(standaloneQuizAttemptAnswers.attemptId, attempts.map((a) => a.id)));
         await db.delete(standaloneQuizAttempts).where(eq(standaloneQuizAttempts.quizId, input.id));
       }
+      await db.delete(standaloneQuizWidgetLaunches).where(eq(standaloneQuizWidgetLaunches.quizId, input.id));
       await db.delete(standaloneQuizQuestions).where(eq(standaloneQuizQuestions.quizId, input.id));
       await db.delete(standaloneQuizzes).where(eq(standaloneQuizzes.id, input.id));
       return { success: true };

@@ -7559,6 +7559,25 @@ export const standaloneQuizAttempts = mysqlTable("standalone_quiz_attempts", {
 });
 export type StandaloneQuizAttempt = typeof standaloneQuizAttempts.$inferSelect;
 
+// Revocable, opaque launch credentials for administrator-approved HTML widgets.
+// Only the SHA-256 token digest is stored. A raw credential is returned once to
+// the administrator when a widget is generated and is never persisted.
+export const standaloneQuizWidgetLaunches = mysqlTable("standalone_quiz_widget_launches", {
+  id: int("id").autoincrement().primaryKey(),
+  quizId: int("quiz_id").notNull(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+  label: varchar("label", { length: 120 }),
+  createdByUserId: int("created_by_user_id").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("standalone_quiz_widget_launches_token_hash_unique").on(table.tokenHash),
+  index("standalone_quiz_widget_launches_quiz_active_idx").on(table.quizId, table.isActive, table.expiresAt),
+]);
+export type StandaloneQuizWidgetLaunch = typeof standaloneQuizWidgetLaunches.$inferSelect;
+
 // Per-question answers within an attempt
 export const standaloneQuizAttemptAnswers = mysqlTable("standalone_quiz_attempt_answers", {
   id: int("id").autoincrement().primaryKey(),

@@ -112,11 +112,14 @@
 - [x] Inspect and diagnose the RPhS administrator preview route that rejects the draft quiz as not found.
 - [x] Add a clear standalone-quiz publish or unpublish status control in Quiz Creator and make administrator preview work for draft quizzes without exposing drafts to learners.
 - [ ] Ensure published standalone quizzes remain available only through an assigned learning module or explicit HTML widget and are not open for direct enrollment, checkout, catalog, search, or learner-facing listing discovery.
-- [ ] Implement and verify a dedicated protected published standalone-quiz HTML-widget access path that does not depend on LMS assignment.
+- [x] Implement and verify a dedicated protected published standalone-quiz HTML-widget access path that does not depend on LMS assignment.
 - [ ] Audit and test every learner-facing catalog, checkout, search, dashboard, and direct-route surface to ensure standalone quizzes remain hidden outside approved module/widget paths.
+- [x] Add a secure administrator-generated, expiry-bound widget launch path for published standalone quizzes that does not require LMS assignment and does not create direct learner discovery.
 - [x] Remove the standalone quiz feedback OK button and make Next dismiss feedback and advance, while preserving final-question submission behavior.
 - [x] Align Quiz Creator Design settings and preview with the existing dark navy-to-aqua player pattern, including primary teal, gradient background, and readable text color.
 - [x] Audit the RPhS PDF-derived questions for direct guide, PDF, source-document, or similar provenance references in question text or feedback.
 - [x] Present the exact affected RPhS records and obtain explicit approval before changing any source-reference language.
 - [x] Remove direct source-document wording from the 313 audited RPhS PDF-derived questions while preserving their clinical facts, answers, feedback, links, and order.
 - [x] Verify zero direct PDF/guide/source/transcript references remain in the RPhS generated set after the approved cleanup.
+- [x] Correct standalone quiz progress counters so they display only the active attempt’s selected-question count, never the full linked question-bank count.
+- [x] Audit all stored quiz questions and feedback for direct transcript, source, document, guide, PDF, or analogous provenance references, then remove only those references while preserving clinical content and learner data.
