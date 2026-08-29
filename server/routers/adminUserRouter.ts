@@ -1110,7 +1110,7 @@ export const adminUserRouter = router({
 
       // Generate a fresh auto-login token
       const _resendBaseUrl = process.env.VITE_OAUTH_PORTAL_URL || "https://app.allaboutultrasound.com";
-      let loginUrl = `${_resendBaseUrl}/dashboard`;
+      let loginUrl = `${_resendBaseUrl}/my-dashboard`;
       if (purchase.userId) {
         try {
           const _resendToken = await generateAutoLoginToken(purchase.userId, loginUrl);
@@ -2821,7 +2821,7 @@ export const adminUserRouter = router({
       // Build a simple resend wrapper — forward the original subject/recipient
       // We don't store the original HTML body, so we send a plain-text notice with a re-login link
       const _resendLogBaseUrl = process.env.VITE_OAUTH_PORTAL_URL || "https://app.allaboutultrasound.com";
-      let loginUrl = `${_resendLogBaseUrl}/dashboard`;
+      let loginUrl = `${_resendLogBaseUrl}/my-dashboard`;
       if (logEntry.userId) {
         try {
           const _resendLogToken = await generateAutoLoginToken(logEntry.userId, loginUrl);
@@ -3284,8 +3284,8 @@ export const adminUserRouter = router({
       try { accessToken = await getOrCreateAccessToken(input.userId); } catch { /* non-fatal */ }
       const baseUrl = "https://app.allaboutultrasound.com";
       const accessUrl = accessToken
-        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessToken)
-        : `${baseUrl}/dashboard`;
+        ? buildPersistentAccessUrl(`${baseUrl}/my-dashboard`, accessToken)
+        : `${baseUrl}/my-dashboard`;
 
       const htmlBody = emailWrapper(`
         <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>

@@ -399,6 +399,8 @@ function Router() {
         <Route path="/upgrade-success" component={UpgradeSuccess} />
         <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
+        <Route path="/dashboard/:rest*" component={LegacyStudentDashboardRedirect} />
+        <Route path="/dashboard" component={LegacyStudentDashboardRedirect} />
         <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
@@ -797,6 +799,8 @@ function MembersRouter() {
         <MembersLayout>
           <Suspense fallback={pageFallback}>
             <Switch>
+              <Route path="/dashboard/:rest*" component={LegacyStudentDashboardRedirect} />
+              <Route path="/dashboard" component={LegacyStudentDashboardRedirect} />
               <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
               <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
               <Route path="/my-dashboard" component={StudentDashboardPage} />
@@ -991,6 +995,8 @@ function LMSRouter() {
         <Route path="/register" component={Register} />
         {/* /profile redirects to dashboard profile tab */}
         <Route path="/profile">{() => { window.location.replace("/my-dashboard?tab=profile"); return null; }}</Route>
+        <Route path="/dashboard/:rest*" component={LegacyStudentDashboardRedirect} />
+        <Route path="/dashboard" component={LegacyStudentDashboardRedirect} />
         <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
@@ -1063,6 +1069,8 @@ function IHeartEchoRouter() {
         <Route path="/upgrade-success" component={UpgradeSuccess} />
                 <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
+        <Route path="/dashboard/:rest*" component={LegacyStudentDashboardRedirect} />
+        <Route path="/dashboard" component={LegacyStudentDashboardRedirect} />
         <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />

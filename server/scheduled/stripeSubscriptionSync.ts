@@ -154,7 +154,7 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
                   <p>We were unable to process your payment for <strong>${courseTitle}</strong>. Your access has been maintained while we retry the payment over the next <strong>${GRACE_PERIOD_DAYS} days</strong>.</p>
                   <p>To avoid losing access, please update your payment method:</p>
                   <div style="text-align:center;margin:24px 0">
-                    <a href="https://app.allaboutultrasound.com/dashboard/subscriptions"
+                    <a href="https://app.allaboutultrasound.com/my-dashboard?tab=subscriptions"
                        style="background:#0f766e;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">
                       Update Payment Method
                     </a>

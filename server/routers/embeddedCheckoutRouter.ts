@@ -510,7 +510,7 @@ export const embeddedCheckoutRouter = router({
           } else if (input.productType === "bundle") {
             loginUrl = `${baseUrl}/my-courses`;
           } else if (input.fulfillmentBrand) {
-            loginUrl = `${baseUrl}/dashboard`;
+            loginUrl = `${baseUrl}/my-dashboard`;
           }
           // Generate auto-login token so the email link logs them in automatically
           let autoLoginUrl = loginUrl;

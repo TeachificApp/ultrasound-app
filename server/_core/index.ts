@@ -38,6 +38,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { detectBrandFromHostname, detectBrandMode } from "../../shared/brands";
+import { normalizeLegacyStudentDashboardLocation } from "../../shared/studentDashboardUrls";
 import { resolveAssetUrls } from "../lib/resolveAssetUrl";
 import { startChallengeCron } from "../jobs/challengeCron";
 import { startMediaPurgeCron } from "../jobs/mediaPurgeCron";
@@ -990,6 +991,13 @@ async function startServer() {
   app.get("/products/:slug", (req, res) => {
     const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
     res.redirect(301, `/product/${req.params.slug}${qs}`);
+  });
+  // /dashboard → /my-dashboard  (legacy student dashboard URL)
+  app.get(/^\/dashboard(?:\/.*)?$/, (req, res) => {
+    const pathname = req.path.replace(/\/+$/, "") || "/";
+    const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+    const target = normalizeLegacyStudentDashboardLocation(pathname, qs) ?? "/my-dashboard";
+    res.redirect(301, target);
   });
 
   // Media repository public serve/embed routes (cookieless, token-based access)

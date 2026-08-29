@@ -74,13 +74,27 @@ export function buildQuizCoursePlayerUrl(courseSlug: string) {
   return `${LEARN_APP_ORIGIN}/courses/${courseSlug}/player`;
 }
 
+const LEGACY_DASHBOARD_SUBPATH_TABS: Record<string, StudentDashboardMainTab> = {
+  subscriptions: "subscriptions",
+  purchases: "purchases",
+  certificates: "certificates",
+  profile: "profile",
+  content: "content",
+  instructor: "instructor",
+  revenue_partner: "revenue_partner",
+};
+
 /** Map legacy/broken dashboard paths to the current /my-dashboard format. */
 export function normalizeLegacyStudentDashboardLocation(pathname: string, search = ""): string | null {
   const normalizedPath = pathname.replace(/\/+$/, "") || "/";
   const isLegacyPath =
-    normalizedPath === "/dashboard/my-content"
+    normalizedPath === "/dashboard"
+    || normalizedPath === "/dashboard/my-content"
     || normalizedPath === "/my-dashboard/my-content";
-  if (!isLegacyPath && normalizedPath !== "/my-dashboard") return null;
+  const isLegacyDashboardSubpath =
+    normalizedPath.startsWith("/dashboard/")
+    && normalizedPath !== "/dashboard/my-content";
+  if (!isLegacyPath && !isLegacyDashboardSubpath && normalizedPath !== "/my-dashboard") return null;
 
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const rawTab = params.get("tab");
@@ -99,7 +113,17 @@ export function normalizeLegacyStudentDashboardLocation(pathname: string, search
     }
   }
 
-  if (isLegacyPath) tab = "content";
+  if (normalizedPath === "/dashboard/my-content" || normalizedPath === "/my-dashboard/my-content") {
+    tab = "content";
+  } else if (normalizedPath === "/dashboard") {
+    tab = rawTab && STUDENT_DASHBOARD_MAIN_TABS.has(rawTab as StudentDashboardMainTab)
+      ? (rawTab as StudentDashboardMainTab)
+      : "content";
+  } else if (isLegacyDashboardSubpath) {
+    const subpath = normalizedPath.slice("/dashboard/".length);
+    const mappedTab = LEGACY_DASHBOARD_SUBPATH_TABS[subpath];
+    if (mappedTab) tab = mappedTab;
+  }
 
   const next = new URLSearchParams();
   next.set("tab", tab);

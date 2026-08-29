@@ -328,7 +328,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
           console.error(`[Stripe] Failed to generate access token for ${customerEmail}:`, atErr);
         }
         const accessUrl = accessTokenForEmail
-          ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessTokenForEmail)
+          ? buildPersistentAccessUrl(`${baseUrl}/my-dashboard`, accessTokenForEmail)
           : setPasswordUrl;
         try {
           const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
@@ -936,7 +936,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
         accessTokenForEmail = await getOrCreateAccessToken(userId);
       } catch { /* non-fatal */ }
       const accessUrl = accessTokenForEmail
-        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessTokenForEmail)
+        ? buildPersistentAccessUrl(`${baseUrl}/my-dashboard`, accessTokenForEmail)
         : setPasswordUrl;
       const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
       const emailContent = buildPasswordResetEmail({
@@ -973,8 +973,8 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
       let accessToken: string | null = null;
       try { accessToken = await getOrCreateAccessToken(userId); } catch { /* non-fatal */ }
       const accessUrl = accessToken
-        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessToken)
-        : `${baseUrl}/dashboard`;
+        ? buildPersistentAccessUrl(`${baseUrl}/my-dashboard`, accessToken)
+        : `${baseUrl}/my-dashboard`;
       const brandLabel = brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
       const planLabel = isLifetime ? `${brandLabel} Lifetime Premium Membership` : `${brandLabel} Premium Membership`;
       const htmlBody = emailWrapper(`
@@ -1173,7 +1173,7 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
         accessTokenForEmail = await getOrCreateAccessToken(userId);
       } catch { /* non-fatal */ }
       const accessUrl = accessTokenForEmail
-        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessTokenForEmail)
+        ? buildPersistentAccessUrl(`${baseUrl}/my-dashboard`, accessTokenForEmail)
         : setPasswordUrl;
       const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
       const emailContent = buildPasswordResetEmail({
@@ -1210,8 +1210,8 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
       let accessToken: string | null = null;
       try { accessToken = await getOrCreateAccessToken(userId); } catch { /* non-fatal */ }
       const accessUrl = accessToken
-        ? buildPersistentAccessUrl(`${baseUrl}/dashboard`, accessToken)
-        : `${baseUrl}/dashboard`;
+        ? buildPersistentAccessUrl(`${baseUrl}/my-dashboard`, accessToken)
+        : `${baseUrl}/my-dashboard`;
       const planLabel = isLifetime ? "All Access Dual Lifetime Membership" : "All Access Dual Membership";
       const htmlBody = emailWrapper(`
         <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>
@@ -2297,7 +2297,7 @@ export async function handleInvoicePaymentFailed(invoice: Record<string, unknown
   }
 
   const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
-  const updatePaymentUrl = `${baseUrl}/dashboard`;
+  const updatePaymentUrl = `${baseUrl}/my-dashboard`;
 
   // Send payment failed email
   const productName = membership ? `Your ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"} Membership` : "Your Subscription";

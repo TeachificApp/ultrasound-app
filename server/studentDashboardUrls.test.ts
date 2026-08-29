@@ -29,4 +29,16 @@ describe("student dashboard URLs", () => {
     expect(normalizeLegacyStudentDashboardLocation("/my-dashboard", "tab=quizzes"))
       .toBe("/my-dashboard?tab=content&contentTab=quizzes");
   });
+
+  it("redirects bare /dashboard to my-dashboard content tab", () => {
+    expect(normalizeLegacyStudentDashboardLocation("/dashboard", ""))
+      .toBe("/my-dashboard?tab=content");
+    expect(normalizeLegacyStudentDashboardLocation("/dashboard", "tab=subscriptions"))
+      .toBe("/my-dashboard?tab=subscriptions");
+  });
+
+  it("redirects /dashboard/subscriptions to subscriptions tab", () => {
+    expect(normalizeLegacyStudentDashboardLocation("/dashboard/subscriptions", ""))
+      .toBe("/my-dashboard?tab=subscriptions");
+  });
 });
