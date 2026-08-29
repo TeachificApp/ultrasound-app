@@ -1,4 +1,4 @@
-/** OpenAI TTS voices available for native quiz read-aloud (not mock exams). */
+/** Manus AI TTS voices available for native quiz read-aloud (not mock exams). */
 export const QUIZ_TTS_VOICES = [
   { id: "alloy", label: "Alloy — neutral" },
   { id: "nova", label: "Nova — warm" },

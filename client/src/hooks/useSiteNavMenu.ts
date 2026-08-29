@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import type { SiteNavItem, SiteNavMenuKey } from "@shared/sitePagesConstants";
+import { resolveStudentDashboardHref } from "@shared/studentDashboardUrls";
 import { getSitePageDomain } from "@/lib/sitePageDomain";
 
 export type SiteNavLinkItem = {
@@ -12,7 +13,7 @@ export type SiteNavLinkItem = {
 };
 
 function mapNavItem(item: SiteNavItem): SiteNavLinkItem {
-  const href = item.href ?? "/";
+  const href = resolveStudentDashboardHref(item.href ?? "/");
   const external = /^https?:\/\//i.test(href);
   return {
     label: item.label,

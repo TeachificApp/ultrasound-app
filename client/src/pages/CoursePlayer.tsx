@@ -11,6 +11,7 @@ import { useParams, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
+import { STUDENT_DASHBOARD_PATH } from "@shared/studentDashboardUrls";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1207,7 +1208,7 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl, isLoadi
               <p>Your certificate is taking longer than expected.</p>
               <p className="text-xs text-gray-400">
                 Return to this course or visit your{" "}
-                <a href="/my-dashboard?tab=certificates" className="text-teal-600 underline">Certificates</a>{" "}
+                <a href={`${STUDENT_DASHBOARD_PATH}?tab=certificates`} className="text-teal-600 underline">Certificates</a>{" "}
                 tab to download it. If it still does not appear, contact{" "}
                 <a href="mailto:support@allaboutultrasound.com" className="text-teal-600 underline">support@allaboutultrasound.com</a>.
               </p>
@@ -2307,7 +2308,7 @@ export default function CoursePlayer() {
             <button
               className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors"
               style={{ color: primaryColor }}
-              onClick={() => { setMobileSidebarOpen(false); navigate("/my-dashboard"); }}
+              onClick={() => { setMobileSidebarOpen(false); navigate(STUDENT_DASHBOARD_PATH); }}
             >
               <ChevronLeft className="w-3 h-3" /> My Dashboard
             </button>
@@ -2355,7 +2356,7 @@ export default function CoursePlayer() {
             <button
               className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors"
               style={{ color: primaryColor }}
-              onClick={() => navigate("/my-dashboard")}
+              onClick={() => navigate(STUDENT_DASHBOARD_PATH)}
             >
               <ChevronLeft className="w-3 h-3" /> My Dashboard
             </button>

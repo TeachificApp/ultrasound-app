@@ -55,6 +55,7 @@ const LEGACY_CONTENT_TAB_ALIASES: Record<string, StudentDashboardContentTab> = {
 
 export const APP_STUDENT_DASHBOARD_ORIGIN = "https://app.allaboutultrasound.com";
 export const LEARN_APP_ORIGIN = "https://learn.allaboutultrasound.com";
+export const STUDENT_DASHBOARD_PATH = "/my-dashboard";
 
 export function buildStudentDashboardUrl(opts?: {
   origin?: typeof APP_STUDENT_DASHBOARD_ORIGIN | typeof LEARN_APP_ORIGIN | "relative";
@@ -135,4 +136,19 @@ export function normalizeLegacyStudentDashboardLocation(pathname: string, search
   }
   const qs = next.toString();
   return `/my-dashboard${qs ? `?${qs}` : ""}`;
+}
+
+/** Rewrite legacy /dashboard links to /my-dashboard (relative or same-origin absolute). */
+export function resolveStudentDashboardHref(href: string): string {
+  if (!href) return href;
+  const isAbsolute = /^https?:\/\//i.test(href);
+  try {
+    const parsed = new URL(href, LEARN_APP_ORIGIN);
+    const mapped = normalizeLegacyStudentDashboardLocation(parsed.pathname, parsed.search);
+    if (!mapped) return href;
+    if (isAbsolute) return `${parsed.origin}${mapped}`;
+    return mapped;
+  } catch {
+    return href;
+  }
 }

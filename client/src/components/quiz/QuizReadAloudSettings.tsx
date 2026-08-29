@@ -39,7 +39,7 @@ export function QuizReadAloudSettings({
             </Label>
             {!compact && (
               <p className="text-xs text-gray-500 mt-0.5">
-                AI voice reads each question, answer choices, and feedback during the quiz.
+                Manus AI reads each question, answer choices, and feedback during the quiz.
               </p>
             )}
           </div>

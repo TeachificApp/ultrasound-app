@@ -1,5 +1,5 @@
 /**
- * Text-to-speech via OpenAI audio/speech (Railway) or compatible API root.
+ * Text-to-speech via Manus AI (Forge audio/speech on Railway) or compatible API root.
  */
 import { getOpenAiApiKey, openAiV1Url } from "../lib/openAiConfig";
 import type { QuizTtsVoiceId } from "../../shared/quizVoiceOptions";
@@ -32,7 +32,7 @@ export async function synthesizeSpeech(options: SynthesizeSpeechOptions): Promis
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(
-      `OpenAI speech synthesis failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`,
+      `Manus AI speech synthesis failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`,
     );
   }
 
