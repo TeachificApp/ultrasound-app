@@ -61,7 +61,7 @@ export function QuizReadAloudSettings({
           {availability?.configured === false ? (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
               Manus AI voices require <code className="font-mono">OPENAI_API_KEY</code> on Railway.
-              Samples will use your browser voice until that is configured.
+              Until then, samples use distinct browser voice profiles (approximate).
             </p>
           ) : null}
           <div className="flex items-center justify-between gap-2">

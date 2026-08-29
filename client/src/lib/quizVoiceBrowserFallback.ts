@@ -1,22 +1,62 @@
+import {
+  getBrowserSpeechProfile,
+  pickBrowserVoiceIndex,
+  type BrowserVoiceCandidate,
+} from "@shared/quizVoiceBrowserMapping";
+import type { QuizTtsVoiceId } from "@shared/quizVoiceOptions";
+
 /** Browser SpeechSynthesis fallback when OpenAI TTS is unavailable on the server. */
 export function isBrowserSpeechSynthesisAvailable(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 }
 
-export function speakWithBrowser(text: string): Promise<void> {
+function waitForBrowserVoices(): Promise<SpeechSynthesisVoice[]> {
+  if (!isBrowserSpeechSynthesisAvailable()) return Promise.resolve([]);
+
+  const existing = window.speechSynthesis.getVoices();
+  if (existing.length > 0) return Promise.resolve(existing);
+
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => {
+      resolve(window.speechSynthesis.getVoices());
+    }, 500);
+
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.clearTimeout(timeout);
+      resolve(window.speechSynthesis.getVoices());
+    };
+  });
+}
+
+function toCandidates(voices: SpeechSynthesisVoice[]): BrowserVoiceCandidate[] {
+  return voices.map((voice) => ({
+    name: voice.name,
+    lang: voice.lang,
+    default: voice.default,
+  }));
+}
+
+export function speakWithBrowser(text: string, voiceId: QuizTtsVoiceId): Promise<void> {
   if (!isBrowserSpeechSynthesisAvailable()) {
     return Promise.reject(new Error("Browser speech is not available in this environment."));
   }
 
-  return new Promise((resolve, reject) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => reject(new Error("Browser speech playback failed"));
+  return waitForBrowserVoices().then((voices) => {
+    const profile = getBrowserSpeechProfile(voiceId);
+    const index = pickBrowserVoiceIndex(voiceId, toCandidates(voices));
+    const selected = index >= 0 ? voices[index] : voices[0];
 
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    return new Promise<void>((resolve, reject) => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = profile.rate;
+      utterance.pitch = profile.pitch;
+      if (selected) utterance.voice = selected;
+      utterance.onend = () => resolve();
+      utterance.onerror = () => reject(new Error("Browser speech playback failed"));
+
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    });
   });
 }
 

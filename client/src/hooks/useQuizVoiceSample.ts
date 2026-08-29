@@ -25,6 +25,7 @@ function sampleErrorMessage(error: unknown): string {
 
 export function useQuizVoiceSample(quizTitle: string) {
   const synth = trpc.quizVoice.synthesize.useMutation();
+  const { data: availability } = trpc.quizVoice.getAvailability.useQuery();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [previewingVoice, setPreviewingVoice] = useState<QuizTtsVoiceId | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
@@ -79,11 +80,13 @@ export function useQuizVoiceSample(quizTitle: string) {
           void audio.play().catch(reject);
         });
       } catch (error) {
-        if (shouldUseBrowserSpeechFallback(error)) {
+        const allowBrowserFallback =
+          availability?.configured === false && shouldUseBrowserSpeechFallback(error);
+        if (allowBrowserFallback) {
           try {
-            await speakWithBrowser(text);
+            await speakWithBrowser(text, voice);
             toast.message("Using browser voice preview", {
-              description: "Add OPENAI_API_KEY on Railway for Manus AI voice samples.",
+              description: "Add OPENAI_API_KEY on Railway for distinct Manus AI voices.",
             });
             setPreviewingVoice(null);
             setIsPreviewLoading(false);
@@ -97,7 +100,7 @@ export function useQuizVoiceSample(quizTitle: string) {
         setIsPreviewLoading(false);
       }
     },
-    [quizTitle, stop, synth],
+    [quizTitle, stop, synth, availability?.configured],
   );
 
   return {
