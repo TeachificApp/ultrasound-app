@@ -326,6 +326,7 @@ export default function StandaloneQuizPlayer() {
       <QuizReadAloudSettings
         enabled={readAloudEnabled}
         voice={readAloudVoice}
+        quizTitle={quizInfo.title}
         onEnabledChange={setReadAloudEnabled}
         onVoiceChange={setReadAloudVoice}
         compact={!!builderMeta}
