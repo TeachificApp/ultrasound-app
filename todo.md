@@ -161,3 +161,7 @@
 - [ ] Repair the Railway production R2 credential or bucket policy so authenticated editor writes to the lms-images prefix succeed.
 - [x] Restore the Quizzes tab for every user while showing My Quiz Results only when a user has direct or lesson-module native quiz results.
 - [x] Add focused navigation and result-visibility regression coverage for the all-user Quizzes tab and native quiz results condition.
+- [ ] Trace and repair the Railway editor-upload upstream 502 failure after the R2 credential update, then verify a live Platform Admin upload.
+- [x] Repair the lesson editor AI content generator so it completes server-side without requiring a Manus task confirmation from the author.
+- [x] Prefer the Railway-configured Forge chat API for interactive lesson content generation when both Forge and Manus task credentials are present.
+- [ ] Verify a live Railway lesson-editor generation completes through Forge AI without a Manus task confirmation.

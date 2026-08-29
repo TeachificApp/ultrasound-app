@@ -118,7 +118,7 @@ export function getSpeechSynthesisApiKey(): string {
 /** Pick a chat model compatible with the configured backend. */
 export function resolveLlmChatModel(explicitModel?: string): string {
   if (explicitModel?.trim()) return explicitModel.trim();
-  return isOpenAiBackend() ? "gpt-4o-mini" : "gemini-2.5-flash";
+  return isOpenAiBackend() ? "gpt-4o-mini" : "gemini-3-flash-preview";
 }
 
 export function resolveLlmChatCompletionsUrl(): string {

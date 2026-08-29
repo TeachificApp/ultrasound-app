@@ -680,6 +680,9 @@ export const lmsRouter = router({
       };
       const instruction = formatInstructions[input.format];
       const response = await invokeLLM({
+        transport: "forge",
+        model: "gemini-3-flash-preview",
+        maxTokens: 4000,
         messages: [
           {
             role: "system",

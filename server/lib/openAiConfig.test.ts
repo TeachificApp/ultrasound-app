@@ -22,7 +22,9 @@ describe("openAiConfig", () => {
       "BUILT_IN_FORGE_API_KEY",
       "OPENAI_API_KEY",
       "OPENAI_BASE_URL",
+      "OPENAI_API_BASE",
       "FORGE_API_KEY",
+      "FORGE_API_URL",
       "MANUS_API_KEY",
     ]) {
       saved[key] = process.env[key];
@@ -71,6 +73,10 @@ describe("openAiConfig", () => {
   it("defaults OpenAI base URL when only OPENAI_API_KEY is set", () => {
     delete process.env.BUILT_IN_FORGE_API_URL;
     delete process.env.BUILT_IN_FORGE_API_KEY;
+    delete process.env.OPENAI_BASE_URL;
+    delete process.env.OPENAI_API_BASE;
+    delete process.env.FORGE_API_URL;
+    delete process.env.FORGE_API_KEY;
     process.env.OPENAI_API_KEY = "sk-openai-only";
     expect(resolveForgeApiUrl()).toBe("https://api.openai.com");
     expect(resolveLlmChatModel()).toBe("gpt-4o-mini");
@@ -85,7 +91,7 @@ describe("openAiConfig", () => {
 
   it("selects gemini model for Manus Forge host", () => {
     process.env.BUILT_IN_FORGE_API_URL = "https://forge.manus.ai";
-    expect(resolveLlmChatModel()).toBe("gemini-2.5-flash");
+    expect(resolveLlmChatModel()).toBe("gemini-3-flash-preview");
   });
 
   it("uses OPENAI_API_KEY for speech synthesis when Forge is Manus", () => {

@@ -5,6 +5,8 @@ import {
   isOpenAiBackend,
   resolveLlmChatCompletionsUrl,
   resolveLlmChatModel,
+  resolveForgeApiKey,
+  resolveForgeApiUrl,
 } from "../lib/openAiConfig";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
@@ -66,6 +68,11 @@ export type InvokeParams = {
   messages: Message[];
   /** Override default model (gpt-4o-mini on OpenAI, gemini-2.5-flash on Forge). */
   model?: string;
+  /**
+   * Select the non-interactive Forge chat API for an immediate response, or the
+   * Manus task API only where an agent task is intentionally required.
+   */
+  transport?: "auto" | "forge" | "manus_task";
   tools?: Tool[];
   toolChoice?: ToolChoice;
   tool_choice?: ToolChoice;
@@ -343,9 +350,24 @@ export function extractAssistantText(result: InvokeResult): string {
 }
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  if (ENV.manusApiKey) {
+  const forgeConfigured = Boolean(resolveForgeApiKey() && resolveForgeApiUrl());
+  const requestedTransport = params.transport ?? "auto";
+
+  if (requestedTransport === "manus_task") {
+    if (!ENV.manusApiKey) {
+      throw new Error("MANUS_API_KEY is not configured for the requested Manus task transport");
+    }
     return invokeManusApi(params);
   }
+
+  if (requestedTransport === "forge" && !forgeConfigured) {
+    throw new Error("Forge chat is not configured. Set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY in Railway Variables.");
+  }
+
+  if (requestedTransport === "auto" && ENV.manusApiKey && !forgeConfigured) {
+    return invokeManusApi(params);
+  }
+
   assertApiKey();
 
   const {
@@ -382,10 +404,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (isOpenAiBackend()) {
     payload.max_tokens = max_tokens ?? maxTokens ?? 16384;
   } else {
-    payload.max_tokens = max_tokens ?? maxTokens ?? 32768;
-    payload.thinking = {
-      budget_tokens: 128,
-    };
+    payload.max_tokens = max_tokens ?? maxTokens ?? 16384;
   }
 
   const normalizedResponseFormat = normalizeResponseFormat({
