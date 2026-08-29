@@ -38,6 +38,7 @@ import {
 import {
   assertStandaloneQuizLearnerAccess,
 } from "../lib/embeddedQuizCourseAccess";
+import { loadMyQuizResultsSummary } from "../lib/quizResultsSummary";
 import {
   buildStandaloneQuizWidgetEmbed,
   createStandaloneQuizWidgetToken,
@@ -696,22 +697,39 @@ export const standaloneQuizLearnerRouter = router({
       return [];
     }),
 
+  /** Summary for My Quiz Results visibility + split analytics (native quiz vs mock exam) */
+  getMyQuizResultsSummary: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    return loadMyQuizResultsSummary(db, ctx.user.id);
+  }),
+
   /** Get all completed attempts for this user (for My Quizzes history tab) */
   getMyAttempts: protectedProcedure
-    .query(async ({ ctx }) => {
+    .input(
+      z
+        .object({
+          quizType: z.enum(["quiz", "mock_exam"]).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const conditions = [
+        eq(standaloneQuizAttempts.userId, ctx.user.id),
+        isNotNull(standaloneQuizAttempts.completedAt),
+      ];
+      if (input?.quizType) conditions.push(eq(standaloneQuizzes.type, input.quizType));
       const rows = await db
         .select({
           attempt: standaloneQuizAttempts,
           quizTitle: standaloneQuizzes.title,
+          quizType: standaloneQuizzes.type,
         })
         .from(standaloneQuizAttempts)
         .innerJoin(standaloneQuizzes, eq(standaloneQuizAttempts.quizId, standaloneQuizzes.id))
-        .where(and(
-          eq(standaloneQuizAttempts.userId, ctx.user.id),
-          isNotNull(standaloneQuizAttempts.completedAt),
-        ))
+        .where(and(...conditions))
         .orderBy(desc(standaloneQuizAttempts.completedAt))
         .limit(100);
       return rows;

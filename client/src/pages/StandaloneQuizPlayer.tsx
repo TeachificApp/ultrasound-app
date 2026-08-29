@@ -20,6 +20,12 @@ import {
   FeedbackPopup,
   getFeedbackMessage,
 } from "@/components/quiz/BuilderQuizPlayer";
+import {
+  QuizReadAloudSettings,
+  DEFAULT_QUIZ_TTS_VOICE,
+} from "@/components/quiz/QuizReadAloudSettings";
+import { useQuizReadAloud } from "@/hooks/useQuizReadAloud";
+import type { QuizTtsVoiceId } from "@shared/quizVoiceOptions";
 
 export function getStandaloneSelectedOptionFeedback(
   type: string,
@@ -130,6 +136,11 @@ export default function StandaloneQuizPlayer() {
   const [feedbackPopup, setFeedbackPopup] = useState<{ type: "correct" | "incorrect" | "partial"; message: string } | null>(null);
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<number, boolean>>({});
   const [showMockExamReview, setShowMockExamReview] = useState(false);
+  const [readAloudEnabled, setReadAloudEnabled] = useState(false);
+  const [readAloudVoice, setReadAloudVoice] = useState<QuizTtsVoiceId>(DEFAULT_QUIZ_TTS_VOICE);
+
+  const isNativeQuizType = (quizData?.type ?? quizInfo?.type) !== "mock_exam";
+  const readAloud = useQuizReadAloud(readAloudEnabled && phase === "started" && isNativeQuizType, readAloudVoice);
 
   const builderMeta = (quizInfo as any)?.builderConfig ?? quizData?.builderMeta ?? null;
   const branding = builderMeta?.branding ?? null;
@@ -156,6 +167,40 @@ export default function StandaloneQuizPlayer() {
       setFeedbackPopup(null);
     }
   }, [currentIdx, currentQuestion?.questionBankId, isBuilderMode, quizData?.type, answers, revealed]);
+
+  useEffect(() => {
+    if (phase !== "started" || !readAloudEnabled || !isNativeQuizType || !currentQuestion) return;
+    let options: string[] = [];
+    try {
+      const parsed = JSON.parse(currentQuestion.options ?? "[]") as Array<string | { text: string }>;
+      options = parsed.map((o) => (typeof o === "string" ? o : o.text));
+    } catch {
+      /* ignore */
+    }
+    void readAloud.speakQuestionBundle(currentQuestion.question ?? "", options);
+    return () => {
+      readAloud.stop();
+    };
+  }, [phase, readAloudEnabled, isNativeQuizType, currentIdx, currentQuestion?.questionBankId]);
+
+  useEffect(() => {
+    if (!readAloudEnabled || !isNativeQuizType || !currentQuestion || phase !== "started") return;
+    if (!revealed[currentQuestion.questionBankId]) return;
+    let options: Array<{ text: string; feedback?: string }> = [];
+    try {
+      options = JSON.parse(currentQuestion.options ?? "[]");
+    } catch {
+      /* ignore */
+    }
+    const givenAnswer = answers[currentQuestion.questionBankId];
+    const feedback =
+      getStandaloneSelectedOptionFeedback(currentQuestion.type, options, givenAnswer, currentQuestion.explanation)
+      || currentQuestion.explanation
+      || feedbackPopup?.message;
+    if (feedback?.trim()) {
+      void readAloud.speak(feedback);
+    }
+  }, [revealed[currentQuestion?.questionBankId ?? 0], feedbackPopup?.message]);
 
   function handleStart() {
     startMutation.mutate(
@@ -266,6 +311,17 @@ export default function StandaloneQuizPlayer() {
   }
 
   // ── Intro screen ──
+  const readAloudSettingsEl =
+    (quizInfo.type !== "mock_exam") ? (
+      <QuizReadAloudSettings
+        enabled={readAloudEnabled}
+        voice={readAloudVoice}
+        onEnabledChange={setReadAloudEnabled}
+        onVoiceChange={setReadAloudVoice}
+        compact={!!builderMeta}
+      />
+    ) : null;
+
   if (phase === "idle") {
     if (builderMeta) {
       return (
@@ -281,6 +337,7 @@ export default function StandaloneQuizPlayer() {
           onStart={handleStart}
           disabled={!quizInfo.canAttempt}
           loading={startMutation.isPending}
+          readAloudFooter={readAloudSettingsEl}
         />
         </>
       );
@@ -317,10 +374,11 @@ export default function StandaloneQuizPlayer() {
               <p className="text-red-600 font-medium">You have reached the maximum number of attempts.</p>
             )}
           </div>
+          {readAloudSettingsEl}
           <Button
             onClick={handleStart}
             disabled={!quizInfo.canAttempt || startMutation.isPending}
-            className="w-full bg-teal-600 hover:bg-teal-700 h-12 text-base"
+            className="w-full bg-teal-600 hover:bg-teal-700 h-12 text-base mt-6"
           >
             {startMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
             {quizInfo.canAttempt ? "Start Quiz" : "No Attempts Remaining"}
