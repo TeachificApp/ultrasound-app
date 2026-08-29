@@ -59,4 +59,10 @@ describe("embedded Quiz Creator access", () => {
   it("allows an administrator to preview embedded quiz content without an enrollment", async () => {
     await expect(assertEmbeddedQuizAccess(mockDatabase([]), { id: 1, role: "admin" }, 30001)).resolves.toBeUndefined();
   });
+
+  it("allows platform staff to preview embedded quiz content without an enrollment", async () => {
+    await expect(
+      assertEmbeddedQuizAccess(mockDatabase([]), { id: 1, role: "user" }, 30001, ["platform_admin"]),
+    ).resolves.toBeUndefined();
+  });
 });

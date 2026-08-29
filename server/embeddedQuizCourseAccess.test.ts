@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   assertCoursePlayerQuizAccess,
   assertEmbeddedQuizAccess,
+  assertStandaloneQuizLearnerAccess,
 } from "./lib/embeddedQuizCourseAccess";
 
 function mockEnrollmentDatabase(
@@ -67,6 +68,12 @@ describe("embedded quiz course player access", () => {
     await expect(assertEmbeddedQuizAccess(mockEnrollmentDatabase([]), { id: 1, role: "admin" }, 30001)).resolves.toBeUndefined();
   });
 
+  it("allows platform staff to preview embedded quiz content without an enrollment", async () => {
+    await expect(
+      assertEmbeddedQuizAccess(mockEnrollmentDatabase([]), { id: 1, role: "user" }, 30001, ["platform_admin"]),
+    ).resolves.toBeUndefined();
+  });
+
   it("allows course-player access when the learner is enrolled in the parent course", async () => {
     const db = {
       select: vi.fn()
@@ -104,5 +111,17 @@ describe("embedded quiz course player access", () => {
     };
 
     await expect(assertCoursePlayerQuizAccess(db, 7, "rphs-test-learn", 30001)).resolves.toBeUndefined();
+  });
+
+  it("allows quiz staff to open standalone quizzes without enrollment or preview flag", async () => {
+    await expect(
+      assertStandaloneQuizLearnerAccess(
+        mockEnrollmentDatabase([]),
+        { id: 1, role: "user" },
+        30001,
+        { adminPreview: false, isStaff: true },
+        async () => false,
+      ),
+    ).resolves.toBeUndefined();
   });
 });

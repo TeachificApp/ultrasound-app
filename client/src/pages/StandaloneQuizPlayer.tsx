@@ -111,11 +111,10 @@ export default function StandaloneQuizPlayer() {
     user?.role === "admin" ||
     appRoles.includes("platform_admin") ||
     appRoles.includes("platform_owner");
-  const urlAdminPreview = new URLSearchParams(window.location.search).get("adminPreview") === "1";
-  const isAdminPreview = isQuizStaff && (user?.role === "admin" || urlAdminPreview);
+  const isAdminPreview = isQuizStaff;
   const widgetToken = new URLSearchParams(window.location.search).get("widget") ?? undefined;
 
-  const { data: quizInfo, isLoading: infoLoading } = trpc.standaloneQuizLearner.getQuizInfo.useQuery(
+  const { data: quizInfo, isLoading: infoLoading, error: infoError } = trpc.standaloneQuizLearner.getQuizInfo.useQuery(
     { quizId: qId, adminPreview: isAdminPreview, widgetToken },
     { enabled: !!user && !isNaN(qId) }
   );
@@ -300,12 +299,17 @@ export default function StandaloneQuizPlayer() {
 
   if (infoLoading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>;
 
-  if (!quizInfo) {
+  if (infoError || !quizInfo) {
+    const forbidden = infoError?.data?.code === "FORBIDDEN";
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-4">
         <AlertTriangle className="w-12 h-12 text-yellow-500" />
-        <h2 className="text-xl font-bold">Quiz not found</h2>
-        <p className="text-gray-500">This quiz may not be published yet.</p>
+        <h2 className="text-xl font-bold">{forbidden ? "Quiz access required" : "Quiz not found"}</h2>
+        <p className="text-gray-500">
+          {infoError?.message ?? (forbidden
+            ? "This quiz is available through its assigned learning experience."
+            : "This quiz may not be published yet.")}
+        </p>
       </div>
     );
   }

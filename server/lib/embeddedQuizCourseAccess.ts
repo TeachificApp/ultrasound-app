@@ -19,8 +19,9 @@ export async function assertEmbeddedQuizAccess(
   db: any,
   user: { id: number; role: string },
   quizId: number,
+  appRoles: string[] = [],
 ) {
-  if (isStandaloneQuizStaff(user.role)) return;
+  if (isStandaloneQuizStaff(user.role, appRoles)) return;
 
   const [directAssignment] = await db
     .select({ lessonId: lmsLessons.id })
@@ -116,7 +117,7 @@ export async function assertStandaloneQuizLearnerAccess(
   opts: { adminPreview: boolean; isStaff: boolean; widgetToken?: string; courseSlug?: string },
   hasActiveWidgetLaunch: (db: any, rawToken: string | undefined, quizId: number) => Promise<boolean>,
 ) {
-  if (opts.adminPreview && opts.isStaff) return;
+  if (opts.isStaff) return;
   if (await hasActiveWidgetLaunch(db, opts.widgetToken, quizId)) return;
   if (opts.courseSlug) {
     await assertCoursePlayerQuizAccess(db, user.id, opts.courseSlug, quizId);
