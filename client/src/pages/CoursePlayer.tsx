@@ -2307,7 +2307,7 @@ export default function CoursePlayer() {
             <button
               className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors"
               style={{ color: primaryColor }}
-              onClick={() => { setMobileSidebarOpen(false); navigate("/dashboard"); }}
+              onClick={() => { setMobileSidebarOpen(false); navigate("/my-dashboard"); }}
             >
               <ChevronLeft className="w-3 h-3" /> My Dashboard
             </button>
@@ -2355,7 +2355,7 @@ export default function CoursePlayer() {
             <button
               className="text-[10px] font-medium flex items-center gap-1 mb-1 transition-colors"
               style={{ color: primaryColor }}
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/my-dashboard")}
             >
               <ChevronLeft className="w-3 h-3" /> My Dashboard
             </button>

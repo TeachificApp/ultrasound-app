@@ -20,7 +20,7 @@ export function bundleAccessHref(): string {
 }
 
 export function productAccessHref(): string {
-  return "/dashboard";
+  return "/my-dashboard";
 }
 
 export function premiumResumeHref(brand: "aaus" | "iheartecho"): string {

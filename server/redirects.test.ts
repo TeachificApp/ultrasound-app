@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { normalizeLegacyStudentDashboardLocation } from "../shared/studentDashboardUrls";
 
 // ─── Redirect logic extracted for unit testing ────────────────────────────────
 // Mirrors the logic in server/_core/index.ts without spinning up a full server.
@@ -30,6 +31,11 @@ function buildLegacyRedirectTarget(pathname: string, qs: string): string | null 
   // /products/:slug → /product/:slug
   const productsMatch = pathname.match(/^\/products\/([^/]+)$/);
   if (productsMatch) return `/product/${productsMatch[1]}${qs}`;
+
+  // /dashboard → /my-dashboard
+  if (/^\/dashboard(?:\/.*)?$/.test(pathname)) {
+    return normalizeLegacyStudentDashboardLocation(pathname, qs) ?? `/my-dashboard${qs}`;
+  }
 
   return null;
 }
@@ -104,8 +110,14 @@ describe("Legacy URL 301 redirects", () => {
       expect(buildLegacyRedirectTarget("/product/sono-guide", "")).toBeNull();
     });
 
-    it("returns null for /dashboard", () => {
-      expect(buildLegacyRedirectTarget("/dashboard", "")).toBeNull();
+    it("redirects /dashboard to /my-dashboard", () => {
+      expect(buildLegacyRedirectTarget("/dashboard", "")).toBe("/my-dashboard?tab=content");
+    });
+
+    it("redirects /dashboard/subscriptions with tab param", () => {
+      expect(buildLegacyRedirectTarget("/dashboard/subscriptions", "")).toBe(
+        "/my-dashboard?tab=subscriptions",
+      );
     });
 
     it("returns null for /api/trpc/...", () => {
