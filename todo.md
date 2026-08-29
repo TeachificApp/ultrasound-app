@@ -164,8 +164,10 @@
 - [ ] Trace and repair the Railway editor-upload upstream 502 failure after the R2 credential update, then verify a live Platform Admin upload.
 - [x] Repair the lesson editor AI content generator so it completes server-side without requiring a Manus task confirmation from the author.
 - [x] Prefer the Railway-configured Forge chat API for interactive lesson content generation when both Forge and Manus task credentials are present.
-- [ ] Verify a live Railway lesson-editor generation completes through Forge AI without a Manus task confirmation.
+- [ ] Verify a live Railway lesson-editor generation completes through the configured server-side AI transport without a user confirmation. Supersedes the unavailable Forge-only verification.
 - [ ] Ensure the Railway production application service exposes both required Forge variables so the direct lesson generator can authenticate.
+- [x] Trace and repair the current live Railway Forge generation error with a safe author-facing failure response and targeted regression coverage. Resolved by selecting the configured Manus API fallback when Forge credentials are absent.
+- [x] Route interactive AI generation through the configured Railway Manus API key without creating confirmation-prone or open-ended tasks.
 - [x] Accept the existing Railway VITE Forge configuration as a server-side compatibility fallback only when server-only Forge variables are absent.
 - [x] Inventory every AI generation workflow and its current model transport, authorization gate, input limits, output handling, and failure path.
 - [x] Move each compatible interactive AI generation workflow to the Railway-configured Forge chat or image-generation path and add focused regressions.

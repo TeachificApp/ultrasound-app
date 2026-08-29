@@ -680,8 +680,9 @@ export const lmsRouter = router({
       };
       const instruction = formatInstructions[input.format];
       const response = await invokeLLM({
-        transport: "forge",
-        model: "gemini-3-flash-preview",
+        // Prefer Forge when it is configured, but use the Railway-held Manus API
+        // key through the constrained non-interactive fallback when it is not.
+        transport: "auto",
         maxTokens: 4000,
         messages: [
           {

@@ -1,12 +1,33 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("Railway Manus API client", () => {
   const savedKey = process.env.MANUS_API_KEY;
+  const forgeEnvKeys = [
+    "BUILT_IN_FORGE_API_URL",
+    "BUILT_IN_FORGE_API_KEY",
+    "FORGE_API_URL",
+    "FORGE_API_KEY",
+    "VITE_FRONTEND_FORGE_API_URL",
+    "VITE_FRONTEND_FORGE_API_KEY",
+    "OPENAI_BASE_URL",
+    "OPENAI_API_BASE",
+    "OPENAI_API_KEY",
+  ] as const;
+  const savedForgeEnv = Object.fromEntries(forgeEnvKeys.map((key) => [key, process.env[key]]));
   const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    for (const key of forgeEnvKeys) delete process.env[key];
+  });
 
   afterEach(() => {
     if (savedKey === undefined) delete process.env.MANUS_API_KEY;
     else process.env.MANUS_API_KEY = savedKey;
+    for (const key of forgeEnvKeys) {
+      const value = savedForgeEnv[key];
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
     global.fetch = originalFetch;
     vi.resetModules();
   });
@@ -35,6 +56,11 @@ describe("Railway Manus API client", () => {
     expect(result.model).toBe("manus-api-v2");
     expect(result.choices[0].message.content).toBe("answer");
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.manus.ai/v2/task.create");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual(expect.objectContaining({
+      interactive_mode: false,
+      agent_profile: "manus-1.6-lite",
+      message: expect.objectContaining({ connectors: [], enable_skills: [] }),
+    }));
   });
 
   it("passes PDF sources to the Manus task as file attachments instead of URL-only prompt text", async () => {

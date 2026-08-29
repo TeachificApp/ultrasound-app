@@ -28,6 +28,8 @@ The LMS router contained a generator for synthetic customer testimonials and rat
 
 Forge chat is now the automatic shared preference whenever valid Railway Forge credentials are present, including where a legacy Manus task credential is also available. The AI connection check reports that same preferred transport. Text and image helper errors now provide a safe retry message to authors while logging only an HTTP status server-side.
 
+The live Railway service currently has a Manus API key but no Forge chat credential pair. The lesson editor therefore uses automatic transport rather than forcing Forge: it prefers Forge when a matching URL/key pair is subsequently configured and otherwise creates a constrained Manus API task. The fallback is private, non-interactive, uses the lightweight agent profile, and supplies no inherited connectors or skills, avoiding unnecessary tool access and confirmation requests for the bounded authoring prompt.
+
 The synthetic testimonial endpoint and its Landing Page Builder controls are removed. AI product and digital-download landing-page prompts no longer create review blocks, new funnel templates no longer add a testimonial block by default, and newly added review fields start blank for administrators to enter genuine content. Focused Forge, structured-generation, and funnel regressions pass (143 tests); affected client and server bundles compile successfully.
 
 ## Read-aloud finding

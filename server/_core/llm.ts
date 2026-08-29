@@ -66,7 +66,7 @@ export type ToolChoice =
 
 export type InvokeParams = {
   messages: Message[];
-  /** Override default model (gpt-4o-mini on OpenAI, gemini-2.5-flash on Forge). */
+  /** Override default model when the selected direct chat backend supports it. */
   model?: string;
   /**
    * Select the non-interactive Forge chat API for an immediate response, or the

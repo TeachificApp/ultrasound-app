@@ -81,10 +81,17 @@ export async function createManusTask(input: {
   content?: string | ManusTaskContentPart[];
 }): Promise<Required<Pick<ManusTaskCreateResponse, "task_id">> & ManusTaskCreateResponse> {
   const payload = {
-    message: { content: input.content ?? input.prompt },
+    message: {
+      content: input.content ?? input.prompt,
+      // Interactive authoring jobs must not inherit account connectors or skills
+      // that could make an otherwise text-only request wait for user input.
+      connectors: [],
+      enable_skills: [],
+    },
     title: input.title,
     locale: "en",
     interactive_mode: false,
+    agent_profile: "manus-1.6-lite",
     share_visibility: "private",
     ...(input.structuredOutputSchema ? { structured_output_schema: input.structuredOutputSchema } : {}),
   };
