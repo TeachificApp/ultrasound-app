@@ -15,6 +15,7 @@ function cacheKey(text: string, voice: QuizTtsVoiceId) {
 
 export function useQuizReadAloud(enabled: boolean, voice: QuizTtsVoiceId) {
   const synth = trpc.quizVoice.synthesize.useMutation();
+  const { data: availability } = trpc.quizVoice.getAvailability.useQuery(undefined, { enabled });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [speaking, setSpeaking] = useState(false);
 
@@ -65,9 +66,11 @@ export function useQuizReadAloud(enabled: boolean, voice: QuizTtsVoiceId) {
           void audio.play().catch(reject);
         });
       } catch (error) {
-        if (shouldUseBrowserSpeechFallback(error)) {
+        const allowBrowserFallback =
+          availability?.configured === false && shouldUseBrowserSpeechFallback(error);
+        if (allowBrowserFallback) {
           try {
-            await speakWithBrowser(text);
+            await speakWithBrowser(text, voice);
             setSpeaking(false);
             return;
           } catch {
@@ -77,7 +80,7 @@ export function useQuizReadAloud(enabled: boolean, voice: QuizTtsVoiceId) {
         setSpeaking(false);
       }
     },
-    [enabled, voice, stop, synth],
+    [enabled, voice, stop, synth, availability?.configured],
   );
 
   const speakQuestionBundle = useCallback(

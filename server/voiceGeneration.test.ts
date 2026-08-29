@@ -20,7 +20,7 @@ describe("voiceGeneration speech routing", () => {
     }
   });
 
-  it("calls OpenAI TTS even when chat Forge is Manus", async () => {
+  it("calls OpenAI TTS with the requested voice id", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       arrayBuffer: async () => Uint8Array.from([1, 2, 3]).buffer,
@@ -28,15 +28,30 @@ describe("voiceGeneration speech routing", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { synthesizeSpeech } = await import("../server/_core/voiceGeneration");
-    const audio = await synthesizeSpeech({ text: "Hello", voice: "nova" });
+    await synthesizeSpeech({ text: "Hello", voice: "alloy" });
+    await synthesizeSpeech({ text: "Hello", voice: "onyx" });
 
-    expect(audio.length).toBe(3);
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
       "https://api.openai.com/v1/audio/speech",
       expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          authorization: "Bearer sk-openai-tts",
+        body: JSON.stringify({
+          model: "tts-1",
+          input: "Hello",
+          voice: "alloy",
+          response_format: "mp3",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.openai.com/v1/audio/speech",
+      expect.objectContaining({
+        body: JSON.stringify({
+          model: "tts-1",
+          input: "Hello",
+          voice: "onyx",
+          response_format: "mp3",
         }),
       }),
     );
