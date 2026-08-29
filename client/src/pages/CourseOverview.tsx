@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { STUDENT_DASHBOARD_PATH, resolveStudentDashboardHref } from "@shared/studentDashboardUrls";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
@@ -196,7 +197,7 @@ export default function CourseOverview() {
             ))}
             <div className="prose max-w-none text-slate-700" dangerouslySetInnerHTML={{ __html: welcome.body || "<p>You’ll be granted access once the course is open.</p>" }} />
             {welcome.ctaLabel && welcome.ctaUrl && (
-              <a className="inline-flex min-h-11 items-center rounded-md bg-[#189aa1] px-5 py-3 font-semibold text-white transition-colors hover:bg-[#147c82]" href={welcome.ctaUrl}>
+              <a className="inline-flex min-h-11 items-center rounded-md bg-[#189aa1] px-5 py-3 font-semibold text-white transition-colors hover:bg-[#147c82]" href={resolveStudentDashboardHref(welcome.ctaUrl)}>
                 {welcome.ctaLabel}
               </a>
             )}
@@ -394,6 +395,14 @@ export default function CourseOverview() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1 text-gray-600 hidden sm:flex"
+              onClick={() => navigate(STUDENT_DASHBOARD_PATH)}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> My Dashboard
+            </Button>
             {effectiveIsAdmin && (
               <Button
                 size="sm"
