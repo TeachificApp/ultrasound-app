@@ -1682,6 +1682,43 @@ export default function CoursePlayer() {
     return () => clearTimeout(timer);
   }, [_isFreePreviewEnrollmentForEffect, _isEnrolledForEffect]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Hooks must run before any conditional return (React error #310).
+  const contentBlocks: Block[] = useMemo(() => {
+    try { return lessonData?.contentBlocks ? JSON.parse(lessonData.contentBlocks) : []; }
+    catch { return []; }
+  }, [lessonData?.contentBlocks]);
+  const lessonMediaRepoScormSrc = useMemo(() => {
+    if (!lessonData) return null;
+    const linked = (lessonData as {
+      linkedMediaAsset?: { slug: string; mediaType: string | null; fileName: string | null } | null;
+    }).linkedMediaAsset ?? null;
+    return resolveLessonMediaScormUrl(
+      {
+        type: lessonData.type,
+        embedUrl: lessonData.embedUrl,
+        content: lessonData.content,
+      },
+      linked,
+    );
+  }, [lessonData]);
+  const hasScormContentBlock = useMemo(() => contentBlocks.some((block) => {
+    if (block.type === "scorm_embed") return true;
+    if (block.type === "file_download") {
+      const d = block.data as Record<string, unknown>;
+      const mediaType = (d.mediaAssetMediaType ?? d.mediaType ?? "") as string;
+      const fileName = (d.fileName ?? d.mediaAssetTitle ?? "") as string;
+      const slug = (d.mediaAssetSlug ?? "") as string;
+      return !!slug && isInteractiveMediaPackage(mediaType, fileName);
+    }
+    return false;
+  }), [contentBlocks]);
+  const showLessonLevelScorm = !!lessonMediaRepoScormSrc && !hasScormContentBlock;
+  const lessonExternalEmbedUrl = useMemo(() => {
+    if (!lessonData?.embedUrl || lessonMediaRepoScormSrc) return null;
+    const isMediaRepo = lessonData.embedUrl.includes("/api/media/") || lessonData.embedUrl.includes("/media/");
+    return isMediaRepo ? null : lessonData.embedUrl;
+  }, [lessonData, lessonMediaRepoScormSrc]);
+
   const handleMarkComplete = async () => {
     if (!selectedLessonId) return;
     // Optimistically mark as complete immediately so checkmarks appear in both sidebars
@@ -1972,45 +2009,6 @@ export default function CoursePlayer() {
   const isAdminPreviewMode = (data?.isAdminPreview ?? false) || adminPreviewStudent;
   const canMarkComplete = !requireVideoCompletion || videoWatched || isAdminPreviewMode;
 
-  // Parse content blocks and learning objectives from lesson data
-  const contentBlocks: Block[] = (() => {
-    try { return lessonData?.contentBlocks ? JSON.parse(lessonData.contentBlocks) : []; }
-    catch { return []; }
-  })();
-  const lessonMediaRepoScormSrc = useMemo(() => {
-    if (!lessonData) return null;
-    const linked = (lessonData as {
-      linkedMediaAsset?: { slug: string; mediaType: string | null; fileName: string | null } | null;
-      type?: string | null;
-      embedUrl?: string | null;
-      content?: string | null;
-    }).linkedMediaAsset ?? null;
-    return resolveLessonMediaScormUrl(
-      {
-        type: lessonData.type,
-        embedUrl: lessonData.embedUrl,
-        content: lessonData.content,
-      },
-      linked,
-    );
-  }, [lessonData]);
-  const hasScormContentBlock = contentBlocks.some((block) => {
-    if (block.type === "scorm_embed") return true;
-    if (block.type === "file_download") {
-      const d = block.data as Record<string, unknown>;
-      const mediaType = (d.mediaAssetMediaType ?? d.mediaType ?? "") as string;
-      const fileName = (d.fileName ?? d.mediaAssetTitle ?? "") as string;
-      const slug = (d.mediaAssetSlug ?? "") as string;
-      return !!slug && isInteractiveMediaPackage(mediaType, fileName);
-    }
-    return false;
-  });
-  const showLessonLevelScorm = !!lessonMediaRepoScormSrc && !hasScormContentBlock;
-  const lessonExternalEmbedUrl = useMemo(() => {
-    if (!lessonData?.embedUrl || lessonMediaRepoScormSrc) return null;
-    const isMediaRepo = lessonData.embedUrl.includes("/api/media/") || lessonData.embedUrl.includes("/media/");
-    return isMediaRepo ? null : lessonData.embedUrl;
-  }, [lessonData, lessonMediaRepoScormSrc]);
   const hasInlineLessonQuiz = contentBlocks.some((block) => block.type === "lesson_quiz");
   const hasSdmsCmeModule = contentBlocks.some((block) => block.type === "sdms_cme_module");
   const isCmeCourse = isCertificateCourse(data?.course);
