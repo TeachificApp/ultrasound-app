@@ -398,6 +398,51 @@ export async function storagePut(
   return forgePut(relKey, data, contentType);
 }
 
+export type StorageHealthStatus = {
+  backend: "r2" | "forge" | "unavailable";
+  r2Configured: boolean;
+  forgeConfigured: boolean;
+  r2Write: "not_checked" | "healthy" | "access_denied" | "failed";
+};
+
+/**
+ * Performs a minimal write/delete permission probe for administrators.
+ * It returns no credentials, bucket names, object keys, URLs, or provider error text.
+ */
+export async function getStorageHealth(): Promise<StorageHealthStatus> {
+  const r2Configured = Boolean(getR2Client() && process.env.CF_R2_PUBLIC_URL);
+  const forgeConfigured = hasForgeCredentials();
+  let backend: StorageHealthStatus["backend"] = "unavailable";
+
+  try {
+    backend = resolveStorageBackend();
+  } catch {
+    return { backend, r2Configured, forgeConfigured, r2Write: "not_checked" };
+  }
+
+  if (backend !== "r2" || !r2Configured) {
+    return { backend, r2Configured, forgeConfigured, r2Write: "not_checked" };
+  }
+
+  const probeKey = `diagnostics/storage-health-${randomBytes(16).toString("hex")}.txt`;
+  try {
+    await r2Put(probeKey, "health check", "text/plain");
+    try {
+      await r2Delete(probeKey);
+    } catch {
+      // A successful write establishes upload readiness; never reveal delete-provider details.
+    }
+    return { backend, r2Configured, forgeConfigured, r2Write: "healthy" };
+  } catch (error) {
+    return {
+      backend,
+      r2Configured,
+      forgeConfigured,
+      r2Write: isStorageAccessDeniedError(error) ? "access_denied" : "failed",
+    };
+  }
+}
+
 export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
   const key = normalizeKey(relKey);
 

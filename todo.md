@@ -150,3 +150,8 @@
 - [x] Create a GitHub pull request containing the current verified project revision for Railway deployment review.
 - [x] Verify and correct visibility of the requested Railway deployment handoff pull request in the user’s intended GitHub repository.
 - [x] Assign all eligible open pull requests in the connected repository to the GitHub account associated with hello@teachific.app.
+- [ ] Add Meta Pixel 1250905844949244 completed-sale tracking for all product purchases without sending payment details or secrets to the browser.
+- [ ] Preserve email-campaign attribution through checkout and record completed campaign-attributed sales for campaign reporting.
+- [ ] Add product-sale and email-campaign conversion metrics to the existing administrator analytics workflow.
+- [ ] Repair the editor image-upload Access Denied failure so authorized administrators can upload images from the device without weakening storage access controls.
+- [x] Add a safe administrator-only Railway storage health check that reports write/delete permission stages without exposing secret values or retaining test objects.

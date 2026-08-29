@@ -4,6 +4,7 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from "./t
 import { ENV } from "./env";
 import { verifyManusApiConnection } from "../lib/manusApiClient";
 import { verifyAiConnection } from "../lib/aiConnection";
+import { getStorageHealth } from "../storage";
 
 export const systemRouter = router({
   health: publicProcedure
@@ -55,6 +56,9 @@ export const systemRouter = router({
       };
     }
   }),
+
+  /** Reports only storage readiness stages; no values, object paths, URLs, or credentials are returned. */
+  checkStorageHealth: adminProcedure.mutation(async () => getStorageHealth()),
 
   /**
    * requestAccess — called by authenticated users who land on the Access Required page.

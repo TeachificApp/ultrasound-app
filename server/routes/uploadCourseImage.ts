@@ -11,7 +11,7 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import { randomBytes } from "crypto";
-import { storagePut } from "../storage";
+import { getStorageHealth, storagePut } from "../storage";
 import { getDb } from "../db";
 import { mediaAssets, mediaVersions } from "../../drizzle/schema";
 import { authenticateContentUploader } from "../lib/contentUploadAuth";
@@ -87,7 +87,16 @@ router.post(
       res.json({ url, fileKey });
     } catch (err: any) {
       console.error("[upload-course-image]", err);
-      res.status(500).json({ error: err?.message ?? "Upload failed" });
+      const message = err?.message ?? "Upload failed";
+      if (/access denied|accessdenied|not authorized|forbidden/i.test(message)) {
+        const storage = await getStorageHealth().catch(() => null);
+        res.status(503).json({
+          error: "Image storage is temporarily unavailable. The deployment storage write permission must be restored.",
+          storage,
+        });
+        return;
+      }
+      res.status(500).json({ error: message });
     }
   }
 );
