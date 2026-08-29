@@ -85,6 +85,30 @@ The target application reads a defined environment contract for app identity, ca
 
 The read-only inventory is complete enough to prepare a target environment and an import dry run. It is **not** evidence that Railway data has been backed up or that the target has parity. The target configuration requirements are now defined; the next phase is to design the backup, reconciliation, dry-run import, validation, and rollback plan. No production domain or data transfer will occur.
 
+## Completed read-only reverse-sync baseline
+
+The prior Manus-to-Railway transfer provides an existing foundation for reverse synchronization. A fresh metadata-only comparison now confirms 355 base tables in Railway and 355 in the restored Manus environment, with 351 shared table names. Of those shared tables, 297 have equal exact row counts and 54 have count differences. The environment-specific tables are preserved as implementation details: Railway has four identity/authentication support tables, while Manus has four SSO, widget-launch, and webhook support tables. No table is to be dropped merely to make the counts equal.
+
+A second pass compared **hashed primary-key presence** in 20 high-priority identity, learning, assessment, commerce, and media tables. It retained neither raw identifiers nor application records. The result found 1,471 Railway-only keys and 185 Manus-only keys. The main source-side changes are newer user/access records, learner progress, Question Bank items, standalone quiz questions and attempts, commerce records, and a small number of media metadata records. Manus-only records remain in identity/access, learning, folders, commerce, and certificate families.
+
+| Reconciliation family | Read-only result | Controlled reverse-sync rule |
+| --- | --- | --- |
+| Users, roles, memberships, subscriptions | Both Railway-only and Manus-only stable keys exist. | Compare by stable key and business relationship; do not overwrite either side from count deltas alone. |
+| Courses and lessons | Course keys match; Manus includes a small number of target-only lesson/certificate records. | Preserve Manus-only records and assess each Railway change against its course and user parent. |
+| Questions and standalone quizzes | Railway has 350 source-only Question Bank records, 350 quiz-question records, 11 attempts, and 150 attempt-answer records. | Stage in parent-to-child order: folders/tags, questions, quizzes, quiz questions, attempts, then answers. |
+| Orders and purchases | Both environments have records absent from the other. | Reconcile on stable record and provider identifiers; never replay payment events or overwrite a conflict automatically. |
+| Media metadata | Railway has a small set of source-only asset/version records. | Require an R2 object manifest and target-object availability check before metadata is staged. |
+
+This baseline demonstrates that a controlled reverse sync is feasible but that a blind restore would lose the week of Railway activity or create conflicts. It is sufficient to formulate a test-import proposal after encrypted source backup evidence is available; it is not authorization to import records.
+
+## Read-only referential and media-capacity evidence
+
+The declared foreign-key review found three declared relationships in each environment and **zero orphaned relationships** in both. This is a limited integrity signal because most application relationships are managed by the application rather than declared database foreign keys. It supports, but does not replace, the stable-ID and parent-before-child staging checks required for any test import.
+
+The source R2 aggregate inventory completed without reading bytes, object URLs, or object names. It reports **9,467 objects** totaling **10,055,720,462 bytes** across 28 top-level prefixes. The main capacity groups are the media repository (114 objects; approximately 5.43 GB), extracted SCORM content (8,402 objects; approximately 3.05 GB), page-builder media (318 objects; approximately 545 MB), dedicated media assets (2 objects; approximately 433 MB), certificates (408 objects; approximately 195 MB), digital files (17 objects; approximately 140 MB), and LMS editor images (67 objects; approximately 109 MB). This is sufficient for target storage capacity planning.
+
+An **encrypted object-level manifest** and object-copy plan are still required before media metadata is imported. Object names, checksums, and references will be retained only in that encrypted migration artifact; they are not stored in this project documentation.
+
 ## References
 
 [1] [Manus Help Center — How to Back Up Your Data](https://help.manus.im/en/articles/16147892-service-change-overview-how-to-back-up-your-data)

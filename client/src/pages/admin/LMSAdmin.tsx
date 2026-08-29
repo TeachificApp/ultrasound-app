@@ -82,6 +82,7 @@ import { QuizQuestionGroups } from "@/components/QuizQuestionGroups";
 import { AiSourceFileReview } from "@/components/admin/AiSourceFileReview";
 import { QuizResultsAdmin } from "./QuizResultsAdmin";
 import { InteractiveQuestionEditorPanel, isInteractiveType } from "@/components/InteractiveQuestionEditorPanel";
+import { FocusRegenerationDialog } from "@/components/admin/FocusRegenerationDialog";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -1284,6 +1285,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
   const [quizLesson, setQuizLesson] = useState<any>(null);
   const [importMediaSection, setImportMediaSection] = useState<number | null>(null);
   const [editSectionDrip, setEditSectionDrip] = useState<{ id: number; title: string; dripDays: number } | null>(null);
+  const [courseFocusRegenerationOpen, setCourseFocusRegenerationOpen] = useState(false);
 
   const updateSection = trpc.lmsAdmin.updateSection.useMutation({
     onSuccess: (_data, vars) => { if (vars.dripDays !== undefined) { toast.success("Drip schedule saved"); setEditSectionDrip(null); } refetch(); },
@@ -1505,6 +1507,15 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
         <Badge className="text-xs bg-gray-100 text-gray-600 border border-gray-200 capitalize">{course.type}</Badge>
         <Badge className={`text-xs ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
         <Button
+          size="sm"
+          variant="outline"
+          className="h-8 text-xs text-teal-700 border-teal-300 hover:bg-teal-50"
+          onClick={() => setCourseFocusRegenerationOpen(true)}
+          title="Preview instructional content rewritten for a new clinical focus while preserving course structure"
+        >
+          <Sparkles className="w-3 h-3 mr-1" /> Regenerate Focus
+        </Button>
+        <Button
           size="sm" variant="outline"
           className="h-8 text-xs text-teal-600 border-teal-300"
           onClick={() => openLearnLink(`/courses/${course.slug}/player`)}
@@ -1517,6 +1528,13 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
           <Users className="w-3 h-3 mr-1" /> Preview as Student
         </Button>
       </div>
+
+      <FocusRegenerationDialog
+        open={courseFocusRegenerationOpen}
+        target={{ kind: "course", courseId, title: course.title }}
+        onOpenChange={setCourseFocusRegenerationOpen}
+        onApplied={refetch}
+      />
 
       {/* Unsaved CME form changes warning dialog */}
       <Dialog open={unsavedWarningOpen} onOpenChange={setUnsavedWarningOpen}>
@@ -4981,6 +4999,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [headerSaving, setHeaderSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+  const [lessonFocusRegenerationOpen, setLessonFocusRegenerationOpen] = useState(false);
 
   const handleCloseWithConfirm = () => {
     if (isDirty) {
@@ -5190,6 +5209,15 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             size="sm"
             variant="outline"
             className="border-teal-300 text-teal-700 hover:bg-teal-50 h-7 text-xs font-semibold"
+            onClick={() => setLessonFocusRegenerationOpen(true)}
+            title="Preview this lesson rewritten for a new clinical focus"
+          >
+            <Sparkles className="w-3 h-3 sm:mr-1" /><span className="hidden sm:inline">Regenerate Focus</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-teal-300 text-teal-700 hover:bg-teal-50 h-7 text-xs font-semibold"
             disabled={headerSaving || update.isPending}
             onClick={() => handleHeaderSave(false)}
           >
@@ -5258,6 +5286,13 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           </button>
         </div>
       </div>
+
+      <FocusRegenerationDialog
+        open={lessonFocusRegenerationOpen}
+        target={{ kind: "lesson", courseId: lesson.courseId, lessonId: lesson.id, title: lesson.title }}
+        onOpenChange={setLessonFocusRegenerationOpen}
+        onApplied={() => { onSaved(); }}
+      />
 
       {/* Tab Content */}
       <>

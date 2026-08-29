@@ -46,6 +46,12 @@ No target data import begins until schema parity is documented. The source code 
 
 The dry run produces reports only: a table mapping, row-count delta report, schema-diff report, identity-collision report, media-reference report, and a list of excluded data. It must not write to the Manus production database, send email, dispatch a job, or call a live payment provider.
 
+### Completed reverse-sync baseline
+
+The no-write comparison now confirms an established prior-transfer foundation rather than an empty target: both environments contain 355 base tables, 351 names overlap, 297 shared tables match by exact count, and 54 shared tables require mapping. A hashed stable-key comparison across 20 core business tables identifies Railway-only and Manus-only records without retaining raw identifiers. The test-import design must preserve existing Manus-only records, stage Railway-only records in parent-to-child order, and isolate same-key conflicts for review. Delivery logs, access logs, telemetry, raw authentication artifacts, payment-event replays, and email sends remain excluded.
+
+The no-write relationship check found no orphans in any of the three declared foreign-key relationships in either database. The source R2 bucket contains 9,467 objects totaling approximately 10.06 GB. The object-level manifest remains intentionally deferred until an encrypted backup destination is available; no object names or bytes were read by the capacity inventory.
+
 ## Phase C — Manus staging import and validation
 
 After the user reviews the dry run, import only the approved data into the isolated Manus test environment. The test may use a timestamp-bounded source export or an explicitly selected dataset. Never use the Manus staging environment to process live Stripe events or email campaigns.

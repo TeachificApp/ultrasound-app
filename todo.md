@@ -172,10 +172,24 @@
 - [ ] Configure a direct Railway model-completions endpoint and server-only key for synchronous authoring generation; do not use the Manus task API as the interactive fallback.
 - [ ] Verify the Railway OpenAI-compatible credential is available to the production service and route all synchronous authoring generation through that direct completion path.
 - [ ] Identify and repair the live direct AI provider rejection using the non-sensitive Railway HTTP status and compatible request parameters.
+- [ ] Validate the newly funded Railway OpenAI direct-completions integration through authorized lesson, question, flashcard, and image-generation workflows before any hosting move.
+- [x] Add a course-level AI regeneration workflow that preserves modules, lesson order, blocks, layout, and media placement while adapting instructional content to a new focus and objective.
+- [x] Require administrator review before applying generated course-content changes, preserving all original content until an explicit apply action.
+- [x] Add focused validation that a focus change rewrites only content fields and never changes course structure, lesson identities, access, completion, quiz attempts, enrollments, or pricing.
+- [x] Ensure course-level regeneration updates every lesson’s title, objectives, and instructional body content for the new focus while preserving blocks, layout, media placement, and learner records.
+- [x] Add a lesson-level focus-regeneration workflow with the same review-before-apply, content-only safeguards as the course-level workflow.
+- [ ] Validate the course and lesson focus-regeneration preview and explicit apply flow on Railway with an administrator before using it on active course content.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.
 - [ ] Prepare backup evidence and a no-write migration dry run for Railway data and storage references without changing the production source of truth.
+- [ ] Create an encrypted Railway MySQL source snapshot and R2 object manifest, then record checksums and timestamps outside source control.
+- [ ] Collect a read-only aggregate R2 object inventory by prefix, count, and size without retaining object names or bytes.
+- [x] Produce a no-write Railway-to-Manus schema and table-count reconciliation baseline using approved read-only source and target evidence. Identity and media-reference comparison remain pending encrypted backup evidence.
+- [x] Produce a read-only hashed stable-key reconciliation for 20 core identity, learning, assessment, commerce, and media tables without retaining raw identifiers or application row content.
+- [x] Confirm declared foreign-key relationships have zero orphan counts in the Railway source and Manus target without reading application row content.
+- [ ] Produce a read-only stable-ID and parent-child relationship reconciliation for users, roles, content, enrollments, purchases, quiz records, and media references before considering a Manus test import.
+- [ ] Reuse the prior Manus-to-Railway ID and dependency mappings to classify current Railway deltas for a controlled reverse-sync dry run.
 - [x] Define Manus test-environment configuration, parity validation, and DNS rollback requirements without repointing any production domain.
 - [x] Deliver the parallel Manus migration package for review before requesting any import, sync, or cutover approval.
 - [x] Verify that the uploaded Manus backup corresponds to the intended UltrasoundAssist project and define the no-write staging reconciliation steps, based on owner confirmation and current restored-project scope without reopening the one-time restoration.

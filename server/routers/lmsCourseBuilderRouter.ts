@@ -92,9 +92,107 @@ import {
 import { draftNotifyEntries, cmeActivityForms } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 import { parseScheduledTimestamp } from "../../shared/platformTime";
+import { applyEditableBlockText, collectEditableBlockText, stripCodeFences, type BlockTextField } from "../lib/lessonFocusRegeneration";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
+
+const focusRegenerationInput = z.object({
+  newFocus: z.string().trim().min(3).max(500),
+  objective: z.string().trim().min(3).max(1_500),
+});
+
+const blockTextFieldInput = z.object({
+  path: z.string().min(1).max(500),
+  value: z.string().trim().min(1).max(50_000),
+});
+
+const focusChangeInput = z.object({
+  lessonId: z.number().int().positive(),
+  title: z.string().trim().min(1).max(255),
+  learningObjectives: z.array(z.string().trim().min(1).max(1_000)).max(12),
+  content: z.string().max(100_000),
+  videoContent: z.string().max(100_000),
+  blockText: z.array(blockTextFieldInput).max(200),
+});
+
+type FocusChange = z.infer<typeof focusChangeInput>;
+
+const focusRegenerationResponseFormat = {
+  type: "json_schema" as const,
+  json_schema: {
+    name: "lesson_focus_regeneration",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        learningObjectives: { type: "array", items: { type: "string" } },
+        content: { type: "string" },
+        videoContent: { type: "string" },
+        blockText: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { path: { type: "string" }, value: { type: "string" } },
+            required: ["path", "value"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["title", "learningObjectives", "content", "videoContent", "blockText"],
+      additionalProperties: false,
+    },
+  },
+};
+
+function parseObjectives(value: string | null | undefined): string[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+async function generateFocusChange(input: {
+  lesson: typeof lmsLessons.$inferSelect;
+  courseTitle: string;
+  newFocus: string;
+  objective: string;
+}): Promise<FocusChange> {
+  const editableBlockText = collectEditableBlockText(input.lesson.contentBlocks);
+  const source = {
+    title: input.lesson.title,
+    learningObjectives: parseObjectives(input.lesson.learningObjectives),
+    content: input.lesson.content ?? "",
+    videoContent: input.lesson.videoContent ?? "",
+    editableBlockText,
+  };
+  const response = await invokeLLM({
+    transport: "auto",
+    maxTokens: 8_000,
+    response_format: focusRegenerationResponseFormat,
+    messages: [
+      {
+        role: "system",
+        content: "You are an expert medical ultrasound educator for All About Ultrasound and iHeartEcho. Rewrite only the instructional content of one lesson for a new clinical focus. Preserve the lesson's teaching depth, professional US English, and clinical accuracy. Return strict JSON only. Never invent patient cases, testimonials, study results, sources, citations, or learner records. Do not alter block IDs, types, layout, colors, URLs, media, buttons, quiz questions, answer choices, settings, or access rules. Rewrite only title, learning objectives, HTML instructional content, optional video-supporting instructional content, and the supplied editable block-text paths.",
+      },
+      {
+        role: "user",
+        content: `Course: ${input.courseTitle}\nNew clinical focus: ${input.newFocus}\nLearning objective for this rewrite: ${input.objective}\n\nCurrent editable lesson fields:\n${JSON.stringify(source)}\n\nReturn a clinically appropriate version of every supplied text field. Keep blockText paths exactly as supplied; return no additional paths. If content or videoContent is empty, return an empty string for that field.`,
+      },
+    ],
+  });
+  try {
+    const raw = response.choices?.[0]?.message?.content;
+    const parsed = typeof raw === "string" ? JSON.parse(stripCodeFences(raw)) : raw;
+    return focusChangeInput.parse({ lessonId: input.lesson.id, ...parsed });
+  } catch {
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned an invalid lesson regeneration preview. Please try again." });
+  }
+}
 
 export const lmsCourseBuilderRouter = router({
   // ── Lesson fetch for editor ──
@@ -107,6 +205,73 @@ export const lmsCourseBuilderRouter = router({
       const [lesson] = await db.select().from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
       return lesson;
+    }),
+  previewLessonFocusRegeneration: protectedProcedure
+    .input(focusRegenerationInput.extend({ lessonId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [lesson] = await db.select().from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+      const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, lesson.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+      const proposal = await generateFocusChange({ lesson, courseTitle: course.title, newFocus: input.newFocus, objective: input.objective });
+      return {
+        courseId: lesson.courseId,
+        lesson: { id: lesson.id, title: lesson.title, learningObjectives: parseObjectives(lesson.learningObjectives) },
+        proposal,
+      };
+    }),
+  previewCourseFocusRegeneration: protectedProcedure
+    .input(focusRegenerationInput.extend({ courseId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id, title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+      const lessons = await db.select().from(lmsLessons).where(eq(lmsLessons.courseId, input.courseId)).orderBy(asc(lmsLessons.position));
+      if (lessons.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "This course has no lessons to regenerate." });
+      if (lessons.length > 30) throw new TRPCError({ code: "BAD_REQUEST", message: "Preview up to 30 lessons at a time. Use the lesson-level workflow for additional lessons." });
+      const changes: FocusChange[] = [];
+      for (const lesson of lessons) {
+        changes.push(await generateFocusChange({ lesson, courseTitle: course.title, newFocus: input.newFocus, objective: input.objective }));
+      }
+      return {
+        course: { id: course.id, title: course.title },
+        changes: lessons.map((lesson, index) => ({
+          lesson: { id: lesson.id, title: lesson.title, learningObjectives: parseObjectives(lesson.learningObjectives) },
+          proposal: changes[index],
+        })),
+      };
+    }),
+  applyFocusRegeneration: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive(), changes: z.array(focusChangeInput).min(1).max(30) }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const ids = input.changes.map(change => change.lessonId);
+      const lessons = await db.select().from(lmsLessons).where(and(eq(lmsLessons.courseId, input.courseId), inArray(lmsLessons.id, ids)));
+      if (lessons.length !== ids.length) throw new TRPCError({ code: "BAD_REQUEST", message: "One or more lessons do not belong to this course." });
+      const byId = new Map(lessons.map(lesson => [lesson.id, lesson]));
+      const applied: Array<{ lessonId: number; blockTextChanges: number }> = [];
+      await db.transaction(async tx => {
+        for (const change of input.changes) {
+          const lesson = byId.get(change.lessonId)!;
+          const blockResult = applyEditableBlockText(lesson.contentBlocks, change.blockText as BlockTextField[]);
+          await tx.update(lmsLessons).set({
+            title: change.title,
+            learningObjectives: JSON.stringify(change.learningObjectives),
+            content: change.content || null,
+            videoContent: change.videoContent || null,
+            contentBlocks: blockResult.contentBlocks,
+          }).where(eq(lmsLessons.id, lesson.id));
+          applied.push({ lessonId: lesson.id, blockTextChanges: blockResult.appliedCount });
+        }
+      });
+      return { success: true, applied };
     }),
   // ── Courses ──
   listCourses: protectedProcedure
