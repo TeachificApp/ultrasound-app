@@ -169,6 +169,11 @@
 - [x] Trace and repair the current live Railway Forge generation error with a safe author-facing failure response and targeted regression coverage. Resolved by selecting the configured Manus API fallback when Forge credentials are absent.
 - [x] Route interactive AI generation through the configured Railway Manus API key without creating confirmation-prone or open-ended tasks.
 - [ ] Replace the confirmed confirmation-prone Railway Manus task path with a generation response flow that can complete without an author interaction.
+- [ ] Configure a direct Railway model-completions endpoint and server-only key for synchronous authoring generation; do not use the Manus task API as the interactive fallback.
+- [ ] Verify the Railway OpenAI-compatible credential is available to the production service and route all synchronous authoring generation through that direct completion path.
+- [ ] Identify and repair the live direct AI provider rejection using the non-sensitive Railway HTTP status and compatible request parameters.
+- [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
+- [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Add one constrained automatic resume for ordinary Manus text-generation questions, without confirming external actions or requesting account access.
 - [x] Accept the existing Railway VITE Forge configuration as a server-side compatibility fallback only when server-only Forge variables are absent.
 - [x] Inventory every AI generation workflow and its current model transport, authorization gate, input limits, output handling, and failure path.
