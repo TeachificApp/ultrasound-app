@@ -39,6 +39,7 @@ import {
   OpenTemplateLibraryButton,
   useBlockTemplateLibrary,
 } from "@/components/BlockTemplateLibrary";
+import { prepareEmailRichTextHtml } from "@shared/emailRichTextHtml";
 
 // ─── Email-specific auto-content block types ─────────────────────────────────
 // These are email-only blocks not in the main BLOCK_CATALOG
@@ -158,13 +159,18 @@ function toAbsoluteUrl(link: string | undefined): string {
   return `https://learn.allaboutultrasound.com${link.startsWith("/") ? "" : "/"}${link}`;
 }
 
+/** Ensure nested rich text from TipTap renders safely in email clients. */
+function emailRichTextInner(html: string): string {
+  return prepareEmailRichTextHtml(html);
+}
+
 export function emailBlockToHtml(block: Block): string {
   const d = block.data ?? {};
   const align = (d.align as string) ?? "left";
 
   switch (block.type) {
     case "text": {
-      const html = (d.html as string) ?? "";
+      const html = emailRichTextInner((d.html as string) ?? "");
       const bg = (d.bgColor as string) ?? "";
       const color = (d.textColor as string) ?? "#1a2e3b";
       const bgStyle = bg && bg !== "#ffffff" ? `background:${bg};` : "";
@@ -354,21 +360,24 @@ export function emailBlockToHtml(block: Block): string {
       return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:12px 0;font-size:${fontSize}px;">${rowsHtml}</table>`;
     }
     case "two_column": {
-      const leftHtml = (d.leftHtml as string) ?? "";
-      const rightHtml = (d.rightHtml as string) ?? "";
+      const leftHtml = emailRichTextInner((d.leftHtml as string) ?? "");
+      const rightHtml = emailRichTextInner((d.rightHtml as string) ?? "");
       const bg = (d.bgColor as string) ?? "#ffffff";
       const leftRatio = (d.leftRatio as number) ?? 50;
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};margin:12px 0;"><tr><td width="${leftRatio}%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${leftHtml}</td><td width="${100 - leftRatio}%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${rightHtml}</td></tr></table>`;
     }
     case "three_column": {
-      const col1 = (d.col1Html as string) ?? "";
-      const col2 = (d.col2Html as string) ?? "";
-      const col3 = (d.col3Html as string) ?? "";
+      const col1 = emailRichTextInner((d.col1Html as string) ?? "");
+      const col2 = emailRichTextInner((d.col2Html as string) ?? "");
+      const col3 = emailRichTextInner((d.col3Html as string) ?? "");
       const bg = (d.bgColor as string) ?? "#ffffff";
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};margin:12px 0;"><tr><td width="33%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${col1}</td><td width="33%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${col2}</td><td width="34%" style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;">${col3}</td></tr></table>`;
     }
     case "divided_columns": {
-      const columns = (d.columns as { html: string }[]) ?? [];
+      const columns = ((d.columns as { html: string }[]) ?? []).map(col => ({
+        ...col,
+        html: emailRichTextInner(col.html ?? ""),
+      }));
       const bg = (d.bgColor as string) ?? "#ffffff";
       const cells = columns.map((col) => `<td style="padding:12px;vertical-align:top;font-size:15px;color:#1a2e3b;line-height:1.7;width:${Math.floor(100 / columns.length)}%;">${col.html}</td>`).join("");
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};margin:12px 0;"><tr>${cells}</tr></table>`;
@@ -610,7 +619,7 @@ export function emailBlockToHtml(block: Block): string {
       return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bg};border:2px solid ${accent};border-radius:8px;margin:16px 0;"><tr><td style="padding:24px;text-align:center;"><p style="color:${accent};font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin:0 0 6px;">⏰ Time-Sensitive</p><h3 style="color:${textColor};font-size:20px;font-weight:700;margin:0 0 8px;">${headline}</h3>${subtext ? `<p style="color:${textColor};font-size:14px;margin:0 0 8px;opacity:0.85;">${subtext}</p>` : ""}${deadlineText ? `<p style="color:${accent};font-size:14px;font-weight:600;margin:0;">${deadlineText}</p>` : ""}</td></tr></table>`;
     }
     case "ai_content": {
-      const html = (d.html as string) ?? "";
+      const html = emailRichTextInner((d.html as string) ?? "");
       if (!html) return "";
       const bg = (d.bgColor as string) ?? "";
       const color = (d.textColor as string) ?? "#1a2e3b";
@@ -626,7 +635,7 @@ export function emailBlockToHtml(block: Block): string {
  * Convert blocks to email HTML.
  * @param blocks - The blocks to convert
  * @param trackingPixelUrl - Optional tracking pixel URL to inject
- * @param standalone - When true (default), wraps output in a 900px outer table suitable for
+ * @param standalone - When true (default), wraps output in a 750px outer table suitable for
  *   standalone preview. When false, returns raw inner HTML for use inside wrapInBrandedEmail.
  */
 export function emailBlocksToHtml(blocks: Block[], trackingPixelUrl?: string, standalone = true): string {
