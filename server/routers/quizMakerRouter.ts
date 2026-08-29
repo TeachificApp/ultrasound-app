@@ -35,6 +35,7 @@ import {
   questionBankIdFromBuilderId,
   questionBankValuesFromBuilderQuestion,
 } from "../lib/visualBuilderQuestionBankSync";
+import { hydrateBuilderConfigFromQuestionBank } from "../lib/standaloneQuizBuilderHydration";
 import { isStandaloneQuizStaff } from "../lib/standaloneQuizStaffAccess";
 
 async function assertStandaloneQuizStaff(ctx: { user: { id: number; role: string } }) {
@@ -80,23 +81,7 @@ async function hydrateBuilderQuestionsFromBank(
   quizId: number,
   config: QuizFile,
 ) {
-  const bankIds = config.questions
-    .map((question) => questionBankIdFromBuilderId(question.id))
-    .filter((id): id is number => id !== null);
-  if (bankIds.length === 0) return config;
-  const linked = await db
-    .select({ sqq: standaloneQuizQuestions, qb: questionBank })
-    .from(standaloneQuizQuestions)
-    .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
-    .where(and(eq(standaloneQuizQuestions.quizId, quizId), inArray(standaloneQuizQuestions.questionBankId, bankIds)));
-  const canonicalById = new Map(linked.map((row) => [`bank-${row.qb.id}`, standaloneQuestionToBuilderQuestion(row)]));
-  return {
-    ...config,
-    questions: config.questions.map((question) => {
-      const canonical = canonicalById.get(question.id);
-      return canonical ? mergeCanonicalBuilderQuestion(question as Record<string, unknown>, canonical) : question;
-    }),
-  } as QuizFile;
+  return hydrateBuilderConfigFromQuestionBank(db, quizId, config);
 }
 
 async function synchronizeBuilderQuestionsToBank(

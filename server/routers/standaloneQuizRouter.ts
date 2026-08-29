@@ -27,8 +27,9 @@ import {
   lmsCourses,
 } from "../../drizzle/schema";
 import { drawQuestionsFromBuilder, parseBuilderConfig } from "../lib/quizBuilderConfig";
+import { hydrateBuilderConfigFromQuestionBank } from "../lib/standaloneQuizBuilderHydration";
 import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
-import { builderQuestionFromQuestionBank, mergeCanonicalBuilderQuestion, questionBankIdFromBuilderId } from "../lib/visualBuilderQuestionBankSync";
+import { questionBankIdFromBuilderId } from "../lib/visualBuilderQuestionBankSync";
 import { buildStandaloneLearnerOptions, orderQuestionOptions } from "../lib/questionOptionOrder";
 import { canOpenStandaloneQuiz, requiresEmbeddedLearnerAccess } from "../lib/standaloneQuizPreviewAccess";
 import {
@@ -89,25 +90,7 @@ async function hasActiveWidgetLaunch(db: any, rawToken: string | undefined, quiz
 }
 
 /** Hydrate linked builder questions from their canonical Question Bank record before learner delivery or grading. */
-async function hydrateBuilderConfigFromQuestionBank(db: any, quizId: number, config: NonNullable<ReturnType<typeof parseBuilderConfig>>) {
-  const bankIds = config.questions
-    .map((question: any) => questionBankIdFromBuilderId(question.id))
-    .filter((id: number | null): id is number => id !== null);
-  if (bankIds.length === 0) return config;
-  const links = await db
-    .select({ sqq: standaloneQuizQuestions, qb: questionBank })
-    .from(standaloneQuizQuestions)
-    .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
-    .where(and(eq(standaloneQuizQuestions.quizId, quizId), inArray(standaloneQuizQuestions.questionBankId, bankIds)));
-  const canonicalById = new Map(links.map((row: any) => [`bank-${row.qb.id}`, builderQuestionFromQuestionBank(row)]));
-  return {
-    ...config,
-    questions: config.questions.map((question: any) => {
-      const canonical = canonicalById.get(question.id);
-      return canonical ? mergeCanonicalBuilderQuestion(question, canonical) : question;
-    }),
-  };
-}
+export { hydrateBuilderConfigFromQuestionBank } from "../lib/standaloneQuizBuilderHydration";
 
 export function getConfiguredAttemptQuestionCount(
   quiz: typeof standaloneQuizzes.$inferSelect,
@@ -226,6 +209,7 @@ export const standaloneQuizLearnerRouter = router({
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      try {
       const [quiz] = await db
         .select()
         .from(standaloneQuizzes)
@@ -245,17 +229,16 @@ export const standaloneQuizLearnerRouter = router({
         }, hasActiveWidgetLaunch);
       }
       const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
-      const builderConfig = parsedBuilderConfig
-        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig)
-        : null;
-      const linkedQuestionFolders = await db
-        .select({ folderId: questionBank.folderId })
-        .from(standaloneQuizQuestions)
-        .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
-        .where(eq(standaloneQuizQuestions.quizId, quiz.id));
+      const linkedQuestionFolders = parsedBuilderConfig?.questions.length
+        ? []
+        : await db
+            .select({ folderId: questionBank.folderId })
+            .from(standaloneQuizQuestions)
+            .innerJoin(questionBank, eq(standaloneQuizQuestions.questionBankId, questionBank.id))
+            .where(eq(standaloneQuizQuestions.quizId, quiz.id));
       const questionCount = getConfiguredAttemptQuestionCount(
         quiz,
-        builderConfig,
+        parsedBuilderConfig,
         linkedQuestionFolders.map((question) => question.folderId),
       );
       // Check attempt limits
@@ -280,9 +263,17 @@ export const standaloneQuizLearnerRouter = router({
         questionCount,
         attemptCount,
         canAttempt,
-        builderConfig: builderConfig?.meta ?? null,
+        builderConfig: parsedBuilderConfig?.meta ?? null,
         isPreview: adminPreview && quiz.status !== "published",
       };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error("[standaloneQuizLearner.getQuizInfo]", err);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Unable to load this quiz. Please try again shortly.",
+        });
+      }
     }),
 
   /** Start a new attempt — returns attempt ID and the ordered questions */
@@ -311,9 +302,6 @@ export const standaloneQuizLearnerRouter = router({
       }
 
       const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
-      const builderConfig = parsedBuilderConfig
-        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig)
-        : null;
 
       // Check attempt limits
       if (!quiz.allowRetakes || quiz.maxAttempts) {
@@ -342,14 +330,26 @@ export const standaloneQuizLearnerRouter = router({
       const attemptNumber = Number(prevCnt) + 1;
 
       // ── Visual builder mode: questions from builderConfig JSON ──
-      if (builderConfig && builderConfig.questions.length > 0) {
-        let drawn = drawQuestionsFromBuilder(builderConfig) as typeof builderConfig.questions;
+      if (parsedBuilderConfig && parsedBuilderConfig.questions.length > 0) {
+        let drawn = drawQuestionsFromBuilder(parsedBuilderConfig) as typeof parsedBuilderConfig.questions;
         // The standalone quiz-level cap applies to visual-builder quizzes too.
         // Every visible counter therefore reflects the selected attempt set,
         // never the full builder or question-bank pool.
         if (quiz.questionsPerAttempt && drawn.length > quiz.questionsPerAttempt) {
-          drawn = shuffle(drawn).slice(0, quiz.questionsPerAttempt) as typeof builderConfig.questions;
+          drawn = shuffle(drawn).slice(0, quiz.questionsPerAttempt) as typeof parsedBuilderConfig.questions;
         }
+        const drawnBankIds = drawn
+          .map((question) => questionBankIdFromBuilderId((question as { id?: unknown }).id))
+          .filter((id): id is number => id !== null);
+        const builderConfig = await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig, {
+          onlyBankIds: drawnBankIds,
+        });
+        const hydratedById = new Map(
+          builderConfig.questions.map((question) => [String((question as { id?: unknown }).id), question]),
+        );
+        drawn = drawn.map(
+          (question) => hydratedById.get(String((question as { id?: unknown }).id)) ?? question,
+        ) as typeof parsedBuilderConfig.questions;
         const totalPoints = drawn.reduce((s, q) => s + ((q as { points?: number }).points ?? 1), 0);
         const [result] = await db.insert(standaloneQuizAttempts).values({
           quizId: quiz.id,
@@ -485,9 +485,14 @@ export const standaloneQuizLearnerRouter = router({
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
 
       const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
-      const builderConfig = parsedBuilderConfig
-        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig)
-        : null;
+      const answeredStableIds = new Set(input.answers.map((answer) => answer.questionBankId));
+      const answeredBankIds = (parsedBuilderConfig?.questions ?? [])
+        .filter((question) => answeredStableIds.has(stableBuilderQuestionId(String((question as { id?: unknown }).id))))
+        .map((question) => questionBankIdFromBuilderId((question as { id?: unknown }).id))
+        .filter((id): id is number => id !== null);
+      const builderConfig = parsedBuilderConfig && answeredBankIds.length > 0
+        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig, { onlyBankIds: answeredBankIds })
+        : parsedBuilderConfig;
       const isBuilderMode = !!(builderConfig && builderConfig.questions.length > 0);
 
       let earnedPoints = 0;
@@ -607,16 +612,27 @@ export const standaloneQuizLearnerRouter = router({
         .limit(1);
       if (!quiz) throw new TRPCError({ code: "NOT_FOUND" });
 
+      const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
+      const answers = await db
+        .select()
+        .from(standaloneQuizAttemptAnswers)
+        .where(eq(standaloneQuizAttemptAnswers.attemptId, input.attemptId));
+
+      const answeredStableIds = new Set(answers.map((answer) => answer.questionId));
+      const answeredBankIds = (parsedBuilderConfig?.questions ?? [])
+        .filter((question) => answeredStableIds.has(stableBuilderQuestionId(String((question as { id?: unknown }).id))))
+        .map((question) => questionBankIdFromBuilderId((question as { id?: unknown }).id))
+        .filter((id): id is number => id !== null);
+      const builderConfig = parsedBuilderConfig && answeredBankIds.length > 0
+        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig, { onlyBankIds: answeredBankIds })
+        : parsedBuilderConfig;
+
       // Check whether the score is released. Per-question review is a separately
       // configured learner permission for visual-builder quizzes.
       const now = new Date();
       const canSeeResults =
         quiz.showResultsImmediately ||
         (quiz.showResultsAfterDate && now >= new Date(quiz.showResultsAfterDate));
-      const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
-      const builderConfig = parsedBuilderConfig
-        ? await hydrateBuilderConfigFromQuestionBank(db, quiz.id, parsedBuilderConfig)
-        : null;
       const builderReviewEnabled = builderConfig?.meta.showPerQuestionResult
         ?? ((builderConfig?.meta.resultSlide as { showReviewButton?: boolean } | undefined)?.showReviewButton)
         ?? quiz.showPerQuestionResult;
@@ -624,11 +640,6 @@ export const standaloneQuizLearnerRouter = router({
       const showGroupNames = builderConfig
         ? builderConfig.meta.showGroupNames === true
         : quiz.showGroupNames === true;
-
-      const answers = await db
-        .select()
-        .from(standaloneQuizAttemptAnswers)
-        .where(eq(standaloneQuizAttemptAnswers.attemptId, input.attemptId));
 
       let questionDetails: any[] = [];
       if (canReviewAnswers) {
