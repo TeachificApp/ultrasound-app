@@ -24,6 +24,7 @@ const MEMBERS_URL = "https://members.allaboutultrasound.com";
 import { getAdminUrl, APP_URL } from "@/hooks/useSubdomain";
 import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
 import { SiteNavHeaderLinks, SiteNavProfileLinks } from "@/components/SiteNavLinks";
+import { STUDENT_DASHBOARD_PATH } from "@shared/studentDashboardUrls";
 const AAUS_APP_URL = "https://app.allaboutultrasound.com";
 
 interface NavItem {
@@ -238,7 +239,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
 
                       {/* My Dashboard — stays on learn domain */}
                       <a
-                        href="/my-dashboard"
+                        href={STUDENT_DASHBOARD_PATH}
                         className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                         onClick={() => setAccountOpen(false)}
                       >

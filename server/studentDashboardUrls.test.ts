@@ -3,6 +3,7 @@ import {
   buildQuizCoursePlayerUrl,
   buildStudentDashboardUrl,
   normalizeLegacyStudentDashboardLocation,
+  resolveStudentDashboardHref,
 } from "../shared/studentDashboardUrls";
 
 describe("student dashboard URLs", () => {
@@ -40,5 +41,12 @@ describe("student dashboard URLs", () => {
   it("redirects /dashboard/subscriptions to subscriptions tab", () => {
     expect(normalizeLegacyStudentDashboardLocation("/dashboard/subscriptions", ""))
       .toBe("/my-dashboard?tab=subscriptions");
+  });
+
+  it("resolveStudentDashboardHref maps relative and learn-domain absolute links", () => {
+    expect(resolveStudentDashboardHref("/dashboard")).toBe("/my-dashboard?tab=content");
+    expect(resolveStudentDashboardHref("https://learn.allaboutultrasound.com/dashboard"))
+      .toBe("https://learn.allaboutultrasound.com/my-dashboard?tab=content");
+    expect(resolveStudentDashboardHref("/courses/foo/player")).toBe("/courses/foo/player");
   });
 });
