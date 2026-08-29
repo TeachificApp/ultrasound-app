@@ -174,6 +174,11 @@
 - [ ] Identify and repair the live direct AI provider rejection using the non-sensitive Railway HTTP status and compatible request parameters.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
+- [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.
+- [ ] Prepare backup evidence and a no-write migration dry run for Railway data and storage references without changing the production source of truth.
+- [x] Define Manus test-environment configuration, parity validation, and DNS rollback requirements without repointing any production domain.
+- [x] Deliver the parallel Manus migration package for review before requesting any import, sync, or cutover approval.
+- [x] Verify that the uploaded Manus backup corresponds to the intended UltrasoundAssist project and define the no-write staging reconciliation steps, based on owner confirmation and current restored-project scope without reopening the one-time restoration.
 - [x] Add one constrained automatic resume for ordinary Manus text-generation questions, without confirming external actions or requesting account access.
 - [x] Accept the existing Railway VITE Forge configuration as a server-side compatibility fallback only when server-only Forge variables are absent.
 - [x] Inventory every AI generation workflow and its current model transport, authorization gate, input limits, output handling, and failure path.
