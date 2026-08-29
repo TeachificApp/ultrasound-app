@@ -117,6 +117,26 @@ describe("llmHelpers", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://forge.manus.ai/v1/chat/completions");
   });
+
+  it("retries one direct provider rate-limit response without exposing provider details", async () => {
+    for (const key of AI_ENV_KEYS) delete process.env[key];
+    process.env.OPENAI_API_KEY = "server-only-test-key";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("", { status: 429, headers: { "retry-after": "0" } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: "chatcmpl-after-retry",
+        created: 1,
+        model: "gpt-4o-mini",
+        choices: [{ index: 0, message: { role: "assistant", content: "Generated" }, finish_reason: "stop" }],
+      }), { status: 200 }));
+    global.fetch = fetchMock as typeof fetch;
+
+    const { invokeLLM } = await import("../_core/llm");
+    const result = await invokeLLM({ messages: [{ role: "user", content: "Generate content." }] });
+
+    expect(result.choices[0]?.message.content).toBe("Generated");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("aiConnection", () => {

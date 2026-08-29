@@ -172,6 +172,8 @@
 - [ ] Configure a direct Railway model-completions endpoint and server-only key for synchronous authoring generation; do not use the Manus task API as the interactive fallback.
 - [ ] Verify the Railway OpenAI-compatible credential is available to the production service and route all synchronous authoring generation through that direct completion path.
 - [ ] Identify and repair the live direct AI provider rejection using the non-sensitive Railway HTTP status and compatible request parameters.
+- [x] Add bounded server-side retry/backoff for direct AI provider HTTP 429 responses, with no provider error body or credential exposed to authors.
+- [x] Add one bounded Retry-After-aware server-side retry for direct AI provider HTTP 429 responses, with no provider error body or credential exposed to authors.
 - [ ] Validate the newly funded Railway OpenAI direct-completions integration through authorized lesson, question, flashcard, and image-generation workflows before any hosting move.
 - [x] Add a course-level AI regeneration workflow that preserves modules, lesson order, blocks, layout, and media placement while adapting instructional content to a new focus and objective.
 - [x] Require administrator review before applying generated course-content changes, preserving all original content until an explicit apply action.

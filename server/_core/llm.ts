@@ -353,6 +353,19 @@ export function extractAssistantText(result: InvokeResult): string {
   return "";
 }
 
+const directProviderRetryDelayMs = (response: Response): number => {
+  const retryAfter = response.headers.get("retry-after");
+  const seconds = retryAfter ? Number(retryAfter) : Number.NaN;
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(Math.round(seconds * 1000), 5_000);
+  }
+  return 750;
+};
+
+const wait = (milliseconds: number) => new Promise<void>((resolve) => {
+  setTimeout(resolve, milliseconds);
+});
+
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const forgeConfigured = Boolean(resolveForgeApiKey() && resolveForgeApiUrl());
   const requestedTransport = params.transport ?? "auto";
@@ -422,17 +435,30 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveLlmChatCompletionsUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${getOpenAiApiKey()}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  let response: Response;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    response = await fetch(resolveLlmChatCompletionsUrl(), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${getOpenAiApiKey()}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.status !== 429 || attempt === 1) break;
+
+    const delayMs = directProviderRetryDelayMs(response);
+    console.warn(`[LLM] Direct provider rate limited; retrying once after ${delayMs}ms`);
+    await wait(delayMs);
+  }
 
   if (!response.ok) {
-    console.error(`[LLM] Forge chat request failed with HTTP ${response.status}`);
+    if (response.status === 429) {
+      console.warn("[LLM] Direct provider remained rate limited after one retry");
+      throw new Error("AI generation is rate limited. Please wait a moment and try again.");
+    }
+    console.error(`[LLM] Direct provider request failed with HTTP ${response.status}`);
     throw new Error("AI generation is temporarily unavailable. Please retry in a moment.");
   }
 

@@ -32,6 +32,8 @@ The live Railway service currently has a Manus API key but no Forge chat credent
 
 The Manus fallback now also detects one ordinary `messageAskUser` state and replies with a fixed, bounded instruction to proceed using the supplied authoring prompt. It never sends a confirmation or responds to browser, connector, email, deployment, payment, or other external-action waiting states. A second question or any non-question waiting state remains a safe failure rather than an automatic action.
 
+When a direct configured provider responds with HTTP 429, the shared authoring helper retries exactly once. It honors a `Retry-After` delay up to five seconds, otherwise waits 750 milliseconds. A continued rate limit returns a concise author-facing retry message and logs no upstream body, prompt content, or credential. This protects all text-generation workflows that use the shared helper without creating open-ended retries.
+
 The synthetic testimonial endpoint and its Landing Page Builder controls are removed. AI product and digital-download landing-page prompts no longer create review blocks, new funnel templates no longer add a testimonial block by default, and newly added review fields start blank for administrators to enter genuine content. Focused Forge, structured-generation, and funnel regressions pass (143 tests); affected client and server bundles compile successfully.
 
 ## Read-aloud finding
