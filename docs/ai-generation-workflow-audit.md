@@ -30,6 +30,8 @@ Forge chat is now the automatic shared preference whenever valid Railway Forge c
 
 The live Railway service currently has a Manus API key but no Forge chat credential pair. The lesson editor therefore uses automatic transport rather than forcing Forge: it prefers Forge when a matching URL/key pair is subsequently configured and otherwise creates a constrained Manus API task. The fallback is private, non-interactive, uses the lightweight agent profile, and supplies no inherited connectors or skills, avoiding unnecessary tool access and confirmation requests for the bounded authoring prompt.
 
+The Manus fallback now also detects one ordinary `messageAskUser` state and replies with a fixed, bounded instruction to proceed using the supplied authoring prompt. It never sends a confirmation or responds to browser, connector, email, deployment, payment, or other external-action waiting states. A second question or any non-question waiting state remains a safe failure rather than an automatic action.
+
 The synthetic testimonial endpoint and its Landing Page Builder controls are removed. AI product and digital-download landing-page prompts no longer create review blocks, new funnel templates no longer add a testimonial block by default, and newly added review fields start blank for administrators to enter genuine content. Focused Forge, structured-generation, and funnel regressions pass (143 tests); affected client and server bundles compile successfully.
 
 ## Read-aloud finding

@@ -325,7 +325,11 @@ async function invokeManusApi(params: InvokeParams): Promise<InvokeResult> {
     content: buildManusTaskContent(params.messages, prompt),
     structuredOutputSchema: structuredSchema,
   });
-  const completed = await waitForManusTask(created.task_id);
+  const completed = await waitForManusTask(created.task_id, {
+    // The application can safely answer one ordinary clarification for a
+    // bounded writing request; it never confirms an action or grants access.
+    autoResumeQuestion: true,
+  });
   const content = completed.structuredOutput !== undefined
     ? JSON.stringify(completed.structuredOutput)
     : completed.assistantText ?? "";

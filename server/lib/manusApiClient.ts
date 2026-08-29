@@ -23,7 +23,13 @@ export type ManusTaskMessageResponse = ManusApiEnvelope & {
     type: string;
     assistant_message?: { content?: string };
     error_message?: { content?: string };
-    status_update?: { agent_status?: ManusTaskStatus; status_detail?: { waiting_description?: string } };
+    status_update?: {
+      agent_status?: ManusTaskStatus;
+      status_detail?: {
+        waiting_description?: string;
+        waiting_for_event_type?: string;
+      };
+    };
     structured_output_result?: { success: boolean; value: unknown; error: string | null };
   }>;
 };
@@ -111,15 +117,31 @@ export async function getManusTaskMessages(taskId: string): Promise<ManusTaskMes
   return apiRequest<ManusTaskMessageResponse>(`/v2/task.listMessages?task_id=${encodeURIComponent(taskId)}&order=asc&limit=100`);
 }
 
+/**
+ * Resume only a normal agent question. This never confirms provider actions,
+ * accesses a browser, sends messages, or supplies account information.
+ */
+export async function replyToManusTaskQuestion(taskId: string, content: string): Promise<void> {
+  await apiRequest<ManusApiEnvelope>("/v2/task.sendMessage", {
+    method: "POST",
+    body: JSON.stringify({
+      task_id: taskId,
+      message: { content, connectors: [], enable_skills: [] },
+      clear_connectors: true,
+    }),
+  });
+}
+
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export async function waitForManusTask(
   taskId: string,
-  options: { timeoutMs?: number; pollIntervalMs?: number } = {},
+  options: { timeoutMs?: number; pollIntervalMs?: number; autoResumeQuestion?: boolean } = {},
 ): Promise<{ structuredOutput?: unknown; assistantText?: string }> {
   const timeoutMs = options.timeoutMs ?? ENV.manusApiTimeoutMs ?? DEFAULT_TIMEOUT_MS;
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const deadline = Date.now() + timeoutMs;
+  let resumedQuestion = false;
 
   while (Date.now() < deadline) {
     const detail = await getManusTaskDetail(taskId);
@@ -135,7 +157,23 @@ export async function waitForManusTask(
       return { structuredOutput: structured.value };
     }
     if (status === "waiting") {
-      const waiting = messages.messages?.find((message) => message.type === "status_update")?.status_update?.status_detail?.waiting_description;
+      const statusUpdate = [...(messages.messages ?? [])]
+        .reverse()
+        .find((message) => message.type === "status_update")?.status_update?.status_detail;
+      if (
+        options.autoResumeQuestion &&
+        !resumedQuestion &&
+        statusUpdate?.waiting_for_event_type === "messageAskUser"
+      ) {
+        resumedQuestion = true;
+        await replyToManusTaskQuestion(
+          taskId,
+          "Proceed immediately using your expert clinical judgment and the information already supplied. Do not ask a follow-up question, access external services, use connectors, or take any external action. Return the requested final content only.",
+        );
+        await pause(pollIntervalMs);
+        continue;
+      }
+      const waiting = statusUpdate?.waiting_description;
       throw new Error(`Manus task requires user input or confirmation${waiting ? `: ${waiting}` : ""}`);
     }
     if (status === "error") {

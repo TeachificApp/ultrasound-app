@@ -78,4 +78,72 @@ describe("Railway Manus API client", () => {
       expect.objectContaining({ type: "file", file_url: "https://files.example/source.pdf", mime_type: "application/pdf" }),
     ]));
   });
+
+  it("automatically resumes one ordinary text question without confirming external actions", async () => {
+    process.env.MANUS_API_KEY = "server-only-test-key";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        task: { id: "task123", status: "waiting" },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        messages: [{
+          type: "status_update",
+          status_update: {
+            agent_status: "waiting",
+            status_detail: { waiting_for_event_type: "messageAskUser", waiting_description: "Need a detail" },
+          },
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, task_id: "task123" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        task: { id: "task123", status: "stopped" },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        messages: [{ type: "assistant_message", assistant_message: { content: "lesson" } }],
+      }), { status: 200 }));
+    global.fetch = fetchMock as typeof fetch;
+    const { waitForManusTask } = await import("./lib/manusApiClient");
+
+    await expect(waitForManusTask("task123", {
+      pollIntervalMs: 0,
+      autoResumeQuestion: true,
+    })).resolves.toEqual({ assistantText: "lesson" });
+
+    expect(fetchMock.mock.calls[2][0]).toBe("https://api.manus.ai/v2/task.sendMessage");
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual(expect.objectContaining({
+      clear_connectors: true,
+      message: expect.objectContaining({ connectors: [], enable_skills: [] }),
+    }));
+  });
+
+  it("does not resume a confirmation or external-access waiting state", async () => {
+    process.env.MANUS_API_KEY = "server-only-test-key";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        task: { id: "task123", status: "waiting" },
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        messages: [{
+          type: "status_update",
+          status_update: {
+            agent_status: "waiting",
+            status_detail: { waiting_for_event_type: "needConnectMyBrowser", waiting_description: "Browser access" },
+          },
+        }],
+      }), { status: 200 }));
+    global.fetch = fetchMock as typeof fetch;
+    const { waitForManusTask } = await import("./lib/manusApiClient");
+
+    await expect(waitForManusTask("task123", {
+      pollIntervalMs: 0,
+      autoResumeQuestion: true,
+    })).rejects.toThrow("Manus task requires user input or confirmation");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

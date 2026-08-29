@@ -168,6 +168,8 @@
 - [ ] Ensure the Railway production application service exposes both required Forge variables so the direct lesson generator can authenticate.
 - [x] Trace and repair the current live Railway Forge generation error with a safe author-facing failure response and targeted regression coverage. Resolved by selecting the configured Manus API fallback when Forge credentials are absent.
 - [x] Route interactive AI generation through the configured Railway Manus API key without creating confirmation-prone or open-ended tasks.
+- [ ] Replace the confirmed confirmation-prone Railway Manus task path with a generation response flow that can complete without an author interaction.
+- [x] Add one constrained automatic resume for ordinary Manus text-generation questions, without confirming external actions or requesting account access.
 - [x] Accept the existing Railway VITE Forge configuration as a server-side compatibility fallback only when server-only Forge variables are absent.
 - [x] Inventory every AI generation workflow and its current model transport, authorization gate, input limits, output handling, and failure path.
 - [x] Move each compatible interactive AI generation workflow to the Railway-configured Forge chat or image-generation path and add focused regressions.
