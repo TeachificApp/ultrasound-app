@@ -30,6 +30,14 @@ describe("storage health diagnostics", () => {
     expect(storage).toContain("providerError?.Code ?? providerError?.code");
   });
 
+  it("honors a validated Railway R2 endpoint while retaining the account-derived endpoint fallback", () => {
+    const storage = read("server/storage.ts");
+    expect(storage).toContain("process.env.CF_R2_ENDPOINT?.trim()");
+    expect(storage).toContain('endpoint.hostname.endsWith(".r2.cloudflarestorage.com")');
+    expect(storage).toContain("return `https://${accountId}.r2.cloudflarestorage.com`;");
+    expect(storage).toContain("endpoint: getR2Endpoint(accountId)");
+  });
+
   it("returns an actionable but non-sensitive response when an editor upload is denied", () => {
     const route = read("server/routes/uploadCourseImage.ts");
     expect(route).toContain("Image storage is temporarily unavailable");

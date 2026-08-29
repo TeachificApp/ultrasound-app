@@ -130,6 +130,29 @@ async function forgePut(
 
 let r2Client: S3Client | null = null;
 
+function getR2Endpoint(accountId: string): string {
+  const configuredEndpoint = process.env.CF_R2_ENDPOINT?.trim();
+  if (!configuredEndpoint) {
+    return `https://${accountId}.r2.cloudflarestorage.com`;
+  }
+
+  let endpoint: URL;
+  try {
+    endpoint = new URL(configuredEndpoint);
+  } catch {
+    throw new Error("CF_R2_ENDPOINT must be a valid HTTPS R2 endpoint");
+  }
+
+  if (
+    endpoint.protocol !== "https:" ||
+    !endpoint.hostname.endsWith(".r2.cloudflarestorage.com")
+  ) {
+    throw new Error("CF_R2_ENDPOINT must use an HTTPS Cloudflare R2 hostname");
+  }
+
+  return endpoint.toString().replace(/\/+$/, "");
+}
+
 function getR2Client(): S3Client | null {
   if (r2Client) return r2Client;
 
@@ -141,7 +164,7 @@ function getR2Client(): S3Client | null {
 
   r2Client = new S3Client({
     region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    endpoint: getR2Endpoint(accountId),
     credentials: { accessKeyId, secretAccessKey },
   });
 
