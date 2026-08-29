@@ -916,8 +916,9 @@ function MyContentTab({ initialContentTab }: { initialContentTab?: ContentSubTab
     { key: "communities",  label: "Communities",  icon: Users,          count: data?.communities?.length ?? 0 },
   ];
 
-  // On mobile, only show tabs that have content (count > 0) or the active tab
-  const visibleSubTabs = subTabs.filter(t => t.count > 0 || t.key === contentTab);
+  // Quizzes is always discoverable. Other empty content categories stay hidden
+  // on small screens unless selected, keeping the dashboard compact.
+  const visibleSubTabs = subTabs.filter(t => t.key === "quizzes" || t.count > 0 || t.key === contentTab);
 
   return (
     <div className="space-y-6">

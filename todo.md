@@ -158,3 +158,6 @@
 - [ ] Implement and validate a production-safe editor image-upload fallback that succeeds when the Railway R2 primary path is denied, without storing files in the database or weakening authorization.
 - [x] Honor an explicitly configured Railway R2 S3 endpoint for editor uploads, while preserving the canonical account-derived endpoint fallback and secret-safe error handling.
 - [x] Recognize persisted Platform Admin and content-authoring roles directly in the authenticated uploader path, while retaining session verification and learner denial.
+- [ ] Repair the Railway production R2 credential or bucket policy so authenticated editor writes to the lms-images prefix succeed.
+- [x] Restore the Quizzes tab for every user while showing My Quiz Results only when a user has direct or lesson-module native quiz results.
+- [x] Add focused navigation and result-visibility regression coverage for the all-user Quizzes tab and native quiz results condition.
