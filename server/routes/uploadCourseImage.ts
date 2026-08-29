@@ -12,9 +12,9 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import { randomBytes } from "crypto";
 import { storagePut } from "../storage";
-import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
 import { mediaAssets, mediaVersions } from "../../drizzle/schema";
+import { authenticateContentUploader } from "../lib/contentUploadAuth";
 
 const router = Router();
 
@@ -35,9 +35,8 @@ router.post(
   upload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      let user: any = null;
-      try { user = await sdk.authenticateRequest(req); } catch {}
-      if (!user || user.role !== "admin") {
+      const user = await authenticateContentUploader(req);
+      if (!user) {
         res.status(401).json({ error: "Unauthorized" });
         return;
       }

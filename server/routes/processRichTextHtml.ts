@@ -5,8 +5,8 @@
  */
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import { sdk } from "../_core/sdk";
 import { processRichTextHtml } from "../lib/processRichTextHtml";
+import { authenticateContentUploader } from "../lib/contentUploadAuth";
 
 const router = Router();
 
@@ -17,9 +17,8 @@ const bodySchema = z.object({
 
 router.post("/api/process-rich-text-html", async (req: Request, res: Response) => {
   try {
-    let user: any = null;
-    try { user = await sdk.authenticateRequest(req); } catch {}
-    if (!user || user.role !== "admin") {
+    const user = await authenticateContentUploader(req);
+    if (!user) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }

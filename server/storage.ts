@@ -78,10 +78,43 @@ function buildAuthHeaders(apiKey: string): HeadersInit {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
-function buildR2PublicUrl(key: string): string {
-  const base = process.env.CF_R2_PUBLIC_URL?.replace(/\/+$/, "");
-  if (!base) throw new Error("CF_R2_PUBLIC_URL is not configured");
-  return `${base}/${key}`;
+function hasForgeCredentials(): boolean {
+  return !!(process.env.BUILT_IN_FORGE_API_URL && process.env.BUILT_IN_FORGE_API_KEY);
+}
+
+function isStorageAccessDeniedError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err ?? "");
+  const name = err instanceof Error ? err.name : "";
+  return (
+    /access denied|accessdenied|not authorized|forbidden/i.test(msg) ||
+    name === "AccessDenied"
+  );
+}
+
+async function forgePut(
+  relKey: string,
+  data: Buffer | Uint8Array | string,
+  contentType: string
+): Promise<{ key: string; url: string }> {
+  const { baseUrl, apiKey } = getStorageConfig();
+  const key = normalizeKey(relKey);
+  const uploadUrl = buildUploadUrl(baseUrl, key);
+  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: buildAuthHeaders(apiKey),
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(
+      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
+    );
+  }
+  const url = (await response.json()).url;
+  mirrorToR2(key, data, contentType).catch(() => {});
+  return { key, url };
 }
 
 // ── R2 Client ──────────────────────────────────────────────────────────────────
@@ -108,6 +141,12 @@ function getR2Client(): S3Client | null {
 
 function getR2Bucket(): string {
   return process.env.CF_R2_BUCKET_NAME || "ultrasound-assist";
+}
+
+function buildR2PublicUrl(key: string): string {
+  const base = process.env.CF_R2_PUBLIC_URL?.replace(/\/+$/, "");
+  if (!base) throw new Error("CF_R2_PUBLIC_URL is not configured");
+  return `${base}/${key}`;
 }
 
 async function r2Put(
@@ -345,30 +384,18 @@ export async function storagePut(
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
   if (resolveStorageBackend() === "r2") {
-    return r2Put(relKey, data, contentType);
+    try {
+      return await r2Put(relKey, data, contentType);
+    } catch (err) {
+      if (isStorageAccessDeniedError(err) && hasForgeCredentials()) {
+        console.warn("[Storage] R2 upload denied; falling back to Forge for", relKey);
+        return forgePut(relKey, data, contentType);
+      }
+      throw err;
+    }
   }
 
-  const { baseUrl, apiKey } = getStorageConfig();
-  const key = normalizeKey(relKey);
-  const uploadUrl = buildUploadUrl(baseUrl, key);
-  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: buildAuthHeaders(apiKey),
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
-  }
-  const url = (await response.json()).url;
-
-  mirrorToR2(key, data, contentType).catch(() => {});
-
-  return { key, url };
+  return forgePut(relKey, data, contentType);
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
