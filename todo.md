@@ -173,5 +173,6 @@
 - [ ] Verify every AI generation workflow and the creator-controlled read-aloud setting on the live Railway deployment. Supersedes the removed-feature verification request.
 - [x] Remove the synthetic customer-testimonial generator and its UI entry points because fabricated reviews and ratings must not be generated or stored.
 - [x] Remove hardcoded synthetic customer-review defaults and AI landing-page prompts that create fictitious testimonials, while retaining fields for genuine administrator-entered reviews.
-- [x] Add an administrator/creator-controlled read-aloud setting per quiz, preserve existing quiz behavior by default, and show the learner control only when enabled.
+- [x] Add an administrator/creator-controlled read-aloud setting per quiz, preserve existing quiz behavior by default, and show the learner control only when enabled. Superseded by the default-off request.
 - [x] Provide two basic creator-selectable quiz read-aloud voices, Female and Male, with natural pacing and a stable browser-supported fallback.
+- [x] Make read-aloud default to off for newly created and previously unset quizzes, leaving it visible only when a creator explicitly enables it.

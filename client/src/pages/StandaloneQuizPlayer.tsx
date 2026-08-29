@@ -142,7 +142,7 @@ export default function StandaloneQuizPlayer() {
 
   const isNativeQuizType = (quizData?.type ?? quizInfo?.type) !== "mock_exam";
   const builderMeta = (quizInfo as any)?.builderConfig ?? quizData?.builderMeta ?? null;
-  const creatorReadAloudEnabled = builderMeta?.readAloudEnabled ?? quizInfo?.readAloudEnabled ?? true;
+  const creatorReadAloudEnabled = builderMeta?.readAloudEnabled ?? quizInfo?.readAloudEnabled ?? false;
   const creatorReadAloudVoice = (builderMeta?.readAloudVoice ?? quizInfo?.readAloudVoice ?? DEFAULT_QUIZ_READ_ALOUD_VOICE) as QuizReadAloudVoice;
   const readAloudVoice = quizReadAloudVoiceToTtsVoice(creatorReadAloudVoice);
   const readAloud = useQuizReadAloud(creatorReadAloudEnabled && readAloudEnabled && phase === "started" && isNativeQuizType, readAloudVoice);

@@ -29,10 +29,10 @@ describe("creator-controlled quiz read-aloud settings", () => {
     expect(quizReadAloudVoiceToTtsVoice(config.meta.readAloudVoice!)).toBe("onyx");
   });
 
-  it("keeps existing quizzes read-aloud enabled with the Female default", () => {
+  it("keeps previously unset quiz read-aloud disabled with the Female default", () => {
     const config = builderConfigFromQuizRow(baseQuiz);
 
-    expect(config.meta.readAloudEnabled).toBe(true);
+    expect(config.meta.readAloudEnabled).toBe(false);
     expect(config.meta.readAloudVoice).toBe("female");
     expect(quizReadAloudVoiceToTtsVoice(config.meta.readAloudVoice!)).toBe("nova");
   });

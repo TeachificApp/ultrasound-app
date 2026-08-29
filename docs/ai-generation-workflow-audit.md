@@ -32,6 +32,6 @@ The synthetic testimonial endpoint and its Landing Page Builder controls are rem
 
 ## Read-aloud finding
 
-Quiz read-aloud remains available as a creator-controlled setting for native standalone quizzes. Existing quizzes preserve the enabled default. Creators can disable the learner-facing control entirely or select one of two clear voice profiles: **Female** or **Male**. The learner can still decide whether to activate the offered read-aloud before starting an attempt.
+Quiz read-aloud remains available as a creator-controlled setting for native standalone quizzes. It defaults to **off** for newly created and previously unset quizzes. Creators can explicitly enable the learner-facing control and select one of two clear voice profiles: **Female** or **Male**. Explicitly saved creator choices remain unchanged. The learner can still decide whether to activate the offered read-aloud before starting an attempt.
 
 The selected profile maps to a stable server voice when compatible speech synthesis is configured. That request now asks for warm United States English, natural unhurried pacing, sentence pauses, and careful clinical-term articulation. When server speech is unavailable, the existing browser fallback uses the closest available English voice with a calm 0.94 playback rate. Quiz questions, answer choices, attempts, scores, and existing result settings are unchanged.
