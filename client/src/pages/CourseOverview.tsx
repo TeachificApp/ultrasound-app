@@ -695,9 +695,20 @@ export default function CourseOverview() {
           </DialogContent>
         </Dialog>
 
-        {/* Quiz Attempts Section — shown when course has quiz lessons and user has attempts */}
-        {quizAttemptsData && quizAttemptsData.byLesson.length > 0 && (
-          <QuizAttemptsSection byLesson={quizAttemptsData.byLesson} primaryColor={primaryColor} />
+        {/* Quiz results — native quizzes only; mock exams tracked separately */}
+        {quizAttemptsData && quizAttemptsData.byLesson.some((g) => !g.isMockExam) && (
+          <QuizAttemptsSection
+            byLesson={quizAttemptsData.byLesson.filter((g) => !g.isMockExam)}
+            primaryColor={primaryColor}
+            title="My Quiz Results"
+          />
+        )}
+        {quizAttemptsData && quizAttemptsData.byLesson.some((g) => g.isMockExam) && (
+          <QuizAttemptsSection
+            byLesson={quizAttemptsData.byLesson.filter((g) => g.isMockExam)}
+            primaryColor={primaryColor}
+            title="Mock Exam Results"
+          />
         )}
 
         {/* Certificate badge */}
@@ -741,6 +752,7 @@ type LessonAttemptGroup = {
   lessonId: number;
   lessonTitle: string;
   lessonType: string;
+  isMockExam?: boolean;
   attemptCount: number;
   bestScore: number;
   bestPassed: boolean;
@@ -750,7 +762,15 @@ type LessonAttemptGroup = {
   attempts: QuizAttemptRecord[];
 };
 
-function QuizAttemptsSection({ byLesson, primaryColor }: { byLesson: LessonAttemptGroup[]; primaryColor: string }) {
+function QuizAttemptsSection({
+  byLesson,
+  primaryColor,
+  title = "My Quiz Results",
+}: {
+  byLesson: LessonAttemptGroup[];
+  primaryColor: string;
+  title?: string;
+}) {
   const [expandedLesson, setExpandedLesson] = useState<number | null>(null);
 
   const fmtTime = (secs: number | null) => {
@@ -762,7 +782,7 @@ function QuizAttemptsSection({ byLesson, primaryColor }: { byLesson: LessonAttem
   return (
     <div className="mt-8">
       <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-1.5">
-        <BarChart2 className="w-4 h-4" style={{ color: primaryColor }} /> My Quiz Results
+        <BarChart2 className="w-4 h-4" style={{ color: primaryColor }} /> {title}
       </h3>
       <div className="space-y-3">
         {byLesson.map((group) => (

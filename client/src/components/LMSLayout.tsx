@@ -24,6 +24,7 @@ const MEMBERS_URL = "https://members.allaboutultrasound.com";
 import { getAdminUrl, APP_URL } from "@/hooks/useSubdomain";
 import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
 import { SiteNavHeaderLinks, SiteNavProfileLinks } from "@/components/SiteNavLinks";
+import { trpc } from "@/lib/trpc";
 const AAUS_APP_URL = "https://app.allaboutultrasound.com";
 
 interface NavItem {
@@ -66,6 +67,11 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
   })();
 
   const { isAuthenticated, user, loading: authLoading, logout } = useAuth();
+  const { data: quizResultsSummary } = trpc.standaloneQuizLearner.getMyQuizResultsSummary.useQuery(
+    undefined,
+    { enabled: isAuthenticated },
+  );
+  const showQuizResultsLink = Boolean(quizResultsSummary?.hasNativeQuizAttempts);
   const isAdmin = (user as any)?.role === "admin";
   const appRoles: string[] = (user as any)?.appRoles ?? [];
   const isPlatformAdmin = appRoles.includes("platform_admin") || isAdmin;
@@ -244,13 +250,15 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                       >
                         <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
                       </a>
-                      <a
-                        href="/my-quizzes"
-                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        onClick={() => setAccountOpen(false)}
-                      >
-                        <GraduationCap className="w-3.5 h-3.5 text-teal-600" /> My Quiz Results
-                      </a>
+                      {showQuizResultsLink && (
+                        <a
+                          href="/my-quizzes"
+                          className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          onClick={() => setAccountOpen(false)}
+                        >
+                          <GraduationCap className="w-3.5 h-3.5 text-teal-600" /> My Quiz Results
+                        </a>
+                      )}
                       <SiteNavProfileLinks
                         items={profileNavItems}
                         location={location}

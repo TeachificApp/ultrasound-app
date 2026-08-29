@@ -4802,11 +4802,17 @@ export const lmsLearnerRouter = router({
 
       if (attempts.length === 0) return { byLesson: [] };
 
-      // Get lesson titles for the lessons that have attempts
+      // Get lesson titles + mock-exam flag for lessons that have attempts
       const lessonIds = Array.from(new Set(attempts.map(a => a.lessonId)));
       const lessons = await db
-        .select({ id: lmsLessons.id, title: lmsLessons.title, lessonType: lmsLessons.lessonType })
+        .select({
+          id: lmsLessons.id,
+          title: lmsLessons.title,
+          lessonType: lmsLessons.lessonType,
+          isMockExam: lmsQuizzes.isMockExam,
+        })
         .from(lmsLessons)
+        .leftJoin(lmsQuizzes, eq(lmsLessons.id, lmsQuizzes.lessonId))
         .where(sql`${lmsLessons.id} IN (${sql.join(lessonIds.map(id => sql`${id}`), sql`, `)})`);
       const lessonMap = new Map(lessons.map(l => [l.id, l]));
 
@@ -4825,6 +4831,7 @@ export const lmsLearnerRouter = router({
           lessonId,
           lessonTitle: lesson?.title ?? `Quiz (Lesson ${lessonId})`,
           lessonType: lesson?.lessonType ?? "quiz",
+          isMockExam: Boolean(lesson?.isMockExam),
           attemptCount: lessonAttempts.length,
           bestScore: best.score,
           bestPassed: best.passed,
