@@ -300,15 +300,21 @@ export default function StandaloneQuizPlayer() {
   if (infoLoading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>;
 
   if (infoError || !quizInfo) {
-    const forbidden = infoError?.data?.code === "FORBIDDEN";
+    const errorCode = infoError?.data?.code;
+    const forbidden = errorCode === "FORBIDDEN";
+    const serverError = errorCode === "INTERNAL_SERVER_ERROR";
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-4">
         <AlertTriangle className="w-12 h-12 text-yellow-500" />
-        <h2 className="text-xl font-bold">{forbidden ? "Quiz access required" : "Quiz not found"}</h2>
-        <p className="text-gray-500">
-          {infoError?.message ?? (forbidden
-            ? "This quiz is available through its assigned learning experience."
-            : "This quiz may not be published yet.")}
+        <h2 className="text-xl font-bold">
+          {forbidden ? "Quiz access required" : serverError ? "Unable to load quiz" : "Quiz not found"}
+        </h2>
+        <p className="text-gray-500 max-w-lg">
+          {serverError
+            ? "Something went wrong loading this quiz. Please try again shortly."
+            : infoError?.message ?? (forbidden
+              ? "This quiz is available through its assigned learning experience."
+              : "This quiz may not be published yet.")}
         </p>
       </div>
     );
