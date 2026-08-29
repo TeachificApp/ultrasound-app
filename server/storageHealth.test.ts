@@ -15,11 +15,19 @@ describe("storage health diagnostics", () => {
   it("uses an ephemeral write/delete probe and never returns credentials or provider URLs", () => {
     const storage = read("server/storage.ts");
     const healthFunction = storage.slice(storage.indexOf("export async function getStorageHealth"));
-    expect(storage).toContain("diagnostics/storage-health-");
+    expect(storage).toContain('prefix = "diagnostics/storage-health"');
+    expect(storage).toContain('"diagnostics/storage-health"');
     expect(storage).toContain("await r2Delete(probeKey)");
     expect(healthFunction).toContain("r2Write: \"healthy\"");
     expect(healthFunction).not.toContain("secretAccessKey");
     expect(healthFunction).not.toContain("CF_R2_SECRET_ACCESS_KEY");
+  });
+
+  it("recognizes AWS SDK Access Denied responses by provider code and HTTP status", () => {
+    const storage = read("server/storage.ts");
+    expect(storage).toContain("providerError?.$metadata?.httpStatusCode");
+    expect(storage).toContain("status === 403");
+    expect(storage).toContain("providerError?.Code ?? providerError?.code");
   });
 
   it("returns an actionable but non-sensitive response when an editor upload is denied", () => {
@@ -27,5 +35,6 @@ describe("storage health diagnostics", () => {
     expect(route).toContain("Image storage is temporarily unavailable");
     expect(route).toContain("storage,");
     expect(route).toContain("res.status(503)");
+    expect(route).toContain("getStorageHealth(\"lms-images/storage-health\")");
   });
 });

@@ -89,7 +89,7 @@ router.post(
       console.error("[upload-course-image]", err);
       const message = err?.message ?? "Upload failed";
       if (/access denied|accessdenied|not authorized|forbidden/i.test(message)) {
-        const storage = await getStorageHealth().catch(() => null);
+        const storage = await getStorageHealth("lms-images/storage-health").catch(() => null);
         res.status(503).json({
           error: "Image storage is temporarily unavailable. The deployment storage write permission must be restored.",
           storage,

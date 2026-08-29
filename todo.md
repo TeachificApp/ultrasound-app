@@ -155,3 +155,4 @@
 - [ ] Add product-sale and email-campaign conversion metrics to the existing administrator analytics workflow.
 - [ ] Repair the editor image-upload Access Denied failure so authorized administrators can upload images from the device without weakening storage access controls.
 - [x] Add a safe administrator-only Railway storage health check that reports write/delete permission stages without exposing secret values or retaining test objects.
+- [ ] Implement and validate a production-safe editor image-upload fallback that succeeds when the Railway R2 primary path is denied, without storing files in the database or weakening authorization.

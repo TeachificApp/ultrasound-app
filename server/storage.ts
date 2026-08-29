@@ -85,9 +85,18 @@ function hasForgeCredentials(): boolean {
 function isStorageAccessDeniedError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err ?? "");
   const name = err instanceof Error ? err.name : "";
+  const providerError = err as {
+    Code?: unknown;
+    code?: unknown;
+    $metadata?: { httpStatusCode?: unknown };
+  };
+  const providerCode = String(providerError?.Code ?? providerError?.code ?? "");
+  const status = Number(providerError?.$metadata?.httpStatusCode ?? 0);
   return (
     /access denied|accessdenied|not authorized|forbidden/i.test(msg) ||
-    name === "AccessDenied"
+    /access denied|accessdenied|not authorized|forbidden/i.test(name) ||
+    /access denied|accessdenied|not authorized|forbidden/i.test(providerCode) ||
+    status === 403
   );
 }
 
@@ -409,7 +418,7 @@ export type StorageHealthStatus = {
  * Performs a minimal write/delete permission probe for administrators.
  * It returns no credentials, bucket names, object keys, URLs, or provider error text.
  */
-export async function getStorageHealth(): Promise<StorageHealthStatus> {
+export async function getStorageHealth(prefix = "diagnostics/storage-health"): Promise<StorageHealthStatus> {
   const r2Configured = Boolean(getR2Client() && process.env.CF_R2_PUBLIC_URL);
   const forgeConfigured = hasForgeCredentials();
   let backend: StorageHealthStatus["backend"] = "unavailable";
@@ -424,7 +433,8 @@ export async function getStorageHealth(): Promise<StorageHealthStatus> {
     return { backend, r2Configured, forgeConfigured, r2Write: "not_checked" };
   }
 
-  const probeKey = `diagnostics/storage-health-${randomBytes(16).toString("hex")}.txt`;
+  const normalizedPrefix = normalizeKey(prefix).replace(/\/+$/, "") || "diagnostics/storage-health";
+  const probeKey = `${normalizedPrefix}-${randomBytes(16).toString("hex")}.txt`;
   try {
     await r2Put(probeKey, "health check", "text/plain");
     try {
