@@ -18,7 +18,8 @@ const CONTENT_UPLOAD_APP_ROLES = new Set([
 export type ContentUploadUser = { id: number; role: string };
 
 export async function canUploadCourseContent(user: ContentUploadUser): Promise<boolean> {
-  if (user.role === "admin") return true;
+  const directRole = user.role.trim().toLowerCase();
+  if (directRole === "admin" || CONTENT_UPLOAD_APP_ROLES.has(directRole)) return true;
 
   const db = await getDb();
   if (db) {

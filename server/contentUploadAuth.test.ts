@@ -23,16 +23,22 @@ describe("contentUploadAuth", () => {
     expect(getUserAppRoles).not.toHaveBeenCalled();
   });
 
+  it("allows a persisted Platform Admin role after authenticated session resolution", async () => {
+    await expect(canUploadCourseContent({ id: 2, role: "platform_admin" })).resolves.toBe(true);
+    expect(getDb).not.toHaveBeenCalled();
+    expect(getUserAppRoles).not.toHaveBeenCalled();
+  });
+
   it("allows platform_admin app role", async () => {
     vi.mocked(getDb).mockResolvedValue(null as any);
     vi.mocked(getUserAppRoles).mockResolvedValue(["platform_admin"]);
-    await expect(canUploadCourseContent({ id: 2, role: "user" })).resolves.toBe(true);
+    await expect(canUploadCourseContent({ id: 3, role: "user" })).resolves.toBe(true);
   });
 
   it("allows education_manager app role", async () => {
     vi.mocked(getDb).mockResolvedValue(null as any);
     vi.mocked(getUserAppRoles).mockResolvedValue(["education_manager"]);
-    await expect(canUploadCourseContent({ id: 3, role: "user" })).resolves.toBe(true);
+    await expect(canUploadCourseContent({ id: 4, role: "user" })).resolves.toBe(true);
   });
 
   it("denies regular learners", async () => {
@@ -46,6 +52,6 @@ describe("contentUploadAuth", () => {
       }),
     } as any);
     vi.mocked(getUserAppRoles).mockResolvedValue([]);
-    await expect(canUploadCourseContent({ id: 4, role: "user" })).resolves.toBe(false);
+    await expect(canUploadCourseContent({ id: 5, role: "user" })).resolves.toBe(false);
   });
 });
