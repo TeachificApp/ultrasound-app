@@ -84,7 +84,6 @@ export function BuilderIntroScreen({
   onStart,
   disabled,
   loading,
-  readAloudFooter,
 }: {
   intro?: BuilderIntroSlide | null;
   branding?: BuilderBranding | null;
@@ -95,7 +94,6 @@ export function BuilderIntroScreen({
   onStart: () => void;
   disabled?: boolean;
   loading?: boolean;
-  readAloudFooter?: React.ReactNode;
 }) {
   const primary = branding?.primaryColor ?? "#24abbc";
   const bg = branding?.backgroundColor ?? "#0d1f3c";
@@ -124,7 +122,6 @@ export function BuilderIntroScreen({
           <p>{questionCount} questions · Passing score: {passingScore}%</p>
           {timeLimitMinutes && <p>Time limit: {timeLimitMinutes} minutes</p>}
         </div>
-        {readAloudFooter ? <div className="mb-6 text-left">{readAloudFooter}</div> : null}
         <button
           type="button"
           onClick={onStart}

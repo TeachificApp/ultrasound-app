@@ -68,7 +68,6 @@ import { printfulAdminRouter, printfulPublicRouter } from "./routers/printfulRou
 import { shopifyAdminRouter } from "./routers/shopifyRouter";
 import { printifyAdminRouter } from "./routers/printifyRouter";
 import { standaloneQuizPublicRouter, standaloneQuizLearnerRouter, standaloneQuizAdminRouter, standaloneQuizResultsAdminRouter } from "./routers/standaloneQuizRouter";
-import { quizVoiceRouter } from "./routers/quizVoiceRouter";
 import { quizBankRouter } from "./routers/quizBankRouter";
 import { quizMakerRouter } from "./routers/quizMakerRouter";
 import { teamRouter } from "./routers/teamRouter";
@@ -2813,7 +2812,6 @@ export const appRouter = router({
   // ─── Standalone Quiz Creator ────────────────────────────────────────────────
   standaloneQuiz: standaloneQuizPublicRouter,
   standaloneQuizLearner: standaloneQuizLearnerRouter,
-  quizVoice: quizVoiceRouter,
   standaloneQuizAdmin: standaloneQuizAdminRouter,
   standaloneQuizResults: standaloneQuizResultsAdminRouter,
   // ─── Quiz Bank ───────────────────────────────────────────────────────────────
