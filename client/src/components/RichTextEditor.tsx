@@ -39,6 +39,12 @@ import { Table } from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableCell from "@tiptap/extension-table-cell";
 import TableHeader from "@tiptap/extension-table-header";
+import {
+  mergeEmojiOnlyPlainTextLines,
+  normalizePastedRichTextHtml,
+  plainTextToPasteHtml,
+  shouldFallbackToPlainTextEmojiPaste,
+} from "@shared/richTextPasteTransform";
 
 // Extended Table with borderless attribute
 const CustomTable = Table.extend({
@@ -729,154 +735,28 @@ export default function RichTextEditor({
       // Strip non-standard HTML attributes that external editors (web pages, Google Docs, Word, etc.)
       // add to elements. Without this, unknown attributes like containerstyle/wrapperstyle render
       // as visible raw text in the TipTap editor area.
-      transformPastedHTML: (html: string) => {
-        try {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, "text/html");
-
-          // ── Convert ChatGPT / Wikipedia MathML to TipTap math nodes ──────────
-          // ChatGPT wraps each equation in <span class="math"> or similar, with
-          // a <math> element that contains <annotation encoding="application/x-tex">
-          // holding the raw LaTeX.  We replace the whole math container with a
-          // TipTap-compatible node that the Mathematics extension can parse.
-          doc.body.querySelectorAll<HTMLElement>("math").forEach((mathEl) => {
-            const annotation = mathEl.querySelector('annotation[encoding="application/x-tex"]');
-            const latex = annotation?.textContent?.trim() ?? "";
-            if (!latex) return;
-
-            // Determine display mode: MathML uses display="block" for block equations
-            const isBlock = mathEl.getAttribute("display") === "block" ||
-              mathEl.closest(".math-display, .katex-display, [data-display='block']") !== null;
-
-            // Build the replacement element that the Mathematics extension parses
-            const replacement = isBlock
-              ? Object.assign(doc.createElement("div"), {
-                  dataset: { type: "block-math", latex },
-                })
-              : Object.assign(doc.createElement("span"), {
-                  dataset: { type: "inline-math", latex },
-                });
-            replacement.setAttribute("data-type", isBlock ? "block-math" : "inline-math");
-            replacement.setAttribute("data-latex", latex);
-
-            // Replace the outermost math container (could be wrapped in a <span class="math">)
-            const container = mathEl.closest(".math, .math-inline, .math-display") ?? mathEl;
-            container.replaceWith(replacement);
-          });
-
-          // ── Strip non-standard attributes from other editors ──────────────────
-          const nonStandardAttrs = [
-            "containerstyle", "wrapperstyle", "containerStyle", "wrapperStyle",
-          ];
-          doc.body.querySelectorAll("*").forEach((el) => {
-            nonStandardAttrs.forEach((attr) => el.removeAttribute(attr));
-            Array.from(el.attributes).forEach((a) => {
-              if (
-                a.name.startsWith("data-mce") ||
-                a.name.startsWith("data-stringify") ||
-                a.name.startsWith("data-sheets")
-              ) {
-                el.removeAttribute(a.name);
-              }
-            });
-          });
-
-          // ── Merge emoji-only <p> tags with the following <p> ──────────────────────────
-          // Email clients often put each emoji on its own <p> line.
-          // We merge them: <p>🏆</p><p>Bragging rights</p> → <p>🏆 Bragging rights</p>
-          // Use a broad emoji-detection function that covers all Unicode emoji ranges
-          const isEmojiOnly = (text: string): boolean => {
-            if (!text.trim()) return false;
-            // Use Unicode property \p{Emoji} to strip all emoji chars + modifiers
-            const stripped = text
-              .replace(/\p{Emoji}/gu, "")
-              .replace(/[\u200D\uFE0F\u20E3]/g, "")
-              .replace(/\s/g, "");
-            return stripped.length === 0;
-          };
-          const blockEls = Array.from(doc.body.querySelectorAll<HTMLElement>("p, li, div"));
-          for (let bi = 0; bi < blockEls.length - 1; bi++) {
-            const el = blockEls[bi];
-            const next = blockEls[bi + 1];
-            if (!el.parentNode || el.parentNode !== next.parentNode) continue;
-            const text = el.textContent?.trim() ?? "";
-            if (text && isEmojiOnly(text)) {
-              // Prepend emoji text to the next sibling
-              const space = doc.createTextNode(text + " ");
-              next.insertBefore(space, next.firstChild);
-              el.remove();
-              bi--; // re-check from same position
-            }
-          }
-
-          return doc.body.innerHTML;
-        } catch {
-          return html;
-        }
-      },
-      // Merge emoji-only lines with the following text line for plain-text paste
-      transformPastedText: (text: string) => {
-        // Merge lines where an emoji-only line precedes a text line
-        // e.g. "🏆\nBragging rights" → "🏆 Bragging rights"
-        const isEmojiOnlyLine = (s: string): boolean => {
-          if (!s.trim()) return false;
-          // Remove all emoji, variation selectors, ZWJ sequences, and whitespace
-          // Use a simple approach: remove chars in known emoji ranges + modifiers
-          const noEmoji = s.replace(/\p{Emoji}/gu, "").replace(/[\u200D\uFE0F\u20E3]/g, "").replace(/\s/g, "");
-          return noEmoji.length === 0;
-        };
-        const lines = text.split('\n');
-        const merged: string[] = [];
-        let i = 0;
-        while (i < lines.length) {
-          const line = lines[i];
-          const trimmed = line.trim();
-          if (trimmed && isEmojiOnlyLine(trimmed) && i + 1 < lines.length && lines[i + 1].trim()) {
-            merged.push(trimmed + ' ' + lines[i + 1].trim());
-            i += 2;
-          } else {
-            merged.push(line);
-            i++;
-          }
-        }
-        return merged.join('\n');
-      },
+      transformPastedHTML: normalizePastedRichTextHtml,
+      transformPastedText: mergeEmojiOnlyPlainTextLines,
       handlePaste: (view, event) => {
         const pastedHtml = event.clipboardData?.getData("text/html") ?? "";
         const pastedText = event.clipboardData?.getData("text/plain") ?? "";
 
         // ── Emoji inline paste fix ────────────────────────────────────────────
-        // When pasting content that contains emojis (from ChatGPT, Slack, iMessage,
-        // email clients, etc.), always use the plain-text clipboard version as the
-        // source of truth. This avoids the common problem where the HTML version
-        // breaks emojis into separate block elements.
-        //
-        // Exception: if the HTML contains images, we must use the HTML path so
-        // images are preserved and uploaded correctly.
-        const hasEmoji = /\p{Emoji_Presentation}/u.test(pastedText);
+        // Only fall back to plain text when HTML is missing or emoji-only blocks
+        // would break layout. Well-formed ChatGPT HTML keeps bold/lists/headings.
         const hasImage = pastedHtml.includes("data:image") || pastedHtml.includes("<img");
 
-        if (hasEmoji && !hasImage && pastedText.trim()) {
+        if (
+          shouldFallbackToPlainTextEmojiPaste({ pastedHtml, pastedText, hasImage })
+        ) {
           event.preventDefault();
-          // Convert plain text to HTML: single newlines → <br>, double newlines → new <p>
-          const paragraphs = pastedText.split(/\n{2,}/);
-          const htmlContent = paragraphs
-            .map(para => {
-              const lines = para.split(/\n/);
-              const inner = lines
-                .map(l => l.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"))
-                .join("<br>");
-              return `<p>${inner}</p>`;
-            })
-            .join("");
-          // Use ProseMirror's DOMParser to parse the HTML and dispatch a transaction
-          // directly via the view — this avoids any dependency on editorRef.current
-          // which is set asynchronously via useEffect and may be null on first paste.
+          const htmlContent = plainTextToPasteHtml(pastedText);
           const domEl = document.createElement("div");
           domEl.innerHTML = htmlContent;
-          const pmSlice = PmDOMParser.fromSchema(view.state.schema).parseSlice(domEl, { preserveWhitespace: true });
-          const tr = view.state.tr.replaceSelection(pmSlice);
-          view.dispatch(tr);
+          const pmSlice = PmDOMParser.fromSchema(view.state.schema).parseSlice(domEl, {
+            preserveWhitespace: true,
+          });
+          view.dispatch(view.state.tr.replaceSelection(pmSlice));
           return true;
         }
 
