@@ -25,9 +25,12 @@ describe("openAiConfig", () => {
       "OPENAI_API_BASE",
       "FORGE_API_KEY",
       "FORGE_API_URL",
+      "VITE_FRONTEND_FORGE_API_KEY",
+      "VITE_FRONTEND_FORGE_API_URL",
       "MANUS_API_KEY",
     ]) {
       saved[key] = process.env[key];
+      delete process.env[key];
     }
     process.env.BUILT_IN_FORGE_API_URL = "https://api.openai.com";
     process.env.BUILT_IN_FORGE_API_KEY = "sk-test";
@@ -68,6 +71,23 @@ describe("openAiConfig", () => {
     process.env.OPENAI_API_KEY = "sk-openai-only";
     expect(resolveForgeApiKey()).toBe("sk-openai-only");
     expect(getOpenAiApiKey()).toBe("sk-openai-only");
+  });
+
+  it("falls back to the existing Railway VITE Forge pair when server variables are absent", () => {
+    delete process.env.BUILT_IN_FORGE_API_URL;
+    delete process.env.BUILT_IN_FORGE_API_KEY;
+    delete process.env.FORGE_API_URL;
+    delete process.env.FORGE_API_KEY;
+    delete process.env.OPENAI_BASE_URL;
+    delete process.env.OPENAI_API_BASE;
+    delete process.env.OPENAI_API_KEY;
+    process.env.VITE_FRONTEND_FORGE_API_URL = "https://forge.manus.ai/v1";
+    process.env.VITE_FRONTEND_FORGE_API_KEY = "railway-forge-key";
+
+    expect(resolveForgeApiUrl()).toBe("https://forge.manus.ai");
+    expect(resolveForgeApiKey()).toBe("railway-forge-key");
+    expect(isAiConfigured()).toBe(true);
+    expect(resolveLlmChatModel()).toBe("gemini-3-flash-preview");
   });
 
   it("defaults OpenAI base URL when only OPENAI_API_KEY is set", () => {

@@ -1878,6 +1878,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                         { key: "showResultsImmediately", label: "Show results immediately after submission" },
                         { key: "showExplanations", label: "Show explanations in results" },
                         { key: "allowRetakes", label: "Allow retakes" },
+                        { key: "readAloudEnabled", label: "Offer read-aloud to learners" },
                       ].map(({ key, label }) => (
                         <div key={key} className="flex items-center justify-between">
                           <Label className="cursor-pointer">{label}</Label>
@@ -1887,6 +1888,22 @@ function QuizEditor({ quizId }: { quizId: number }) {
                           />
                         </div>
                       ))}
+                      {settings.readAloudEnabled !== false ? (
+                        <div className="pt-1">
+                          <Label htmlFor="quiz-read-aloud-voice">Read-aloud voice</Label>
+                          <Select
+                            value={settings.readAloudVoice ?? "female"}
+                            onValueChange={(value) => setSettings((s: any) => ({ ...s, readAloudVoice: value }))}
+                          >
+                            <SelectTrigger id="quiz-read-aloud-voice" className="mt-1"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="female">Female</SelectItem>
+                              <SelectItem value="male">Male</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="mt-1 text-xs text-gray-500">Learners can turn read-aloud on or off before starting. The selected voice uses natural pacing.</p>
+                        </div>
+                      ) : null}
                     </div>
                   </CardContent>
                 </Card>

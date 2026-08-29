@@ -1200,7 +1200,7 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-800">AI Generate Sales Page</p>
-                <p className="text-xs text-gray-500 mt-0.5">The AI will read your product title, description, and pricing to generate a complete block-based sales page — hero, features, testimonials, FAQ, and CTA.</p>
+                <p className="text-xs text-gray-500 mt-0.5">The AI will read your product title, description, and pricing to generate a complete block-based sales page — hero, features, FAQ, and CTA.</p>
               </div>
             </div>
             <Button

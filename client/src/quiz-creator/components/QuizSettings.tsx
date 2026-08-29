@@ -417,6 +417,33 @@ export function QuizSettings({ onClose }: Props) {
                   </label>
                 ))}
               </div>
+              <div className="border-t border-gray-100 pt-4 space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={m.readAloudEnabled !== false}
+                    onChange={(e) => updateMeta({ readAloudEnabled: e.target.checked })}
+                    className="accent-teal-500 w-4 h-4"
+                  />
+                  <div>
+                    <span className="text-sm text-gray-700 font-medium">Offer read-aloud to learners</span>
+                    <p className="text-xs text-gray-400 mt-0.5">Learners can choose to hear questions, answers, and feedback before starting.</p>
+                  </div>
+                </label>
+                {m.readAloudEnabled !== false ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Read-aloud voice</label>
+                    <select
+                      value={m.readAloudVoice ?? "female"}
+                      onChange={(e) => updateMeta({ readAloudVoice: e.target.value as "female" | "male" })}
+                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400/50"
+                    >
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                    </select>
+                  </div>
+                ) : null}
+              </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Questions Per Page</label>
                 <select

@@ -153,6 +153,8 @@ function defaultMeta(): QuizMeta {
     maxAttempts: 3,
     allowBackNavigation: true,
     showProgressBar: true,
+    readAloudEnabled: true,
+    readAloudVoice: "female",
     editorViewMode: "form",
   };
 }

@@ -223,9 +223,9 @@ describe("Funnel Builder", () => {
   });
 
   describe("Default Blocks by Page Type", () => {
-    it("should generate landing page defaults with hero + bullets + testimonial + CTA", () => {
+    it("should generate landing page defaults with hero + bullets + CTA", () => {
       const pageType = "landing";
-      const expectedTypes = ["hero", "bullets", "testimonial", "cta_standalone"];
+      const expectedTypes = ["hero", "bullets", "cta_standalone"];
       // The getDefaultBlocks function generates these for landing pages
       expect(expectedTypes).toContain("hero");
       expect(expectedTypes).toContain("cta_standalone");

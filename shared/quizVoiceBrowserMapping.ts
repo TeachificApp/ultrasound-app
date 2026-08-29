@@ -6,21 +6,13 @@ export type BrowserVoiceCandidate = {
   default?: boolean;
 };
 
-/** Pitch/rate tweaks so browser fallback voices feel distinct even on one system voice. */
+/** Natural, conversational pacing for browser fallback voices. */
 export function getBrowserSpeechProfile(voiceId: QuizTtsVoiceId): { pitch: number; rate: number } {
   switch (voiceId) {
-    case "shimmer":
-      return { pitch: 1.18, rate: 1.06 };
     case "nova":
-      return { pitch: 1.08, rate: 1.02 };
-    case "alloy":
-      return { pitch: 1, rate: 1 };
-    case "echo":
-      return { pitch: 0.96, rate: 0.98 };
-    case "fable":
-      return { pitch: 0.92, rate: 0.96 };
+      return { pitch: 1.02, rate: 0.94 };
     case "onyx":
-      return { pitch: 0.78, rate: 0.92 };
+      return { pitch: 0.93, rate: 0.94 };
     default:
       return { pitch: 1, rate: 1 };
   }
@@ -39,22 +31,20 @@ export function scoreBrowserVoiceForQuizVoice(
   const femaleHints = /female|woman|girl|samantha|victoria|zira|jenny|aria|susan|karen|moira|tessa|fiona/;
   const maleHints = /male|man|boy|daniel|david|guy|fred|alex|tom|james|mark|george|richard/;
 
-  if (voiceId === "nova" || voiceId === "shimmer") {
+  if (voiceId === "nova") {
     if (femaleHints.test(name)) score += 12;
     if (maleHints.test(name)) score -= 4;
   }
 
-  if (voiceId === "echo" || voiceId === "onyx" || voiceId === "fable") {
+  if (voiceId === "onyx") {
     if (maleHints.test(name)) score += 12;
     if (femaleHints.test(name)) score -= 4;
   }
 
   if (voiceId === "onyx" && /deep|low|baritone|bass/.test(name)) score += 6;
-  if (voiceId === "shimmer" && /bright|young|light/.test(name)) score += 4;
-  if (voiceId === "alloy" && /neutral|google us english/.test(name)) score += 3;
 
-  // Spread voices across the list when names are ambiguous.
-  const voiceOrder: QuizTtsVoiceId[] = ["alloy", "nova", "shimmer", "echo", "fable", "onyx"];
+  // Spread choices across the list when names are ambiguous.
+  const voiceOrder: QuizTtsVoiceId[] = ["nova", "onyx"];
   const slot = voiceOrder.indexOf(voiceId);
   if (slot >= 0 && name.includes(String(slot))) score += 1;
 
@@ -87,7 +77,7 @@ export function pickBrowserVoiceIndex(
   if (pool.length > 1) {
     const tied = pool.filter(({ voice }) => scoreBrowserVoiceForQuizVoice(voiceId, voice) === bestScore);
     if (tied.length > 1) {
-      const voiceOrder: QuizTtsVoiceId[] = ["alloy", "nova", "shimmer", "echo", "fable", "onyx"];
+      const voiceOrder: QuizTtsVoiceId[] = ["nova", "onyx"];
       const offset = Math.max(0, voiceOrder.indexOf(voiceId));
       bestIndex = tied[offset % tied.length]?.index ?? bestIndex;
     }

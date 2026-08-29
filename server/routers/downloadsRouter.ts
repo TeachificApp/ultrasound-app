@@ -1738,9 +1738,9 @@ Description: ${product.description ?? ""}
 Price: ${priceText}
 Cover Image: ${product.thumbnailUrl ?? ""}
 
-Generate a JSON array of 5-7 content blocks. Each block MUST have:
+Generate a JSON array of 4-6 content blocks. Each block MUST have:
 - id: unique string like "block_1", "block_2", etc.
-- type: MUST be one of these exact strings: hero, text, reviews, faq, cta_standalone
+- type: MUST be one of these exact strings: hero, text, faq, cta_standalone
 - data: object with the fields described below
 
 Block data schemas:
@@ -1762,17 +1762,12 @@ Block data schemas:
    html: string (HTML with h2, p, ul/li tags — write compelling content about what's included, benefits, who it's for)
    bgColor: "#ffffff"
 
-3. reviews block — data fields:
-   headline: "What People Are Saying"
-   bgColor: "#ffffff"
-   reviews: array of 3 objects each with: name (string), text (string — realistic review), rating (number 4 or 5)
-
-4. faq block — data fields:
+3. faq block — data fields:
    headline: "Frequently Asked Questions"
    bgColor: "#f9fafb"
    items: array of 5 objects each with: q (string — question), a (string — answer)
 
-5. cta_standalone block — data fields:
+4. cta_standalone block — data fields:
    headline: string (urgent call to action)
    subtext: string (reassurance text)
    ctaText: "Get Instant Access"
@@ -1781,7 +1776,7 @@ Block data schemas:
    bgColor: "#f0fafa"
    align: "center"
 
-Create blocks in this order: hero, text (what you get + benefits), text (about/description), reviews, faq, cta_standalone.
+Create blocks in this order: hero, text (what you get + benefits), text (about/description), faq, cta_standalone.
 Make ALL content specific and compelling based on the product title and description above. Do NOT use generic placeholder text.`;
 
       const response = await invokeLLM({

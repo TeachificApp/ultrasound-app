@@ -22,9 +22,10 @@ export async function synthesizeSpeech(options: SynthesizeSpeechOptions): Promis
       authorization: `Bearer ${getSpeechSynthesisApiKey()}`,
     },
     body: JSON.stringify({
-      model: "tts-1",
+      model: "gpt-4o-mini-tts",
       input: input.slice(0, 4096),
       voice: options.voice,
+      instructions: "Speak in clear, warm United States English at a natural, unhurried conversational pace. Use brief pauses at sentence boundaries and articulate clinical terminology carefully.",
       response_format: "mp3",
     }),
   });

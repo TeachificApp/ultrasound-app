@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 describe("llmHelpers", () => {
   const AI_ENV_KEYS = [
@@ -10,6 +10,8 @@ describe("llmHelpers", () => {
     "OPENAI_API_BASE",
     "FORGE_API_URL",
     "FORGE_API_KEY",
+    "VITE_FRONTEND_FORGE_API_URL",
+    "VITE_FRONTEND_FORGE_API_KEY",
   ] as const;
   const savedEnv: Record<string, string | undefined> = {};
   const originalFetch = global.fetch;
@@ -66,7 +68,6 @@ describe("llmHelpers", () => {
     const body = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(body.model).toBe("gemini-3-flash-preview");
     expect(fetchMock.mock.calls[0][0]).toBe("https://forge.manus.ai/v1/chat/completions");
-
   });
 
   it("uses direct Forge chat when explicitly requested even when a Manus task key exists", async () => {
@@ -95,7 +96,26 @@ describe("llmHelpers", () => {
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(body.model).toBe("gemini-3-flash-preview");
     expect(body.thinking).toBeUndefined();
+  });
 
+  it("automatically prefers Forge chat when both Forge and Manus task credentials exist", async () => {
+    process.env.MANUS_API_KEY = "task-test-key";
+    process.env.BUILT_IN_FORGE_API_URL = "https://forge.manus.ai";
+    process.env.BUILT_IN_FORGE_API_KEY = "forge-test-key";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: "chatcmpl-auto-forge",
+      created: 1,
+      model: "gemini-3-flash-preview",
+      choices: [{ index: 0, message: { role: "assistant", content: "Generated" }, finish_reason: "stop" }],
+    }), { status: 200 }));
+    global.fetch = fetchMock as typeof fetch;
+
+    const { invokeLLM } = await import("../_core/llm");
+    const result = await invokeLLM({ messages: [{ role: "user", content: "Generate content." }] });
+
+    expect(result.choices[0]?.message.content).toBe("Generated");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://forge.manus.ai/v1/chat/completions");
   });
 });
 
@@ -110,6 +130,8 @@ describe("aiConnection", () => {
     "OPENAI_API_BASE",
     "FORGE_API_URL",
     "FORGE_API_KEY",
+    "VITE_FRONTEND_FORGE_API_URL",
+    "VITE_FRONTEND_FORGE_API_KEY",
   ] as const;
 
   beforeEach(() => {
@@ -136,14 +158,21 @@ describe("aiConnection", () => {
     });
   });
 
-  it("prefers Manus API v2 when MANUS_API_KEY is set", async () => {
+  it("prefers Forge chat when both Forge and Manus task credentials are set", async () => {
     process.env.MANUS_API_KEY = "server-only-test-key";
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true, data: [] }), { status: 200 }));
+    process.env.BUILT_IN_FORGE_API_URL = "https://forge.manus.ai";
+    process.env.BUILT_IN_FORGE_API_KEY = "forge-test-key";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      id: "chatcmpl-health",
+      created: 1,
+      model: "gemini-3-flash-preview",
+      choices: [{ index: 0, message: { role: "assistant", content: "OK" }, finish_reason: "stop" }],
+    }), { status: 200 }));
     global.fetch = fetchMock as typeof fetch;
     const { verifyAiConnection } = await import("./aiConnection");
     await expect(verifyAiConnection()).resolves.toEqual({
       configured: true,
-      backend: "manus-api-v2",
+      backend: "forge-chat",
       connected: true,
     });
   });

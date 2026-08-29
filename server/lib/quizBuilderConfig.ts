@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { DEFAULT_QUIZ_READ_ALOUD_VOICE, type QuizReadAloudVoice } from "../../shared/quizVoiceOptions";
 
 export const SITE_BRAND_THEMES = {
   aaus: {
@@ -53,6 +54,8 @@ export interface QuizFileMeta {
   resultSlide?: Record<string, unknown>;
   allowBackNavigation?: boolean;
   showProgressBar?: boolean;
+  readAloudEnabled?: boolean;
+  readAloudVoice?: QuizReadAloudVoice;
   questionsPerPage?: number;
   branchingEnabled?: boolean;
   groups?: { id: string; name: string; color: string }[];
@@ -104,6 +107,8 @@ export function builderConfigFromQuizRow(
     maxAttempts: number | null;
     brand: BuilderBrand;
     builderConfig: string | null;
+    readAloudEnabled?: boolean | null;
+    readAloudVoice?: QuizReadAloudVoice | null;
   },
   user?: { name?: string | null; email?: string | null }
 ): QuizFile {
@@ -122,6 +127,8 @@ export function builderConfigFromQuizRow(
         shuffleAnswers: quiz.shuffleAnswers,
         allowRetry: quiz.allowRetakes,
         maxAttempts: quiz.maxAttempts ?? existing.meta.maxAttempts,
+        readAloudEnabled: quiz.readAloudEnabled ?? true,
+        readAloudVoice: quiz.readAloudVoice ?? DEFAULT_QUIZ_READ_ALOUD_VOICE,
         branding: existing.meta.branding ?? defaultBrandingForBrand(quiz.brand),
       },
     };
@@ -164,6 +171,8 @@ export function builderConfigFromQuizRow(
       },
       allowBackNavigation: true,
       showProgressBar: true,
+      readAloudEnabled: quiz.readAloudEnabled ?? true,
+      readAloudVoice: quiz.readAloudVoice ?? DEFAULT_QUIZ_READ_ALOUD_VOICE,
       branchingEnabled: false,
       groups: [],
       editorViewMode: "form",

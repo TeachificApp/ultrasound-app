@@ -6,7 +6,6 @@ describe("lmsAdminRouter AI procedures", () => {
     "generatePromoContent",
     "generateQuizFromLesson",
     "generateFlashcardsFromLesson",
-    "generateTestimonials",
     "generateAiImage",
     "listTestimonialPresets",
     "saveTestimonialPreset",

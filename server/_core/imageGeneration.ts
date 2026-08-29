@@ -47,10 +47,8 @@ async function generateImageViaOpenAi(
   });
 
   if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(
-      `OpenAI image generation failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`
-    );
+    console.error(`[generateImage] OpenAI image generation failed with HTTP ${response.status}`);
+    throw new Error("AI image generation is temporarily unavailable. Please retry in a moment.");
   }
 
   const result = (await response.json()) as {
@@ -96,10 +94,8 @@ async function generateImageViaForge(
   });
 
   if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(
-      `Image generation request failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`
-    );
+    console.error(`[generateImage] Forge image generation failed with HTTP ${response.status}`);
+    throw new Error("AI image generation is temporarily unavailable. Please retry in a moment.");
   }
 
   const result = (await response.json()) as {

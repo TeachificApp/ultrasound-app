@@ -22,10 +22,13 @@ import {
 } from "@/components/quiz/BuilderQuizPlayer";
 import {
   QuizReadAloudSettings,
-  DEFAULT_QUIZ_TTS_VOICE,
 } from "@/components/quiz/QuizReadAloudSettings";
 import { useQuizReadAloud } from "@/hooks/useQuizReadAloud";
-import type { QuizTtsVoiceId } from "@shared/quizVoiceOptions";
+import {
+  DEFAULT_QUIZ_READ_ALOUD_VOICE,
+  quizReadAloudVoiceToTtsVoice,
+  type QuizReadAloudVoice,
+} from "@shared/quizVoiceOptions";
 
 export function getStandaloneSelectedOptionFeedback(
   type: string,
@@ -136,12 +139,13 @@ export default function StandaloneQuizPlayer() {
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<number, boolean>>({});
   const [showMockExamReview, setShowMockExamReview] = useState(false);
   const [readAloudEnabled, setReadAloudEnabled] = useState(false);
-  const [readAloudVoice, setReadAloudVoice] = useState<QuizTtsVoiceId>(DEFAULT_QUIZ_TTS_VOICE);
 
   const isNativeQuizType = (quizData?.type ?? quizInfo?.type) !== "mock_exam";
-  const readAloud = useQuizReadAloud(readAloudEnabled && phase === "started" && isNativeQuizType, readAloudVoice);
-
   const builderMeta = (quizInfo as any)?.builderConfig ?? quizData?.builderMeta ?? null;
+  const creatorReadAloudEnabled = builderMeta?.readAloudEnabled ?? quizInfo?.readAloudEnabled ?? true;
+  const creatorReadAloudVoice = (builderMeta?.readAloudVoice ?? quizInfo?.readAloudVoice ?? DEFAULT_QUIZ_READ_ALOUD_VOICE) as QuizReadAloudVoice;
+  const readAloudVoice = quizReadAloudVoiceToTtsVoice(creatorReadAloudVoice);
+  const readAloud = useQuizReadAloud(creatorReadAloudEnabled && readAloudEnabled && phase === "started" && isNativeQuizType, readAloudVoice);
   const branding = builderMeta?.branding ?? null;
   const isBuilderMode = !!(quizData?.builderMode || builderMeta);
   const currentQuestion = phase === "started" ? questions[currentIdx] : null;
@@ -168,7 +172,7 @@ export default function StandaloneQuizPlayer() {
   }, [currentIdx, currentQuestion?.questionBankId, isBuilderMode, quizData?.type, answers, revealed]);
 
   useEffect(() => {
-    if (phase !== "started" || !readAloudEnabled || !isNativeQuizType || !currentQuestion) return;
+    if (phase !== "started" || !creatorReadAloudEnabled || !readAloudEnabled || !isNativeQuizType || !currentQuestion) return;
     let options: string[] = [];
     try {
       const parsed = JSON.parse(currentQuestion.options ?? "[]") as Array<string | { text: string }>;
@@ -180,10 +184,10 @@ export default function StandaloneQuizPlayer() {
     return () => {
       readAloud.stop();
     };
-  }, [phase, readAloudEnabled, isNativeQuizType, currentIdx, currentQuestion?.questionBankId]);
+  }, [phase, creatorReadAloudEnabled, readAloudEnabled, isNativeQuizType, currentIdx, currentQuestion?.questionBankId]);
 
   useEffect(() => {
-    if (!readAloudEnabled || !isNativeQuizType || !currentQuestion || phase !== "started") return;
+    if (!creatorReadAloudEnabled || !readAloudEnabled || !isNativeQuizType || !currentQuestion || phase !== "started") return;
     if (!revealed[currentQuestion.questionBankId]) return;
     let options: Array<{ text: string; feedback?: string }> = [];
     try {
@@ -322,13 +326,11 @@ export default function StandaloneQuizPlayer() {
 
   // ── Intro screen ──
   const readAloudSettingsEl =
-    (quizInfo.type !== "mock_exam") ? (
+    (creatorReadAloudEnabled && quizInfo.type !== "mock_exam") ? (
       <QuizReadAloudSettings
         enabled={readAloudEnabled}
         voice={readAloudVoice}
-        quizTitle={quizInfo.title}
         onEnabledChange={setReadAloudEnabled}
-        onVoiceChange={setReadAloudVoice}
         compact={!!builderMeta}
       />
     ) : null;

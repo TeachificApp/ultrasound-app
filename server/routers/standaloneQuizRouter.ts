@@ -166,6 +166,8 @@ const quizSettingsInput = z.object({
   showResultsImmediately: z.boolean().default(true),
   showResultsAfterDate: z.string().nullable().optional(), // ISO date string
   showExplanations: z.boolean().default(true),
+  readAloudEnabled: z.boolean().default(true),
+  readAloudVoice: z.enum(["female", "male"]).default("female"),
   allowRetakes: z.boolean().default(true),
   maxAttempts: z.number().int().min(1).nullable().optional(),
   accessType: z.enum(["enrolled", "members_only"]).default("enrolled"),

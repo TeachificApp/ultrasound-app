@@ -7503,6 +7503,9 @@ export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
   showResultsImmediately: boolean("show_results_immediately").default(true).notNull(),
   showResultsAfterDate: timestamp("show_results_after_date"),
   showExplanations: boolean("show_explanations").default(true).notNull(),
+  // Creator-controlled learner read-aloud availability and voice profile.
+  readAloudEnabled: boolean("read_aloud_enabled").default(true).notNull(),
+  readAloudVoice: mysqlEnum("read_aloud_voice", ["female", "male"]).default("female").notNull(),
   allowRetakes: boolean("allow_retakes").default(true).notNull(),
   maxAttempts: int("max_attempts"),
   accessType: mysqlEnum("access_type", ["public", "enrolled", "members_only"]).default("enrolled").notNull(),

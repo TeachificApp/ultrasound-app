@@ -1,14 +1,16 @@
 const URL_ENV_KEYS = [
   "BUILT_IN_FORGE_API_URL",
+  "FORGE_API_URL",
+  "VITE_FRONTEND_FORGE_API_URL",
   "OPENAI_BASE_URL",
   "OPENAI_API_BASE",
-  "FORGE_API_URL",
 ] as const;
 
 const KEY_ENV_KEYS = [
   "BUILT_IN_FORGE_API_KEY",
-  "OPENAI_API_KEY",
   "FORGE_API_KEY",
+  "VITE_FRONTEND_FORGE_API_KEY",
+  "OPENAI_API_KEY",
 ] as const;
 
 function normalizeApiRoot(raw: string): string {
@@ -46,7 +48,7 @@ export function getOpenAiApiKey(): string {
   const key = resolveForgeApiKey();
   if (!key) {
     throw new Error(
-      "AI API key is not configured. Set BUILT_IN_FORGE_API_KEY or OPENAI_API_KEY in Railway Variables.",
+      "AI API key is not configured. Set BUILT_IN_FORGE_API_KEY or VITE_FRONTEND_FORGE_API_KEY in Railway Variables.",
     );
   }
   return key;
@@ -57,7 +59,7 @@ export function getOpenAiApiRoot(): string {
   const raw = resolveForgeApiUrl();
   if (!raw) {
     throw new Error(
-      "AI API URL is not configured. Set BUILT_IN_FORGE_API_URL (e.g. https://api.openai.com) or OPENAI_API_KEY.",
+      "AI API URL is not configured. Set BUILT_IN_FORGE_API_URL or VITE_FRONTEND_FORGE_API_URL in Railway Variables.",
     );
   }
   return raw;

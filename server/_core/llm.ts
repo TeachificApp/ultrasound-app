@@ -428,10 +428,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+    console.error(`[LLM] Forge chat request failed with HTTP ${response.status}`);
+    throw new Error("AI generation is temporarily unavailable. Please retry in a moment.");
   }
 
   return (await response.json()) as InvokeResult;

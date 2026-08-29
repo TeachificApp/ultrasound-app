@@ -101,7 +101,7 @@ function getDefaultData(type: BlockType): Record<string, any> {
     case "video": return { url: "" };
     case "bullets": return { headline: "", items: ["Benefit 1", "Benefit 2", "Benefit 3"] };
     case "checklist": return { headline: "", items: ["Feature 1", "Feature 2", "Feature 3"] };
-    case "testimonial": return { quote: "This was amazing!", author: "Happy Customer", role: "" };
+    case "testimonial": return { quote: "", author: "", role: "" };
     case "faq": return { headline: "Frequently Asked Questions", items: [{ q: "Question?", a: "Answer." }] };
     case "pricing_cta": return { ctaText: "Add to Order", ctaColor: "#179ca3", bgColor: "#fff" };
     case "countdown": return { headline: "Offer expires in:", bgColor: "#179ca3", textColor: "#fff", durationMinutes: 30 };

@@ -14,7 +14,7 @@ describe("source-file course and quiz generation workflow", () => {
     expect(courseRouter).toContain('sourceFile: z.object({');
     expect(questionBankRouter).toContain('sourceFile: z.object({');
     expect(courseRouter).toContain('buildAiSourceMessage(userPrompt, sourceFiles)');
-    expect(questionBankRouter).toContain('buildAiSourceMessage(`Generate ${input.count} questions about: ${input.topic}`, sourceFiles)');
+    expect(questionBankRouter).toContain('buildAiSourceMessage(`Generate ${batchCount} unique questions about: ${input.topic}.');
   });
 
   it("offers upload controls in both AI authoring workflows and persists the optional course-wide quiz", () => {

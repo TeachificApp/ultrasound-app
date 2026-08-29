@@ -3179,7 +3179,7 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
           <div>
             <p className="text-sm font-semibold text-gray-800">AI Generate Landing Page</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              The AI will read your {typeLabel} title, description, sections, and lesson content to generate a complete block-based landing page — hero, curriculum, pricing, testimonials, and more.
+              The AI will read your {typeLabel} title, description, sections, and lesson content to generate a complete block-based landing page — hero, curriculum, pricing, FAQs, and more.
             </p>
           </div>
         </div>

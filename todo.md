@@ -165,3 +165,13 @@
 - [x] Repair the lesson editor AI content generator so it completes server-side without requiring a Manus task confirmation from the author.
 - [x] Prefer the Railway-configured Forge chat API for interactive lesson content generation when both Forge and Manus task credentials are present.
 - [ ] Verify a live Railway lesson-editor generation completes through Forge AI without a Manus task confirmation.
+- [ ] Ensure the Railway production application service exposes both required Forge variables so the direct lesson generator can authenticate.
+- [x] Accept the existing Railway VITE Forge configuration as a server-side compatibility fallback only when server-only Forge variables are absent.
+- [x] Inventory every AI generation workflow and its current model transport, authorization gate, input limits, output handling, and failure path.
+- [x] Move each compatible interactive AI generation workflow to the Railway-configured Forge chat or image-generation path and add focused regressions.
+- [x] Remove quiz read-aloud UI controls, text-to-speech calls, and related settings without altering quiz questions, attempts, scores, or accessibility text. Superseded by the creator-controlled setting request.
+- [ ] Verify every AI generation workflow and the creator-controlled read-aloud setting on the live Railway deployment. Supersedes the removed-feature verification request.
+- [x] Remove the synthetic customer-testimonial generator and its UI entry points because fabricated reviews and ratings must not be generated or stored.
+- [x] Remove hardcoded synthetic customer-review defaults and AI landing-page prompts that create fictitious testimonials, while retaining fields for genuine administrator-entered reviews.
+- [x] Add an administrator/creator-controlled read-aloud setting per quiz, preserve existing quiz behavior by default, and show the learner control only when enabled.
+- [x] Provide two basic creator-selectable quiz read-aloud voices, Female and Male, with natural pacing and a stable browser-supported fallback.

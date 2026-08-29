@@ -330,6 +330,8 @@ export interface QuizMeta {
   // Navigation
   allowBackNavigation?: boolean;
   showProgressBar?: boolean;
+  readAloudEnabled?: boolean;
+  readAloudVoice?: "female" | "male";
   questionsPerPage?: number; // null = one at a time
   // Branching
   branchingEnabled?: boolean; // when true, quiz uses branching logic instead of linear flow

@@ -4431,23 +4431,8 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
       return (<div className="space-y-3"><BSTextField data={d} onSet={set} label="Section Headline" field="headline" /><div><label className="text-xs text-gray-500 block mb-1">Columns</label><Input type="number" value={d.columns ?? 3} onChange={e => set("columns", Number(e.target.value))} className="h-8 text-sm" min={1} max={6} /></div><BSColorField data={d} onSet={set} label="Background" field="bgColor" /><div><div className="flex items-center justify-between mb-2"><label className="text-xs text-gray-500 font-medium">Items</label><button onClick={() => set("items", [...items, { icon: "⭐", title: "Feature", text: "Description" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button></div><div className="space-y-2">{items.map((item, i) => (<div key={i} className="border border-gray-200 rounded p-2 space-y-1"><div className="flex justify-between items-center mb-1"><span className="text-xs text-gray-500">Item {i + 1}</span><button onClick={() => set("items", items.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={10} /></button></div><DebouncedInput value={item.icon} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, icon: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Emoji or icon" /><DebouncedInput value={item.title} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, title: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Title" /><DebouncedInput value={item.text} onChange={v => { const next = items.map((it, j) => j === i ? { ...it, text: v } : it); set("items", next); }} className="h-7 text-xs" placeholder="Description" /></div>))}</div></div></div>);
     }
     case "testimonial": {
-      const genSingle = trpc.lmsAdmin.generateTestimonials.useMutation({
-        onSuccess: (data) => {
-          if (data.testimonials.length > 0) {
-            const t = data.testimonials[0];
-            set("quote", t.text);
-            set("author", `${t.name}${t.credentials ? ", " + t.credentials : ""}`);
-            set("rating", t.rating ?? 5);
-            toast.success("Testimonial generated");
-          } else {
-            toast.error("AI did not return a testimonial — try again");
-          }
-        },
-        onError: () => toast.error("Failed to generate testimonial"),
-      });
       const singleAvatarRef = useRef<HTMLInputElement>(null);
       const [singleAvatarUploading, setSingleAvatarUploading] = useState(false);
-      const [singleTone, setSingleTone] = useState<"professional" | "enthusiastic" | "concise" | "heartfelt" | "clinical">("professional");
       const handleSingleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -4462,36 +4447,6 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
       };
       return (
         <div className="space-y-3">
-          {/* AI Generate panel */}
-          <div className="border border-teal-200 rounded-lg p-3 bg-teal-50 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-teal-800 flex items-center gap-1 shrink-0"><Sparkles size={12} /> AI Testimonial</span>
-              <select
-                value={singleTone}
-                onChange={e => setSingleTone(e.target.value as typeof singleTone)}
-                className="h-6 border border-teal-300 rounded px-1 text-[10px] bg-white text-teal-800 ml-auto"
-              >
-                <option value="professional">Professional</option>
-                <option value="enthusiastic">Enthusiastic</option>
-                <option value="concise">Concise</option>
-                <option value="heartfelt">Heartfelt</option>
-                <option value="clinical">Clinical</option>
-              </select>
-              <Button
-                size="sm"
-                disabled={!courseTitle || genSingle.isPending}
-                onClick={() => genSingle.mutate({ courseTitle: courseTitle ?? "this course", courseId: courseId ?? undefined, count: 1, tone: singleTone })}
-                className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1 shrink-0"
-              >
-                {genSingle.isPending
-                  ? <><Loader2 size={11} className="animate-spin" /> Generating...</>
-                  : d.quote
-                    ? <><RefreshCw size={11} /> Regenerate</>
-                    : <><Sparkles size={11} /> Generate</>}
-              </Button>
-            </div>
-            {!courseTitle && <p className="text-[10px] text-teal-600">Open a course landing page to enable AI generation.</p>}
-          </div>
           <BSTextField data={d} onSet={set} label="Quote" field="quote" multiline />
           {/* Author + Avatar row */}
           <div className="flex items-center gap-2">
@@ -4544,76 +4499,15 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
         onSuccess: () => toast.success("Saved to Testimonial Preset Library"),
         onError: () => toast.error("Failed to save preset"),
       });
-      const generateTestimonials = trpc.lmsAdmin.generateTestimonials.useMutation({
-        onSuccess: (data) => {
-          if (data.testimonials.length > 0) {
-            const newReviews = data.testimonials.map((t: any) => ({
-              name: `${t.name}${t.credentials ? ", " + t.credentials : ""}`,
-              rating: t.rating ?? 5,
-              text: t.text,
-              avatarUrl: "",
-            }));
-            set("reviews", newReviews);
-            toast.success(`Generated ${newReviews.length} testimonials`);
-          } else {
-            toast.error("AI did not return valid testimonials — try again");
-          }
-        },
-        onError: () => toast.error("Failed to generate testimonials"),
-      });
-      const [aiCount, setAiCount] = useState(3);
-      const [aiTone, setAiTone] = useState<"professional" | "enthusiastic" | "concise" | "heartfelt" | "clinical">("professional");
       return (
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
           <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
           <BSColorField data={d} onSet={set} label="Card Background" field="cardBgColor" />
-          {/* AI Generate panel */}
-          <div className="border border-teal-200 rounded-lg p-3 bg-teal-50 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-teal-800 flex items-center gap-1 shrink-0"><Sparkles size={12} /> AI Testimonials</span>
-              {/* Tone selector */}
-              <select
-                value={aiTone}
-                onChange={e => setAiTone(e.target.value as typeof aiTone)}
-                className="h-6 border border-teal-300 rounded px-1 text-[10px] bg-white text-teal-800 ml-auto"
-              >
-                <option value="professional">Professional</option>
-                <option value="enthusiastic">Enthusiastic</option>
-                <option value="concise">Concise</option>
-                <option value="heartfelt">Heartfelt</option>
-                <option value="clinical">Clinical</option>
-              </select>
-              {/* Count stepper */}
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setAiCount(c => Math.max(1, c - 1))}
-                  className="w-6 h-6 rounded border border-teal-300 text-teal-700 hover:bg-teal-100 flex items-center justify-center text-xs font-bold"
-                >−</button>
-                <span className="w-5 text-center text-xs font-semibold text-teal-800">{aiCount}</span>
-                <button
-                  type="button"
-                  onClick={() => setAiCount(c => Math.min(6, c + 1))}
-                  className="w-6 h-6 rounded border border-teal-300 text-teal-700 hover:bg-teal-100 flex items-center justify-center text-xs font-bold"
-                >+</button>
-              </div>
-              <Button
-                size="sm"
-                disabled={!courseTitle || generateTestimonials.isPending}
-                onClick={() => generateTestimonials.mutate({ courseTitle: courseTitle ?? "this course", courseId: courseId ?? undefined, count: aiCount, tone: aiTone })}
-                className="h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white gap-1 shrink-0"
-              >
-                {generateTestimonials.isPending ? <><Loader2 size={11} className="animate-spin" /> Generating...</> : reviews.length > 0 ? <><RefreshCw size={11} /> Regenerate</> : <><Sparkles size={11} /> Generate</>}
-              </Button>
-            </div>
-            {!courseTitle && <p className="text-[10px] text-teal-600">Open a course landing page to enable AI generation.</p>}
-            <p className="text-[10px] text-teal-600">Generates {aiCount} realistic testimonial{aiCount > 1 ? "s" : ""} · {aiTone} tone. Edit freely after generation.</p>
-          </div>
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">Reviews</label>
-              <button onClick={() => set("reviews", [...reviews, { name: "Student Name", rating: 5, text: "Great course!", avatarUrl: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
+              <button onClick={() => set("reviews", [...reviews, { name: "", rating: 0, text: "", avatarUrl: "" }])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
             </div>
             <DndContext
               sensors={reviewSensors}

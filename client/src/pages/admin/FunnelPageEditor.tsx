@@ -1752,10 +1752,6 @@ function getDefaultBlocks(pageType: string, title: string): Block[] {
           data: { headline: "What You Get", items: ["Benefit one", "Benefit two", "Benefit three"], iconColor: "#179ca3", bgColor: "#f8fffe" },
         },
         {
-          id: uid(), type: "testimonial",
-          data: { quote: "This completely transformed my practice.", author: "Happy Customer", avatarUrl: "", bgColor: "#f0fafa", accentColor: "#179ca3" },
-        },
-        {
           id: uid(), type: "cta_standalone",
           data: { headline: "Ready to Get Started?", subtext: "", ctaText: "Yes, I Want This!", ctaLink: "", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#ffffff", align: "center" },
         },
@@ -1822,4 +1818,3 @@ function getDefaultBlocks(pageType: string, title: string): Block[] {
       ];
   }
 }
-

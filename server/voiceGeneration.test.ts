@@ -28,7 +28,7 @@ describe("voiceGeneration speech routing", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { synthesizeSpeech } = await import("../server/_core/voiceGeneration");
-    await synthesizeSpeech({ text: "Hello", voice: "alloy" });
+    await synthesizeSpeech({ text: "Hello", voice: "nova" });
     await synthesizeSpeech({ text: "Hello", voice: "onyx" });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -36,9 +36,10 @@ describe("voiceGeneration speech routing", () => {
       "https://api.openai.com/v1/audio/speech",
       expect.objectContaining({
         body: JSON.stringify({
-          model: "tts-1",
+          model: "gpt-4o-mini-tts",
           input: "Hello",
-          voice: "alloy",
+          voice: "nova",
+          instructions: "Speak in clear, warm United States English at a natural, unhurried conversational pace. Use brief pauses at sentence boundaries and articulate clinical terminology carefully.",
           response_format: "mp3",
         }),
       }),
@@ -48,9 +49,10 @@ describe("voiceGeneration speech routing", () => {
       "https://api.openai.com/v1/audio/speech",
       expect.objectContaining({
         body: JSON.stringify({
-          model: "tts-1",
+          model: "gpt-4o-mini-tts",
           input: "Hello",
           voice: "onyx",
+          instructions: "Speak in clear, warm United States English at a natural, unhurried conversational pace. Use brief pauses at sentence boundaries and articulate clinical terminology carefully.",
           response_format: "mp3",
         }),
       }),

@@ -26,7 +26,9 @@ describe("quizVoiceBrowserMapping", () => {
     expect(zira).toBeGreaterThan(david);
   });
 
-  it("uses distinct pitch profiles per quiz voice", () => {
-    expect(getBrowserSpeechProfile("onyx").pitch).toBeLessThan(getBrowserSpeechProfile("shimmer").pitch);
+  it("uses natural conversational pacing for both creator choices", () => {
+    expect(getBrowserSpeechProfile("nova").rate).toBe(0.94);
+    expect(getBrowserSpeechProfile("onyx").rate).toBe(0.94);
+    expect(getBrowserSpeechProfile("onyx").pitch).toBeLessThan(getBrowserSpeechProfile("nova").pitch);
   });
 });

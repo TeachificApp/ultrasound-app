@@ -64,6 +64,8 @@ function metaToQuizSettings(meta: QuizFile["meta"]) {
     maxAttempts: meta.maxAttempts > 0 ? meta.maxAttempts : null,
     showPerQuestionResult: meta.showPerQuestionResult ?? (meta.resultSlide?.showReviewButton !== false),
     showGroupNames: meta.showGroupNames === true,
+    readAloudEnabled: meta.readAloudEnabled ?? true,
+    readAloudVoice: meta.readAloudVoice ?? "female",
   };
 }
 
