@@ -126,7 +126,17 @@ export function normalizeCampaignEmailHtml(html: string): string {
   const w = EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX;
   let out = html
     .replace(/max-width:\s*600px/gi, `max-width:${w}px`)
-    .replace(/\bwidth=["']600["']/gi, `width="${w}"`);
+    .replace(/max-width:\s*900px/gi, `max-width:${w}px`)
+    .replace(/\bwidth=["']600["']/gi, `width="${w}"`)
+    .replace(/\bwidth=["']900["']/gi, `width="${w}"`);
+
+  // Strip ChatGPT / editor metadata that can leak into sent mail as visible attributes
+  out = out
+    .replace(/\sdata-start="[^"]*"/gi, "")
+    .replace(/\sdata-end="[^"]*"/gi, "")
+    .replace(/\sdata-is-only-node="[^"]*"/gi, "")
+    .replace(/\sdata-is-last-node="[^"]*"/gi, "")
+    .replace(/\s(containerstyle|wrapperstyle|containerStyle|wrapperStyle)="[^"]*"/gi, "");
 
   // Remove stub href values (bare protocol stubs with no destination) — replace with "#"
   // so buttons don't silently go to an invalid URL in email clients

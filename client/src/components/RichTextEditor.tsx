@@ -46,6 +46,35 @@ import {
   shouldFallbackToPlainTextEmojiPaste,
 } from "@shared/richTextPasteTransform";
 
+const COURSE_IMAGE_UPLOAD_TIMEOUT_MS = 120_000;
+
+async function uploadCourseImageFile(file: File): Promise<{ url: string; fileKey?: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), COURSE_IMAGE_UPLOAD_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/upload-course-image", {
+      method: "POST",
+      credentials: "include",
+      body: fd,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Upload failed (${res.status})`);
+    }
+    return res.json();
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Upload timed out — try a smaller image or check your connection");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // Extended Table with borderless attribute
 const CustomTable = Table.extend({
   addAttributes() {
@@ -784,11 +813,8 @@ export default function RichTextEditor({
             event.preventDefault();
             const file = item.getAsFile();
             if (!file) return true;
-            const fd = new FormData();
-            fd.append("file", file);
             toast.info("Uploading pasted image...");
-            fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd })
-              .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(new Error(e.error || "Upload failed"))))
+            uploadCourseImageFile(file)
               .then(({ url }) => {
                 view.dispatch(view.state.tr.replaceSelectionWith(
                   view.state.schema.nodes.image.create({ src: url, alt: file.name || "pasted image" })
@@ -807,12 +833,9 @@ export default function RichTextEditor({
         const file = files[0];
         if (!file.type.startsWith("image/")) return false;
         event.preventDefault();
-        const fd = new FormData();
-        fd.append("file", file);
         toast.info("Uploading dropped image...");
         const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? view.state.selection.from;
-        fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd })
-          .then(r => r.ok ? r.json() : r.json().then(e => Promise.reject(new Error(e.error || "Upload failed"))))
+        uploadCourseImageFile(file)
           .then(({ url }) => {
             const node = view.state.schema.nodes.image.create({ src: url, alt: file.name || "dropped image" });
             view.dispatch(view.state.tr.insert(pos, node));
@@ -880,17 +903,10 @@ export default function RichTextEditor({
     if (!file || !editor) return;
     e.target.value = "";
     // Upload to S3 and populate the URL field — do NOT auto-insert (user must click Insert Image)
-    const fd = new FormData();
-    fd.append("file", file);
     try {
       setImageUploading(true);
       toast.info("Uploading image\u2026");
-      const res = await fetch("/api/upload-course-image", { method: "POST", credentials: "include", body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Upload failed");
-      }
-      const { url } = await res.json();
+      const { url } = await uploadCourseImageFile(file);
       setImageUrl(url);
       if (!imageAlt.trim()) setImageAlt(file.name.replace(/\.[^.]+$/, ""));
       toast.success("Image ready \u2014 click Insert Image to add it");

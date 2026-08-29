@@ -33,7 +33,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useAuth } from "@/_core/hooks/useAuth";
 import type { AudienceFilter, LegacyInterestKey } from "@shared/emailCampaignAudience";
 import { DEFAULT_AUDIENCE_FILTER } from "@shared/emailCampaignAudience";
-import { wrapInBrandedCampaignEmail } from "@shared/emailCampaignLayout";
+import { wrapInBrandedCampaignEmail, EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX } from "@shared/emailCampaignLayout";
 import { formatInTimeZone, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 // Block type is imported from LandingPageBuilder via EmailBlockEditor
@@ -528,12 +528,13 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Compute scale to fit 900px email into the preview container
+  // Compute scale to fit the campaign email width into the preview container
   useEffect(() => {
     if (!previewContainerRef.current) return;
+    const emailWidth = EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX;
     const obs = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect.width ?? 0;
-      if (w > 0) setPreviewScale(Math.min(1, (w - 32) / 900));
+      if (w > 0) setPreviewScale(Math.min(1, (w - 32) / emailWidth));
     });
     obs.observe(previewContainerRef.current);
     return () => obs.disconnect();
@@ -608,7 +609,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
     if (!draftLoaded || !user) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
-      // standalone=false: raw inner HTML, wrapInBrandedEmail provides the 900px outer container
+      // standalone=false: raw inner HTML, wrapInBrandedEmail provides the outer container
       const htmlBody = emailBlocksToHtml(blocks, undefined, false);
       const wrapped = wrapInBrandedEmail(htmlBody, previewText, headerTitle || undefined, headerSubtext || undefined, headerColor || undefined, headerEnabled);
       autoSaveDraftMutation.mutate({
@@ -660,7 +661,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   });
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
-  // standalone=false: raw inner HTML, wrapInBrandedEmail provides the 900px outer container
+  // standalone=false: raw inner HTML, wrapInBrandedEmail provides the outer container
   const htmlBody = useMemo(() => emailBlocksToHtml(blocks, undefined, false), [blocks]);
   const wrappedHtml = useMemo(
     () => wrapInBrandedEmail(htmlBody, previewText, headerTitle || undefined, headerSubtext || undefined, headerColor || undefined, headerEnabled),
@@ -937,14 +938,14 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
               </div>
               <div ref={previewContainerRef} className="overflow-hidden" style={{ maxHeight: "calc(100vh - 160px)", overflowY: "auto" }}>
                 {previewMode === "desktop" ? (
-                  // Scale the 900px email down to fit the preview pane
+                  // Scale the campaign email down to fit the preview pane
                   <div className="p-4">
                     <div style={{ position: "relative", width: "100%", paddingBottom: `${140 / previewScale}%` }}>
                       <div
                         dangerouslySetInnerHTML={{ __html: wrappedHtml }}
                         style={{
                           position: "absolute", top: 0, left: 0,
-                          width: "900px",
+                          width: `${EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX}px`,
                           border: "none", borderRadius: "6px",
                           transformOrigin: "top left",
                           transform: `scale(${previewScale})`,
