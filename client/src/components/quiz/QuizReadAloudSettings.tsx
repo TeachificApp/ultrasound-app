@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Volume2, Play, Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuizVoiceSample } from "@/hooks/useQuizVoiceSample";
+import { trpc } from "@/lib/trpc";
 
 type Props = {
   enabled: boolean;
@@ -32,6 +33,9 @@ export function QuizReadAloudSettings({
   compact = false,
 }: Props) {
   const { preview, previewingVoice, isLoading } = useQuizVoiceSample(quizTitle);
+  const { data: availability } = trpc.quizVoice.getAvailability.useQuery(undefined, {
+    enabled,
+  });
 
   return (
     <div className={cn("rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3", className)}>
@@ -54,6 +58,12 @@ export function QuizReadAloudSettings({
 
       {enabled ? (
         <div className="space-y-2">
+          {availability?.configured === false ? (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              Manus AI voices require <code className="font-mono">OPENAI_API_KEY</code> on Railway.
+              Samples will use your browser voice until that is configured.
+            </p>
+          ) : null}
           <div className="flex items-center justify-between gap-2">
             <Label className="text-xs text-gray-600">Voice</Label>
             <span className="text-xs font-medium text-teal-700">

@@ -1,7 +1,7 @@
 /**
  * Text-to-speech via Manus AI (Forge audio/speech on Railway) or compatible API root.
  */
-import { getOpenAiApiKey, openAiV1Url } from "../lib/openAiConfig";
+import { getSpeechSynthesisApiKey, resolveSpeechSynthesisV1Url } from "../lib/openAiConfig";
 import type { QuizTtsVoiceId } from "../../shared/quizVoiceOptions";
 
 export type SynthesizeSpeechOptions = {
@@ -15,11 +15,11 @@ export async function synthesizeSpeech(options: SynthesizeSpeechOptions): Promis
     throw new Error("Cannot synthesize empty text");
   }
 
-  const response = await fetch(openAiV1Url("audio/speech"), {
+  const response = await fetch(resolveSpeechSynthesisV1Url("audio/speech"), {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${getOpenAiApiKey()}`,
+      authorization: `Bearer ${getSpeechSynthesisApiKey()}`,
     },
     body: JSON.stringify({
       model: "tts-1",

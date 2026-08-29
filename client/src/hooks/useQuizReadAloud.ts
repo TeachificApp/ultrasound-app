@@ -1,6 +1,10 @@
 import { useCallback, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { stripHtml } from "@/lib/utils";
+import {
+  shouldUseBrowserSpeechFallback,
+  speakWithBrowser,
+} from "@/lib/quizVoiceBrowserFallback";
 import type { QuizTtsVoiceId } from "@shared/quizVoiceOptions";
 
 const audioCache = new Map<string, string>();
@@ -19,6 +23,9 @@ export function useQuizReadAloud(enabled: boolean, voice: QuizTtsVoiceId) {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
     setSpeaking(false);
   }, []);
 
@@ -35,6 +42,9 @@ export function useQuizReadAloud(enabled: boolean, voice: QuizTtsVoiceId) {
         let src = audioCache.get(cacheKey(text, voice));
         if (!src) {
           const result = await synth.mutateAsync({ text, voice });
+          if (!result.audioBase64?.trim()) {
+            throw new Error("Speech synthesis returned empty audio.");
+          }
           src = `data:${result.mimeType};base64,${result.audioBase64}`;
           audioCache.set(cacheKey(text, voice), src);
         }
@@ -54,7 +64,16 @@ export function useQuizReadAloud(enabled: boolean, voice: QuizTtsVoiceId) {
           };
           void audio.play().catch(reject);
         });
-      } catch {
+      } catch (error) {
+        if (shouldUseBrowserSpeechFallback(error)) {
+          try {
+            await speakWithBrowser(text);
+            setSpeaking(false);
+            return;
+          } catch {
+            /* fall through */
+          }
+        }
         setSpeaking(false);
       }
     },

@@ -77,6 +77,44 @@ export function openAiV1Url(path: string): string {
   return `${getOpenAiApiRoot()}/v1/${segment}`;
 }
 
+/**
+ * OpenAI-compatible TTS (`/v1/audio/speech`) is only available on api.openai.com.
+ * Manus Forge chat credentials (forge.manus.ai) do not expose speech synthesis.
+ * When Forge is Manus, set OPENAI_API_KEY for quiz read-aloud voices.
+ */
+export function isSpeechSynthesisConfigured(): boolean {
+  if (process.env.OPENAI_API_KEY?.trim()) return true;
+  try {
+    return isOpenAiBackend() && !!resolveForgeApiKey();
+  } catch {
+    return false;
+  }
+}
+
+export function resolveSpeechSynthesisV1Url(path = "audio/speech"): string {
+  if (process.env.OPENAI_API_KEY?.trim()) {
+    const segment = path.replace(/^\/+/, "").replace(/^v1\//, "");
+    return `https://api.openai.com/v1/${segment}`;
+  }
+  if (isOpenAiBackend()) {
+    return openAiV1Url(path);
+  }
+  throw new Error(
+    "Quiz read-aloud requires OPENAI_API_KEY (OpenAI TTS). Manus Forge chat credentials alone do not support speech synthesis.",
+  );
+}
+
+export function getSpeechSynthesisApiKey(): string {
+  const openAiKey = process.env.OPENAI_API_KEY?.trim();
+  if (openAiKey) return openAiKey;
+  if (isOpenAiBackend()) {
+    return getOpenAiApiKey();
+  }
+  throw new Error(
+    "Quiz read-aloud requires OPENAI_API_KEY (OpenAI TTS). Manus Forge chat credentials alone do not support speech synthesis.",
+  );
+}
+
 /** Pick a chat model compatible with the configured backend. */
 export function resolveLlmChatModel(explicitModel?: string): string {
   if (explicitModel?.trim()) return explicitModel.trim();

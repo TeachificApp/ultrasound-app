@@ -2,9 +2,15 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { synthesizeSpeech } from "../_core/voiceGeneration";
+import { isSpeechSynthesisConfigured } from "../lib/openAiConfig";
 import { QUIZ_TTS_VOICE_IDS } from "../../shared/quizVoiceOptions";
 
 export const quizVoiceRouter = router({
+  /** Whether server-side Manus/OpenAI TTS is configured for quiz read-aloud. */
+  getAvailability: protectedProcedure.query(() => ({
+    configured: isSpeechSynthesisConfigured(),
+  })),
+
   /** Synthesize quiz read-aloud audio for native quizzes (client-side playback). */
   synthesize: protectedProcedure
     .input(

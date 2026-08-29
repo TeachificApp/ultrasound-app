@@ -8,6 +8,9 @@ import {
   resolveForgeApiKey,
   resolveForgeApiUrl,
   resolveLlmChatModel,
+  resolveSpeechSynthesisV1Url,
+  getSpeechSynthesisApiKey,
+  isSpeechSynthesisConfigured,
 } from "./openAiConfig";
 
 describe("openAiConfig", () => {
@@ -83,5 +86,24 @@ describe("openAiConfig", () => {
   it("selects gemini model for Manus Forge host", () => {
     process.env.BUILT_IN_FORGE_API_URL = "https://forge.manus.ai";
     expect(resolveLlmChatModel()).toBe("gemini-2.5-flash");
+  });
+
+  it("uses OPENAI_API_KEY for speech synthesis when Forge is Manus", () => {
+    process.env.BUILT_IN_FORGE_API_URL = "https://forge.manus.ai";
+    process.env.BUILT_IN_FORGE_API_KEY = "forge-key";
+    process.env.OPENAI_API_KEY = "sk-openai-tts";
+    expect(isSpeechSynthesisConfigured()).toBe(true);
+    expect(getSpeechSynthesisApiKey()).toBe("sk-openai-tts");
+    expect(resolveSpeechSynthesisV1Url("audio/speech")).toBe(
+      "https://api.openai.com/v1/audio/speech",
+    );
+  });
+
+  it("reports speech synthesis unavailable for Manus Forge without OPENAI_API_KEY", () => {
+    process.env.BUILT_IN_FORGE_API_URL = "https://forge.manus.ai";
+    process.env.BUILT_IN_FORGE_API_KEY = "forge-key";
+    delete process.env.OPENAI_API_KEY;
+    expect(isSpeechSynthesisConfigured()).toBe(false);
+    expect(() => resolveSpeechSynthesisV1Url("audio/speech")).toThrow(/OPENAI_API_KEY/);
   });
 });
