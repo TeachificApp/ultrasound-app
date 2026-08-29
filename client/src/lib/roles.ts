@@ -55,3 +55,33 @@ export function hasPlatformAdminAccess(appRoles: string[] | undefined | null): b
   if (!appRoles || appRoles.length === 0) return false;
   return appRoles.some((r) => PLATFORM_ADMIN_ROLES.has(r));
 }
+
+/** Members Hub + support workflows */
+export function hasMemberHubAccess(
+  appRoles: string[] | undefined | null,
+  legacyRole?: string | null,
+): boolean {
+  if (legacyRole === "admin") return true;
+  if (!appRoles?.length) return false;
+  return appRoles.some((r) =>
+    r === "platform_admin" || r === "platform_owner" || r === "customer_support",
+  );
+}
+
+export function canAssignMemberStaffRoles(
+  appRoles: string[] | undefined | null,
+  legacyRole?: string | null,
+): boolean {
+  if (legacyRole === "admin") return true;
+  if (!appRoles?.length) return false;
+  return appRoles.some((r) => r === "platform_admin" || r === "platform_owner");
+}
+
+export function canAssignPlatformAdminRole(
+  appRoles: string[] | undefined | null,
+  legacyRole?: string | null,
+): boolean {
+  if (legacyRole === "admin") return true;
+  if (!appRoles?.length) return false;
+  return appRoles.includes("platform_owner");
+}

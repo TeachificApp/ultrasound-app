@@ -120,7 +120,7 @@ import { ContentWaitlistDashboard } from "@/components/admin/ContentWaitlistDash
 const CmeFormsListTab = lazy(() => import("@/components/admin/CmeFormsListTab").then(m => ({ default: m.CmeFormsListTab })));
 const CertificateTemplatesAdmin = lazy(() => import("./admin/CertificateTemplatesAdmin"));
 
-type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager";
+type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager" | "customer_support";
 
 const ROLE_META: Record<AppRole, { label: string; color: string; icon: React.ElementType; description: string }> = {
   user: {
@@ -152,6 +152,12 @@ const ROLE_META: Record<AppRole, { label: string; color: string; icon: React.Ele
     color: "bg-teal-100 text-teal-700",
     icon: Shield,
     description: "Full platform management access",
+  },
+  customer_support: {
+    label: "Customer Support",
+    color: "bg-blue-100 text-blue-700",
+    icon: Users,
+    description: "Member support access — lookup, enrollments, and communications",
   },
   accreditation_manager: {
     label: "Accreditation Manager",

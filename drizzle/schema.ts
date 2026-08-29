@@ -836,6 +836,7 @@ export type InsertAccreditationReadinessNavigator = typeof accreditationReadines
 //   diy_admin      — Lab Admin who manages the DIY Accreditation Tool & assigns seats
 //   diy_user       — seat-assigned user with DIY Accreditation Tool access
 //   platform_admin — full platform management access (owner-level)
+//   customer_support — member lookup, enrollments, and support workflows (no role assignment)
 //   accreditation_manager — can manage all DIY orgs + full-service accounts; no other platform admin access
 export const appRoleEnum = mysqlEnum("appRole", [
   "user",
@@ -849,6 +850,7 @@ export const appRoleEnum = mysqlEnum("appRole", [
   "education_student",
   "platform_owner",
   "platform_moderator",
+  "customer_support",
   "instructor",
   "team_admin",
   "affiliate",
@@ -857,7 +859,7 @@ export const appRoleEnum = mysqlEnum("appRole", [
 export const userRoles = mysqlTable("userRoles", {
   id: int("id").primaryKey().autoincrement(),
   userId: int("userId").notNull(),
-  role: mysqlEnum("role", ["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager", "education_manager", "education_admin", "education_student", "platform_owner", "platform_moderator", "instructor", "team_admin", "affiliate"]).notNull(),
+  role: mysqlEnum("role", ["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager", "education_manager", "education_admin", "education_student", "platform_owner", "platform_moderator", "customer_support", "instructor", "team_admin", "affiliate"]).notNull(),
   // For diy_user: which lab subscription granted this seat
   grantedByLabId: int("grantedByLabId"),
   // Who assigned this role (platform_admin or diy_admin userId)
