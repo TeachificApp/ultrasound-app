@@ -21,6 +21,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
   const [newFocus, setNewFocus] = useState("");
   const [objective, setObjective] = useState("");
   const [preview, setPreview] = useState<any>(null);
+  const [courseOffset, setCourseOffset] = useState(0);
   const previewCourse = trpc.lmsAdmin.previewCourseFocusRegeneration.useMutation();
   const previewLesson = trpc.lmsAdmin.previewLessonFocusRegeneration.useMutation();
   const applyChanges = trpc.lmsAdmin.applyFocusRegeneration.useMutation();
@@ -28,6 +29,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
   useEffect(() => {
     if (!open) {
       setPreview(null);
+      setCourseOffset(0);
       setNewFocus("");
       setObjective("");
     }
@@ -46,7 +48,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
     try {
       const input = { newFocus: newFocus.trim(), objective: objective.trim() };
       const result = target.kind === "course"
-        ? await previewCourse.mutateAsync({ ...input, courseId: target.courseId })
+        ? await previewCourse.mutateAsync({ ...input, courseId: target.courseId, offset: courseOffset })
         : await previewLesson.mutateAsync({ ...input, lessonId: target.lessonId });
       setPreview(result);
     } catch (error: any) {
@@ -70,13 +72,22 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
       });
       toast.success(`Updated instructional content for ${proposedLessons.length} lesson${proposedLessons.length === 1 ? "" : "s"}.`);
       onApplied();
-      onOpenChange(false);
+      if (target.kind === "course" && preview.nextOffset !== null && preview.nextOffset !== undefined) {
+        setCourseOffset(preview.nextOffset);
+        setPreview(null);
+      } else {
+        onOpenChange(false);
+      }
     } catch (error: any) {
       toast.error(error?.message || "Could not apply the reviewed regeneration.");
     }
   };
 
   const targetLabel = target.kind === "course" ? "Course" : "Lesson";
+  const isCourseBatch = target.kind === "course" && preview;
+  const batchStart = isCourseBatch ? Number(preview.batchOffset ?? 0) + 1 : 1;
+  const batchEnd = isCourseBatch ? Number(preview.batchOffset ?? 0) + proposedLessons.length : proposedLessons.length;
+  const hasNextBatch = isCourseBatch && preview.nextOffset !== null && preview.nextOffset !== undefined;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -93,7 +104,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
           <div className="space-y-4 py-2">
             <div className="rounded-lg border border-teal-100 bg-teal-50 p-3 text-sm text-teal-800">
               <p className="font-semibold">Review first; nothing is changed yet.</p>
-              <p className="mt-1 text-xs text-teal-700">Describe the new clinical lens and the learning objective. The current course or lesson structure remains fixed.</p>
+              <p className="mt-1 text-xs text-teal-700">Describe the new clinical lens and the learning objective. {target.kind === "course" ? "Course lessons are generated in reviewable batches of five." : "The current lesson structure remains fixed."}</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="regen-focus">New clinical focus</Label>
@@ -108,7 +119,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
           <div className="space-y-3 py-2">
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>Review each proposal below. You can close this dialog without saving; apply is the only action that writes changes.</p>
+              <p>Review each proposal below. {isCourseBatch ? `This is lessons ${batchStart}–${batchEnd} of ${preview.totalLessons}. ` : ""}You can close this dialog without saving; apply is the only action that writes changes.</p>
             </div>
             {proposedLessons.map((entry: any, index: number) => (
               <article key={entry.proposal.lessonId} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
@@ -135,7 +146,8 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
         )}
 
         <DialogFooter className="gap-2">
-          {preview && <Button variant="outline" disabled={applyChanges.isPending} onClick={() => setPreview(null)}>Start Over</Button>}
+          {preview && <Button variant="outline" disabled={applyChanges.isPending} onClick={() => { setPreview(null); setCourseOffset(0); }}>Start Over</Button>}
+          {hasNextBatch && <Button variant="outline" disabled={applyChanges.isPending} onClick={() => { setCourseOffset(preview.nextOffset); setPreview(null); }}>Discard This Batch & Continue</Button>}
           <Button variant="outline" disabled={generating || applyChanges.isPending} onClick={() => onOpenChange(false)}>Cancel</Button>
           {!preview ? (
             <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!canGenerate || generating} onClick={generatePreview}>
@@ -143,7 +155,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
             </Button>
           ) : (
             <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={applyChanges.isPending} onClick={applyPreview}>
-              {applyChanges.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying...</> : <><CheckCircle2 className="mr-2 h-4 w-4" /> Apply Reviewed Changes</>}
+              {applyChanges.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying...</> : <><CheckCircle2 className="mr-2 h-4 w-4" /> {hasNextBatch ? "Apply This Batch & Continue" : "Apply Reviewed Changes"}</>}
             </Button>
           )}
         </DialogFooter>

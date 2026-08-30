@@ -93,6 +93,7 @@ import { draftNotifyEntries, cmeActivityForms } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 import { parseScheduledTimestamp } from "../../shared/platformTime";
 import { applyEditableBlockText, collectEditableBlockText, stripCodeFences, type BlockTextField } from "../lib/lessonFocusRegeneration";
+import { getCourseFocusRegenerationBatch } from "../lib/courseFocusRegenerationBatch";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -224,7 +225,7 @@ export const lmsCourseBuilderRouter = router({
       };
     }),
   previewCourseFocusRegeneration: protectedProcedure
-    .input(focusRegenerationInput.extend({ courseId: z.number().int().positive() }))
+    .input(focusRegenerationInput.extend({ courseId: z.number().int().positive(), offset: z.number().int().min(0).default(0) }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
@@ -233,14 +234,24 @@ export const lmsCourseBuilderRouter = router({
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
       const lessons = await db.select().from(lmsLessons).where(eq(lmsLessons.courseId, input.courseId)).orderBy(asc(lmsLessons.position));
       if (lessons.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "This course has no lessons to regenerate." });
-      if (lessons.length > 30) throw new TRPCError({ code: "BAD_REQUEST", message: "Preview up to 30 lessons at a time. Use the lesson-level workflow for additional lessons." });
+      let batch;
+      try {
+        batch = getCourseFocusRegenerationBatch(lessons.length, input.offset);
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No lessons remain in this course regeneration preview." });
+      }
+      const batchLessons = lessons.slice(batch.offset, batch.end);
       const changes: FocusChange[] = [];
-      for (const lesson of lessons) {
+      for (const lesson of batchLessons) {
         changes.push(await generateFocusChange({ lesson, courseTitle: course.title, newFocus: input.newFocus, objective: input.objective }));
       }
       return {
         course: { id: course.id, title: course.title },
-        changes: lessons.map((lesson, index) => ({
+        totalLessons: lessons.length,
+        batchOffset: batch.offset,
+        batchSize: batch.count,
+        nextOffset: batch.nextOffset,
+        changes: batchLessons.map((lesson, index) => ({
           lesson: { id: lesson.id, title: lesson.title, learningObjectives: parseObjectives(lesson.learningObjectives) },
           proposal: changes[index],
         })),

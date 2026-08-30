@@ -181,6 +181,9 @@
 - [x] Ensure course-level regeneration updates every lesson’s title, objectives, and instructional body content for the new focus while preserving blocks, layout, media placement, and learner records.
 - [x] Add a lesson-level focus-regeneration workflow with the same review-before-apply, content-only safeguards as the course-level workflow.
 - [ ] Validate the course and lesson focus-regeneration preview and explicit apply flow on Railway with an administrator before using it on active course content.
+- [x] Trace and repair the blocked Railway course focus-regeneration preview request without applying any content changes.
+- [x] Replace the 30-lesson hard stop with rate-safe, reviewable course regeneration batches that cover every lesson without altering course structure.
+- [x] Show batch progress and retain generated previews until the administrator explicitly applies or discards each reviewed batch.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.
