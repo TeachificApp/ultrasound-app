@@ -192,6 +192,8 @@
 - [x] Add focused regression coverage for full-lesson word-count validation and the author-facing short-draft error path.
 - [x] Repair live Full Lesson generation when two short AI drafts trigger the 1,500-word guard, using reliable continuation or completion handling without saving undersized content.
 - [x] Add regression coverage for recovering a short Full Lesson draft to the required minimum while retaining the rejection of incomplete output.
+- [x] Repair mathematical-equation rendering that stopped working after the application moved from Manus hosting to Railway, without altering lesson content.
+- [x] Add regression coverage for inline and display mathematical equations in the affected content-rendering paths.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.
