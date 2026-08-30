@@ -42,7 +42,7 @@ import { enrichCohortResources } from "../lib/cohortResources";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
-import { countRenderedWords, isCompleteFullLesson, MIN_FULL_LESSON_WORDS } from "../lib/lessonContentGeneration";
+import { countRenderedWords, extendFullLessonDraft, fullLessonWordsRemaining, isCompleteFullLesson, MIN_FULL_LESSON_WORDS, TARGET_FULL_LESSON_WORDS } from "../lib/lessonContentGeneration";
 import {
   lmsCourses,
   lmsSections,
@@ -674,7 +674,7 @@ export const lmsRouter = router({
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const formatInstructions: Record<string, string> = {
-        full_lesson: `Write a complete, publication-ready lesson of at least ${MIN_FULL_LESSON_WORDS.toLocaleString("en-US")} readable words, excluding HTML markup. Aim for 1,600–1,800 words so the minimum is met. Use a meaningful clinical introduction; clearly labeled sections for anatomy or physiology where relevant, scanning technique, interpretation, common pitfalls, and clinical pearls; and a concise conclusion. Use <h2>, <h3>, <p>, and <ul>/<li> tags. Do not include <html>, <head>, or <body> tags.`,
+        full_lesson: `Write a complete, publication-ready lesson of at least ${MIN_FULL_LESSON_WORDS.toLocaleString("en-US")} readable words, excluding HTML markup. Target approximately ${TARGET_FULL_LESSON_WORDS.toLocaleString("en-US")} readable words so the minimum is met. Use a meaningful clinical introduction; clearly labeled sections for anatomy or physiology where relevant, scanning technique, interpretation, common pitfalls, and clinical pearls; and a concise conclusion. Use <h2>, <h3>, <p>, and <ul>/<li> tags. Do not include <html>, <head>, or <body> tags.`,
         text: "Write comprehensive, well-structured lesson content in HTML format. Use <h2>, <h3>, <p>, and <ul>/<li> tags where appropriate. Do not include <html>, <head>, or <body> tags.",
         outline: "Create a detailed lesson outline in HTML format with main sections as <h2> headings, sub-points as <h3> headings, and key learning objectives as a <ul> list at the top.",
         summary: "Write a concise summary of the key concepts for this lesson in HTML format. Use <p> for intro and <ul><li> bullet points for the main takeaways.",
@@ -702,10 +702,10 @@ export const lmsRouter = router({
         return content.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
       };
 
-      let cleaned = await generate();
-      if (input.format === "full_lesson" && !isCompleteFullLesson(cleaned)) {
-        cleaned = await generate(`The prior draft was only ${countRenderedWords(cleaned)} readable words. Regenerate the complete lesson at no fewer than ${MIN_FULL_LESSON_WORDS.toLocaleString("en-US")} readable words.`);
-      }
+      const initialDraft = await generate();
+      const cleaned = input.format === "full_lesson"
+        ? await extendFullLessonDraft(initialDraft, draft => generate(`The draft below is only ${countRenderedWords(draft).toLocaleString("en-US")} readable words and needs ${fullLessonWordsRemaining(draft).toLocaleString("en-US")} additional words to reach the full-lesson target. Write ONLY new, non-duplicative HTML sections that continue this exact lesson. Do not restart, summarize, mention the prior draft, or include markdown fences. Preserve the lesson topic and add clinically useful depth through scanning technique, interpretation, pitfalls, and practical clinical pearls.\n\nCURRENT DRAFT:\n${draft}`))
+        : initialDraft;
       if (input.format === "full_lesson" && !isCompleteFullLesson(cleaned)) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `AI returned an incomplete full lesson. Full lessons require at least ${MIN_FULL_LESSON_WORDS.toLocaleString("en-US")} words; please generate again.` });
       }
