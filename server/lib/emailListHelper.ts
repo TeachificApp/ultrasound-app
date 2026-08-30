@@ -1,19 +1,18 @@
 /**
- * emailListHelper.ts
  * Shared helpers for managing email lists and subscribers.
  *
  * Key exports:
  *   addToEmailList(email, name?, options?) — upsert a subscriber into a list
  *   addToAllContacts(email, name?, options?) — add to the master "All Contacts" list
  *   ensureAllContactsList() — get or create the "All Contacts" list, returns its ID
- *   backfillAllContacts() — one-time backfill of all existing users into All Contacts
+ *   backfillAllContacts() — reconcile eligible users and newsletter subscribers into All Contacts
  */
 
 import { eq, and, sql } from "drizzle-orm";
 import { getDb } from "../db";
-import { emailLists, emailListSubscribers, users } from "../../drizzle/schema";
+import { emailLists, emailListSubscribers, newsletterSubscribers, users } from "../../drizzle/schema";
 
-// Cache the All Contacts list ID so we don't query on every call
+// Cache the All Contacts list ID so we don't query on every call.
 let allContactsListId: number | null = null;
 
 /** Get or create the master "All Contacts" email list. Returns its ID. */
@@ -22,7 +21,6 @@ export async function ensureAllContactsList(): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
 
-  // Try to find existing
   const existing = await db
     .select({ id: emailLists.id })
     .from(emailLists)
@@ -34,28 +32,40 @@ export async function ensureAllContactsList(): Promise<number> {
     return allContactsListId;
   }
 
-  // Create it
   const [result] = await db.insert(emailLists).values({
     name: "All Contacts",
-    description: "Automatically populated with every contact who interacts with the platform (registrations, purchases, enrollments, form submissions).",
+    description: "Automatically populated with every contact who interacts with the platform (registrations, purchases, enrollments, form submissions, and newsletter subscriptions).",
     isActive: true,
     subscriberCount: 0,
   });
-  allContactsListId = (result as any).insertId as number;
+  allContactsListId = (result as { insertId: number }).insertId;
   return allContactsListId;
 }
 
 export interface AddToListOptions {
   userId?: number;
-  source?: string;       // "registration" | "purchase" | "enrollment" | "form" | "content_block" | "manual" | "import"
-  sourceId?: string;     // e.g. formId, productId
+  source?: string;
+  sourceId?: string;
   metadata?: Record<string, unknown>;
+  /** Only use after a contact explicitly opts in again. */
+  resubscribe?: boolean;
+}
+
+export type EmailListMembershipAction = "insert" | "update" | "reactivate" | "skip";
+
+export function resolveEmailListMembershipAction(
+  existingStatus: string | undefined,
+  hasNewIdentityData: boolean,
+  resubscribe = false,
+): EmailListMembershipAction {
+  if (!existingStatus) return "insert";
+  if (existingStatus === "unsubscribed") return resubscribe ? "reactivate" : "skip";
+  return hasNewIdentityData ? "update" : "skip";
 }
 
 /**
- * Upsert a subscriber into a specific email list.
- * If the subscriber already exists (same listId + email), updates name/userId/metadata.
- * Skips if email is empty or the subscriber has unsubscribed from this list.
+ * Upsert a subscriber into a specific email list. A previous opt-out is never
+ * reversed unless the caller records an explicit re-subscription.
  */
 export async function addToEmailList(
   listId: number,
@@ -70,35 +80,44 @@ export async function addToEmailList(
   if (!db) return;
 
   try {
-    // Check if already subscribed (any status)
     const existing = await db
       .select({ id: emailListSubscribers.id, status: emailListSubscribers.status })
       .from(emailListSubscribers)
-      .where(
-        and(
-          eq(emailListSubscribers.listId, listId),
-          eq(emailListSubscribers.email, normalizedEmail),
-        ),
-      )
+      .where(and(eq(emailListSubscribers.listId, listId), eq(emailListSubscribers.email, normalizedEmail)))
       .limit(1);
 
-    if (existing[0]) {
-      // If they previously unsubscribed from this list, don't re-add
-      if (existing[0].status === "unsubscribed") return;
-      // Update name/userId if we have better info
-      if (name || options.userId) {
-        await db
-          .update(emailListSubscribers)
-          .set({
-            ...(name ? { name } : {}),
-            ...(options.userId ? { userId: options.userId } : {}),
-          })
-          .where(eq(emailListSubscribers.id, existing[0].id));
-      }
+    const action = resolveEmailListMembershipAction(existing[0]?.status, Boolean(name || options.userId), options.resubscribe);
+    if (action === "skip") return;
+
+    if (action === "reactivate" && existing[0]) {
+      await db
+        .update(emailListSubscribers)
+        .set({
+          status: "subscribed",
+          subscribedAt: new Date(),
+          unsubscribedAt: null,
+          ...(name ? { name } : {}),
+          ...(options.userId ? { userId: options.userId } : {}),
+        })
+        .where(eq(emailListSubscribers.id, existing[0].id));
+      await db
+        .update(emailLists)
+        .set({ subscriberCount: sql`subscriberCount + 1` })
+        .where(eq(emailLists.id, listId));
       return;
     }
 
-    // Insert new subscriber
+    if (action === "update" && existing[0]) {
+      await db
+        .update(emailListSubscribers)
+        .set({
+          ...(name ? { name } : {}),
+          ...(options.userId ? { userId: options.userId } : {}),
+        })
+        .where(eq(emailListSubscribers.id, existing[0].id));
+      return;
+    }
+
     await db.insert(emailListSubscribers).values({
       listId,
       email: normalizedEmail,
@@ -109,23 +128,17 @@ export async function addToEmailList(
       status: "subscribed",
       metadata: options.metadata ? JSON.stringify(options.metadata) : null,
     });
-
-    // Increment subscriber count
     await db
       .update(emailLists)
       .set({ subscriberCount: sql`subscriberCount + 1` })
       .where(eq(emailLists.id, listId));
-  } catch (err: any) {
-    // Ignore duplicate key errors (race condition)
-    if (err?.code === "ER_DUP_ENTRY") return;
+  } catch (err: unknown) {
+    if ((err as { code?: string })?.code === "ER_DUP_ENTRY") return;
     console.error("[emailListHelper] addToEmailList error:", err);
   }
 }
 
-/**
- * Add a contact to the master "All Contacts" list.
- * Safe to call from anywhere — creates the list if it doesn't exist.
- */
+/** Add a contact to the master "All Contacts" list. */
 export async function addToAllContacts(
   email: string,
   name?: string | null,
@@ -135,23 +148,50 @@ export async function addToAllContacts(
     const listId = await ensureAllContactsList();
     await addToEmailList(listId, email, name, options);
   } catch (err) {
-    // Never throw — this is a background operation
     console.error("[emailListHelper] addToAllContacts error:", err);
   }
 }
 
 /**
- * One-time backfill: add all existing users to the "All Contacts" list.
- * Safe to call on startup — skips already-subscribed users.
+ * Records a marketing opt-out in All Contacts instead of deleting the contact,
+ * retaining the preference and preventing accidental re-addition.
+ */
+export async function unsubscribeFromAllContacts(email: string): Promise<void> {
+  if (!email || !email.trim()) return;
+  try {
+    const db = await getDb();
+    if (!db) return;
+    const listId = await ensureAllContactsList();
+    const [existing] = await db
+      .select({ id: emailListSubscribers.id, status: emailListSubscribers.status })
+      .from(emailListSubscribers)
+      .where(and(eq(emailListSubscribers.listId, listId), eq(emailListSubscribers.email, email.trim().toLowerCase())))
+      .limit(1);
+    if (!existing || existing.status === "unsubscribed") return;
+
+    await db
+      .update(emailListSubscribers)
+      .set({ status: "unsubscribed", unsubscribedAt: new Date() })
+      .where(eq(emailListSubscribers.id, existing.id));
+    await db
+      .update(emailLists)
+      .set({ subscriberCount: sql`GREATEST(subscriberCount - 1, 0)` })
+      .where(eq(emailLists.id, listId));
+  } catch (err) {
+    console.error("[emailListHelper] unsubscribeFromAllContacts error:", err);
+  }
+}
+
+/**
+ * Reconciles eligible users and active newsletter subscribers into the
+ * campaign-visible All Contacts list. Existing members and opt-outs are safe.
  */
 export async function backfillAllContacts(): Promise<void> {
   try {
     const db = await getDb();
     if (!db) return;
-
     const listId = await ensureAllContactsList();
 
-    // Fetch all users with email addresses who haven't globally unsubscribed
     const allUsers = await db
       .select({
         id: users.id,
@@ -162,18 +202,38 @@ export async function backfillAllContacts(): Promise<void> {
       })
       .from(users);
 
-    let added = 0;
-    for (const u of allUsers) {
-      if (!u.email || u.unsubscribedAt) continue;
-      const displayName = u.displayName || u.name || null;
-      await addToEmailList(listId, u.email, displayName, {
-        userId: u.id,
+    let processed = 0;
+    const globallyUnsubscribedEmails = new Set<string>();
+    for (const user of allUsers) {
+      if (!user.email) continue;
+      const email = user.email.trim().toLowerCase();
+      if (user.unsubscribedAt) {
+        globallyUnsubscribedEmails.add(email);
+        continue;
+      }
+      await addToEmailList(listId, user.email, user.displayName || user.name || null, {
+        userId: user.id,
         source: "registration",
       });
-      added++;
+      processed += 1;
     }
 
-    console.log(`[emailListHelper] Backfill complete — ${added} contacts added to "All Contacts" list.`);
+    const activeNewsletterSubscribers = await db
+      .select({
+        email: newsletterSubscribers.email,
+        firstName: newsletterSubscribers.firstName,
+        lastName: newsletterSubscribers.lastName,
+      })
+      .from(newsletterSubscribers)
+      .where(eq(newsletterSubscribers.isActive, 1));
+    for (const subscriber of activeNewsletterSubscribers) {
+      if (!subscriber.email || globallyUnsubscribedEmails.has(subscriber.email.trim().toLowerCase())) continue;
+      const name = [subscriber.firstName, subscriber.lastName].filter(Boolean).join(" ") || null;
+      await addToEmailList(listId, subscriber.email, name, { source: "newsletter_subscribe" });
+      processed += 1;
+    }
+
+    console.log(`[emailListHelper] All Contacts reconciliation complete — ${processed} eligible user/newsletter records processed.`);
   } catch (err) {
     console.error("[emailListHelper] backfillAllContacts error:", err);
   }

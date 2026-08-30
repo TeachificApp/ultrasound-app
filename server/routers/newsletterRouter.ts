@@ -11,7 +11,7 @@ import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { newsletterSubscribers } from "../../drizzle/schema";
 import { notifyOwner } from "../_core/notification";
-import { addToAllContacts } from "../lib/emailListHelper";
+import { addToAllContacts, unsubscribeFromAllContacts } from "../lib/emailListHelper";
 import {
   upsertSendGridContacts,
   getOrCreateSendGridList,
@@ -54,6 +54,7 @@ export const newsletterRouter = router({
 
       if (existing.length > 0) {
         if (existing[0].isActive) {
+          await addToAllContacts(email, [input.firstName, input.lastName].filter(Boolean).join(" ") || null, { source: "newsletter_subscribe" });
           // Already active — return success silently (don't reveal subscriber status)
           return {
             success: true,
@@ -73,6 +74,7 @@ export const newsletterRouter = router({
             updatedAt: new Date(),
           })
           .where(eq(newsletterSubscribers.email, email));
+        await addToAllContacts(email, [input.firstName, input.lastName].filter(Boolean).join(" ") || null, { source: "newsletter_subscribe", resubscribe: true });
         return { success: true, alreadySubscribed: false, unsubscribeToken: token };
       }
 
@@ -90,11 +92,13 @@ export const newsletterRouter = router({
         unsubscribeToken: token,
       });
 
-      // Sync to SendGrid Marketing Contacts and internal email list (fire-and-forget)
+      // Persist to the campaign-visible All Contacts list before reporting success.
       const name = [input.firstName, input.lastName].filter(Boolean).join(" ") || email;
+      await addToAllContacts(email, name || null, { source: "newsletter_subscribe", resubscribe: true });
+
+      // Sync to SendGrid Marketing Contacts separately (fire-and-forget).
       (async () => {
         try {
-          await addToAllContacts(email, name || null, { source: "newsletter_subscribe" });
           const listId = await getOrCreateSendGridList("Newsletter Subscribers");
           await upsertSendGridContacts(
             [{
@@ -151,6 +155,7 @@ export const newsletterRouter = router({
         .update(newsletterSubscribers)
         .set({ isActive: 0, unsubscribedAt: Date.now(), updatedAt: new Date() })
         .where(eq(newsletterSubscribers.id, row.id));
+      await unsubscribeFromAllContacts(row.email);
 
       // Remove from SendGrid "Newsletter Subscribers" list (marketing only — not global delete)
       (async () => {
@@ -178,6 +183,7 @@ export const newsletterRouter = router({
         .update(newsletterSubscribers)
         .set({ isActive: 0, unsubscribedAt: Date.now(), updatedAt: new Date() })
         .where(eq(newsletterSubscribers.email, email));
+      await unsubscribeFromAllContacts(email);
       return { success: true };
     }),
 

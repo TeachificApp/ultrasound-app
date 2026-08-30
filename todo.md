@@ -194,6 +194,8 @@
 - [x] Add regression coverage for recovering a short Full Lesson draft to the required minimum while retaining the rejection of incomplete output.
 - [x] Repair mathematical-equation rendering that stopped working after the application moved from Manus hosting to Railway, without altering lesson content.
 - [x] Add regression coverage for inline and display mathematical equations in the affected content-rendering paths.
+- [x] Ensure every opted-in newsletter subscription is included exactly once in the Email Campaigns All audience while preserving unsubscribes and suppressions.
+- [x] Add focused regression coverage for newsletter subscription, All-audience inclusion, duplicate prevention, and opt-out preservation.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.
