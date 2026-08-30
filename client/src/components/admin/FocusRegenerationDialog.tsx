@@ -21,7 +21,11 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
   const [newFocus, setNewFocus] = useState("");
   const [objective, setObjective] = useState("");
   const [preview, setPreview] = useState<any>(null);
-  const [courseOffset, setCourseOffset] = useState(0);
+  const [selectedLessonIds, setSelectedLessonIds] = useState<number[]>([]);
+  const { data: courseData, isLoading: courseLessonsLoading } = trpc.lmsAdmin.getCourse.useQuery(
+    { id: target.courseId },
+    { enabled: open && target.kind === "course" },
+  );
   const previewCourse = trpc.lmsAdmin.previewCourseFocusRegeneration.useMutation();
   const previewLesson = trpc.lmsAdmin.previewLessonFocusRegeneration.useMutation();
   const applyChanges = trpc.lmsAdmin.applyFocusRegeneration.useMutation();
@@ -29,7 +33,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
   useEffect(() => {
     if (!open) {
       setPreview(null);
-      setCourseOffset(0);
+      setSelectedLessonIds([]);
       setNewFocus("");
       setObjective("");
     }
@@ -42,13 +46,23 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
   }, [preview]);
 
   const generating = previewCourse.isPending || previewLesson.isPending;
-  const canGenerate = newFocus.trim().length >= 3 && objective.trim().length >= 3;
+  const courseLessons = useMemo(() => target.kind === "course" ? [
+    ...(courseData?.topLevelLessons ?? []),
+    ...(courseData?.sections ?? []).flatMap((section: any) => section.lessons ?? []),
+  ] : [], [courseData, target.kind]);
+  const canGenerate = newFocus.trim().length >= 3 && objective.trim().length >= 3 && (target.kind === "lesson" || selectedLessonIds.length > 0);
+
+  const toggleLesson = (lessonId: number) => {
+    setSelectedLessonIds(current => current.includes(lessonId)
+      ? current.filter(id => id !== lessonId)
+      : current.length >= 25 ? current : [...current, lessonId]);
+  };
 
   const generatePreview = async () => {
     try {
       const input = { newFocus: newFocus.trim(), objective: objective.trim() };
       const result = target.kind === "course"
-        ? await previewCourse.mutateAsync({ ...input, courseId: target.courseId, offset: courseOffset })
+        ? await previewCourse.mutateAsync({ ...input, courseId: target.courseId, selectedLessonIds })
         : await previewLesson.mutateAsync({ ...input, lessonId: target.lessonId });
       setPreview(result);
     } catch (error: any) {
@@ -72,12 +86,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
       });
       toast.success(`Updated instructional content for ${proposedLessons.length} lesson${proposedLessons.length === 1 ? "" : "s"}.`);
       onApplied();
-      if (target.kind === "course" && preview.nextOffset !== null && preview.nextOffset !== undefined) {
-        setCourseOffset(preview.nextOffset);
-        setPreview(null);
-      } else {
-        onOpenChange(false);
-      }
+      onOpenChange(false);
     } catch (error: any) {
       toast.error(error?.message || "Could not apply the reviewed regeneration.");
     }
@@ -85,9 +94,6 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
 
   const targetLabel = target.kind === "course" ? "Course" : "Lesson";
   const isCourseBatch = target.kind === "course" && preview;
-  const batchStart = isCourseBatch ? Number(preview.batchOffset ?? 0) + 1 : 1;
-  const batchEnd = isCourseBatch ? Number(preview.batchOffset ?? 0) + proposedLessons.length : proposedLessons.length;
-  const hasNextBatch = isCourseBatch && preview.nextOffset !== null && preview.nextOffset !== undefined;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -104,7 +110,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
           <div className="space-y-4 py-2">
             <div className="rounded-lg border border-teal-100 bg-teal-50 p-3 text-sm text-teal-800">
               <p className="font-semibold">Review first; nothing is changed yet.</p>
-              <p className="mt-1 text-xs text-teal-700">Describe the new clinical lens and the learning objective. {target.kind === "course" ? "Course lessons are generated in reviewable batches of five." : "The current lesson structure remains fixed."}</p>
+              <p className="mt-1 text-xs text-teal-700">Describe the new clinical lens and the learning objective. {target.kind === "course" ? "Choose the specific lessons to regenerate; unselected lessons remain unchanged." : "The current lesson structure remains fixed."}</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="regen-focus">New clinical focus</Label>
@@ -114,12 +120,38 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
               <Label htmlFor="regen-objective">Learning objective</Label>
               <textarea id="regen-objective" value={objective} onChange={event => setObjective(event.target.value)} placeholder="e.g. Teach clinicians when a pediatric echocardiogram is indicated and how its clinical context differs from fetal studies." maxLength={1500} className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
             </div>
+            {target.kind === "course" && (
+              <div className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <Label className="text-sm font-semibold text-gray-900">Lessons to regenerate</Label>
+                    <p className="text-xs text-gray-600">Select up to 25 lessons. Only selected lessons will be previewed or changed.</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-xs font-semibold ${selectedLessonIds.length === 25 ? "bg-amber-100 text-amber-800" : "bg-teal-100 text-teal-800"}`}>{selectedLessonIds.length} of 25 selected</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" disabled={courseLessonsLoading || courseLessons.length === 0} onClick={() => setSelectedLessonIds(courseLessons.slice(0, 25).map((lesson: any) => lesson.id))}>Select first 25</Button>
+                  <Button type="button" size="sm" variant="ghost" disabled={selectedLessonIds.length === 0} onClick={() => setSelectedLessonIds([])}>Clear selection</Button>
+                </div>
+                <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-gray-200 bg-white p-2">
+                  {courseLessonsLoading ? <p className="p-2 text-sm text-gray-500">Loading course lessons…</p> : courseLessons.length === 0 ? <p className="p-2 text-sm text-amber-700">No course lessons are available to select.</p> : courseLessons.map((lesson: any, index: number) => {
+                    const selected = selectedLessonIds.includes(lesson.id);
+                    const selectionFull = !selected && selectedLessonIds.length >= 25;
+                    return <label key={lesson.id} className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm ${selectionFull ? "cursor-not-allowed text-gray-400" : "text-gray-800 hover:bg-teal-50"}`}>
+                      <input type="checkbox" checked={selected} disabled={selectionFull} onChange={() => toggleLesson(lesson.id)} className="h-4 w-4 accent-teal-600" />
+                      <span className="text-xs font-semibold text-teal-700">{index + 1}</span>
+                      <span className="min-w-0 truncate">{lesson.title || "Untitled lesson"}</span>
+                    </label>;
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-3 py-2">
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <p>Review each proposal below. {isCourseBatch ? `This is lessons ${batchStart}–${batchEnd} of ${preview.totalLessons}. ` : ""}You can close this dialog without saving; apply is the only action that writes changes.</p>
+              <p>Review each proposal below. {isCourseBatch ? `You selected ${proposedLessons.length} of ${preview.totalLessons} course lessons. ` : ""}You can close this dialog without saving; apply is the only action that writes changes.</p>
             </div>
             {proposedLessons.map((entry: any, index: number) => (
               <article key={entry.proposal.lessonId} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
@@ -146,8 +178,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
         )}
 
         <DialogFooter className="gap-2">
-          {preview && <Button variant="outline" disabled={applyChanges.isPending} onClick={() => { setPreview(null); setCourseOffset(0); }}>Start Over</Button>}
-          {hasNextBatch && <Button variant="outline" disabled={applyChanges.isPending} onClick={() => { setCourseOffset(preview.nextOffset); setPreview(null); }}>Discard This Batch & Continue</Button>}
+          {preview && <Button variant="outline" disabled={applyChanges.isPending} onClick={() => { setPreview(null); setSelectedLessonIds([]); }}>Start Over</Button>}
           <Button variant="outline" disabled={generating || applyChanges.isPending} onClick={() => onOpenChange(false)}>Cancel</Button>
           {!preview ? (
             <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!canGenerate || generating} onClick={generatePreview}>
@@ -155,7 +186,7 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
             </Button>
           ) : (
             <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={applyChanges.isPending} onClick={applyPreview}>
-              {applyChanges.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying...</> : <><CheckCircle2 className="mr-2 h-4 w-4" /> {hasNextBatch ? "Apply This Batch & Continue" : "Apply Reviewed Changes"}</>}
+              {applyChanges.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Applying...</> : <><CheckCircle2 className="mr-2 h-4 w-4" /> Apply Reviewed Changes</>}
             </Button>
           )}
         </DialogFooter>

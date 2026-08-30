@@ -184,6 +184,8 @@
 - [x] Trace and repair the blocked Railway course focus-regeneration preview request without applying any content changes.
 - [x] Replace the 30-lesson hard stop with rate-safe, reviewable course regeneration batches that cover every lesson without altering course structure.
 - [x] Show batch progress and retain generated previews until the administrator explicitly applies or discards each reviewed batch.
+- [x] Let administrators select any set of up to 25 lessons for a course focus-regeneration preview, preserving every unselected lesson unchanged.
+- [x] Enforce the 25-lesson selection limit server-side and present clear selection counts, review status, and explicit apply behavior in the course dialog.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.

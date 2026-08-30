@@ -93,7 +93,7 @@ import { draftNotifyEntries, cmeActivityForms } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 import { parseScheduledTimestamp } from "../../shared/platformTime";
 import { applyEditableBlockText, collectEditableBlockText, stripCodeFences, type BlockTextField } from "../lib/lessonFocusRegeneration";
-import { getCourseFocusRegenerationBatch } from "../lib/courseFocusRegenerationBatch";
+import { selectCourseFocusRegenerationLessons } from "../lib/courseFocusRegenerationBatch";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -225,7 +225,7 @@ export const lmsCourseBuilderRouter = router({
       };
     }),
   previewCourseFocusRegeneration: protectedProcedure
-    .input(focusRegenerationInput.extend({ courseId: z.number().int().positive(), offset: z.number().int().min(0).default(0) }))
+    .input(focusRegenerationInput.extend({ courseId: z.number().int().positive(), selectedLessonIds: z.array(z.number().int().positive()).min(1).max(25) }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
@@ -234,31 +234,28 @@ export const lmsCourseBuilderRouter = router({
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
       const lessons = await db.select().from(lmsLessons).where(eq(lmsLessons.courseId, input.courseId)).orderBy(asc(lmsLessons.position));
       if (lessons.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "This course has no lessons to regenerate." });
-      let batch;
+      let selectedLessons;
       try {
-        batch = getCourseFocusRegenerationBatch(lessons.length, input.offset);
+        selectedLessons = selectCourseFocusRegenerationLessons(lessons, input.selectedLessonIds);
       } catch {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "No lessons remain in this course regeneration preview." });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Select one to 25 valid lessons from this course." });
       }
-      const batchLessons = lessons.slice(batch.offset, batch.end);
       const changes: FocusChange[] = [];
-      for (const lesson of batchLessons) {
+      for (const lesson of selectedLessons) {
         changes.push(await generateFocusChange({ lesson, courseTitle: course.title, newFocus: input.newFocus, objective: input.objective }));
       }
       return {
         course: { id: course.id, title: course.title },
         totalLessons: lessons.length,
-        batchOffset: batch.offset,
-        batchSize: batch.count,
-        nextOffset: batch.nextOffset,
-        changes: batchLessons.map((lesson, index) => ({
+        selectedLessonCount: selectedLessons.length,
+        changes: selectedLessons.map((lesson, index) => ({
           lesson: { id: lesson.id, title: lesson.title, learningObjectives: parseObjectives(lesson.learningObjectives) },
           proposal: changes[index],
         })),
       };
     }),
   applyFocusRegeneration: protectedProcedure
-    .input(z.object({ courseId: z.number().int().positive(), changes: z.array(focusChangeInput).min(1).max(30) }))
+    .input(z.object({ courseId: z.number().int().positive(), changes: z.array(focusChangeInput).min(1).max(25) }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();

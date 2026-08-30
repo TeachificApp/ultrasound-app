@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { getCourseFocusRegenerationBatch } from "./lib/courseFocusRegenerationBatch";
+import { selectCourseFocusRegenerationLessons } from "./lib/courseFocusRegenerationBatch";
 
-describe("course focus regeneration batches", () => {
-  it("uses rate-safe five-lesson batches and reports the next offset", () => {
-    expect(getCourseFocusRegenerationBatch(12)).toEqual({ offset: 0, end: 5, count: 5, nextOffset: 5 });
-    expect(getCourseFocusRegenerationBatch(12, 5)).toEqual({ offset: 5, end: 10, count: 5, nextOffset: 10 });
-    expect(getCourseFocusRegenerationBatch(12, 10)).toEqual({ offset: 10, end: 12, count: 2, nextOffset: null });
+describe("course focus regeneration selection", () => {
+  const lessons = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
+
+  it("keeps course order while selecting administrator-requested lessons", () => {
+    expect(selectCourseFocusRegenerationLessons(lessons, [4, 2])).toEqual([{ id: 2 }, { id: 4 }]);
   });
 
-  it("rejects offsets beyond the available course lessons", () => {
-    expect(() => getCourseFocusRegenerationBatch(3, 3)).toThrow("No lessons remain");
+  it("requires valid in-course selections with a maximum of 25 lessons", () => {
+    expect(() => selectCourseFocusRegenerationLessons(lessons, [])).toThrow("Select at least one");
+    expect(() => selectCourseFocusRegenerationLessons(lessons, [1, 1])).toThrow("only once");
+    expect(() => selectCourseFocusRegenerationLessons(lessons, [9])).toThrow("do not belong");
+    expect(() => selectCourseFocusRegenerationLessons(Array.from({ length: 26 }, (_, index) => ({ id: index + 1 })), Array.from({ length: 26 }, (_, index) => index + 1))).toThrow("no more than 25");
   });
 });

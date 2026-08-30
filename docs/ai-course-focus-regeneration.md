@@ -6,10 +6,10 @@ The LMS administration area now provides **Regenerate Focus** at the course leve
 
 1. An administrator selects **Regenerate Focus** for one lesson or an entire course.
 2. The administrator supplies the new clinical focus and the teaching objective.
-3. Course regeneration processes five lessons at a time, rather than failing when a course exceeds a fixed lesson count. The server returns one structured, rate-safe preview batch for review. Nothing is saved during generation.
-4. The administrator expands each lesson preview, reviews the proposed title, objectives, instructional body, and number of existing block text fields that will change.
-5. The dialog shows the current lesson range and remaining course progress. The administrator can discard the current batch and continue, or select **Apply This Batch & Continue** to save only the reviewed lessons and advance to the next batch.
-6. Only an explicit apply action writes the proposal; closing the dialog writes nothing.
+3. For a course, the administrator selects the specific lessons to regenerate. The selection may contain **one to 25 lessons**; it is not restricted to sequential lessons. Unselected lessons remain unchanged.
+4. The server validates that every selected lesson belongs to that course, preserves the stored course order for the preview, and returns a structured proposal only for the selected lessons. Nothing is saved during generation, and no selection is saved automatically.
+5. The administrator expands each lesson preview and reviews the proposed title, objectives, instructional body, and number of existing block text fields that will change.
+6. Only an explicit **Apply Reviewed Changes** action writes the reviewed proposal; closing the dialog or selecting **Start Over** writes nothing.
 
 ## Preserved fields
 
@@ -19,6 +19,6 @@ It can update only the lesson title, learning objectives, free-text instructiona
 
 ## Validation
 
-The implementation is administrator-gated, uses strict structured model output, generates course previews in five-lesson batches to avoid unbounded direct-provider requests, and writes each accepted batch in a single database transaction. Focused regression coverage confirms batch progression plus preservation of media, styling, CTA links, quiz block content, and block IDs when instructional text is updated. Target server and client bundles compile successfully.
+The implementation is administrator-gated, uses strict structured model output, validates a selected course set of one to 25 lessons, and writes only the explicitly reviewed lessons in a single database transaction. Focused regression coverage confirms selected-lesson ordering and selection boundaries plus preservation of media, styling, CTA links, quiz block content, and block IDs when instructional text is updated. Target server and client bundles compile successfully.
 
 Live validation is required before using the workflow on active course content.
