@@ -6,7 +6,9 @@ export type BlockTextField = {
 const EDITABLE_TEXT_KEYS = new Set([
   "headline",
   "headline2",
+  "heading",
   "subheadline",
+  "subheading",
   "title",
   "subtitle",
   "content",
@@ -19,6 +21,10 @@ const EDITABLE_TEXT_KEYS = new Set([
   "message",
   "instructions",
   "quote",
+  "q",
+  "a",
+  "front",
+  "back",
 ]);
 
 const PROTECTED_KEY_PARTS = [
@@ -54,7 +60,8 @@ function isQuizBlock(value: unknown): boolean {
 
 function isEditableTextKey(key: string): boolean {
   const lower = key.toLowerCase();
-  return EDITABLE_TEXT_KEYS.has(lower) && !PROTECTED_KEY_PARTS.some(part => lower.includes(part));
+  const isRichTextHtml = lower === "html" || lower.endsWith("html");
+  return (EDITABLE_TEXT_KEYS.has(lower) || isRichTextHtml) && !PROTECTED_KEY_PARTS.some(part => lower.includes(part));
 }
 
 function safeParseBlocks(contentBlocks: string | null | undefined): unknown {
@@ -73,9 +80,16 @@ function safeParseBlocks(contentBlocks: string | null | undefined): unknown {
  */
 export function collectEditableBlockText(contentBlocks: string | null | undefined): BlockTextField[] {
   const result: BlockTextField[] = [];
-  const walk = (value: unknown, path: string[]) => {
+  const walk = (value: unknown, path: string[], parentKey?: string) => {
     if (Array.isArray(value)) {
-      value.forEach((item, index) => walk(item, [...path, String(index)]));
+      value.forEach((item, index) => {
+        const itemPath = [...path, String(index)];
+        if (typeof item === "string" && item.trim() && parentKey === "items") {
+          result.push({ path: itemPath.join("."), value: item });
+        } else {
+          walk(item, itemPath, parentKey);
+        }
+      });
       return;
     }
     if (!value || typeof value !== "object" || isQuizBlock(value)) return;
@@ -85,7 +99,7 @@ export function collectEditableBlockText(contentBlocks: string | null | undefine
       if (typeof child === "string" && child.trim() && isEditableTextKey(key)) {
         result.push({ path: childPath.join("."), value: child });
       } else if (child && typeof child === "object") {
-        walk(child, childPath);
+        walk(child, childPath, key);
       }
     }
   };
@@ -129,4 +143,54 @@ export function applyEditableBlockText(
 
 export function stripCodeFences(value: string): string {
   return value.replace(/^```[\w-]*\n?/m, "").replace(/\n?```$/m, "").trim();
+}
+
+type FocusProposalLike = {
+  content: string;
+  videoContent: string;
+  blockText: BlockTextField[];
+};
+
+function normalizedInstructionalText(value: string): string {
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function materiallyChanged(source: string, proposal: string): boolean {
+  return normalizedInstructionalText(source) !== normalizedInstructionalText(proposal);
+}
+
+/**
+ * Rejects incomplete model output before an administrator can review or apply it.
+ * A focus regeneration is a substantive instructional rewrite, not a title-only edit.
+ */
+export function assertSubstantiveFocusRegeneration(
+  source: { content: string; videoContent: string; editableBlockText: BlockTextField[] },
+  proposal: FocusProposalLike,
+): void {
+  if (source.content.trim() && (!proposal.content.trim() || !materiallyChanged(source.content, proposal.content))) {
+    throw new Error("The instructional body was not substantively rewritten.");
+  }
+  if (source.videoContent.trim() && (!proposal.videoContent.trim() || !materiallyChanged(source.videoContent, proposal.videoContent))) {
+    throw new Error("The video-supporting instructional text was not substantively rewritten.");
+  }
+
+  const sourceByPath = new Map(source.editableBlockText.map(field => [field.path, field.value]));
+  const proposalPaths = proposal.blockText.map(field => field.path);
+  if (new Set(proposalPaths).size !== proposalPaths.length || proposalPaths.length !== sourceByPath.size) {
+    throw new Error("The editable block-text proposal is incomplete.");
+  }
+  for (const field of proposal.blockText) {
+    const original = sourceByPath.get(field.path);
+    if (!original || !field.value.trim() || !materiallyChanged(original, field.value)) {
+      throw new Error("The editable block-text proposal is incomplete.");
+    }
+  }
+
+  const sourceText = [source.content, source.videoContent, ...source.editableBlockText.map(field => field.value)]
+    .map(normalizedInstructionalText).join(" ").trim();
+  const proposalText = [proposal.content, proposal.videoContent, ...proposal.blockText.map(field => field.value)]
+    .map(normalizedInstructionalText).join(" ").trim();
+  if (sourceText.length >= 400 && proposalText.length < sourceText.length * 0.35) {
+    throw new Error("The instructional rewrite is too abbreviated.");
+  }
 }

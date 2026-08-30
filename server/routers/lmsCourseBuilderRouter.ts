@@ -92,7 +92,7 @@ import {
 import { draftNotifyEntries, cmeActivityForms } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 import { parseScheduledTimestamp } from "../../shared/platformTime";
-import { applyEditableBlockText, collectEditableBlockText, stripCodeFences, type BlockTextField } from "../lib/lessonFocusRegeneration";
+import { applyEditableBlockText, assertSubstantiveFocusRegeneration, collectEditableBlockText, stripCodeFences, type BlockTextField } from "../lib/lessonFocusRegeneration";
 import { selectCourseFocusRegenerationLessons } from "../lib/courseFocusRegenerationBatch";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -178,20 +178,22 @@ async function generateFocusChange(input: {
     messages: [
       {
         role: "system",
-        content: "You are an expert medical ultrasound educator for All About Ultrasound and iHeartEcho. Rewrite only the instructional content of one lesson for a new clinical focus. Preserve the lesson's teaching depth, professional US English, and clinical accuracy. Return strict JSON only. Never invent patient cases, testimonials, study results, sources, citations, or learner records. Do not alter block IDs, types, layout, colors, URLs, media, buttons, quiz questions, answer choices, settings, or access rules. Rewrite only title, learning objectives, HTML instructional content, optional video-supporting instructional content, and the supplied editable block-text paths.",
+        content: "You are an expert medical ultrasound educator for All About Ultrasound and iHeartEcho. Create a full instructional adaptation of one lesson for a new clinical focus, not a title-only or objective-only edit. Rewrite every non-empty supplied instructional field with clinically appropriate content for the new focus, preserving the lesson's teaching depth, approximate detail, functional HTML markup, professional US English, and clinical accuracy. Every supplied editable block-text path must appear exactly once in blockText with a rewritten non-empty value; do not add paths. Return strict JSON only. Never invent patient cases, testimonials, study results, sources, citations, or learner records. Do not alter block IDs, types, layout, colors, URLs, media, buttons, quiz questions, answer choices, settings, or access rules. Rewrite only title, learning objectives, HTML instructional content, optional video-supporting instructional content, and the supplied editable block-text paths.",
       },
       {
         role: "user",
-        content: `Course: ${input.courseTitle}\nNew clinical focus: ${input.newFocus}\nLearning objective for this rewrite: ${input.objective}\n\nCurrent editable lesson fields:\n${JSON.stringify(source)}\n\nReturn a clinically appropriate version of every supplied text field. Keep blockText paths exactly as supplied; return no additional paths. If content or videoContent is empty, return an empty string for that field.`,
+        content: `Course: ${input.courseTitle}\nNew clinical focus: ${input.newFocus}\nLearning objective for this rewrite: ${input.objective}\n\nCurrent editable lesson fields:\n${JSON.stringify(source)}\n\nReturn a complete clinically appropriate rewrite of every supplied non-empty instructional field. The body content and existing editable block text must change substantively for the new focus; a header-only response is invalid. Keep blockText paths exactly as supplied, include every supplied path once, and return no additional paths. If content or videoContent is empty, return an empty string for that field.`,
       },
     ],
   });
   try {
     const raw = response.choices?.[0]?.message?.content;
     const parsed = typeof raw === "string" ? JSON.parse(stripCodeFences(raw)) : raw;
-    return focusChangeInput.parse({ lessonId: input.lesson.id, ...parsed });
+    const proposal = focusChangeInput.parse({ lessonId: input.lesson.id, ...parsed });
+    assertSubstantiveFocusRegeneration(source, proposal);
+    return proposal;
   } catch {
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI returned an invalid lesson regeneration preview. Please try again." });
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI did not return a complete instructional rewrite for this lesson. Please try again." });
   }
 }
 

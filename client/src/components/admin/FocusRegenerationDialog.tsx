@@ -171,7 +171,21 @@ export function FocusRegenerationDialog({ open, target, onOpenChange, onApplied 
                   <summary className="cursor-pointer text-sm font-semibold text-teal-800">Review proposed instructional content</summary>
                   <div className="mt-3 text-sm text-gray-700"><RichTextDisplay content={entry.proposal.content || entry.proposal.videoContent || "No free-text lesson body is present; only the listed editable block text will be updated."} /></div>
                 </details>
-                {entry.proposal.blockText.length > 0 && <p className="text-xs text-gray-500">{entry.proposal.blockText.length} existing block text field{entry.proposal.blockText.length === 1 ? "" : "s"} will be updated. Block structure, layout, and media remain unchanged.</p>}
+                {entry.proposal.blockText.length > 0 && (
+                  <details className="rounded-lg border border-teal-100 bg-teal-50/40 p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-teal-800">Review {entry.proposal.blockText.length} proposed block-text update{entry.proposal.blockText.length === 1 ? "" : "s"}</summary>
+                    <div className="mt-3 space-y-3">
+                      {entry.proposal.blockText.map((field: { path: string; value: string }, blockIndex: number) => (
+                        <div key={field.path} className="rounded-md border border-teal-100 bg-white p-3">
+                          <p className="text-xs font-medium text-gray-500">Instructional field {blockIndex + 1}</p>
+                          <code className="mt-1 block break-all text-[11px] text-teal-700">{field.path}</code>
+                          <div className="mt-2 text-sm text-gray-700"><RichTextDisplay content={field.value} /></div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-3 text-xs text-gray-500">Block structure, layout, links, quizzes, and media remain unchanged.</p>
+                  </details>
+                )}
               </article>
             ))}
           </div>
