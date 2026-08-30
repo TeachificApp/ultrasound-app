@@ -188,6 +188,8 @@
 - [x] Enforce the 25-lesson selection limit server-side and present clear selection counts, review status, and explicit apply behavior in the course dialog.
 - [x] Repair focus-regeneration proposals that change only lesson headers rather than substantively rewriting the selected lessons’ instructional content for the new clinical focus.
 - [x] Add regressions confirming focus regeneration returns meaningful editable instructional body and block-text proposals while protected media, layouts, quizzes, and learner records remain unchanged.
+- [x] Require the lesson AI content-generation module to produce at least 1,500 words for a full lesson and reject undersized full-lesson drafts before they can be saved.
+- [x] Add focused regression coverage for full-lesson word-count validation and the author-facing short-draft error path.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.

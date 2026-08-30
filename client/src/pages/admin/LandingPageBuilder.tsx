@@ -3512,7 +3512,7 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
       setMany({ html: result.content, prompt: aiPrompt, contentType: aiContentType });
       setAiMode("edit");
       setIsAiGenerating(false);
-      toast.success("Content generated \u2014 review and edit as needed.");
+      toast.success(aiContentType === "lesson" ? `Full lesson generated — ${result.wordCount.toLocaleString("en-US")} words. Review and edit as needed.` : "Content generated — review and edit as needed.");
     },
     onError: (e) => {
       toast.error(`AI generation failed: ${e.message}`);
@@ -3548,8 +3548,8 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
     }
     if (!aiPrompt.trim()) { toast.error("Please enter a prompt."); return; }
     setIsAiGenerating(true);
-    const formatMap: Record<string, "text" | "outline" | "summary" | "quiz_questions"> = {
-      lesson: "text", explanation: "text", summary: "summary", outline: "outline",
+    const formatMap: Record<string, "full_lesson" | "text" | "outline" | "summary" | "quiz_questions"> = {
+      lesson: "full_lesson", explanation: "text", summary: "summary", outline: "outline",
       exercise: "text", section: "text", quiz_questions: "quiz_questions",
       announcement: "text", newsletter_section: "text", promo_copy: "text",
       event_recap: "text", follow_up: "text", intro_paragraph: "text", closing_paragraph: "text",
@@ -3586,7 +3586,7 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
                 </>
               ) : (
                 <>
-                  <option value="lesson">Full Lesson</option>
+                  <option value="lesson">Full Lesson (minimum 1,500 words)</option>
                   <option value="explanation">Explanation</option>
                   <option value="summary">Summary</option>
                   <option value="outline">Outline</option>

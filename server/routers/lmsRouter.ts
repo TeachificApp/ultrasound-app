@@ -42,6 +42,7 @@ import { enrichCohortResources } from "../lib/cohortResources";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
+import { countRenderedWords, isCompleteFullLesson, MIN_FULL_LESSON_WORDS } from "../lib/lessonContentGeneration";
 import {
   lmsCourses,
   lmsSections,
@@ -668,37 +669,47 @@ export const lmsRouter = router({
     .input(z.object({
       lessonTitle: z.string().min(1),
       courseTitle: z.string().optional(),
-      format: z.enum(["text", "outline", "summary", "quiz_questions"]).default("text"),
+      format: z.enum(["full_lesson", "text", "outline", "summary", "quiz_questions"]).default("text"),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const formatInstructions: Record<string, string> = {
+        full_lesson: `Write a complete, publication-ready lesson of at least ${MIN_FULL_LESSON_WORDS.toLocaleString("en-US")} readable words, excluding HTML markup. Aim for 1,600–1,800 words so the minimum is met. Use a meaningful clinical introduction; clearly labeled sections for anatomy or physiology where relevant, scanning technique, interpretation, common pitfalls, and clinical pearls; and a concise conclusion. Use <h2>, <h3>, <p>, and <ul>/<li> tags. Do not include <html>, <head>, or <body> tags.`,
         text: "Write comprehensive, well-structured lesson content in HTML format. Use <h2>, <h3>, <p>, and <ul>/<li> tags where appropriate. Do not include <html>, <head>, or <body> tags.",
         outline: "Create a detailed lesson outline in HTML format with main sections as <h2> headings, sub-points as <h3> headings, and key learning objectives as a <ul> list at the top.",
         summary: "Write a concise summary of the key concepts for this lesson in HTML format. Use <p> for intro and <ul><li> bullet points for the main takeaways.",
         quiz_questions: "Generate 5 quiz questions with answers for this lesson in HTML format. Format as <ol> with each <li> containing the question in <strong> and the answer in a <p> below it.",
       };
       const instruction = formatInstructions[input.format];
-      const response = await invokeLLM({
-        // Prefer Forge when it is configured, but use the Railway-held Manus API
-        // key through the constrained non-interactive fallback when it is not.
-        transport: "auto",
-        maxTokens: 4000,
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert medical ultrasound educator creating content for All About Ultrasound™ and iHeartEcho™ online learning platforms. Generate high-quality, clinically accurate lesson content for ultrasound and echocardiography education. ${instruction} Return only the HTML fragment — no markdown code fences, no surrounding tags.`,
-          },
-          {
-            role: "user",
-            content: `Generate lesson content for the lesson titled: "${input.lessonTitle}"${input.courseTitle ? ` (part of the course "${input.courseTitle}")` : ""}.`,
-          },
-        ],
-      });
-      const content = (response.choices?.[0]?.message?.content ?? "") as string;
-      // Strip any accidental markdown code fences
-      const cleaned = content.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-      return { content: cleaned };
+      const generate = async (revisionInstruction?: string) => {
+        const response = await invokeLLM({
+          // Prefer Forge when it is configured, but use the Railway-held Manus API
+          // key through the constrained non-interactive fallback when it is not.
+          transport: "auto",
+          maxTokens: input.format === "full_lesson" ? 6000 : 4000,
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert medical ultrasound educator creating content for All About Ultrasound™ and iHeartEcho™ online learning platforms. Generate high-quality, clinically accurate lesson content for ultrasound and echocardiography education. ${instruction} Return only the HTML fragment — no markdown code fences, no surrounding tags.`,
+            },
+            {
+              role: "user",
+              content: `Generate lesson content for the lesson titled: "${input.lessonTitle}"${input.courseTitle ? ` (part of the course "${input.courseTitle}")` : ""}.${revisionInstruction ? `\n\n${revisionInstruction}` : ""}`,
+            },
+          ],
+        });
+        const content = (response.choices?.[0]?.message?.content ?? "") as string;
+        return content.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      };
+
+      let cleaned = await generate();
+      if (input.format === "full_lesson" && !isCompleteFullLesson(cleaned)) {
+        cleaned = await generate(`The prior draft was only ${countRenderedWords(cleaned)} readable words. Regenerate the complete lesson at no fewer than ${MIN_FULL_LESSON_WORDS.toLocaleString("en-US")} readable words.`);
+      }
+      if (input.format === "full_lesson" && !isCompleteFullLesson(cleaned)) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `AI returned an incomplete full lesson. Full lessons require at least ${MIN_FULL_LESSON_WORDS.toLocaleString("en-US")} words; please generate again.` });
+      }
+      return { content: cleaned, wordCount: countRenderedWords(cleaned) };
     }),
   generatePromoContent: protectedProcedure
     .input(z.object({
