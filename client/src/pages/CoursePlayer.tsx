@@ -1641,6 +1641,21 @@ export default function CoursePlayer() {
   });
 
   useEffect(() => { setVideoWatched(false); setRightPanelTab("info"); }, [selectedLessonId]);
+
+  // A lesson can be selected from the initial course route, a refreshed editor
+  // state, or automatic Next navigation. Persist that opened state even when it
+  // did not originate from a sidebar click, so an open-based prerequisite gate
+  // continues to unlock normal learner progression after a page refresh.
+  useEffect(() => {
+    if (!selectedLessonId || !slug || optimisticOpened.has(selectedLessonId)) return;
+    if ((data?.progress ?? []).some((progressRow: any) => progressRow.lessonId === selectedLessonId)) return;
+    setOptimisticOpened((previous) => new Set([...previous, selectedLessonId]));
+    recordLessonOpened.mutate({
+      lessonId: selectedLessonId,
+      courseSlug: slug,
+      isAdminPreview: data?.isAdminPreview ?? false,
+    });
+  }, [selectedLessonId, slug, data?.isAdminPreview, data?.progress, optimisticOpened, recordLessonOpened]);
   // Exit fullscreen on Escape key
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape" && contentFullscreen) setContentFullscreen(false); };
@@ -1783,7 +1798,7 @@ export default function CoursePlayer() {
         ? (lessonData.effectBannerDuration ?? 5) * 1000
         : 0;
       const navDelay = bannerDuration > 0 ? bannerDuration + 500 : 1500;
-      setTimeout(() => setSelectedLessonId(nextLesson.id), navDelay);
+      setTimeout(() => handleLessonSelect(nextLesson.id), navDelay);
     }
   };
 

@@ -22,14 +22,22 @@ describe("CME course player video gate", () => {
     expect(coursePlayer).toContain("Watch at least 90% of each required video lesson.");
   });
 
-  it("auto-completes ordinary CME lessons on Next while preserving video and quiz completion gates", () => {
+  it("auto-completes eligible CME lessons on Next while preserving explicit video and quiz completion gates", () => {
     expect(coursePlayer).toContain("shouldAutoCompleteCmeLessonOnAdvance");
     expect(coursePlayer).toContain("const handleNextLesson = async () => {");
     expect(coursePlayer).toContain("onClick={handleNextLesson}");
     expect(shouldAutoCompleteCmeLessonOnAdvance({ isCmeCourse: true, lessonType: "text", requiresVideoCompletion: false, hasInlineQuiz: false, isCompleted: false })).toBe(true);
     expect(shouldAutoCompleteCmeLessonOnAdvance({ isCmeCourse: true, lessonType: "video", requiresVideoCompletion: true, hasInlineQuiz: false, isCompleted: false })).toBe(false);
+    expect(shouldAutoCompleteCmeLessonOnAdvance({ isCmeCourse: true, lessonType: "video", requiresVideoCompletion: false, hasInlineQuiz: false, isCompleted: false })).toBe(true);
+    expect(shouldAutoCompleteCmeLessonOnAdvance({ isCmeCourse: true, lessonType: "video_text", requiresVideoCompletion: false, hasInlineQuiz: false, isCompleted: false })).toBe(true);
     expect(shouldAutoCompleteCmeLessonOnAdvance({ isCmeCourse: true, lessonType: "text", requiresVideoCompletion: false, hasInlineQuiz: true, isCompleted: false })).toBe(false);
     expect(shouldAutoCompleteCmeLessonOnAdvance({ isCmeCourse: true, lessonType: "text", requiresVideoCompletion: false, hasInlineQuiz: false, hasSdmsCmeModule: true, isCompleted: false })).toBe(false);
+  });
+
+  it("persists opened state for initial and auto-advanced lessons so normal CME progression survives refresh", () => {
+    expect(coursePlayer).toContain("A lesson can be selected from the initial course route");
+    expect(coursePlayer).toContain("recordLessonOpened.mutate({");
+    expect(coursePlayer).toContain("setTimeout(() => handleLessonSelect(nextLesson.id), navDelay)");
   });
 
   it("treats certificate courses by hasCertificate alone (credit hours optional)", () => {

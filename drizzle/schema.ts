@@ -3352,7 +3352,9 @@ export const lmsLessonProgress = mysqlTable("lms_lesson_progress", {
   quizScore: int("quiz_score"), // percentage if quiz lesson
   quizPassed: boolean("quiz_passed"),
   attempts: int("attempts").default(0).notNull(),
-});
+}, (table) => ({
+  enrollmentLessonUnique: uniqueIndex("lms_lesson_progress_enrollment_lesson_unique").on(table.enrollmentId, table.lessonId),
+}));
 export type LmsLessonProgress = typeof lmsLessonProgress.$inferSelect;
 
 export const lmsGroups = mysqlTable("lms_groups", {

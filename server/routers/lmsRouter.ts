@@ -2219,6 +2219,10 @@ export const lmsLearnerRouter = router({
           enrollmentId: enrollment.id,
           lessonId: input.lessonId,
           completedAt: null,
+        }).onDuplicateKeyUpdate({
+          // A concurrent Mark Complete write may have created the authoritative
+          // row first. Keep that row intact rather than failing this open event.
+          set: { lessonId: sql`${lmsLessonProgress.lessonId}` },
         });
       }
       return { success: true };
@@ -2258,7 +2262,10 @@ export const lmsLearnerRouter = router({
           await db.update(lmsLessonProgress).set({ completedAt: new Date() }).where(eq(lmsLessonProgress.id, existing.id));
         }
       } else {
-        await db.insert(lmsLessonProgress).values({ enrollmentId: enrollment.id, lessonId: input.lessonId, completedAt: new Date() });
+        await db.insert(lmsLessonProgress).values({ enrollmentId: enrollment.id, lessonId: input.lessonId, completedAt: new Date() })
+          .onDuplicateKeyUpdate({
+            set: { completedAt: sql`COALESCE(${lmsLessonProgress.completedAt}, VALUES(${lmsLessonProgress.completedAt}))` },
+          });
       }
       await recalcProgress(db, enrollment.id);
       // Log lesson completion to unified activity log (fire-and-forget)
@@ -2382,6 +2389,15 @@ export const lmsLearnerRouter = router({
           quizPassed: passed,
           completedAt: passed ? new Date() : null,
           attempts: 1,
+        }).onDuplicateKeyUpdate({
+          set: {
+            quizScore: score,
+            quizPassed: passed,
+            completedAt: passed
+              ? sql`COALESCE(${lmsLessonProgress.completedAt}, VALUES(${lmsLessonProgress.completedAt}))`
+              : lmsLessonProgress.completedAt,
+            attempts: sql`${lmsLessonProgress.attempts} + 1`,
+          },
         });
       }
 
@@ -2498,6 +2514,15 @@ export const lmsLearnerRouter = router({
           enrollmentId: enrollment.id, lessonId: input.lessonId,
           quizScore: score, quizPassed: passed,
           completedAt: passed ? new Date() : null, attempts: 1,
+        }).onDuplicateKeyUpdate({
+          set: {
+            quizScore: score,
+            quizPassed: passed,
+            completedAt: passed
+              ? sql`COALESCE(${lmsLessonProgress.completedAt}, VALUES(${lmsLessonProgress.completedAt}))`
+              : lmsLessonProgress.completedAt,
+            attempts: sql`${lmsLessonProgress.attempts} + 1`,
+          },
         });
       }
       if (passed) await recalcProgress(db, enrollment.id);

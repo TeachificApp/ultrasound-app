@@ -1278,6 +1278,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
       params.set("editLesson", String(editLesson.id));
     } else {
       params.delete("editLesson");
+      params.delete("editLessonTab");
     }
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState(null, "", newUrl);
@@ -4996,11 +4997,31 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   // Use the full lesson once loaded; fall back to the shallow object while loading
   const lesson = fullLesson ?? lessonShallow;
 
-  const [activeTab, setActiveTab] = useState<"settings" | "content">("settings");
+  const initialEditorTab = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get("editLessonTab") === "content"
+        ? "content"
+        : "settings";
+    } catch {
+      return "settings";
+    }
+  })();
+  const [activeTab, setActiveTab] = useState<"settings" | "content">(initialEditorTab);
   const [headerSaving, setHeaderSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [lessonFocusRegenerationOpen, setLessonFocusRegenerationOpen] = useState(false);
+
+  // Preserve the active full-screen lesson editor tab across a browser refresh.
+  // The parent already persists editCourse and editLesson; this records only the
+  // view choice and does not persist any unsaved form or block changes.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("editLesson")) return;
+    if (activeTab === "content") params.set("editLessonTab", "content");
+    else params.delete("editLessonTab");
+    window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+  }, [activeTab, lessonShallow.id]);
 
   const handleCloseWithConfirm = () => {
     if (isDirty) {

@@ -209,6 +209,11 @@
 - [x] Include certificate management in CME Management with per-activity issued-certificate status, issuance date, and export visibility.
 - [x] Add per-CME-activity reporting and CSV export with learner full name, email, activity and completion dates, quiz results, and recorded quiz or survey responses.
 - [x] Add focused authorization, reporting-accuracy, and CSV export regressions for the CME Management panel without exposing learner data to non-administrators.
+- [ ] Trace and repair CME lesson-quiz access and completion gating that prevents enrolled learners from reaching a required CME quiz and certificate eligibility.
+- [ ] Verify and repair the learner-facing lookup and parsing of existing CME lesson quizzes without replacing, duplicating, or modifying quiz content.
+- [x] Repair CME course progression so every completed lesson persists correctly, eligible next lessons unlock normally, and displayed progress reflects the learner’s actual completion state.
+- [x] Preserve the active lesson-editor view and lesson context across a page refresh so administrators return directly to Lesson Editor rather than lesson settings.
+- [ ] Add focused regressions proving an authorized CME learner can access required lesson quizzes, record completion, and reach the existing certificate-eligibility path without changing unrelated learner records.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.

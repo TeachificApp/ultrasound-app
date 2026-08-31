@@ -24,8 +24,9 @@ export function hasReachedCmeVideoCompletionThreshold(currentTime: number, durat
 }
 
 /**
- * Ordinary CME instruction completes when the learner advances. Video and quiz
- * requirements remain explicit so their completion gates cannot be bypassed.
+ * Ordinary CME instruction, including video lessons without an explicitly
+ * enabled viewing gate, completes when the learner advances. Quiz, SDMS, and
+ * explicitly required video completions remain protected.
  */
 export function shouldAutoCompleteCmeLessonOnAdvance({
   isCmeCourse,
@@ -48,7 +49,5 @@ export function shouldAutoCompleteCmeLessonOnAdvance({
     && !hasInlineQuiz
     && !hasSdmsCmeModule
     && lessonType !== "quiz"
-    && lessonType !== "standalone_quiz"
-    && lessonType !== "video"
-    && lessonType !== "video_text";
+    && lessonType !== "standalone_quiz";
 }
