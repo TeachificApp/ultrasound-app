@@ -200,7 +200,13 @@
 - [x] Validate the CME lesson-quiz template’s question count, wording, creator-controlled settings, and non-discovery status before administrator review.
 - [x] Expose saved lesson templates in the active lesson editor with a clear picker and an Add to Lesson action, including the CME Activity Evaluation Survey template.
 - [x] Add focused regression coverage that template insertion creates safe fresh content-block IDs and does not mutate the saved source template.
+- [x] Add the supplied activity-quality ratings, narrative feedback, recommendation, and referral-source questions to the reusable CME Activity Evaluation Survey template.
+- [x] Validate that the expanded CME evaluation template records all added questions as unscored survey responses suitable for CME activity export.
+- [x] Persist submitted inline CME lesson-quiz responses by learner, course, lesson, and question so survey answers are available for activity-level reporting and export.
+- [x] Create a separate unassigned, unscored CME Speaker Evaluation Survey template with the supplied knowledge, effectiveness, and engagement rating questions.
+- [x] Validate the CME Speaker Evaluation Survey template’s three question ratings and CME export-compatible response format before checkpointing the survey templates.
 - [ ] Build an administrator-only CME Management panel that lists CME courses and activities with learner enrollment and completion reporting.
+- [ ] Include certificate management in CME Management with per-activity issued-certificate status, issuance date, and export visibility.
 - [ ] Add per-CME-activity reporting and CSV export with learner full name, email, activity and completion dates, quiz results, and recorded quiz or survey responses.
 - [ ] Add focused authorization, reporting-accuracy, and CSV export regressions for the CME Management panel without exposing learner data to non-administrators.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.

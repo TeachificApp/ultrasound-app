@@ -248,13 +248,13 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         const allCorrect = pairs.every((p: any) => answers[p.id] === p.right);
         if (allCorrect && pairs.length > 0) correct++;
       }
-      // Survey types (likert, star_rating, open_text) don't count toward score
+      // Survey types (likert, star_rating, open_text, survey_choice) don't count toward score
       // Interactive types
       if (INTERACTIVE_TYPES.includes(qt)) {
         if (scoreInteractiveAnswer(question as any, interactiveAnswers[i])) correct++;
       }
     });
-    const scorableCount = shuffledQuestions.filter((q: any) => !["likert", "star_rating", "open_text"].includes(q.type ?? "mcq") && !isInteractiveSurveyType(q.type ?? "mcq")).length;
+    const scorableCount = shuffledQuestions.filter((q: any) => !["likert", "star_rating", "open_text", "survey_choice"].includes(q.type ?? "mcq") && !isInteractiveSurveyType(q.type ?? "mcq")).length;
     if (scorableCount === 0) return 100;
     return Math.round((correct / scorableCount) * 100);
   };
@@ -271,8 +271,10 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
       const answers = matchingAnswers[currentIndex] ?? {};
       return pairs.every((p: any) => answers[p.id]);
     }
-    if (qType === "likert" || qType === "star_rating") return surveyAnswers[currentIndex] !== undefined;
-    if (qType === "open_text") return true; // always considered answered (optional free text)
+    if (qType === "likert" || qType === "star_rating" || qType === "survey_choice") return surveyAnswers[currentIndex] !== undefined;
+    if (qType === "open_text") return q.required === true
+      ? Boolean(String(surveyAnswers[currentIndex] ?? "").trim())
+      : true;
     if (INTERACTIVE_TYPES.includes(qType)) return interactiveAnswers[currentIndex] !== undefined;
     return false;
   };
@@ -287,8 +289,10 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
       const answers = matchingAnswers[i] ?? {};
       return pairs.every((p: any) => answers[p.id]);
     }
-    if (qt === "likert" || qt === "star_rating") return surveyAnswers[i] !== undefined;
-    if (qt === "open_text") return true;
+    if (qt === "likert" || qt === "star_rating" || qt === "survey_choice") return surveyAnswers[i] !== undefined;
+    if (qt === "open_text") return shuffledQuestions[i]?.required === true
+      ? Boolean(String(surveyAnswers[i] ?? "").trim())
+      : true;
     if (INTERACTIVE_TYPES.includes(qt)) return interactiveAnswers[i] !== undefined;
     return false;
   });
@@ -306,11 +310,23 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
   const handleSubmit = () => {
     const calculatedScore = computeScore();
     setSubmitted(true);
+    const responses = shuffledQuestions.map((question: any, shuffledIndex: number) => {
+      const sourceIndex = rawQuestions.indexOf(question);
+      const questionType = question.type ?? "mcq";
+      const answerValue = ["likert", "star_rating", "open_text", "survey_choice"].includes(questionType)
+        ? surveyAnswers[shuffledIndex] ?? null
+        : null;
+      return {
+        questionKey: String(question.id ?? sourceIndex),
+        answerValue,
+      };
+    });
     recordInlineQuiz.mutate({
       lessonId,
       courseSlug,
       score: calculatedScore,
       isAdminPreview,
+      responses,
     });
   };
 
@@ -446,16 +462,16 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         <div className="flex items-center gap-2 mb-3">
           <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-teal-600 text-white text-xs font-bold shrink-0">{currentIndex + 1}</span>
           <span className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-            {qType === "mcq" ? "Multiple Choice" : qType === "truefalse" ? "True / False" : qType === "multiselect" ? "Select All That Apply" : qType === "hotspot" ? "Hotspot" : qType === "matching" ? "Matching" : qType === "likert" ? "Opinion Poll" : qType === "star_rating" ? "Star Rating" : qType === "image_comparison" ? "Image Comparison" : qType === "drag_sort" ? "Ordering" : qType === "branching" ? "Clinical Scenario" : qType === "fill_blank" ? "Fill in the Blank" : qType === "annotation" ? "Image Annotation" : qType === "flashcard" ? "Flashcard" : "Open Response"}
+            {qType === "mcq" ? "Multiple Choice" : qType === "truefalse" ? "True / False" : qType === "multiselect" ? "Select All That Apply" : qType === "hotspot" ? "Hotspot" : qType === "matching" ? "Matching" : qType === "likert" ? "Opinion Poll" : qType === "star_rating" ? "Star Rating" : qType === "survey_choice" ? "Survey" : qType === "image_comparison" ? "Image Comparison" : qType === "drag_sort" ? "Ordering" : qType === "branching" ? "Clinical Scenario" : qType === "fill_blank" ? "Fill in the Blank" : qType === "annotation" ? "Image Annotation" : qType === "flashcard" ? "Flashcard" : "Open Response"}
           </span>
-          {submitted && showFeedback && !(qType === "likert" || qType === "star_rating" || qType === "open_text") && (
+          {submitted && showFeedback && !(qType === "likert" || qType === "star_rating" || qType === "open_text" || qType === "survey_choice") && (
             <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full ${
               isCurrentCorrect() ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
             }`}>
               {isCurrentCorrect() ? "✓ Correct" : "✗ Incorrect"}
             </span>
           )}
-          {submitted && showFeedback && (qType === "likert" || qType === "star_rating" || qType === "open_text") && (
+          {submitted && showFeedback && (qType === "likert" || qType === "star_rating" || qType === "open_text" || qType === "survey_choice") && (
             <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">✓ Recorded</span>
           )}
         </div>
@@ -731,7 +747,7 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         {/* Open Text Response */}
         {qType === "open_text" && (
           <div className="space-y-2">
-            <p className="text-xs text-gray-400">Share your thoughts (optional)</p>
+            <p className="text-xs text-gray-400">{q.required === true ? "A response is required" : "Share your thoughts (optional)"}</p>
             <textarea
               disabled={submitted}
               value={String(surveyAnswers[currentIndex] ?? "")}
@@ -749,6 +765,33 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
                 {surveyAnswers[currentIndex] ? "Response recorded" : "No response provided"}
               </p>
             )}
+          </div>
+        )}
+
+        {/* Single-choice survey response */}
+        {qType === "survey_choice" && (
+          <div className="space-y-2">
+            {(q.options ?? []).map((option: string, index: number) => {
+              const isSelected = surveyAnswers[currentIndex] === option;
+              return (
+                <button
+                  key={`${option}-${index}`}
+                  type="button"
+                  disabled={submitted}
+                  onClick={() => !submitted && setSurveyAnswers(previous => ({ ...previous, [currentIndex]: option }))}
+                  className={`flex w-full items-center gap-3 rounded-xl border-2 px-4 py-3 text-left text-sm transition-colors ${
+                    isSelected
+                      ? "border-teal-500 bg-teal-50 text-teal-900"
+                      : submitted
+                      ? "border-gray-200 bg-gray-50 text-gray-400"
+                      : "border-gray-200 text-gray-700 hover:border-teal-400 hover:bg-teal-50/40"
+                  }`}
+                >
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${isSelected ? "border-teal-500 bg-teal-500 text-white" : "border-gray-300"}`}>{isSelected ? "✓" : ""}</span>
+                  <span>{option}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 

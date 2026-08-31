@@ -111,6 +111,8 @@ import {
   workshopInstances,
   lmsQuizAttempts,
   lmsQuizAttemptAnswers,
+  lmsInlineQuizAttempts,
+  lmsInlineQuizResponses,
   lmsQuizQuestionGroups,
   lmsQuizGroupQuestions,
   questionBank,
@@ -133,6 +135,7 @@ import { getCourseLessonAccessDecision } from "../lib/lessonAccess";
 import { courseDollarsToStripeCents } from "../lib/courseCheckoutPricing";
 import { dollarsToStripeCents } from "../lib/stripePriceUnits";
 import { formatWorkshopDollars } from "../../shared/workshopPricing";
+import { prepareInlineQuizResponses } from "../lib/inlineLessonQuizResponses";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
 // ─── Certificate Template Router (admin) ─────────────────────────────────────
@@ -2283,6 +2286,10 @@ export const lmsLearnerRouter = router({
       courseSlug: z.string(),
       score: z.number().min(0).max(100),
       isAdminPreview: z.boolean().optional(),
+      responses: z.array(z.object({
+        questionKey: z.string().min(1).max(128),
+        answerValue: z.union([z.string().max(10_000), z.number(), z.null()]).optional(),
+      })).max(200).optional().default([]),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -2332,6 +2339,30 @@ export const lmsLearnerRouter = router({
         input.score,
         Number(inlineQuiz?.data?.passingScore ?? 70),
       );
+
+      // Record ordinary learner submissions for CME activity reporting. Admin
+      // previews intentionally do not enter learner-facing completion exports.
+      if (!input.isAdminPreview) {
+        const responseRows = prepareInlineQuizResponses(
+          inlineQuiz?.data?.questions,
+          input.responses,
+        );
+        const [attempt] = await db.insert(lmsInlineQuizAttempts).values({
+          userId: ctx.user.id,
+          courseId: course.id,
+          lessonId: lesson.id,
+          quizBlockId: String(inlineQuiz?.id ?? "inline-lesson-quiz"),
+          score,
+          passed,
+          submittedAt: new Date(),
+        }).$returningId();
+        if (responseRows.length > 0) {
+          await db.insert(lmsInlineQuizResponses).values(responseRows.map(response => ({
+            attemptId: attempt.id,
+            ...response,
+          })));
+        }
+      }
       const [existing] = await db.select().from(lmsLessonProgress)
         .where(and(eq(lmsLessonProgress.enrollmentId, enrollment.id), eq(lmsLessonProgress.lessonId, lesson.id))).limit(1);
       if (existing) {

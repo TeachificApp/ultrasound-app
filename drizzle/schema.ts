@@ -8294,6 +8294,33 @@ export const cmeActivityForms = mysqlTable("cme_activity_forms", {
 export type CmeActivityForm = typeof cmeActivityForms.$inferSelect;
 export type InsertCmeActivityForm = typeof cmeActivityForms.$inferInsert;
 
+// ─── Inline Lesson Quiz Attempts & Responses ───────────────────────────────────
+// Inline lesson quizzes live in lesson content blocks rather than lms_quizzes.
+// These rows preserve each submitted evaluation or knowledge-check response for
+// authorized activity reporting without changing lesson-progress state.
+export const lmsInlineQuizAttempts = mysqlTable("lms_inline_quiz_attempts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  courseId: int("course_id").notNull(),
+  lessonId: int("lesson_id").notNull(),
+  quizBlockId: varchar("quiz_block_id", { length: 128 }).notNull(),
+  score: int("score").notNull(),
+  passed: boolean("passed").notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+});
+export type LmsInlineQuizAttempt = typeof lmsInlineQuizAttempts.$inferSelect;
+
+export const lmsInlineQuizResponses = mysqlTable("lms_inline_quiz_responses", {
+  id: int("id").autoincrement().primaryKey(),
+  attemptId: int("attempt_id").notNull(),
+  questionKey: varchar("question_key", { length: 128 }).notNull(),
+  questionText: text("question_text").notNull(),
+  questionType: varchar("question_type", { length: 32 }).notNull(),
+  answerValue: text("answer_value"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+export type LmsInlineQuizResponse = typeof lmsInlineQuizResponses.$inferSelect;
+
 // ─── Newsletter Subscribers ───────────────────────────────────────────────────
 export const newsletterSubscribers = mysqlTable("newsletter_subscribers", {
   id: int("id").autoincrement().primaryKey(),
