@@ -198,6 +198,11 @@
 - [x] Add focused regression coverage for newsletter subscription, All-audience inclusion, duplicate prevention, and opt-out preservation.
 - [x] Extract the uploaded Standardized CME Survey questions and create an unpublished reusable lesson-quiz template without assigning it to learners.
 - [x] Validate the CME lesson-quiz template’s question count, wording, creator-controlled settings, and non-discovery status before administrator review.
+- [x] Expose saved lesson templates in the active lesson editor with a clear picker and an Add to Lesson action, including the CME Activity Evaluation Survey template.
+- [x] Add focused regression coverage that template insertion creates safe fresh content-block IDs and does not mutate the saved source template.
+- [ ] Build an administrator-only CME Management panel that lists CME courses and activities with learner enrollment and completion reporting.
+- [ ] Add per-CME-activity reporting and CSV export with learner full name, email, activity and completion dates, quiz results, and recorded quiz or survey responses.
+- [ ] Add focused authorization, reporting-accuracy, and CSV export regressions for the CME Management panel without exposing learner data to non-administrators.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.

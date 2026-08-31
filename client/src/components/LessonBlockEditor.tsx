@@ -70,6 +70,37 @@ interface LessonBlockEditorProps {
 // Picker tab type
 type PickerTab = "catalog" | "from_lessons" | "templates" | "import_url";
 
+/**
+ * Turn persisted template JSON into independently editable lesson blocks.  Only
+ * content-block IDs are regenerated; all instructional data remains intact.
+ */
+export function cloneLessonTemplateBlocks(rawBlocks: unknown, createId: () => string = uid): Block[] {
+  let parsed: unknown = rawBlocks;
+  if (typeof rawBlocks === "string") {
+    try { parsed = JSON.parse(rawBlocks); } catch { return []; }
+  }
+  if (!Array.isArray(parsed)) return [];
+
+  const cloneBlock = (candidate: unknown): Block | null => {
+    if (!candidate || typeof candidate !== "object") return null;
+    const copied = JSON.parse(JSON.stringify(candidate)) as Block;
+    if (!copied.type) return null;
+    copied.id = createId();
+    if (copied.type === "column_layout" && copied.data) {
+      for (const key of ["leftBlocks", "rightBlocks"] as const) {
+        if (Array.isArray(copied.data[key])) {
+          copied.data[key] = copied.data[key]
+            .map(cloneBlock)
+            .filter((block): block is Block => block !== null);
+        }
+      }
+    }
+    return copied;
+  };
+
+  return parsed.map(cloneBlock).filter((block): block is Block => block !== null);
+}
+
 const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockEditorProps>(function LessonBlockEditor({
   lessonId,
   courseId,
@@ -1153,15 +1184,36 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
           </div>
         )}
 
-        {/* ── Block Templates tab ── */}
+        {/* ── Saved Templates tab ── */}
         {pickerTab === "templates" && (
-          <BlockTemplatesTabContent
-            onInsert={(block) => {
-              setBlocks(prev => [...prev, block]);
-              setAddMenuOpen(false);
-              toast.success("Block template inserted!");
-            }}
-          />
+          <div className="flex flex-1 min-h-0 flex-col gap-4 overflow-hidden">
+            <LessonTemplatesTabContent
+              onInsert={(template) => {
+                const copies = cloneLessonTemplateBlocks(template.blocks);
+                if (!copies.length) {
+                  toast.error("This lesson template does not contain usable content blocks.");
+                  return;
+                }
+                setBlocks(prev => [...prev, ...copies]);
+                setSelectedBlockId(copies[0].id);
+                setAddMenuOpen(false);
+                toast.success(`${copies.length} template block${copies.length === 1 ? "" : "s"} added to this lesson.`);
+                scrollToBlock(copies[copies.length - 1].id);
+              }}
+            />
+            <div className="border-t border-gray-100 pt-3 min-h-0 flex flex-1 flex-col">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Saved Block Templates</p>
+              <BlockTemplatesTabContent
+                onInsert={(block) => {
+                  setBlocks(prev => [...prev, block]);
+                  setSelectedBlockId(block.id);
+                  setAddMenuOpen(false);
+                  toast.success("Block template inserted!");
+                  scrollToBlock(block.id);
+                }}
+              />
+            </div>
+          </div>
         )}
         {/* ── Import from URL tab ── */}
         {pickerTab === "import_url" && (
@@ -1342,6 +1394,59 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
 });
 
 export default LessonBlockEditor;
+
+function LessonTemplatesTabContent({ onInsert }: { onInsert: (template: { id: number; title: string; tags: string | null; blocks: unknown }) => void }) {
+  const [search, setSearch] = useState("");
+  const { data: templates, isLoading } = trpc.lmsAdmin.listLessonTemplates.useQuery();
+  const normalizedSearch = search.trim().toLowerCase();
+  const visibleTemplates = (templates ?? []).filter((template: any) => {
+    if (!normalizedSearch) return true;
+    return `${template.title ?? ""} ${template.tags ?? ""}`.toLowerCase().includes(normalizedSearch);
+  });
+
+  return (
+    <div className="flex min-h-0 flex-[0_0_auto] flex-col gap-2">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Lesson Templates</p>
+        <p className="mt-0.5 text-xs text-gray-500">Add a copy to this lesson. Your current blocks stay in place.</p>
+      </div>
+      <div className="relative shrink-0">
+        <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+        <Input
+          value={search}
+          onChange={event => setSearch(event.target.value)}
+          placeholder="Search lesson templates…"
+          className="h-8 pl-8 text-xs"
+        />
+      </div>
+      <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+        {isLoading ? (
+          <p className="py-4 text-center text-xs text-gray-400">Loading lesson templates…</p>
+        ) : visibleTemplates.length === 0 ? (
+          <p className="py-4 text-center text-xs text-gray-400">No saved lesson templates match this search.</p>
+        ) : visibleTemplates.map((template: any) => {
+          const blockCount = cloneLessonTemplateBlocks(template.blocks, () => "preview").length;
+          return (
+            <div key={template.id} className="flex items-center justify-between gap-3 rounded-lg border border-teal-100 bg-teal-50/40 px-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-gray-800">{template.title}</p>
+                <p className="mt-0.5 text-xs text-gray-500">{blockCount} block{blockCount === 1 ? "" : "s"}{template.tags ? ` · ${template.tags}` : ""}</p>
+              </div>
+              <Button
+                size="sm"
+                className="h-7 shrink-0 bg-teal-600 text-xs text-white hover:bg-teal-700"
+                onClick={() => onInsert(template)}
+                disabled={blockCount === 0}
+              >
+                <Plus className="mr-1 h-3 w-3" /> Add to Lesson
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function BlockTemplatesTabContent({ onInsert }: { onInsert: (block: Block) => void }) {
   const [search, setSearch] = useState("");
