@@ -690,7 +690,7 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
                 })}
               </div>
               {submitted && selected !== undefined && (
-                <p className="text-xs text-teal-600 font-medium">Your response: {parsedLabels[selected - 1]} ({selected}/5)</p>
+                <p className="text-xs text-teal-600 font-medium">Your response: {parsedLabels[selected - 1]} ({selected}/{parsedLabels.length})</p>
               )}
             </div>
           );

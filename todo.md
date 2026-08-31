@@ -196,6 +196,8 @@
 - [x] Add regression coverage for inline and display mathematical equations in the affected content-rendering paths.
 - [x] Ensure every opted-in newsletter subscription is included exactly once in the Email Campaigns All audience while preserving unsubscribes and suppressions.
 - [x] Add focused regression coverage for newsletter subscription, All-audience inclusion, duplicate prevention, and opt-out preservation.
+- [x] Extract the uploaded Standardized CME Survey questions and create an unpublished reusable lesson-quiz template without assigning it to learners.
+- [x] Validate the CME lesson-quiz template’s question count, wording, creator-controlled settings, and non-discovery status before administrator review.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.
