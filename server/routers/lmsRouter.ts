@@ -126,6 +126,7 @@ import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled, restoreMissingCourseCertificate } from "./lmsHelpers";
 import { cmeActivityFormRouter } from "./cmeActivityFormRouter";
+import { cmeManagementRouter } from "./cmeManagementRouter";
 import { lmsCourseBuilderRouter } from "./lmsCourseBuilderRouter";
 import { lmsQuizLandingRouter } from "./lmsQuizLandingRouter";
 import { lmsEnrollmentAdminRouter } from "./lmsEnrollmentAdminRouter";
@@ -863,6 +864,7 @@ export const lmsAdminRouter = router({
   ...lmsCohortAdminRouter._def.procedures,
   ...lmsCertificateRouter._def.procedures,
   ...cmeActivityFormRouter._def.procedures,
+  ...cmeManagementRouter._def.procedures,
 });
 
 // ─── Public Router ────────────────────────────────────────────────────────────

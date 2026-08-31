@@ -205,10 +205,10 @@
 - [x] Persist submitted inline CME lesson-quiz responses by learner, course, lesson, and question so survey answers are available for activity-level reporting and export.
 - [x] Create a separate unassigned, unscored CME Speaker Evaluation Survey template with the supplied knowledge, effectiveness, and engagement rating questions.
 - [x] Validate the CME Speaker Evaluation Survey template’s three question ratings and CME export-compatible response format before checkpointing the survey templates.
-- [ ] Build an administrator-only CME Management panel that lists CME courses and activities with learner enrollment and completion reporting.
-- [ ] Include certificate management in CME Management with per-activity issued-certificate status, issuance date, and export visibility.
-- [ ] Add per-CME-activity reporting and CSV export with learner full name, email, activity and completion dates, quiz results, and recorded quiz or survey responses.
-- [ ] Add focused authorization, reporting-accuracy, and CSV export regressions for the CME Management panel without exposing learner data to non-administrators.
+- [x] Build an administrator-only CME Management panel that lists CME courses and activities with learner enrollment and completion reporting.
+- [x] Include certificate management in CME Management with per-activity issued-certificate status, issuance date, and export visibility.
+- [x] Add per-CME-activity reporting and CSV export with learner full name, email, activity and completion dates, quiz results, and recorded quiz or survey responses.
+- [x] Add focused authorization, reporting-accuracy, and CSV export regressions for the CME Management panel without exposing learner data to non-administrators.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.
