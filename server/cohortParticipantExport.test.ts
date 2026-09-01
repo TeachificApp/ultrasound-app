@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("cohort participant export", () => {
   const source = readFileSync(resolve(import.meta.dirname, "routers/lmsTeamManagerRouter.ts"), "utf8");
+  const adminPanel = readFileSync(resolve(import.meta.dirname, "../client/src/pages/admin/LMSAdmin.tsx"), "utf8");
 
   it("limits exports to authorized accepted active seats", () => {
     const procedure = source.slice(source.indexOf("exportActiveMembersCSV: protectedProcedure"));
@@ -17,5 +18,10 @@ describe("cohort participant export", () => {
     expect(source).toContain('"Specialty"');
     expect(source).toContain('"Location"');
     expect(source).toContain("/^[=+\\-@]/.test(text)");
+  });
+
+  it("surfaces the protected export in Cohort Groups administration", () => {
+    expect(adminPanel).toContain("lmsTeamManager.exportActiveMembersCSV.useQuery");
+    expect(adminPanel).toContain("Export Active Participants");
   });
 });

@@ -12140,6 +12140,10 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [groupEnrollDialogOpen, setGroupEnrollDialogOpen] = useState(false);
   const [groupEnrollGroupId, setGroupEnrollGroupId] = useState<number | null>(null);
   const { data: groupStudents = [], isLoading: groupStudentsLoading, refetch: refetchGroupStudents } = trpc.lmsAdmin.listCohortGroupStudents.useQuery({ cohortGroupId: selectedGroupId ?? 0 }, { enabled: !!selectedGroupId });
+  const cohortExport = trpc.lmsTeamManager.exportActiveMembersCSV.useQuery(
+    { groupId: selectedGroupId ?? 0 },
+    { enabled: false },
+  );
   const { data: unassignedStudents = [], isLoading: unassignedLoading, refetch: refetchUnassigned } = trpc.lmsAdmin.listUnassignedCohortStudents.useQuery(
     { courseId },
     { enabled: activeTab === "groups" },
@@ -12153,6 +12157,17 @@ function CohortTab({ courseId }: { courseId: number }) {
     onError: (e) => toast.error(e.message),
   });
   const [bulkSelected, setBulkSelected] = useState<number[]>([]);
+  const downloadActiveCohortParticipants = async () => {
+    const result = await cohortExport.refetch();
+    if (!result.data) { toast.error("Could not prepare the participant export"); return; }
+    const blob = new Blob([result.data.csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `cohort-group-${selectedGroupId}-active-participants.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
   const [movingStudentId, setMovingStudentId] = useState<number | null>(null);
   const moveStudent = trpc.lmsAdmin.assignStudentToCohortGroup.useMutation({
     onSuccess: () => { refetchGroupStudents(); refetchGroups(); refetchUnassigned(); toast.success("Student moved to new group"); setMovingStudentId(null); },
@@ -13411,13 +13426,18 @@ function CohortTab({ courseId }: { courseId: number }) {
                           <span className="text-sm font-medium text-gray-700">Students in this group</span>
                           <span className="text-xs text-gray-400 ml-2">{groupStudents.length} assigned</span>
                         </div>
-                        <Button
-                          size="sm"
-                          className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7"
-                          onClick={() => { setGroupEnrollGroupId(group.id); setGroupEnrollDialogOpen(true); }}
-                        >
-                          <Plus className="w-3.5 h-3.5 mr-1" /> Add Student
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={downloadActiveCohortParticipants} disabled={cohortExport.isFetching}>
+                            {cohortExport.isFetching ? "Preparing…" : "Export Active Participants"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7"
+                            onClick={() => { setGroupEnrollGroupId(group.id); setGroupEnrollDialogOpen(true); }}
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-1" /> Add Student
+                          </Button>
+                        </div>
                       </div>
                       {groupStudentsLoading ? (
                         <div className="text-sm text-gray-400">Loading...</div>
