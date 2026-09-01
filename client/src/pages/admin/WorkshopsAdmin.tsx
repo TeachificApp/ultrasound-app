@@ -304,6 +304,10 @@ function WorkshopInstanceStudentsPanel({
 
   const { data: instanceStudents = [], isLoading, refetch: refetchInstanceStudents } =
     trpc.workshopAdmin.listWorkshopInstanceStudents.useQuery({ workshopId, instanceId });
+  const instanceExport = trpc.workshopAdmin.exportWorkshopInstanceStudentsCSV.useQuery(
+    { workshopId, instanceId },
+    { enabled: false },
+  );
   const { data: unassignedStudents = [], refetch: refetchUnassigned } =
     trpc.workshopAdmin.listUnassignedWorkshopStudents.useQuery({ workshopId });
   const { data: searchResults } = trpc.lmsAdmin.searchUsers.useQuery(
@@ -346,6 +350,18 @@ function WorkshopInstanceStudentsPanel({
     );
   };
 
+  const downloadActiveParticipants = async () => {
+    const result = await instanceExport.refetch();
+    if (!result.data) { toast.error("Could not prepare the participant export"); return; }
+    const blob = new Blob([result.data.csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `workshop-instance-${instanceId}-active-participants.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="mt-4 border-t pt-4 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -353,9 +369,14 @@ function WorkshopInstanceStudentsPanel({
           <div className="text-sm font-medium text-gray-700">Students in this instance</div>
           <div className="text-xs text-gray-400">{instanceStudents.length} assigned</div>
         </div>
-        <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7" onClick={() => setAddDialogOpen(true)}>
-          <Plus className="w-3.5 h-3.5 mr-1" /> Add Student
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="text-xs h-7" onClick={downloadActiveParticipants} disabled={instanceExport.isFetching}>
+            {instanceExport.isFetching ? "Preparing…" : "Export Active Participants"}
+          </Button>
+          <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7" onClick={() => setAddDialogOpen(true)}>
+            <Plus className="w-3.5 h-3.5 mr-1" /> Add Student
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

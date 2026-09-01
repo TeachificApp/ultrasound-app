@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 describe("workshop participant export", () => {
   const source = readFileSync(resolve(import.meta.dirname, "routers/workshopRouter.ts"), "utf8");
+  const adminPanel = readFileSync(resolve(import.meta.dirname, "../client/src/pages/admin/WorkshopsAdmin.tsx"), "utf8");
   const procedure = source.slice(source.indexOf("exportWorkshopInstanceStudentsCSV: protectedProcedure"), source.indexOf("/** Workshop enrollments not linked"));
 
   it("is administrator-only and excludes non-active participants", () => {
@@ -16,5 +17,10 @@ describe("workshop participant export", () => {
     expect(procedure).toContain('"Specialty"');
     expect(procedure).toContain('"Location"');
     expect(procedure).toContain("/^[=+\\-@]/.test(text)");
+  });
+
+  it("surfaces the protected export only in the workshop administrator participant panel", () => {
+    expect(adminPanel).toContain("exportWorkshopInstanceStudentsCSV.useQuery");
+    expect(adminPanel).toContain("Export Active Participants");
   });
 });
