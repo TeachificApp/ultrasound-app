@@ -5,7 +5,8 @@
  */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Award, BookOpen, ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { resolveEmbeddedFormUrl } from "@/lib/embeddedFormUrl";
 import CarouselBlock from "@/components/CarouselBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
@@ -129,7 +130,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
   // Pre-compute pass-through URL for url_embed blocks (hooks must be at top level, not inside switch)
   const urlEmbedSrc = useMemo(() => {
     if (block.type !== "url_embed") return "";
-    const rawUrl = d.url ?? "";
+    const rawUrl = resolveEmbeddedFormUrl(String(d.url ?? ""), user);
     if (!rawUrl || !user || (!d.passName && !d.passEmail)) return rawUrl;
     const sep = rawUrl.includes('?') ? '&' : '?';
     const params: string[] = [];
