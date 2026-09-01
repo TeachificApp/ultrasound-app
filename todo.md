@@ -308,3 +308,8 @@
 - [x] Add focused regression coverage confirming LMS course settings renders its participant communication card and related tab content without unresolved component references.
 - [x] Repair the Platform Admin `/question-bank` route so it renders the same authorized Question Bank data and extracted Advanced Cardiac Sonographer questions as the LMS Question Bank route.
 - [x] Add focused regression coverage for route registration and shared Question Bank data-contract parity without changing any question records.
+- [x] Make Question Bank folders navigable so opening a folder shows its assigned questions and supports nested folder hierarchy navigation.
+- [x] Add clear rename and reorder controls for Question Bank folders, preserving existing folder IDs, parent assignments, and question assignments.
+- [x] Add focused hierarchy, folder-filtering, rename, reorder, and question-preservation regressions for the Question Bank folder experience.
+- [x] Create or reuse Question Bank subfolders for each ZIP or SCORM extracted quiz group beneath the administrator-selected parent folder, preserving every imported question and group assignment.
+- [x] Add focused import-subfolder hierarchy and question-preservation regression coverage for grouped ZIP and SCORM quiz extraction.

@@ -4,6 +4,8 @@ import {
   questionBankFolderOptionLabel,
   scormImportQuestionTagIds,
 } from "../shared/questionBankFolders";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 describe("questionBankFolders helpers", () => {
   it("flattens nested folders depth-first with sort order", () => {
@@ -27,5 +29,19 @@ describe("questionBankFolders helpers", () => {
   it("does not auto-create SCORM tags from group names", () => {
     expect(scormImportQuestionTagIds(undefined)).toEqual([]);
     expect(scormImportQuestionTagIds([4, 9])).toEqual([4, 9]);
+  });
+
+  it("uses each imported SCORM group as a created or reused subfolder", () => {
+    const source = readFileSync(resolve(import.meta.dirname, "routers/questionBankRouter.ts"), "utf8");
+    expect(source).toContain("const groupFolderId = existingGroupFolder?.id ?? await insertQuestionBankFolder");
+    expect(source).toContain("parentId: resolvedFolderId");
+    expect(source).toContain("folderId: groupFolderId");
+  });
+
+  it("filters Question Bank questions when an administrator opens a folder", () => {
+    const source = readFileSync(resolve(import.meta.dirname, "../client/src/pages/admin/LMSAdmin.tsx"), "utf8");
+    expect(source).toContain("const [selectedFolderId, setSelectedFolderId]");
+    expect(source).toContain("folderId: selectedFolderId");
+    expect(source).toContain("onClick={() => selectFolder(f.id)}");
   });
 });

@@ -777,6 +777,21 @@ export const questionBankRouter = router({
 
       for (const group of groups) {
         const groupName = plainTextFromISpring(group.name) || `Group ${results.length + 1}`;
+        const [existingGroupFolder] = await db
+          .select({ id: questionBankFolders.id })
+          .from(questionBankFolders)
+          .where(and(
+            eq(questionBankFolders.name, groupName),
+            resolvedFolderId === null
+              ? sql`${questionBankFolders.parentId} IS NULL`
+              : eq(questionBankFolders.parentId, resolvedFolderId),
+          ))
+          .limit(1);
+        const groupFolderId = existingGroupFolder?.id ?? await insertQuestionBankFolder(db, {
+          name: groupName,
+          parentId: resolvedFolderId,
+          createdByAdminId: ctx.user.id,
+        });
         let inserted = 0;
 
         for (const q of group.questions) {
@@ -805,7 +820,7 @@ export const questionBankRouter = router({
             options: JSON.stringify(options),
             correctAnswer: q.correctAnswer,
             explanation,
-            folderId: resolvedFolderId,
+            folderId: groupFolderId,
             createdByAdminId: ctx.user.id,
           }).$returningId();
 

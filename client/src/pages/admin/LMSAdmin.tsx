@@ -11126,6 +11126,7 @@ function QuestionBankAdmin() {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showTagManager, setShowTagManager] = useState(false);
   const [showFolderManager, setShowFolderManager] = useState(false);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | undefined>(undefined);
   const [aiTopic, setAITopic] = useState("");
   const [aiCount, setAICount] = useState(10);
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
@@ -11193,6 +11194,7 @@ function QuestionBankAdmin() {
     tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
     type: typeFilter || undefined,
     isPreset: presetFilter,
+    folderId: selectedFolderId,
     page,
     pageSize: 25,
   });
@@ -11299,6 +11301,12 @@ function QuestionBankAdmin() {
 
   const selectedQuestionIds = [...selectedIds];
 
+  const selectFolder = (folderId: number | undefined) => {
+    setSelectedFolderId(folderId);
+    setPage(1);
+    setSelectedIds(new Set());
+  };
+
   const applyBulkFolderMove = () => {
     if (!bulkFolderValue || selectedQuestionIds.length === 0) return;
     if (bulkFolderValue === "__new__") {
@@ -11323,7 +11331,7 @@ function QuestionBankAdmin() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Database className="w-5 h-5 text-teal-600" /> Question Bank</h2>
-          <p className="text-sm text-gray-500 mt-0.5">{total} question{total !== 1 ? "s" : ""} total</p>
+          <p className="text-sm text-gray-500 mt-0.5">{total} question{total !== 1 ? "s" : ""}{selectedFolderId ? " in selected folder" : " total"}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setShowTagManager(p => !p)} className="gap-1.5"><Tag className="w-3.5 h-3.5" /> Tags</Button>
@@ -11357,7 +11365,7 @@ function QuestionBankAdmin() {
               const siblings = folderTree.filter((s: any) => (s.parentId ?? null) === parentId);
               const siblingIndex = siblings.findIndex((s: any) => s.id === f.id);
               return (
-              <div key={f.id} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-purple-200" style={{ marginLeft: `${f.depth * 16}px` }}>
+              <div key={f.id} className={cn("flex items-center gap-2 px-3 py-2 rounded-lg border", selectedFolderId === f.id ? "bg-purple-100 border-purple-400" : "bg-white border-purple-200")} style={{ marginLeft: `${f.depth * 16}px` }}>
                 <div className="flex flex-col gap-0.5">
                   <button type="button" disabled={siblingIndex === 0 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "up")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
                   <button type="button" disabled={siblingIndex === siblings.length - 1 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "down")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
@@ -11366,7 +11374,7 @@ function QuestionBankAdmin() {
                 {editingFolderId === f.id ? (
                   <Input value={editingFolderName} onChange={e => setEditingFolderName(e.target.value)} className="h-8 text-sm flex-1 bg-white border-purple-200" onKeyDown={e => { if (e.key === "Enter") saveEditFolder(); if (e.key === "Escape") { setEditingFolderId(null); setEditingFolderName(""); } }} autoFocus />
                 ) : (
-                  <span className="text-sm text-gray-800 flex-1">{f.name}{f.questionCount ? <span className="text-xs text-gray-400 ml-2">({f.questionCount})</span> : null}</span>
+                  <button type="button" onClick={() => selectFolder(f.id)} className="text-sm text-gray-800 flex-1 text-left hover:text-purple-700 font-medium">{f.name}{f.questionCount ? <span className="text-xs text-gray-400 ml-2">({f.questionCount})</span> : null}</button>
                 )}
                 <div className="flex items-center gap-1">
                   {editingFolderId === f.id ? (
