@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import MediaRedirect from "@/pages/MediaRedirect";
-import { Route, Switch, useLocation, useParams } from "wouter";
+import { Redirect, Route, Switch, useLocation, useParams } from "wouter";
 import { HardRedirect } from "@/components/HardRedirect";
 import { useEffect, lazy, Suspense } from "react";
 import { trpc } from "./lib/trpc";
@@ -649,7 +649,7 @@ function Router() {
         <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
         {/* ── Question Bank ─────────────────────────────────────────────────────────────────────────────────────── */}
         <Route path="/question-bank/import">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankImportPage /></RoleGuard>}</Route>
-        <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankPage /></RoleGuard>}</Route>
+        <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Redirect to="/admin/lms?tab=question_bank" /></RoleGuard>}</Route>
         <Route path="/quizzes/:quizId">{() => <StandaloneQuizPlayer />}</Route>
         <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
         <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
@@ -757,7 +757,7 @@ function MembersRouter() {
       <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
       <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
       <Route path="/question-bank/import">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankImportPage /></RoleGuard>}</Route>
-      <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankPage /></RoleGuard>}</Route>
+      <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Redirect to="/admin/lms?tab=question_bank" /></RoleGuard>}</Route>
       <Route path="/quizzes/:quizId">{() => <StandaloneQuizPlayer />}</Route>
       <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
       <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>

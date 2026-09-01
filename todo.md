@@ -306,3 +306,5 @@
 - [x] Require a separate explicit administrator confirmation immediately before sending any participant email, and add authorization, audience, sender, and send-confirmation regressions.
 - [x] Repair the LMS course-settings runtime failure caused by the unresolved CardHeader reference without changing course, learner, export, or email data.
 - [x] Add focused regression coverage confirming LMS course settings renders its participant communication card and related tab content without unresolved component references.
+- [x] Repair the Platform Admin `/question-bank` route so it renders the same authorized Question Bank data and extracted Advanced Cardiac Sonographer questions as the LMS Question Bank route.
+- [x] Add focused regression coverage for route registration and shared Question Bank data-contract parity without changing any question records.
