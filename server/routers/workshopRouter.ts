@@ -1253,6 +1253,29 @@ export const workshopAdminRouter = router({
         .orderBy(asc(users.name));
     }),
 
+  exportWorkshopInstanceStudentsCSV: protectedProcedure
+    .input(z.object({ workshopId: z.number().int().positive(), instanceId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select({
+        name: users.name, email: users.email, credentials: users.credentials, specialty: users.specialty, location: users.location,
+        enrollmentDate: workshopEnrollments.accessGrantedAt, status: workshopEnrollments.status,
+      }).from(workshopEnrollments).innerJoin(users, eq(workshopEnrollments.userId, users.id)).where(and(
+        eq(workshopEnrollments.workshopId, input.workshopId), eq(workshopEnrollments.instanceId, input.instanceId),
+        eq(workshopEnrollments.status, "active"), sql`${users.name} NOT LIKE '[Merged into #%'`,
+      )).orderBy(asc(users.name));
+      const escape = (value: unknown) => {
+        const text = String(value ?? "");
+        const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
+      const headers = ["Name", "Email", "Credentials", "Specialty", "Location", "Enrollment Date", "Status"];
+      const csv = [headers.join(","), ...rows.map((row) => [escape(row.name), escape(row.email), escape(row.credentials), escape(row.specialty), escape(row.location), row.enrollmentDate ? new Date(row.enrollmentDate).toISOString() : "", escape(row.status)].join(","))].join("\n");
+      return { csv, count: rows.length };
+    }),
+
   /** Workshop enrollments not linked to any current instance (orphaned/null instance) */
   listUnassignedWorkshopStudents: protectedProcedure
     .input(z.object({ workshopId: z.number() }))
