@@ -1311,6 +1311,78 @@ function LessonNoteEditor({ lessonId, courseSlug, initialNote }: { lessonId: num
 }
 
 // ─── Certificate Dialog ───────────────────────────────────────────────────────
+const CME_CERTIFICATE_CONFETTI_COLORS = ["#0F5E66", "#179CA3", "#1AB7B4", "#9DE2DE", "#C9A84C"];
+
+function CertificateConfettiCannons({ active }: { active: boolean }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hasCelebratedRef = useRef(false);
+
+  useEffect(() => {
+    if (!active) {
+      hasCelebratedRef.current = false;
+      return;
+    }
+    if (hasCelebratedRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+
+    hasCelebratedRef.current = true;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const particles = Array.from({ length: 150 }, (_, index) => {
+      const isLeftCannon = index < 75;
+      const launchAngle = isLeftCannon
+        ? -Math.PI / 4 + (Math.random() - 0.5) * (Math.PI / 3)
+        : -Math.PI * 3 / 4 + (Math.random() - 0.5) * (Math.PI / 3);
+      const speed = 9 + Math.random() * 10;
+      return {
+        x: isLeftCannon ? 0 : canvas.width,
+        y: canvas.height,
+        vx: Math.cos(launchAngle) * speed,
+        vy: Math.sin(launchAngle) * speed,
+        size: 6 + Math.random() * 7,
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.28,
+        color: CME_CERTIFICATE_CONFETTI_COLORS[index % CME_CERTIFICATE_CONFETTI_COLORS.length],
+        opacity: 1,
+      };
+    });
+    let frame = 0;
+    let animationFrame = 0;
+    const draw = () => {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach((particle) => {
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        particle.vy += 0.12;
+        particle.rotation += particle.rotationSpeed;
+        if (frame > 115) particle.opacity = Math.max(0, particle.opacity - 0.035);
+        context.save();
+        context.globalAlpha = particle.opacity;
+        context.translate(particle.x, particle.y);
+        context.rotate(particle.rotation);
+        context.fillStyle = particle.color;
+        context.fillRect(-particle.size / 2, -particle.size / 4, particle.size, particle.size / 2);
+        context.restore();
+      });
+      frame += 1;
+      if (frame < 150) {
+        animationFrame = window.requestAnimationFrame(draw);
+      } else {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+    animationFrame = window.requestAnimationFrame(draw);
+    return () => {
+      window.cancelAnimationFrame(animationFrame);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+    };
+  }, [active]);
+
+  return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-[60] h-screen w-screen" />;
+}
+
 function CertificateDialog({ open, onClose, courseTitle, certificateUrl, isLoading }: {
   open: boolean; onClose: () => void; courseTitle: string; certificateUrl?: string; isLoading?: boolean;
 }) {
@@ -1328,6 +1400,7 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl, isLoadi
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
+        <CertificateConfettiCannons active={open && Boolean(certificateUrl)} />
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-teal-700">
             <Award className="w-5 h-5" /> Certificate of Completion

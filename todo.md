@@ -283,3 +283,5 @@
 - [x] Ensure completed required CME survey modules persist their completion state, advance course progress accurately, and unlock the existing certificate path only when all required course items are complete.
 - [x] Preserve previously recorded inline lesson-quiz and CME survey answers when a learner uses Previous, Next, lesson navigation, or returns to the lesson.
 - [x] Add focused regressions for failed survey-write handling, answer restoration, required CME survey completion, displayed course progress, and certificate eligibility.
+- [x] Add an accessible teal/aqua branded confetti-cannon celebration when the CME certificate availability window is displayed, without changing certificate records or access behavior.
+- [x] Add focused regression coverage for the CME certificate celebration trigger and reduced-motion suppression.
