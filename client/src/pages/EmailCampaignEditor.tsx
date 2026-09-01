@@ -469,6 +469,7 @@ function AudienceFilterBuilder({ filter, onChange, preview }: {
 interface EditorProps {
   campaignId?: number;
   onClose?: () => void;
+  initialAudienceFilter?: AudienceFilter;
 }
 
 function formatRelativeTime(date: Date): string {
@@ -481,7 +482,7 @@ function formatRelativeTime(date: Date): string {
   return `${diffHr}h ago`;
 }
 
-export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps) {
+export default function EmailCampaignEditor({ campaignId, onClose, initialAudienceFilter }: EditorProps) {
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
@@ -494,7 +495,7 @@ export default function EmailCampaignEditor({ campaignId, onClose }: EditorProps
   const [headerEnabled, setHeaderEnabled] = useState(true);
   const [blocks, setBlocks] = useState<Block[]>(defaultEmailBlocks());
   const handleBlocksChange = useCallback((newBlocks: Block[]) => setBlocks(newBlocks), []);
-  const [filter, setFilter] = useState<AudienceFilter>(DEFAULT_FILTER);
+  const [filter, setFilter] = useState<AudienceFilter>(initialAudienceFilter ?? DEFAULT_FILTER);
   const [senderProfileId, setSenderProfileId] = useState<number | undefined>();
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [showPreview, setShowPreview] = useState(false);

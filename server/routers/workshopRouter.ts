@@ -1208,7 +1208,8 @@ export const workshopAdminRouter = router({
   /** List enrollments for a workshop (admin) */
   listEnrollments: protectedProcedure
     .input(z.object({ workshopId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const rows = await db
@@ -1228,7 +1229,8 @@ export const workshopAdminRouter = router({
   /** Students assigned to a specific workshop instance */
   listWorkshopInstanceStudents: protectedProcedure
     .input(z.object({ workshopId: z.number(), instanceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       return db

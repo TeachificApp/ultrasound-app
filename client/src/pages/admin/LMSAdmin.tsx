@@ -1592,6 +1592,15 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
         {/* Settings Tab */}
         <TabsContent value="settings" className="mt-4 space-y-4">
           <CourseSettingsForm course={course} onSave={handleSaveCourseSettings} saving={updateCourse.isPending} onTypeChangedToWorkshop={onTypeChangedToWorkshop} onCmeDirtyChange={setCmeDirty} />
+          <Card className="border-teal-200">
+            <CardHeader className="pb-2"><CardTitle className="text-base">Participant Communications</CardTitle></CardHeader>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-gray-600">Compose a campaign-style message for enrolled course participants. The recipient audience is set from this course; delivery still requires confirmation in the composer.</p>
+              <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => { window.location.href = `/admin/email-campaigns?courseId=${courseId}`; }}>
+                <Mail className="mr-2 h-4 w-4" /> Email course participants
+              </Button>
+            </CardContent>
+          </Card>
           <AffiliateCoursePanel courseId={courseId} />
         </TabsContent>
 

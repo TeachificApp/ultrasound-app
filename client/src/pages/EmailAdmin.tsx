@@ -159,6 +159,10 @@ export default function EmailAdmin() {
     const params = new URLSearchParams(window.location.search);
     return params.get("prefillEmails") ?? params.get("to") ?? "";
   });
+  const [lockedCourseAudienceId] = useState(() => {
+    const value = Number(new URLSearchParams(window.location.search).get("courseId"));
+    return Number.isInteger(value) && value > 0 ? value : null;
+  });
   const [audienceExpanded, setAudienceExpanded] = useState(true);
 
   // ── Template state ──────────────────────────────────────────────────────────
@@ -192,6 +196,7 @@ export default function EmailAdmin() {
       .split(/[\n,;]+/)
       .map((e) => e.trim())
       .filter((e) => e.includes("@")),
+    enrolledInCourseIds: lockedCourseAudienceId ? [lockedCourseAudienceId] : [],
   };
   const { data: audiencePreview, isLoading: audienceLoading } = trpc.emailCampaign.previewAudience.useQuery(
     audienceFilter,
@@ -351,6 +356,12 @@ export default function EmailAdmin() {
             </div>
           </div>
         </div>
+
+        {lockedCourseAudienceId && (
+          <div className="mb-5 rounded-lg border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+            <strong>Course participant message:</strong> recipients are restricted to enrolled learners in the selected course. The standard final send confirmation remains required.
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ── Left: Composer ─────────────────────────────────────────────── */}

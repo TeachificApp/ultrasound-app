@@ -886,6 +886,10 @@ function NewsletterSubscribersTab() {
 export default function EmailCampaignDashboard() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated, loading } = useAuth();
+  const [courseAudienceId] = useState(() => {
+    const value = Number(new URLSearchParams(window.location.search).get("courseId"));
+    return Number.isInteger(value) && value > 0 ? value : null;
+  });
   const utils = trpc.useUtils();
 
   const [activeTab, setActiveTab] = useState("campaigns");
@@ -949,7 +953,7 @@ export default function EmailCampaignDashboard() {
 
   // If editor is open, show it full-page
   if (showEditor) {
-    return <EmailCampaignEditor campaignId={editCampaignId} onClose={() => { setShowEditor(false); setEditCampaignId(undefined); refetchCampaigns(); }} />;
+    return <EmailCampaignEditor campaignId={editCampaignId} initialAudienceFilter={courseAudienceId ? { ...DEFAULT_AUDIENCE_FILTER, enrolledInCourseIds: [courseAudienceId] } : undefined} onClose={() => { setShowEditor(false); setEditCampaignId(undefined); refetchCampaigns(); }} />;
   }
 
   // ── Derived stats ────────────────────────────────────────────────────────────

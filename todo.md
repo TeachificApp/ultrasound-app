@@ -298,3 +298,9 @@
 - [x] Audit every learner-facing workshop and group query, card, landing page, player, and enrollment surface for counts, capacity, seats, or other learner information.
 - [x] Remove learner-visible workshop/group enrollment totals, seat availability, capacity, and peer details while retaining those details for authorized administrators and group managers only.
 - [x] Add focused data-contract and UI regressions proving learners cannot receive or render workshop/group counts, seat data, or other-student details.
+- [ ] Add administrator-authorized exports of enrolled learner name, email, credentials, specialty, location, enrollment, progress, and completion details for all LMS courses, excluding billing and authentication data.
+- [ ] Add authorized cohort-group and workshop-instance learner-detail exports, retaining group manager scope only for their assigned group and administrator scope for all records.
+- [ ] Add focused authorization, CSV formula-safety, scope, and field-format regressions for course, cohort, and workshop learner-detail exports.
+- [ ] Add administrator-managed approved From email and sender-name options for course, cohort, and workshop participant communications.
+- [ ] Reuse the email campaign editor for a draft-only participant composer built into course settings, with authorized cohort and workshop-instance entry points, while locking the recipient audience to the selected enrollment scope.
+- [ ] Require a separate explicit administrator confirmation immediately before sending any participant email, and add authorization, audience, sender, and send-confirmation regressions.

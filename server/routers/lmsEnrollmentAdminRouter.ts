@@ -2436,11 +2436,11 @@ CRITICAL REQUIREMENTS:
           email: users.email,
           displayName: users.displayName,
           name: users.name,
+          credentials: users.credentials,
+          specialty: users.specialty,
+          location: users.location,
           courseTitle: lmsCourses.title,
           courseSlug: lmsCourses.slug,
-          orderAmount: lmsOrders.amount,
-          orderStatus: lmsOrders.status,
-          stripeSessionId: lmsOrders.stripeSessionId,
         })
         .from(lmsEnrollments)
         .leftJoin(users, eq(lmsEnrollments.userId, users.id))
@@ -2468,11 +2468,11 @@ CRITICAL REQUIREMENTS:
             email: users.email,
             displayName: users.displayName,
             name: users.name,
+            credentials: users.credentials,
+            specialty: users.specialty,
+            location: users.location,
             courseTitle: lmsCourses.title,
             courseSlug: lmsCourses.slug,
-            orderAmount: lmsOrders.amount,
-            orderStatus: lmsOrders.status,
-            stripeSessionId: lmsOrders.stripeSessionId,
           })
           .from(lmsOrders)
           .leftJoin(users, eq(lmsOrders.userId, users.id))
@@ -2483,21 +2483,25 @@ CRITICAL REQUIREMENTS:
       }
 
       const allRows = [...enrollmentRows, ...pendingRows];
-      const esc = (v: string | null | undefined | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-      const headers = ["Type", "Email", "Name", "Course", "Course Slug", "Date", "Progress %", "Order Amount ($)", "Order Status", "Stripe Session ID"];
+      const esc = (v: string | null | undefined | number) => {
+        const value = String(v ?? "");
+        const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
+      const headers = ["Type", "Email", "Name", "Credentials", "Specialty", "Location", "Course", "Course Slug", "Enrollment Date", "Progress %"];
       const csvLines = [
         headers.join(","),
         ...allRows.map(r => [
           esc(r.rowType),
           esc(r.email),
           esc(r.displayName ?? r.name),
+          esc(r.credentials),
+          esc(r.specialty),
+          esc(r.location),
           esc(r.courseTitle),
           esc(r.courseSlug),
           r.rowDate ? new Date(r.rowDate).toISOString() : "",
           r.progressPct ?? 0,
-          r.orderAmount != null ? (Number(r.orderAmount) / 100).toFixed(2) : "",
-          esc(r.orderStatus),
-          esc(r.stripeSessionId),
         ].join(",")),
       ];
 
