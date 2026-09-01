@@ -3,7 +3,7 @@
  * Route: /quizzes/:quizId
  * Handles both quiz mode (instant per-question feedback) and mock_exam mode (submit all at end).
  */
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ import {
   quizReadAloudVoiceToTtsVoice,
   type QuizReadAloudVoice,
 } from "@shared/quizVoiceOptions";
+import { filterVisibleDependentQuestions } from "@shared/quizQuestionDependency";
 
 export function getStandaloneSelectedOptionFeedback(
   type: string,
@@ -148,7 +149,18 @@ export default function StandaloneQuizPlayer() {
   const readAloud = useQuizReadAloud(creatorReadAloudEnabled && readAloudEnabled && phase === "started" && isNativeQuizType, readAloudVoice);
   const branding = builderMeta?.branding ?? null;
   const isBuilderMode = !!(quizData?.builderMode || builderMeta);
-  const currentQuestion = phase === "started" ? questions[currentIdx] : null;
+  const activeQuestions = useMemo(() => {
+    if (!isBuilderMode) return questions;
+    const answersByBuilderId = new Map(
+      questions.map((question) => [String(question.builderQuestionId ?? ""), answers[question.questionBankId]]),
+    );
+    return filterVisibleDependentQuestions(questions, (questionId) => answersByBuilderId.get(questionId));
+  }, [answers, isBuilderMode, questions]);
+  const currentQuestion = phase === "started" ? activeQuestions[currentIdx] : null;
+
+  useEffect(() => {
+    setCurrentIdx((index) => Math.max(0, Math.min(index, Math.max(0, activeQuestions.length - 1))));
+  }, [activeQuestions.length]);
 
   const limitSeconds = quizInfo?.timeLimitMinutes ? quizInfo.timeLimitMinutes * 60 : null;
 
@@ -234,7 +246,7 @@ export default function StandaloneQuizPlayer() {
   }
 
   function handleNext() {
-    if (currentIdx < questions.length - 1) {
+    if (currentIdx < activeQuestions.length - 1) {
       setCurrentIdx((i) => i + 1);
       setQStartTime(Date.now());
     }
@@ -242,7 +254,7 @@ export default function StandaloneQuizPlayer() {
 
   function handleFeedbackAdvance() {
     setFeedbackPopup(null);
-    if (currentIdx < questions.length - 1) {
+    if (currentIdx < activeQuestions.length - 1) {
       handleNext();
       return;
     }
@@ -428,14 +440,14 @@ export default function StandaloneQuizPlayer() {
   }
   const selectedOptionFeedback = getStandaloneSelectedOptionFeedback(q.type, options, givenAnswer, q.explanation);
 
-  const progress = ((currentIdx + 1) / questions.length) * 100;
-  const answeredCount = Object.keys(answers).length;
+  const progress = ((currentIdx + 1) / Math.max(activeQuestions.length, 1)) * 100;
+  const answeredCount = activeQuestions.filter((question) => answers[question.questionBankId] !== undefined).length;
   const isMockExam = quizData?.type === "mock_exam";
   const isFlagged = Boolean(flaggedQuestions[q.questionBankId]);
-  const flaggedReviewItems = questions
+  const flaggedReviewItems = activeQuestions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => flaggedQuestions[question.questionBankId]);
-  const unansweredReviewItems = questions
+  const unansweredReviewItems = activeQuestions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => answers[question.questionBankId] === undefined);
 
@@ -466,7 +478,7 @@ export default function StandaloneQuizPlayer() {
             imageUrl={q.feedbackImageUrl}
             videoUrl={q.feedbackVideoUrl}
             onAdvance={handleFeedbackAdvance}
-            advanceLabel={currentIdx < questions.length - 1 ? "Next" : "Finish quiz"}
+            advanceLabel={currentIdx < activeQuestions.length - 1 ? "Next" : "Finish quiz"}
           />
         )}
         <BuilderQuestionFrame branding={branding} question={q} footer={
@@ -475,7 +487,7 @@ export default function StandaloneQuizPlayer() {
               <ChevronLeft className="w-4 h-4 mr-1" /> Previous
             </Button>
             {timerDisplay && <span className="text-sm font-mono text-white/70"><Clock className="w-4 h-4 inline mr-1" />{timerDisplay}</span>}
-            {currentIdx < questions.length - 1 ? (
+            {currentIdx < activeQuestions.length - 1 ? (
               <button
                 type="button"
                 onClick={() => { if (isQuizMode && !isRevealed) handleBuilderSubmit(); else handleNext(); }}
@@ -497,7 +509,7 @@ export default function StandaloneQuizPlayer() {
           </div>
         }>
           <div className="flex items-center justify-between text-xs opacity-60 mb-4">
-            <span>Question {currentIdx + 1} of {questions.length}</span>
+            <span>Question {currentIdx + 1} of {activeQuestions.length}</span>
             <div className="flex items-center gap-3">
               <span>{answeredCount} answered</span>
               {isMockExam && <button type="button" onClick={() => toggleQuestionFlag(q.questionBankId)} className="inline-flex items-center gap-1 font-medium hover:opacity-100"><Flag className={`h-3.5 w-3.5 ${isFlagged ? "fill-current" : ""}`} /> {isFlagged ? "Flagged" : "Flag"}</button>}
@@ -544,7 +556,7 @@ export default function StandaloneQuizPlayer() {
         <div className="max-w-3xl mx-auto flex items-center gap-4">
           <div className="flex-1">
             <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-              <span>{currentIdx + 1} / {questions.length}</span>
+              <span>{currentIdx + 1} / {activeQuestions.length}</span>
               <span>{answeredCount} answered</span>
             </div>
             <Progress value={progress} className="h-2" />
@@ -666,7 +678,7 @@ export default function StandaloneQuizPlayer() {
             <ChevronLeft className="w-4 h-4 mr-1" /> Previous
           </Button>
 
-          {currentIdx < questions.length - 1 ? (
+          {currentIdx < activeQuestions.length - 1 ? (
             <Button
               onClick={handleNext}
               disabled={isQuizMode && !isRevealed && givenAnswer === undefined}
@@ -681,7 +693,7 @@ export default function StandaloneQuizPlayer() {
                   handleMockExamSubmitRequest();
                   return;
                 }
-                const unanswered = questions.filter((q) => answers[q.questionBankId] === undefined).length;
+                const unanswered = activeQuestions.filter((q) => answers[q.questionBankId] === undefined).length;
                 if (unanswered > 0 && !confirm(`You have ${unanswered} unanswered question(s). Submit anyway?`)) return;
                 handleSubmit();
               }}
@@ -696,7 +708,7 @@ export default function StandaloneQuizPlayer() {
 
         {/* Question navigator dots */}
         <div className="flex flex-wrap gap-1.5 mt-6 justify-center">
-          {questions.map((q2, i) => (
+          {activeQuestions.map((q2, i) => (
             <button
               key={i}
               onClick={() => { setCurrentIdx(i); setQStartTime(Date.now()); }}

@@ -232,6 +232,9 @@
 - [x] Make enabling Survey Mode clear all correct-answer keys from every lesson-quiz question and hide answer-key configuration until Survey Mode is turned off.
 - [x] Repair the lesson-quiz dependent-question selector crash caused by an empty select-item value.
 - [x] Add focused regressions proving Survey Mode removes stored answer keys and the dependent-question selector renders without an empty option value.
+- [x] Improve the lesson-quiz dependent-question layout so the prior-question and answer-condition controls are clearly separated, readable, and responsive.
+- [x] Add author-configured dependent-question branching to the standalone Quiz Builder and exclude hidden questions from visible navigation, scoring, and required-answer checks.
+- [x] Add focused regressions for lesson-layout clarity and standalone Quiz Builder conditional visibility, scoring, and completion behavior.
 - [ ] Add focused regressions for role-neutral CME survey responses, completion submission, and safe retry behavior after a transient completion error.
 - [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
 - [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.

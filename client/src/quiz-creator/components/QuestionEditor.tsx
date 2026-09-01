@@ -47,6 +47,15 @@ export function QuestionEditor() {
 
   const update = (updates: Partial<QuizQuestion>) => updateQuestion(question.id, updates);
   const updateData = (data: QuestionData) => update({ data });
+  const priorQuestions = quiz.questions
+    .filter((candidate) => candidate.id !== question.id && candidate.order < question.order)
+    .sort((a, b) => a.order - b.order);
+  const selectedParent = priorQuestions.find((candidate) => candidate.id === question.showWhen?.parentQuestionId) ?? priorQuestions[0];
+  const parentChoices = selectedParent?.type === "tf"
+    ? ["true", "false"]
+    : selectedParent?.type === "mcq" || selectedParent?.type === "image_choice"
+      ? ((selectedParent.data as { choices?: { id: string; text: string }[] }).choices ?? []).map((choice) => choice.id).filter(Boolean)
+      : [];
   const updateQuestionFeedback = (kind: "correct" | "incorrect", html: string) => {
     update({
       feedback: {
@@ -227,6 +236,65 @@ export function QuestionEditor() {
 
       {/* Divider */}
       <div className="border-t border-gray-100" />
+
+      {priorQuestions.length > 0 && (
+        <section className="rounded-xl border border-teal-200 bg-teal-50/50 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-semibold text-teal-950">Dependent Question</h3>
+              <p className="mt-1 text-xs leading-5 text-teal-800">Show this question only after a selected answer to an earlier question. Hidden questions are skipped in learner navigation and scoring.</p>
+            </div>
+            <label className="inline-flex shrink-0 items-center gap-2 text-xs font-medium text-teal-950">
+              <input
+                type="checkbox"
+                checked={Boolean(question.showWhen)}
+                onChange={(event) => update({
+                  showWhen: event.target.checked && selectedParent
+                    ? { parentQuestionId: selectedParent.id, expectedAnswer: parentChoices[0] ?? "" }
+                    : undefined,
+                })}
+                className="h-4 w-4 accent-teal-600"
+              />
+              Enable
+            </label>
+          </div>
+          {question.showWhen && selectedParent && (
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              <label className="min-w-0 rounded-lg border border-teal-100 bg-white p-3">
+                <span className="block text-xs font-semibold text-gray-800">1. Prior question</span>
+                <span className="mt-0.5 block text-[11px] text-gray-500">The response that controls whether this question appears.</span>
+                <select
+                  value={question.showWhen.parentQuestionId}
+                  onChange={(event) => {
+                    const nextParent = priorQuestions.find((candidate) => candidate.id === event.target.value);
+                    const nextChoices = nextParent?.type === "tf"
+                      ? ["true", "false"]
+                      : ((nextParent?.data as { choices?: { id: string }[] } | undefined)?.choices ?? []).map((choice) => choice.id).filter(Boolean);
+                    update({ showWhen: { parentQuestionId: event.target.value, expectedAnswer: nextChoices[0] ?? "" } });
+                  }}
+                  className="mt-2 h-9 w-full rounded-md border border-gray-200 bg-white px-2 text-left text-xs text-gray-800 focus:border-teal-500 focus:outline-none"
+                >
+                  {priorQuestions.map((candidate) => <option key={candidate.id} value={candidate.id}>Question {candidate.order}: {candidate.stem || "Untitled question"}</option>)}
+                </select>
+              </label>
+              <label className="min-w-0 rounded-lg border border-teal-100 bg-white p-3">
+                <span className="block text-xs font-semibold text-gray-800">2. Show when the answer is</span>
+                <span className="mt-0.5 block text-[11px] text-gray-500">The exact answer that reveals this follow-up question.</span>
+                <select
+                  value={question.showWhen.expectedAnswer}
+                  onChange={(event) => update({ showWhen: { parentQuestionId: question.showWhen!.parentQuestionId, expectedAnswer: event.target.value } })}
+                  className="mt-2 h-9 w-full rounded-md border border-gray-200 bg-white px-2 text-left text-xs text-gray-800 focus:border-teal-500 focus:outline-none"
+                  disabled={parentChoices.length === 0}
+                >
+                  {parentChoices.length > 0
+                    ? parentChoices.map((choice) => <option key={choice} value={choice}>{selectedParent.type === "tf" ? (choice === "true" ? "True" : "False") : ((selectedParent.data as { choices?: { id: string; text: string }[] }).choices ?? []).find((item) => item.id === choice)?.text ?? choice}</option>)
+                    : <option value="">Choose a multiple-choice or true/false prior question</option>}
+                </select>
+              </label>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Type-specific editor */}
       <div>

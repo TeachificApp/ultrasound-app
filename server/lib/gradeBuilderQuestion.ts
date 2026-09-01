@@ -95,6 +95,7 @@ export function builderQuestionToPlayerPayload(
     explanation?: string;
     feedback?: { correct?: string; incorrect?: string; partial?: string };
     branchRules?: unknown[];
+    showWhen?: { parentQuestionId: string; expectedAnswer: string };
     data: unknown;
     shuffleAnswerOptions?: boolean;
     lockAnswerOrder?: boolean;
@@ -125,6 +126,7 @@ export function builderQuestionToPlayerPayload(
     backgroundColor: q.backgroundColor ?? null,
     feedback: q.feedback ?? null,
     branchRules: q.branchRules ?? [],
+    showWhen: q.showWhen ?? null,
     data: playerData,
     ...(showAnswers
       ? {

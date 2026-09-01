@@ -31,6 +31,7 @@ import { hydrateBuilderConfigFromQuestionBank } from "../lib/standaloneQuizBuild
 import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
 import { questionBankIdFromBuilderId } from "../lib/visualBuilderQuestionBankSync";
 import { buildStandaloneLearnerOptions, orderQuestionOptions } from "../lib/questionOptionOrder";
+import { filterVisibleDependentQuestions } from "../../shared/quizQuestionDependency";
 import { canOpenStandaloneQuiz, requiresEmbeddedLearnerAccess } from "../lib/standaloneQuizPreviewAccess";
 import {
   isStandaloneQuizStaff,
@@ -500,8 +501,25 @@ export const standaloneQuizLearnerRouter = router({
       let earnedPoints = 0;
       let correctAnswers = 0;
       const answerRows: typeof standaloneQuizAttemptAnswers.$inferInsert[] = [];
+      let completedTotalPoints = attempt.totalPoints;
+      let completedTotalQuestions = attempt.totalQuestions;
 
       if (isBuilderMode) {
+        const submittedAnswersByBuilderId = new Map(
+          input.answers.map((answer) => {
+            const builderQuestion = builderConfig!.questions.find(
+              (question) => stableBuilderQuestionId(String((question as { id?: unknown }).id)) === answer.questionBankId,
+            ) as { id?: unknown } | undefined;
+            return [String(builderQuestion?.id ?? ""), answer.givenAnswer] as const;
+          }),
+        );
+        const visibleBuilderQuestions = filterVisibleDependentQuestions(
+          builderConfig!.questions as Array<{ id: string; showWhen?: { parentQuestionId: string; expectedAnswer: string } | null }>,
+          (questionId) => submittedAnswersByBuilderId.get(questionId),
+        );
+        const visibleStableIds = new Set(visibleBuilderQuestions.map((question) => stableBuilderQuestionId(String((question as { id?: unknown }).id))));
+        completedTotalPoints = visibleBuilderQuestions.reduce((sum, question) => sum + Number((question as { points?: number }).points ?? 1), 0);
+        completedTotalQuestions = visibleBuilderQuestions.length;
         const qMap = new Map(
           builderConfig!.questions.map((q) => {
             const qq = q as { id: string; points: number };
@@ -509,6 +527,7 @@ export const standaloneQuizLearnerRouter = router({
           })
         );
         for (const ans of input.answers) {
+          if (!visibleStableIds.has(ans.questionBankId)) continue;
           const q = qMap.get(ans.questionBankId) as { id: string; points: number; type: string; data: unknown } | undefined;
           if (!q) continue;
           const isCorrect = gradeBuilderAnswer(q, ans.givenAnswer);
@@ -578,7 +597,7 @@ export const standaloneQuizLearnerRouter = router({
         await db.insert(standaloneQuizAttemptAnswers).values(answerRows);
       }
 
-      const totalPoints = attempt.totalPoints;
+      const totalPoints = completedTotalPoints;
       const score = totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : 0;
       const passed = score >= quiz.passingScore;
 
@@ -589,9 +608,11 @@ export const standaloneQuizLearnerRouter = router({
         correctAnswers,
         earnedPoints,
         timeSpentSeconds: input.timeSpentSeconds ?? null,
+        totalQuestions: completedTotalQuestions,
+        totalPoints: completedTotalPoints,
       }).where(eq(standaloneQuizAttempts.id, input.attemptId));
 
-      return { attemptId: input.attemptId, score, passed, correctAnswers, totalQuestions: attempt.totalQuestions, earnedPoints, totalPoints };
+      return { attemptId: input.attemptId, score, passed, correctAnswers, totalQuestions: completedTotalQuestions, earnedPoints, totalPoints };
     }),
 
   /** Get attempt result with per-question breakdown */

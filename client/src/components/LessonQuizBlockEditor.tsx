@@ -675,26 +675,28 @@ function QuestionEditor({
                 ? Array.from({ length: parent.starMax ?? 5 }, (_, index) => String(index + 1))
                 : parent.options ?? []);
             return (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-[11px] text-gray-600">Prior question</Label>
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="min-w-0 rounded-md border border-teal-100 bg-white p-2.5">
+                  <Label className="text-[11px] font-semibold text-gray-700">1. Prior question</Label>
+                  <p className="mt-0.5 text-[11px] text-gray-500">Choose the answer that controls this follow-up.</p>
                   <Select value={parentKey} onValueChange={(value) => {
                     const nextParent = previousQuestions.find((candidate, index) => String(candidate.id || index || "first-question") === value);
                     setQ(previous => ({ ...previous, showWhen: { parentQuestionKey: value, expectedAnswer: String(nextParent?.options?.[0] ?? "") } }));
                   }}>
-                    <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="mt-2 h-9 w-full min-w-0 text-left text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {previousQuestions.map((candidate, index) => {
                         const candidateKey = String(candidate.id || index || "first-question");
-                        return <SelectItem key={candidateKey} value={candidateKey}>{index + 1}. {candidate.question || "Untitled question"}</SelectItem>;
+                        return <SelectItem key={candidateKey} value={candidateKey} className="max-w-[min(28rem,calc(100vw-3rem))] truncate">{index + 1}. {candidate.question || "Untitled question"}</SelectItem>;
                       })}
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-[11px] text-gray-600">Show when answer is</Label>
+                <div className="min-w-0 rounded-md border border-teal-100 bg-white p-2.5">
+                  <Label className="text-[11px] font-semibold text-gray-700">2. Show this question when</Label>
+                  <p className="mt-0.5 text-[11px] text-gray-500">Select the response that reveals this question.</p>
                   <Select value={q.showWhen.expectedAnswer || "__none__"} onValueChange={(value) => setQ(previous => ({ ...previous, showWhen: { parentQuestionKey: parentKey, expectedAnswer: value === "__none__" ? "" : value } }))}>
-                    <SelectTrigger className="h-8 text-xs mt-1"><SelectValue placeholder="Choose an answer" /></SelectTrigger>
+                    <SelectTrigger className="mt-2 h-9 w-full min-w-0 text-left text-xs"><SelectValue placeholder="Choose an answer" /></SelectTrigger>
                     <SelectContent>
                       {choices.length ? choices.map((choice) => <SelectItem key={String(choice)} value={String(choice)}>{String(choice)}</SelectItem>) : <SelectItem value="__none__">Choose a response type with options</SelectItem>}
                     </SelectContent>

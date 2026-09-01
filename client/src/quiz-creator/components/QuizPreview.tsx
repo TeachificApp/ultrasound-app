@@ -5,6 +5,7 @@ import { X, ChevronLeft, ChevronRight, CheckCircle2, XCircle, RotateCcw, AlertTr
 import type { QuizQuestion, McqData, TfData, MatchingData, HotspotData, FillBlankData, ShortAnswerData, ImageChoiceData, OrderingData, DragWordsData, DropdownData, NumericData, LikertData, EssayData, DrawConfig } from "../types/quiz";
 import { DndOrdering, DndDragWords } from "./DndQuizInteractions";
 import { RichTextDisplay } from "@/components/RichTextEditor";
+import { filterVisibleDependentQuestions } from "@shared/quizQuestionDependency";
 
 interface Props {
   onClose: () => void;
@@ -541,9 +542,14 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
   const [feedbackRevealed, setFeedbackRevealed] = useState<Record<string, boolean>>({});
   const [questionPath, setQuestionPath] = useState<string[]>([]);
   const branchingEnabled = questions.some((qq) => qq.branchRules && qq.branchRules.length > 0);
+  const conditionalQuestions = useMemo(
+    () => filterVisibleDependentQuestions(questions, (questionId) => answers[questionId] as string | undefined),
+    [answers, questions],
+  );
+  const activeQuestions = conditionalQuestions;
 
-  const q = questions[currentIdx];
-  const totalPoints = questions.reduce((s, q) => s + q.points, 0);
+  const q = activeQuestions[currentIdx];
+  const totalPoints = activeQuestions.reduce((s, q) => s + q.points, 0);
   const questionPreviewBackground = resolveQuizBackground(branding, q);
   const answer = q ? answers[q.id] : undefined;
   const feedbackStatus = q ? evaluatePreviewAnswer(q, answer) : "ungraded";
@@ -569,7 +575,7 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
 
   const calcScore = () => {
     let earned = 0;
-    questions.forEach((q) => {
+    activeQuestions.forEach((q) => {
       const ans = answers[q.id];
       if (q.type === "mcq" || q.type === "image_choice") {
         const data = q.data as McqData;
@@ -660,7 +666,7 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500">
-              {currentIdx + 1} / {questions.length}
+              {currentIdx + 1} / {activeQuestions.length}
             </span>
             <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
               <X className="w-5 h-5" />
@@ -672,7 +678,7 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
         <div className="h-1 bg-gray-100">
           <div
             className="h-full transition-all"
-            style={{ width: `${((currentIdx + 1) / questions.length) * 100}%`, background: "#24abbc" }}
+            style={{ width: `${((currentIdx + 1) / Math.max(activeQuestions.length, 1)) * 100}%`, background: "#24abbc" }}
           />
         </div>
 
@@ -732,7 +738,7 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
                 setQuestionPath(newPath);
                 const prevId = newPath[newPath.length - 1];
                 if (prevId) {
-                  const prevIdx = questions.findIndex((qq) => qq.id === prevId);
+                  const prevIdx = activeQuestions.findIndex((qq) => qq.id === prevId);
                   if (prevIdx >= 0) setCurrentIdx(prevIdx);
                 } else {
                   setCurrentIdx(0);
@@ -792,14 +798,14 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
                     }
                     if (rule.target.type === "question") {
                       const target = rule.target as { type: "question"; questionId: string };
-                      const targetIdx = questions.findIndex((qq) => qq.id === target.questionId);
+                      const targetIdx = activeQuestions.findIndex((qq) => qq.id === target.questionId);
                       if (targetIdx >= 0) { setCurrentIdx(targetIdx); return; }
                     }
                     break;
                   }
                 }
                 // No rule matched: go next linearly
-                if (currentIdx < questions.length - 1) setCurrentIdx((i) => i + 1);
+                if (currentIdx < activeQuestions.length - 1) setCurrentIdx((i) => i + 1);
                 else setSubmitted(true);
               } else {
                 if (branchingEnabled) setQuestionPath((p) => [...p, q.id]);
@@ -807,7 +813,7 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
               }
             };
 
-            const isLast = currentIdx >= questions.length - 1;
+            const isLast = currentIdx >= activeQuestions.length - 1;
             if (branchingEnabled) {
               return (
                 <button

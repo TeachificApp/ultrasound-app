@@ -235,6 +235,11 @@ export interface QuizQuestion {
   questionBankOverride?: boolean;
   // Branching / conditional logic
   branchRules?: BranchRule[];
+  /** Show this question only when a preceding question received this exact response. */
+  showWhen?: {
+    parentQuestionId: string;
+    expectedAnswer: string;
+  };
   // Group assignment
   groupId?: string;
   // Per-question randomization. This is intentionally not quiz-wide: questions such as
