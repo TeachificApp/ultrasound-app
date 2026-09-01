@@ -285,3 +285,16 @@
 - [x] Add focused regressions for failed survey-write handling, answer restoration, required CME survey completion, displayed course progress, and certificate eligibility.
 - [x] Add an accessible teal/aqua branded confetti-cannon celebration when the CME certificate availability window is displayed, without changing certificate records or access behavior.
 - [x] Add focused regression coverage for the CME certificate celebration trigger and reduced-motion suppression.
+- [x] Add an administrator-only Survey Results tab in LMS course settings that appears only for CME courses and lists individual stored inline-survey responses.
+- [x] Add validated date-range filtering and a CSV export that contains only the currently filtered CME survey result rows.
+- [x] Add focused authorization, CME-only tab-visibility, date-filter, detail-display, and export-format regressions without exposing learner responses outside administrators.
+- [x] Add creator-selected account-data fields to standalone quizzes, inline lesson quizzes, and mock exams, including a controlled display and required-field configuration.
+- [x] Prefill only selected permitted account fields from the signed-in learner at quiz delivery time and persist resulting responses through existing authorized result records.
+- [x] Add focused authoring, prefill, required-field, privacy, and result-persistence regressions across standalone, inline lesson-quiz, and mock-exam modes.
+- [x] Add accessible drag-and-drop and keyboard-friendly reordering for questions in the inline Lesson Quiz editor while preserving every question’s answer configuration and dependency rules.
+- [x] Add focused regression coverage confirming lesson-quiz question reordering persists the creator-selected sequence without mutating question content or settings.
+- [x] Name each CME certificate download with the `AllAboutUltrasound_CME_` prefix and a safe unique suffix, without changing certificate content, access, or learner records.
+- [x] Add focused regression coverage for the CMS certificate download filename prefix, safe filename normalization, and uniqueness suffix.
+- [x] Audit every learner-facing workshop and group query, card, landing page, player, and enrollment surface for counts, capacity, seats, or other learner information.
+- [x] Remove learner-visible workshop/group enrollment totals, seat availability, capacity, and peer details while retaining those details for authorized administrators and group managers only.
+- [x] Add focused data-contract and UI regressions proving learners cannot receive or render workshop/group counts, seat data, or other-student details.

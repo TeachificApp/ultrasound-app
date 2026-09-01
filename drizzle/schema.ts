@@ -7527,6 +7527,8 @@ export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
   questionsPerAttempt: int("questions_per_attempt"),
   // iSpring-style visual builder config (QuizFile JSON: meta, questions, groups, branching, slides)
   builderConfig: longtext("builder_config"),
+  // Creator-selected allow-listed account fields to show before a learner starts a quiz or mock exam.
+  accountFields: longtext("account_fields"),
   createdByUserId: int("created_by_user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -7562,6 +7564,8 @@ export const standaloneQuizAttempts = mysqlTable("standalone_quiz_attempts", {
   earnedPoints: int("earned_points").default(0).notNull(),
   timeSpentSeconds: int("time_spent_seconds"),
   attemptNumber: int("attempt_number").default(1).notNull(),
+  // Snapshot of only the creator-selected account fields at the start of this attempt.
+  accountFieldValues: longtext("account_field_values"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type StandaloneQuizAttempt = typeof standaloneQuizAttempts.$inferSelect;
@@ -8309,6 +8313,8 @@ export const lmsInlineQuizAttempts = mysqlTable("lms_inline_quiz_attempts", {
   score: int("score").notNull(),
   passed: boolean("passed").notNull(),
   submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  // Snapshot of only the creator-selected account fields at inline quiz submission.
+  accountFieldValues: longtext("account_field_values"),
 });
 export type LmsInlineQuizAttempt = typeof lmsInlineQuizAttempts.$inferSelect;
 

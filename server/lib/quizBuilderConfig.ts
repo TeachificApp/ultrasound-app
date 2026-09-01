@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { DEFAULT_QUIZ_READ_ALOUD_VOICE, type QuizReadAloudVoice } from "../../shared/quizVoiceOptions";
+import type { QuizAccountFieldKey } from "../../shared/quizAccountFields";
 
 export const SITE_BRAND_THEMES = {
   aaus: {
@@ -56,6 +57,7 @@ export interface QuizFileMeta {
   showProgressBar?: boolean;
   readAloudEnabled?: boolean;
   readAloudVoice?: QuizReadAloudVoice;
+  accountFields?: QuizAccountFieldKey[];
   questionsPerPage?: number;
   branchingEnabled?: boolean;
   groups?: { id: string; name: string; color: string }[];

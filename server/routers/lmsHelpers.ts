@@ -20,6 +20,7 @@ import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { overlayLearnerData } from "../lib/certificatePdfOverlay";
+import { buildCmeCertificateFileKey } from "../lib/cmeCertificateFilename";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
@@ -332,7 +333,7 @@ export async function issueCertificateIfEnabled(
 
   // Upload PDF to S3
   const suffix = randomBytes(6).toString("hex");
-  const fileKey = `certificates/cert-${userId}-${courseId}-${suffix}.pdf`;
+  const fileKey = buildCmeCertificateFileKey(course.title, issuedAt, suffix);
   const { url: certificateUrl } = await storagePut(fileKey, pdfBuffer, "application/pdf");
 
   // Save certificate record

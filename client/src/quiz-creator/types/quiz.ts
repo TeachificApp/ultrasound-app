@@ -337,6 +337,8 @@ export interface QuizMeta {
   showProgressBar?: boolean;
   readAloudEnabled?: boolean;
   readAloudVoice?: "female" | "male";
+  /** Creator-selected, allow-listed account fields shown read-only to the learner before the attempt starts. */
+  accountFields?: Array<"full_name" | "email" | "credentials" | "specialty">;
   questionsPerPage?: number; // null = one at a time
   // Branching
   branchingEnabled?: boolean; // when true, quiz uses branching logic instead of linear flow

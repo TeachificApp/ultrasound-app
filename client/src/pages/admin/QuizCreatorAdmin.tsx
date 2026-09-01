@@ -7,6 +7,7 @@
  */
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { flattenQuestionBankFolderTree, questionBankFolderOptionLabel } from "@shared/questionBankFolders";
+import { QUIZ_ACCOUNT_FIELD_OPTIONS } from "@shared/quizAccountFields";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -1904,6 +1905,28 @@ function QuizEditor({ quizId }: { quizId: number }) {
                           <p className="mt-1 text-xs text-gray-500">Learners can turn read-aloud on or off before starting. The selected voice uses natural pacing.</p>
                         </div>
                       ) : null}
+                    </div>
+                    <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
+                      <Label className="text-teal-900">Learner account fields</Label>
+                      <p className="mt-1 text-xs text-teal-800">Select read-only account fields to prefill at the start of this quiz or mock exam. Only selected values are captured with the learner’s attempt.</p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {QUIZ_ACCOUNT_FIELD_OPTIONS.map((field) => {
+                          const selected = (settings.accountFields ?? []).includes(field.key);
+                          return <label key={field.key} className="flex cursor-pointer items-center gap-2 text-sm text-gray-800">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={(event) => setSettings((current: any) => ({
+                                ...current,
+                                accountFields: event.target.checked
+                                  ? [...(current.accountFields ?? []), field.key]
+                                  : (current.accountFields ?? []).filter((key: string) => key !== field.key),
+                              }))}
+                            />
+                            {field.label}
+                          </label>;
+                        })}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

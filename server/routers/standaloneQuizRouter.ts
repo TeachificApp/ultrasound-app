@@ -32,6 +32,7 @@ import { builderQuestionToPlayerPayload, gradeBuilderAnswer, stableBuilderQuesti
 import { questionBankIdFromBuilderId } from "../lib/visualBuilderQuestionBankSync";
 import { buildStandaloneLearnerOptions, orderQuestionOptions } from "../lib/questionOptionOrder";
 import { filterVisibleDependentQuestions } from "../../shared/quizQuestionDependency";
+import { normalizeQuizAccountFieldKeys, resolveQuizAccountFields } from "../../shared/quizAccountFields";
 import { canOpenStandaloneQuiz, requiresEmbeddedLearnerAccess } from "../lib/standaloneQuizPreviewAccess";
 import {
   isStandaloneQuizStaff,
@@ -184,6 +185,7 @@ const quizSettingsInput = z.object({
   // Per-group question draw config
   categoryConfig: z.string().nullable().optional(), // JSON: [{folderId, folderName, count}]
   questionsPerAttempt: z.number().int().min(1).nullable().optional(),
+  accountFields: z.array(z.enum(["full_name", "email", "credentials", "specialty"])).max(4).optional(),
 });
 
 const learnerQuizAccessInput = z.object({
@@ -305,6 +307,22 @@ export const standaloneQuizLearnerRouter = router({
       }
 
       const parsedBuilderConfig = parseBuilderConfig(quiz.builderConfig);
+      let storedAccountFields: unknown = null;
+      try { if (quiz.accountFields) storedAccountFields = JSON.parse(quiz.accountFields); } catch { /* Ignore malformed legacy configuration. */ }
+      const selectedAccountFields = normalizeQuizAccountFieldKeys(storedAccountFields).length
+        ? normalizeQuizAccountFieldKeys(storedAccountFields)
+        : normalizeQuizAccountFieldKeys(parsedBuilderConfig?.meta?.accountFields);
+      const [profile] = selectedAccountFields.length ? await db.select({
+        name: users.name,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        displayName: users.displayName,
+        email: users.email,
+        credentials: users.credentials,
+        specialty: users.specialty,
+      }).from(users).where(eq(users.id, ctx.user.id)).limit(1) : [null];
+      const accountFields = profile ? resolveQuizAccountFields(selectedAccountFields, profile) : [];
+      const accountFieldValues = accountFields.length ? JSON.stringify(accountFields) : null;
 
       // Check attempt limits
       if (!quiz.allowRetakes || quiz.maxAttempts) {
@@ -360,6 +378,7 @@ export const standaloneQuizLearnerRouter = router({
           totalQuestions: drawn.length,
           totalPoints,
           attemptNumber,
+          accountFieldValues,
         });
         const attemptId = (result as { insertId: number }).insertId;
         const showAnswers = quiz.type === "quiz";
@@ -370,6 +389,7 @@ export const standaloneQuizLearnerRouter = router({
           attemptId,
           questions,
           quiz: { ...quiz, totalPoints, builderMode: true, builderMeta: builderConfig.meta },
+          accountFields,
         };
       }
 
@@ -417,6 +437,7 @@ export const standaloneQuizLearnerRouter = router({
         totalQuestions: quizQs.length,
         totalPoints,
         attemptNumber,
+        accountFieldValues,
       });
       const attemptId = (result as any).insertId as number;
 
@@ -454,7 +475,7 @@ export const standaloneQuizLearnerRouter = router({
         };
       });
 
-      return { attemptId, questions, quiz: { ...quiz, totalPoints } };
+      return { attemptId, questions, quiz: { ...quiz, totalPoints }, accountFields };
     }),
 
   /** Submit a completed attempt */
@@ -967,8 +988,10 @@ export const standaloneQuizAdminRouter = router({
       await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { accountFields, ...quizInput } = input;
       const [result] = await db.insert(standaloneQuizzes).values({
-        ...input,
+        ...quizInput,
+        accountFields: JSON.stringify(normalizeQuizAccountFieldKeys(accountFields)),
         showResultsAfterDate: input.showResultsAfterDate ? new Date(input.showResultsAfterDate) : null,
         createdByUserId: ctx.user.id,
       });
@@ -982,11 +1005,12 @@ export const standaloneQuizAdminRouter = router({
       await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { id, showResultsAfterDate, ...rest } = input;
+      const { id, showResultsAfterDate, accountFields, ...rest } = input;
       const updates: any = { ...rest };
       if (showResultsAfterDate !== undefined) {
         updates.showResultsAfterDate = showResultsAfterDate ? new Date(showResultsAfterDate) : null;
       }
+      if (accountFields !== undefined) updates.accountFields = JSON.stringify(normalizeQuizAccountFieldKeys(accountFields));
       await db.update(standaloneQuizzes).set(updates).where(eq(standaloneQuizzes.id, id));
       return { success: true };
     }),

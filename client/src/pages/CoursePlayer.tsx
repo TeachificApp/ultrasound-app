@@ -28,6 +28,7 @@ import { formatCmeCreditPhrase } from "@shared/cmeCreditLabel";
 import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse } from "../../../shared/cmeLessonCompletion";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
 import { getVisibleInlineLessonQuizQuestionIndexes, inlineLessonQuizQuestionKey } from "../../../shared/inlineLessonQuizFlow";
+import { resolveQuizAccountFields, type QuizAccountFieldKey } from "../../../shared/quizAccountFields";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
@@ -162,7 +163,9 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
 }
 
 // ─── Inline Lesson Quiz (for lesson_quiz content blocks) ────────────────────
-function InlineLessonQuiz({ data, lessonId, courseSlug, quizBlockId, isAdminPreview, onComplete }: { data: { title?: string; questions?: any[]; isSurvey?: boolean; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; requireSurveyCompletion?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string }; lessonId: number; courseSlug: string; quizBlockId: string; isAdminPreview?: boolean; onComplete: () => void }) {
+function InlineLessonQuiz({ data, lessonId, courseSlug, quizBlockId, isAdminPreview, onComplete }: { data: { title?: string; questions?: any[]; isSurvey?: boolean; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; requireSurveyCompletion?: boolean; accountFields?: QuizAccountFieldKey[]; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string }; lessonId: number; courseSlug: string; quizBlockId: string; isAdminPreview?: boolean; onComplete: () => void }) {
+  const { user } = useAuth();
+  const prefilledAccountFields = resolveQuizAccountFields(data.accountFields, user ?? {});
   const rawQuestions = data.questions ?? [];
   // Stabilize shuffle with useMemo so re-renders don't re-shuffle
   const shuffledQuestions = useMemo(() => {
@@ -540,6 +543,15 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, quizBlockId, isAdminPrev
       <div className="h-1.5 bg-teal-100">
         <div className="h-full bg-teal-500 transition-all duration-300" style={{ width: `${progressPct}%` }} />
       </div>
+
+      {prefilledAccountFields.length > 0 && (
+        <section aria-label="Prefilled account information" className="border-b border-teal-100 bg-teal-50/70 px-5 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Your account information</p>
+          <dl className="mt-2 grid gap-x-5 gap-y-1 text-sm sm:grid-cols-2">
+            {prefilledAccountFields.map((field) => <div key={field.key} className="flex gap-1.5"><dt className="text-gray-500">{field.label}:</dt><dd className="font-medium text-gray-800">{field.value || "Not provided"}</dd></div>)}
+          </dl>
+        </section>
+      )}
 
       {/* Results banner (shown after submit) */}
       {submitted && (

@@ -780,7 +780,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       // Batch fetch sections + all lessons in 2 parallel queries (avoids N+1)
       // Strip heavy content columns (contentBlocks, content, videoContent) from the list —
       // they are fetched on-demand by getLessonsWithBlocks when the editor opens a lesson.
-      const [sections, allLessons, landingPage, cis] = await Promise.all([
+      const [sections, allLessons, landingPage, cis, cmeActivity] = await Promise.all([
         db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
         db.select({
           id: lmsLessons.id,
@@ -821,6 +821,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         }).from(lmsLessons).where(eq(lmsLessons.courseId, course.id)).orderBy(asc(lmsLessons.position)),
         db.select().from(lmsLandingPages).where(eq(lmsLandingPages.courseId, course.id)).limit(1),
         db.select().from(lmsCourseInstructors).where(eq(lmsCourseInstructors.courseId, course.id)),
+        db.select({ id: cmeActivityForms.id }).from(cmeActivityForms).where(eq(cmeActivityForms.courseId, course.id)).limit(1),
       ]);
       // Group lessons by sectionId in JS
       const lessonsBySectionId = new Map<number, typeof allLessons>();
@@ -834,7 +835,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         }
       }
       const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
-      return { ...course, sections: sectionsWithLessons, topLevelLessons, landingPage: landingPage[0] ?? null, courseInstructors: cis };
+      return { ...course, sections: sectionsWithLessons, topLevelLessons, landingPage: landingPage[0] ?? null, courseInstructors: cis, hasCmeActivity: cmeActivity.length > 0 };
     }),
 
   // ── Sections ──

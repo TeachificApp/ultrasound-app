@@ -140,6 +140,7 @@ export default function StandaloneQuizPlayer() {
   const [flaggedQuestions, setFlaggedQuestions] = useState<Record<number, boolean>>({});
   const [showMockExamReview, setShowMockExamReview] = useState(false);
   const [readAloudEnabled, setReadAloudEnabled] = useState(false);
+  const [accountFields, setAccountFields] = useState<Array<{ key: string; label: string; value: string }>>([]);
 
   const isNativeQuizType = (quizData?.type ?? quizInfo?.type) !== "mock_exam";
   const builderMeta = (quizInfo as any)?.builderConfig ?? quizData?.builderMeta ?? null;
@@ -225,6 +226,7 @@ export default function StandaloneQuizPlayer() {
           setAttemptId(res.attemptId);
           setQuestions(res.questions);
           setQuizData(res.quiz);
+          setAccountFields(res.accountFields ?? []);
           setPhase("started");
           setCurrentIdx(0);
           setQStartTime(Date.now());
@@ -481,6 +483,14 @@ export default function StandaloneQuizPlayer() {
             advanceLabel={currentIdx < activeQuestions.length - 1 ? "Next" : "Finish quiz"}
           />
         )}
+        {accountFields.length > 0 && (
+          <div className="mx-auto mb-4 max-w-3xl rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Your account information</p>
+            <dl className="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2">
+              {accountFields.map((field) => <div key={field.key} className="flex gap-1.5"><dt className="text-gray-500">{field.label}:</dt><dd className="font-medium text-gray-800">{field.value || "Not provided"}</dd></div>)}
+            </dl>
+          </div>
+        )}
         <BuilderQuestionFrame branding={branding} question={q} footer={
           <div className="flex items-center gap-3 w-full justify-between pt-4">
             <Button variant="outline" onClick={handlePrev} disabled={currentIdx === 0} className="border-white/30 text-white bg-transparent hover:bg-white/10">
@@ -579,6 +589,14 @@ export default function StandaloneQuizPlayer() {
 
       {/* Question */}
       <div className="max-w-3xl mx-auto px-4 py-8">
+        {accountFields.length > 0 && (
+          <section aria-label="Prefilled account information" className="mb-4 rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-sm">
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Your account information</p>
+            <dl className="mt-2 grid gap-x-5 gap-y-1 sm:grid-cols-2">
+              {accountFields.map((field) => <div key={field.key} className="flex gap-1.5"><dt className="text-gray-500">{field.label}:</dt><dd className="font-medium text-gray-800">{field.value || "Not provided"}</dd></div>)}
+            </dl>
+          </section>
+        )}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-4">
           <StandaloneQuestionMedia questionImageUrl={q.questionImageUrl} questionVideoUrl={q.questionVideoUrl} />
           <p className="text-gray-900 text-base font-medium leading-relaxed mb-6">{q.question}</p>

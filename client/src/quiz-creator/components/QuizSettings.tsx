@@ -3,6 +3,7 @@ import { useQuizStore } from "../store/quizStore";
 import { X, Upload, Trash2, Plus, Palette } from "lucide-react";
 import type { QuestionGroup, DrawConfig, GroupDrawConfig } from "../types/quiz";
 import { CURRENT_QUIZ_PLAYER_PATTERN } from "@shared/quizBrandingPattern";
+import { QUIZ_ACCOUNT_FIELD_OPTIONS, type QuizAccountFieldKey } from "@shared/quizAccountFields";
 
 interface Props {
   onClose: () => void;
@@ -169,6 +170,27 @@ export function QuizSettings({ onClose }: Props) {
                   placeholder="anatomy, cardiology, beginner"
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-400/50"
                 />
+              </div>
+              <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-4">
+                <p className="text-sm font-semibold text-teal-900">Learner account fields</p>
+                <p className="mt-1 text-xs text-teal-800">Choose the account fields to display as read-only, prefilled information before this quiz or mock exam starts. Only the selected values are captured with the learner’s attempt.</p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {QUIZ_ACCOUNT_FIELD_OPTIONS.map((field) => {
+                    const selected = m.accountFields?.includes(field.key) ?? false;
+                    return <label key={field.key} className="flex cursor-pointer items-center gap-2 rounded-md bg-white px-3 py-2 text-sm text-gray-800 ring-1 ring-teal-100">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={(event) => updateMeta({
+                          accountFields: event.target.checked
+                            ? [...(m.accountFields ?? []), field.key]
+                            : (m.accountFields ?? []).filter((key) => key !== field.key),
+                        } as { accountFields: QuizAccountFieldKey[] })}
+                      />
+                      {field.label}
+                    </label>;
+                  })}
+                </div>
               </div>
             </div>
           )}

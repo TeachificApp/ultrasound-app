@@ -233,8 +233,6 @@ export const workshopPublicRouter = router({
           venueCity: workshopInstances.venueCity,
           venueState: workshopInstances.venueState,
           description: workshopInstances.description,
-          capacity: workshopInstances.capacity,
-          enrolledCount: workshopInstances.enrolledCount,
           workshopTitle: workshops.title,
         })
         .from(workshopInstances)
@@ -264,8 +262,6 @@ export const workshopPublicRouter = router({
           venueCity: workshopInstances.venueCity,
           venueState: workshopInstances.venueState,
           description: workshopInstances.description,
-          capacity: workshopInstances.capacity,
-          enrolledCount: workshopInstances.enrolledCount,
           workshopTitle: workshops.title,
         })
         .from(workshopInstances)
@@ -286,8 +282,6 @@ export const workshopPublicRouter = router({
         .select({
           id: workshopInstances.id,
           title: workshopInstances.title,
-          capacity: workshopInstances.capacity,
-          enrolledCount: workshopInstances.enrolledCount,
           status: workshopInstances.status,
           availableForPurchase: workshopInstances.availableForPurchase,
         })
@@ -295,16 +289,10 @@ export const workshopPublicRouter = router({
         .where(eq(workshopInstances.id, input.instanceId))
         .limit(1);
       if (!instance) throw new TRPCError({ code: "NOT_FOUND" });
-      const capacity = instance.capacity ?? null;
-      const enrolled = instance.enrolledCount ?? 0;
-      const remaining = capacity !== null ? Math.max(0, capacity - enrolled) : null;
       return {
         instanceId: instance.id,
         title: instance.title,
-        capacity,
-        enrolled,
-        remaining, // null = unlimited
-        isFull: capacity !== null && enrolled >= capacity,
+        enrollmentOpen: instance.status !== "waitlist" && instance.status !== "enrollment_closed" && instance.availableForPurchase,
         hideEnrollmentPresentation: instance.status === "waitlist" || instance.status === "enrollment_closed" || !instance.availableForPurchase,
       };
     }),

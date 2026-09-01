@@ -36,6 +36,7 @@ import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
+import { buildCmeCertificateFileKey } from "../lib/cmeCertificateFilename";
 import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
@@ -138,6 +139,7 @@ import { courseDollarsToStripeCents } from "../lib/courseCheckoutPricing";
 import { dollarsToStripeCents } from "../lib/stripePriceUnits";
 import { formatWorkshopDollars } from "../../shared/workshopPricing";
 import { prepareInlineQuizResponses } from "../lib/inlineLessonQuizResponses";
+import { normalizeQuizAccountFieldKeys, resolveQuizAccountFields } from "../../shared/quizAccountFields";
 import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
@@ -1591,8 +1593,6 @@ export const lmsPublicRouter = router({
         startDate: row.startDate,
         endDate: row.endDate,
         enrollmentCloseDate: row.enrollmentCloseDate,
-        maxStudents: row.maxStudents,
-        enrollmentCount,
         isSoldOut,
         status: row.status,
         landingBlocks,
@@ -1616,16 +1616,10 @@ export const lmsPublicRouter = router({
         .select({ count: sql<number>`count(*)` })
         .from(lmsCohortGroupEnrollments)
         .where(eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId));
-      const enrolled = Number(countRow?.count ?? 0);
-      const capacity = group.maxStudents ?? null;
-      const remaining = capacity !== null ? Math.max(0, capacity - enrolled) : null;
       return {
         cohortGroupId: group.id,
         name: group.name,
-        capacity,
-        enrolled,
-        remaining, // null = unlimited
-        isFull: capacity !== null && enrolled >= capacity,
+        enrollmentOpen: group.status !== "waitlist" && group.status !== "enrollment_closed",
         hideEnrollmentPresentation: group.status === "waitlist" || group.status === "enrollment_closed",
       };
     }),
@@ -2348,6 +2342,12 @@ export const lmsLearnerRouter = router({
       if (!inlineQuiz) throw new TRPCError({ code: "BAD_REQUEST", message: "This lesson does not contain the selected built-in lesson quiz" });
 
       const quizQuestions = Array.isArray(inlineQuiz?.data?.questions) ? inlineQuiz.data.questions : [];
+      const selectedAccountFields = normalizeQuizAccountFieldKeys(inlineQuiz?.data?.accountFields);
+      const [profile] = selectedAccountFields.length ? await db.select({
+        name: users.name, firstName: users.firstName, lastName: users.lastName, displayName: users.displayName,
+        email: users.email, credentials: users.credentials, specialty: users.specialty,
+      }).from(users).where(eq(users.id, ctx.user.id)).limit(1) : [null];
+      const accountFieldValues = profile ? JSON.stringify(resolveQuizAccountFields(selectedAccountFields, profile)) : null;
       const nonScoringSurvey = inlineQuiz?.data?.isSurvey === true || inlineQuiz?.data?.requireSurveyCompletion === true;
       const requiresPassingScore = !nonScoringSurvey && inlineQuiz?.data?.requirePassToComplete !== false;
       const { score: calculatedScore, passed: calculatedScorePassed, passingScore } = evaluateInlineLessonQuizScore(
@@ -2378,6 +2378,7 @@ export const lmsLearnerRouter = router({
           quizBlockId: input.quizBlockId,
           score,
           passed,
+          accountFieldValues,
         }).$returningId();
         if (responseRows.length > 0) {
           await db.insert(lmsInlineQuizResponses).values(responseRows.map(response => ({
@@ -3558,7 +3559,7 @@ export const lmsLearnerRouter = router({
 
       // Upload new PDF to S3
       const suffix = randomBytes(6).toString("hex");
-      const fileKey = `certificates/cert-${ctx.user.id}-${course.id}-${suffix}.pdf`;
+      const fileKey = buildCmeCertificateFileKey(course.title, cert.issuedAt, suffix);
       const { url: certificateUrl } = await storagePut(fileKey, pdfBuffer, "application/pdf");
 
       // Update the certificate record with the new URL

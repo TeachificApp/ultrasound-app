@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, count, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte } from "drizzle-orm";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
@@ -17,12 +17,113 @@ import {
   users,
 } from "../../drizzle/schema";
 import { buildCmeActivityCsv, type CmeActivityReportForCsv } from "../lib/cmeManagementCsv";
+import { platformCalendarDayBoundaryToUtc } from "../../shared/platformTime";
 
 function fullName(user: { name: string | null; firstName: string | null; lastName: string | null }): string {
   return user.name?.trim() || `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Unnamed learner";
 }
 
 type CmeActivityReportOptions = { page?: number; pageSize?: number; includeAll?: boolean };
+type CmeSurveyResultsOptions = { startDate?: string; endDate?: string };
+
+const cmeSurveyDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a calendar date in YYYY-MM-DD format");
+
+function parseContentBlocks(value: unknown): any[] {
+  if (Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(String(value ?? "[]"));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function escapeCsvCell(value: unknown): string {
+  const rawText = value == null ? "" : String(value);
+  const text = /^[=+\-@]/.test(rawText) ? `'${rawText}` : rawText;
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function buildCmeSurveyResultsCsv(rows: Array<Record<string, unknown>>): string {
+  const headers = ["Submitted At", "Learner Name", "Learner Email", "Lesson", "Survey", "Question", "Question Type", "Response"];
+  return [
+    headers.join(","),
+    ...rows.map(row => [
+      row.submittedAt instanceof Date ? row.submittedAt.toISOString() : row.submittedAt,
+      row.learnerName,
+      row.learnerEmail,
+      row.lessonTitle,
+      row.surveyTitle,
+      row.questionText,
+      row.questionType,
+      row.answerValue,
+    ].map(escapeCsvCell).join(",")),
+  ].join("\r\n");
+}
+
+async function getCmeSurveyResults(courseId: number, options: CmeSurveyResultsOptions = {}) {
+  const db = await getDb();
+  if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+  if (options.startDate && options.endDate && options.startDate > options.endDate) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "The start date must be on or before the end date" });
+  }
+  const [activity] = await db.select({ id: cmeActivityForms.id, activityTitle: cmeActivityForms.activityTitle })
+    .from(cmeActivityForms).where(eq(cmeActivityForms.courseId, courseId)).limit(1);
+  if (!activity) throw new TRPCError({ code: "NOT_FOUND", message: "CME activity not found" });
+
+  const dateFilters = [eq(lmsInlineQuizAttempts.courseId, courseId)];
+  if (options.startDate) dateFilters.push(gte(lmsInlineQuizAttempts.submittedAt, platformCalendarDayBoundaryToUtc(options.startDate, "start")));
+  if (options.endDate) dateFilters.push(lte(lmsInlineQuizAttempts.submittedAt, platformCalendarDayBoundaryToUtc(options.endDate, "end")));
+  const attempts = await db.select({
+    id: lmsInlineQuizAttempts.id,
+    lessonId: lmsInlineQuizAttempts.lessonId,
+    quizBlockId: lmsInlineQuizAttempts.quizBlockId,
+    submittedAt: lmsInlineQuizAttempts.submittedAt,
+    learnerName: users.name,
+    firstName: users.firstName,
+    lastName: users.lastName,
+    learnerEmail: users.email,
+    lessonTitle: lmsLessons.title,
+    lessonBlocks: lmsLessons.contentBlocks,
+  }).from(lmsInlineQuizAttempts)
+    .innerJoin(users, eq(users.id, lmsInlineQuizAttempts.userId))
+    .leftJoin(lmsLessons, eq(lmsLessons.id, lmsInlineQuizAttempts.lessonId))
+    .where(and(...dateFilters))
+    .orderBy(desc(lmsInlineQuizAttempts.submittedAt));
+
+  const surveyAttempts = attempts.filter(attempt => parseContentBlocks(attempt.lessonBlocks).some((block: any) => (
+    block?.type === "lesson_quiz"
+    && String(block.id) === attempt.quizBlockId
+    && (block?.data?.isSurvey === true || block?.data?.requireSurveyCompletion === true)
+  )));
+  const surveyAttemptIds = surveyAttempts.map(attempt => attempt.id);
+  const responses = surveyAttemptIds.length ? await db.select({
+    attemptId: lmsInlineQuizResponses.attemptId,
+    questionText: lmsInlineQuizResponses.questionText,
+    questionType: lmsInlineQuizResponses.questionType,
+    answerValue: lmsInlineQuizResponses.answerValue,
+  }).from(lmsInlineQuizResponses).where(inArray(lmsInlineQuizResponses.attemptId, surveyAttemptIds)) : [];
+  const surveyTitleByAttemptId = new Map(surveyAttempts.map(attempt => {
+    const block = parseContentBlocks(attempt.lessonBlocks).find((candidate: any) => candidate?.type === "lesson_quiz" && String(candidate.id) === attempt.quizBlockId);
+    return [attempt.id, String(block?.data?.title ?? "CME Survey")];
+  }));
+  const attemptById = new Map(surveyAttempts.map(attempt => [attempt.id, attempt]));
+  const rows = responses.map(response => {
+    const attempt = attemptById.get(response.attemptId)!;
+    return {
+      attemptId: response.attemptId,
+      submittedAt: attempt.submittedAt,
+      learnerName: fullName({ name: attempt.learnerName, firstName: attempt.firstName, lastName: attempt.lastName }),
+      learnerEmail: attempt.learnerEmail ?? "",
+      lessonTitle: attempt.lessonTitle ?? `Lesson ${attempt.lessonId}`,
+      surveyTitle: surveyTitleByAttemptId.get(response.attemptId) ?? "CME Survey",
+      questionText: response.questionText,
+      questionType: response.questionType,
+      answerValue: response.answerValue ?? "",
+    };
+  });
+  return { activityTitle: activity.activityTitle?.trim() || "CME Activity", rows };
+}
 
 async function getCmeActivityReport(courseId: number, options: CmeActivityReportOptions = {}): Promise<CmeActivityReportForCsv & { summary: { enrollmentCount: number; completionCount: number; certificateCount: number }; page: number; pageSize: number }> {
   const db = await getDb();
@@ -205,6 +306,33 @@ export const cmeManagementRouter = router({
       return {
         filename: `${safeTitle}-cme-report.csv`,
         csv: buildCmeActivityCsv(report),
+      };
+    }),
+
+  getCmeSurveyResults: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      startDate: cmeSurveyDateSchema.optional(),
+      endDate: cmeSurveyDateSchema.optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      return getCmeSurveyResults(input.courseId, input);
+    }),
+
+  exportCmeSurveyResultsCsv: protectedProcedure
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      startDate: cmeSurveyDateSchema.optional(),
+      endDate: cmeSurveyDateSchema.optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const report = await getCmeSurveyResults(input.courseId, input);
+      const safeTitle = report.activityTitle.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "cme-activity";
+      return {
+        filename: `${safeTitle}-survey-results.csv`,
+        csv: buildCmeSurveyResultsCsv(report.rows),
       };
     }),
 });

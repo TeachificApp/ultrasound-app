@@ -1582,6 +1582,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
           <TabsTrigger value="revenue-share" className="text-xs">Revenue Share</TabsTrigger>
           <TabsTrigger value="users" className="text-xs">Students</TabsTrigger>
           <TabsTrigger value="analytics" className="text-xs">Analytics</TabsTrigger>
+          {course.hasCmeActivity && <TabsTrigger value="cme-survey-results" className="text-xs">CME Survey Results</TabsTrigger>}
           <TabsTrigger value="sales" className="text-xs">Sales</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs">After Purchase</TabsTrigger>
           <TabsTrigger value="checkout-page" className="text-xs">Checkout Page</TabsTrigger>
@@ -1593,6 +1594,12 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
           <CourseSettingsForm course={course} onSave={handleSaveCourseSettings} saving={updateCourse.isPending} onTypeChangedToWorkshop={onTypeChangedToWorkshop} onCmeDirtyChange={setCmeDirty} />
           <AffiliateCoursePanel courseId={courseId} />
         </TabsContent>
+
+        {course.hasCmeActivity && (
+          <TabsContent value="cme-survey-results" className="mt-4">
+            <CmeSurveyResultsPanel courseId={courseId} />
+          </TabsContent>
+        )}
 
         {/* Curriculum Tab */}
         <TabsContent value="curriculum" className="mt-4">
@@ -1998,6 +2005,119 @@ function CertTemplateSelector({ value, onChange }: { value: number | null; onCha
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function CmeSurveyResultsPanel({ courseId }: { courseId: number }) {
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [appliedDates, setAppliedDates] = useState<{ startDate?: string; endDate?: string }>({});
+  const reportInput = { courseId, ...appliedDates };
+  const { data: report, isLoading, isError, error } = trpc.lmsAdmin.getCmeSurveyResults.useQuery(reportInput);
+  const exportResults = trpc.lmsAdmin.exportCmeSurveyResultsCsv.useMutation({
+    onSuccess: ({ filename, csv }) => {
+      const objectUrl = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      toast.success("CME survey results CSV downloaded");
+    },
+    onError: (cause) => toast.error(`Could not export CME survey results: ${cause.message}`),
+  });
+  const applyDates = () => {
+    if (startDate && endDate && startDate > endDate) {
+      toast.error("The start date must be on or before the end date");
+      return;
+    }
+    setAppliedDates({ startDate: startDate || undefined, endDate: endDate || undefined });
+  };
+  const clearDates = () => {
+    setStartDate("");
+    setEndDate("");
+    setAppliedDates({});
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-5">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+          <div>
+            <div className="flex items-center gap-2 text-teal-900">
+              <ListChecks className="h-5 w-5" />
+              <h3 className="font-semibold">CME Survey Results</h3>
+            </div>
+            <p className="mt-1 text-sm text-teal-800">Review each recorded learner response for this CME activity, or download the visible filtered results as a CSV file.</p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => exportResults.mutate(reportInput)}
+            disabled={exportResults.isPending || isLoading}
+            className="shrink-0 bg-teal-600 text-white hover:bg-teal-700"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {exportResults.isPending ? "Preparing CSV…" : "Export filtered CSV"}
+          </Button>
+        </div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="w-full sm:w-48">
+            <Label htmlFor="cme-survey-start-date" className="text-xs font-semibold text-teal-900">From date</Label>
+            <Input id="cme-survey-start-date" type="date" value={startDate} onChange={event => setStartDate(event.target.value)} className="mt-1 bg-white" />
+          </div>
+          <div className="w-full sm:w-48">
+            <Label htmlFor="cme-survey-end-date" className="text-xs font-semibold text-teal-900">Through date</Label>
+            <Input id="cme-survey-end-date" type="date" value={endDate} onChange={event => setEndDate(event.target.value)} className="mt-1 bg-white" />
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" onClick={applyDates} className="bg-teal-600 text-white hover:bg-teal-700">Apply filter</Button>
+            {(startDate || endDate || appliedDates.startDate || appliedDates.endDate) && <Button type="button" size="sm" variant="outline" onClick={clearDates}>Clear</Button>}
+          </div>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-5">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-10 w-full" />)}</div>
+      ) : isError ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800">Survey results could not be loaded: {error.message}</div>
+      ) : report?.rows.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-300 bg-white p-8 text-center">
+          <ListChecks className="mx-auto h-8 w-8 text-teal-500" />
+          <p className="mt-3 font-medium text-gray-800">No CME survey responses match this date range.</p>
+          <p className="mt-1 text-sm text-gray-500">Recorded responses will appear here after learners submit a survey in this CME activity.</p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="border-b border-gray-100 px-5 py-3 text-sm text-gray-600"><strong className="text-gray-900">{report?.rows.length ?? 0}</strong> recorded survey response{report?.rows.length === 1 ? "" : "s"}{appliedDates.startDate || appliedDates.endDate ? " in the selected date range" : ""}.</div>
+          <div className="overflow-x-auto">
+            <table className="min-w-[1040px] w-full text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Submitted</th>
+                  <th className="px-4 py-3 font-semibold">Learner</th>
+                  <th className="px-4 py-3 font-semibold">Lesson / Survey</th>
+                  <th className="px-4 py-3 font-semibold">Question</th>
+                  <th className="px-4 py-3 font-semibold">Response</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {report?.rows.map((row: any, index: number) => (
+                  <tr key={`${row.attemptId}-${row.questionText}-${index}`} className="align-top hover:bg-teal-50/30">
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-600">{formatInTimeZone(row.submittedAt, { dateStyle: "medium", timeStyle: "short" }, PLATFORM_TIMEZONE)}</td>
+                    <td className="px-4 py-3"><p className="font-medium text-gray-900">{row.learnerName}</p><p className="mt-0.5 text-xs text-gray-500">{row.learnerEmail}</p></td>
+                    <td className="px-4 py-3"><p className="font-medium text-gray-800">{row.lessonTitle}</p><p className="mt-0.5 text-xs text-teal-700">{row.surveyTitle}</p></td>
+                    <td className="px-4 py-3 text-gray-700"><p>{row.questionText}</p><p className="mt-1 text-xs text-gray-400 capitalize">{String(row.questionType).replace(/_/g, " ")}</p></td>
+                    <td className="max-w-sm px-4 py-3 text-gray-900 whitespace-pre-wrap break-words">{row.answerValue || <span className="text-gray-400">No response recorded</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

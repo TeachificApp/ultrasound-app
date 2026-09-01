@@ -25,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { clearSurveyAnswerKeys, clearSurveyAnswerKeysFromQuestions, nonEmptySurveyChoices } from "@/lib/lessonQuizSurveyMode";
+import { QUIZ_ACCOUNT_FIELD_OPTIONS, type QuizAccountFieldKey } from "@shared/quizAccountFields";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ export interface LessonQuizData {
   shuffleAnswers?: boolean;
   requirePassToComplete?: boolean;
   requireSurveyCompletion?: boolean;
+  accountFields?: QuizAccountFieldKey[];
 }
 
 interface Props {
@@ -1073,6 +1075,7 @@ export { QuestionEditor as LessonQuizQuestionEditor };
 export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload, lessonId, courseId }: Props) {
   const [addTab, setAddTab] = useState<"ai" | "manual" | "bank" | "presets">("manual");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draggingQuestionIndex, setDraggingQuestionIndex] = useState<number | null>(null);
   const [addingNew, setAddingNew] = useState(false);
   const [aiCount, setAiCount] = useState(5);
   const [aiStyle, setAiStyle] = useState<"understanding" | "thinking" | "compliance" | "thought_provoking" | "reflection" | "custom">("understanding");
@@ -1135,6 +1138,17 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
     qs.splice(i, 1);
     set("questions", qs);
     if (editingIndex === i) setEditingIndex(null);
+  };
+
+  const reorderQuestions = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= questions.length || toIndex >= questions.length) return;
+    const reordered = [...questions];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+    set("questions", reordered);
+    if (editingIndex === fromIndex) setEditingIndex(toIndex);
+    else if (editingIndex !== null && fromIndex < editingIndex && editingIndex <= toIndex) setEditingIndex(editingIndex - 1);
+    else if (editingIndex !== null && toIndex <= editingIndex && editingIndex < fromIndex) setEditingIndex(editingIndex + 1);
   };
 
   const saveAiEdit = (q: QuizQuestion) => {
@@ -1224,6 +1238,25 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
         })} />
       </div>
 
+      <div className="rounded-lg border border-teal-200 bg-teal-50 px-3 py-3">
+        <p className="text-xs font-medium text-teal-900">Learner account fields</p>
+        <p className="mt-0.5 text-xs text-teal-700">Choose read-only account fields to prefill for this lesson quiz. Only selected values are saved with the learner’s quiz attempt.</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {QUIZ_ACCOUNT_FIELD_OPTIONS.map((field) => {
+            const selected = data.accountFields?.includes(field.key) ?? false;
+            return <label key={field.key} className="flex items-center gap-2 text-xs text-teal-950">
+              <Checkbox
+                checked={selected}
+                onCheckedChange={(checked) => set("accountFields", checked
+                  ? [...(data.accountFields ?? []), field.key]
+                  : (data.accountFields ?? []).filter((key) => key !== field.key))}
+              />
+              {field.label}
+            </label>;
+          })}
+        </div>
+      </div>
+
       {/* Passing score */}
       {requirePass && !data.requireSurveyCompletion && (
         <div>
@@ -1254,9 +1287,22 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
       {questions.length > 0 && (
         <div className="space-y-1">
           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Questions ({questions.length})</p>
+          <p className="text-xs text-gray-400">Drag a question to a new position, or use the move controls. Reordering does not change question settings or dependencies.</p>
           {questions.map((q, i) => (
             <div key={i}>
-              <div className="flex items-start gap-2 p-2 bg-gray-50 rounded border border-gray-200 text-xs">
+              <div
+                draggable
+                onDragStart={() => setDraggingQuestionIndex(i)}
+                onDragEnd={() => setDraggingQuestionIndex(null)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (draggingQuestionIndex !== null) reorderQuestions(draggingQuestionIndex, i);
+                  setDraggingQuestionIndex(null);
+                }}
+                className={cn("flex items-start gap-2 p-2 bg-gray-50 rounded border text-xs transition-colors", draggingQuestionIndex === i ? "border-teal-500 bg-teal-50 opacity-70" : "border-gray-200")}
+              >
+                <GripVertical className="mt-0.5 h-4 w-4 shrink-0 cursor-grab text-gray-400 active:cursor-grabbing" aria-hidden="true" />
                 <span className="text-gray-400 font-medium shrink-0 mt-0.5">{i + 1}.</span>
                 <span className="shrink-0 mt-0.5 text-teal-600" title={QUESTION_TYPE_LABELS[q.type ?? "mcq"]}>
                   {QUESTION_TYPE_ICONS[q.type ?? "mcq"]}
@@ -1265,6 +1311,12 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
                 {q.hotspotImageUrl && <img src={q.hotspotImageUrl} alt="" className="h-8 w-auto rounded border border-gray-200 object-cover shrink-0" />}
                 <p className="font-medium text-gray-700 flex-1 min-w-0 break-words">{q.question}</p>
                 <div className="flex gap-1 shrink-0">
+                  <button type="button" className="p-1 rounded hover:bg-teal-50 text-teal-600 disabled:cursor-not-allowed disabled:text-gray-300" disabled={i === 0} aria-label={`Move question ${i + 1} up`} title="Move up" onClick={() => reorderQuestions(i, i - 1)}>
+                    <ChevronUp size={12} />
+                  </button>
+                  <button type="button" className="p-1 rounded hover:bg-teal-50 text-teal-600 disabled:cursor-not-allowed disabled:text-gray-300" disabled={i === questions.length - 1} aria-label={`Move question ${i + 1} down`} title="Move down" onClick={() => reorderQuestions(i, i + 1)}>
+                    <ChevronDown size={12} />
+                  </button>
                   <button type="button" className="p-1 rounded hover:bg-teal-50 text-teal-600 transition-colors" title="Edit question"
                     onClick={() => { setAddingNew(false); setEditingIndex(editingIndex === i ? null : i); }}>
                     <Pencil size={12} />

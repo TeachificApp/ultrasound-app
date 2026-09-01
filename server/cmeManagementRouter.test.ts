@@ -25,4 +25,21 @@ describe("CME Management reporting router", () => {
     expect(source).toContain(".limit(pageSize)");
     expect(source).toContain("{ includeAll: true }");
   });
+
+  it("protects CME survey result rows and CSV exports with validated platform-date filters", () => {
+    expect(source).toContain("getCmeSurveyResults: protectedProcedure");
+    expect(source).toContain("exportCmeSurveyResultsCsv: protectedProcedure");
+    expect(source.match(/await assertAdmin\(ctx\)/g)?.length).toBeGreaterThanOrEqual(5);
+    expect(source).toContain("platformCalendarDayBoundaryToUtc(options.startDate, \"start\")");
+    expect(source).toContain("platformCalendarDayBoundaryToUtc(options.endDate, \"end\")");
+    expect(source).toContain("The start date must be on or before the end date");
+    expect(source).toContain("buildCmeSurveyResultsCsv(report.rows)");
+    expect(source).toContain("const text = /^[=+\\-@]/.test(rawText) ? `'${rawText}` : rawText;");
+  });
+
+  it("includes only recorded responses from blocks configured as CME surveys", () => {
+    expect(source).toContain('block?.data?.isSurvey === true || block?.data?.requireSurveyCompletion === true');
+    expect(source).toContain("String(block.id) === attempt.quizBlockId");
+    expect(source).toContain("lmsInlineQuizResponses.answerValue");
+  });
 });
