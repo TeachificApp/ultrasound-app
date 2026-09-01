@@ -69,6 +69,7 @@ export interface QuizQuestion {
 export interface LessonQuizData {
   title?: string;
   questions: QuizQuestion[];
+  isSurvey?: boolean;
   showExplanations?: boolean;
   passingScore?: number;
   shuffleQuestions?: boolean;
@@ -1174,9 +1175,21 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
       <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
         <div>
           <p className="text-xs font-medium text-gray-700">Require Pass to Complete</p>
-          <p className="text-xs text-gray-400 mt-0.5">{data.requireSurveyCompletion ? "Disabled while required survey completion is enabled." : "Student must reach passing score to mark lesson complete"}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{data.isSurvey || data.requireSurveyCompletion ? "Disabled while non-scoring survey mode is enabled." : "Student must reach passing score to mark lesson complete"}</p>
         </div>
-        <Switch checked={data.requireSurveyCompletion ? false : requirePass} disabled={data.requireSurveyCompletion} onCheckedChange={(v) => set("requirePassToComplete", v)} />
+        <Switch checked={data.isSurvey || data.requireSurveyCompletion ? false : requirePass} disabled={data.isSurvey || data.requireSurveyCompletion} onCheckedChange={(v) => set("requirePassToComplete", v)} />
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
+        <div>
+          <p className="text-xs font-medium text-teal-900">Non-Scoring Survey</p>
+          <p className="text-xs text-teal-700 mt-0.5">All responses are recorded only. There are no correct or incorrect answers, scores, passing scores, or graded feedback.</p>
+        </div>
+        <Switch checked={data.isSurvey ?? false} onCheckedChange={(v) => onChange({
+          ...data,
+          isSurvey: v,
+          requirePassToComplete: v ? false : data.requirePassToComplete,
+        })} />
       </div>
 
       <div className="flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
@@ -1188,6 +1201,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
           ...data,
           requireSurveyCompletion: v,
           // A response-required survey deliberately has no score threshold.
+          isSurvey: v ? true : data.isSurvey,
           requirePassToComplete: v ? false : data.requirePassToComplete,
         })} />
       </div>

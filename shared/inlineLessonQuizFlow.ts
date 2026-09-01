@@ -94,8 +94,10 @@ export function evaluateInlineLessonQuizCompletion(input: {
   questions: InlineLessonQuizFlowQuestion[];
   responses: InlineLessonQuizFlowResponse[];
   scorePassed: boolean;
+  nonScoringSurvey?: boolean;
   requireSurveyCompletion?: boolean;
 }) {
+  const nonScoringSurvey = input.nonScoringSurvey === true || input.requireSurveyCompletion === true;
   const requiresSurveyCompletion = input.requireSurveyCompletion === true;
   const surveyCompleted = hasCompletedRequiredInlineSurvey(
     input.questions,
@@ -103,8 +105,9 @@ export function evaluateInlineLessonQuizCompletion(input: {
     requiresSurveyCompletion,
   );
   return {
+    nonScoringSurvey,
     requiresSurveyCompletion,
     surveyCompleted,
-    passed: requiresSurveyCompletion ? surveyCompleted : input.scorePassed,
+    passed: nonScoringSurvey ? (requiresSurveyCompletion ? surveyCompleted : true) : input.scorePassed,
   };
 }

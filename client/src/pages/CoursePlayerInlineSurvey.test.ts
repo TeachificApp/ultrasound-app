@@ -12,6 +12,13 @@ describe("InlineLessonQuiz CME survey controls", () => {
     expect(source).toContain('✓ Recorded');
   });
 
+  it("suppresses answer-key feedback for every question type in explicit non-scoring survey mode", () => {
+    expect(source).toContain('const isNonScoringSurvey = data.isSurvey === true || requiresSurveyCompletion;');
+    expect(source).toContain('!isNonScoringSurvey && submitted && origIdx === q.correctAnswer');
+    expect(source).toContain('!isNonScoringSurvey && submitted && (q.correctAnswers ?? []).includes(origIdx)');
+    expect(source).toContain('submitted && !isNonScoringSurvey && (q.hotspotMarkers ?? [])');
+  });
+
   it("requires a response for template questions marked required", () => {
     expect(source).toContain('q.required === true');
     expect(source).toContain('A response is required');

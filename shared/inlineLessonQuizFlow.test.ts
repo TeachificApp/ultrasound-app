@@ -48,4 +48,13 @@ describe("inline lesson quiz survey flow", () => {
       requireSurveyCompletion: true,
     })).toMatchObject({ requiresSurveyCompletion: true, surveyCompleted: true, passed: true });
   });
+
+  it("treats explicitly non-scoring selectable questions as recorded responses rather than graded answers", () => {
+    expect(evaluateInlineLessonQuizCompletion({
+      questions: [{ id: "professional-role", type: "mcq" }],
+      responses: [{ questionKey: "professional-role", answerValue: "Sonographer" }],
+      scorePassed: false,
+      nonScoringSurvey: true,
+    })).toMatchObject({ nonScoringSurvey: true, requiresSurveyCompletion: false, passed: true });
+  });
 });

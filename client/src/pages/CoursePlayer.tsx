@@ -162,7 +162,7 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
 }
 
 // ─── Inline Lesson Quiz (for lesson_quiz content blocks) ────────────────────
-function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComplete }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; requireSurveyCompletion?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string }; lessonId: number; courseSlug: string; isAdminPreview?: boolean; onComplete: () => void }) {
+function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComplete }: { data: { title?: string; questions?: any[]; isSurvey?: boolean; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; requireSurveyCompletion?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string }; lessonId: number; courseSlug: string; isAdminPreview?: boolean; onComplete: () => void }) {
   const rawQuestions = data.questions ?? [];
   // Stabilize shuffle with useMemo so re-renders don't re-shuffle
   const shuffledQuestions = useMemo(() => {
@@ -320,8 +320,11 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
     if (INTERACTIVE_TYPES.includes(qt)) return interactiveAnswers[i] !== undefined;
     return false;
   });
-  const score = submitted ? computeScore() : 0;
-  const passed = requiresSurveyCompletion ? allAnswered : score >= (data.passingScore ?? 70);
+  const isNonScoringSurvey = data.isSurvey === true || requiresSurveyCompletion;
+  const score = submitted && !isNonScoringSurvey ? computeScore() : 0;
+  const passed = isNonScoringSurvey
+    ? (requiresSurveyCompletion ? allAnswered : true)
+    : data.requirePassToComplete === false || score >= (data.passingScore ?? 70);
 
   const handleRetake = () => {
     setSelected({});
@@ -334,7 +337,7 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
   };
 
   const handleSubmit = () => {
-    const calculatedScore = computeScore();
+    const calculatedScore = isNonScoringSurvey ? 0 : computeScore();
     setSubmitted(true);
     const responses = visibleQuestionIndexes.map((shuffledIndex) => {
       const question: any = shuffledQuestions[shuffledIndex];
@@ -477,7 +480,7 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         }`}>
           <span className="text-lg">{passed ? "🎉" : "📝"}</span>
           <span className="flex-1">
-            {requiresSurveyCompletion
+            {isNonScoringSurvey
               ? (passed ? "Survey recorded — lesson completion is available." : "Please answer all visible survey questions before submitting.")
               : data.requirePassToComplete !== false
               ? (passed ? `Passed! Score: ${score}%` : `Score: ${score}% — ${data.passingScore ?? 70}% required to pass`)
@@ -495,16 +498,16 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         <div className="flex items-center gap-2 mb-3">
           <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-teal-600 text-white text-xs font-bold shrink-0">{currentIndex + 1}</span>
           <span className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-            {qType === "mcq" ? "Multiple Choice" : qType === "truefalse" ? "True / False" : qType === "multiselect" ? "Select All That Apply" : qType === "hotspot" ? "Hotspot" : qType === "matching" ? "Matching" : qType === "likert" ? "Opinion Poll" : qType === "star_rating" ? "Star Rating" : qType === "survey_choice" ? "Survey" : qType === "image_comparison" ? "Image Comparison" : qType === "drag_sort" ? "Ordering" : qType === "branching" ? "Clinical Scenario" : qType === "fill_blank" ? "Fill in the Blank" : qType === "annotation" ? "Image Annotation" : qType === "flashcard" ? "Flashcard" : "Open Response"}
+            {isNonScoringSurvey ? "Survey" : qType === "mcq" ? "Multiple Choice" : qType === "truefalse" ? "True / False" : qType === "multiselect" ? "Select All That Apply" : qType === "hotspot" ? "Hotspot" : qType === "matching" ? "Matching" : qType === "likert" ? "Opinion Poll" : qType === "star_rating" ? "Star Rating" : qType === "survey_choice" ? "Survey" : qType === "image_comparison" ? "Image Comparison" : qType === "drag_sort" ? "Ordering" : qType === "branching" ? "Clinical Scenario" : qType === "fill_blank" ? "Fill in the Blank" : qType === "annotation" ? "Image Annotation" : qType === "flashcard" ? "Flashcard" : "Open Response"}
           </span>
-          {submitted && showFeedback && !(qType === "likert" || qType === "star_rating" || qType === "open_text" || qType === "survey_choice") && (
+          {submitted && showFeedback && !isNonScoringSurvey && !(qType === "likert" || qType === "star_rating" || qType === "open_text" || qType === "survey_choice") && (
             <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full ${
               isCurrentCorrect() ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
             }`}>
               {isCurrentCorrect() ? "✓ Correct" : "✗ Incorrect"}
             </span>
           )}
-          {submitted && showFeedback && (qType === "likert" || qType === "star_rating" || qType === "open_text" || qType === "survey_choice") && (
+          {submitted && showFeedback && (isNonScoringSurvey || qType === "likert" || qType === "star_rating" || qType === "open_text" || qType === "survey_choice") && (
             <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">✓ Recorded</span>
           )}
         </div>
@@ -541,8 +544,8 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
             {answerOrder.map((origIdx: number, displayIdx: number) => {
               const opt = opts[origIdx] ?? "";
               const isSelected = selected[currentIndex] === origIdx;
-              const isCorrect = submitted && origIdx === q.correctAnswer;
-              const isWrong = submitted && isSelected && origIdx !== q.correctAnswer;
+              const isCorrect = !isNonScoringSurvey && submitted && origIdx === q.correctAnswer;
+              const isWrong = !isNonScoringSurvey && submitted && isSelected && origIdx !== q.correctAnswer;
               const ansImg = q.answerImages?.[origIdx];
               return (
                 <button
@@ -581,8 +584,8 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
             {answerOrder.map((origIdx: number, displayIdx: number) => {
               const opt = opts[origIdx] ?? "";
               const isSelected = (selected[currentIndex] ?? []).includes(origIdx);
-              const isCorrect = submitted && (q.correctAnswers ?? []).includes(origIdx);
-              const isWrong = submitted && isSelected && !(q.correctAnswers ?? []).includes(origIdx);
+              const isCorrect = !isNonScoringSurvey && submitted && (q.correctAnswers ?? []).includes(origIdx);
+              const isWrong = !isNonScoringSurvey && submitted && isSelected && !(q.correctAnswers ?? []).includes(origIdx);
               return (
                 <button
                   key={origIdx}
@@ -619,7 +622,7 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         {/* Hotspot */}
         {qType === "hotspot" && (
           <div className="space-y-2">
-            <p className="text-xs text-gray-400">{submitted ? "" : "Click on the correct location in the image"}</p>
+            <p className="text-xs text-gray-400">{submitted ? "" : isNonScoringSurvey ? "Click a location in the image" : "Click on the correct location in the image"}</p>
             <div
               className={`relative rounded-xl overflow-hidden border-2 ${submitted ? "border-gray-200" : "border-teal-300 cursor-crosshair"}`}
               onClick={handleHotspotClick}
@@ -635,17 +638,17 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
               {hotspotClick[currentIndex] && (
                 <div
                   className={`absolute w-8 h-8 rounded-full border-4 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 shadow-lg text-white text-xs font-bold ${
-                    submitted
+                    submitted && !isNonScoringSurvey
                       ? isCurrentCorrect() ? "bg-green-500 border-green-700" : "bg-red-500 border-red-700"
                       : "bg-teal-500 border-teal-700"
                   }`}
                   style={{ left: `${hotspotClick[currentIndex].x}%`, top: `${hotspotClick[currentIndex].y}%` }}
                 >
-                  {submitted ? (isCurrentCorrect() ? "✓" : "✗") : "●"}
+                  {submitted && !isNonScoringSurvey ? (isCurrentCorrect() ? "✓" : "✗") : "●"}
                 </div>
               )}
               {/* Show correct markers after submit */}
-              {submitted && (q.hotspotMarkers ?? []).filter((m: any) => m.isCorrect).map((m: any) => (
+              {submitted && !isNonScoringSurvey && (q.hotspotMarkers ?? []).filter((m: any) => m.isCorrect).map((m: any) => (
                 <div
                   key={m.id}
                   className="absolute w-8 h-8 rounded-full bg-green-400/70 border-2 border-green-600 flex items-center justify-center transform -translate-x-1/2 -translate-y-1/2 text-white text-xs font-bold"
@@ -665,12 +668,12 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         {/* Matching */}
         {qType === "matching" && (
           <div className="space-y-2">
-            <p className="text-xs text-gray-400 mb-2">Match each item on the left to its correct pair on the right</p>
+            <p className="text-xs text-gray-400 mb-2">{isNonScoringSurvey ? "Match each item on the left to the response that best applies." : "Match each item on the left to its correct pair on the right"}</p>
             {(q.matchingPairs ?? []).map((pair: any, pi: number) => {
               const rightOptions = [...(q.matchingPairs ?? [])].map((p: any) => p.right).sort();
               const currentAnswer = matchingAnswers[currentIndex]?.[pair.id];
-              const isCorrect = submitted && currentAnswer === pair.right;
-              const isWrong = submitted && currentAnswer && currentAnswer !== pair.right;
+              const isCorrect = !isNonScoringSurvey && submitted && currentAnswer === pair.right;
+              const isWrong = !isNonScoringSurvey && submitted && currentAnswer && currentAnswer !== pair.right;
               return (
                 <div key={pair.id} className="flex items-center gap-2">
                   <div className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium ${

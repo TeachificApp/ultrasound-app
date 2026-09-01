@@ -219,6 +219,12 @@
 - [x] Add focused regressions for author-configured Yes/No dependent-question branching, learner visibility, and required-survey completion behavior.
 - [x] Ensure the required-survey completion setting applies to existing CME survey blocks with legacy single-choice question types, without requiring those blocks to be rebuilt.
 - [x] Add regression coverage confirming legacy CME survey questions complete by visible response submission and never by a passing-score threshold when survey completion is enabled.
+- [ ] Repair the reported CME Ergonomics survey completion error without changing existing learner attempts or certificate records.
+- [x] Ensure professional-role and other CME survey questions are unscored response fields that never mark a valid answer wrong or require a specific role selection.
+- [x] Add an explicit non-scoring selectable-answer lesson-survey option that records a response without correct-answer, score, pass/fail, or graded-feedback behavior.
+- [x] Keep required CME survey completion independent from scoring so authors can require visible responses without configuring a correct answer or passing score.
+- [x] Add focused regressions confirming non-scoring selectable survey responses never display correct/incorrect treatment and still satisfy configured completion requirements.
+- [ ] Add focused regressions for role-neutral CME survey responses, completion submission, and safe retry behavior after a transient completion error.
 - [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
 - [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.
 - [x] Allow discount codes to target the full catalog, one or more selected content types, or one or more individual products.

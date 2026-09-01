@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { prepareInlineQuizResponses } from "./lib/inlineLessonQuizResponses";
+import { evaluateInlineLessonQuizCompletion } from "../shared/inlineLessonQuizFlow";
 
 describe("prepareInlineQuizResponses", () => {
   const questions = [
@@ -7,6 +8,17 @@ describe("prepareInlineQuizResponses", () => {
     { id: "recommend", question: "Would you recommend this activity?", type: "survey_choice" },
     { id: "feedback", question: "What did you like most?", type: "open_text" },
   ];
+
+  it("records a non-scoring selectable survey response without an answer key or score threshold", () => {
+    const completion = evaluateInlineLessonQuizCompletion({
+      questions: [{ id: "role", type: "mcq" }],
+      responses: [{ questionKey: "role", answerValue: "Sonographer" }],
+      scorePassed: false,
+      nonScoringSurvey: true,
+    });
+
+    expect(completion).toMatchObject({ nonScoringSurvey: true, requiresSurveyCompletion: false, passed: true });
+  });
 
   it("keeps only one response per stored question and retains stored labels", () => {
     const result = prepareInlineQuizResponses(questions, [

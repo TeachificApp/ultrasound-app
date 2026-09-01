@@ -2347,14 +2347,19 @@ export const lmsLearnerRouter = router({
       if (!inlineQuiz) throw new TRPCError({ code: "BAD_REQUEST", message: "This lesson does not contain a built-in lesson quiz" });
 
       const quizQuestions = Array.isArray(inlineQuiz?.data?.questions) ? inlineQuiz.data.questions : [];
-      const { score, passed: scorePassed, passingScore } = evaluateInlineLessonQuizScore(
+      const nonScoringSurvey = inlineQuiz?.data?.isSurvey === true || inlineQuiz?.data?.requireSurveyCompletion === true;
+      const requiresPassingScore = !nonScoringSurvey && inlineQuiz?.data?.requirePassToComplete !== false;
+      const { score: calculatedScore, passed: calculatedScorePassed, passingScore } = evaluateInlineLessonQuizScore(
         input.score,
         Number(inlineQuiz?.data?.passingScore ?? 70),
       );
+      const score = nonScoringSurvey ? 0 : calculatedScore;
+      const scorePassed = requiresPassingScore ? calculatedScorePassed : true;
       const { requiresSurveyCompletion, surveyCompleted, passed } = evaluateInlineLessonQuizCompletion({
         questions: quizQuestions,
         responses: input.responses,
         scorePassed,
+        nonScoringSurvey,
         requireSurveyCompletion: inlineQuiz?.data?.requireSurveyCompletion === true,
       });
 
