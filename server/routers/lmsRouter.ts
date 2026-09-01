@@ -2295,6 +2295,7 @@ export const lmsLearnerRouter = router({
     .input(z.object({
       lessonId: z.number().int(),
       courseSlug: z.string(),
+      quizBlockId: z.string().min(1).max(128),
       score: z.number().min(0).max(100),
       isAdminPreview: z.boolean().optional(),
       responses: z.array(z.object({
@@ -2343,8 +2344,8 @@ export const lmsLearnerRouter = router({
       } catch {
         blocks = [];
       }
-      const inlineQuiz = blocks.find((block: any) => block?.type === "lesson_quiz");
-      if (!inlineQuiz) throw new TRPCError({ code: "BAD_REQUEST", message: "This lesson does not contain a built-in lesson quiz" });
+      const inlineQuiz = blocks.find((block: any) => block?.type === "lesson_quiz" && String(block.id) === input.quizBlockId);
+      if (!inlineQuiz) throw new TRPCError({ code: "BAD_REQUEST", message: "This lesson does not contain the selected built-in lesson quiz" });
 
       const quizQuestions = Array.isArray(inlineQuiz?.data?.questions) ? inlineQuiz.data.questions : [];
       const nonScoringSurvey = inlineQuiz?.data?.isSurvey === true || inlineQuiz?.data?.requireSurveyCompletion === true;
@@ -2374,10 +2375,9 @@ export const lmsLearnerRouter = router({
           userId: ctx.user.id,
           courseId: course.id,
           lessonId: lesson.id,
-          quizBlockId: String(inlineQuiz?.id ?? "inline-lesson-quiz"),
+          quizBlockId: input.quizBlockId,
           score,
           passed,
-          submittedAt: new Date(),
         }).$returningId();
         if (responseRows.length > 0) {
           await db.insert(lmsInlineQuizResponses).values(responseRows.map(response => ({
@@ -2417,6 +2417,46 @@ export const lmsLearnerRouter = router({
 
       if (passed) await recalcProgress(db, enrollment.id);
       return { passed, score, passingScore, requiresSurveyCompletion, surveyCompleted };
+    }),
+
+  /** Restore the authenticated learner's most recent saved answers for one inline quiz block. */
+  getInlineLessonQuizAttempt: protectedProcedure
+    .input(z.object({
+      lessonId: z.number().int(),
+      courseSlug: z.string(),
+      quizBlockId: z.string().min(1).max(128),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses)
+        .where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const [enrollment] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments).where(and(
+        eq(lmsEnrollments.userId, ctx.user.id),
+        eq(lmsEnrollments.courseId, course.id),
+      )).limit(1);
+      if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
+      const [lesson] = await db.select({ id: lmsLessons.id, courseId: lmsLessons.courseId }).from(lmsLessons)
+        .where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson || lesson.courseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
+      const [attempt] = await db.select({
+        id: lmsInlineQuizAttempts.id,
+        passed: lmsInlineQuizAttempts.passed,
+        score: lmsInlineQuizAttempts.score,
+      }).from(lmsInlineQuizAttempts).where(and(
+        eq(lmsInlineQuizAttempts.userId, ctx.user.id),
+        eq(lmsInlineQuizAttempts.courseId, course.id),
+        eq(lmsInlineQuizAttempts.lessonId, input.lessonId),
+        eq(lmsInlineQuizAttempts.quizBlockId, input.quizBlockId),
+      )).orderBy(desc(lmsInlineQuizAttempts.submittedAt)).limit(1);
+      if (!attempt) return null;
+      const responses = await db.select({
+        questionKey: lmsInlineQuizResponses.questionKey,
+        questionType: lmsInlineQuizResponses.questionType,
+        answerValue: lmsInlineQuizResponses.answerValue,
+      }).from(lmsInlineQuizResponses).where(eq(lmsInlineQuizResponses.attemptId, attempt.id));
+      return { attempt, responses };
     }),
 
   /** Submit quiz answers */

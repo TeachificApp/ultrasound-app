@@ -27,5 +27,15 @@ describe("InlineLessonQuiz CME survey controls", () => {
   it("keeps an inline survey ready to retry after a transient completion error", () => {
     expect(source).toContain('onError: (error) => toast.error(`Quiz progress could not be saved: ${error.message}`)');
     expect(source).toContain('disabled={!allAnswered || recordInlineQuiz.isPending}');
+    expect(source).not.toContain('const calculatedScore = isNonScoringSurvey ? 0 : computeScore();\n    setSubmitted(true);');
+    expect(source).toContain('onSuccess: (record) => {\n      setSubmitted(true);');
+  });
+
+  it("restores saved answers by quiz block and retains in-progress answers across learner navigation", () => {
+    expect(source).toContain('getInlineLessonQuizAttempt.useQuery');
+    expect(source).toContain('inline-lesson-quiz-answers:${courseSlug}:${lessonId}:${quizBlockId}');
+    expect(source).toContain('quizBlockId={String(block.id)}');
+    expect(source).toContain('if (!isAdminPreview && isSavedAttemptLoading) return;');
+    expect(source).toContain('sessionStorage.setItem(answerDraftKey');
   });
 });

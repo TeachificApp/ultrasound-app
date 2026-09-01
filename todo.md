@@ -279,3 +279,7 @@
 - [x] Add an administrator/creator-controlled read-aloud setting per quiz, preserve existing quiz behavior by default, and show the learner control only when enabled. Superseded by the default-off request.
 - [x] Provide two basic creator-selectable quiz read-aloud voices, Female and Male, with natural pacing and a stable browser-supported fallback.
 - [x] Make read-aloud default to off for newly created and previously unset quizzes, leaving it visible only when a creator explicitly enables it.
+- [x] Repair the failed `lms_inline_quiz_attempts` write that prevents inline CME survey progress and lesson completion from persisting, without changing existing learner data.
+- [x] Ensure completed required CME survey modules persist their completion state, advance course progress accurately, and unlock the existing certificate path only when all required course items are complete.
+- [x] Preserve previously recorded inline lesson-quiz and CME survey answers when a learner uses Previous, Next, lesson navigation, or returns to the lesson.
+- [x] Add focused regressions for failed survey-write handling, answer restoration, required CME survey completion, displayed course progress, and certificate eligibility.

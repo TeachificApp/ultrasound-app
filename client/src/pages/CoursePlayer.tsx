@@ -162,7 +162,7 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
 }
 
 // ─── Inline Lesson Quiz (for lesson_quiz content blocks) ────────────────────
-function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComplete }: { data: { title?: string; questions?: any[]; isSurvey?: boolean; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; requireSurveyCompletion?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string }; lessonId: number; courseSlug: string; isAdminPreview?: boolean; onComplete: () => void }) {
+function InlineLessonQuiz({ data, lessonId, courseSlug, quizBlockId, isAdminPreview, onComplete }: { data: { title?: string; questions?: any[]; isSurvey?: boolean; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; requireSurveyCompletion?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string }; lessonId: number; courseSlug: string; quizBlockId: string; isAdminPreview?: boolean; onComplete: () => void }) {
   const rawQuestions = data.questions ?? [];
   // Stabilize shuffle with useMemo so re-renders don't re-shuffle
   const shuffledQuestions = useMemo(() => {
@@ -196,13 +196,79 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
   const [surveyAnswers, setSurveyAnswers] = useState<Record<number, string | number>>({});
   // Interactive question type answers: { [questionIndex]: any }
   const [interactiveAnswers, setInteractiveAnswers] = useState<Record<number, any>>({});
+  const answerDraftKey = `inline-lesson-quiz-answers:${courseSlug}:${lessonId}:${quizBlockId}`;
+  const restoredAnswerKeyRef = useRef<string | null>(null);
+  const { data: savedAttempt, isLoading: isSavedAttemptLoading } = trpc.lmsLearner.getInlineLessonQuizAttempt.useQuery(
+    { lessonId, courseSlug, quizBlockId },
+    { enabled: !isAdminPreview },
+  );
   const recordInlineQuiz = trpc.lmsLearner.submitInlineLessonQuiz.useMutation({
     onSuccess: (record) => {
+      setSubmitted(true);
+      sessionStorage.removeItem(answerDraftKey);
       if (record.passed) onComplete();
     },
     onError: (error) => toast.error(`Quiz progress could not be saved: ${error.message}`),
   });
   const INTERACTIVE_TYPES = ["image_comparison","drag_sort","branching","fill_blank","annotation","flashcard"];
+
+  useEffect(() => {
+    if (restoredAnswerKeyRef.current === answerDraftKey) return;
+    if (!isAdminPreview && isSavedAttemptLoading) return;
+    const savedResponses = savedAttempt?.responses ?? [];
+    let localDraft: Record<string, any> | null = null;
+    try {
+      const rawDraft = sessionStorage.getItem(answerDraftKey);
+      localDraft = rawDraft ? JSON.parse(rawDraft) : null;
+    } catch {
+      sessionStorage.removeItem(answerDraftKey);
+    }
+    if (localDraft) {
+      setSelected(localDraft.selected ?? {});
+      setHotspotClick(localDraft.hotspotClick ?? {});
+      setMatchingAnswers(localDraft.matchingAnswers ?? {});
+      setSurveyAnswers(localDraft.surveyAnswers ?? {});
+      setInteractiveAnswers(localDraft.interactiveAnswers ?? {});
+      restoredAnswerKeyRef.current = answerDraftKey;
+      return;
+    }
+    if (savedResponses.length === 0) {
+      if (savedAttempt) setSubmitted(true);
+      restoredAnswerKeyRef.current = answerDraftKey;
+      return;
+    }
+    const responsesByQuestionKey = new Map(savedResponses.map((response: any) => [response.questionKey, response.answerValue]));
+    const restoredSelected: Record<number, any> = {};
+    const restoredSurveyAnswers: Record<number, string | number> = {};
+    shuffledQuestions.forEach((question: any, index: number) => {
+      const answerValue = responsesByQuestionKey.get(String(question.id ?? rawQuestions.indexOf(question)));
+      if (answerValue === undefined || answerValue === null) return;
+      const questionType = question.type ?? "mcq";
+      if (["likert", "star_rating"].includes(questionType)) {
+        const rating = Number(answerValue);
+        if (Number.isFinite(rating)) restoredSurveyAnswers[index] = rating;
+      } else if (["open_text", "survey_choice"].includes(questionType)) {
+        restoredSurveyAnswers[index] = answerValue;
+      } else if (["mcq", "truefalse"].includes(questionType)) {
+        const optionIndex = (question.options ?? []).indexOf(answerValue);
+        if (optionIndex >= 0) restoredSelected[index] = optionIndex;
+      } else if (questionType === "multiselect") {
+        try {
+          const values = JSON.parse(answerValue);
+          if (Array.isArray(values)) restoredSelected[index] = values.map(value => (question.options ?? []).indexOf(value)).filter(optionIndex => optionIndex >= 0);
+        } catch { /* Retain no answer for an invalid legacy multi-select value. */ }
+      }
+    });
+    setSelected(restoredSelected);
+    setSurveyAnswers(restoredSurveyAnswers);
+    setSubmitted(true);
+    restoredAnswerKeyRef.current = answerDraftKey;
+  }, [answerDraftKey, isAdminPreview, isSavedAttemptLoading, rawQuestions, savedAttempt, shuffledQuestions]);
+
+  useEffect(() => {
+    if (restoredAnswerKeyRef.current !== answerDraftKey || submitted) return;
+    sessionStorage.setItem(answerDraftKey, JSON.stringify({ selected, hotspotClick, matchingAnswers, surveyAnswers, interactiveAnswers }));
+  }, [answerDraftKey, interactiveAnswers, matchingAnswers, selected, submitted, surveyAnswers, hotspotClick]);
 
   const branchAnswersByQuestionKey = rawQuestions.reduce<Record<string, unknown>>((answers, question: any, index: number) => {
     const type = question?.type ?? "mcq";
@@ -334,11 +400,12 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
     setSurveyAnswers({});
     setInteractiveAnswers({});
     setCurrentIndex(0);
+    setSubmitted(false);
+    sessionStorage.removeItem(answerDraftKey);
   };
 
   const handleSubmit = () => {
     const calculatedScore = isNonScoringSurvey ? 0 : computeScore();
-    setSubmitted(true);
     const responses = visibleQuestionIndexes.map((shuffledIndex) => {
       const question: any = shuffledQuestions[shuffledIndex];
       const sourceIndex = rawQuestions.indexOf(question);
@@ -358,6 +425,7 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
     recordInlineQuiz.mutate({
       lessonId,
       courseSlug,
+      quizBlockId,
       score: calculatedScore,
       isAdminPreview,
       responses,
@@ -2969,6 +3037,7 @@ export default function CoursePlayer() {
                             data={block.data as any}
                             lessonId={lessonData.id}
                             courseSlug={slug!}
+                            quizBlockId={String(block.id)}
                             isAdminPreview={data?.isAdminPreview ?? false}
                             onComplete={() => {
                               fireLessonCompleteEffect();
