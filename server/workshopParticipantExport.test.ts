@@ -22,5 +22,6 @@ describe("workshop participant export", () => {
   it("surfaces the protected export only in the workshop administrator participant panel", () => {
     expect(adminPanel).toContain("exportWorkshopInstanceStudentsCSV.useQuery");
     expect(adminPanel).toContain("Export Active Participants");
+    expect(adminPanel).toContain("email-campaigns?workshopInstanceId=${instanceId}");
   });
 });

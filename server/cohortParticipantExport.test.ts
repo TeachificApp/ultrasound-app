@@ -23,5 +23,6 @@ describe("cohort participant export", () => {
   it("surfaces the protected export in Cohort Groups administration", () => {
     expect(adminPanel).toContain("lmsTeamManager.exportActiveMembersCSV.useQuery");
     expect(adminPanel).toContain("Export Active Participants");
+    expect(adminPanel).toContain("email-campaigns?cohortGroupId=${group.id}");
   });
 });

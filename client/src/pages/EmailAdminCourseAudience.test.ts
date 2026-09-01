@@ -11,6 +11,8 @@ describe("course participant campaign handoff", () => {
     expect(lmsAdmin).toContain("Email course participants");
     expect(lmsAdmin).toContain("/admin/email-campaigns?courseId=${courseId}");
     expect(dashboard).toContain("activeAccessCourseIds: [courseAudienceId]");
+    expect(dashboard).toContain("inCohortGroupIds: [cohortGroupAudienceId]");
+    expect(dashboard).toContain("workshopInstanceIds: [workshopInstanceAudienceId]");
     expect(dashboard).toContain('userStatus: "active"');
     expect(editor).toContain("initialAudienceFilter");
   });

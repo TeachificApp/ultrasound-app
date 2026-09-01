@@ -890,6 +890,14 @@ export default function EmailCampaignDashboard() {
     const value = Number(new URLSearchParams(window.location.search).get("courseId"));
     return Number.isInteger(value) && value > 0 ? value : null;
   });
+  const [cohortGroupAudienceId] = useState(() => {
+    const value = Number(new URLSearchParams(window.location.search).get("cohortGroupId"));
+    return Number.isInteger(value) && value > 0 ? value : null;
+  });
+  const [workshopInstanceAudienceId] = useState(() => {
+    const value = Number(new URLSearchParams(window.location.search).get("workshopInstanceId"));
+    return Number.isInteger(value) && value > 0 ? value : null;
+  });
   const utils = trpc.useUtils();
 
   const [activeTab, setActiveTab] = useState("campaigns");
@@ -953,7 +961,14 @@ export default function EmailCampaignDashboard() {
 
   // If editor is open, show it full-page
   if (showEditor) {
-    return <EmailCampaignEditor campaignId={editCampaignId} initialAudienceFilter={courseAudienceId ? { ...DEFAULT_AUDIENCE_FILTER, activeAccessCourseIds: [courseAudienceId], userStatus: "active" } : undefined} onClose={() => { setShowEditor(false); setEditCampaignId(undefined); refetchCampaigns(); }} />;
+    const initialAudienceFilter = courseAudienceId
+      ? { ...DEFAULT_AUDIENCE_FILTER, activeAccessCourseIds: [courseAudienceId], userStatus: "active" }
+      : cohortGroupAudienceId
+        ? { ...DEFAULT_AUDIENCE_FILTER, inCohortGroupIds: [cohortGroupAudienceId], userStatus: "active" }
+        : workshopInstanceAudienceId
+          ? { ...DEFAULT_AUDIENCE_FILTER, workshopInstanceIds: [workshopInstanceAudienceId], userStatus: "active" }
+          : undefined;
+    return <EmailCampaignEditor campaignId={editCampaignId} initialAudienceFilter={initialAudienceFilter} onClose={() => { setShowEditor(false); setEditCampaignId(undefined); refetchCampaigns(); }} />;
   }
 
   // ── Derived stats ────────────────────────────────────────────────────────────

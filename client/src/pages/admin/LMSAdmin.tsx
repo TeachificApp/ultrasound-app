@@ -13430,6 +13430,9 @@ function CohortTab({ courseId }: { courseId: number }) {
                           <Button size="sm" variant="outline" className="text-xs h-7" onClick={downloadActiveCohortParticipants} disabled={cohortExport.isFetching}>
                             {cohortExport.isFetching ? "Preparing…" : "Export Active Participants"}
                           </Button>
+                          <Button size="sm" variant="outline" className="text-xs h-7 border-teal-300 text-teal-700 hover:bg-teal-50" onClick={() => { window.location.href = `/admin/email-campaigns?cohortGroupId=${group.id}`; }}>
+                            Email Active Participants
+                          </Button>
                           <Button
                             size="sm"
                             className="bg-teal-600 hover:bg-teal-700 text-white text-xs h-7"
