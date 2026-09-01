@@ -1,4 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
+import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
 /**
  * bundleRouter.ts — Bundles: sell multiple items as one package
  */
@@ -244,11 +245,16 @@ export const bundleLearnerRouter = router({
         ? selectedOption.pricingType === "subscription"
         : selectedOption?.type === "subscription";
 
+      let discounts: Array<{ promotion_code: string }> | undefined;
       // ── 100% promo intercept for bundles ──────────────────────────────────
       if (input.promoCode && !isSubscription) {
         try {
           const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
           if (promoCodes.data[0]) {
+            if (!await isPromotionCodeEligibleForTarget(db, promoCodes.data[0], { contentType: "bundle", productKey: `bundle:${bundle.id}` })) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "This discount code is not available for this bundle." });
+            }
+            discounts = [{ promotion_code: promoCodes.data[0].id }];
             const coupon = promoCodes.data[0].coupon as any;
             const priceCents = Math.round(price * 100);
             const discountedCents = coupon.percent_off === 100 ? 0 : coupon.amount_off ? Math.max(0, priceCents - coupon.amount_off) : priceCents;
@@ -271,7 +277,10 @@ export const bundleLearnerRouter = router({
               return { alreadyEnrolled: false, checkoutUrl: null, enrolled: true };
             }
           }
-        } catch { /* ignore — checkout still works without promo */ }
+        } catch (error) {
+          if (error instanceof TRPCError) throw error;
+          // Ignore an unavailable or invalid Stripe code and continue to checkout.
+        }
       }
 
       // Resolve subscription interval for structured options
@@ -289,7 +298,9 @@ export const bundleLearnerRouter = router({
         : {
             price_data: {
               currency: "usd",
-              product_data: { name: bundle.title, description: `Bundle: ${bundle.title}` },
+              ...(bundle.stripeProductId
+                ? { product: bundle.stripeProductId }
+                : { product_data: { name: bundle.title, description: `Bundle: ${bundle.title}` } }),
               unit_amount: Math.round(price * 100),
               ...(isSubscription ? { recurring: { interval: subInterval, ...(subIntervalCount > 1 ? { interval_count: subIntervalCount } : {}) } } : {}),
             },
@@ -300,7 +311,7 @@ export const bundleLearnerRouter = router({
         mode: isSubscription ? "subscription" : "payment",
         customer_email: userEmail,
         client_reference_id: userId ? userId.toString() : undefined,
-        allow_promotion_codes: true,
+        ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         ...(bundle.collectShippingAddress ? { shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "AU", "NZ", "IE"] } } : {}),
         metadata: {
           user_id: userId ? userId.toString() : "",

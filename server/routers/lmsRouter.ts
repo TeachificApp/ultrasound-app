@@ -138,6 +138,7 @@ import { courseDollarsToStripeCents } from "../lib/courseCheckoutPricing";
 import { dollarsToStripeCents } from "../lib/stripePriceUnits";
 import { formatWorkshopDollars } from "../../shared/workshopPricing";
 import { prepareInlineQuizResponses } from "../lib/inlineLessonQuizResponses";
+import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
 // ─── Certificate Template Router (admin) ─────────────────────────────────────
@@ -2781,6 +2782,10 @@ export const lmsLearnerRouter = router({
           const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
           if (promoCodes.data[0]) {
             const pc = promoCodes.data[0];
+            const couponContentType = course.type === "quiz" ? "quiz" : "course";
+            if (!await isPromotionCodeEligibleForTarget(db, pc, { contentType: couponContentType, productKey: `${couponContentType}:${course.id}` })) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: `This discount code is not available for this ${couponContentType}.` });
+            }
             discounts = [{ promotion_code: pc.id }];
             // ── 100% promo intercept ───────────────────────────────────────────
             // If the promo makes the price $0 (100% off), skip Stripe entirely.

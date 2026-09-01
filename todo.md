@@ -221,6 +221,9 @@
 - [x] Add regression coverage confirming legacy CME survey questions complete by visible response submission and never by a passing-score threshold when survey completion is enabled.
 - [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
 - [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.
+- [x] Allow discount codes to target the full catalog, one or more selected content types, or one or more individual products.
+- [x] Enforce discount-code scope consistently in administrator configuration and checkout validation while retaining date, redemption-limit, and eligibility safeguards.
+- [x] Add focused regressions for full-catalog, content-type, and multi-product discount-code eligibility and ineligible checkout rejection.
 - [ ] Add focused regressions proving an authorized CME learner can access required lesson quizzes, record completion, and reach the existing certificate-eligibility path without changing unrelated learner records.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.

@@ -24,6 +24,7 @@ import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import { sendDownloadAccessEmail, sendBundleAccessEmail } from "../lib/enrollmentEmail";
 import { addToAllContacts } from "../lib/emailListHelper";
+import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
 
 function assertAdmin(ctx: any) {
   if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -280,11 +281,13 @@ export const downloadsLearnerRouter = router({
       const primaryLineItem = product.isFree ? [] : [{
         price_data: {
           currency: product.currency,
-          product_data: {
-            name: product.title,
-            description: product.subtitle ?? undefined,
-            images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
-          },
+          ...(product.stripeProductId
+            ? { product: product.stripeProductId }
+            : { product_data: {
+                name: product.title,
+                description: product.subtitle ?? undefined,
+                images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
+              } }),
           unit_amount: Math.round(Number(product.price) * 100),
         },
         quantity: 1,
@@ -294,7 +297,12 @@ export const downloadsLearnerRouter = router({
       if (input.promoCode) {
         try {
           const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
-          if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
+          if (promoCodes.data[0]) {
+            if (!await isPromotionCodeEligibleForTarget(db, promoCodes.data[0], { contentType: "download", productKey: `download:${product.id}` })) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "This discount code is not available for this download." });
+            }
+            discounts = [{ promotion_code: promoCodes.data[0].id }];
+          }
         } catch { /* ignore invalid codes — checkout still works */ }
       }
       // ── 100% promo intercept for downloads ─────────────────────────────────

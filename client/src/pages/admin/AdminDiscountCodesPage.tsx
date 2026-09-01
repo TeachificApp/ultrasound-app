@@ -47,6 +47,14 @@ function CreateCouponDialog({ open, onClose, onCreated }: { open: boolean; onClo
   const [promoCode, setPromoCode] = useState("");
   const [maxRedemptions, setMaxRedemptions] = useState("");
   const [redeemBy, setRedeemBy] = useState("");
+  const [scope, setScope] = useState<"site_wide" | "content_types" | "specific_products">("site_wide");
+  const [contentTypes, setContentTypes] = useState<string[]>([]);
+  const [productKeys, setProductKeys] = useState<string[]>([]);
+  const [targetSearch, setTargetSearch] = useState("");
+  const { data: targetData, isLoading: targetsLoading } = trpc.adminUser.listCouponTargets.useQuery(undefined, { enabled: open });
+  const targets: Array<{ contentType: string; productKey: string; id: number; title: string }> = targetData?.targets ?? [];
+  const availableContentTypes = Array.from(new Set(targets.map(target => target.contentType)));
+  const visibleTargets = targets.filter(target => `${target.title} ${target.contentType}`.toLowerCase().includes(targetSearch.trim().toLowerCase()));
 
   const createMutation = trpc.adminUser.createCoupon.useMutation({
     onSuccess: (data) => {
@@ -55,6 +63,7 @@ function CreateCouponDialog({ open, onClose, onCreated }: { open: boolean; onClo
       onCreated();
       onClose();
       setName(""); setDiscountType("percent"); setDiscountValue(""); setPromoCode(""); setMaxRedemptions(""); setRedeemBy("");
+      setScope("site_wide"); setContentTypes([]); setProductKeys([]); setTargetSearch("");
     },
     onError: (e) => toast.error(`Failed: ${e.message}`),
   });
@@ -64,6 +73,8 @@ function CreateCouponDialog({ open, onClose, onCreated }: { open: boolean; onClo
     if (!name.trim()) { toast.error("Name is required"); return; }
     if (isNaN(val) || val <= 0) { toast.error("Enter a valid discount value"); return; }
     if (discountType === "percent" && val > 100) { toast.error("Percent discount cannot exceed 100%"); return; }
+    if (scope === "content_types" && contentTypes.length === 0) { toast.error("Select at least one content type"); return; }
+    if (scope === "specific_products" && productKeys.length === 0) { toast.error("Select at least one product"); return; }
     createMutation.mutate({
       name: name.trim(),
       discountType,
@@ -71,12 +82,15 @@ function CreateCouponDialog({ open, onClose, onCreated }: { open: boolean; onClo
       promoCode: promoCode.trim() || undefined,
       maxRedemptions: maxRedemptions ? parseInt(maxRedemptions) : undefined,
       redeemBy: redeemBy || undefined,
+      scope,
+      contentTypes: scope === "content_types" ? contentTypes : [],
+      productKeys: scope === "specific_products" ? productKeys : [],
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[calc(100vh-3rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-[#189aa1]">
             <Tag className="w-5 h-5" /> Create Discount Coupon
@@ -123,6 +137,57 @@ function CreateCouponDialog({ open, onClose, onCreated }: { open: boolean; onClo
             />
             <p className="text-xs text-gray-400 mt-1">The code customers enter at checkout. Leave blank to create a coupon without a code.</p>
           </div>
+          <div className="rounded-lg border border-teal-100 bg-teal-50/40 p-3 space-y-3">
+            <div>
+              <Label className="text-sm font-medium text-gray-800">Discount Applies To</Label>
+              <p className="text-xs text-gray-500 mt-1">Choose the entire catalog, selected content types, or specific products. You can select more than one type or product.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                { value: "site_wide", label: "All Products", detail: "Entire catalog" },
+                { value: "content_types", label: "Content Types", detail: "One or more types" },
+                { value: "specific_products", label: "Specific Products", detail: "One or more products" },
+              ].map(option => (
+                <button key={option.value} type="button" onClick={() => { setScope(option.value as typeof scope); setContentTypes([]); setProductKeys([]); }}
+                  className={`rounded-md border p-2.5 text-left transition-colors ${scope === option.value ? "border-[#189aa1] bg-white shadow-sm" : "border-gray-200 bg-white/70 hover:border-teal-300"}`}>
+                  <span className="block text-sm font-semibold text-gray-800">{option.label}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">{option.detail}</span>
+                </button>
+              ))}
+            </div>
+            {scope === "content_types" && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border-t border-teal-100 pt-3">
+                {availableContentTypes.map(type => {
+                  const selected = contentTypes.includes(type);
+                  return <label key={type} className="flex items-center gap-2 rounded bg-white px-2.5 py-2 text-sm text-gray-700 cursor-pointer">
+                    <input type="checkbox" checked={selected} onChange={() => setContentTypes(current => selected ? current.filter(item => item !== type) : [...current, type])} className="accent-[#189aa1]" />
+                    {type.replace(/_/g, " ")}
+                  </label>;
+                })}
+                {targetsLoading && <span className="col-span-full text-xs text-gray-500">Loading available content types…</span>}
+              </div>
+            )}
+            {scope === "specific_products" && (
+              <div className="border-t border-teal-100 pt-3 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <Input value={targetSearch} onChange={event => setTargetSearch(event.target.value)} placeholder="Search products…" className="h-8 bg-white" />
+                  <span className="whitespace-nowrap text-xs text-gray-500">{productKeys.length} selected</span>
+                </div>
+                <div className="max-h-52 overflow-y-auto rounded border border-gray-200 bg-white divide-y divide-gray-100">
+                  {visibleTargets.map(target => {
+                    const selected = productKeys.includes(target.productKey);
+                    return <label key={target.productKey} className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 cursor-pointer hover:bg-teal-50/50">
+                      <input type="checkbox" checked={selected} onChange={() => setProductKeys(current => selected ? current.filter(key => key !== target.productKey) : [...current, target.productKey])} className="accent-[#189aa1]" />
+                      <span className="flex-1 truncate">{target.title}</span>
+                      <span className="text-xs capitalize text-gray-400">{target.contentType.replace(/_/g, " ")}</span>
+                    </label>;
+                  })}
+                  {!targetsLoading && visibleTargets.length === 0 && <p className="px-3 py-4 text-sm text-gray-500">No matching products.</p>}
+                  {targetsLoading && <p className="px-3 py-4 text-sm text-gray-500">Loading available products…</p>}
+                </div>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-sm font-medium">Max Redemptions (optional)</Label>
@@ -151,7 +216,7 @@ function CreateCouponDialog({ open, onClose, onCreated }: { open: boolean; onClo
 }
 
 // ─── Coupon Row ───────────────────────────────────────────────────────────────
-function CouponRow({ coupon, promoCodes, onRefresh }: { coupon: any; promoCodes: any[]; onRefresh: () => void }) {
+function CouponRow({ coupon, promoCodes, targeting, onRefresh }: { coupon: any; promoCodes: any[]; targeting?: { scope: string; productKeys: string | null }; onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deactivatePromoId, setDeactivatePromoId] = useState<string | null>(null);
@@ -170,6 +235,15 @@ function CouponRow({ coupon, promoCodes, onRefresh }: { coupon: any; promoCodes:
     : `${fmtDollars(coupon.amount_off / 100, coupon.currency)} off`; // Stripe returns amount_off in cents
 
   const isValid = coupon.valid !== false;
+  const targetLabels = (() => {
+    if (!targeting || targeting.scope === "site_wide") return ["All products"];
+    try {
+      const keys = targeting.productKeys ? JSON.parse(targeting.productKeys) as string[] : [];
+      return targeting.scope === "content_types"
+        ? keys.map(key => key.replace(/^type:/, "").replace(/_/g, " "))
+        : keys;
+    } catch { return ["Scoped products"]; }
+  })();
 
   return (
     <>
@@ -190,6 +264,7 @@ function CouponRow({ coupon, promoCodes, onRefresh }: { coupon: any; promoCodes:
                   <Calendar className="w-3 h-3" /> Expires {fmtDate(coupon.redeem_by)}
                 </span>
               )}
+              <Badge className="text-xs border-0 bg-teal-50 text-teal-700 capitalize">{targetLabels.length === 1 ? targetLabels[0] : `${targetLabels.length} selected targets`}</Badge>
             </div>
             <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-3">
               <span className="font-mono">{coupon.id}</span>
@@ -301,6 +376,7 @@ export default function AdminDiscountCodesPage() {
 
   const coupons: any[] = data?.coupons ?? [];
   const promoCodesByCoupon: Record<string, any[]> = data?.promoCodesByCoupon ?? {};
+  const targetingByCoupon: Record<string, { scope: string; productKeys: string | null }> = data?.targetingByCoupon ?? {};
 
   const activeCoupons = coupons.filter(c => c.valid !== false);
   const inactiveCoupons = coupons.filter(c => c.valid === false);
@@ -323,7 +399,7 @@ export default function AdminDiscountCodesPage() {
             <Tag className="w-6 h-6 text-[#189aa1]" /> Discount Codes
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Create Stripe coupons and promo codes. Codes apply globally across all courses, quizzes, downloads, products, and memberships.
+            Create Stripe coupons and promo codes for all products, selected content types, or selected individual products.
           </p>
         </div>
         <Button className="bg-[#189aa1] hover:bg-[#0e4a50] text-white gap-2" onClick={() => setCreateOpen(true)}>
@@ -370,7 +446,7 @@ export default function AdminDiscountCodesPage() {
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Active ({activeCoupons.length})</h2>
               <div className="space-y-3">
                 {activeCoupons.map(c => (
-                  <CouponRow key={c.id} coupon={c} promoCodes={promoCodesByCoupon[c.id] ?? []} onRefresh={refetch} />
+                  <CouponRow key={c.id} coupon={c} promoCodes={promoCodesByCoupon[c.id] ?? []} targeting={targetingByCoupon[c.id]} onRefresh={refetch} />
                 ))}
               </div>
             </div>
@@ -380,7 +456,7 @@ export default function AdminDiscountCodesPage() {
               <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Deleted / Expired ({inactiveCoupons.length})</h2>
               <div className="space-y-3">
                 {inactiveCoupons.map(c => (
-                  <CouponRow key={c.id} coupon={c} promoCodes={promoCodesByCoupon[c.id] ?? []} onRefresh={refetch} />
+                  <CouponRow key={c.id} coupon={c} promoCodes={promoCodesByCoupon[c.id] ?? []} targeting={targetingByCoupon[c.id]} onRefresh={refetch} />
                 ))}
               </div>
             </div>

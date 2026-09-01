@@ -1,4 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
+import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 /**
  * webinarRouter.ts — Live & prerecorded webinars with discussions
@@ -461,11 +462,16 @@ export const webinarSessionRouter = router({
       const [settings] = await db.select().from(platformSettings).limit(1);
       const webTerms = resolveCheckoutTerms(webinar, settings);
       const stripe = getStripeClient();
+      let discounts: Array<{ promotion_code: string }> | undefined;
       // ── 100% promo intercept for webinars ────────────────────────────────
       if (input.promoCode) {
         try {
           const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
           if (promoCodes.data.length > 0) {
+            if (!await isPromotionCodeEligibleForTarget(db, promoCodes.data[0], { contentType: "webinar", productKey: `webinar:${webinar.id}` })) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "This discount code is not available for this webinar." });
+            }
+            discounts = [{ promotion_code: promoCodes.data[0].id }];
             const coupon = promoCodes.data[0].coupon as any;
             let discountedCents = priceCents;
             if (coupon.percent_off) discountedCents -= Math.round(priceCents * (coupon.percent_off / 100));
@@ -480,7 +486,10 @@ export const webinarSessionRouter = router({
               return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: subtitle, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: 100, brand: webinar.brand ?? "all_about_ultrasound" };
             }
           }
-        } catch { /* ignore, fall through to Stripe */ }
+        } catch (error) {
+          if (error instanceof TRPCError) throw error;
+          // Ignore invalid or unavailable Stripe codes and continue to checkout.
+        }
       }
 
       const session = await stripe.checkout.sessions.create({
@@ -488,15 +497,17 @@ export const webinarSessionRouter = router({
         mode: "payment",
         customer_email: ctx.user?.email ?? undefined,
         client_reference_id: userId ? userId.toString() : undefined,
-        allow_promotion_codes: true,
+        ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         line_items: [{
           price_data: {
             currency: "usd",
-            product_data: {
-              name: webinar.title,
-              description: subtitle ?? undefined,
-              images: webinar.thumbnailUrl ? [webinar.thumbnailUrl] : undefined,
-            },
+            ...(webinar.stripeProductId
+              ? { product: webinar.stripeProductId }
+              : { product_data: {
+                  name: webinar.title,
+                  description: subtitle ?? undefined,
+                  images: webinar.thumbnailUrl ? [webinar.thumbnailUrl] : undefined,
+                } }),
             unit_amount: priceCents,
           },
           quantity: 1,

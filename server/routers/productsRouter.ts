@@ -18,6 +18,7 @@ import {
 import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
 import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
 import { dollarsToStripeCents } from "../lib/stripePriceUnits";
+import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
 import {
   getSyncProduct,
   isPrintfulConfigured,
@@ -319,6 +320,9 @@ export const productsLearnerRouter = router({
         try {
           const promoCodes = await stripe.promotionCodes.list({ code: input.promoCode.toUpperCase(), active: true, limit: 1 });
           if (promoCodes.data[0]) {
+            if (!await isPromotionCodeEligibleForTarget(db, promoCodes.data[0], { contentType: "physical_product", productKey: `physical_product:${product.id}` })) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "This discount code is not available for this product." });
+            }
             discounts = [{ promotion_code: promoCodes.data[0].id }];
             // ── 100% promo intercept for physical products ────────────────────
             const coupon = promoCodes.data[0].coupon as any;
@@ -343,11 +347,13 @@ export const productsLearnerRouter = router({
         line_items: [{
           price_data: {
             currency: product.currency,
-            product_data: {
-              name: pricingLabel,
-              description: product.subtitle ?? undefined,
-              images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
-            },
+            ...(product.stripeProductId
+              ? { product: product.stripeProductId }
+              : { product_data: {
+                  name: pricingLabel,
+                  description: product.subtitle ?? undefined,
+                  images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
+                } }),
             unit_amount: Math.round(Number(unitAmount) * 100),
           },
           quantity: 1,

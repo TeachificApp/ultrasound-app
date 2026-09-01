@@ -56,6 +56,7 @@ import {
   workshopEnrollments,
   workshopInstances,
   workshops,
+  couponMetadata,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { issueCertificateIfEnabled } from "./lmsHelpers";
@@ -66,11 +67,71 @@ import { getBrandDisplayConfig } from "../../shared/brands";
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { or, like, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
+import { serializeCouponTargeting, validateCouponTargeting } from "../lib/couponTargeting";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role !== "admin") {
     throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
   }
+}
+
+type CouponTargetCatalogRow = {
+  contentType: string;
+  productKey: string;
+  id: number;
+  title: string;
+  stripeProductId: string | null;
+  stripePriceId: string | null;
+};
+
+async function loadCouponTargetCatalog(db: any): Promise<CouponTargetCatalogRow[]> {
+  const [rows] = await db.execute(sql`
+    SELECT CASE WHEN type = 'quiz' THEN 'quiz' ELSE 'course' END AS contentType,
+      CONCAT(CASE WHEN type = 'quiz' THEN 'quiz' ELSE 'course' END, ':', id) AS productKey, id, title,
+      NULL AS stripeProductId, stripe_price_id AS stripePriceId
+    FROM lms_courses WHERE status IN ('public', 'presale', 'private', 'hidden') AND is_free = 0 AND stripe_price_id IS NOT NULL
+    UNION ALL
+    SELECT 'download' AS contentType, CONCAT('download:', id) AS productKey, id, title,
+      stripe_product_id AS stripeProductId, NULL AS stripePriceId
+    FROM digital_products WHERE status = 'published' AND is_free = 0 AND stripe_product_id IS NOT NULL
+    UNION ALL
+    SELECT 'physical_product' AS contentType, CONCAT('physical_product:', id) AS productKey, id, title,
+      stripe_product_id AS stripeProductId, NULL AS stripePriceId
+    FROM physical_products WHERE status = 'published' AND is_free = 0 AND stripe_product_id IS NOT NULL
+    UNION ALL
+    SELECT 'bundle' AS contentType, CONCAT('bundle:', id) AS productKey, id, title,
+      stripe_product_id AS stripeProductId, stripe_price_id AS stripePriceId
+    FROM bundles WHERE status IN ('published', 'presale') AND is_free = 0 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)
+    UNION ALL
+    SELECT 'webinar' AS contentType, CONCAT('webinar:', id) AS productKey, id, title,
+      stripe_product_id AS stripeProductId, stripe_price_id AS stripePriceId
+    FROM webinars WHERE status IN ('published', 'presale') AND is_free = 0 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)
+    ORDER BY contentType, title
+  `);
+  return (Array.isArray(rows) ? rows : (rows as any)[0] ?? []) as CouponTargetCatalogRow[];
+}
+
+async function resolveStripeCouponProductIds(db: any, stripe: any, targeting: { scope: string; contentTypes: string[]; productKeys: string[] }): Promise<string[]> {
+  if (targeting.scope === "site_wide") return [];
+  const catalog = await loadCouponTargetCatalog(db);
+  const selected = targeting.scope === "content_types"
+    ? catalog.filter(row => targeting.contentTypes.includes(row.contentType))
+    : catalog.filter(row => targeting.productKeys.includes(row.productKey));
+  const expectedCount = targeting.scope === "content_types" ? selected.length : targeting.productKeys.length;
+  if (!selected.length || selected.length !== expectedCount) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Each selected discount target must be published and have an active Stripe product or price mapping." });
+  }
+  if (selected.length > 100) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "A restricted coupon can include up to 100 mapped products. Create separate codes for larger selections." });
+  }
+  const productIds = new Set(selected.map(row => row.stripeProductId).filter((id): id is string => Boolean(id)));
+  for (const row of selected.filter(row => !row.stripeProductId && row.stripePriceId)) {
+    const price = await stripe.prices.retrieve(row.stripePriceId!);
+    const product = typeof price.product === "string" ? price.product : price.product?.id;
+    if (!product) throw new TRPCError({ code: "BAD_REQUEST", message: `The Stripe price for ${row.title} is not linked to a product.` });
+    productIds.add(product);
+  }
+  return [...productIds];
 }
 
 export const adminUserRouter = router({
@@ -1394,6 +1455,14 @@ export const adminUserRouter = router({
     }),
 
   // ── Coupon / Promo Code Management ──────────────────────────────────────────
+  listCouponTargets: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const targets = await loadCouponTargetCatalog(db);
+    return { targets };
+  }),
+
   createCoupon: protectedProcedure
     .input(z.object({
       name: z.string().min(1).max(255),
@@ -1403,16 +1472,32 @@ export const adminUserRouter = router({
       maxRedemptions: z.number().int().positive().optional(),
       redeemBy: z.string().optional(),
       promoCode: z.string().min(1).max(50).optional(),
+      scope: z.enum(["site_wide", "content_types", "specific_products"]).default("site_wide"),
+      contentTypes: z.array(z.string()).max(8).default([]),
+      productKeys: z.array(z.string()).max(100).default([]),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);      const stripe = getStripeClient();
+	  await assertAdmin(ctx);
+      const targeting = (() => {
+        try {
+          return validateCouponTargeting(input);
+        } catch (error: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error?.message ?? "Invalid coupon targeting." });
+        }
+      })();
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const stripe = getStripeClient();
+      const stripeProductIds = await resolveStripeCouponProductIds(db, stripe, targeting);
       const couponParams: Record<string, unknown> = {
         name: input.name,
         duration: "once",
+		metadata: { discount_scope: targeting.scope },
         ...(input.discountType === "percent"
           ? { percent_off: input.discountValue }
           : { amount_off: Math.round(input.discountValue * 100), currency: input.currency }), // Stripe requires cents
       };
+      if (stripeProductIds.length) couponParams.applies_to = { products: stripeProductIds };
       if (input.maxRedemptions) couponParams.max_redemptions = input.maxRedemptions;
       if (input.redeemBy) couponParams.redeem_by = Math.floor(new Date(input.redeemBy).getTime() / 1000);
       const coupon = await (stripe.coupons as any).create(couponParams);
@@ -1423,7 +1508,22 @@ export const adminUserRouter = router({
           code: input.promoCode.toUpperCase(),
         });
       }
-      return { coupon, promoCode: promoCodeObj };
+
+      await db.insert(couponMetadata).values({
+        stripeCouponId: coupon.id,
+        scope: targeting.scope,
+        productKeys: JSON.stringify(serializeCouponTargeting(targeting)),
+        duration: "once",
+        updatedAt: Date.now(),
+      }).onDuplicateKeyUpdate({
+        set: {
+          scope: targeting.scope,
+          productKeys: JSON.stringify(serializeCouponTargeting(targeting)),
+          updatedAt: Date.now(),
+        },
+      });
+
+      return { coupon, promoCode: promoCodeObj, targeting };
     }),
 
   listCoupons: protectedProcedure
@@ -1444,7 +1544,13 @@ export const adminUserRouter = router({
       );
       const promoCodesByCoupon: Record<string, any[]> = {};
       couponIds.forEach((id: string, i: number) => { promoCodesByCoupon[id] = promoCodeResults[i]; });
-      return { coupons: coupons.data, hasMore: coupons.has_more, promoCodesByCoupon };
+	  const db = await getDb();
+      const metadata = db && couponIds.length
+        ? await db.select().from(couponMetadata).where(sql`${couponMetadata.stripeCouponId} IN (${sql.join(couponIds.map(id => sql`${id}`), sql`, `)})`)
+        : [];
+      const targetingByCoupon: Record<string, { scope: string; productKeys: string | null }> = {};
+      metadata.forEach((entry) => { targetingByCoupon[entry.stripeCouponId] = { scope: entry.scope, productKeys: entry.productKeys }; });
+      return { coupons: coupons.data, hasMore: coupons.has_more, promoCodesByCoupon, targetingByCoupon };
     }),
 
   deactivateCoupon: protectedProcedure
