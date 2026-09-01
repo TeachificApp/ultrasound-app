@@ -10,7 +10,8 @@ describe("course participant campaign handoff", () => {
   it("opens the existing campaign composer from course settings with a course audience", () => {
     expect(lmsAdmin).toContain("Email course participants");
     expect(lmsAdmin).toContain("/admin/email-campaigns?courseId=${courseId}");
-    expect(dashboard).toContain("enrolledInCourseIds: [courseAudienceId]");
+    expect(dashboard).toContain("activeAccessCourseIds: [courseAudienceId]");
+    expect(dashboard).toContain('userStatus: "active"');
     expect(editor).toContain("initialAudienceFilter");
   });
 

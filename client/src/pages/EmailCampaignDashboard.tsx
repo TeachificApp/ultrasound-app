@@ -953,7 +953,7 @@ export default function EmailCampaignDashboard() {
 
   // If editor is open, show it full-page
   if (showEditor) {
-    return <EmailCampaignEditor campaignId={editCampaignId} initialAudienceFilter={courseAudienceId ? { ...DEFAULT_AUDIENCE_FILTER, enrolledInCourseIds: [courseAudienceId] } : undefined} onClose={() => { setShowEditor(false); setEditCampaignId(undefined); refetchCampaigns(); }} />;
+    return <EmailCampaignEditor campaignId={editCampaignId} initialAudienceFilter={courseAudienceId ? { ...DEFAULT_AUDIENCE_FILTER, activeAccessCourseIds: [courseAudienceId], userStatus: "active" } : undefined} onClose={() => { setShowEditor(false); setEditCampaignId(undefined); refetchCampaigns(); }} />;
   }
 
   // ── Derived stats ────────────────────────────────────────────────────────────
