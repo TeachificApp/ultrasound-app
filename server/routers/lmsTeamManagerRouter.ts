@@ -570,4 +570,42 @@ export const lmsTeamManagerRouter = router({
         dailyActivity,
       };
     }),
+
+  exportActiveMembersCSV: protectedProcedure
+    .input(z.object({ groupId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      await assertManagerOrAdmin(db, ctx.user.id, input.groupId, ctx.user.role === "admin");
+
+      const seats = await db.select().from(lmsGroupSeats).where(and(
+        eq(lmsGroupSeats.groupId, input.groupId),
+        eq(lmsGroupSeats.status, "active"),
+      ));
+      const emails = seats.filter((seat) => !!seat.acceptedAt).map((seat) => seat.email.toLowerCase());
+      if (emails.length === 0) return { csv: "Name,Email,Credentials,Specialty,Location,Enrollment Date,Progress %,Completion Date", count: 0 };
+
+      const members = await db.select({
+        id: users.id, name: users.name, displayName: users.displayName, email: users.email,
+        credentials: users.credentials, specialty: users.specialty, location: users.location,
+      }).from(users).where(sql`LOWER(${users.email}) IN (${sql.join(emails.map((email) => sql`${email}`), sql`, `)})`);
+      const memberIds = members.map((member) => member.id);
+      const groupCourses = await db.select({ courseId: lmsGroupCourses.courseId }).from(lmsGroupCourses).where(eq(lmsGroupCourses.groupId, input.groupId));
+      const courseIds = groupCourses.map((course) => course.courseId);
+      const enrollments = memberIds.length && courseIds.length ? await db.select().from(lmsEnrollments).where(and(
+        sql`${lmsEnrollments.userId} IN (${sql.join(memberIds.map((id) => sql`${id}`), sql`, `)})`,
+        sql`${lmsEnrollments.courseId} IN (${sql.join(courseIds.map((id) => sql`${id}`), sql`, `)})`,
+      )) : [];
+      const escape = (value: unknown) => {
+        const text = String(value ?? "");
+        const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+        return `"${safe.replace(/"/g, '""')}"`;
+      };
+      const header = ["Name", "Email", "Credentials", "Specialty", "Location", "Enrollment Date", "Progress %", "Completion Date"];
+      const rows = members.map((member) => {
+        const enrollment = enrollments.find((entry) => entry.userId === member.id);
+        return [escape(member.displayName ?? member.name), escape(member.email), escape(member.credentials), escape(member.specialty), escape(member.location), enrollment?.enrolledAt ? new Date(enrollment.enrolledAt).toISOString() : "", enrollment?.progressPct ?? 0, enrollment?.completedAt ? new Date(enrollment.completedAt).toISOString() : ""].join(",");
+      });
+      return { csv: [header.join(","), ...rows].join("\n"), count: members.length };
+    }),
 });
