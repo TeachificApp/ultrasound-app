@@ -27,6 +27,7 @@ import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or, gte } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { evaluateInlineLessonQuizScore } from "../../shared/inlineLessonQuizCompletion";
+import { evaluateInlineLessonQuizCompletion } from "../../shared/inlineLessonQuizFlow";
 import { lessonHasAssessmentContent } from "../../shared/lessonAccessGating";
 import { resolvePresaleWelcome } from "../../shared/contentAvailability";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
@@ -2344,10 +2345,17 @@ export const lmsLearnerRouter = router({
       const inlineQuiz = blocks.find((block: any) => block?.type === "lesson_quiz");
       if (!inlineQuiz) throw new TRPCError({ code: "BAD_REQUEST", message: "This lesson does not contain a built-in lesson quiz" });
 
-      const { score, passed, passingScore } = evaluateInlineLessonQuizScore(
+      const quizQuestions = Array.isArray(inlineQuiz?.data?.questions) ? inlineQuiz.data.questions : [];
+      const { score, passed: scorePassed, passingScore } = evaluateInlineLessonQuizScore(
         input.score,
         Number(inlineQuiz?.data?.passingScore ?? 70),
       );
+      const { requiresSurveyCompletion, surveyCompleted, passed } = evaluateInlineLessonQuizCompletion({
+        questions: quizQuestions,
+        responses: input.responses,
+        scorePassed,
+        requireSurveyCompletion: inlineQuiz?.data?.requireSurveyCompletion === true,
+      });
 
       // Record ordinary learner submissions for CME activity reporting. Admin
       // previews intentionally do not enter learner-facing completion exports.
@@ -2402,7 +2410,7 @@ export const lmsLearnerRouter = router({
       }
 
       if (passed) await recalcProgress(db, enrollment.id);
-      return { passed, score, passingScore };
+      return { passed, score, passingScore, requiresSurveyCompletion, surveyCompleted };
     }),
 
   /** Submit quiz answers */

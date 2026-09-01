@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-export type QuestionType = "mcq" | "truefalse" | "multiselect" | "hotspot" | "matching" | "likert" | "star_rating" | "open_text";
+export type QuestionType = "mcq" | "truefalse" | "multiselect" | "hotspot" | "matching" | "likert" | "star_rating" | "open_text" | "survey_choice";
 
 export interface HotspotMarker {
   id: string;
@@ -44,6 +44,7 @@ export interface MatchingPair {
 }
 
 export interface QuizQuestion {
+  id?: string;
   type?: QuestionType;
   question: string;
   options: string[];
@@ -62,6 +63,7 @@ export interface QuizQuestion {
   likertLabels?: string[];
   starMax?: number;
   surveyRequired?: boolean;
+  showWhen?: { parentQuestionKey: string; expectedAnswer: string };
 }
 
 export interface LessonQuizData {
@@ -72,6 +74,7 @@ export interface LessonQuizData {
   shuffleQuestions?: boolean;
   shuffleAnswers?: boolean;
   requirePassToComplete?: boolean;
+  requireSurveyCompletion?: boolean;
 }
 
 interface Props {
@@ -95,6 +98,7 @@ const QUESTION_TYPE_ICONS: Record<QuestionType, React.ReactNode> = {
   likert: <span style={{fontSize:10}}>1–5</span>,
   star_rating: <span style={{fontSize:10}}>★</span>,
   open_text: <span style={{fontSize:10}}>T</span>,
+  survey_choice: <ToggleLeft size={12} />,
 };
 
 const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
@@ -106,6 +110,7 @@ const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   likert: "Likert Scale",
   star_rating: "Star Rating",
   open_text: "Open Response",
+  survey_choice: "Survey Choice",
 };
 
 const EMPTY_QUESTION: QuizQuestion = {
@@ -482,6 +487,7 @@ function QuestionEditor({
   handleFileUpload,
   onSave,
   onCancel,
+  previousQuestions,
 }: {
   question: QuizQuestion;
   index: number | null;
@@ -489,6 +495,7 @@ function QuestionEditor({
   handleFileUpload?: Props["handleFileUpload"];
   onSave: (q: QuizQuestion) => void;
   onCancel: () => void;
+  previousQuestions: QuizQuestion[];
 }) {
   const [q, setQ] = useState<QuizQuestion>(() => ({
     type: "mcq",
@@ -518,6 +525,7 @@ function QuestionEditor({
                newType === "mcq" ? ["", "", "", ""] :
                newType === "multiselect" ? ["", "", "", ""] :
                (newType === "likert" || newType === "star_rating" || newType === "open_text") ? [] :
+               newType === "survey_choice" ? ["Yes", "No"] :
                prev.options,
       correctAnswer: 0,
       correctAnswers: [],
@@ -604,7 +612,7 @@ function QuestionEditor({
       <div>
         <Label className="text-xs text-gray-600 mb-1 block">Question Type</Label>
         <div className="flex flex-wrap gap-1">
-          {(["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text"] as QuestionType[]).map(t => (
+          {(["mcq", "truefalse", "multiselect", "hotspot", "matching", "likert", "star_rating", "open_text", "survey_choice"] as QuestionType[]).map(t => (
             <button
               key={t}
               type="button"
@@ -631,6 +639,63 @@ function QuestionEditor({
           className="text-sm mt-1 min-h-[60px]"
         />
       </div>
+
+      {previousQuestions.length > 0 && (
+        <div className="rounded-lg border border-teal-100 bg-teal-50/40 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium text-teal-900">Dependent Question</p>
+              <p className="text-[11px] text-teal-700">Show this question only after a selected prior answer.</p>
+            </div>
+            <Switch
+              checked={!!q.showWhen}
+              onCheckedChange={(enabled) => setQ(previous => ({
+                ...previous,
+                showWhen: enabled
+                  ? { parentQuestionKey: String(previousQuestions[0].id ?? 0), expectedAnswer: String(previousQuestions[0].options?.[0] ?? "") }
+                  : undefined,
+              }))}
+            />
+          </div>
+          {q.showWhen && (() => {
+            const parentIndex = previousQuestions.findIndex((candidate, index) => String(candidate.id ?? index) === q.showWhen?.parentQuestionKey);
+            const parent = parentIndex >= 0 ? previousQuestions[parentIndex] : previousQuestions[0];
+            const parentKey = String(parent.id ?? Math.max(0, parentIndex));
+            const choices = parent.type === "likert"
+              ? (parent.likertLabels ?? [])
+              : parent.type === "star_rating"
+                ? Array.from({ length: parent.starMax ?? 5 }, (_, index) => String(index + 1))
+                : parent.options ?? [];
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-[11px] text-gray-600">Prior question</Label>
+                  <Select value={parentKey} onValueChange={(value) => {
+                    const nextParent = previousQuestions.find((candidate, index) => String(candidate.id ?? index) === value);
+                    setQ(previous => ({ ...previous, showWhen: { parentQuestionKey: value, expectedAnswer: String(nextParent?.options?.[0] ?? "") } }));
+                  }}>
+                    <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {previousQuestions.map((candidate, index) => (
+                        <SelectItem key={String(candidate.id ?? index)} value={String(candidate.id ?? index)}>{index + 1}. {candidate.question || "Untitled question"}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-[11px] text-gray-600">Show when answer is</Label>
+                  <Select value={q.showWhen.expectedAnswer || "__none__"} onValueChange={(value) => setQ(previous => ({ ...previous, showWhen: { parentQuestionKey: parentKey, expectedAnswer: value === "__none__" ? "" : value } }))}>
+                    <SelectTrigger className="h-8 text-xs mt-1"><SelectValue placeholder="Choose an answer" /></SelectTrigger>
+                    <SelectContent>
+                      {choices.length ? choices.map((choice) => <SelectItem key={String(choice)} value={String(choice)}>{String(choice)}</SelectItem>) : <SelectItem value="__none__">Choose a response type with options</SelectItem>}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Question image (not for hotspot — hotspot has its own) */}
       {qType !== "hotspot" && handleFileUpload && (
@@ -768,6 +833,24 @@ function QuestionEditor({
               <Plus size={11} className="mr-1" /> Add Option
             </Button>
           )}
+        </div>
+      )}
+
+      {qType === "survey_choice" && (
+        <div className="space-y-2">
+          <Label className="text-xs text-gray-600">Survey Response Options</Label>
+          {q.options.map((option, optionIndex) => (
+            <div key={optionIndex} className="flex items-center gap-2">
+              <Input value={option} onChange={(event) => {
+                const options = [...q.options];
+                options[optionIndex] = event.target.value;
+                setQ(previous => ({ ...previous, options }));
+              }} placeholder={`Option ${optionIndex + 1}`} className="h-8 text-sm flex-1" />
+              {q.options.length > 2 && <button type="button" className="text-red-400 hover:text-red-600" onClick={() => removeOption(optionIndex)}><X size={12} /></button>}
+            </div>
+          ))}
+          {q.options.length < 10 && <Button type="button" size="sm" variant="outline" className="h-7 text-xs border-dashed w-full" onClick={addOption}><Plus size={11} className="mr-1" /> Add Option</Button>}
+          <p className="text-xs text-gray-400">Responses are recorded but never count toward a score.</p>
         </div>
       )}
 
@@ -1022,7 +1105,8 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
 
   const saveQuestion = (q: QuizQuestion) => {
     const qs = [...questions];
-    if (editingIndex === null) { qs.push(q); } else { qs[editingIndex] = q; }
+    const savedQuestion = { ...q, id: q.id ?? `lesson-question-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
+    if (editingIndex === null) { qs.push(savedQuestion); } else { qs[editingIndex] = savedQuestion; }
     set("questions", qs);
     setEditingIndex(null);
     setAddingNew(false);
@@ -1090,13 +1174,26 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
       <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
         <div>
           <p className="text-xs font-medium text-gray-700">Require Pass to Complete</p>
-          <p className="text-xs text-gray-400 mt-0.5">Student must reach passing score to mark lesson complete</p>
+          <p className="text-xs text-gray-400 mt-0.5">{data.requireSurveyCompletion ? "Disabled while required survey completion is enabled." : "Student must reach passing score to mark lesson complete"}</p>
         </div>
-        <Switch checked={requirePass} onCheckedChange={(v) => set("requirePassToComplete", v)} />
+        <Switch checked={data.requireSurveyCompletion ? false : requirePass} disabled={data.requireSurveyCompletion} onCheckedChange={(v) => set("requirePassToComplete", v)} />
+      </div>
+
+      <div className="flex items-center justify-between rounded-lg border border-teal-200 bg-teal-50 px-3 py-2">
+        <div>
+          <p className="text-xs font-medium text-teal-900">Require Survey Responses for Completion</p>
+          <p className="text-xs text-teal-700 mt-0.5">For an unscored survey, every visible response must be submitted before the lesson can complete. No passing score is used.</p>
+        </div>
+        <Switch checked={data.requireSurveyCompletion ?? false} onCheckedChange={(v) => onChange({
+          ...data,
+          requireSurveyCompletion: v,
+          // A response-required survey deliberately has no score threshold.
+          requirePassToComplete: v ? false : data.requirePassToComplete,
+        })} />
       </div>
 
       {/* Passing score */}
-      {requirePass && (
+      {requirePass && !data.requireSurveyCompletion && (
         <div>
           <Label className="text-xs text-gray-600">Passing Score (%)</Label>
           <Input type="number" min={0} max={100} value={data.passingScore ?? 70}
@@ -1148,7 +1245,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
               </div>
               {editingIndex === i && (
                 <QuestionEditor question={q} index={i} isNew={false} handleFileUpload={handleFileUpload}
-                  onSave={saveQuestion} onCancel={() => setEditingIndex(null)} />
+                  onSave={saveQuestion} onCancel={() => setEditingIndex(null)} previousQuestions={questions.slice(0, i)} />
               )}
             </div>
           ))}
@@ -1158,7 +1255,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
       {/* New question form */}
       {addingNew && editingIndex === null && (
         <QuestionEditor question={{ ...EMPTY_QUESTION }} index={null} isNew={true} handleFileUpload={handleFileUpload}
-          onSave={saveQuestion} onCancel={() => setAddingNew(false)} />
+          onSave={saveQuestion} onCancel={() => setAddingNew(false)} previousQuestions={questions} />
       )}
 
       {/* Add / AI tabs */}

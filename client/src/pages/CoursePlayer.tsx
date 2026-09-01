@@ -27,6 +27,7 @@ import {
 import { formatCmeCreditPhrase } from "@shared/cmeCreditLabel";
 import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse } from "../../../shared/cmeLessonCompletion";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
+import { getVisibleInlineLessonQuizQuestionIndexes, inlineLessonQuizQuestionKey, isSurveyOnlyInlineLessonQuiz } from "../../../shared/inlineLessonQuizFlow";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
@@ -161,11 +162,13 @@ function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit 
 }
 
 // ─── Inline Lesson Quiz (for lesson_quiz content blocks) ────────────────────
-function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComplete }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string }; lessonId: number; courseSlug: string; isAdminPreview?: boolean; onComplete: () => void }) {
+function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComplete }: { data: { title?: string; questions?: any[]; showExplanations?: boolean; passingScore?: number; shuffleQuestions?: boolean; shuffleAnswers?: boolean; requirePassToComplete?: boolean; requireSurveyCompletion?: boolean; isMockExam?: boolean; timeLimitMinutes?: number | null; mockExamInstructions?: string }; lessonId: number; courseSlug: string; isAdminPreview?: boolean; onComplete: () => void }) {
   const rawQuestions = data.questions ?? [];
   // Stabilize shuffle with useMemo so re-renders don't re-shuffle
   const shuffledQuestions = useMemo(() => {
-    if (!data.shuffleQuestions) return rawQuestions;
+    // Dependent questions rely on their configured prior question, so their
+    // order is intentionally retained even when general shuffling is enabled.
+    if (!data.shuffleQuestions || rawQuestions.some((question: any) => question?.showWhen)) return rawQuestions;
     return [...rawQuestions].sort(() => Math.random() - 0.5);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.shuffleQuestions, rawQuestions.length]);
@@ -200,6 +203,17 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
     onError: (error) => toast.error(`Quiz progress could not be saved: ${error.message}`),
   });
   const INTERACTIVE_TYPES = ["image_comparison","drag_sort","branching","fill_blank","annotation","flashcard"];
+
+  const branchAnswersByQuestionKey = rawQuestions.reduce<Record<string, unknown>>((answers, question: any, index: number) => {
+    const type = question?.type ?? "mcq";
+    if (["likert", "star_rating", "open_text", "survey_choice"].includes(type)) {
+      answers[inlineLessonQuizQuestionKey(question, index)] = surveyAnswers[index];
+    } else if (["mcq", "truefalse"].includes(type) && typeof selected[index] === "number") {
+      answers[inlineLessonQuizQuestionKey(question, index)] = (question.options ?? [])[selected[index]];
+    }
+    return answers;
+  }, {});
+  const visibleQuestionIndexes = getVisibleInlineLessonQuizQuestionIndexes(rawQuestions, branchAnswersByQuestionKey);
   // Mock exam mode
   const isMockExam = !!(data as any).isMockExam;
   const timeLimitMinutes = (data as any).timeLimitMinutes ?? null;
@@ -215,9 +229,16 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
   }, [isMockExam, examStarted, submitted, timeLeft]);
   const hotspotContainerRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    if (visibleQuestionIndexes.length && !visibleQuestionIndexes.includes(currentIndex)) {
+      setCurrentIndex(visibleQuestionIndexes[0]);
+    }
+  }, [currentIndex, visibleQuestionIndexes]);
+
   if (rawQuestions.length === 0) return null;
 
-  const total = shuffledQuestions.length;
+  const total = visibleQuestionIndexes.length;
+  const visiblePosition = Math.max(0, visibleQuestionIndexes.indexOf(currentIndex));
   const q = shuffledQuestions[currentIndex];
   const qType = q?.type ?? "mcq";
   const answerOrder = shuffledAnswerOrders[currentIndex] ?? [];
@@ -226,7 +247,8 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
   // Scoring
   const computeScore = () => {
     let correct = 0;
-    shuffledQuestions.forEach((question: any, i: number) => {
+    visibleQuestionIndexes.forEach((i) => {
+      const question: any = shuffledQuestions[i];
       const qt = question.type ?? "mcq";
       if (qt === "mcq" || qt === "truefalse") {
         if (selected[i] === question.correctAnswer) correct++;
@@ -254,13 +276,13 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         if (scoreInteractiveAnswer(question as any, interactiveAnswers[i])) correct++;
       }
     });
-    const scorableCount = shuffledQuestions.filter((q: any) => !["likert", "star_rating", "open_text", "survey_choice"].includes(q.type ?? "mcq") && !isInteractiveSurveyType(q.type ?? "mcq")).length;
+    const scorableCount = visibleQuestionIndexes.filter((index) => {
+      const question: any = shuffledQuestions[index];
+      return !["likert", "star_rating", "open_text", "survey_choice"].includes(question.type ?? "mcq") && !isInteractiveSurveyType(question.type ?? "mcq");
+    }).length;
     if (scorableCount === 0) return 100;
     return Math.round((correct / scorableCount) * 100);
   };
-
-  const score = submitted ? computeScore() : 0;
-  const passed = score >= (data.passingScore ?? 70);
 
   const isCurrentAnswered = () => {
     if (qType === "mcq" || qType === "truefalse") return selected[currentIndex] !== undefined;
@@ -279,7 +301,9 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
     return false;
   };
 
-  const allAnswered = shuffledQuestions.every((_: any, i: number) => {
+  const requiresSurveyCompletion = data.requireSurveyCompletion === true && isSurveyOnlyInlineLessonQuiz(rawQuestions);
+
+  const allAnswered = visibleQuestionIndexes.every((i) => {
     const qt = shuffledQuestions[i]?.type ?? "mcq";
     if (qt === "mcq" || qt === "truefalse") return selected[i] !== undefined;
     if (qt === "multiselect") return (selected[i] ?? []).length > 0;
@@ -290,12 +314,14 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
       return pairs.every((p: any) => answers[p.id]);
     }
     if (qt === "likert" || qt === "star_rating" || qt === "survey_choice") return surveyAnswers[i] !== undefined;
-    if (qt === "open_text") return shuffledQuestions[i]?.required === true
+    if (qt === "open_text") return requiresSurveyCompletion || shuffledQuestions[i]?.required === true
       ? Boolean(String(surveyAnswers[i] ?? "").trim())
       : true;
     if (INTERACTIVE_TYPES.includes(qt)) return interactiveAnswers[i] !== undefined;
     return false;
   });
+  const score = submitted ? computeScore() : 0;
+  const passed = requiresSurveyCompletion ? allAnswered : score >= (data.passingScore ?? 70);
 
   const handleRetake = () => {
     setSelected({});
@@ -310,12 +336,17 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
   const handleSubmit = () => {
     const calculatedScore = computeScore();
     setSubmitted(true);
-    const responses = shuffledQuestions.map((question: any, shuffledIndex: number) => {
+    const responses = visibleQuestionIndexes.map((shuffledIndex) => {
+      const question: any = shuffledQuestions[shuffledIndex];
       const sourceIndex = rawQuestions.indexOf(question);
       const questionType = question.type ?? "mcq";
       const answerValue = ["likert", "star_rating", "open_text", "survey_choice"].includes(questionType)
         ? surveyAnswers[shuffledIndex] ?? null
-        : null;
+        : ["mcq", "truefalse"].includes(questionType) && typeof selected[shuffledIndex] === "number"
+          ? String((question.options ?? [])[selected[shuffledIndex]] ?? "")
+          : questionType === "multiselect"
+            ? JSON.stringify((selected[shuffledIndex] ?? []).map((optionIndex: number) => (question.options ?? [])[optionIndex] ?? ""))
+            : null;
       return {
         questionKey: String(question.id ?? sourceIndex),
         answerValue,
@@ -338,7 +369,7 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
     setHotspotClick(prev => ({ ...prev, [currentIndex]: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 } }));
   };
 
-  const progressPct = total > 0 ? ((currentIndex + 1) / total) * 100 : 0;
+  const progressPct = total > 0 ? ((visiblePosition + 1) / total) * 100 : 0;
   const answeredCount = Object.keys(selected).length + Object.keys(hotspotClick).length + Object.keys(matchingAnswers).length;
   // Format time for display
   const formatTime = (secs: number) => {
@@ -431,7 +462,7 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
       <div className="px-5 py-3 bg-gradient-to-r from-teal-700 to-teal-500 flex items-center gap-3">
         <svg className="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
         <h3 className="text-white font-semibold text-sm flex-1 truncate">{data.title || "Knowledge Check"}</h3>
-        <span className="text-teal-100 text-xs shrink-0">Question {currentIndex + 1} of {total}</span>
+        <span className="text-teal-100 text-xs shrink-0">Question {visiblePosition + 1} of {total}</span>
       </div>
 
       {/* Progress bar */}
@@ -446,7 +477,9 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         }`}>
           <span className="text-lg">{passed ? "🎉" : "📝"}</span>
           <span className="flex-1">
-            {data.requirePassToComplete !== false
+            {requiresSurveyCompletion
+              ? (passed ? "Survey recorded — lesson completion is available." : "Please answer all visible survey questions before submitting.")
+              : data.requirePassToComplete !== false
               ? (passed ? `Passed! Score: ${score}%` : `Score: ${score}% — ${data.passingScore ?? 70}% required to pass`)
               : `Score: ${score}%`}
           </span>
@@ -832,15 +865,15 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
         {/* Navigation */}
         <div className="flex items-center justify-between mt-5 pt-4 border-t border-gray-100">
           <button
-            onClick={() => setCurrentIndex(i => Math.max(0, i - 1))}
-            disabled={currentIndex === 0}
+            onClick={() => setCurrentIndex(visibleQuestionIndexes[Math.max(0, visiblePosition - 1)])}
+            disabled={visiblePosition === 0}
             className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
           >
             ← Previous
           </button>
 
           <div className="flex gap-1">
-            {shuffledQuestions.map((_: any, i: number) => {
+            {visibleQuestionIndexes.map((i) => {
               const isAnswered = shuffledQuestions[i]?.type === "hotspot" ? !!hotspotClick[i]
                 : shuffledQuestions[i]?.type === "matching" ? Object.keys(matchingAnswers[i] ?? {}).length > 0
                 : selected[i] !== undefined;
@@ -858,9 +891,9 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
             })}
           </div>
 
-          {currentIndex < total - 1 ? (
+          {visiblePosition < total - 1 ? (
             <button
-              onClick={() => setCurrentIndex(i => Math.min(total - 1, i + 1))}
+              onClick={() => setCurrentIndex(visibleQuestionIndexes[Math.min(total - 1, visiblePosition + 1)])}
               className="px-4 py-2 text-sm font-medium text-teal-700 border border-teal-300 rounded-lg hover:bg-teal-50 transition-colors"
             >
               Next →

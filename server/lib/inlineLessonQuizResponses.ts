@@ -1,7 +1,10 @@
+import { getVisibleInlineLessonQuizQuestionIndexes } from "../../shared/inlineLessonQuizFlow";
+
 export type InlineQuizQuestion = {
   id?: unknown;
   question?: unknown;
   type?: unknown;
+  showWhen?: { parentQuestionKey?: unknown; expectedAnswer?: unknown } | null;
 };
 
 export type SubmittedInlineQuizResponse = {
@@ -28,8 +31,19 @@ export function prepareInlineQuizResponses(
 ): PersistedInlineQuizResponse[] {
   if (!Array.isArray(questions) || !Array.isArray(submitted)) return [];
 
+  const typedQuestions = questions as InlineQuizQuestion[];
+  const submittedByKey = new Map<string, SubmittedInlineQuizResponse>();
+  submitted.forEach(response => {
+    if (!response?.questionKey || submittedByKey.has(response.questionKey)) return;
+    submittedByKey.set(response.questionKey, response);
+  });
+  const answerByQuestionKey = Object.fromEntries(
+    [...submittedByKey.entries()].map(([questionKey, response]) => [questionKey, response.answerValue]),
+  );
+  const visibleQuestionIndexes = new Set(getVisibleInlineLessonQuizQuestionIndexes(typedQuestions, answerByQuestionKey));
   const knownQuestions = new Map<string, { questionText: string; questionType: string }>();
   questions.forEach((candidate, index) => {
+    if (!visibleQuestionIndexes.has(index)) return;
     if (!candidate || typeof candidate !== "object") return;
     const question = candidate as InlineQuizQuestion;
     const questionText = typeof question.question === "string" ? question.question.trim() : "";
@@ -39,12 +53,6 @@ export function prepareInlineQuizResponses(
       questionText,
       questionType: typeof question.type === "string" && question.type.trim() ? question.type : "mcq",
     });
-  });
-
-  const submittedByKey = new Map<string, SubmittedInlineQuizResponse>();
-  submitted.forEach(response => {
-    if (!response?.questionKey || submittedByKey.has(response.questionKey)) return;
-    submittedByKey.set(response.questionKey, response);
   });
 
   return [...knownQuestions.entries()].flatMap(([questionKey, question]) => {

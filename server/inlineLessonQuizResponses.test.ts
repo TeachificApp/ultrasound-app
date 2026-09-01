@@ -32,4 +32,18 @@ describe("prepareInlineQuizResponses", () => {
       { questionKey: "0", questionText: "Legacy question", questionType: "open_text", answerValue: "Learner response" },
     ]);
   });
+
+  it("does not retain an answer for a hidden dependent survey question", () => {
+    const result = prepareInlineQuizResponses([
+      { id: "recommend", question: "Would you recommend this activity?", type: "survey_choice" },
+      { id: "why", question: "Why would you recommend it?", type: "open_text", showWhen: { parentQuestionKey: "recommend", expectedAnswer: "Yes" } },
+    ], [
+      { questionKey: "recommend", answerValue: "No" },
+      { questionKey: "why", answerValue: "This should not be retained." },
+    ]);
+
+    expect(result).toEqual([
+      { questionKey: "recommend", questionText: "Would you recommend this activity?", questionType: "survey_choice", answerValue: "No" },
+    ]);
+  });
 });
