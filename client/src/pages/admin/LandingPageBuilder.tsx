@@ -8232,8 +8232,9 @@ export default function LandingPageBuilder() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await saveBlocks.mutateAsync({ courseId: numericCourseId, blocks });
+      await saveBlocks.mutateAsync({ courseId: numericCourseId, blocks: blocksRef.current });
       autoSave.markClean();
+      await lpUtils.lmsAdmin.getLandingPageBlocks.invalidate({ courseId: numericCourseId });
     } finally { setIsSaving(false); }
   };
 
@@ -8494,8 +8495,22 @@ export default function LandingPageBuilder() {
   }, []);
 
   const insertTemplateBlocks = useCallback((tplBlocks: Block[]) => {
-    setBlocks(prev => [...prev, ...tplBlocks]);
-  }, []);
+    const nextBlocks = [...blocksRef.current, ...tplBlocks];
+    setBlocks(nextBlocks);
+    autoSave.markDirty();
+    setIsSaving(true);
+    void saveBlocks.mutateAsync({ courseId: numericCourseId, blocks: nextBlocks })
+      .then(async () => {
+        autoSave.markClean();
+        await lpUtils.lmsAdmin.getLandingPageBlocks.invalidate({ courseId: numericCourseId });
+        toast.success("Page template added and saved!");
+      })
+      .catch(() => {
+        // The mutation's existing error handler shows the safe author-facing error.
+        autoSave.markDirty();
+      })
+      .finally(() => setIsSaving(false));
+  }, [autoSave, lpUtils.lmsAdmin.getLandingPageBlocks, numericCourseId, saveBlocks]);
 
   const utils = trpc.useUtils();
   const saveBlockTemplateMutation = trpc.blockTemplates.save.useMutation({

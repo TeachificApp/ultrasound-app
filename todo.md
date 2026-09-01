@@ -242,6 +242,9 @@
 - [x] Add focused regression coverage for successful filtered Page Template listing and safe client recovery from an endpoint failure.
 - [ ] Capture and repair the remaining live Page Template Library request failure after the initial minimal-column list query did not restore saved templates.
 - [ ] Add regression coverage for the confirmed production Page Template failure mode before redeploying the corrected endpoint.
+- [x] Repair page-editor explicit-save and autosave persistence so administrator edits survive a reload without overwriting authored content.
+- [x] Ensure blocks added from a saved Page Template enter the page editor’s dirty state and durable save path, with a clear confirmation before page reload.
+- [x] Add focused regressions for page-editor save, autosave, and reload persistence.
 - [x] Add focused regressions for role-neutral CME survey responses, completion submission, and safe retry behavior after a transient completion error.
 - [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
 - [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.

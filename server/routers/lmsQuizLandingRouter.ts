@@ -542,14 +542,20 @@ Rules:
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const blocksJson = JSON.stringify(input.blocks);
+      const updatedAt = new Date();
       const [existing] = await db.select({ id: lmsLandingPages.id })
         .from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
       if (existing) {
         await db.update(lmsLandingPages)
-          .set({ blocks: blocksJson, isCustom: true })
+          .set({ blocks: blocksJson, isCustom: true, updatedAt })
           .where(eq(lmsLandingPages.courseId, input.courseId));
       } else {
-        await db.insert(lmsLandingPages).values({ courseId: input.courseId, blocks: blocksJson, isCustom: true });
+        await db.insert(lmsLandingPages).values({ courseId: input.courseId, blocks: blocksJson, isCustom: true, updatedAt });
+      }
+      const [persisted] = await db.select({ blocks: lmsLandingPages.blocks })
+        .from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
+      if (!persisted || persisted.blocks !== blocksJson) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The page could not be verified after saving." });
       }
       // Auto-enable group purchase on courses linked via group_purchase CTA action
       const courseIdsToEnableGroup = new Set<number>();
@@ -582,7 +588,7 @@ Rules:
       for (const cid of courseIdsToEnableGroup) {
         await db.update(lmsCourses).set({ allowGroupPurchase: true }).where(eq(lmsCourses.id, cid));
       }
-      return { success: true };
+      return { success: true, savedBlockCount: input.blocks.length, updatedAt: updatedAt.getTime() };
     }),
   // ── Save Landing Page SEO / Link Preview ──
   saveLandingPageSeo: protectedProcedure
