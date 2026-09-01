@@ -219,6 +219,8 @@
 - [x] Add focused regressions for author-configured Yes/No dependent-question branching, learner visibility, and required-survey completion behavior.
 - [x] Ensure the required-survey completion setting applies to existing CME survey blocks with legacy single-choice question types, without requiring those blocks to be rebuilt.
 - [x] Add regression coverage confirming legacy CME survey questions complete by visible response submission and never by a passing-score threshold when survey completion is enabled.
+- [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
+- [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.
 - [ ] Add focused regressions proving an authorized CME learner can access required lesson quizzes, record completion, and reach the existing certificate-eligibility path without changing unrelated learner records.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.

@@ -4579,19 +4579,6 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
         <div className="space-y-3">
           <BSTextField data={d} onSet={set} label="Section Headline" field="headline" />
           <div className="border-t pt-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Color Scheme</p>
-            <div className="space-y-2">
-              <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
-              <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
-              <BSColorField data={d} onSet={set} label="Accent / Border Color" field="accentColor" />
-              <BSColorField data={d} onSet={set} label="Question Text Color" field="questionColor" />
-              <BSColorField data={d} onSet={set} label="Answer Text Color" field="answerColor" />
-              <BSColorField data={d} onSet={set} label="Item Background" field="itemBgColor" />
-              <BSColorField data={d} onSet={set} label="Item Hover Background" field="itemHoverColor" />
-              <BSColorField data={d} onSet={set} label="Divider Color" field="dividerColor" />
-            </div>
-          </div>
-          <div className="border-t pt-3">
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs text-gray-500 font-medium">FAQ Items <span className="text-gray-400">(drag to reorder)</span></label>
               <button onClick={() => set("items", [{ id: `faq-${Date.now()}`, q: "Question?", a: "Answer." }, ...items])} className="text-xs text-teal-600 flex items-center gap-1"><Plus size={12} /> Add</button>
@@ -4612,6 +4599,19 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
                 </div>
               </SortableContext>
             </DndContext>
+          </div>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Color Scheme</p>
+            <div className="space-y-2">
+              <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
+              <BSColorField data={d} onSet={set} label="Headline Color" field="headlineColor" />
+              <BSColorField data={d} onSet={set} label="Accent / Border Color" field="accentColor" />
+              <BSColorField data={d} onSet={set} label="Question Text Color" field="questionColor" />
+              <BSColorField data={d} onSet={set} label="Answer Text Color" field="answerColor" />
+              <BSColorField data={d} onSet={set} label="Item Background" field="itemBgColor" />
+              <BSColorField data={d} onSet={set} label="Item Hover Background" field="itemHoverColor" />
+              <BSColorField data={d} onSet={set} label="Divider Color" field="dividerColor" />
+            </div>
           </div>
         </div>
       );
