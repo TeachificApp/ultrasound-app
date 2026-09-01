@@ -659,7 +659,7 @@ Rules:
         ? pricing.map(p => `${p.label ?? "Option"}: $${Number(p.price ?? 0).toFixed(2)}${p.subscriptionInterval ? "/" + p.subscriptionInterval : ""} (${p.pricingType ?? "one_time"})`).join(", ")
         : course.price ? `$${Number(course.price).toFixed(2)}` : "Free";
 
-      const systemPrompt = `You are an expert landing page designer for online ${typeLabel}s. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided. Return ONLY valid JSON, no markdown.`;
+      const systemPrompt = `You are an expert landing page designer for online ${typeLabel}s. Generate a complete, compelling landing page block structure as JSON. The blocks should be professional, conversion-focused, and specific to the content provided. Return ONLY valid JSON, no markdown. Never invent testimonials, reviews, ratings, named students, or other user-generated content.`;
       const userPrompt = `Generate a landing page for this ${typeLabel}:
 
 Title: ${course.title}
@@ -671,9 +671,9 @@ Cover Image: ${course.coverImageUrl ?? ""}
 Curriculum:
 ${curriculumText}
 
-Generate a JSON array of 6-8 content blocks. Each block MUST have:
+Generate a JSON array of 6-7 content blocks. Each block MUST have:
 - id: unique string like "block_1", "block_2", etc.
-- type: MUST be one of these exact strings: hero, text, curriculum_auto, pricing_options_auto, reviews, faq, cta_standalone
+- type: MUST be one of these exact strings: hero, text, curriculum_auto, pricing_options_auto, faq, cta_standalone
 - data: object with the fields described below
 
 Block data schemas:
@@ -703,17 +703,12 @@ Block data schemas:
    headline: "Enroll Today"
    bgColor: "#f0fafa"
 
-5. reviews block — data fields:
-   headline: "What Students Are Saying"
-   bgColor: "#ffffff"
-   reviews: array of 3 objects each with: name (string), text (string — realistic review), rating (number 4 or 5)
-
-6. faq block — data fields:
+5. faq block — data fields:
    headline: "Frequently Asked Questions"
    bgColor: "#f9fafb"
    items: array of 5-6 objects each with: q (string — question), a (string — answer)
 
-7. cta_standalone block — data fields:
+6. cta_standalone block — data fields:
    headline: string (urgent call to action)
    subtext: string (reassurance text)
    ctaText: "Enroll Now"
@@ -722,7 +717,7 @@ Block data schemas:
    bgColor: "#f0fafa"
    align: "center"
 
-Create blocks in this order: hero, text (what you'll learn + benefits), curriculum_auto, text (about the instructor/course), pricing_options_auto, reviews, faq, cta_standalone.
+Create blocks in this order: hero, text (what you'll learn + benefits), curriculum_auto, text (about the instructor/course), pricing_options_auto, faq, cta_standalone.
 Make ALL content specific and compelling based on the course title, description, and curriculum above. Do NOT use generic placeholder text.`;
 
       const response = await invokeLLM({
@@ -730,6 +725,7 @@ Make ALL content specific and compelling based on the course title, description,
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        maxTokens: 6000,
       });
 
       let blocks: any[];
@@ -737,20 +733,16 @@ Make ALL content specific and compelling based on the course title, description,
         const raw = response.choices[0].message.content as string;
         blocks = parseLandingBlocks(raw);
       } catch (err: any) {
-        console.error("[aiGenerateLandingPage] parse error:", err?.message, "raw:", (response.choices[0]?.message?.content as string)?.slice(0, 400));
+        console.error("[aiGenerateLandingPage] parse error:", err?.message);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `AI returned invalid JSON: ${err?.message ?? "unknown error"}. Please try again.` });
       }
-      // Save the generated blocks
-      const blocksJson = JSON.stringify(blocks);
-      const [existing] = await db.select({ id: lmsLandingPages.id })
-        .from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
-      if (existing) {
-        await db.update(lmsLandingPages).set({ blocks: blocksJson, isCustom: true }).where(eq(lmsLandingPages.courseId, input.courseId));
-      } else {
-        await db.insert(lmsLandingPages).values({ courseId: input.courseId, blocks: blocksJson, isCustom: true });
+      const draftBlocks = blocks.filter((block) => block.type !== "reviews");
+      if (draftBlocks.length === 0) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI did not return a usable page draft. Please try again." });
       }
-
-      return { success: true, blockCount: blocks.length };
+      // This endpoint intentionally returns a draft only. The administrator must review it
+      // in the builder and explicitly choose Save Page before any persisted layout changes.
+      return { success: true, blockCount: draftBlocks.length, blocks: draftBlocks };
     }),
 
   // ── Page Templates ──

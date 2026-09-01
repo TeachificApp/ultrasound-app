@@ -8073,6 +8073,7 @@ export default function LandingPageBuilder() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [aiDraftLoaded, setAiDraftLoaded] = useState(false);
   // Track whether blocks have been loaded from the server (to avoid marking dirty on initial load)
   const blocksLoadedRef = useRef(false);
   // Right panel resizable width
@@ -8110,6 +8111,7 @@ export default function LandingPageBuilder() {
     setHasLoaded(false);
     setBlocks([]);
     setSelectedId(null);
+    setAiDraftLoaded(false);
     seoInitialized.current = false;
     // Invalidate the query so fresh data is fetched (not stale cache)
     lpUtils.lmsAdmin.getLandingPageBlocks.invalidate({ courseId: numericCourseId });
@@ -8191,7 +8193,21 @@ export default function LandingPageBuilder() {
       setSeoDescription(lpData.seoDescription ?? lpData.defaultSeoDescription ?? "");
       setSeoImage(lpData.seoImage ?? lpData.defaultSeoImage ?? "");
     }
-    if (lpData.blocks && lpData.blocks.length > 0) {
+    let generatedDraft: Block[] | null = null;
+    try {
+      const rawDraft = sessionStorage.getItem(`landing-page-ai-draft:${numericCourseId}`);
+      const parsedDraft = rawDraft ? JSON.parse(rawDraft) : null;
+      if (Array.isArray(parsedDraft) && parsedDraft.length > 0) {
+        generatedDraft = parsedDraft as Block[];
+        sessionStorage.removeItem(`landing-page-ai-draft:${numericCourseId}`);
+      }
+    } catch {
+      sessionStorage.removeItem(`landing-page-ai-draft:${numericCourseId}`);
+    }
+    if (generatedDraft) {
+      setBlocks(generatedDraft);
+      setAiDraftLoaded(true);
+    } else if (lpData.blocks && lpData.blocks.length > 0) {
       setBlocks(lpData.blocks as Block[]);
     } else {
       setBlocks([
@@ -8234,24 +8250,27 @@ export default function LandingPageBuilder() {
     try {
       await saveBlocks.mutateAsync({ courseId: numericCourseId, blocks: blocksRef.current });
       autoSave.markClean();
+      setAiDraftLoaded(false);
       await lpUtils.lmsAdmin.getLandingPageBlocks.invalidate({ courseId: numericCourseId });
     } finally { setIsSaving(false); }
   };
 
   const autoSave = useAutoSave({
     onSave: async () => {
+      if (aiDraftLoaded) return;
       await saveBlocks.mutateAsync({ courseId: numericCourseId, blocks });
     },
     intervalMs: 60_000,
   });
 
-  // Mark dirty whenever blocks change after initial load
+  // AI-generated page drafts must remain review-only until Save Page is selected.
+  // Normal persisted-page edits continue to use the existing autosave behavior.
   useEffect(() => {
-    if (blocksLoadedRef.current) {
+    if (blocksLoadedRef.current && !aiDraftLoaded) {
       autoSave.markDirty();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocks]);
+  }, [blocks, aiDraftLoaded]);
 
   // ─── Cross-list DnD helpers ───────────────────────────────────────────────
   // Column drop zone IDs use the format: "col:BLOCK_ID:left" or "col:BLOCK_ID:right"
@@ -8618,6 +8637,12 @@ export default function LandingPageBuilder() {
           </Button>
         </div>
       </div>
+      {aiDraftLoaded && (
+        <div className="flex items-center gap-2 border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+          <span><strong>AI draft loaded for review.</strong> Your saved page is unchanged until you select Save Page.</span>
+        </div>
+      )}
 
       {/* Main Editor Area */}
       <div className="flex flex-1 min-h-0 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">

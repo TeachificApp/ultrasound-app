@@ -245,6 +245,8 @@
 - [x] Repair page-editor explicit-save and autosave persistence so administrator edits survive a reload without overwriting authored content.
 - [x] Ensure blocks added from a saved Page Template enter the page editor’s dirty state and durable save path, with a clear confirmation before page reload.
 - [x] Add focused regressions for page-editor save, autosave, and reload persistence.
+- [x] Repair the Page Regenerate workflow so administrators receive a reviewable AI page draft without overwriting current page content unless they explicitly apply it.
+- [x] Add focused regression coverage for page-regeneration request handling, safe draft display, and explicit apply-only persistence.
 - [x] Add focused regressions for role-neutral CME survey responses, completion submission, and safe retry behavior after a transient completion error.
 - [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
 - [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.

@@ -3139,8 +3139,14 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
   };
 
   const aiGenerateLandingPage = trpc.lmsAdmin.aiGenerateLandingPage.useMutation({
-    onSuccess: () => {
-      toast.success("Landing page generated! Opening builder...");
+    onSuccess: (result) => {
+      try {
+        sessionStorage.setItem(`landing-page-ai-draft:${courseId}`, JSON.stringify(result.blocks));
+      } catch {
+        toast.error("The generated draft could not be opened. Please try again.");
+        return;
+      }
+      toast.success("Landing page draft generated. Review it before saving.");
       setTimeout(() => navigate(`/admin/lms/${courseId}/landing-builder?t=${Date.now()}`), 600);
     },
     onError: e => toast.error(`AI error: ${e.message}`),
@@ -3199,7 +3205,7 @@ function LandingPageEditor({ courseId, courseType }: { courseId: number; courseT
           <div>
             <p className="text-sm font-semibold text-gray-800">AI Generate Landing Page</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              The AI will read your {typeLabel} title, description, sections, and lesson content to generate a complete block-based landing page — hero, curriculum, pricing, FAQs, and more.
+              The AI will read your {typeLabel} title, description, sections, and lesson content to generate a complete block-based landing page draft. Review it in the builder, then select Save Page to apply it.
             </p>
           </div>
         </div>
