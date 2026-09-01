@@ -754,7 +754,16 @@ Make ALL content specific and compelling based on the course title, description,
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const rows = await db.select().from(lmsPageTemplates)
+      const rows = await db.select({
+        id: lmsPageTemplates.id,
+        name: lmsPageTemplates.name,
+        description: lmsPageTemplates.description,
+        templateType: lmsPageTemplates.templateType,
+        blockType: lmsPageTemplates.blockType,
+        blocks: lmsPageTemplates.blocks,
+        createdAt: lmsPageTemplates.createdAt,
+        updatedAt: lmsPageTemplates.updatedAt,
+      }).from(lmsPageTemplates)
         .where(input.templateType ? eq(lmsPageTemplates.templateType, input.templateType) : undefined)
         .orderBy(lmsPageTemplates.updatedAt);
       return rows.map(r => ({

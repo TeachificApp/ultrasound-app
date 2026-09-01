@@ -238,6 +238,8 @@
 - [x] Repair saved Page Template discovery so administrator-created templates appear in the page editor insertion picker.
 - [x] Ensure Page Template insertion creates safe new block copies without overwriting the open page or mutating the saved source template.
 - [x] Add focused regressions for page-template listing, picker visibility, and copy-on-insert behavior.
+- [x] Repair the failing production Page Template list endpoint so existing saved templates load in the page editor without changing template data.
+- [x] Add focused regression coverage for successful filtered Page Template listing and safe client recovery from an endpoint failure.
 - [x] Add focused regressions for role-neutral CME survey responses, completion submission, and safe retry behavior after a transient completion error.
 - [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
 - [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.
