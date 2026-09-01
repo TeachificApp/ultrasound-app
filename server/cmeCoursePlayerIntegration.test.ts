@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse, lessonRequiresExplicitCompletion } from "../shared/cmeLessonCompletion";
+import { buildPrereqLockedIds } from "../shared/lessonAccessGating";
 
 const coursePlayer = readFileSync(resolve(process.cwd(), "client/src/pages/CoursePlayer.tsx"), "utf8");
 
@@ -51,5 +52,23 @@ describe("CME course player video gate", () => {
     expect(lessonRequiresExplicitCompletion({ requireManualComplete: 0 }, true)).toBe(false);
     expect(lessonRequiresExplicitCompletion({}, false)).toBe(false);
     expect(lessonRequiresExplicitCompletion({ requireVideoCompletion: 1 }, false)).toBe(true);
+  });
+
+  it("unlocks the next CME lesson after the required predecessor persists as complete", () => {
+    const lessons = [
+      { id: 1, isPrerequisite: true, requireManualComplete: 1, type: "text" },
+      { id: 2, type: "text" },
+    ];
+    expect(buildPrereqLockedIds({ allLessons: lessons, completedIds: new Set(), openedIds: new Set(), courseDefaultMarkComplete: true })).toEqual(new Set([2]));
+    expect(buildPrereqLockedIds({ allLessons: lessons, completedIds: new Set([1]), openedIds: new Set([1]), courseDefaultMarkComplete: true })).toEqual(new Set());
+  });
+
+  it("unlocks a CME assessment once every other countable lesson is complete", () => {
+    const lessons = [
+      { id: 1, isPrerequisite: true, requireManualComplete: 1, type: "text" },
+      { id: 2, type: "video", requireVideoCompletion: 1 },
+      { id: 3, type: "quiz", hasAssessmentContent: true },
+    ];
+    expect(buildPrereqLockedIds({ allLessons: lessons, completedIds: new Set([1, 2]), openedIds: new Set([1, 2]), courseDefaultMarkComplete: true })).not.toContain(3);
   });
 });
