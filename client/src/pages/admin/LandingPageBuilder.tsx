@@ -73,6 +73,7 @@ import UserParamTagsHelper from "@/components/UserParamTagsHelper";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { AutoSaveIndicator } from "@/components/AutoSaveIndicator";
 import { InteractiveQuestionEditorPanel } from "@/components/InteractiveQuestionEditorPanel";
+import { copyPageTemplateBlocks } from "@/lib/pageTemplateInsertion";
 
 export function uid() { return Math.random().toString(36).slice(2, 10); }
 
@@ -7861,7 +7862,10 @@ function TemplateLibrary({ blocks, onInsert, onClose }: {
   const [saveDesc, setSaveDesc] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  const { data: templates, refetch } = trpc.lmsAdmin.listPageTemplates.useQuery({});
+  const { data: templates = [], isLoading, isError, error, refetch } = trpc.lmsAdmin.listPageTemplates.useQuery(
+    { templateType: "page" },
+    { staleTime: 0, refetchOnMount: "always" },
+  );
   const saveMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
     onSuccess: () => { toast.success("Template saved!"); setSaveName(""); setSaveDesc(""); refetch(); },
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
@@ -7887,6 +7891,40 @@ function TemplateLibrary({ blocks, onInsert, onClose }: {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Saved page templates */}
+          <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-teal-800">Saved Page Templates</p>
+                <p className="mt-0.5 text-xs text-teal-700/75">Add a saved page layout without replacing the page you are editing.</p>
+              </div>
+              {!isLoading && <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-teal-700">{templates.length}</span>}
+            </div>
+            {isLoading ? (
+              <p className="py-4 text-center text-sm text-gray-400">Loading saved templates…</p>
+            ) : isError ? (
+              <div className="rounded-lg border border-red-200 bg-white p-3 text-sm text-red-700">
+                <p>Saved templates could not be loaded. {error?.message ? "Please try again." : ""}</p>
+                <Button variant="outline" onClick={() => refetch()} className="mt-2 h-7 border-red-200 text-xs text-red-700">Retry</Button>
+              </div>
+            ) : templates.length === 0 ? (
+              <p className="rounded-lg bg-white px-3 py-4 text-center text-sm text-gray-500">No saved page templates yet. Save this page below to create one.</p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {templates.map((tpl: any) => {
+                  const templateBlocks = Array.isArray(tpl.blocks) ? tpl.blocks : [];
+                  return <div key={tpl.id} className="rounded-lg border border-teal-100 bg-white p-3">
+                    <h3 className="truncate text-sm font-semibold text-gray-900">{tpl.name}</h3>
+                    {tpl.description && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{tpl.description}</p>}
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="text-xs text-gray-400">{templateBlocks.length} block{templateBlocks.length === 1 ? "" : "s"}</span>
+                      <Button onClick={() => { onInsert(copyPageTemplateBlocks(templateBlocks, uid)); onClose(); }} className="h-7 bg-teal-600 px-2.5 text-xs text-white hover:bg-teal-700">Add to Page</Button>
+                    </div>
+                  </div>;
+                })}
+              </div>
+            )}
+          </div>
           {/* Built-in sales funnel templates */}
           <div className="border border-amber-200 rounded-xl p-4 bg-amber-50/70">
             <p className="text-xs font-semibold text-amber-700 mb-3">Built-in Sales Funnel Templates</p>
@@ -7913,24 +7951,6 @@ function TemplateLibrary({ blocks, onInsert, onClose }: {
               </Button>
             </div>
           </div>
-          {/* Template list */}
-          {!templates || templates.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-sm">No page templates saved yet</div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {templates.map((tpl: any) => (
-                <div key={tpl.id} className="border border-gray-200 rounded-xl p-4 hover:border-teal-300 transition-colors">
-                  <h3 className="font-semibold text-gray-900 text-sm mb-1 truncate">{tpl.name}</h3>
-                  {tpl.description && <p className="text-xs text-gray-500 mb-3 line-clamp-2">{tpl.description}</p>}
-                  <p className="text-xs text-gray-400 mb-3">{Array.isArray(tpl.blocks) ? tpl.blocks.length : 0} block{Array.isArray(tpl.blocks) && tpl.blocks.length !== 1 ? "s" : ""}</p>
-                  <div className="flex gap-2">
-                    <Button onClick={() => { const tplBlocks = (Array.isArray(tpl.blocks) ? tpl.blocks : []).map((b: Block) => ({ ...b, id: uid() })); onInsert(tplBlocks); onClose(); }} className="flex-1 h-7 text-xs bg-teal-600 hover:bg-teal-700 text-white">Insert</Button>
-                    <button onClick={() => deleteMutation.mutate({ id: tpl.id })} className="w-7 h-7 border border-gray-200 rounded text-gray-400 hover:text-red-500 flex items-center justify-center flex-shrink-0"><Trash2 size={12} /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
