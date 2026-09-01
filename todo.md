@@ -217,6 +217,8 @@
 - [x] Add focused regressions for required unscored survey completion, explicit scored-pass requirements, and CME certificate eligibility.
 - [x] Allow lesson-quiz authors to configure a dependent question that displays only when a specified prior-answer condition is met, and exclude hidden dependent questions from scoring and required-completion checks.
 - [x] Add focused regressions for author-configured Yes/No dependent-question branching, learner visibility, and required-survey completion behavior.
+- [x] Ensure the required-survey completion setting applies to existing CME survey blocks with legacy single-choice question types, without requiring those blocks to be rebuilt.
+- [x] Add regression coverage confirming legacy CME survey questions complete by visible response submission and never by a passing-score threshold when survey completion is enabled.
 - [ ] Add focused regressions proving an authorized CME learner can access required lesson quizzes, record completion, and reach the existing certificate-eligibility path without changing unrelated learner records.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.

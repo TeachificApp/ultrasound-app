@@ -77,11 +77,9 @@ export function hasCompletedRequiredInlineSurvey(
       .map((response) => [String(response.questionKey), response.answerValue]),
   );
   const visibleIndexes = getVisibleInlineLessonQuizQuestionIndexes(questions, answerByQuestionKey);
-  const visibleSurveyQuestions = visibleIndexes
-    .map((index) => ({ question: questions[index], index }))
-    .filter(({ question }) => INLINE_SURVEY_QUESTION_TYPES.has(String(question?.type ?? "mcq")));
+  const visibleQuestions = visibleIndexes.map((index) => ({ question: questions[index], index }));
 
-  return visibleSurveyQuestions.length > 0 && visibleSurveyQuestions.every(({ question, index }) =>
+  return visibleQuestions.length > 0 && visibleQuestions.every(({ question, index }) =>
     hasResponseValue(answerByQuestionKey[inlineLessonQuizQuestionKey(question, index)]),
   );
 }
@@ -98,8 +96,7 @@ export function evaluateInlineLessonQuizCompletion(input: {
   scorePassed: boolean;
   requireSurveyCompletion?: boolean;
 }) {
-  const requiresSurveyCompletion = input.requireSurveyCompletion === true
-    && isSurveyOnlyInlineLessonQuiz(input.questions);
+  const requiresSurveyCompletion = input.requireSurveyCompletion === true;
   const surveyCompleted = hasCompletedRequiredInlineSurvey(
     input.questions,
     input.responses,

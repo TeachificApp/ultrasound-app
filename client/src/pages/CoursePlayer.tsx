@@ -27,7 +27,7 @@ import {
 import { formatCmeCreditPhrase } from "@shared/cmeCreditLabel";
 import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse } from "../../../shared/cmeLessonCompletion";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
-import { getVisibleInlineLessonQuizQuestionIndexes, inlineLessonQuizQuestionKey, isSurveyOnlyInlineLessonQuiz } from "../../../shared/inlineLessonQuizFlow";
+import { getVisibleInlineLessonQuizQuestionIndexes, inlineLessonQuizQuestionKey } from "../../../shared/inlineLessonQuizFlow";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
@@ -301,7 +301,7 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, isAdminPreview, onComple
     return false;
   };
 
-  const requiresSurveyCompletion = data.requireSurveyCompletion === true && isSurveyOnlyInlineLessonQuiz(rawQuestions);
+  const requiresSurveyCompletion = data.requireSurveyCompletion === true;
 
   const allAnswered = visibleQuestionIndexes.every((i) => {
     const qt = shuffledQuestions[i]?.type ?? "mcq";

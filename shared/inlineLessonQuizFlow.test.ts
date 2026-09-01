@@ -42,10 +42,10 @@ describe("inline lesson quiz survey flow", () => {
     })).toMatchObject({ requiresSurveyCompletion: true, surveyCompleted: true, passed: true });
 
     expect(evaluateInlineLessonQuizCompletion({
-      questions: [{ id: "scored", type: "mcq" }],
-      responses: [],
+      questions: [{ id: "legacy-choice", type: "mcq" }],
+      responses: [{ questionKey: "legacy-choice", answerValue: "Yes" }],
       scorePassed: false,
       requireSurveyCompletion: true,
-    })).toMatchObject({ requiresSurveyCompletion: false, passed: false });
+    })).toMatchObject({ requiresSurveyCompletion: true, surveyCompleted: true, passed: true });
   });
 });
