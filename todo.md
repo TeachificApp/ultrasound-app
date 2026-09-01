@@ -235,7 +235,7 @@
 - [x] Improve the lesson-quiz dependent-question layout so the prior-question and answer-condition controls are clearly separated, readable, and responsive.
 - [x] Add author-configured dependent-question branching to the standalone Quiz Builder and exclude hidden questions from visible navigation, scoring, and required-answer checks.
 - [x] Add focused regressions for lesson-layout clarity and standalone Quiz Builder conditional visibility, scoring, and completion behavior.
-- [ ] Add focused regressions for role-neutral CME survey responses, completion submission, and safe retry behavior after a transient completion error.
+- [x] Add focused regressions for role-neutral CME survey responses, completion submission, and safe retry behavior after a transient completion error.
 - [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
 - [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.
 - [x] Allow discount codes to target the full catalog, one or more selected content types, or one or more individual products.

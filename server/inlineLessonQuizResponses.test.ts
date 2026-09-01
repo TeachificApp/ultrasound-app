@@ -20,6 +20,19 @@ describe("prepareInlineQuizResponses", () => {
     expect(completion).toMatchObject({ nonScoringSurvey: true, requiresSurveyCompletion: false, passed: true });
   });
 
+  it("accepts every professional-role response as a recorded non-scoring survey answer", () => {
+    const roles = ["Physician", "Sonographer", "Nurse", "Student", "Other"];
+    for (const role of roles) {
+      expect(evaluateInlineLessonQuizCompletion({
+        questions: [{ id: "role", type: "survey_choice" }],
+        responses: [{ questionKey: "role", answerValue: role }],
+        scorePassed: false,
+        nonScoringSurvey: true,
+        requiresSurveyCompletion: true,
+      }).passed).toBe(true);
+    }
+  });
+
   it("keeps only one response per stored question and retains stored labels", () => {
     const result = prepareInlineQuizResponses(questions, [
       { questionKey: "quality", answerValue: 5 },

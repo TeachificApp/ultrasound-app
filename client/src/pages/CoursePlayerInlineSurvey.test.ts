@@ -23,4 +23,9 @@ describe("InlineLessonQuiz CME survey controls", () => {
     expect(source).toContain('q.required === true');
     expect(source).toContain('A response is required');
   });
+
+  it("keeps an inline survey ready to retry after a transient completion error", () => {
+    expect(source).toContain('onError: (error) => toast.error(`Quiz progress could not be saved: ${error.message}`)');
+    expect(source).toContain('disabled={!allAnswered || recordInlineQuiz.isPending}');
+  });
 });
