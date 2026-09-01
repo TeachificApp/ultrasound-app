@@ -17,4 +17,9 @@ describe("LMS course CME Survey Results tab", () => {
     expect(source).toContain("The start date must be on or before the end date");
     expect(source).toContain("Export filtered CSV");
   });
+
+  it("imports every card component used by the Course Settings participant communication card", () => {
+    expect(source).toContain('import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";');
+    expect(source).toContain("<CardHeader className=\"pb-2\"><CardTitle className=\"text-base\">Participant Communications</CardTitle></CardHeader>");
+  });
 });

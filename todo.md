@@ -304,3 +304,5 @@
 - [x] Add administrator-managed approved From email and sender-name options for course, cohort, and workshop participant communications.
 - [x] Reuse the email campaign editor for a draft-only participant composer built into course settings, with authorized cohort and workshop-instance entry points, while locking the recipient audience to active participants in the selected enrollment scope by default.
 - [x] Require a separate explicit administrator confirmation immediately before sending any participant email, and add authorization, audience, sender, and send-confirmation regressions.
+- [x] Repair the LMS course-settings runtime failure caused by the unresolved CardHeader reference without changing course, learner, export, or email data.
+- [x] Add focused regression coverage confirming LMS course settings renders its participant communication card and related tab content without unresolved component references.
