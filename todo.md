@@ -229,6 +229,9 @@
 - [x] Make explicit non-scoring Survey Mode available on every Lesson Quiz module, including legacy question types, while retaining an independent required-response completion option.
 - [x] Repair the production build failure caused by the missing BlockPreview authentication-hook import so the global Survey Mode and CME embedded-form updates can deploy.
 - [x] Add focused regression coverage confirming global Survey Mode suppresses correct/incorrect feedback for all Lesson Quiz question types and the production client bundle resolves the authentication hook.
+- [x] Make enabling Survey Mode clear all correct-answer keys from every lesson-quiz question and hide answer-key configuration until Survey Mode is turned off.
+- [x] Repair the lesson-quiz dependent-question selector crash caused by an empty select-item value.
+- [x] Add focused regressions proving Survey Mode removes stored answer keys and the dependent-question selector renders without an empty option value.
 - [ ] Add focused regressions for role-neutral CME survey responses, completion submission, and safe retry behavior after a transient completion error.
 - [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
 - [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.

@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { clearSurveyAnswerKeys, clearSurveyAnswerKeysFromQuestions, nonEmptySurveyChoices } from "@/lib/lessonQuizSurveyMode";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ export interface QuizQuestion {
   question: string;
   options: string[];
   answerImages?: (string | undefined)[];
-  correctAnswer: number;
+  correctAnswer?: number;
   correctAnswers?: number[]; // for multiselect
   hotspotImageUrl?: string;
   hotspotMarkers?: HotspotMarker[];
@@ -132,12 +133,14 @@ export function HotspotEditor({
   onImageUpload,
   onMarkersChange,
   handleFileUpload,
+  isSurvey = false,
 }: {
   imageUrl?: string;
   markers: HotspotMarker[];
   onImageUpload: (url: string) => void;
   onMarkersChange: (markers: HotspotMarker[]) => void;
   handleFileUpload?: Props["handleFileUpload"];
+  isSurvey?: boolean;
 }) {
   const imgRef = useRef<HTMLInputElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -160,7 +163,7 @@ export function HotspotEditor({
       x: Math.round(x * 10) / 10,
       y: Math.round(y * 10) / 10,
       label: `Region ${markers.length + 1}`,
-      isCorrect: markers.length === 0, // first marker is correct by default
+      isCorrect: isSurvey ? false : markers.length === 0, // surveys do not have a correct location
     };
     onMarkersChange([...markers, newMarker]);
     setPlacing(false);
@@ -194,12 +197,12 @@ export function HotspotEditor({
               <div
                 key={m.id}
                 className={`absolute w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold transform -translate-x-1/2 -translate-y-1/2 shadow-md ${
-                  m.isCorrect ? "bg-teal-500 border-teal-700 text-white" : "bg-red-400 border-red-600 text-white"
+                  !isSurvey && m.isCorrect ? "bg-teal-500 border-teal-700 text-white" : "bg-slate-400 border-slate-600 text-white"
                 }`}
                 style={{ left: `${m.x}%`, top: `${m.y}%` }}
                 title={m.label}
               >
-                {m.isCorrect ? "✓" : "✗"}
+                {!isSurvey && m.isCorrect ? "✓" : "•"}
               </div>
             ))}
           </div>
@@ -216,7 +219,7 @@ export function HotspotEditor({
           </div>
           {markers.length > 0 && (
             <div className="space-y-1">
-              <Label className="text-xs text-gray-600">Markers (toggle correct/incorrect):</Label>
+              <Label className="text-xs text-gray-600">{isSurvey ? "Response locations" : "Markers (toggle correct/incorrect):"}</Label>
               {markers.map((m, idx) => (
                 <div key={m.id} className="flex items-center gap-2 text-xs bg-gray-50 rounded px-2 py-1">
                   <span className="text-gray-400 shrink-0">{idx + 1}.</span>
@@ -225,13 +228,13 @@ export function HotspotEditor({
                     onChange={(e) => onMarkersChange(markers.map(mk => mk.id === m.id ? { ...mk, label: e.target.value } : mk))}
                     className="h-6 text-xs flex-1"
                   />
-                  <button
+                  {!isSurvey && <button
                     type="button"
                     onClick={() => onMarkersChange(markers.map(mk => mk.id === m.id ? { ...mk, isCorrect: !mk.isCorrect } : mk))}
                     className={`px-2 py-0.5 rounded text-xs font-medium ${m.isCorrect ? "bg-teal-100 text-teal-700" : "bg-red-100 text-red-600"}`}
                   >
                     {m.isCorrect ? "Correct" : "Wrong"}
-                  </button>
+                  </button>}
                   <button type="button" className="text-red-400 hover:text-red-600"
                     onClick={() => onMarkersChange(markers.filter(mk => mk.id !== m.id))}>
                     <X size={12} />
@@ -251,9 +254,11 @@ export function HotspotEditor({
 export function MatchingEditor({
   pairs,
   onChange,
+  isSurvey = false,
 }: {
   pairs: MatchingPair[];
   onChange: (pairs: MatchingPair[]) => void;
+  isSurvey?: boolean;
 }) {
   const addPair = () => onChange([...pairs, { id: `p${Date.now()}`, left: "", right: "" }]);
   const removePair = (id: string) => onChange(pairs.filter(p => p.id !== id));
@@ -262,7 +267,7 @@ export function MatchingEditor({
 
   return (
     <div className="space-y-2">
-      <Label className="text-xs text-gray-600">Matching Pairs (left → right)</Label>
+      <Label className="text-xs text-gray-600">{isSurvey ? "Response Pairs (not scored)" : "Matching Pairs (left → right)"}</Label>
       {pairs.map((p, idx) => (
         <div key={p.id} className="flex items-center gap-2">
           <span className="text-xs text-gray-400 shrink-0 w-4">{idx + 1}.</span>
@@ -489,6 +494,7 @@ function QuestionEditor({
   onSave,
   onCancel,
   previousQuestions,
+  isSurvey,
 }: {
   question: QuizQuestion;
   index: number | null;
@@ -497,6 +503,7 @@ function QuestionEditor({
   onSave: (q: QuizQuestion) => void;
   onCancel: () => void;
   previousQuestions: QuizQuestion[];
+  isSurvey: boolean;
 }) {
   const [q, setQ] = useState<QuizQuestion>(() => ({
     type: "mcq",
@@ -653,33 +660,34 @@ function QuestionEditor({
               onCheckedChange={(enabled) => setQ(previous => ({
                 ...previous,
                 showWhen: enabled
-                  ? { parentQuestionKey: String(previousQuestions[0].id ?? 0), expectedAnswer: String(previousQuestions[0].options?.[0] ?? "") }
+                  ? { parentQuestionKey: String(previousQuestions[0].id || "first-question"), expectedAnswer: String(previousQuestions[0].options?.[0] ?? "") }
                   : undefined,
               }))}
             />
           </div>
           {q.showWhen && (() => {
-            const parentIndex = previousQuestions.findIndex((candidate, index) => String(candidate.id ?? index) === q.showWhen?.parentQuestionKey);
+            const parentIndex = previousQuestions.findIndex((candidate, index) => String(candidate.id || index || "first-question") === q.showWhen?.parentQuestionKey);
             const parent = parentIndex >= 0 ? previousQuestions[parentIndex] : previousQuestions[0];
-            const parentKey = String(parent.id ?? Math.max(0, parentIndex));
-            const choices = parent.type === "likert"
+            const parentKey = String(parent.id || Math.max(0, parentIndex));
+            const choices = nonEmptySurveyChoices(parent.type === "likert"
               ? (parent.likertLabels ?? [])
               : parent.type === "star_rating"
                 ? Array.from({ length: parent.starMax ?? 5 }, (_, index) => String(index + 1))
-                : parent.options ?? [];
+                : parent.options ?? []);
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                   <Label className="text-[11px] text-gray-600">Prior question</Label>
                   <Select value={parentKey} onValueChange={(value) => {
-                    const nextParent = previousQuestions.find((candidate, index) => String(candidate.id ?? index) === value);
+                    const nextParent = previousQuestions.find((candidate, index) => String(candidate.id || index || "first-question") === value);
                     setQ(previous => ({ ...previous, showWhen: { parentQuestionKey: value, expectedAnswer: String(nextParent?.options?.[0] ?? "") } }));
                   }}>
                     <SelectTrigger className="h-8 text-xs mt-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {previousQuestions.map((candidate, index) => (
-                        <SelectItem key={String(candidate.id ?? index)} value={String(candidate.id ?? index)}>{index + 1}. {candidate.question || "Untitled question"}</SelectItem>
-                      ))}
+                      {previousQuestions.map((candidate, index) => {
+                        const candidateKey = String(candidate.id || index || "first-question");
+                        return <SelectItem key={candidateKey} value={candidateKey}>{index + 1}. {candidate.question || "Untitled question"}</SelectItem>;
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -745,17 +753,18 @@ function QuestionEditor({
       {/* True/False */}
       {qType === "truefalse" && (
         <div>
-          <Label className="text-xs text-gray-600">Correct Answer</Label>
+          <Label className="text-xs text-gray-600">{isSurvey ? "Response Options" : "Correct Answer"}</Label>
           <div className="flex gap-2 mt-1">
             {["True", "False"].map((opt, j) => (
               <button
                 key={j}
                 type="button"
-                onClick={() => setQ(prev => ({ ...prev, correctAnswer: j }))}
+                onClick={() => !isSurvey && setQ(prev => ({ ...prev, correctAnswer: j }))}
+                disabled={isSurvey}
                 className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-all ${
-                  j === q.correctAnswer
+                  !isSurvey && j === q.correctAnswer
                     ? "border-teal-500 bg-teal-500 text-white"
-                    : "border-gray-200 text-gray-600 hover:border-teal-300"
+                    : "border-gray-200 text-gray-600"
                 }`}
               >
                 {opt}
@@ -768,17 +777,18 @@ function QuestionEditor({
       {/* Multiple Choice */}
       {qType === "mcq" && (
         <div className="space-y-2">
-          <Label className="text-xs text-gray-600">Answer Options (click letter to mark correct)</Label>
+          <Label className="text-xs text-gray-600">{isSurvey ? "Response Options" : "Answer Options (click letter to mark correct)"}</Label>
           {q.options.map((opt, j) => (
             <div key={j} className="space-y-1">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setQ(prev => ({ ...prev, correctAnswer: j }))}
+                  onClick={() => !isSurvey && setQ(prev => ({ ...prev, correctAnswer: j }))}
+                  disabled={isSurvey}
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${
-                    j === q.correctAnswer
+                    !isSurvey && j === q.correctAnswer
                       ? "border-teal-500 bg-teal-500 text-white"
-                      : "border-gray-300 text-gray-400 hover:border-teal-400"
+                      : "border-gray-300 text-gray-400"
                   }`}
                 >
                   {LETTERS[j]}
@@ -858,14 +868,14 @@ function QuestionEditor({
       {/* Multi-Select */}
       {qType === "multiselect" && (
         <div className="space-y-2">
-          <Label className="text-xs text-gray-600">Answer Options (check all correct answers)</Label>
+          <Label className="text-xs text-gray-600">{isSurvey ? "Response Options" : "Answer Options (check all correct answers)"}</Label>
           {q.options.map((opt, j) => (
             <div key={j} className="flex items-center gap-2">
-              <Checkbox
+              {isSurvey ? <span className="w-4 h-4 rounded border border-gray-300 shrink-0" aria-hidden="true" /> : <Checkbox
                 id={`ms-${j}`}
                 checked={(q.correctAnswers ?? []).includes(j)}
                 onCheckedChange={() => toggleMultiCorrect(j)}
-              />
+              />}
               <Input
                 value={opt}
                 onChange={(e) => {
@@ -890,7 +900,7 @@ function QuestionEditor({
               <Plus size={11} className="mr-1" /> Add Option
             </Button>
           )}
-          {(q.correctAnswers ?? []).length === 0 && (
+          {!isSurvey && (q.correctAnswers ?? []).length === 0 && (
             <p className="text-xs text-amber-600">Check at least one correct answer.</p>
           )}
         </div>
@@ -904,6 +914,7 @@ function QuestionEditor({
           onImageUpload={(url) => setQ(prev => ({ ...prev, hotspotImageUrl: url }))}
           onMarkersChange={(markers) => setQ(prev => ({ ...prev, hotspotMarkers: markers }))}
           handleFileUpload={handleFileUpload}
+          isSurvey={isSurvey}
         />
       )}
 
@@ -912,6 +923,7 @@ function QuestionEditor({
         <MatchingEditor
           pairs={q.matchingPairs ?? []}
           onChange={(pairs) => setQ(prev => ({ ...prev, matchingPairs: pairs }))}
+          isSurvey={isSurvey}
         />
       )}
 
@@ -988,11 +1000,11 @@ function QuestionEditor({
 
       {/* Explanation */}
       <div>
-        <Label className="text-xs text-gray-600">Explanation / Feedback (optional)</Label>
+        <Label className="text-xs text-gray-600">{isSurvey ? "Optional Follow-up Message" : "Explanation / Feedback (optional)"}</Label>
         <Textarea
           value={q.explanation ?? ""}
           onChange={(e) => setQ(prev => ({ ...prev, explanation: e.target.value }))}
-          placeholder="Explain why the correct answer is correct…"
+          placeholder={isSurvey ? "Optional neutral follow-up for respondents…" : "Explain why the correct answer is correct…"}
           className="text-sm mt-1 min-h-[50px]"
         />
       </div>
@@ -1106,7 +1118,10 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
 
   const saveQuestion = (q: QuizQuestion) => {
     const qs = [...questions];
-    const savedQuestion = { ...q, id: q.id ?? `lesson-question-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
+    const savedQuestion = {
+      ...(data.isSurvey ? clearSurveyAnswerKeys(q) : q),
+      id: q.id ?? `lesson-question-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    };
     if (editingIndex === null) { qs.push(savedQuestion); } else { qs[editingIndex] = savedQuestion; }
     set("questions", qs);
     setEditingIndex(null);
@@ -1130,7 +1145,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
 
   const applyAiPreview = () => {
     if (!aiPreview) return;
-    set("questions", [...questions, ...aiPreview]);
+    set("questions", [...questions, ...(data.isSurvey ? clearSurveyAnswerKeysFromQuestions(aiPreview) : aiPreview)]);
     setAiPreview(null);
     toast.success("Questions added to quiz.");
   };
@@ -1189,6 +1204,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
           ...data,
           isSurvey: v,
           requirePassToComplete: v ? false : data.requirePassToComplete,
+          questions: v ? clearSurveyAnswerKeysFromQuestions(data.questions ?? []) : data.questions,
         })} />
       </div>
 
@@ -1259,7 +1275,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
               </div>
               {editingIndex === i && (
                 <QuestionEditor question={q} index={i} isNew={false} handleFileUpload={handleFileUpload}
-                  onSave={saveQuestion} onCancel={() => setEditingIndex(null)} previousQuestions={questions.slice(0, i)} />
+                  onSave={saveQuestion} onCancel={() => setEditingIndex(null)} previousQuestions={questions.slice(0, i)} isSurvey={data.isSurvey ?? false} />
               )}
             </div>
           ))}
@@ -1269,7 +1285,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
       {/* New question form */}
       {addingNew && editingIndex === null && (
         <QuestionEditor question={{ ...EMPTY_QUESTION }} index={null} isNew={true} handleFileUpload={handleFileUpload}
-          onSave={saveQuestion} onCancel={() => setAddingNew(false)} previousQuestions={questions} />
+          onSave={saveQuestion} onCancel={() => setAddingNew(false)} previousQuestions={questions} isSurvey={data.isSurvey ?? false} />
       )}
 
       {/* Add / AI tabs */}
@@ -1528,7 +1544,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
                     </div>
                     {editingAiIndex === i && (
                       <QuestionEditor question={q} index={i} isNew={false} handleFileUpload={handleFileUpload}
-                        onSave={saveAiEdit} onCancel={() => setEditingAiIndex(null)} />
+                        onSave={saveAiEdit} onCancel={() => setEditingAiIndex(null)} previousQuestions={[]} isSurvey={data.isSurvey ?? false} />
                     )}
                   </div>
                 ))}
