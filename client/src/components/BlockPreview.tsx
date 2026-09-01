@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Award, BookOpen, ChevronDown, Globe, Image, Package, Upload, Video } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { resolveEmbeddedFormUrl } from "@/lib/embeddedFormUrl";
 import CarouselBlock from "@/components/CarouselBlock";
 import InlineCheckoutBlock from "@/components/InlineCheckoutBlock";
