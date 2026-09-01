@@ -11,7 +11,8 @@ describe("Page Template listing contract", () => {
     const procedure = source.slice(start, end);
 
     expect(procedure).toContain("templateType: lmsPageTemplates.templateType");
-    expect(procedure).toContain("blocks: lmsPageTemplates.blocks");
+    expect(procedure).toContain("if (input.includeBlocks === false)");
+    expect(procedure).toContain("getPageTemplate:");
     expect(procedure).not.toContain("thumbnailUrl: lmsPageTemplates.thumbnailUrl");
     expect(procedure).not.toContain("db.select().from(lmsPageTemplates)");
   });

@@ -749,11 +749,32 @@ Make ALL content specific and compelling based on the course title, description,
 
   // ── Page Templates ──
   listPageTemplates: protectedProcedure
-    .input(z.object({ templateType: z.enum(["page", "block"]).optional() }))
+    .input(z.object({
+      templateType: z.enum(["page", "block"]).optional(),
+      // Existing block-template consumers retain their full-block response unless
+      // they explicitly opt into the lightweight page-library listing.
+      includeBlocks: z.boolean().optional(),
+    }))
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const whereTemplateType = input.templateType ? eq(lmsPageTemplates.templateType, input.templateType) : undefined;
+
+      if (input.includeBlocks === false) {
+        return db.select({
+          id: lmsPageTemplates.id,
+          name: lmsPageTemplates.name,
+          description: lmsPageTemplates.description,
+          templateType: lmsPageTemplates.templateType,
+          blockType: lmsPageTemplates.blockType,
+          createdAt: lmsPageTemplates.createdAt,
+          updatedAt: lmsPageTemplates.updatedAt,
+        }).from(lmsPageTemplates)
+          .where(whereTemplateType)
+          .orderBy(lmsPageTemplates.updatedAt);
+      }
+
       const rows = await db.select({
         id: lmsPageTemplates.id,
         name: lmsPageTemplates.name,
@@ -764,12 +785,35 @@ Make ALL content specific and compelling based on the course title, description,
         createdAt: lmsPageTemplates.createdAt,
         updatedAt: lmsPageTemplates.updatedAt,
       }).from(lmsPageTemplates)
-        .where(input.templateType ? eq(lmsPageTemplates.templateType, input.templateType) : undefined)
+        .where(whereTemplateType)
         .orderBy(lmsPageTemplates.updatedAt);
       return rows.map(r => ({
         ...r,
         blocks: typeof r.blocks === "string" ? JSON.parse(r.blocks) : r.blocks,
       }));
+    }),
+
+  getPageTemplate: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [template] = await db.select({
+        id: lmsPageTemplates.id,
+        name: lmsPageTemplates.name,
+        description: lmsPageTemplates.description,
+        templateType: lmsPageTemplates.templateType,
+        blocks: lmsPageTemplates.blocks,
+      }).from(lmsPageTemplates)
+        .where(eq(lmsPageTemplates.id, input.id))
+        .limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Template not found" });
+      try {
+        return { ...template, blocks: typeof template.blocks === "string" ? JSON.parse(template.blocks) : template.blocks };
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This template has invalid saved content" });
+      }
     }),
 
   savePageTemplate: protectedProcedure

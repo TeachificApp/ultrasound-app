@@ -7863,9 +7863,24 @@ function TemplateLibrary({ blocks, onInsert, onClose }: {
   const [isSaving, setIsSaving] = useState(false);
 
   const { data: templates = [], isLoading, isError, error, refetch } = trpc.lmsAdmin.listPageTemplates.useQuery(
-    { templateType: "page" },
+    { templateType: "page", includeBlocks: false },
     { staleTime: 0, refetchOnMount: "always" },
   );
+  const utils = trpc.useUtils();
+  const [insertingTemplateId, setInsertingTemplateId] = useState<number | null>(null);
+  const handleInsertSavedTemplate = async (templateId: number) => {
+    setInsertingTemplateId(templateId);
+    try {
+      const template = await utils.lmsAdmin.getPageTemplate.fetch({ id: templateId });
+      const templateBlocks = Array.isArray(template.blocks) ? template.blocks : [];
+      onInsert(copyPageTemplateBlocks(templateBlocks, uid));
+      onClose();
+    } catch (loadError) {
+      toast.error(loadError instanceof Error ? loadError.message : "This saved template could not be opened.");
+    } finally {
+      setInsertingTemplateId(null);
+    }
+  };
   const saveMutation = trpc.lmsAdmin.savePageTemplate.useMutation({
     onSuccess: () => { toast.success("Template saved!"); setSaveName(""); setSaveDesc(""); refetch(); },
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
@@ -7912,13 +7927,12 @@ function TemplateLibrary({ blocks, onInsert, onClose }: {
             ) : (
               <div className="grid gap-2 sm:grid-cols-2">
                 {templates.map((tpl: any) => {
-                  const templateBlocks = Array.isArray(tpl.blocks) ? tpl.blocks : [];
                   return <div key={tpl.id} className="rounded-lg border border-teal-100 bg-white p-3">
                     <h3 className="truncate text-sm font-semibold text-gray-900">{tpl.name}</h3>
                     {tpl.description && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{tpl.description}</p>}
                     <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className="text-xs text-gray-400">{templateBlocks.length} block{templateBlocks.length === 1 ? "" : "s"}</span>
-                      <Button onClick={() => { onInsert(copyPageTemplateBlocks(templateBlocks, uid)); onClose(); }} className="h-7 bg-teal-600 px-2.5 text-xs text-white hover:bg-teal-700">Add to Page</Button>
+                      <span className="text-xs text-gray-400">Ready to insert</span>
+                      <Button disabled={insertingTemplateId === tpl.id} onClick={() => handleInsertSavedTemplate(tpl.id)} className="h-7 bg-teal-600 px-2.5 text-xs text-white hover:bg-teal-700">{insertingTemplateId === tpl.id ? "Loading…" : "Add to Page"}</Button>
                     </div>
                   </div>;
                 })}
