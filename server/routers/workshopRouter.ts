@@ -110,11 +110,20 @@ export const workshopPublicRouter = router({
         )
         .orderBy(asc(workshopInstances.startDate));
 
-      // Filter by the availability CTA each instance should receive.
-      const availableInstances = allInstances.filter(isInstanceOnSale);
-      const waitlistInstances = allInstances.filter((instance) => instance.status === "waitlist");
+      // Archived display state is date-aware: a closed instance that has ended
+      // remains in staff reporting but is removed from public enrollment choices.
+      // A waitlist is therefore shown only when no future or active alternative
+      // remains available for the same workshop.
+      const now = new Date();
+      const visibleInstances = allInstances.filter((instance) => {
+        const end = instance.endDate ?? instance.startDate;
+        return !end || end >= now;
+      });
+      // Filter by the availability CTA each visible instance should receive.
+      const availableInstances = visibleInstances.filter(isInstanceOnSale);
+      const waitlistInstances = visibleInstances.filter((instance) => instance.status === "waitlist");
       // Instances that are date-valid but sold out (at capacity)
-      const soldOutInstances = allInstances.filter(isInstanceSoldOut);
+      const soldOutInstances = visibleInstances.filter(isInstanceSoldOut);
 
       // Get pricing options
       const pricingOptions = await db
@@ -146,7 +155,7 @@ export const workshopPublicRouter = router({
         availableInstances,
         waitlistInstances,
         soldOutInstances,
-        allInstances,
+        allInstances: visibleInstances,
         pricingOptions,
         resources,
       };

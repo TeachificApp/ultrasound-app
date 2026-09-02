@@ -313,3 +313,9 @@
 - [x] Add focused hierarchy, folder-filtering, rename, reorder, and question-preservation regressions for the Question Bank folder experience.
 - [x] Create or reuse Question Bank subfolders for each ZIP or SCORM extracted quiz group beneath the administrator-selected parent folder, preserving every imported question and group assignment.
 - [x] Add focused import-subfolder hierarchy and question-preservation regression coverage for grouped ZIP and SCORM quiz extraction.
+- [ ] Redesign the Question Bank as a full-screen repository-style workspace with a persistent active-folder sidebar and selected-folder questions in the main pane.
+- [ ] Move nested folder opening, creation, subfolder, rename, and sibling reorder controls into the Question Bank sidebar while preserving folder and question assignments.
+- [ ] Add focused full-screen Question Bank layout, sidebar hierarchy, selected-folder, rename, and reorder regressions.
+- [ ] Move Question Bank out of LMS navigation into a dedicated full-screen administration route with links back to Platform Admin and LMS Admin, preserving the authorized Question Bank data contract.
+- [x] Archive closed workshop instances and cohorts after their end date; show waitlist only when no alternative available instance or cohort group exists for the same offering, preserving historical enrollment, learner, completion, attendance, and reporting data.
+- [x] Add focused date-boundary, alternative-availability, public visibility, waitlist, archive, and historical-data preservation regressions for past closed workshop instances and cohorts.

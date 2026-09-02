@@ -1185,6 +1185,13 @@ export const lmsPublicRouter = router({
 
       // ── Capacity / sold-out helpers for cohort groups ──────────────────────────
       const now = new Date();
+      // Closed groups that have ended remain in staff history, but are archived
+      // from the public enrollment chooser. Waitlist presentation therefore
+      // reflects whether another current or future group is actually available.
+      const visibleCohortGroups = cohortGroupsRaw.filter((g) => {
+        const end = g.endDate ?? g.startDate;
+        return !end || new Date(end) >= now;
+      });
       const isCohortGroupOnSale = (g: typeof cohortGroupsRaw[0]) => {
         if (g.status !== "open") return false;
         if (g.enrollmentCloseDate && !isScheduledDeadlineOpen(g.enrollmentCloseDate, "America/New_York", now)) return false;
@@ -1203,19 +1210,19 @@ export const lmsPublicRouter = router({
       // Priority: (1) admin-pinned isFeaturedOnLanding group, (2) next upcoming open group
       // whose startDate is still in the future (not in-progress), (3) first non-archived group.
       // "active" (in-progress) groups are intentionally skipped for the hero/single display.
-      const nextUpcomingOpen = cohortGroupsRaw
+      const nextUpcomingOpen = visibleCohortGroups
         .filter(g => g.status === "open" && g.startDate && new Date(g.startDate) > now)
         .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime())[0] ?? null;
       const featuredGroup =
-        cohortGroupsRaw.find(g => g.isFeaturedOnLanding) ??
+        visibleCohortGroups.find(g => g.isFeaturedOnLanding) ??
         nextUpcomingOpen ??
-        cohortGroupsRaw[0] ?? null;
+        visibleCohortGroups[0] ?? null;
       // hasOpenGroup: true only if at least one group is on sale (date-valid AND not at capacity)
-      const hasOpenGroup = cohortGroupsRaw.some(isCohortGroupOnSale);
+      const hasOpenGroup = visibleCohortGroups.some(isCohortGroupOnSale);
       // soldOutGroups: date-valid but at capacity
-      const soldOutGroups = cohortGroupsRaw.filter(isCohortGroupSoldOut);
+      const soldOutGroups = visibleCohortGroups.filter(isCohortGroupSoldOut);
       // Include all non-archived cohort groups so the Live Sessions Auto block can show them
-      const cohortGroups = cohortGroupsRaw;
+      const cohortGroups = visibleCohortGroups;
       return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions, featuredGroup, hasOpenGroup, soldOutGroups, cohortGroups };
     }),
 
@@ -1606,7 +1613,7 @@ export const lmsPublicRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [group] = await db
-        .select({ id: lmsCohortGroups.id, name: lmsCohortGroups.name, maxStudents: lmsCohortGroups.maxStudents, status: lmsCohortGroups.status })
+        .select({ id: lmsCohortGroups.id, name: lmsCohortGroups.name, maxStudents: lmsCohortGroups.maxStudents, status: lmsCohortGroups.status, endDate: lmsCohortGroups.endDate })
         .from(lmsCohortGroups)
         .where(eq(lmsCohortGroups.id, input.cohortGroupId))
         .limit(1);
@@ -1616,11 +1623,13 @@ export const lmsPublicRouter = router({
         .select({ count: sql<number>`count(*)` })
         .from(lmsCohortGroupEnrollments)
         .where(eq(lmsCohortGroupEnrollments.cohortGroupId, input.cohortGroupId));
+      const isArchived = Boolean(group.endDate && new Date(group.endDate) < new Date() && (group.status === "waitlist" || group.status === "enrollment_closed"));
       return {
         cohortGroupId: group.id,
         name: group.name,
-        enrollmentOpen: group.status !== "waitlist" && group.status !== "enrollment_closed",
-        hideEnrollmentPresentation: group.status === "waitlist" || group.status === "enrollment_closed",
+        enrollmentOpen: !isArchived && group.status !== "waitlist" && group.status !== "enrollment_closed",
+        hideEnrollmentPresentation: isArchived || group.status === "waitlist" || group.status === "enrollment_closed",
+        lifecycleStatus: isArchived ? "archived" : group.status,
       };
     }),
 
