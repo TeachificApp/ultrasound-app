@@ -319,3 +319,7 @@
 - [ ] Move Question Bank out of LMS navigation into a dedicated full-screen administration route with links back to Platform Admin and LMS Admin, preserving the authorized Question Bank data contract.
 - [x] Archive closed workshop instances and cohorts after their end date; show waitlist only when no alternative available instance or cohort group exists for the same offering, preserving historical enrollment, learner, completion, attendance, and reporting data.
 - [x] Add focused date-boundary, alternative-availability, public visibility, waitlist, archive, and historical-data preservation regressions for past closed workshop instances and cohorts.
+- [ ] Repair the Fetal Echocardiography workshop URL’s public title, description, image, canonical URL, and social metadata so link previews do not fall back to Adult Echo content.
+- [ ] Add focused public metadata-route regression coverage confirming each workshop URL receives its own saved SEO and social preview fields without changing its URL or workshop content.
+- [x] Repair email logo rendering by replacing the unreliable source with publicly reachable absolute image markup while preserving the existing branded email header.
+- [x] Add focused email-template regression coverage for an absolute public logo URL, meaningful alt text, and email-client-safe image dimensions without sending email.

@@ -59,6 +59,8 @@ export interface BrandDisplayConfig {
   websiteUrl: string;
   appUrl: string;
   logoUrl: string;
+  /** Stable public HTTPS image used in transactional email headers. */
+  emailLogoUrl: string;
   primaryColor: string;
   darkColor: string;
   accentColor: string;
@@ -68,6 +70,10 @@ const AAUS_LOGO =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png";
 const IHE_LOGO =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-512_79ee0572.png";
+const AAUS_EMAIL_LOGO =
+  "https://www.allaboutultrasound.com/uploads/5/3/6/0/5360192/sono-ring4_orig.png";
+const IHE_EMAIL_LOGO =
+  "https://www.iheartecho.com/uploads/5/3/6/0/5360192/published/sono-ring-echo-iheartecho.png";
 
 export { AAUS_LOGO as AAUS_BRAND_LOGO_URL, IHE_LOGO as IHE_BRAND_LOGO_URL };
 
@@ -85,6 +91,7 @@ export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
         websiteUrl: "https://www.iheartecho.com",
         appUrl: "https://app.iheartecho.com",
         logoUrl: IHE_LOGO,
+        emailLogoUrl: IHE_EMAIL_LOGO,
         primaryColor: "#189aa1",
         darkColor: "#0e1e2e",
         accentColor: "#4ad9e0",
@@ -101,6 +108,7 @@ export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
         websiteUrl: "https://www.allaboutultrasound.com",
         appUrl: "https://app.allaboutultrasound.com",
         logoUrl: AAUS_LOGO,
+        emailLogoUrl: AAUS_EMAIL_LOGO,
         primaryColor: "#189aa1",
         darkColor: "#0e1e2e",
         accentColor: "#4ad9e0",
@@ -118,6 +126,7 @@ export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
         websiteUrl: "https://www.allaboutultrasound.com",
         appUrl: "https://app.allaboutultrasound.com",
         logoUrl: AAUS_LOGO,
+        emailLogoUrl: AAUS_EMAIL_LOGO,
         primaryColor: "#189aa1",
         darkColor: "#0e1e2e",
         accentColor: "#4ad9e0",

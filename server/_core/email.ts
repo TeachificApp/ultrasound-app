@@ -7,7 +7,6 @@
  */
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
-import { resolveAssetUrl } from "../lib/resolveAssetUrl";
 import { getDb } from "../db";
 import { eq } from "drizzle-orm";
 import { users, emailSendLog as emailSendLogTable } from "../../drizzle/schema";
@@ -170,9 +169,9 @@ const brandDark = "#0e1e2e";
 /** Brand-aware email wrapper. Pass brandMode to customize header/footer. */
 export function emailWrapper(content: string, brandMode?: BrandMode): string {
   const bc = getBrandDisplayConfig(brandMode || "aaus");
-  const logoSrc = resolveAssetUrl(bc.logoUrl) ?? bc.logoUrl;
+  const logoSrc = bc.emailLogoUrl;
   // For combined mode, show only the AAUS logo (covers both brands)
-  const logoHtml = `<img src="${logoSrc}" alt="${bc.displayName}" width="80" height="80" style="border-radius:50%;display:block;margin:0 auto 12px;" />`;
+  const logoHtml = `<img src="${logoSrc}" alt="${bc.shortName} logo" width="76" height="76" border="0" style="display:block;width:76px;height:76px;margin:0 auto 12px;border:0;outline:none;text-decoration:none;" />`;
 
   return `<!DOCTYPE html>
 <html lang="en">
