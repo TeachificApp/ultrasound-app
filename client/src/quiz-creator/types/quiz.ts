@@ -5,6 +5,7 @@ export type QuestionType =
   | "tf"
   | "matching"
   | "hotspot"
+  | "image_labeling"
   | "fill_blank"
   | "short_answer"
   | "image_choice"
@@ -58,6 +59,24 @@ export interface HotspotData {
   imageAlt: string;
   regions: HotspotRegion[];
   multiSelect: boolean;
+}
+
+/** A creator-defined label choice placed against one blank target on the question image. */
+export interface ImageLabelChoice {
+  id: string;
+  text: string;
+}
+export interface ImageLabelTarget {
+  id: string;
+  /** Percentage position measured from the top-left of the question image. */
+  x: number;
+  y: number;
+  /** The label choice that belongs at this target. Each target uses one unique label. */
+  labelId: string;
+}
+export interface ImageLabelingData {
+  labels: ImageLabelChoice[];
+  targets: ImageLabelTarget[];
 }
 
 export interface FillBlankBlank {
@@ -172,6 +191,7 @@ export type QuestionData =
   | TfData
   | MatchingData
   | HotspotData
+  | ImageLabelingData
   | FillBlankData
   | ShortAnswerData
   | ImageChoiceData

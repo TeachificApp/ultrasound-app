@@ -12,6 +12,7 @@ interface TfData {
 }
 
 import { orderQuestionOptions, shouldShuffleQuestionOptions } from "./questionOptionOrder";
+import { gradeImageLabelingAnswer } from "../../shared/imageLabeling";
 
 export function stableBuilderQuestionId(builderQuestionId: string): number {
   let h = 0;
@@ -75,6 +76,10 @@ export function gradeBuilderAnswer(
       const data = question.data as { pairs: { id: string }[] };
       const ans = given as Record<string, string>;
       return data.pairs.every((p) => ans[p.id] === p.id);
+    }
+    case "image_labeling": {
+      const data = question.data as { targets: { id: string; labelId: string }[] };
+      return gradeImageLabelingAnswer(data.targets ?? [], given);
     }
     default:
       return false;

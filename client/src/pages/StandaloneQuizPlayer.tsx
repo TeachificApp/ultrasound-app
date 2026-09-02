@@ -30,6 +30,8 @@ import {
   type QuizReadAloudVoice,
 } from "@shared/quizVoiceOptions";
 import { filterVisibleDependentQuestions } from "@shared/quizQuestionDependency";
+import { ImageLabelingInteraction } from "@/quiz-creator/components/ImageLabelingInteraction";
+import { isCompleteImageLabelingAnswer } from "@shared/imageLabeling";
 
 export function getStandaloneSelectedOptionFeedback(
   type: string,
@@ -454,16 +456,28 @@ export default function StandaloneQuizPlayer() {
     .filter(({ question }) => answers[question.questionBankId] === undefined);
 
   // ── Builder mode (iSpring-style themed player) ──
-  if (isBuilderMode && (q.type === "mcq" || q.type === "image_choice" || q.type === "tf")) {
+  if (isBuilderMode && (q.type === "mcq" || q.type === "image_choice" || q.type === "tf" || q.type === "image_labeling")) {
     const mcqData = q.data as { choices?: { id: string; text: string; correct: boolean }[]; correct?: boolean } | undefined;
     const choices = q.type === "tf"
       ? [{ id: "true", text: "TRUE", correct: mcqData?.correct === true }, { id: "false", text: "FALSE", correct: mcqData?.correct === false }]
       : (mcqData?.choices ?? []);
     const selectedIds: string[] = givenAnswer ? (() => { try { return JSON.parse(givenAnswer); } catch { return [givenAnswer]; } })() : [];
+    const imageLabelingAnswer: Record<string, string> = givenAnswer ? (() => {
+      try {
+        const parsed = JSON.parse(givenAnswer);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, string> : {};
+      } catch {
+        return {};
+      }
+    })() : {};
+    const imageLabelingComplete = q.type !== "image_labeling" || isCompleteImageLabelingAnswer(
+      (q.data as { targets?: { id: string; labelId: string }[] }).targets ?? [],
+      imageLabelingAnswer,
+    );
     const primary = branding?.primaryColor ?? "#24abbc";
 
     const handleBuilderSubmit = () => {
-      if (givenAnswer === undefined) return;
+      if (givenAnswer === undefined || !imageLabelingComplete) return;
       if (isQuizMode) {
         const fb = getFeedbackMessage(q, givenAnswer);
         setFeedbackPopup(fb);
@@ -501,7 +515,7 @@ export default function StandaloneQuizPlayer() {
               <button
                 type="button"
                 onClick={() => { if (isQuizMode && !isRevealed) handleBuilderSubmit(); else handleNext(); }}
-                disabled={givenAnswer === undefined || (isQuizMode && !isRevealed && givenAnswer === undefined)}
+                disabled={givenAnswer === undefined || !imageLabelingComplete || (isQuizMode && !isRevealed && givenAnswer === undefined)}
                 className="px-6 py-2 border-2 border-white text-white font-semibold rounded hover:bg-white/10 disabled:opacity-40"
               >
                 {isQuizMode && !isRevealed ? "Submit" : "Next"}
@@ -510,7 +524,8 @@ export default function StandaloneQuizPlayer() {
               <button
                 type="button"
                 onClick={() => { if (isQuizMode && !isRevealed) handleBuilderSubmit(); else if (isMockExam) handleMockExamSubmitRequest(); else handleSubmit(); }}
-                className="px-6 py-2 font-semibold text-white rounded"
+                disabled={!imageLabelingComplete}
+                className="px-6 py-2 font-semibold text-white rounded disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ background: primary }}
               >
                 Finish
@@ -526,7 +541,15 @@ export default function StandaloneQuizPlayer() {
             </div>
           </div>
           <p className="text-lg font-medium mb-6 leading-relaxed">{q.question}</p>
-          <div className="flex gap-8">
+          {q.type === "image_labeling" ? (
+            <ImageLabelingInteraction
+              data={q.data as { labels: { id: string; text: string }[]; targets: { id: string; x: number; y: number; labelId: string }[] }}
+              imageUrl={q.questionImageUrl}
+              answer={imageLabelingAnswer}
+              onChange={(nextAnswer) => recordAnswer(q.questionBankId, JSON.stringify(nextAnswer))}
+              disabled={isQuizMode && !!isRevealed}
+            />
+          ) : <div className="flex gap-8">
             <div className="flex-1 space-y-3">
               {choices.map((c) => {
                 const isSelected = selectedIds.includes(c.id);
@@ -553,7 +576,7 @@ export default function StandaloneQuizPlayer() {
                   : <img src={q.questionImageUrl} alt="" className="max-h-64 rounded-lg object-contain" />}
               </div>
             )}
-          </div>
+          </div>}
         </BuilderQuestionFrame>
       </>
     );

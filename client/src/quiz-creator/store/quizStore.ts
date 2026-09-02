@@ -34,6 +34,21 @@ function defaultData(type: QuestionType): QuestionData {
       };
     case "hotspot":
       return { imageUrl: "", imageAlt: "", regions: [], multiSelect: false };
+    case "image_labeling": {
+      const labels = [
+        { id: uuidv4(), text: "Label 1" },
+        { id: uuidv4(), text: "Label 2" },
+        { id: uuidv4(), text: "Label 3" },
+      ];
+      return {
+        labels,
+        targets: [
+          { id: uuidv4(), x: 24, y: 28, labelId: labels[0].id },
+          { id: uuidv4(), x: 58, y: 52, labelId: labels[1].id },
+          { id: uuidv4(), x: 38, y: 76, labelId: labels[2].id },
+        ],
+      };
+    }
     case "fill_blank":
       return {
         template: "The {{blank1}} is important for {{blank2}}.",

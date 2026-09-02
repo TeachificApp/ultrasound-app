@@ -139,6 +139,9 @@
 - [x] Audit and propose a single canonical Question Bank source of truth for Visual Builder questions so question text, answers, and feedback remain synchronized before any existing records are migrated or changed.
 - [x] Implement the approved canonical Question Bank synchronization for Visual Builder loads and saves, while retaining an explicit quiz-only find-and-replace override.
 - [x] Add explicit Visual Builder revision choices to update the linked Question Bank record or create a new linked Question Bank record for the revised quiz question.
+- [x] Add a native Quiz Builder image-labeling question type with creator-defined image targets and label choices, without changing existing hotspot questions or quiz records.
+- [x] Build learner label-to-image-target matching, answer persistence, correctness feedback, and scoring for native image-labeling questions.
+- [x] Add focused regressions for image-labeling authoring, accessible learner matching, answer evaluation, scoring, and legacy hotspot compatibility.
 - [x] Repair magic-link URL generation and completion routing so valid learner links on learn.allaboutultrasound.com never land on an inactive funnel page, without resending email unless separately approved.
 - [x] Repair the learner content-access page runtime error “Can’t find variable: cn” without changing enrollment, entitlement, or content data.
 - [x] Repair the authorized RPhS quiz launch path that currently shows “Quiz not found,” while retaining standalone quiz non-discovery rules.

@@ -3,6 +3,7 @@
  */
 import React from "react";
 import { resolveQuizBackground } from "@shared/quizBackground";
+import { gradeImageLabelingAnswer } from "@shared/imageLabeling";
 
 export interface BuilderBranding {
   primaryColor?: string;
@@ -193,6 +194,9 @@ export function isBuilderQuestionCorrect(q: any, givenAnswer: string): boolean {
     if (q.type === "tf") {
       return given === q.data?.correct;
     }
+    if (q.type === "image_labeling") {
+      return gradeImageLabelingAnswer(q.data?.targets ?? [], given);
+    }
     return false;
   } catch {
     return false;
@@ -211,7 +215,7 @@ export function getFeedbackMessage(q: any, givenAnswer: string): { type: "correc
       selectedChoiceFeedback = "";
     }
   }
-  if (q.type !== "tf") {
+  if (q.type !== "tf" && q.type !== "image_labeling") {
     try {
       const selectedIds: string[] = JSON.parse(givenAnswer);
       const choices = (q.data?.choices ?? []) as { id: string; feedback?: string }[];

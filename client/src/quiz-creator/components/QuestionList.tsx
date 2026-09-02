@@ -18,13 +18,14 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { QuizQuestion, QuestionType } from "../types/quiz";
-import { GripVertical, Plus, CheckSquare, ToggleLeft, Shuffle, MapPin, AlignLeft, MessageSquare, Image, ArrowDownUp, Move, Type, ChevronDown, Hash, BarChart3, FileText } from "lucide-react";
+import { GripVertical, Plus, CheckSquare, ToggleLeft, Shuffle, MapPin, AlignLeft, MessageSquare, Image, ArrowDownUp, Move, Type, ChevronDown, Hash, BarChart3, FileText, Tags } from "lucide-react";
 
 const TYPE_ICONS: Record<QuestionType, React.ReactNode> = {
   mcq: <CheckSquare className="w-3.5 h-3.5" />,
   tf: <ToggleLeft className="w-3.5 h-3.5" />,
   matching: <Shuffle className="w-3.5 h-3.5" />,
   hotspot: <MapPin className="w-3.5 h-3.5" />,
+  image_labeling: <Tags className="w-3.5 h-3.5" />,
   fill_blank: <AlignLeft className="w-3.5 h-3.5" />,
   short_answer: <MessageSquare className="w-3.5 h-3.5" />,
   image_choice: <Image className="w-3.5 h-3.5" />,
@@ -42,6 +43,7 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   tf: "True / False",
   matching: "Matching",
   hotspot: "Hotspot",
+  image_labeling: "Image Labeling",
   fill_blank: "Fill in the Blank",
   short_answer: "Short Answer",
   image_choice: "Image Choice",
@@ -56,7 +58,7 @@ const TYPE_LABELS: Record<QuestionType, string> = {
 
 const QUESTION_TYPES: QuestionType[] = [
   "mcq", "tf", "matching", "ordering", "fill_blank", "drag_words", "dropdown",
-  "hotspot", "drag_drop", "image_choice", "short_answer", "numeric", "likert", "essay",
+  "hotspot", "image_labeling", "drag_drop", "image_choice", "short_answer", "numeric", "likert", "essay",
 ];
 
 function SortableQuestionItem({ question, isActive, onClick, groupColor }: { question: QuizQuestion; isActive: boolean; onClick: () => void; groupColor?: string }) {

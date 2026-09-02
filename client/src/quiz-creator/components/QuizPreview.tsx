@@ -2,10 +2,12 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useQuizStore } from "../store/quizStore";
 import { resolveQuizBackground } from "@shared/quizBackground";
 import { X, ChevronLeft, ChevronRight, CheckCircle2, XCircle, RotateCcw, AlertTriangle } from "lucide-react";
-import type { QuizQuestion, McqData, TfData, MatchingData, HotspotData, FillBlankData, ShortAnswerData, ImageChoiceData, OrderingData, DragWordsData, DropdownData, NumericData, LikertData, EssayData, DrawConfig } from "../types/quiz";
+import type { QuizQuestion, McqData, TfData, MatchingData, HotspotData, ImageLabelingData, FillBlankData, ShortAnswerData, ImageChoiceData, OrderingData, DragWordsData, DropdownData, NumericData, LikertData, EssayData, DrawConfig } from "../types/quiz";
 import { DndOrdering, DndDragWords } from "./DndQuizInteractions";
+import { ImageLabelingInteraction } from "./ImageLabelingInteraction";
 import { RichTextDisplay } from "@/components/RichTextEditor";
 import { filterVisibleDependentQuestions } from "@shared/quizQuestionDependency";
+import { gradeImageLabelingAnswer } from "@shared/imageLabeling";
 
 interface Props {
   onClose: () => void;
@@ -37,6 +39,9 @@ export function evaluatePreviewAnswer(q: QuizQuestion, answer: Answer | undefine
     const expected = data.regions.filter((region) => region.correct).map((region) => region.id).sort();
     const selected = ((answer as string[]) ?? []).slice().sort();
     return JSON.stringify(expected) === JSON.stringify(selected) ? "correct" : "incorrect";
+  }
+  if (q.type === "image_labeling") {
+    return gradeImageLabelingAnswer((q.data as ImageLabelingData).targets, answer) ? "correct" : "incorrect";
   }
   if (q.type === "ordering") {
     const expected = (q.data as OrderingData).items.map((item) => item.id);
@@ -560,6 +565,7 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
     (q.type === "image_choice" && (q.data as ImageChoiceData).multiSelect) ||
     (q.type === "matching") ||
     (q.type === "hotspot" && (q.data as HotspotData).multiSelect) ||
+    (q.type === "image_labeling") ||
     (q.type === "fill_blank") ||
     (q.type === "ordering") ||
     (q.type === "drag_words") ||
@@ -590,6 +596,9 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
         const a = (ans as Record<string, string>) ?? {};
         const allCorrect = data.pairs.every((p) => a[p.id] === p.id);
         if (allCorrect) earned += q.points;
+      } else if (q.type === "image_labeling") {
+        const data = q.data as ImageLabelingData;
+        if (gradeImageLabelingAnswer(data.targets, ans)) earned += q.points;
       } else if (q.type === "ordering") {
         const data = q.data as OrderingData;
         const a = (ans as string[]) ?? [];
@@ -693,13 +702,14 @@ export function QuizPreview({ onClose, mode = "entire", currentQuestionId }: Pro
               <span className="text-xs text-gray-400">{q.points} point{q.points !== 1 ? "s" : ""}</span>
             </div>
             <p className="text-base font-medium text-gray-800">{q.stem || "(No question text)"}</p>
-            {q.image && <img src={q.image.url} alt={q.image.alt} className="mt-3 rounded-xl max-h-48 object-cover" />}
+            {q.image && q.type !== "image_labeling" && <img src={q.image.url} alt={q.image.alt} className="mt-3 rounded-xl max-h-48 object-cover" />}
           </div>
 
           {q.type === "mcq" && <McqQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} revealed={isFeedbackRevealed} shuffleChoices={!q.lockAnswerOrder && (q.shuffleAnswerOptions ?? quiz.meta.shuffleAnswers)} />}
           {q.type === "tf" && <TfQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} revealed={isFeedbackRevealed} />}
           {q.type === "matching" && <MatchingQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
           {q.type === "hotspot" && (q.data as HotspotData).imageUrl && <HotspotQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
+          {q.type === "image_labeling" && <ImageLabelingInteraction data={q.data as ImageLabelingData} imageUrl={q.image?.url} imageAlt={q.image?.alt} answer={(answer as Record<string, string>) ?? {}} onChange={setQuestionAnswer} disabled={isFeedbackRevealed} />}
           {q.type === "fill_blank" && <FillBlankQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} />}
           {q.type === "short_answer" && <ShortAnswerQuestion answer={answer} setAnswer={setQuestionAnswer} />}
           {q.type === "image_choice" && <ImageChoiceQuestion q={q} answer={answer} setAnswer={setQuestionAnswer} revealed={isFeedbackRevealed} shuffleChoices={!q.lockAnswerOrder && (q.shuffleAnswerOptions ?? quiz.meta.shuffleAnswers)} />}
