@@ -260,7 +260,7 @@ const ImageQualityReview = lazy(() => import("./pages/ImageQualityReview"));
 // ── Standalone Quiz Creator ───────────────────────────────────────────────────
 const QuizCreatorAdmin = lazy(() => import("./pages/admin/QuizCreatorAdmin"));
 const QuizVisualBuilder = lazy(() => import("./pages/admin/QuizVisualBuilder"));
-const QuestionBankPage = lazy(() => import("./pages/QuestionBankPage"));
+const QuestionBankPage = lazy(() => import("./pages/QuestionBankWorkspacePage"));
 const QuestionBankImportPage = lazy(() => import("./pages/QuestionBankImportPage"));
 const StandaloneQuizPlayer = lazy(() => import("./pages/StandaloneQuizPlayer"));
 const StandaloneQuizResults = lazy(() => import("./pages/StandaloneQuizResults"));
@@ -649,7 +649,7 @@ function Router() {
         <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
         {/* ── Question Bank ─────────────────────────────────────────────────────────────────────────────────────── */}
         <Route path="/question-bank/import">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankImportPage /></RoleGuard>}</Route>
-        <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Redirect to="/admin/lms?tab=question_bank" /></RoleGuard>}</Route>
+        <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankPage /></RoleGuard>}</Route>
         <Route path="/quizzes/:quizId">{() => <StandaloneQuizPlayer />}</Route>
         <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
         <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
@@ -757,7 +757,7 @@ function MembersRouter() {
       <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
       <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
       <Route path="/question-bank/import">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankImportPage /></RoleGuard>}</Route>
-      <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Redirect to="/admin/lms?tab=question_bank" /></RoleGuard>}</Route>
+      <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankPage /></RoleGuard>}</Route>
       <Route path="/quizzes/:quizId">{() => <StandaloneQuizPlayer />}</Route>
       <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
       <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>

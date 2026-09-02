@@ -1705,7 +1705,7 @@ export default function PlatformAdmin() {
     { id: "media-repository", href: getAdminUrl("/admin/media-repository"), icon: HardDrive, label: "Media Repository", description: "Shared media library with AAUS/IHE brand tags", color: "#0f766e" },
     { id: "lms", href: getAdminUrl("/admin/lms"), icon: Library, label: "LMS Management", description: "Manage courses, videos, and learning content", color: "#1d4ed8" },
     { id: "quiz-creator", href: getAdminUrl("/admin/quiz-creator"), icon: FileQuestion, label: "Quiz Creator", description: "Build standalone quizzes and mock exams from the question bank with analytics", color: "#0e7490" },
-    { id: "question-bank", href: getAdminUrl("/admin/lms?tab=question_bank"), icon: BookOpen, label: "Question Bank", description: "Browse, import (SCORM/CSV/XLSX), and manage the shared question bank used across all quizzes", color: "#7c3aed" },
+    { id: "question-bank", href: getAdminUrl("/question-bank"), icon: BookOpen, label: "Question Bank", description: "Browse, import (SCORM/CSV/XLSX), and manage the shared question bank used across all quizzes", color: "#0f766e" },
     { id: "funnels", href: getAdminUrl("/admin/funnels"), icon: LayoutTemplate, label: "Funnel Management", description: "Build funnels, manage contacts/leads, and track Lead \u2192 User \u2192 Purchaser conversions", color: "#be185d" },
     { id: "widgets", href: getAdminUrl("/admin/widgets"), icon: Code2, label: "Embed Widgets", description: "Create embeddable course/quiz card widgets for any external website", color: "#7c3aed" },
     { id: "members", href: getAdminUrl("/admin/members"), icon: Users, label: "Members", description: "Registered users, enrollments, sales, memberships, and activity logs", color: "#0d9488" },

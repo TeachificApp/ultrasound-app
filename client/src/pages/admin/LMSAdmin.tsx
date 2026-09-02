@@ -49,7 +49,7 @@ import {
   Repeat, Film, CalendarRange, ExternalLink, Link2, Mail, Activity, Briefcase,
   Percent, Search, Presentation,
 } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link, Redirect, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import LessonEffectEditor from "@/components/LessonEffectEditor";
 import { LMSSalesTab } from "@/components/LMSSalesTab";
@@ -8522,7 +8522,6 @@ const LMS_NAV_GROUPS = [
     label: "Tools",
     color: "gray",
     items: [
-      { value: "question_bank",     label: "Question Bank",     icon: Database },
       { value: "quiz_creator",      label: "Quiz Creator",      icon: FileQuestion, href: getAdminUrl("/admin/quiz-creator") },
       { value: "publish_requests",  label: "Publish Requests",  icon: CheckCircle },
       { value: "trash",             label: "Trash",             icon: Trash2, danger: true },
@@ -8558,6 +8557,9 @@ export default function LMSAdmin() {
   const urlEditBundle = urlParams?.get("editBundle") ?? null;
   const urlEditMembership = urlParams?.get("editMembership") ?? null;
   const urlEditWorkshop = urlParams?.get("editWorkshop") ?? null;
+  if (urlTab === "question_bank") {
+    return <Redirect to={getAdminUrl("/question-bank")} />;
+  }
   const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : urlEditProduct ? "products" : urlEditWebinar ? "webinars" : urlEditWorkshop ? "workshops" : urlEditBundle ? "bundles" : urlEditMembership ? "memberships" : "courses"));
   const [editingCourseId, setEditingCourseId] = useState<number | null>(urlEditCourse ? Number(urlEditCourse) : null);
   const [workshopsInitialEditId, setWorkshopsInitialEditId] = useState<number | undefined>(urlEditWorkshop ? Number(urlEditWorkshop) : undefined);
@@ -8694,7 +8696,6 @@ export default function LMSAdmin() {
               {activeTab === "analytics"   && <AnalyticsTab />}
               {activeTab === "quiz_results" && <QuizResultsAdmin />}
               {activeTab === "affiliates"  && <AffiliatesTab />}
-              {activeTab === "question_bank"    && <QuestionBankAdmin />}
               {activeTab === "publish_requests" && <PublishRequestsTab />}
               {activeTab === "trash"             && <TrashTab />}
               {activeTab === "lms_settings"      && <LMSPublishDomainSettings />}
@@ -11113,7 +11114,7 @@ function CoursePricingOptionsEditor({ courseId, courseSlug }: { courseId: number
 
 // ─── Question Bank Admin ──────────────────────────────────────────────────────
 
-function QuestionBankAdmin() {
+export function QuestionBankWorkspace({ standalone = false }: { standalone?: boolean }) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
@@ -11125,7 +11126,7 @@ function QuestionBankAdmin() {
   const [showCreate, setShowCreate] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showTagManager, setShowTagManager] = useState(false);
-  const [showFolderManager, setShowFolderManager] = useState(false);
+  const [showFolderManager, setShowFolderManager] = useState(standalone);
   const [selectedFolderId, setSelectedFolderId] = useState<number | undefined>(undefined);
   const [aiTopic, setAITopic] = useState("");
   const [aiCount, setAICount] = useState(10);
@@ -11326,16 +11327,19 @@ function QuestionBankAdmin() {
   );
 
   return (
-    <div className="space-y-4">
+    <div className={cn(
+      "space-y-4",
+      standalone && "lg:grid lg:grid-cols-[19rem_minmax(0,1fr)] lg:auto-rows-min lg:gap-x-5 lg:gap-y-4 lg:space-y-0",
+    )} data-question-bank-workspace={standalone ? "standalone" : "embedded"}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className={cn("flex items-center justify-between", standalone && "lg:col-span-2")}>
         <div>
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Database className="w-5 h-5 text-teal-600" /> Question Bank</h2>
           <p className="text-sm text-gray-500 mt-0.5">{total} question{total !== 1 ? "s" : ""}{selectedFolderId ? " in selected folder" : " total"}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setShowTagManager(p => !p)} className="gap-1.5"><Tag className="w-3.5 h-3.5" /> Tags</Button>
-          <Button size="sm" variant="outline" onClick={() => setShowFolderManager(p => !p)} className="gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"><FolderOpen className="w-3.5 h-3.5" /> Folders</Button>
+          {!standalone && <Button size="sm" variant="outline" onClick={() => setShowFolderManager(p => !p)} className="gap-1.5 border-purple-300 text-purple-700 hover:bg-purple-50"><FolderOpen className="w-3.5 h-3.5" /> Folders</Button>}
           <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50 gap-1.5" onClick={handleExportZip} disabled={exportLoading || total === 0}>
             {exportLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
             Export ZIP
@@ -11346,14 +11350,22 @@ function QuestionBankAdmin() {
         </div>
       </div>
 
-      {/* Folder Manager */}
-      {showFolderManager && (
-        <div className="border border-purple-200 rounded-xl p-4 bg-purple-50 space-y-3">
+      {/* Folder manager becomes the persistent repository sidebar on the standalone route. */}
+      {(standalone || showFolderManager) && (
+        <aside className={cn(
+          "border border-purple-200 rounded-xl p-4 bg-purple-50 space-y-3",
+          standalone && "lg:col-start-1 lg:row-span-[20] lg:sticky lg:top-5 lg:self-start lg:border-teal-200 lg:bg-teal-50",
+        )} aria-label="Question Bank folders" data-question-bank-sidebar={standalone ? "persistent" : "panel"}>
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-purple-800 text-sm flex items-center gap-2"><FolderOpen className="w-4 h-4" /> Manage Folders</h3>
-            <Button size="sm" variant="ghost" onClick={() => setShowFolderManager(false)}><X className="w-3.5 h-3.5" /></Button>
+            <h3 className={cn("font-semibold text-sm flex items-center gap-2", standalone ? "text-teal-800" : "text-purple-800")}><FolderOpen className="w-4 h-4" /> {standalone ? "Repository folders" : "Manage Folders"}</h3>
+            {!standalone && <Button size="sm" variant="ghost" onClick={() => setShowFolderManager(false)}><X className="w-3.5 h-3.5" /></Button>}
           </div>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
+          <div className={cn("space-y-2 overflow-y-auto", standalone ? "max-h-[calc(100vh-17rem)] pr-1" : "max-h-48")}>
+            {standalone && (
+              <button type="button" onClick={() => selectFolder(undefined)} className={cn("w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors", selectedFolderId === undefined ? "bg-teal-600 text-white shadow-sm" : "text-gray-700 hover:bg-white")}>
+                <Database className="w-3.5 h-3.5" /> All questions
+              </button>
+            )}
             {foldersError && (
               <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 Could not load folders: {foldersError.message}
@@ -11410,7 +11422,7 @@ function QuestionBankAdmin() {
               if (val) createFolder.mutate({ name: val, parentId: newFolderParentId });
             }}>Add Folder</Button>
           </div>
-        </div>
+        </aside>
       )}
       {/* Tag Manager */}
       {showTagManager && (
