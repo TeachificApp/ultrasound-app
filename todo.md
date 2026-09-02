@@ -223,6 +223,8 @@
 - [x] Ensure the required-survey completion setting applies to existing CME survey blocks with legacy single-choice question types, without requiring those blocks to be rebuilt.
 - [x] Add regression coverage confirming legacy CME survey questions complete by visible response submission and never by a passing-score threshold when survey completion is enabled.
 - [ ] Repair the reported CME Ergonomics survey completion error without changing existing learner attempts or certificate records.
+- [x] Repair the inline CME survey attempt-insert failure shown during required survey completion, preserving existing responses, learner progress, and certificate records.
+- [x] Add focused regression coverage for the inline-survey attempt insert contract and the resulting certificate-eligibility completion path.
 - [x] Resolve learner name and email merge fields in the existing embedded CME Ergonomics form URL so the form no longer receives literal placeholder values.
 - [x] Add focused regression coverage for encoded embedded-form name, last-name, and email placeholder substitution without exposing user data.
 - [x] Ensure professional-role and other CME survey questions are unscored response fields that never mark a valid answer wrong or require a specific role selection.

@@ -141,6 +141,7 @@ import { formatWorkshopDollars } from "../../shared/workshopPricing";
 import { prepareInlineQuizResponses } from "../lib/inlineLessonQuizResponses";
 import { normalizeQuizAccountFieldKeys, resolveQuizAccountFields } from "../../shared/quizAccountFields";
 import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
+import { buildInlineQuizAttemptValues, isMissingInlineQuizAccountFieldsColumn } from "../lib/inlineQuizAttemptPersistence";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
 // ─── Certificate Template Router (admin) ─────────────────────────────────────
@@ -2380,7 +2381,7 @@ export const lmsLearnerRouter = router({
           inlineQuiz?.data?.questions,
           input.responses,
         );
-        const [attempt] = await db.insert(lmsInlineQuizAttempts).values({
+        const attemptValues = buildInlineQuizAttemptValues({
           userId: ctx.user.id,
           courseId: course.id,
           lessonId: lesson.id,
@@ -2388,7 +2389,37 @@ export const lmsLearnerRouter = router({
           score,
           passed,
           accountFieldValues,
-        }).$returningId();
+        });
+        let attempt: { id: number } | undefined;
+        try {
+          [attempt] = await db.insert(lmsInlineQuizAttempts).values(attemptValues).$returningId();
+        } catch (error) {
+          // Existing deployments may have the pre-account-fields attempt table. A
+          // survey submission must still be recorded so required completion and
+          // the existing CME certificate path are not blocked by an optional
+          // reporting snapshot.
+          if (accountFieldValues !== null && isMissingInlineQuizAccountFieldsColumn(error)) {
+            [attempt] = await db.insert(lmsInlineQuizAttempts).values({
+              userId: ctx.user.id,
+              courseId: course.id,
+              lessonId: lesson.id,
+              quizBlockId: input.quizBlockId,
+              score,
+              passed,
+            }).$returningId();
+          } else {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Your survey response could not be saved. Please try again.",
+            });
+          }
+        }
+        if (!attempt) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Your survey response could not be saved. Please try again.",
+          });
+        }
         if (responseRows.length > 0) {
           await db.insert(lmsInlineQuizResponses).values(responseRows.map(response => ({
             attemptId: attempt.id,
