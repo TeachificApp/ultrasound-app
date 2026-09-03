@@ -68,6 +68,32 @@ const ALLOWED_COOKIE_DOMAINS = new Set([
   "accreditation.iheartecho.com",
 ]);
 
+/**
+ * Trusted first-party origins that may serve as redirect-based session bridges.
+ * These are intentionally narrower than the full return-origin allowlist.
+ */
+const BRIDGE_FALLBACK_ORIGINS = new Set([
+  "https://learn.allaboutultrasound.com",
+  "https://app.allaboutultrasound.com",
+]);
+
+function getFallbackBridgeUrl(req: Request, returnUrl: string): string | null {
+  const fallbackOrigin = typeof req.query.fallback === "string" ? req.query.fallback : "";
+  if (!BRIDGE_FALLBACK_ORIGINS.has(fallbackOrigin)) return null;
+
+  const attemptedIndex = Number(req.query.bridge_try ?? "0");
+  const nextAttempt = Number.isInteger(attemptedIndex) && attemptedIndex >= 0
+    ? attemptedIndex + 1
+    : 1;
+  const retryReturnUrl = new URL(returnUrl);
+  retryReturnUrl.searchParams.set("bridge_try", String(nextAttempt));
+
+  const retryUrl = new URL("/api/sso/bridge", fallbackOrigin);
+  retryUrl.searchParams.set("return", retryReturnUrl.toString());
+  retryUrl.searchParams.set("bridge_try", String(nextAttempt));
+  return retryUrl.toString();
+}
+
 function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
   if (ALLOWED_ORIGINS.has(origin)) return true;
@@ -308,6 +334,11 @@ export function registerSsoAutoRoute(app: Express) {
       const session = resolved?.session ?? null;
 
       if (!session) {
+        const fallbackUrl = getFallbackBridgeUrl(req, returnUrl);
+        if (fallbackUrl) {
+          console.log("[SsoBridge] No session; continuing via trusted fallback bridge");
+          return res.redirect(fallbackUrl);
+        }
         // Not authenticated — redirect back with ?sso_failed=1 so the client
         // knows the bridge was attempted and stops retrying (loop-breaker).
         console.log(`[SsoBridge] No session, redirecting back to ${returnUrl}`);

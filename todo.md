@@ -353,3 +353,5 @@
 - [x] Repair automatic sign-in on app.iheartecho.com for users already authenticated on All About Ultrasound, preserving existing accounts, sessions, and domain security boundaries.
 - [x] Add brand-correct logo display to phone-only app headers for UltrasoundAssist and EchoAssist without changing tablet or desktop headers.
 - [x] Add focused cross-domain sign-in and mobile-header logo regressions without exposing session tokens or account details.
+- [ ] Trace and repair the remaining live app.iheartecho.com automatic sign-in failure across Learn/App bridge, returned exchange, and iHeartEcho first-party session creation without changing user accounts or existing sessions.
+- [ ] Add focused full bridge-sequence regressions covering iHeartEcho fallback across approved source domains and first-party session completion without exposing tokens or account details.

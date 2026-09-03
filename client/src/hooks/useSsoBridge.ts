@@ -129,7 +129,9 @@ export function useSsoBridge() {
       if (!bridgeOrigin) return;
 
       const returnUrl = getBridgeReturnUrlWithAttempt(tryIndex);
-      const bridgeUrl = `${bridgeOrigin}/api/sso/bridge?return=${encodeURIComponent(returnUrl)}&bridge_try=${tryIndex}`;
+      const fallbackOrigin = bridgeOrigins[tryIndex + 1];
+      const fallbackParam = fallbackOrigin ? `&fallback=${encodeURIComponent(fallbackOrigin)}` : "";
+      const bridgeUrl = `${bridgeOrigin}/api/sso/bridge?return=${encodeURIComponent(returnUrl)}&bridge_try=${tryIndex}${fallbackParam}`;
       console.log("[SsoBridge] Redirecting to bridge:", bridgeUrl);
       window.location.href = bridgeUrl;
     };
