@@ -355,3 +355,6 @@
 - [x] Add focused cross-domain sign-in and mobile-header logo regressions without exposing session tokens or account details.
 - [ ] Trace and repair the remaining live app.iheartecho.com automatic sign-in failure across Learn/App bridge, returned exchange, and iHeartEcho first-party session creation without changing user accounts or existing sessions.
 - [ ] Add focused full bridge-sequence regressions covering iHeartEcho fallback across approved source domains and first-party session completion without exposing tokens or account details.
+- [x] Audit all active-domain password login, magic-link request, token verification, session creation, return-path, and protected-content access flows without sending an email or exposing authentication data.
+- [x] Confirm no separate password-login or magic-link verification defect in the shared audited paths; retain the live iHeartEcho automatic SSO issue as a separate open repair without changing accounts, sessions, passwords, access, or domain-security controls.
+- [x] Add focused cross-domain login and magic-link issuance, verification, redirect, cookie, and protected-content regressions without generating or disclosing real tokens.
