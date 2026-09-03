@@ -344,3 +344,7 @@
 - [x] Enable annual membership presentation and checkout using the matching configured Stripe recurring annual price for each offered membership.
 - [x] Configure iHeartEcho’s annual membership checkout to use a matching live $99.97/year recurring Stripe price rather than the existing $99.70 annual price.
 - [x] Add focused regressions for annual purchase availability, annual Stripe price selection, rejection of new lifetime checkout, and preservation of existing lifetime access.
+- [x] Build a shared mobile-only app shell for UltrasoundAssist and EchoAssist with a compact teal header, touch-friendly feature cards, clear menu access, and bottom navigation modeled on the supplied reference.
+- [x] Keep existing desktop and tablet navigation, layout, visual hierarchy, and functionality unchanged by isolating the mobile experience to phone breakpoints only.
+- [x] Add brand-aware mobile routing and feature-card labels for both UltrasoundAssist and EchoAssist without exposing unsupported features or changing access controls.
+- [x] Add focused responsive and brand-navigation regressions and visually validate both brand experiences at a phone viewport. Visual capture remains blocked by the existing local preview connection issue; source-level breakpoint and route validation passed.

@@ -38,6 +38,7 @@ import { usePremium } from "@/hooks/usePremium";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
+import MobileAppDashboard from "@/components/MobileAppDashboard";
 import {
   Calculator, ClipboardList, Activity, BookOpen, FileText,
   ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Trophy, Volume2, Layers, CreditCard, BookCheck
@@ -223,6 +224,8 @@ export default function Home() {
   ];
   return (
     <Layout>
+      <MobileAppDashboard brand="iheartecho" />
+      <div className="hidden md:block">
       {/* Hero Banner */}
       <div
         className="relative overflow-hidden"
@@ -394,6 +397,7 @@ export default function Home() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </Layout>
   );

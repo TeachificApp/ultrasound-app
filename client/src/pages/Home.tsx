@@ -41,6 +41,7 @@ import {
   ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Heart, ClipboardCheck, BrainCircuit
 } from "lucide-react";
 import NewsletterInlineWidget from "@/components/NewsletterInlineWidget";
+import MobileAppDashboard from "@/components/MobileAppDashboard";
 
 const BRAND = "#189aa1";
 
@@ -171,6 +172,8 @@ export default function Home() {
 
   return (
     <Layout>
+      <MobileAppDashboard brand="aaus" />
+      <div className="hidden md:block">
       {/* Hero Banner */}
       <div
         className="relative overflow-hidden"
@@ -409,6 +412,7 @@ export default function Home() {
         <div className="mt-6">
           <NewsletterInlineWidget dark source="home_page" />
         </div>
+      </div>
       </div>
     </Layout>
   );

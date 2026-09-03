@@ -398,17 +398,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top bar */}
-        <header className="sticky top-0 z-10 bg-white border-b border-[#189aa1]/20 px-2 sm:px-4 py-2.5 sm:py-3 flex items-center gap-1.5 sm:gap-3 shadow-sm min-w-0">
+        <header className="sticky top-0 z-10 flex min-w-0 items-center gap-1.5 border-b border-[#0e5964] bg-[#0e6470] px-2 py-2.5 text-white shadow-md sm:px-4 sm:py-3 md:border-[#189aa1]/20 md:bg-white md:text-inherit md:shadow-sm">
           <button
-            className="lg:hidden p-2 rounded-md text-[#189aa1] hover:bg-[#f0fbfc] min-w-[40px] min-h-[40px] flex items-center justify-center flex-shrink-0"
+            className="lg:hidden flex min-h-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-md p-2 text-white hover:bg-white/10 md:text-[#189aa1] md:hover:bg-[#f0fbfc]"
             onClick={() => setSidebarOpen(true)}
             aria-label="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
             <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse flex-shrink-0 hidden sm:block" />
-            <span className="text-xs sm:text-sm font-semibold text-[#189aa1] truncate" style={{ fontFamily: "Merriweather, serif" }}>
+            <span className="truncate text-sm font-semibold text-white md:hidden" style={{ fontFamily: "Merriweather, serif" }}>
+              {brandNav.title}
+            </span>
+            <span className="hidden truncate text-xs font-semibold text-[#189aa1] sm:text-sm md:inline" style={{ fontFamily: "Merriweather, serif" }}>
               {allNavItems.find((n: { path: string; label: string }) => n.path === location)?.label ?? brandNav.title}
             </span>
           </div>
@@ -421,7 +424,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {/* Avatar trigger — click to toggle */}
                 <button
                   onClick={() => setAccountOpen(o => !o)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-[#f0fbfc] transition-all border border-transparent hover:border-[#189aa1]/20"
+                  className="flex items-center gap-2 rounded-lg border border-transparent px-2.5 py-1.5 transition-all hover:bg-white/10 md:hover:border-[#189aa1]/20 md:hover:bg-[#f0fbfc]"
                 >
                   <UserAvatar
                     avatarUrl={(user as any).avatarUrl}
@@ -655,11 +658,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </a>
                 <a
                   href="/login"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold text-xs text-white transition-all hover:opacity-90"
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white transition-all hover:opacity-90"
                   style={{ background: "linear-gradient(135deg, #189aa1 0%, #4ad9e0 100%)" }}
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Sign In</span>
+                  <span>Sign In</span>
                 </a>
               </div>
             )}
@@ -667,7 +670,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Page content — add bottom padding on mobile so content isn't hidden behind bottom nav */}
-        <main className="flex-1 pb-20 lg:pb-0">
+        <main className="flex-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-20 lg:pb-0">
           {children}
         </main>
       </div>
@@ -689,13 +692,43 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 function MobileBottomNav({ location, brandNav }: { location: string; brandNav: any }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const brand = brandNav?.brand ?? "aaus";
+  const isIHE = brand === "iheartecho";
 
-  const tabs = [
+  const tabs = isIHE ? [
+    { path: "/", label: "Home", icon: LayoutDashboard },
+    { path: "/echo-assist-hub", label: "Echo", icon: Stethoscope },
+    { path: "/quickfire-ihe", label: "Learn", icon: Zap },
+    { path: "/flashcards", label: "Cards", icon: Layers },
+  ] : [
     { path: "/", label: "Home", icon: LayoutDashboard },
     { path: "/ultrasound-assist", label: "Clinical", icon: Stethoscope },
-    { path: "/quickfire", label: "Learn", icon: Zap },
-    { path: "/community", label: "Community", icon: Users },
+    { path: "/quickfire-aaus", label: "Learn", icon: Zap },
+    { path: "/flashcards", label: "Cards", icon: Layers },
   ];
+
+  const moreItems = isIHE
+    ? [
+        { path: "/echoassist", label: "Calculators", icon: Calculator },
+        { path: "/scan-coach", label: "Scan Coach", icon: Scan },
+        { path: "/guidelines-assist", label: "Guidelines", icon: BookOpen },
+        { path: "/case-library", label: "Cases", icon: Library },
+        { path: "/soundbytes-ihe", label: "SoundBytes", icon: BookMarked },
+        { path: "/cme", label: "CME Hub", icon: GraduationCap },
+        { path: "/registry-review", label: "Registry", icon: ClipboardCheck },
+        { path: "/community/all-about-ultrasound", label: "Community", icon: Users },
+        { path: "/premium", label: "Premium", icon: Crown },
+      ]
+    : [
+        { path: "/calculators", label: "Calculators", icon: Calculator },
+        { path: "/scan-coach", label: "Scan Coach", icon: Scan },
+        { path: "/case-library", label: "Cases", icon: Library },
+        { path: "/soundbytes-aaus", label: "SoundBytes", icon: BookMarked },
+        { path: "/cme", label: "CME Hub", icon: GraduationCap },
+        { path: "/registry-review", label: "Registry", icon: ClipboardCheck },
+        { path: "/clinical-intelligence", label: "Clinical Intel", icon: Brain },
+        { path: "/community/all-about-ultrasound", label: "Community", icon: Users },
+        { path: "/premium", label: "Premium", icon: Crown },
+      ];
 
   const isActive = (path: string) =>
     path === "/" ? location === "/" : location === path || location.startsWith(path + "/");
@@ -717,17 +750,7 @@ function MobileBottomNav({ location, brandNav }: { location: string; brandNav: a
             </button>
           </div>
           <div className="grid grid-cols-3 gap-3">
-            {[
-              { path: "/calculators", label: "Calculators", icon: Calculator },
-              { path: "/flashcards", label: "Flashcards", icon: Layers },
-              { path: "/case-library", label: "Cases", icon: Library },
-              { path: "/soundbytes", label: "SoundBytes", icon: BookMarked },
-              { path: "/cme", label: "CME Hub", icon: GraduationCap },
-              { path: "/registry-review", label: "Registry", icon: ClipboardCheck },
-              { path: "/career-network", label: "Career", icon: Briefcase },
-              { path: "/premium", label: "Premium", icon: Crown },
-              { path: "/scan-coach-hub", label: "Scan Coach", icon: Scan },
-            ].map(({ path, label, icon: Icon }) => (
+            {moreItems.map(({ path, label, icon: Icon }) => (
               <Link key={path} href={path}>
                 <button
                   onClick={() => setMoreOpen(false)}
