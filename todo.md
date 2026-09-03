@@ -350,3 +350,6 @@
 - [x] Add focused responsive and brand-navigation regressions and visually validate both brand experiences at a phone viewport. Visual capture remains blocked by the existing local preview connection issue; source-level breakpoint and route validation passed.
 - [x] Repair the LMS course-editor runtime failure caused by `isRestrictedManager` being referenced before definition, preserving all Platform Admin and Manager restrictions.
 - [x] Add focused regression coverage that the LMS course editor renders for authorized administrators and retains Manager-safe pricing and delete restrictions.
+- [x] Repair automatic sign-in on app.iheartecho.com for users already authenticated on All About Ultrasound, preserving existing accounts, sessions, and domain security boundaries.
+- [x] Add brand-correct logo display to phone-only app headers for UltrasoundAssist and EchoAssist without changing tablet or desktop headers.
+- [x] Add focused cross-domain sign-in and mobile-header logo regressions without exposing session tokens or account details.

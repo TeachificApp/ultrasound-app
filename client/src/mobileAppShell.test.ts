@@ -31,6 +31,9 @@ describe("phone-only app shell", () => {
   it("uses phone-only app chrome while restoring the existing neutral header from tablet widths onward", () => {
     const layout = source("client/src/components/Layout.tsx");
 
+    expect(layout).toContain("src={brandNav.logoUrl}");
+    expect(layout).toContain('alt={`${brandNav.logoAlt} logo`}');
+    expect(layout).toContain("object-contain p-0.5 shadow-sm md:hidden");
     expect(layout).toContain('bg-[#0e6470]');
     expect(layout).toContain('md:bg-white');
     expect(layout).toContain('md:shadow-sm');

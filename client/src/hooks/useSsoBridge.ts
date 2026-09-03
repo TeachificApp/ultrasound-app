@@ -53,6 +53,13 @@ function getBridgeReturnUrl(): string {
   return `${window.location.origin}/my-dashboard`;
 }
 
+/** Preserve the bridge attempt index on the return URL so a failed bridge can try the next approved origin. */
+function getBridgeReturnUrlWithAttempt(tryIndex: number): string {
+  const returnUrl = new URL(getBridgeReturnUrl());
+  returnUrl.searchParams.set("bridge_try", String(tryIndex));
+  return returnUrl.toString();
+}
+
 export function useSsoBridge() {
   const { user, loading } = useAuth();
   const hasRun = useRef(false);
@@ -93,9 +100,10 @@ export function useSsoBridge() {
         window.location.hash;
 
       if (tryIndex + 1 < bridgeOrigins.length) {
-        const returnUrl = getBridgeReturnUrl();
-        const bridgeUrl = `${bridgeOrigins[tryIndex + 1]}/api/sso/bridge?return=${encodeURIComponent(returnUrl)}&bridge_try=${tryIndex + 1}`;
-        console.log("[SsoBridge] Retrying bridge via", bridgeOrigins[tryIndex + 1]);
+        const nextTryIndex = tryIndex + 1;
+        const returnUrl = getBridgeReturnUrlWithAttempt(nextTryIndex);
+        const bridgeUrl = `${bridgeOrigins[nextTryIndex]}/api/sso/bridge?return=${encodeURIComponent(returnUrl)}&bridge_try=${nextTryIndex}`;
+        console.log("[SsoBridge] Retrying bridge via", bridgeOrigins[nextTryIndex]);
         window.location.href = bridgeUrl;
         return;
       }
@@ -120,7 +128,7 @@ export function useSsoBridge() {
       const bridgeOrigin = bridgeOrigins[tryIndex] ?? bridgeOrigins[0];
       if (!bridgeOrigin) return;
 
-      const returnUrl = getBridgeReturnUrl();
+      const returnUrl = getBridgeReturnUrlWithAttempt(tryIndex);
       const bridgeUrl = `${bridgeOrigin}/api/sso/bridge?return=${encodeURIComponent(returnUrl)}&bridge_try=${tryIndex}`;
       console.log("[SsoBridge] Redirecting to bridge:", bridgeUrl);
       window.location.href = bridgeUrl;

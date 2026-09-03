@@ -20,6 +20,7 @@ export function useSsoConsumer() {
     hasRun.current = true;
 
     params.delete("sso");
+    params.delete("bridge_try");
     const cleanSearch = params.toString();
     const returnPath =
       window.location.pathname +

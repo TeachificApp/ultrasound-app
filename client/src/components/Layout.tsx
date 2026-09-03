@@ -407,6 +407,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+            <img
+              src={brandNav.logoUrl}
+              alt={`${brandNav.logoAlt} logo`}
+              className="h-8 w-8 shrink-0 rounded-lg bg-white/95 object-contain p-0.5 shadow-sm md:hidden"
+            />
             <div className="w-2 h-2 rounded-full bg-[#4ad9e0] animate-pulse flex-shrink-0 hidden sm:block" />
             <span className="truncate text-sm font-semibold text-white md:hidden" style={{ fontFamily: "Merriweather, serif" }}>
               {brandNav.title}
