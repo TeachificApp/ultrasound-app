@@ -338,3 +338,5 @@
 - [x] Prevent Managers from receiving or viewing currency amounts, revenue totals, sales-money analytics, or financial reporting data across all administrative APIs and interfaces.
 - [x] Allow Managers to create and update approved content and administrative records while denying destructive product and course actions server-side and hiding related UI controls.
 - [x] Add focused Manager authorization, money-data redaction, content-management, email-campaign analytics, and create-without-delete regressions.
+- [x] Remove “Founding Member” language from app membership names, descriptions, badges, and member-facing displays without changing membership identifiers, access, pricing, subscriptions, enrollments, or historical records.
+- [x] Add focused regression coverage confirming membership copy no longer exposes “Founding Member” language and membership access behavior remains unchanged.

@@ -1,6 +1,6 @@
 /**
  * Premium Access page — brand-aware for AAUS (general ultrasound) and iHeartEcho (echo/cardiac).
- * Founding Member positioning: monthly $9.97, lifetime $99.97 (single) / $147 (dual).
+ * Membership positioning: monthly $9.97, lifetime $99.97 (single) / $147 (dual).
  * Annual plans are HIDDEN — set showAnnual: true in brandMembershipRouter to re-enable.
  */
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -197,8 +197,8 @@ export default function Premium() {
     : "Everything an Ultrasound Professional needs — sonographers, physicians, and clinicians — protocols, calculators, cases, and AI tools — in one guideline-based platform.";
 
   const badgeLabel = isIHE
-    ? "iHeartEcho™ — Founding Member Access"
-    : "All About Ultrasound™ — Founding Member Access";
+    ? "iHeartEcho™ — Lifetime Access"
+    : "All About Ultrasound™ — Lifetime Access";
 
   const appName = isIHE ? "EchoAssist™" : "UltrasoundAssist™";
 
@@ -345,7 +345,7 @@ export default function Premium() {
       {!lifetimeExpired && (
         <div className="bg-amber-500 text-white text-center py-2 px-4 text-xs font-bold tracking-wide flex items-center justify-center gap-2">
           <Flame className="w-3.5 h-3.5 flex-shrink-0" />
-          Founding Member pricing ending July 31 — lock in lifetime access before it’s gone.
+          Lifetime pricing ending July 31 — lock in lifetime access before it’s gone.
           <Flame className="w-3.5 h-3.5 flex-shrink-0" />
         </div>
       )}
@@ -357,7 +357,7 @@ export default function Premium() {
       >
         <div className="relative container py-14 md:py-20">
           <div className="max-w-5xl mx-auto text-center">
-            {/* Founding Member badge */}
+            {/* Lifetime-access badge */}
             <div className="inline-flex items-center gap-2 bg-amber-400/20 border border-amber-400/40 rounded-full px-4 py-1.5 mb-4">
               <Crown className="w-4 h-4 text-amber-400" />
               <span className="text-sm text-amber-300 font-semibold">{badgeLabel}</span>
@@ -379,7 +379,7 @@ export default function Premium() {
                 <div className="flex items-center justify-center gap-2 mb-1.5">
                   {!lifetimeExpired && <Flame className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
                   <span className="font-black text-white text-sm" style={{ fontFamily: "Merriweather, serif" }}>
-                    {lifetimeExpired ? "Annual Membership" : "Founding Member Pricing — Limited Time"}
+                    {lifetimeExpired ? "Annual Membership" : "Lifetime Pricing — Limited Time"}
                   </span>
                   {!lifetimeExpired && <Flame className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
                 </div>
@@ -556,7 +556,7 @@ export default function Premium() {
                   UltrasoundAssist™ + EchoAssist™
                 </div>
                 <div className="text-[10px] text-white/40 mb-4">
-                  {lifetimeExpired ? "Full annual access to both apps — cancel anytime." : "Founding Member pricing. Lock in before future increases."}
+                  {lifetimeExpired ? "Full annual access to both apps — cancel anytime." : "Lifetime pricing. Lock in before future increases."}
                 </div>
                 <div className="mt-auto">
                   {loading ? (
@@ -787,7 +787,7 @@ export default function Premium() {
               <div className="flex items-center justify-center gap-2 mb-2">
                 {!lifetimeExpired && <Flame className="w-4 h-4 text-amber-500" />}
                 <span className="font-black text-gray-800 text-base" style={{ fontFamily: "Merriweather, serif" }}>
-                  {lifetimeExpired ? "Annual Membership" : "Founding Member Pricing — Limited Time"}
+                  {lifetimeExpired ? "Annual Membership" : "Lifetime Pricing — Limited Time"}
                 </span>
                 {!lifetimeExpired && <Flame className="w-4 h-4 text-amber-500" />}
               </div>

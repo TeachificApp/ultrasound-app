@@ -34,7 +34,7 @@ export const BRAND_PRODUCTS: Record<Brand, {
   name: string;
   monthlyPrice: number;  // cents
   annualPrice: number;   // cents — HIDDEN, kept for future re-enable
-  lifetimePrice: number; // cents — one-time Founding Member payment
+  lifetimePrice: number; // cents — one-time lifetime payment
   currency: string;
   monthlyPriceId?: string;
   annualPriceId?: string; // HIDDEN — kept for future re-enable
@@ -45,7 +45,7 @@ export const BRAND_PRODUCTS: Record<Brand, {
     name: "UltrasoundAssist™ Premium Access",
     monthlyPrice: 997,   // $9.97/month
     annualPrice: 9997,   // $99.97/year — HIDDEN
-    lifetimePrice: 9997, // $99.97 one-time Founding Member
+    lifetimePrice: 9997, // $99.97 one-time lifetime access
     currency: "usd",
     // Canonical live Stripe monthly price — verified 2026-08-18.
     monthlyPriceId: "price_1U5xVtBj9HgnkZLK6pvUcG4P",
@@ -56,7 +56,7 @@ export const BRAND_PRODUCTS: Record<Brand, {
     name: "EchoAssist™ Premium Access",
     monthlyPrice: 997,   // $9.97/month
     annualPrice: 9997,   // $99.97/year — HIDDEN
-    lifetimePrice: 9997, // $99.97 one-time Founding Member
+    lifetimePrice: 9997, // $99.97 one-time lifetime access
     currency: "usd",
     // Canonical live Stripe monthly price — verified 2026-08-18.
     monthlyPriceId: "price_1U5xVtBj9HgnkZLKzl3Qo0pE",
@@ -67,14 +67,14 @@ export const BRAND_PRODUCTS: Record<Brand, {
 
 /**
  * Dual Membership product — grants premium access to BOTH brands.
- * $12.99/month or $147 one-time Founding Member lifetime access.
+ * $12.99/month or $147 one-time lifetime access.
  */
 export const DUAL_MEMBERSHIP_PRODUCT = {
   name: "All Access Dual Membership — UltrasoundAssist™ + EchoAssist™",
   description: "Full premium access to both All About Ultrasound™ (UltrasoundAssist™) and iHeartEcho™ (EchoAssist™) platforms.",
   monthlyPrice: 1299,   // $12.99/month
   annualPrice: 14700,   // $147.00/year — same rate as former lifetime
-  lifetimePrice: 14700, // $147.00 one-time Founding Member
+  lifetimePrice: 14700, // $147.00 one-time lifetime access
   currency: "usd",
   // Canonical live Stripe monthly price — verified 2026-08-18.
   monthlyPriceId: "price_1U5xVuBj9HgnkZLKEL1A9qkU",
@@ -156,7 +156,7 @@ async function buildBrandLifetimeLineItem(
     price_data: {
       currency: productConfig.currency,
       product_data: {
-        name: `${productConfig.name} — Founding Member Lifetime Access`,
+        name: `${productConfig.name} — Lifetime Access`,
         description: "One-time payment. Lock in lifetime access before future pricing increases.",
         metadata: { brand },
       },
@@ -237,7 +237,7 @@ async function buildDualLifetimeLineItem(stripe: StripeClient) {
     price_data: {
       currency: DUAL_MEMBERSHIP_PRODUCT.currency,
       product_data: {
-        name: `${DUAL_MEMBERSHIP_PRODUCT.name} — Founding Member Lifetime Access`,
+        name: `${DUAL_MEMBERSHIP_PRODUCT.name} — Lifetime Access`,
         description: "One-time payment. Lifetime access to both UltrasoundAssist™ + EchoAssist™. Lock in before future pricing increases.",
         metadata: { type: "dual_membership_lifetime" },
       },
