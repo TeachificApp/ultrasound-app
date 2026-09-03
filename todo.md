@@ -225,6 +225,8 @@
 - [ ] Repair the reported CME Ergonomics survey completion error without changing existing learner attempts or certificate records.
 - [x] Repair the inline CME survey attempt-insert failure shown during required survey completion, preserving existing responses, learner progress, and certificate records.
 - [x] Add focused regression coverage for the inline-survey attempt insert contract and the resulting certificate-eligibility completion path.
+- [x] Audit and repair the shared inline lesson-quiz submission path for all courses and instances, preserving valid learner attempts, scores, progress, and certificate records.
+- [x] Add focused all-course inline quiz submission regressions for legacy and current attempt-table compatibility, response persistence, progress, and certificate eligibility.
 - [x] Resolve learner name and email merge fields in the existing embedded CME Ergonomics form URL so the form no longer receives literal placeholder values.
 - [x] Add focused regression coverage for encoded embedded-form name, last-name, and email placeholder substitution without exposing user data.
 - [x] Ensure professional-role and other CME survey questions are unscored response fields that never mark a valid answer wrong or require a specific role selection.

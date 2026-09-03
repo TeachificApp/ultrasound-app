@@ -142,6 +142,7 @@ import { prepareInlineQuizResponses } from "../lib/inlineLessonQuizResponses";
 import { normalizeQuizAccountFieldKeys, resolveQuizAccountFields } from "../../shared/quizAccountFields";
 import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
 import { buildInlineQuizAttemptValues, isMissingInlineQuizAccountFieldsColumn } from "../lib/inlineQuizAttemptPersistence";
+import { ensureInlineLessonQuizSchema } from "../lib/ensureInlineLessonQuizSchema";
 
 // ─── Admin Router (merged from sub-routers) ───────────────────────────────────
 // ─── Certificate Template Router (admin) ─────────────────────────────────────
@@ -2377,6 +2378,16 @@ export const lmsLearnerRouter = router({
       // Record ordinary learner submissions for CME activity reporting. Admin
       // previews intentionally do not enter learner-facing completion exports.
       if (!input.isAdminPreview) {
+        // Railway deployments may point to an older compatible LMS schema.
+        // Ensure the shared reporting tables before every real learner attempt
+        // so any course's required quiz can complete and reach its certificate path.
+        try {
+          await ensureInlineLessonQuizSchema(db);
+        } catch {
+          // Continue to the insert: an existing usable table must not be
+          // blocked by a non-essential schema inspection failure.
+          console.error("[inline lesson quiz] schema assurance unavailable");
+        }
         const responseRows = prepareInlineQuizResponses(
           inlineQuiz?.data?.questions,
           input.responses,

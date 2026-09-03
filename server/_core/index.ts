@@ -1125,6 +1125,14 @@ async function startServer() {
         return ensureLmsCoursesSchema(db);
       })
       .catch((err) => console.error("[Startup] ensureLmsCoursesSchema error:", err));
+    // Ensure the shared inline-lesson quiz reporting tables are available for
+    // every course before learners submit required CME surveys or quizzes.
+    getDb()
+      .then(async (db) => {
+        const { ensureInlineLessonQuizSchema } = await import("../lib/ensureInlineLessonQuizSchema");
+        return ensureInlineLessonQuizSchema(db);
+      })
+      .catch(() => console.error("[Startup] inline lesson quiz schema assurance unavailable"));
     // Ensure lms_cohort_groups has all columns expected by admin cohort queries
     getDb()
       .then(async (db) => {

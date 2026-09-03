@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildInlineQuizAttemptValues, isMissingInlineQuizAccountFieldsColumn } from "./lib/inlineQuizAttemptPersistence";
+import { INLINE_LESSON_QUIZ_SCHEMA_CONTRACT } from "./lib/ensureInlineLessonQuizSchema";
 
 const source = readFileSync(resolve(import.meta.dirname, "routers/lmsRouter.ts"), "utf8");
 const submitProcedure = source.slice(
@@ -35,6 +36,31 @@ describe("inline lesson-quiz persistence", () => {
     expect(isMissingInlineQuizAccountFieldsColumn({ message: "Duplicate entry" })).toBe(false);
     expect(submitProcedure).toContain('isMissingInlineQuizAccountFieldsColumn(error)');
     expect(submitProcedure).toContain('message: "Your survey response could not be saved. Please try again."');
+  });
+
+  it("assures the shared attempt and response tables before any real learner submission across all courses", () => {
+    expect(INLINE_LESSON_QUIZ_SCHEMA_CONTRACT).toEqual({
+      attemptsTable: "lms_inline_quiz_attempts",
+      responsesTable: "lms_inline_quiz_responses",
+      optionalAttemptColumn: "account_field_values",
+    });
+    expect(submitProcedure).toContain("await ensureInlineLessonQuizSchema(db)");
+    expect(submitProcedure).toContain("if (!input.isAdminPreview)");
+  });
+
+  it("applies only the additive inline-quiz compatibility steps when an older attempt table lacks the optional snapshot column", async () => {
+    vi.resetModules();
+    const { ensureInlineLessonQuizSchema } = await import("./lib/ensureInlineLessonQuizSchema");
+    const statements: unknown[] = [];
+    const legacyAttemptDb = {
+      execute: async (statement: unknown) => {
+        statements.push(statement);
+        // The third call lists columns after both CREATE TABLE IF NOT EXISTS statements.
+        return statements.length === 3 ? [[{ COLUMN_NAME: "id" }], []] : [[], []];
+      },
+    };
+    await ensureInlineLessonQuizSchema(legacyAttemptDb as never);
+    expect(statements).toHaveLength(4);
   });
 
   it("exposes only the authenticated learner's latest block-scoped answers for restoration", () => {
