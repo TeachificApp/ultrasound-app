@@ -348,3 +348,5 @@
 - [x] Keep existing desktop and tablet navigation, layout, visual hierarchy, and functionality unchanged by isolating the mobile experience to phone breakpoints only.
 - [x] Add brand-aware mobile routing and feature-card labels for both UltrasoundAssist and EchoAssist without exposing unsupported features or changing access controls.
 - [x] Add focused responsive and brand-navigation regressions and visually validate both brand experiences at a phone viewport. Visual capture remains blocked by the existing local preview connection issue; source-level breakpoint and route validation passed.
+- [x] Repair the LMS course-editor runtime failure caused by `isRestrictedManager` being referenced before definition, preserving all Platform Admin and Manager restrictions.
+- [x] Add focused regression coverage that the LMS course editor renders for authorized administrators and retains Manager-safe pricing and delete restrictions.

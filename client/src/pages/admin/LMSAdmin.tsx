@@ -2139,6 +2139,10 @@ function CmeSurveyResultsPanel({ courseId }: { courseId: number }) {
 }
 
 function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, onCmeDirtyChange }: { course: any; onSave: (data: any) => void; saving: boolean; onTypeChangedToWorkshop?: (newWorkshopId: number) => void; onCmeDirtyChange?: (dirty: boolean) => void }) {
+  const { user } = useAuth();
+  const isRestrictedManager = (user?.appRoles ?? []).includes("platform_manager")
+    && !(user?.appRoles ?? []).some((role) => role === "platform_admin" || role === "platform_owner")
+    && user?.role !== "admin";
   const [reformatDialogOpen, setReformatDialogOpen] = useState(false);
   const [reformatNewName, setReformatNewName] = useState("");
   const [reformatStep, setReformatStep] = useState<"idle" | "running" | "done">("idle");
