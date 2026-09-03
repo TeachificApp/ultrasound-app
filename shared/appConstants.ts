@@ -68,7 +68,5 @@ export const CATEGORY_COLORS: Record<string, string> = {
 export const FREE_FLASHCARDS_PER_DAY = 10;
 export const PREMIUM_PRICE_MONTHLY = "$9.97/month";
 export const PREMIUM_PRICE_ANNUAL = "$99.97/year"; // HIDDEN — kept for future re-enable
-export const PREMIUM_PRICE_LIFETIME = "$99.97"; // one-time lifetime access (single app)
 export const DUAL_PRICE_MONTHLY = "$12.99/month";
-export const DUAL_PRICE_LIFETIME = "$147"; // one-time lifetime access (both apps)
 export const SHOW_ANNUAL_PRICING = false; // set true to re-enable annual plans

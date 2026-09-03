@@ -122,7 +122,7 @@ function lifetimeBrandSessionStripe() {
     customer_email: "lifetime@example.com",
     customer: { id: "cus_003", email: "lifetime@example.com" },
     metadata: { type: "brand_membership_upgrade", brand: "aaus", interval: "lifetime", user_id: "77" },
-    line_items: { data: [{ price: { id: BRAND_PRODUCTS.aaus.lifetimePriceId } }] },
+    line_items: { data: [{ price: { id: BRAND_PRODUCTS.aaus.legacyLifetimePriceId } }] },
   };
   mockStripeInstance.checkout.sessions.list.mockResolvedValue({ data: [session], has_more: false });
 }
@@ -136,7 +136,7 @@ function lifetimeDualSessionStripe() {
     customer_email: "duallift@example.com",
     customer: { id: "cus_004", email: "duallift@example.com" },
     metadata: { type: "dual_membership_lifetime", user_id: "88" },
-    line_items: { data: [{ price: { id: DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId } }] },
+    line_items: { data: [{ price: { id: DUAL_MEMBERSHIP_PRODUCT.legacyLifetimePriceId } }] },
   };
   mockStripeInstance.checkout.sessions.list.mockResolvedValue({ data: [session], has_more: false });
 }
@@ -311,7 +311,7 @@ describe("brandMembership.bulkReconcileBrandMemberships", () => {
       customer_email: "unpaid@example.com",
       customer: { id: "cus_005", email: "unpaid@example.com" },
       metadata: { type: "dual_membership_lifetime" },
-      line_items: { data: [{ price: { id: DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId } }] },
+      line_items: { data: [{ price: { id: DUAL_MEMBERSHIP_PRODUCT.legacyLifetimePriceId } }] },
     };
     mockStripeInstance.checkout.sessions.list.mockResolvedValue({ data: [session], has_more: false });
 
@@ -334,7 +334,7 @@ describe("brandMembership.bulkReconcileBrandMemberships", () => {
       customer: { id: "cus_010", email: "pricematch@example.com" },
       // No metadata.type or metadata.interval — only canonical price ID
       metadata: { brand: "aaus", user_id: "99" },
-      line_items: { data: [{ price: { id: BRAND_PRODUCTS.aaus.lifetimePriceId } }] },
+      line_items: { data: [{ price: { id: BRAND_PRODUCTS.aaus.legacyLifetimePriceId } }] },
     };
     mockStripeInstance.checkout.sessions.list.mockResolvedValue({ data: [session], has_more: false });
 
@@ -355,7 +355,7 @@ describe("brandMembership.bulkReconcileBrandMemberships", () => {
       customer: { id: "cus_011", email: "dualpricematch@example.com" },
       // No metadata.type — only canonical dual lifetime price ID
       metadata: { user_id: "100" },
-      line_items: { data: [{ price: { id: DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId } }] },
+      line_items: { data: [{ price: { id: DUAL_MEMBERSHIP_PRODUCT.legacyLifetimePriceId } }] },
     };
     mockStripeInstance.checkout.sessions.list.mockResolvedValue({ data: [session], has_more: false });
 

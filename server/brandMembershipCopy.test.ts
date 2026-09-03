@@ -12,11 +12,14 @@ describe("brand membership copy", () => {
     const appConstants = projectFile("shared/appConstants.ts");
 
     expect(`${premiumPage}\n${membershipRouter}\n${appConstants}`).not.toMatch(/founding[\s-]*member/i);
-    expect(BRAND_PRODUCTS.aaus.lifetimePrice).toBe(9997);
-    expect(BRAND_PRODUCTS.iheartecho.lifetimePrice).toBe(9997);
-    expect(DUAL_MEMBERSHIP_PRODUCT.lifetimePrice).toBe(14700);
-    expect(BRAND_PRODUCTS.aaus.lifetimePriceId).toBeTruthy();
-    expect(BRAND_PRODUCTS.iheartecho.lifetimePriceId).toBeTruthy();
-    expect(DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId).toBeTruthy();
+    expect(BRAND_PRODUCTS.aaus.annualPrice).toBe(9997);
+    expect(BRAND_PRODUCTS.iheartecho.annualPrice).toBe(9997);
+    expect(DUAL_MEMBERSHIP_PRODUCT.annualPrice).toBe(14700);
+    expect(BRAND_PRODUCTS.aaus.annualPriceId).toBeTruthy();
+    expect(BRAND_PRODUCTS.iheartecho.annualPriceId).toBeTruthy();
+    expect(DUAL_MEMBERSHIP_PRODUCT.annualPriceId).toBeTruthy();
+    expect(BRAND_PRODUCTS.aaus.legacyLifetimePriceId).toBeTruthy();
+    expect(BRAND_PRODUCTS.iheartecho.legacyLifetimePriceId).toBeTruthy();
+    expect(DUAL_MEMBERSHIP_PRODUCT.legacyLifetimePriceId).toBeTruthy();
   });
 });

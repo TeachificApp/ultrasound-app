@@ -22,63 +22,53 @@ import type { Brand } from "../../shared/brands";
 
 /**
  * Brand-specific Stripe product configuration.
- * Annual plans are HIDDEN (showAnnual: false) — set to true to re-enable.
+ * Monthly and annual recurring membership plans are available for purchase.
  */
-/** July 31 2026 11:59 PM ET — after this, annual replaces lifetime */
-const LIFETIME_OFFER_END = new Date("2026-08-01T03:59:00.000Z"); // 2026-07-31 23:59 ET = 2026-08-01 03:59 UTC
-export function isLifetimeOfferActive(): boolean {
-  return Date.now() < LIFETIME_OFFER_END.getTime();
-}
-
 export const BRAND_PRODUCTS: Record<Brand, {
   name: string;
   monthlyPrice: number;  // cents
-  annualPrice: number;   // cents — HIDDEN, kept for future re-enable
-  lifetimePrice: number; // cents — one-time lifetime payment
+  annualPrice: number;   // cents
   currency: string;
   monthlyPriceId?: string;
-  annualPriceId?: string; // HIDDEN — kept for future re-enable
-  lifetimePriceId?: string;
-  showAnnual: boolean;   // false = annual option hidden from UI
+  annualPriceId?: string;
+  legacyLifetimePriceId?: string; // preserved only to reconcile existing lifetime access
 }> = {
   aaus: {
     name: "UltrasoundAssist™ Premium Access",
     monthlyPrice: 997,   // $9.97/month
-    annualPrice: 9997,   // $99.97/year — HIDDEN
-    lifetimePrice: 9997, // $99.97 one-time lifetime access
+    annualPrice: 9997,   // $99.97/year
     currency: "usd",
-    // Canonical live Stripe monthly price — verified 2026-08-18.
+    // Canonical live Stripe recurring prices.
     monthlyPriceId: "price_1U5xVtBj9HgnkZLK6pvUcG4P",
-    lifetimePriceId: "price_1Tl7pbPvVOPkJOleDjA0D43O",
-    showAnnual: !isLifetimeOfferActive() ? true : false,
+    annualPriceId: "23328b7a-45a0-407c-8be8-fd7bde241d26",
+    legacyLifetimePriceId: "price_1Tl7pbPvVOPkJOleDjA0D43O",
   },
   iheartecho: {
     name: "EchoAssist™ Premium Access",
     monthlyPrice: 997,   // $9.97/month
-    annualPrice: 9997,   // $99.97/year — HIDDEN
-    lifetimePrice: 9997, // $99.97 one-time lifetime access
+    annualPrice: 9997,   // $99.97/year
     currency: "usd",
-    // Canonical live Stripe monthly price — verified 2026-08-18.
+    // Canonical live Stripe recurring prices.
     monthlyPriceId: "price_1U5xVtBj9HgnkZLKzl3Qo0pE",
-    lifetimePriceId: "price_1Tl7pbPvVOPkJOleQayUZjad",
-    showAnnual: !isLifetimeOfferActive() ? true : false,
+    annualPriceId: "price_1UBbfWBj9HgnkZLKv0EOec2f",
+    legacyLifetimePriceId: "price_1Tl7pbPvVOPkJOleQayUZjad",
   },
 };
 
 /**
  * Dual Membership product — grants premium access to BOTH brands.
- * $12.99/month or $147 one-time lifetime access.
+ * $12.99/month or $147/year annual access.
  */
 export const DUAL_MEMBERSHIP_PRODUCT = {
   name: "All Access Dual Membership — UltrasoundAssist™ + EchoAssist™",
   description: "Full premium access to both All About Ultrasound™ (UltrasoundAssist™) and iHeartEcho™ (EchoAssist™) platforms.",
   monthlyPrice: 1299,   // $12.99/month
-  annualPrice: 14700,   // $147.00/year — same rate as former lifetime
-  lifetimePrice: 14700, // $147.00 one-time lifetime access
+  annualPrice: 14700,   // $147.00/year
   currency: "usd",
-  // Canonical live Stripe monthly price — verified 2026-08-18.
+  // Canonical live Stripe recurring prices.
   monthlyPriceId: "price_1U5xVuBj9HgnkZLKEL1A9qkU",
-  lifetimePriceId: "price_1Tl7pcPvVOPkJOleJDKwSypQ",
+  annualPriceId: "price_1UBbbvBj9HgnkZLKY1yAmXEt",
+  legacyLifetimePriceId: "price_1Tl7pcPvVOPkJOleJDKwSypQ",
 } as const;
 
 /** Admin check helper */
@@ -145,27 +135,6 @@ function isPaidBrandTier(tier: string, status: string): boolean {
   return (tier === "premium" || tier === "lifetime") && status === "active";
 }
 
-async function buildBrandLifetimeLineItem(
-  stripe: StripeClient,
-  productConfig: (typeof BRAND_PRODUCTS)[Brand],
-  brand: Brand,
-) {
-  const validatedPriceId = await validateStripePriceId(stripe, productConfig.lifetimePriceId);
-  if (validatedPriceId) return { price: validatedPriceId, quantity: 1 };
-  return {
-    price_data: {
-      currency: productConfig.currency,
-      product_data: {
-        name: `${productConfig.name} — Lifetime Access`,
-        description: "One-time payment. Lock in lifetime access before future pricing increases.",
-        metadata: { brand },
-      },
-      unit_amount: productConfig.lifetimePrice,
-    },
-    quantity: 1,
-  };
-}
-
 async function buildBrandRecurringLineItem(
   stripe: StripeClient,
   productConfig: (typeof BRAND_PRODUCTS)[Brand],
@@ -215,6 +184,8 @@ async function buildDualMonthlyLineItem(stripe: StripeClient) {
 }
 
 async function buildDualAnnualLineItem(stripe: StripeClient) {
+  const validatedPriceId = await validateStripePriceId(stripe, DUAL_MEMBERSHIP_PRODUCT.annualPriceId);
+  if (validatedPriceId) return { price: validatedPriceId, quantity: 1 };
   return {
     price_data: {
       currency: DUAL_MEMBERSHIP_PRODUCT.currency,
@@ -225,23 +196,6 @@ async function buildDualAnnualLineItem(stripe: StripeClient) {
       },
       unit_amount: DUAL_MEMBERSHIP_PRODUCT.annualPrice,
       recurring: { interval: "year" as const, interval_count: 1 },
-    },
-    quantity: 1,
-  };
-}
-
-async function buildDualLifetimeLineItem(stripe: StripeClient) {
-  const validatedPriceId = await validateStripePriceId(stripe, DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId);
-  if (validatedPriceId) return { price: validatedPriceId, quantity: 1 };
-  return {
-    price_data: {
-      currency: DUAL_MEMBERSHIP_PRODUCT.currency,
-      product_data: {
-        name: `${DUAL_MEMBERSHIP_PRODUCT.name} — Lifetime Access`,
-        description: "One-time payment. Lifetime access to both UltrasoundAssist™ + EchoAssist™. Lock in before future pricing increases.",
-        metadata: { type: "dual_membership_lifetime" },
-      },
-      unit_amount: DUAL_MEMBERSHIP_PRODUCT.lifetimePrice,
     },
     quantity: 1,
   };
@@ -294,7 +248,7 @@ export const brandMembershipRouter = router({
    */
   createCheckout: protectedProcedure
     .input(z.object({
-      interval: z.enum(["monthly", "annual", "lifetime"]).default("monthly"),
+      interval: z.enum(["monthly", "annual"]).default("monthly"),
       origin: z.string().url(),
       promoCode: z.string().optional(),
     }))
@@ -304,15 +258,8 @@ export const brandMembershipRouter = router({
       if (!productConfig) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Unknown brand" });
       }
-      // Guard: annual is hidden — reject if someone tries to use it directly
-      if (input.interval === "annual" && !productConfig.showAnnual) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Annual plan is not currently available" });
-      }
-
       assertStripeConfigured();
       const stripe = getStripeClient();
-
-      const isLifetime = input.interval === "lifetime";
 
       try {
         // Resolve promo code if provided
@@ -339,20 +286,20 @@ export const brandMembershipRouter = router({
                 .limit(1);
               if (existing) {
                 await db.update(brandMemberships)
-                  .set({ tier: isLifetime ? "lifetime" : "premium", status: "active", updatedAt: new Date() })
+                  .set({ tier: "premium", status: "active", updatedAt: new Date() })
                   .where(eq(brandMemberships.id, existing.id));
               } else {
                 await db.insert(brandMemberships).values({
                   userId: ctx.user.id,
                   brand,
-                  tier: isLifetime ? "lifetime" : "premium",
+                  tier: "premium",
                   status: "active",
                   source: "promo_free",
                 });
               }
                             (await import("../_core/notification")).notifyOwner({
                 title: `🎉 Free Brand Membership Activated (100% Promo)`,
-                content: `User ${ctx.user.id} (${ctx.user.email}) activated ${brand} ${isLifetime ? "lifetime" : "premium"} membership via 100% promo code. Source: promo_free.`,
+                content: `User ${ctx.user.id} (${ctx.user.email}) activated ${brand} premium membership via 100% promo code. Source: promo_free.`,
               }).catch(() => {});
               return { checkoutUrl: null, free: true };
             }
@@ -361,46 +308,6 @@ export const brandMembershipRouter = router({
             /* fall through to paid checkout */
           }
         }
-        // ── Lifetime duplicate guard ─────────────────────────────────────────────
-        if (isLifetime) {
-          const db = await getDb();
-          if (db) {
-            const [existingMembership] = await db.select({ id: brandMemberships.id, tier: brandMemberships.tier, status: brandMemberships.status })
-              .from(brandMemberships)
-              .where(and(eq(brandMemberships.userId, ctx.user.id), eq(brandMemberships.brand, brand)))
-              .limit(1);
-            if (existingMembership && existingMembership.tier === "lifetime" && existingMembership.status === "active") {
-              throw new TRPCError({ code: "BAD_REQUEST", message: "You already have lifetime access. Please contact support if you need assistance." });
-            }
-          }
-        }
-
-        if (isLifetime) {
-          const lifetimeLineItem = await buildBrandLifetimeLineItem(stripe, productConfig, brand);
-          const session = await stripe.checkout.sessions.create({
-            mode: "payment",
-            customer_email: ctx.user.email ?? undefined,
-            ...promoOpts,
-            line_items: [lifetimeLineItem],
-            success_url: `${input.origin}/upgrade-success?brand=${brand}&lifetime=1&session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${input.origin}/premium`,
-            client_reference_id: ctx.user.id.toString(),
-            metadata: {
-              user_id: ctx.user.id.toString(),
-              customer_email: ctx.user.email ?? "",
-              customer_name: ctx.user.name ?? "",
-              brand,
-              type: "brand_membership_upgrade",
-              interval: "lifetime",
-            },
-            payment_intent_data: { description: `${productConfig.name} — Lifetime Membership` },
-          }, { idempotencyKey: `brand-lifetime-${ctx.user.id}-${brand}-${new Date().toISOString().slice(0, 10)}` });
-          if (!session.url) {
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
-          }
-          return { checkoutUrl: session.url };
-        }
-
         const recurringInterval = input.interval === "annual" ? "annual" : "monthly";
         const recurringLineItem = await buildBrandRecurringLineItem(stripe, productConfig, brand, recurringInterval);
 
@@ -476,45 +383,7 @@ export const brandMembershipRouter = router({
     }),
 
   /**
-   * Create a Stripe Checkout session for Dual Lifetime Membership ($147 one-time).
-   */
-  createDualLifetimeCheckout: protectedProcedure
-    .input(z.object({
-      origin: z.string().url(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      assertStripeConfigured();
-      const stripe = getStripeClient();
-
-      try {
-        const dualLifetimeLineItem = await buildDualLifetimeLineItem(stripe);
-        const session = await stripe.checkout.sessions.create({
-          mode: "payment",
-          customer_email: ctx.user.email ?? undefined,
-          allow_promotion_codes: true,
-          line_items: [dualLifetimeLineItem],
-          success_url: `${input.origin}/upgrade-success?dual=1&lifetime=1&session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${input.origin}/premium`,
-          client_reference_id: ctx.user.id.toString(),
-          metadata: {
-            user_id: ctx.user.id.toString(),
-            customer_email: ctx.user.email ?? "",
-            customer_name: ctx.user.name ?? "",
-            type: "dual_membership_lifetime",
-          },
-          payment_intent_data: { description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Lifetime Membership` },
-        }, { idempotencyKey: `dual-lifetime-${ctx.user.id}-${new Date().toISOString().slice(0, 10)}` });
-        if (!session.url) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
-        }
-        return { checkoutUrl: session.url };
-      } catch (err) {
-        wrapStripeCheckoutError(err);
-      }
-    }),
-
-  /**
-   * Create a Stripe Checkout session for Dual Annual Membership ($147/year — post-lifetime-offer).
+   * Create a Stripe Checkout session for Dual Annual Membership ($147/year).
    */
   createDualAnnualCheckout: protectedProcedure
     .input(z.object({
@@ -664,9 +533,9 @@ export const brandMembershipRouter = router({
       for (const cfg of Object.values(BRAND_PRODUCTS)) {
         if (cfg.monthlyPriceId) brandPriceIds.add(cfg.monthlyPriceId);
         if (cfg.annualPriceId) brandPriceIds.add(cfg.annualPriceId);
-        if (cfg.lifetimePriceId) {
-          brandPriceIds.add(cfg.lifetimePriceId);
-          lifetimePriceIds.add(cfg.lifetimePriceId);
+        if (cfg.legacyLifetimePriceId) {
+          brandPriceIds.add(cfg.legacyLifetimePriceId);
+          lifetimePriceIds.add(cfg.legacyLifetimePriceId);
         }
       }
       // Include DUAL_MEMBERSHIP_PRODUCT canonical price IDs
@@ -674,10 +543,10 @@ export const brandMembershipRouter = router({
         brandPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.monthlyPriceId);
         dualPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.monthlyPriceId);
       }
-      if (DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId) {
-        brandPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId);
-        dualPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId);
-        lifetimePriceIds.add(DUAL_MEMBERSHIP_PRODUCT.lifetimePriceId);
+      if (DUAL_MEMBERSHIP_PRODUCT.legacyLifetimePriceId) {
+        brandPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.legacyLifetimePriceId);
+        dualPriceIds.add(DUAL_MEMBERSHIP_PRODUCT.legacyLifetimePriceId);
+        lifetimePriceIds.add(DUAL_MEMBERSHIP_PRODUCT.legacyLifetimePriceId);
       }
 
       type ReconcileResult = {

@@ -340,3 +340,7 @@
 - [x] Add focused Manager authorization, money-data redaction, content-management, email-campaign analytics, and create-without-delete regressions.
 - [x] Remove “Founding Member” language from app membership names, descriptions, badges, and member-facing displays without changing membership identifiers, access, pricing, subscriptions, enrollments, or historical records.
 - [x] Add focused regression coverage confirming membership copy no longer exposes “Founding Member” language and membership access behavior remains unchanged.
+- [x] Remove expired lifetime membership purchase offers and lifetime checkout paths from the app while preserving existing lifetime-member access and records.
+- [x] Enable annual membership presentation and checkout using the matching configured Stripe recurring annual price for each offered membership.
+- [x] Configure iHeartEcho’s annual membership checkout to use a matching live $99.97/year recurring Stripe price rather than the existing $99.70 annual price.
+- [x] Add focused regressions for annual purchase availability, annual Stripe price selection, rejection of new lifetime checkout, and preservation of existing lifetime access.
