@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { getLoginUrl } from "@/const";
 
-type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "accreditation_manager" | "education_manager" | "education_admin" | "education_student" | "platform_owner" | "platform_moderator" | "instructor" | "team_admin" | "affiliate";
+type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "platform_manager" | "accreditation_manager" | "education_manager" | "education_admin" | "education_student" | "platform_owner" | "platform_moderator" | "instructor" | "team_admin" | "affiliate";
 
 interface RoleGuardProps {
   /** At least one of these roles must be present for access */
@@ -43,6 +43,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
   diy_admin: "DIY Accreditation Admin",
   diy_user: "DIY Accreditation User",
   platform_admin: "Platform Admin",
+  platform_manager: "Platform Manager",
   accreditation_manager: "Accreditation Manager",
   education_manager: "Education Manager",
   education_admin: "Education Admin",
@@ -59,6 +60,7 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   diy_user: "Seat-based access to the DIY Accreditation Tool™",
   premium_user: "Premium subscription access",
   platform_admin: "Full platform management access",
+  platform_manager: "Limited administrative access without financial or destructive permissions",
   accreditation_manager: "Full access to all DIY Accreditation organizations and managed accounts",
   platform_owner: "Owner-level access — full platform control",
   platform_moderator: "Moderation access — content review and member management",
@@ -78,6 +80,7 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
       roles.some(r =>
         [
           "platform_admin",
+          "platform_manager",
           "platform_owner",
           "platform_moderator",
           "education_admin",

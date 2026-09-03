@@ -1,4 +1,4 @@
-const STANDALONE_QUIZ_STAFF_ROLES = new Set(["platform_admin", "platform_owner"]);
+const STANDALONE_QUIZ_STAFF_ROLES = new Set(["platform_admin", "platform_owner", "platform_manager"]);
 
 export function isLegacyOwner(role: string) {
   return role === "admin";

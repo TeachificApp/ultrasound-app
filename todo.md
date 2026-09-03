@@ -330,3 +330,11 @@
 - [ ] Add focused public metadata-route regression coverage confirming each workshop URL receives its own saved SEO and social preview fields without changing its URL or workshop content.
 - [x] Repair email logo rendering by replacing the unreliable source with publicly reachable absolute image markup while preserving the existing branded email header.
 - [x] Add focused email-template regression coverage for an absolute public logo URL, meaningful alt text, and email-client-safe image dimensions without sending email.
+- [x] Perform a read-only audit of the supplied addresses against current active newsletter subscriptions and report only addresses that are not subscribed.
+- [x] Superseded the campaign/list-management audit after clarification that the supplied addresses must be compared against platform user accounts; no campaign-list data was queried or changed.
+- [x] Audit the supplied addresses against current platform user records and report only addresses with no matching user account, without changing accounts, subscriptions, or lists.
+- [x] Add a server-enforced Manager role with broad limited administrative access to users, subscriptions, content, and email campaigns.
+- [x] Allow Platform Admins to assign or remove the Manager role through the existing user-management interface, with server-side authorization and no self-escalation path.
+- [x] Prevent Managers from receiving or viewing currency amounts, revenue totals, sales-money analytics, or financial reporting data across all administrative APIs and interfaces.
+- [x] Allow Managers to create and update approved content and administrative records while denying destructive product and course actions server-side and hiding related UI controls.
+- [x] Add focused Manager authorization, money-data redaction, content-management, email-campaign analytics, and create-without-delete regressions.

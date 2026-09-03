@@ -23,7 +23,7 @@ import { z } from "zod";
 import { and, desc, eq, gte, inArray, isNull, like, or, sql } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { protectedProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
+import { getDb, getUserRoles } from "../db";
 import { storagePut, storageDelete } from "../storage";
 import { sendEmail } from "../_core/email";
 import AdmZip from "adm-zip";
@@ -43,7 +43,7 @@ import { summarizeScormExtractionStatuses } from "../../shared/scormExtractionWo
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function assertPlatformAdmin(ctx: { user: { id: number; role: string } }) {
+async function assertPlatformAdmin(ctx: { user: { id: number; role: string } }, allowManager = true) {
   const ownerId = process.env.OWNER_OPEN_ID;
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
@@ -52,7 +52,10 @@ async function assertPlatformAdmin(ctx: { user: { id: number; role: string } }) 
     .from((await import("../../drizzle/schema")).users)
     .where(eq((await import("../../drizzle/schema")).users.id, ctx.user.id))
     .limit(1);
-  if (!user || (user.role !== "admin" && user.openId !== ownerId)) {
+  const appRoles = await getUserRoles(ctx.user.id);
+  const isFullPlatformAdmin = user?.role === "admin" || user?.openId === ownerId || appRoles.includes("platform_admin") || appRoles.includes("platform_owner");
+  const isRestrictedManager = appRoles.includes("platform_manager") && !isFullPlatformAdmin;
+  if (!user || (!isFullPlatformAdmin && !(allowManager && isRestrictedManager))) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
   }
 }
@@ -378,7 +381,7 @@ export const mediaRepoRouter = router({
   deleteAsset: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
-      await assertPlatformAdmin(ctx);
+      await assertPlatformAdmin(ctx, false);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db

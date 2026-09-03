@@ -843,6 +843,7 @@ export const appRoleEnum = mysqlEnum("appRole", [
   "diy_admin",
   "diy_user",
   "platform_admin",
+  "platform_manager",
   "accreditation_manager",
   "education_manager",
   "education_admin",
@@ -857,7 +858,7 @@ export const appRoleEnum = mysqlEnum("appRole", [
 export const userRoles = mysqlTable("userRoles", {
   id: int("id").primaryKey().autoincrement(),
   userId: int("userId").notNull(),
-  role: mysqlEnum("role", ["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager", "education_manager", "education_admin", "education_student", "platform_owner", "platform_moderator", "instructor", "team_admin", "affiliate"]).notNull(),
+  role: mysqlEnum("role", ["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "platform_manager", "accreditation_manager", "education_manager", "education_admin", "education_student", "platform_owner", "platform_moderator", "instructor", "team_admin", "affiliate"]).notNull(),
   // For diy_user: which lab subscription granted this seat
   grantedByLabId: int("grantedByLabId"),
   // Who assigned this role (platform_admin or diy_admin userId)

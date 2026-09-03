@@ -154,7 +154,7 @@ function SsoLearnLinkButton({ slug, label }: { slug: string; label?: string }) {
 
 // ─── Course / Quiz / Download List Tab ──────────────────────────────────────
 
-function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: any; onEdit: (id: number) => void; onDuplicate: (id: number, title: string) => void; onDelete: (id: number, title: string) => void }) {
+function SortableCourseRow({ course, onEdit, onDuplicate, onDelete, hideFinancials = false }: { course: any; onEdit: (id: number) => void; onDuplicate: (id: number, title: string) => void; onDelete?: (id: number, title: string) => void; hideFinancials?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: course.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 };
   return (
@@ -165,7 +165,7 @@ function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: 
       <span className="text-gray-400">{TYPE_ICONS[course.type]}</span>
       <div className="order-2 basis-full min-w-0 sm:order-none sm:basis-auto sm:flex-1">
         <p className="font-medium text-gray-900 text-sm whitespace-normal break-words sm:truncate">{course.title}</p>
-        <p className="text-xs text-gray-400 break-words">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type} · {course.isFree ? "Free" : `$${Number(course.price).toFixed(2)}`} · <span className="font-mono">ID: {course.id}</span></p>
+        <p className="text-xs text-gray-400 break-words">{course.brand === "aaus" ? "All About Ultrasound™" : "iHeartEcho™"} · {course.type}{!hideFinancials && <> · {course.isFree ? "Free" : `$${Number(course.price).toFixed(2)}`}</>} · <span className="font-mono">ID: {course.id}</span></p>
       </div>
       <Badge className={`order-3 text-xs sm:order-none ${STATUS_COLORS[course.status]}`}>{course.status}</Badge>
       {((course as any).hasCertificate || (course as any).creditHours) && (course as any).cmeStatus && (
@@ -180,9 +180,11 @@ function SortableCourseRow({ course, onEdit, onDuplicate, onDelete }: { course: 
       <Button size="sm" variant="ghost" className="order-4 h-7 text-xs text-blue-500 hover:bg-blue-50 sm:order-none" title="Duplicate" onClick={() => onDuplicate(course.id, course.title)}>
         <Copy className="w-3 h-3" />
       </Button>
-      <Button size="sm" variant="ghost" className="order-4 h-7 text-red-400 hover:bg-red-50 sm:order-none" onClick={() => onDelete(course.id, course.title)}>
-        <Trash2 className="w-3 h-3" />
-      </Button>
+      {onDelete && (
+        <Button size="sm" variant="ghost" className="order-4 h-7 text-red-400 hover:bg-red-50 sm:order-none" onClick={() => onDelete(course.id, course.title)}>
+          <Trash2 className="w-3 h-3" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -239,6 +241,10 @@ function SortableRecordingRow({
 }
 
 function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) => void; typeFilter?: "course" | "quiz" | "download" | "cohort" }) {
+  const { user } = useAuth();
+  const isRestrictedManager = (user?.appRoles ?? []).includes("platform_manager")
+    && !(user?.appRoles ?? []).some((role) => role === "platform_admin" || role === "platform_owner")
+    && user?.role !== "admin";
   const [createOpen, setCreateOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
@@ -423,7 +429,8 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
               {localCourses.map((c: any) => (
                 <SortableCourseRow key={c.id} course={c} onEdit={onEdit}
                   onDuplicate={(id, title) => handleOpenCopyDialog(id, title)}
-                  onDelete={(id, title) => { if (confirm(`Delete "${title}"?`)) deleteCourse.mutate({ id }); }}
+                  onDelete={isRestrictedManager ? undefined : (id, title) => { if (confirm(`Delete "${title}"?`)) deleteCourse.mutate({ id }); }}
+                  hideFinancials={isRestrictedManager}
                 />
               ))}
             </div>
@@ -445,7 +452,8 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
           {displayCourses.map((c: any) => (
             <SortableCourseRow key={c.id} course={c} onEdit={onEdit}
               onDuplicate={(id, title) => handleOpenCopyDialog(id, title)}
-              onDelete={(id, title) => { if (confirm(`Delete "${title}"?`)) deleteCourse.mutate({ id }); }}
+              onDelete={isRestrictedManager ? undefined : (id, title) => { if (confirm(`Delete "${title}"?`)) deleteCourse.mutate({ id }); }}
+              hideFinancials={isRestrictedManager}
             />
           ))}
           {displayCourses.length === 0 && (
@@ -2460,6 +2468,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, o
       </div>
 
       {/* Pricing */}
+      {!isRestrictedManager && (
       <div className="border border-gray-200 rounded-lg p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-700">Pricing</h3>
@@ -2624,6 +2633,7 @@ function CourseSettingsForm({ course, onSave, saving, onTypeChangedToWorkshop, o
         {/* Default Team Pricing Tiers */}
         <DefaultTeamPricingPanel courseId={course.id} primaryPrice={Number(course.price ?? 0)} courseSlug={course.slug} />
       </div>
+      )}
 
             <div className="flex items-center gap-2">
         <Switch checked={hasCertificate} onCheckedChange={setHasCertificate} id="cert-switch" />
@@ -8548,6 +8558,11 @@ const GROUP_COLORS: Record<string, { bg: string; text: string; activeBg: string;
 // ─── Main LMSAdmin Component ──────────────────────────────────────────────────
 
 export default function LMSAdmin() {
+  const { user } = useAuth();
+  const isRestrictedManager = (user?.appRoles ?? []).includes("platform_manager")
+    && !(user?.appRoles ?? []).some((role) => role === "platform_admin" || role === "platform_owner")
+    && user?.role !== "admin";
+  const managerRestrictedTabs = new Set(["products", "memberships", "orderbumps", "discount_codes", "orders", "analytics", "affiliates", "trash"]);
   const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
   const urlTab = urlParams?.get("tab") ?? null;
   const urlEditCourse = urlParams?.get("editCourse") ?? null;
@@ -8561,6 +8576,7 @@ export default function LMSAdmin() {
     return <Redirect to={getAdminUrl("/question-bank")} />;
   }
   const [activeTab, setActiveTab] = useState(urlTab || (urlEditDownload ? "downloads" : urlEditProduct ? "products" : urlEditWebinar ? "webinars" : urlEditWorkshop ? "workshops" : urlEditBundle ? "bundles" : urlEditMembership ? "memberships" : "courses"));
+  const resolvedActiveTab = isRestrictedManager && managerRestrictedTabs.has(activeTab) ? "courses" : activeTab;
   const [editingCourseId, setEditingCourseId] = useState<number | null>(urlEditCourse ? Number(urlEditCourse) : null);
   const [workshopsInitialEditId, setWorkshopsInitialEditId] = useState<number | undefined>(urlEditWorkshop ? Number(urlEditWorkshop) : undefined);
   const handleTypeChangedToWorkshop = (newWorkshopId: number) => {
@@ -8591,8 +8607,11 @@ export default function LMSAdmin() {
   }, [editingCourseId]);
 
   // Flatten all tabs to find active group color
-  const allItems = LMS_NAV_GROUPS.flatMap(g => g.items.map(i => ({ ...i, groupColor: g.color })));
-  const activeItem = allItems.find(i => i.value === activeTab);
+  const visibleNavGroups = isRestrictedManager
+    ? LMS_NAV_GROUPS.map((group) => ({ ...group, items: group.items.filter((item) => !managerRestrictedTabs.has(item.value)) })).filter((group) => group.items.length > 0)
+    : LMS_NAV_GROUPS;
+  const allItems = visibleNavGroups.flatMap(g => g.items.map(i => ({ ...i, groupColor: g.color })));
+  const activeItem = allItems.find(i => i.value === resolvedActiveTab);
   const activeGroupColor = activeItem?.groupColor ?? "teal";
 
   return (
@@ -8632,7 +8651,7 @@ export default function LMSAdmin() {
             {/* Sidebar Nav */}
             <aside className="w-52 flex-shrink-0">
               <nav className="space-y-4">
-                {LMS_NAV_GROUPS.map((group) => {
+                {visibleNavGroups.map((group) => {
                   const colors = GROUP_COLORS[group.color];
                   return (
                     <div key={group.label}>
@@ -8643,7 +8662,7 @@ export default function LMSAdmin() {
                       <div className="space-y-0.5">
                         {group.items.map((item) => {
                           const Icon = item.icon;
-                          const isActive = activeTab === item.value;
+                          const isActive = resolvedActiveTab === item.value;
                           const isDanger = (item as any).danger;
                           return (
                             <button
@@ -8674,33 +8693,33 @@ export default function LMSAdmin() {
 
             {/* Main Content */}
             <main className="flex-1 min-w-0">
-              {activeTab === "courses"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="course" />}
-              {activeTab === "quizzes"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" />}
-              {activeTab === "cohorts"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="cohort" />}
-              {activeTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
-              {activeTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
-              {activeTab === "webinars"    && <WebinarsAdmin initialEditId={urlEditWebinar ? Number(urlEditWebinar) : undefined} />}
-              {activeTab === "workshops"   && <WorkshopsAdmin initialEditId={workshopsInitialEditId} onTypeChangedFromWorkshop={handleTypeChangedFromWorkshop} />}
-              {activeTab === "bundles"     && <BundlesAdmin initialEditId={urlEditBundle ? Number(urlEditBundle) : undefined} />}
-              {activeTab === "memberships" && <MembershipsAdmin initialEditId={urlEditMembership ? Number(urlEditMembership) : undefined} />}
-              {activeTab === "communities" && <CommunitiesTab />}
-              {activeTab === "orderbumps"  && <OrderBumpsAdmin />}
-              {activeTab === "collections" && <CollectionsTab />}
-              {activeTab === "groups"      && <GroupsTab />}
-              {activeTab === "instructors" && <InstructorsTab />}
-              {activeTab === "teach"       && <TeachAdminPanel />}
-              {activeTab === "certificates"&& <CertificateTemplatesAdmin />}
-              {activeTab === "enrollments" && <EnrollmentsWithPreviewsTab />}
-              {activeTab === "orders"      && <OrdersManagementTab />}
-              {activeTab === "export"      && <EnrollmentExportTab />}
-              {activeTab === "analytics"   && <AnalyticsTab />}
-              {activeTab === "quiz_results" && <QuizResultsAdmin />}
-              {activeTab === "affiliates"  && <AffiliatesTab />}
-              {activeTab === "publish_requests" && <PublishRequestsTab />}
-              {activeTab === "trash"             && <TrashTab />}
-              {activeTab === "lms_settings"      && <LMSPublishDomainSettings />}
-              {activeTab === "cme_forms"         && <CmeFormsListTab />}
-              {activeTab === "cme_management"    && <CmeManagementTab />}
+              {resolvedActiveTab === "courses"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="course" />}
+              {resolvedActiveTab === "quizzes"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="quiz" />}
+              {resolvedActiveTab === "cohorts"     && <CoursesTab onEdit={setEditingCourseId} typeFilter="cohort" />}
+              {resolvedActiveTab === "downloads"   && <DigitalDownloadsAdmin initialEditId={urlEditDownload ? Number(urlEditDownload) : undefined} />}
+              {resolvedActiveTab === "products"    && <PhysicalProductsAdmin initialEditId={urlEditProduct ? Number(urlEditProduct) : undefined} />}
+              {resolvedActiveTab === "webinars"    && <WebinarsAdmin initialEditId={urlEditWebinar ? Number(urlEditWebinar) : undefined} />}
+              {resolvedActiveTab === "workshops"   && <WorkshopsAdmin initialEditId={workshopsInitialEditId} onTypeChangedFromWorkshop={handleTypeChangedFromWorkshop} />}
+              {resolvedActiveTab === "bundles"     && <BundlesAdmin initialEditId={urlEditBundle ? Number(urlEditBundle) : undefined} />}
+              {resolvedActiveTab === "memberships" && <MembershipsAdmin initialEditId={urlEditMembership ? Number(urlEditMembership) : undefined} />}
+              {resolvedActiveTab === "communities" && <CommunitiesTab />}
+              {resolvedActiveTab === "orderbumps"  && <OrderBumpsAdmin />}
+              {resolvedActiveTab === "collections" && <CollectionsTab />}
+              {resolvedActiveTab === "groups"      && <GroupsTab />}
+              {resolvedActiveTab === "instructors" && <InstructorsTab />}
+              {resolvedActiveTab === "teach"       && <TeachAdminPanel />}
+              {resolvedActiveTab === "certificates"&& <CertificateTemplatesAdmin />}
+              {resolvedActiveTab === "enrollments" && <EnrollmentsWithPreviewsTab />}
+              {resolvedActiveTab === "orders"      && <OrdersManagementTab />}
+              {resolvedActiveTab === "export"      && <EnrollmentExportTab />}
+              {resolvedActiveTab === "analytics"   && <AnalyticsTab />}
+              {resolvedActiveTab === "quiz_results" && <QuizResultsAdmin />}
+              {resolvedActiveTab === "affiliates"  && <AffiliatesTab />}
+              {resolvedActiveTab === "publish_requests" && <PublishRequestsTab />}
+              {resolvedActiveTab === "trash"             && <TrashTab />}
+              {resolvedActiveTab === "lms_settings"      && <LMSPublishDomainSettings />}
+              {resolvedActiveTab === "cme_forms"         && <CmeFormsListTab />}
+              {resolvedActiveTab === "cme_management"    && <CmeManagementTab />}
             </main>
           </div>
         )}

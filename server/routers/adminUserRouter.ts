@@ -17,7 +17,7 @@ import { z } from "zod";
 import { getStripeClient } from "../lib/stripeClient";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
-import { getDb } from "../db";
+import { getDb, getUserRoles } from "../db";
 import {
   users,
   lmsEnrollments,
@@ -69,9 +69,19 @@ import { or, like, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
 import { serializeCouponTargeting, validateCouponTargeting } from "../lib/couponTargeting";
 
-async function assertAdmin(ctx: { user: { id: number; role: string } }) {
-  if (ctx.user.role !== "admin") {
-    throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+type AdminAccessScope = "full" | "manager";
+
+async function assertAdmin(ctx: { user: { id: number; role: string } }): Promise<AdminAccessScope> {
+  if (ctx.user.role === "admin") return "full";
+  const roles = await getUserRoles(ctx.user.id);
+  if (roles.includes("platform_admin") || roles.includes("platform_owner")) return "full";
+  if (roles.includes("platform_manager")) return "manager";
+  throw new TRPCError({ code: "FORBIDDEN", message: "Administrative access required" });
+}
+
+async function assertFinancialAdmin(ctx: { user: { id: number; role: string } }): Promise<void> {
+  if (await assertAdmin(ctx) !== "full") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Financial reporting access is restricted to Platform Admins." });
   }
 }
 
@@ -139,7 +149,7 @@ export const adminUserRouter = router({
   getUserDetail: protectedProcedure
     .input(z.object({ userId: z.number().int() }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      const isRestrictedManager = (await assertAdmin(ctx)) === "manager";
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -424,7 +434,7 @@ export const adminUserRouter = router({
           workshopId: Number(r.workshopId),
           instanceId: r.instanceId ? Number(r.instanceId) : null,
           status: String(r.status ?? "active"),
-          amountPaid: Number(r.amountPaid ?? 0),
+          ...(isRestrictedManager ? {} : { amountPaid: Number(r.amountPaid ?? 0) }),
           accessGrantedAt: r.accessGrantedAt,
           accessExpiresAt: r.accessExpiresAt ?? null,
           attended: Boolean(r.attended),
@@ -444,8 +454,10 @@ export const adminUserRouter = router({
           issuedAt: r.issuedAt,
           courseTitle: String(r.courseTitle),
         })),
-        memberships,
-        funnelPurchases: funnelPurchaseList,
+        memberships: isRestrictedManager
+          ? memberships.map(({ price, currency, ...membership }) => membership)
+          : memberships,
+        funnelPurchases: isRestrictedManager ? [] : funnelPurchaseList,
         digitalPurchases: (digitalPurchaseList as any[]).map(r => ({
           id: Number(r.id),
           purchasedAt: r.purchasedAt,
@@ -456,8 +468,7 @@ export const adminUserRouter = router({
         physicalOrders: (physicalOrderList as any[]).map(r => ({
           id: Number(r.id),
           createdAt: r.createdAt,
-          amountPaid: Number(r.amountPaid ?? 0),
-          currency: String(r.currency ?? "usd"),
+          ...(isRestrictedManager ? {} : { amountPaid: Number(r.amountPaid ?? 0), currency: String(r.currency ?? "usd") }),
           fulfillmentStatus: String(r.fulfillmentStatus ?? "pending"),
           shippingAddress: r.shippingAddress as string | null,
           productTitle: String(r.productTitle),
@@ -507,8 +518,7 @@ export const adminUserRouter = router({
           createdAt: r.createdAt,
           stripeSubscriptionId: r.stripeSubscriptionId ? String(r.stripeSubscriptionId) : null,
           stripeSessionId: r.stripeSessionId ? String(r.stripeSessionId) : null,
-          amount: r.amount != null ? Number(r.amount) : null,
-          currency: String(r.currency ?? "usd"),
+          ...(isRestrictedManager ? {} : { amount: r.amount != null ? Number(r.amount) : null, currency: String(r.currency ?? "usd") }),
           courseId: r.courseId ? Number(r.courseId) : null,
           courseTitle: r.courseTitle ? String(r.courseTitle) : null,
           courseSlug: r.courseSlug ? String(r.courseSlug) : null,
@@ -533,8 +543,7 @@ export const adminUserRouter = router({
           planTitle: String(r.planTitle ?? ""),
           planSlug: String(r.planSlug ?? ""),
           billingInterval: String(r.billingInterval ?? "one_time"),
-          price: Number(r.price ?? 0),
-          currency: String(r.currency ?? "usd"),
+          ...(isRestrictedManager ? {} : { price: Number(r.price ?? 0), currency: String(r.currency ?? "usd") }),
           brand: r.brand ? String(r.brand) : null,
         })),
       };
@@ -618,7 +627,10 @@ export const adminUserRouter = router({
       expiresAt: z.string().datetime().optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      const accessScope = await assertAdmin(ctx);
+      if (accessScope === "manager" && input.paymentMode !== "free") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Platform Managers may grant access but cannot link or create payments." });
+      }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -1127,7 +1139,7 @@ export const adminUserRouter = router({
       reason: z.enum(["duplicate", "fraudulent", "requested_by_customer"]).default("requested_by_customer"),
     }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertFinancialAdmin(ctx);
       const stripe = getStripeClient();
 
       const refund = await stripe.refunds.create({
@@ -1209,7 +1221,7 @@ export const adminUserRouter = router({
       dateTo: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertFinancialAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -1576,7 +1588,7 @@ export const adminUserRouter = router({
       dateTo: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertFinancialAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -1655,7 +1667,7 @@ export const adminUserRouter = router({
 
   /** Member Management Overview: stats, growth chart, status breakdown, recent members, activity feed */
   getMemberOverview: protectedProcedure.query(async ({ ctx }) => {
-    await assertAdmin(ctx);
+    await assertFinancialAdmin(ctx);
     const db = await getDb();
     const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
 
@@ -2254,7 +2266,7 @@ export const adminUserRouter = router({
 
   /** Revenue overview for member dashboard */
   getRevenueOverview: protectedProcedure.query(async ({ ctx }) => {
-    await assertAdmin(ctx);
+    await assertFinancialAdmin(ctx);
     const db = await getDb();
     const toArr2 = (r: any) => Array.isArray(r) ? r : (r?.[0] ?? []);
     // Total revenue from funnel purchases
@@ -2478,7 +2490,7 @@ export const adminUserRouter = router({
   getUserPurchases: protectedProcedure
     .input(z.object({ userId: z.number().int() }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertFinancialAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Funnel purchases

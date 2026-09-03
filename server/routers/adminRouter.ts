@@ -125,7 +125,7 @@ export const platformAdminRouter = router({
   assignRole: protectedProcedure
     .input(z.object({
       userId: z.number(),
-      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager"]),
+      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "platform_manager", "accreditation_manager"]),
       grantedByLabId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -151,7 +151,7 @@ export const platformAdminRouter = router({
   removeRole: protectedProcedure
     .input(z.object({
       userId: z.number(),
-      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager"]),
+      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "platform_manager", "accreditation_manager"]),
     }))
     .mutation(async ({ ctx, input }) => {
       const myRoles = await getUserRoles(ctx.user.id);
@@ -226,7 +226,7 @@ export const platformAdminRouter = router({
   bulkAssignRole: protectedProcedure
     .input(z.object({
       emails: z.array(z.string().email()).min(1).max(500),
-      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager"]),
+      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "platform_manager", "accreditation_manager"]),
     }))
     .mutation(async ({ ctx, input }) => {
       const myRoles = await getUserRoles(ctx.user.id);
@@ -291,7 +291,7 @@ export const platformAdminRouter = router({
   assignRoleByEmail: protectedProcedure
     .input(z.object({
       email: z.string().email(),
-      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "accreditation_manager"]),
+      role: z.enum(["user", "premium_user", "diy_admin", "diy_user", "platform_admin", "platform_manager", "accreditation_manager"]),
     }))
     .mutation(async ({ ctx, input }) => {
       const myRoles = await getUserRoles(ctx.user.id);

@@ -22,7 +22,7 @@ import { generateImage } from "../_core/imageGeneration";
 import { storagePut } from "../storage";
 import { eq, and, desc, lte, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
+import { getDb, getUserRoles } from "../db";
 import {
   users,
   emailTemplates,
@@ -181,20 +181,32 @@ function injectUnsubscribeFooter(htmlBody: string, unsubscribeUrl: string): stri
 async function assertAdmin(userId: number) {
   const db = await getDb();
   if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-  const adminRole = await db
-    .select()
-    .from(userRoles)
-    .where(
-      and(
-        eq(userRoles.userId, userId),
-        eq(userRoles.role, "platform_admin" as any),
-      ),
-    )
-    .limit(1);
+  const appRoles = await getUserRoles(userId);
   const user = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
-  const isAdmin = adminRole.length > 0 || user[0]?.role === "admin";
+  const isAdmin = user[0]?.role === "admin"
+    || appRoles.includes("platform_admin")
+    || appRoles.includes("platform_owner")
+    || appRoles.includes("platform_manager");
   if (!isAdmin) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required." });
+  }
+}
+
+async function isRestrictedManager(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
+  if (user?.role === "admin") return false;
+  const appRoles = await getUserRoles(userId);
+  return appRoles.includes("platform_manager")
+    && !appRoles.includes("platform_admin")
+    && !appRoles.includes("platform_owner");
+}
+
+async function assertFullPlatformAdmin(userId: number): Promise<void> {
+  await assertAdmin(userId);
+  if (await isRestrictedManager(userId)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Delete access is restricted to Platform Admins." });
   }
 }
 
@@ -737,7 +749,7 @@ Rules:
   deleteTemplate: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx.user.id);
+      await assertFullPlatformAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(emailTemplates).where(eq(emailTemplates.id, input.id));
@@ -922,7 +934,7 @@ Rules:
   deleteSenderProfile: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx.user.id);
+      await assertFullPlatformAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(emailSenderProfiles).where(eq(emailSenderProfiles.id, input.id));
@@ -934,7 +946,7 @@ Rules:
   deleteCampaign: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx.user.id);
+      await assertFullPlatformAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       // Only allow deleting drafts and scheduled campaigns, not sent ones
@@ -1395,7 +1407,7 @@ Rules:
       `)) as [{ url: string; clicks: number }[], unknown];
 
       let ordersRaw: { orderCount: number; revenueCents: number }[] = [];
-      try {
+      if (!(await isRestrictedManager(ctx.user.id))) try {
         const [_ordersRaw] = (await db.execute(sql`
           SELECT COUNT(DISTINCT lo.id) as orderCount, COALESCE(SUM(lo.amount), 0) as revenueCents
           FROM lms_orders lo
@@ -1473,10 +1485,12 @@ Rules:
           url: r.url,
           clicks: Number(r.clicks),
         })),
-        orders: {
-          count: Number(ordersRaw[0]?.orderCount ?? 0),
-          revenueCents: Number(ordersRaw[0]?.revenueCents ?? 0),
-        },
+        ...(await isRestrictedManager(ctx.user.id)
+          ? {}
+          : { orders: {
+            count: Number(ordersRaw[0]?.orderCount ?? 0),
+            revenueCents: Number(ordersRaw[0]?.revenueCents ?? 0),
+          } }),
         variantStats,
       };
     }),
@@ -1727,7 +1741,7 @@ Rules:
   deleteEmailList: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx.user.id);
+      await assertFullPlatformAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       // Prevent deleting the master All Contacts list
@@ -1778,7 +1792,7 @@ Rules:
   removeSubscriber: protectedProcedure
     .input(z.object({ subscriberId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx.user.id);
+      await assertFullPlatformAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       // Mark as unsubscribed (soft delete)
@@ -1911,7 +1925,7 @@ Rules:
   deleteLeadCaptureWidget: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx.user.id);
+      await assertFullPlatformAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await db.delete(leadCaptureWidgets).where(eq(leadCaptureWidgets.id, input.id));

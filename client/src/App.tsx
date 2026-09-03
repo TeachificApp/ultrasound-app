@@ -29,6 +29,7 @@ import { useSsoConsumer } from "./hooks/useSsoConsumer";
 import { useCrossDomainSso } from "./hooks/useCrossDomainSso";
 import { useSsoBridge } from "./hooks/useSsoBridge";
 import PlatformAdmin from "./pages/PlatformAdmin";
+import PlatformAdminEntry from "./pages/PlatformAdminEntry";
 import { perBrandAdminRouteElements, perBrandUserRouteElements } from "./routes/perBrandRouteHelpers";
 import { getSitePageDomain } from "@/lib/sitePageDomain";
 import { RESERVED_SITE_SLUGS } from "@shared/sitePagesConstants";
@@ -378,7 +379,7 @@ function Router() {
         {/* ── Public ────────────────────────────────────────────────────── */}
         <Route path="/" component={Home} />
         <Route path="/login" component={Login} />
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><PlatformAdminEntry /></RoleGuard>}</Route>
         <Route path="/admin/notifications">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminNotificationsPage /></RoleGuard>}</Route>
         <Route path="/register" component={Register} />
         <Route path="/verify-email" component={VerifyEmail} />
@@ -537,7 +538,7 @@ function Router() {
         {/* Generic CME disclosure form — must be registered BEFORE the :token route */}
         <Route path="/cme-disclosure/generic">{() => <Suspense fallback={pageFallback}><CmeDisclosureFormGeneric /></Suspense>}</Route>
         <Route path="/cme-disclosure/:token">{() => <Suspense fallback={pageFallback}><CmeDisclosureForm /></Suspense>}</Route>
-        <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePagesAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
@@ -592,7 +593,7 @@ function Router() {
         <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/funnels/:funnelId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelPageEditor /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/contacts">{() => { window.location.replace("/admin/funnels?tab=contacts"); return null; }}</Route>
-        <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
+        <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
@@ -615,14 +616,14 @@ function Router() {
         <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
         <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
         <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EmailAdmin /></RoleGuard>}</Route>
-        <Route path="/admin/email-campaigns">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><EmailCampaignDashboard /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/email-campaigns">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><EmailCampaignDashboard /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
         {/* ── Unified Members Hub (replaces scattered user/sales/membership pages) ── */}
-        <Route path="/admin/members">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembersHub /></Suspense></RoleGuard>}</Route>
+        <Route path="/admin/members">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembersHub /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/product-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductAnalytics /></Suspense></RoleGuard>}</Route>
         {/* Legacy redirects — keep old URLs working */}
         <Route path="/admin/user-analytics">{() => { window.location.replace("/admin/members?tab=members"); return null; }}</Route>
-        <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
+        <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><AdminUserDetailPage /></RoleGuard>}</Route>
         <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
         <Route path="/admin/discount-codes">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminDiscountCodesPage /></RoleGuard>}</Route>
@@ -643,13 +644,13 @@ function Router() {
         <Route path="/quiz/:joinCode">{() => <SonoQuizPlay />}</Route>
         <Route path="/image-quality-review">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ImageQualityReview /></RoleGuard>}</Route>
         {/* ── Standalone Quiz Creator ────────────────────────────────────────────────── */}
-        <Route path="/admin/quiz-creator/builder/new">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizVisualBuilder /></RoleGuard>}</Route>
-        <Route path="/admin/quiz-creator/:quizId/builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizVisualBuilder /></RoleGuard>}</Route>
-        <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
-        <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/quiz-creator/builder/new">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuizVisualBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/quiz-creator/:quizId/builder">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuizVisualBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
         {/* ── Question Bank ─────────────────────────────────────────────────────────────────────────────────────── */}
-        <Route path="/question-bank/import">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankImportPage /></RoleGuard>}</Route>
-        <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankPage /></RoleGuard>}</Route>
+        <Route path="/question-bank/import">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuestionBankImportPage /></RoleGuard>}</Route>
+        <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuestionBankPage /></RoleGuard>}</Route>
         <Route path="/quizzes/:quizId">{() => <StandaloneQuizPlayer />}</Route>
         <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
         <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>
@@ -710,18 +711,18 @@ function MembersRouter() {
       <Route path="/courses/:slug">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}`); return null; }}</Route>
       <Route path="/education-library">{() => { window.location.replace(`${LEARN_APP_URL}/education-library`); return null; }}</Route>
       {/* ── Admin routes served directly on app.allaboutultrasound.com ── */}
-      <Route path="/admin/members">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembersHub /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/members">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembersHub /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/product-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductAnalytics /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
       <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
       <Route path="/admin/user-analytics">{() => { window.location.replace("/admin/members?tab=members"); return null; }}</Route>
       <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
-      <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MembersLayout><PlatformAdmin /></MembersLayout></RoleGuard>}</Route>
+      <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><MembersLayout><PlatformAdminEntry /></MembersLayout></RoleGuard>}</Route>
       {/* Redirect remaining /admin/* routes to learn subdomain — explicit routes before catch-all */}
       <Route path="/admin/lms">{() => { window.location.replace(`${LEARN_APP_URL}/admin/lms`); return null; }}</Route>
       <Route path="/admin/lms/:rest*">{(params: { rest?: string }) => { window.location.replace(`${LEARN_APP_URL}/admin/lms/${params.rest ?? ""}`); return null; }}</Route>
       {/* Admin user detail — must be before the catch-all so it renders on app.allaboutultrasound.com */}
-      <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><AdminUserDetailPage /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/users/:userId">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><AdminUserDetailPage /></Suspense></RoleGuard>}</Route>
       {/* Form builder routes — served on app domain, must be before catch-all */}
       <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><GeneralFormBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/general-forms/analytics-dashboard">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><GeneralFormAnalyticsDashboard /></Suspense></RoleGuard>}</Route>
@@ -730,9 +731,9 @@ function MembersRouter() {
       <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FormBuilderAdmin /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/activity-log">{() => { window.location.replace("/admin/members?tab=activity"); return null; }}</Route>
       {/* All app-domain admin routes — must be before the learn catch-all */}
-      <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MediaRepository /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MediaRepository /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/email">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><EmailAdmin /></Suspense></RoleGuard>}</Route>
-      <Route path="/admin/email-campaigns">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><EmailCampaignDashboard /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/email-campaigns">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><EmailCampaignDashboard /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/funnels/:funnelId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelPageEditor /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/funnels/:funnelId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/funnels">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><FunnelBuilder /></Suspense></RoleGuard>}</Route>
@@ -752,12 +753,12 @@ function MembersRouter() {
       <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/sonoquiz/host/:sessionId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SonoQuizHost /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/sonoquiz">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SonoQuizCreator /></Suspense></RoleGuard>}</Route>
-      <Route path="/admin/quiz-creator/builder/new">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><QuizVisualBuilder /></Suspense></RoleGuard>}</Route>
-      <Route path="/admin/quiz-creator/:quizId/builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><QuizVisualBuilder /></Suspense></RoleGuard>}</Route>
-      <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
-      <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
-      <Route path="/question-bank/import">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankImportPage /></RoleGuard>}</Route>
-      <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankPage /></RoleGuard>}</Route>
+      <Route path="/admin/quiz-creator/builder/new">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><QuizVisualBuilder /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/quiz-creator/:quizId/builder">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><QuizVisualBuilder /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/quiz-creator">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
+      <Route path="/admin/quiz-creator/:quizId">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuizCreatorAdmin /></RoleGuard>}</Route>
+      <Route path="/question-bank/import">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuestionBankImportPage /></RoleGuard>}</Route>
+      <Route path="/question-bank">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><QuestionBankPage /></RoleGuard>}</Route>
       <Route path="/quizzes/:quizId">{() => <StandaloneQuizPlayer />}</Route>
       <Route path="/quizzes/:quizId/results/:attemptId">{() => <StandaloneQuizResults />}</Route>
       <Route path="/my-quizzes">{() => <StudentQuizDashboard />}</Route>

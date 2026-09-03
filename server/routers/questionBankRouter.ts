@@ -17,6 +17,7 @@ import {
   questionBankTagMap,
   lmsQuizQuestions,
   users,
+  userRoles,
   mediaAssets,
   mediaVersions,
 } from "../../drizzle/schema";
@@ -43,7 +44,9 @@ async function assertAdmin(ctx: { user: { id: number; role: string } }) {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [u] = await db.select({ role: users.role }).from(users).where(eq(users.id, ctx.user.id)).limit(1);
-    if (!u || u.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+    const assignedRoles = await db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, ctx.user.id));
+    const hasManagerAccess = assignedRoles.some(({ role }) => role === "platform_admin" || role === "platform_owner" || role === "platform_manager");
+    if (!u || (u.role !== "admin" && !hasManagerAccess)) throw new TRPCError({ code: "FORBIDDEN", message: "Administrative access required" });
   }
 }
 

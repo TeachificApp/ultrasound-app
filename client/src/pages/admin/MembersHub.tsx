@@ -8,6 +8,7 @@
  *   Settings
  */
 import React, { useState, useEffect, lazy, Suspense } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1224,6 +1225,13 @@ function PlaceholderPanel({ title, description }: { title: string; description: 
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function MembersHub() {
+  const { user } = useAuth();
+  const isRestrictedManager = (user?.appRoles ?? []).includes("platform_manager")
+    && !(user?.appRoles ?? []).some((role) => role === "platform_admin" || role === "platform_owner")
+    && user?.role !== "admin";
+  const visibleNavItems = isRestrictedManager
+    ? NAV_ITEMS.filter((item) => !["overview", "sales", "product-analytics", "memberships"].includes(item.id))
+    : NAV_ITEMS;
   const [activeNav, setActiveNav] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get("tab");
@@ -1237,10 +1245,12 @@ export default function MembersHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [newMemberRequest, setNewMemberRequest] = useState(0);
 
-  const pageTitle = NAV_ITEMS.find(n => n.id === activeNav)?.label ?? "Members";
+  const resolvedActiveNav = visibleNavItems.some((item) => item.id === activeNav) ? activeNav : "all-members";
+
+  const pageTitle = visibleNavItems.find(n => n.id === resolvedActiveNav)?.label ?? "Members";
 
   function renderContent() {
-    switch (activeNav) {
+    switch (resolvedActiveNav) {
       case "overview":          return <OverviewPanel />;
       case "all-members":       return <AllMembersPanel openCreateSignal={newMemberRequest} onCreateConsumed={() => setNewMemberRequest(0)} />;
       case "enrollments":       return <EnrollmentsPanel />;
@@ -1292,9 +1302,9 @@ export default function MembersHub() {
 
         {/* Nav Items */}
         <nav className="flex-1 overflow-y-auto py-2">
-          {NAV_ITEMS.map((item, idx) => {
-            const isActive = activeNav === item.id;
-            const showSection = !sidebarCollapsed && item.section && (idx === 0 || NAV_ITEMS[idx - 1].section !== item.section);
+          {visibleNavItems.map((item, idx) => {
+            const isActive = resolvedActiveNav === item.id;
+            const showSection = !sidebarCollapsed && item.section && (idx === 0 || visibleNavItems[idx - 1].section !== item.section);
             return (
               <div key={item.id}>
                 {showSection && (
@@ -1328,7 +1338,7 @@ export default function MembersHub() {
         <div className="flex-shrink-0 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
           <h1 className="text-base font-semibold text-slate-800">{pageTitle}</h1>
           <div className="flex items-center gap-2">
-            {activeNav === "all-members" && (
+            {resolvedActiveNav === "all-members" && (
               <Button
                 variant="outline"
                 size="sm"
@@ -1338,7 +1348,7 @@ export default function MembersHub() {
                 <Download size={13} /> Export
               </Button>
             )}
-            {activeNav === "overview" && (
+            {resolvedActiveNav === "overview" && (
               <Button size="sm" className="text-xs gap-1.5 bg-teal-600 hover:bg-teal-700 h-8" onClick={() => { setActiveNav("all-members"); setNewMemberRequest(Date.now()); }}>
                 <UserPlus size={13} /> New Member & Access
               </Button>

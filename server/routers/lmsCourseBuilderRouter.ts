@@ -88,6 +88,7 @@ import {
   workshopEnrollments,
   digitalBundles,
   standaloneQuizzes,
+  userRoles,
 } from "../../drizzle/schema";
 import { draftNotifyEntries, cmeActivityForms } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
@@ -96,7 +97,7 @@ import { applyEditableBlockText, assertSubstantiveFocusRegeneration, collectEdit
 import { selectCourseFocusRegenerationLessons } from "../lib/courseFocusRegenerationBatch";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
+import { assertAdmin, assertFullAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
 
 const focusRegenerationInput = z.object({
   newFocus: z.string().trim().min(3).max(500),
@@ -526,7 +527,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
   deleteCourse: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertFullAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.id, input.id)).limit(1);
@@ -835,7 +836,16 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         }
       }
       const sectionsWithLessons = sections.map(s => ({ ...s, lessons: lessonsBySectionId.get(s.id) ?? [] }));
-      return { ...course, sections: sectionsWithLessons, topLevelLessons, landingPage: landingPage[0] ?? null, courseInstructors: cis, hasCmeActivity: cmeActivity.length > 0 };
+      const assignedRoles = ctx.user.role === "admin"
+        ? []
+        : await db.select({ role: userRoles.role }).from(userRoles).where(eq(userRoles.userId, ctx.user.id));
+      const isRestrictedManager = ctx.user.role !== "admin"
+        && assignedRoles.some(({ role }) => role === "platform_manager")
+        && !assignedRoles.some(({ role }) => role === "platform_admin" || role === "platform_owner");
+      const responseCourse = isRestrictedManager
+        ? { ...course, price: null, stripePriceId: null, subscriptionPrice: null, downPayment: null, installmentAmount: null }
+        : course;
+      return { ...responseCourse, sections: sectionsWithLessons, topLevelLessons, landingPage: landingPage[0] ?? null, courseInstructors: cis, hasCmeActivity: cmeActivity.length > 0 };
     }),
 
   // ── Sections ──
@@ -1356,7 +1366,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
   deleteLesson: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      await assertAdmin(ctx);
+      await assertFullAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(lmsLessonProgress).where(eq(lmsLessonProgress.lessonId, input.id));

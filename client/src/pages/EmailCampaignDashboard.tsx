@@ -218,7 +218,7 @@ function LeadCaptureWidgetForm({
     </div>
   );
 }
-function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; subject: string; onClose: () => void }) {
+function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }: { campaignId: number; subject: string; onClose: () => void; hideFinancials?: boolean }) {
   const [activeTab, setActiveTab] = useState<"overview" | "recipients" | "geo" | "links">("overview");
   const [expandedLinkUrl, setExpandedLinkUrl] = useState<string | null>(null);
   const [recipientFilter, setRecipientFilter] = useState<"open" | "click" | "unsubscribe" | undefined>(undefined);
@@ -321,7 +321,7 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
                   <div className="text-[10px] text-red-400 mt-0.5">{analytics.unsubscribeRate}% rate</div>
                 </div>
               </div>
-              {analytics.orders && analytics.orders.count > 0 && (
+              {!hideFinancials && analytics.orders && analytics.orders.count > 0 && (
                 <div className="mt-2 pt-2 border-t border-[#189aa1]/20 flex items-center gap-4 text-xs text-amber-700">
                   <span className="font-semibold">💰 {analytics.orders.count} attributed order{analytics.orders.count !== 1 ? "s" : ""}</span>
                   <span>${(analytics.orders.revenueCents / 100).toFixed(2)} revenue</span>
@@ -402,7 +402,7 @@ function AnalyticsModal({ campaignId, subject, onClose }: { campaignId: number; 
                   </div>
                 )}
 
-                {analytics.orders && analytics.orders.count > 0 && (
+                {!hideFinancials && analytics.orders && analytics.orders.count > 0 && (
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="p-3 border rounded-lg bg-amber-50">
                       <p className="text-xs text-amber-700 mb-1">Attributed Orders</p>
@@ -956,7 +956,10 @@ export default function EmailCampaignDashboard() {
   // ── Auth guards ─────────────────────────────────────────────────────────────
   if (loading) return <Layout><div className="container py-12 flex justify-center"><RefreshCw className="w-6 h-6 animate-spin text-[#189aa1]" /></div></Layout>;
   if (!isAuthenticated || !user) return <Layout><div className="container py-12 text-center text-gray-500">Please log in.</div></Layout>;
-  const isAdmin = user.role === "admin" || (user.appRoles ?? []).includes("platform_admin");
+  const isRestrictedManager = (user.appRoles ?? []).includes("platform_manager")
+    && !(user.appRoles ?? []).some((role) => role === "platform_admin" || role === "platform_owner")
+    && user.role !== "admin";
+  const isAdmin = user.role === "admin" || (user.appRoles ?? []).some((role) => ["platform_admin", "platform_owner", "platform_manager"].includes(role));
   if (!isAdmin) return <Layout><div className="container py-12 text-center"><Shield className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">Admin access required.</p></div></Layout>;
 
   // If editor is open, show it full-page
@@ -1127,7 +1130,7 @@ export default function EmailCampaignDashboard() {
                                 <BarChart2 className="w-4 h-4" />
                               </button>
                             )}
-                            {c.status === "sending" && (
+                            {!isRestrictedManager && c.status === "sending" && (
                               <button
                                 onClick={() => { if (window.confirm("Stop this campaign? Emails already sent will not be recalled.")) stopMutation.mutate({ id: c.id }); }}
                                 className="p-1.5 rounded hover:bg-red-50 text-orange-500 hover:text-red-600"
@@ -1145,7 +1148,7 @@ export default function EmailCampaignDashboard() {
                             <button onClick={() => duplicateMutation.mutate({ id: c.id })} className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#189aa1]" title="Duplicate">
                               <Copy className="w-4 h-4" />
                             </button>
-                            {(c.status === "sent" || c.status === "failed") && (
+                            {!isRestrictedManager && (c.status === "sent" || c.status === "failed") && (
                               <button
                                 onClick={() => { if (window.confirm(`Resend "${c.subject}" to all matching recipients?`)) resendMutation.mutate({ id: c.id }); }}
                                 className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-[#189aa1]"
@@ -1155,9 +1158,11 @@ export default function EmailCampaignDashboard() {
                                 <RefreshCw className="w-4 h-4" />
                               </button>
                             )}
-                            <button onClick={() => setDeleteConfirmId(c.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" title="Delete">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {!isRestrictedManager && (
+                              <button onClick={() => setDeleteConfirmId(c.id)} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500" title="Delete">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1203,9 +1208,11 @@ export default function EmailCampaignDashboard() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <button onClick={() => deleteSenderMutation.mutate({ id: sp.id })} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            {!isRestrictedManager && (
+                              <button onClick={() => deleteSenderMutation.mutate({ id: sp.id })} className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -1275,7 +1282,9 @@ export default function EmailCampaignDashboard() {
                         </div>
                         <div className="flex flex-col gap-1 shrink-0">
                           <Button variant="outline" size="sm" onClick={() => { setEditingWidget(w); setShowWidgetForm(true); }}><Edit className="w-4 h-4" /></Button>
-                          <Button variant="outline" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => deleteWidgetMutation.mutate({ id: w.id })}><Trash2 className="w-4 h-4" /></Button>
+                          {!isRestrictedManager && (
+                            <Button variant="outline" size="sm" className="text-red-500 hover:bg-red-50" onClick={() => deleteWidgetMutation.mutate({ id: w.id })}><Trash2 className="w-4 h-4" /></Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1308,6 +1317,7 @@ export default function EmailCampaignDashboard() {
           campaignId={analyticsId}
           subject={analyticsSubject}
           onClose={() => { setAnalyticsId(null); setAnalyticsSubject(""); }}
+          hideFinancials={isRestrictedManager}
         />
       )}
 
