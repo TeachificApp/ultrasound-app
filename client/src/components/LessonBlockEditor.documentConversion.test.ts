@@ -1,0 +1,22 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
+
+const source = readFileSync(resolve(process.cwd(), "client/src/components/LessonBlockEditor.tsx"), "utf8");
+
+describe("LessonBlockEditor document conversion entry", () => {
+  it("exposes a clear Convert File action only while editing a saved lesson", () => {
+    expect(source).toContain('id: "convert_document"');
+    expect(source).toContain('label: "Convert File"');
+    expect(source).toContain("...(lessonId ? [{ id: \"convert_document\" as const");
+    expect(source).toContain("Convert a PDF or PowerPoint into editable lesson content");
+  });
+
+  it("uses the protected conversion mutation, appends output, and keeps persistence on the normal Save path", () => {
+    expect(source).toContain("trpc.lmsAdmin.convertLessonDocument.useMutation()");
+    expect(source).toContain("setBlocks(current => [...current, ...convertedBlocks])");
+    expect(source).toContain("Save the lesson to keep them.");
+    expect(source).toContain("no existing lesson block is replaced automatically");
+    expect(source).not.toContain("updateLesson.mutateAsync({\n        id: lessonId,\n        contentBlocks: JSON.stringify(convertedBlocks)");
+  });
+});

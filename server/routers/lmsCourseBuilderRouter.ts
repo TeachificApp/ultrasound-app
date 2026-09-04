@@ -95,6 +95,14 @@ import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 import { parseScheduledTimestamp } from "../../shared/platformTime";
 import { applyEditableBlockText, assertSubstantiveFocusRegeneration, collectEditableBlockText, stripCodeFences, type BlockTextField } from "../lib/lessonFocusRegeneration";
 import { selectCourseFocusRegenerationLessons } from "../lib/courseFocusRegenerationBatch";
+import { parsePptxBuffer } from "../lib/pptxImport";
+import {
+  assertLessonDocumentUpload,
+  convertPdfToEditableLessonBlocks,
+  convertPptxSlidesToEditableLessonBlocks,
+  getLessonDocumentKind,
+  LESSON_DOCUMENT_MAX_BYTES,
+} from "../lib/documentRichContent";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, assertFullAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -1261,6 +1269,93 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
           .where(eq(standaloneQuizzes.id, input.standaloneQuizId));
       }
       return { id: result.id };
+    }),
+
+  convertLessonDocument: protectedProcedure
+    .input(z.object({
+      lessonId: z.number().int().positive(),
+      fileName: z.string().trim().min(1).max(180),
+      mimeType: z.string().trim().min(1).max(160),
+      fileSize: z.number().int().positive().max(LESSON_DOCUMENT_MAX_BYTES),
+      // The application JSON body limit is 100 MB; this independently bounds the encoded upload.
+      fileData: z.string().min(1).max(Math.ceil(LESSON_DOCUMENT_MAX_BYTES * 1.37)),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [lesson] = await db
+        .select({ id: lmsLessons.id })
+        .from(lmsLessons)
+        .where(eq(lmsLessons.id, input.lessonId))
+        .limit(1);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found." });
+
+      const kind = getLessonDocumentKind(input.fileName, input.mimeType);
+      if (!kind) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a PDF or PowerPoint .pptx file." });
+      }
+
+      let buffer: Buffer;
+      try {
+        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(input.fileData) || input.fileData.length % 4 !== 0) {
+          throw new Error("Invalid base64");
+        }
+        buffer = Buffer.from(input.fileData, "base64");
+      } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The selected document could not be read." });
+      }
+      if (!buffer.length || buffer.length !== input.fileSize) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The selected document size could not be verified." });
+      }
+      try {
+        assertLessonDocumentUpload(input.fileName, input.mimeType, buffer.length);
+      } catch (error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "The selected document is not supported." });
+      }
+
+      const cleanFileName = input.fileName
+        .replace(/[^a-zA-Z0-9._-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 120) || `lesson-document.${kind}`;
+      const token = randomBytes(12).toString("hex");
+      const sourcePrefix = `lms-documents/lesson-${lesson.id}/${token}`;
+      const sourceMimeType = kind === "pdf"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+      const sourceKey = `${sourcePrefix}/source-${cleanFileName}`;
+      const { url: sourceUrl } = await storagePut(sourceKey, buffer, sourceMimeType);
+      const source = {
+        fileName: input.fileName,
+        mimeType: sourceMimeType,
+        storageKey: sourceKey,
+        storageUrl: sourceUrl,
+        convertedAt: new Date().toISOString(),
+      };
+      const uploadImage = async (fileName: string, data: Buffer, mimeType: string) => {
+        const extension = mimeType === "image/jpeg" ? "jpg" : "png";
+        const imageKey = `${sourcePrefix}/assets/${randomBytes(10).toString("hex")}-${fileName.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80) || `asset.${extension}`}`;
+        const { url } = await storagePut(imageKey, data, mimeType);
+        return url;
+      };
+
+      try {
+        const result = kind === "pdf"
+          ? await convertPdfToEditableLessonBlocks(buffer, source, uploadImage)
+          : convertPptxSlidesToEditableLessonBlocks(
+              (await parsePptxBuffer(buffer, uploadImage)).slides,
+              source,
+            );
+        return { ...result, source };
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error && error.message
+            ? error.message
+            : "The document could not be converted. Try exporting it again before uploading.",
+        });
+      }
     }),
 
   updateLesson: protectedProcedure

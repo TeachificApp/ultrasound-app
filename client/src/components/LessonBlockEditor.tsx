@@ -26,7 +26,7 @@ import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import React, { useImperativeHandle } from "react";
 import {
-  X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2,
+  X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2, FileUp,
   ChevronLeft, ChevronRight, Bookmark, GripVertical,
 } from "lucide-react";
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
@@ -68,7 +68,7 @@ interface LessonBlockEditorProps {
 }
 
 // Picker tab type
-type PickerTab = "catalog" | "from_lessons" | "templates" | "import_url";
+type PickerTab = "catalog" | "from_lessons" | "templates" | "import_url" | "convert_document";
 
 /**
  * Turn persisted template JSON into independently editable lesson blocks.  Only
@@ -145,6 +145,8 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const [importUrl, setImportUrl] = useState("");
   const [importPreview, setImportPreview] = useState<{ blocks: any[]; pageTitle: string; blockCount: number } | null>(null);
   const [importSelectedBlocks, setImportSelectedBlocks] = useState<Set<number>>(new Set());
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const documentFileInputRef = useRef<HTMLInputElement>(null);
   const scrapeUrlMutation = trpc.pageScraper.scrapeUrl.useMutation({
     onSuccess: (data) => {
       setImportPreview(data);
@@ -154,6 +156,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   });
 
   const updateLesson = trpc.lmsAdmin.updateLesson.useMutation();
+  const convertLessonDocument = trpc.lmsAdmin.convertLessonDocument.useMutation();
 
   // Save-as-template state
   const [saveTemplateDialogBlock, setSaveTemplateDialogBlock] = useState<Block | null>(null);
@@ -429,6 +432,64 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
     setSelectedBlockId(newBlock.id);
     setAddMenuOpen(false);
     scrollToBlock(newBlock.id);
+  };
+
+  const readFileAsBase64 = async (file: File) => {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const chunkSize = 0x8000;
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+    }
+    return window.btoa(binary);
+  };
+
+  const handleDocumentConversion = async () => {
+    if (!lessonId) {
+      toast.error("Document conversion is available while editing a saved lesson.");
+      return;
+    }
+    if (!documentFile) {
+      toast.error("Choose a PDF or PowerPoint .pptx file first.");
+      return;
+    }
+    if (!/\.(pdf|pptx)$/i.test(documentFile.name)) {
+      toast.error("Choose a PDF or PowerPoint .pptx file.");
+      return;
+    }
+    if (documentFile.size > 25 * 1024 * 1024) {
+      toast.error("Choose a document no larger than 25 MB.");
+      return;
+    }
+
+    try {
+      const mimeType = documentFile.type || (documentFile.name.toLowerCase().endsWith(".pdf")
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+      const result = await convertLessonDocument.mutateAsync({
+        lessonId,
+        fileName: documentFile.name,
+        mimeType,
+        fileSize: documentFile.size,
+        fileData: await readFileAsBase64(documentFile),
+      });
+      const convertedBlocks = result.blocks as Block[];
+      if (!convertedBlocks.length) {
+        toast.error("No editable content could be created from that document.");
+        return;
+      }
+      setBlocks(current => [...current, ...convertedBlocks]);
+      setSelectedBlockId(convertedBlocks[0].id);
+      setDocumentFile(null);
+      setAddMenuOpen(false);
+      toast.success(`${result.pageCount} ${result.pageCount === 1 ? "page or slide" : "pages or slides"} converted into ${convertedBlocks.length} editable block${convertedBlocks.length === 1 ? "" : "s"}. Save the lesson to keep them.`);
+      if (result.warnings.length > 0) {
+        toast.message(`Conversion notes: ${result.warnings.length}. Review the inserted blocks before saving.`);
+      }
+      scrollToBlock(convertedBlocks[0].id);
+    } catch (error: any) {
+      toast.error(error?.message || "The document could not be converted.");
+    }
   };
 
   const copyBlockFromLesson = (block: Block) => {
@@ -975,6 +1036,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
             { id: "from_lessons", icon: <BookOpen className="w-3.5 h-3.5" />, label: "Copy" },
             { id: "templates", icon: <Layers className="w-3.5 h-3.5" />, label: "Templates" },
             { id: "import_url", icon: <Globe className="w-3.5 h-3.5" />, label: "Import URL" },
+            ...(lessonId ? [{ id: "convert_document" as const, icon: <FileUp className="w-3.5 h-3.5" />, label: "Convert File" }] : []),
           ] as const).map(tab => (
             <button
               key={tab.id}
@@ -1025,6 +1087,43 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
                   <span className="text-xs leading-4 font-medium break-words">{b.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Convert PDF / PowerPoint tab ── */}
+        {pickerTab === "convert_document" && (
+          <div className="flex flex-col flex-1 overflow-y-auto gap-5 py-3">
+            <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4 text-sm text-slate-700">
+              <p className="font-semibold text-teal-800">Convert a PDF or PowerPoint into editable lesson content</p>
+              <p className="mt-1.5 leading-6">Each PDF page becomes a responsive page image and editable rich-text block. Each PowerPoint slide becomes editable rich text plus its extracted images. The original file is retained as a source reference, and conversion only appends blocks to this lesson.</p>
+            </div>
+            <input
+              ref={documentFileInputRef}
+              type="file"
+              accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx"
+              className="hidden"
+              onChange={event => setDocumentFile(event.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              onClick={() => documentFileInputRef.current?.click()}
+              className="flex min-h-36 flex-col items-center justify-center rounded-xl border-2 border-dashed border-teal-200 bg-white px-6 py-8 text-center transition-colors hover:border-teal-400 hover:bg-teal-50/50"
+            >
+              <FileUp className="mb-3 h-8 w-8 text-teal-600" />
+              <span className="font-semibold text-slate-800">{documentFile ? documentFile.name : "Choose PDF or PowerPoint (.pptx)"}</span>
+              <span className="mt-1 text-xs text-slate-500">{documentFile ? `${(documentFile.size / (1024 * 1024)).toFixed(1)} MB selected` : "Maximum file size: 25 MB"}</span>
+            </button>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="max-w-md text-xs leading-5 text-slate-500">Conversion adds editable blocks locally. Use the lesson’s standard <strong>Save</strong> action after reviewing them; no existing lesson block is replaced automatically.</p>
+              <Button
+                type="button"
+                onClick={handleDocumentConversion}
+                disabled={!documentFile || convertLessonDocument.isPending}
+                className="bg-teal-600 hover:bg-teal-700"
+              >
+                {convertLessonDocument.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Converting…</> : <><FileUp className="mr-2 h-4 w-4" /> Convert into Blocks</>}
+              </Button>
             </div>
           </div>
         )}

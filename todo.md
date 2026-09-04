@@ -392,12 +392,17 @@
 - [ ] Update newsletter signup consent text to state educational and marketing emails.
 - [ ] Prepare the confirmation email with inbox-whitelisting guidance and request final approval of audience, sender, subject, and content before enabling delivery.
 - [ ] Add focused confirmation-token, pending-state, activation, consent-copy, and no-email-sent regressions.
-- [ ] Add an editable PDF/PowerPoint-to-rich-content lesson and page block that extracts document text and visual assets into a visually configured draft rather than a standard file viewer.
-- [ ] Convert each PDF page and PowerPoint slide into a separate responsive editable lesson/page content block rather than retaining fixed-page display.
-- [ ] Insert converted editable PDF/PPT page and slide blocks directly into the current lesson after conversion, retaining the original source file and preserving other lesson blocks.
+- [x] Add an editable PDF/PowerPoint-to-rich-content lesson and page block that extracts document text and visual assets into a visually configured draft rather than a standard file viewer.
+- [x] Convert each PDF page and PowerPoint slide into a separate responsive editable lesson/page content block rather than retaining fixed-page display.
+- [x] Insert converted editable PDF/PPT page and slide blocks directly into the current lesson after conversion, retaining the original source file and preserving other lesson blocks.
 - [x] Clean up the Add Content Block picker grid so block icons and labels have consistent spacing, wrapping, and touch-friendly row sizing without overlap.
 - [x] Rebuild Add Content Block picker cells so icon and multi-line label layout cannot overlap at the current desktop picker width.
 - [x] Preserve the exact active lesson view across refresh, returning to the same Lesson Editor or Lesson Settings view instead of Course Settings.
 - [x] Add focused picker-cell and lesson-view refresh-state regressions.
-- [ ] Preserve the original source PDF/PowerPoint and asset references while allowing administrators to edit generated text and visual layout before saving the rich-content block.
-- [ ] Add focused document extraction, visual-asset preservation, rich-content editing, and source-file retention regressions.
+- [x] Preserve the original source PDF/PowerPoint and asset references while allowing administrators to edit generated text and visual layout before saving the rich-content block.
+- [x] Add focused document extraction, visual-asset preservation, rich-content editing, and source-file retention regressions.
+- [x] Expose the PDF/PowerPoint conversion action visibly in the current Lesson Editor’s Add Content Block workflow and verify it appends converted blocks without replacing existing content.
+- [ ] Allow Lesson Quiz and Lesson Flashcard modules to select and insert appropriate Question Bank questions or flashcards using the same controlled source-selection workflow as standalone builders.
+- [ ] Record lesson-module quiz attempts and flashcard self-reported Got It Right/Missed outcomes in the signed-in learner’s private My Quiz Results sections, without exposing other learners’ records or class counts.
+- [ ] Add focused authoring, Question Bank preservation, embedded-attempt, flashcard outcome, My Quiz Results, and privacy regressions for lesson modules.
+- [ ] Allow authors to add new lesson-module quiz questions and flashcards into the appropriate Question Bank, with duplicate-safe source linkage and without changing existing learner attempts or source records.
