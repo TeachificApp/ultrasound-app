@@ -380,3 +380,5 @@
 - [x] Repair Lesson Focus Regeneration when valid requests are rejected as incomplete, while preserving review-only drafts and preventing automatic lesson saves.
 - [x] Superseded the ACS lesson-draft request after clarification that ACS work must be Flashcards only; no ACS lesson draft was created or changed.
 - [x] Finish and checkpoint the Ultrasound Physics AI lesson-regeneration repair before resuming any ACS Flashcards work.
+- [ ] Diagnose and repair the actual populated-content Ultrasound Physics Lesson Focus Regeneration failure; do not assume fields are empty or claim success without a populated-case result.
+- [ ] Add a populated-content regeneration regression that preserves review-only drafts and detects the true incomplete-rewrite failure reason without storing raw lesson content.

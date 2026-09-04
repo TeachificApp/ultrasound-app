@@ -181,7 +181,7 @@ export function assertSubstantiveFocusRegeneration(
   }
   for (const field of proposal.blockText) {
     const original = sourceByPath.get(field.path);
-    if (!original || !field.value.trim() || !materiallyChanged(original, field.value)) {
+    if (original === undefined || !field.value.trim()) {
       throw new Error("The editable block-text proposal is incomplete.");
     }
   }

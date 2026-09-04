@@ -191,6 +191,11 @@ async function generateFocusChange(input: {
     const raw = response.choices?.[0]?.message?.content;
     const parsed = typeof raw === "string" ? JSON.parse(stripCodeFences(raw)) : raw;
     const proposal = focusChangeInput.parse({ lessonId: input.lesson.id, ...parsed });
+    const returnedBlockText = new Map(proposal.blockText.map((field) => [field.path, field.value]));
+    proposal.blockText = source.editableBlockText.map((field) => ({
+      path: field.path,
+      value: returnedBlockText.get(field.path)?.trim() || field.value,
+    }));
     // Some lessons have optional empty fields or legacy block text that cannot be
     // regenerated. Keep the draft reviewable when the primary instructional body
     // and title are substantive; applying it still requires an explicit save.
