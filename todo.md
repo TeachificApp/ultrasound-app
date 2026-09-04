@@ -363,3 +363,10 @@
 - [ ] Add administrator-controlled selective imported-product landing-page population, local checkout, and fulfillment-source configuration within the current Products workflow only after the compatible source and required credentials are approved.
 - [x] Repair the Pediatric Digital Flashcards SCORM package display and launch path without replacing the uploaded package or changing course access, learner progress, or completion records.
 - [x] Add focused SCORM launch, asset-access, and learner-player regressions for the Pediatric Digital Flashcards package and compatible course-content packages.
+- [ ] Add LMS-native standalone Flashcards alongside standalone quizzes and mock exams, with a dedicated visual builder while retaining the existing app flashcards unchanged.
+- [x] Duplicate existing app flashcards into an LMS Flashcards Question Bank parent folder with category-specific subfolders, preserving source records and avoiding duplicate imports. Completed idempotent copy: 550 active app flashcards into 12 category subfolders; the protected importer supports later imports.
+- [ ] Support Flashcard Question Bank authoring, learner feedback, configurable total and per-group draws, and selected question-group sourcing for standalone and embedded flashcards.
+- [ ] Add standalone flashcard URL and embeddable delivery using the existing protected standalone-quiz publication and access patterns.
+- [ ] Add Flashcard lesson and page content modules with Question Bank selection, group-draw configuration, progress, and learner feedback without changing existing lesson quizzes.
+- [ ] Add AI and approved PDF, PowerPoint, and Word flashcard generation, treating each PDF/PPT page pair as front and back while avoiding direct source references in generated learner content.
+- [ ] Add focused regressions for app-flashcard preservation, import hierarchy, visual authoring, Question Bank storage, configurable delivery, embeds, lesson modules, and AI/document generation.

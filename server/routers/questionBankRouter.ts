@@ -16,6 +16,7 @@ import {
   questionBankTags,
   questionBankTagMap,
   lmsQuizQuestions,
+  quickfireQuestions,
   users,
   userRoles,
   mediaAssets,
@@ -53,7 +54,7 @@ async function assertAdmin(ctx: { user: { id: number; role: string } }) {
 // ─── Shared question input schema ─────────────────────────────────────────────
 const questionInput = z.object({
   question: z.string().min(1),
-  type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).default("mcq"),
+  type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"]).default("mcq"),
   options: z.array(z.object({
     text: z.string(),
     imageUrl: z.string().optional(),
@@ -63,6 +64,10 @@ const questionInput = z.object({
   correctAnswers: z.array(z.number().int()).optional(),
   hotspotMarkers: z.string().optional(), // JSON string
   matchingPairs: z.string().optional(),  // JSON string
+  flashcardFront: z.string().optional(),
+  flashcardBack: z.string().optional(),
+  flashcardHint: z.string().optional(),
+  flashcardBackImageUrl: z.string().optional(),
   explanation: z.string().optional(),
   questionImageUrl: z.string().optional(),
   questionVideoUrl: z.string().optional(),
@@ -130,7 +135,7 @@ export const questionBankRouter = router({
       tagIds: z.array(z.number().int()).optional(),
       isPreset: z.boolean().optional(),
       presetCategory: z.string().optional(),
-      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).optional(),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"]).optional(),
       folderId: z.number().int().nullable().optional(),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(25),
@@ -259,12 +264,16 @@ export const questionBankRouter = router({
     .input(z.object({
       id: z.number(),
       question: z.string().min(1).optional(),
-      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching"]).optional(),
+      type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"]).optional(),
       options: z.array(z.object({ text: z.string(), imageUrl: z.string().optional(), videoUrl: z.string().optional() })).optional(),
       correctAnswer: z.string().nullable().optional(),
       correctAnswers: z.array(z.number().int()).nullable().optional(),
       hotspotMarkers: z.string().nullable().optional(),
       matchingPairs: z.string().nullable().optional(),
+      flashcardFront: z.string().nullable().optional(),
+      flashcardBack: z.string().nullable().optional(),
+      flashcardHint: z.string().nullable().optional(),
+      flashcardBackImageUrl: z.string().nullable().optional(),
       explanation: z.string().nullable().optional(),
       questionImageUrl: z.string().nullable().optional(),
       questionVideoUrl: z.string().nullable().optional(),
@@ -296,6 +305,93 @@ export const questionBankRouter = router({
         }
       }
       return { success: true };
+    }),
+
+  /**
+   * Copies active app QuickFire review cards into the LMS Question Bank.
+   * The unique source-card reference allows safe later imports without
+   * changing the source app flashcards or duplicating earlier copies.
+   */
+  importAppFlashcards: protectedProcedure
+    .input(z.object({ brand: z.enum(["aaus", "iheartecho", "all"]).default("all") }).optional())
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const requestedBrand = input?.brand ?? "all";
+      const cards = await db.select().from(quickfireQuestions).where(and(
+        eq(quickfireQuestions.type, "quickReview"),
+        eq(quickfireQuestions.isActive, true),
+        ...(requestedBrand === "all" ? [] : [eq(quickfireQuestions.brand, requestedBrand)]),
+      ));
+      if (cards.length === 0) return { imported: 0, skipped: 0, foldersCreated: 0 };
+
+      const folders = await db.select().from(questionBankFolders);
+      let parent = folders.find((folder) => folder.parentId == null && folder.name.trim().toLowerCase() === "flashcards");
+      let foldersCreated = 0;
+      if (!parent) {
+        const [created] = await db.insert(questionBankFolders).values({
+          name: "Flashcards",
+          description: "Reusable LMS flashcards imported from the clinical apps or authored in Quiz Creator.",
+          color: "#179ca3",
+          sortOrder: folders.filter((folder) => folder.parentId == null).length,
+          createdByAdminId: ctx.user.id,
+        }).$returningId();
+        parent = { id: created.id } as typeof questionBankFolders.$inferSelect;
+        foldersCreated += 1;
+      }
+
+      const folderIdsByName = new Map<string, number>();
+      for (const folder of folders) {
+        if (folder.parentId === parent.id) folderIdsByName.set(folder.name.toLowerCase(), folder.id);
+      }
+      const getFolderId = async (card: typeof quickfireQuestions.$inferSelect) => {
+        const brandName = card.brand === "iheartecho" ? "iHeartEcho" : "All About Ultrasound";
+        const category = card.category?.trim() || card.echoCategory?.replaceAll("_", " ") || "General";
+        const name = `${brandName} — ${category}`;
+        const key = name.toLowerCase();
+        const knownId = folderIdsByName.get(key);
+        if (knownId) return knownId;
+        const [created] = await db.insert(questionBankFolders).values({
+          name,
+          description: `Imported ${brandName} flashcards: ${category}.`,
+          parentId: parent!.id,
+          color: card.brand === "iheartecho" ? "#0b6670" : "#179ca3",
+          sortOrder: folderIdsByName.size,
+          createdByAdminId: ctx.user.id,
+        }).$returningId();
+        folderIdsByName.set(key, created.id);
+        foldersCreated += 1;
+        return created.id;
+      };
+
+      const sourceIds = cards.map((card) => card.id);
+      const alreadyImported = await db.select({ sourceId: questionBank.sourceQuickfireQuestionId })
+        .from(questionBank)
+        .where(inArray(questionBank.sourceQuickfireQuestionId, sourceIds));
+      const existingSourceIds = new Set(alreadyImported.map((row) => row.sourceId).filter((id): id is number => id != null));
+
+      let imported = 0;
+      for (const card of cards) {
+        if (existingSourceIds.has(card.id)) continue;
+        const front = card.question.trim();
+        const back = (card.reviewAnswer ?? card.explanation ?? "").trim();
+        if (!front || !back) continue;
+        await db.insert(questionBank).values({
+          question: front,
+          type: "flashcard",
+          correctAnswer: "",
+          explanation: card.explanation ?? null,
+          flashcardFront: front,
+          flashcardBack: back,
+          questionImageUrl: card.imageUrl ?? null,
+          folderId: await getFolderId(card),
+          sourceQuickfireQuestionId: card.id,
+          createdByAdminId: ctx.user.id,
+        });
+        imported += 1;
+      }
+      return { imported, skipped: cards.length - imported, foldersCreated };
     }),
 
   deleteQuestion: protectedProcedure

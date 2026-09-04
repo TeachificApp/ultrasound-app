@@ -5615,7 +5615,7 @@ export type QuestionBankFolder = typeof questionBankFolders.$inferSelect;
 export const questionBank = mysqlTable("question_bank", {
   id: int("id").autoincrement().primaryKey(),
   question: longtext("question").notNull(),
-  type: mysqlEnum("type", ["mcq", "truefalse", "multiselect", "hotspot", "matching"]).default("mcq").notNull(),
+  type: mysqlEnum("type", ["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"]).default("mcq").notNull(),
   // JSON array of { text: string, imageUrl?: string, videoUrl?: string }
   options: longtext("options"),
   correctAnswer: varchar("correct_answer", { length: 500 }).notNull(),
@@ -5633,6 +5633,11 @@ export const questionBank = mysqlTable("question_bank", {
   hotspotMarkers: text("hotspot_markers"),
   /** Matching: JSON array of { id, left, right } */
   matchingPairs: text("matching_pairs"),
+  /** Flashcard content stays editable in the shared Question Bank. */
+  flashcardFront: longtext("flashcard_front"),
+  flashcardBack: longtext("flashcard_back"),
+  flashcardHint: text("flashcard_hint"),
+  flashcardBackImageUrl: text("flashcard_back_image_url"),
   /** Feedback media */
   feedbackImageUrl: text("feedback_image_url"),
   feedbackVideoUrl: text("feedback_video_url"),
@@ -5646,6 +5651,8 @@ export const questionBank = mysqlTable("question_bank", {
   sourceLessonId: int("source_lesson_id"),
   sourceBlockId: varchar("source_block_id", { length: 128 }),
   sourceQuestionIndex: int("source_question_index"),
+  /** Original app flashcard source; used only for idempotent copy-to-LMS imports. */
+  sourceQuickfireQuestionId: int("source_quickfire_question_id"),
   folderId: int("folder_id"), // FK → question_bank_folders.id
   /** Preset library: when true, this question appears in the Preset Questions picker */
   isPreset: boolean("is_preset").default(false).notNull(),
@@ -7498,7 +7505,7 @@ export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
   id: int("id").autoincrement().primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   description: longtext("description"),
-  type: mysqlEnum("type", ["quiz", "mock_exam"]).default("quiz").notNull(),
+  type: mysqlEnum("type", ["quiz", "mock_exam", "flashcards"]).default("quiz").notNull(),
   passingScore: int("passing_score").default(70).notNull(),
   timeLimitMinutes: int("time_limit_minutes"),
   shuffleQuestions: boolean("shuffle_questions").default(false).notNull(),
