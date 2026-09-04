@@ -12,6 +12,8 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 export interface FlashcardItem {
+  /** Existing canonical Question Bank row when selected from the shared bank. */
+  questionBankId?: number;
   front: string;
   back: string;
   hint?: string;
@@ -47,7 +49,7 @@ const DEFAULT_GOT_IT_TEXT = "#ffffff";
 const DEFAULT_STILL_LEARNING_TEXT = "#189593";
 
 export default function LessonFlashcardBlockEditor({ data, onChange, handleFileUpload, lessonId, courseId }: Props) {
-  const [activeTab, setActiveTab] = useState<"ai" | "manual" | "style">("manual");
+  const [activeTab, setActiveTab] = useState<"ai" | "manual" | "bank" | "style">("manual");
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingCard, setEditingCard] = useState<FlashcardItem | null>(null);
   const [aiCount, setAiCount] = useState(10);
@@ -187,9 +189,34 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList className="h-8">
           <TabsTrigger value="manual" className="text-xs h-7">Manual Entry</TabsTrigger>
+          <TabsTrigger value="bank" className="text-xs h-7">From Bank</TabsTrigger>
           <TabsTrigger value="ai" className="text-xs h-7">AI Generate</TabsTrigger>
           <TabsTrigger value="style" className="text-xs h-7">Button Style</TabsTrigger>
         </TabsList>
+
+        {/* ── From Question Bank ── */}
+        <TabsContent value="bank" className="mt-3">
+          <FlashcardBankPicker onAdd={(bankCard) => {
+            const next: FlashcardItem = {
+              questionBankId: bankCard.id,
+              front: bankCard.flashcardFront || bankCard.question,
+              back: bankCard.flashcardBack || "",
+              hint: bankCard.flashcardHint || undefined,
+              imageUrl: bankCard.questionImageUrl || undefined,
+              backImageUrl: bankCard.flashcardBackImageUrl || undefined,
+            };
+            if (!next.front.trim() || !next.back.trim()) {
+              toast.error("This Question Bank flashcard is missing a front or back.");
+              return;
+            }
+            if ((data.cards ?? []).some(card => card.questionBankId === next.questionBankId)) {
+              toast.message("That flashcard is already in this lesson deck.");
+              return;
+            }
+            set("cards", [...(data.cards ?? []), next]);
+            toast.success("Flashcard added from Question Bank.");
+          }} />
+        </TabsContent>
 
         {/* ── AI Generate ── */}
         <TabsContent value="ai" className="mt-3 space-y-3">
@@ -342,6 +369,7 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
 
         {/* ── Manual Entry ── */}
         <TabsContent value="manual" className="mt-3 space-y-3">
+          <p className="rounded-md bg-teal-50 px-2.5 py-2 text-xs leading-5 text-teal-800">New and edited cards are added to or updated in the lesson’s Question Bank folder when you save the lesson.</p>
           {(data.cards ?? []).length === 0 && (
             <p className="text-xs text-gray-400 text-center py-4">No cards yet. Add one below.</p>
           )}
@@ -501,6 +529,50 @@ export default function LessonFlashcardBlockEditor({ data, onChange, handleFileU
           </div>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function FlashcardBankPicker({ onAdd }: { onAdd: (card: any) => void }) {
+  const [search, setSearch] = useState("");
+  const [folderValue, setFolderValue] = useState("all");
+  const { data: foldersData } = trpc.questionBank.listFolders.useQuery();
+  const { data, isLoading } = trpc.questionBank.listQuestions.useQuery({
+    type: "flashcard",
+    search: search.trim() || undefined,
+    folderId: folderValue === "all" ? undefined : Number(folderValue),
+    page: 1,
+    pageSize: 50,
+  });
+  const cards = data?.questions ?? [];
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search flashcard Question Bank…" className="h-8 text-xs flex-1" />
+        <Select value={folderValue} onValueChange={setFolderValue}>
+          <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="All folders" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">All folders</SelectItem>
+            {(foldersData ?? []).map((folder: any) => <SelectItem key={folder.id} value={String(folder.id)} className="text-xs">{folder.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {isLoading ? <p className="py-3 text-center text-xs text-gray-400">Loading flashcards…</p> : cards.length === 0 ? (
+        <p className="rounded-md border border-dashed border-gray-200 py-4 text-center text-xs text-gray-400">No flashcards match this search.</p>
+      ) : (
+        <div className="max-h-60 space-y-1 overflow-y-auto">
+          {cards.map((card: any) => (
+            <div key={card.id} className="flex items-start gap-2 rounded border border-gray-100 bg-gray-50 p-2 text-xs hover:border-teal-200 hover:bg-teal-50">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-gray-700">Front: {card.flashcardFront || card.question}</p>
+                <p className="truncate text-gray-500">Back: {card.flashcardBack || "No back saved"}</p>
+              </div>
+              <Button type="button" size="sm" className="h-6 bg-teal-600 px-2 text-xs hover:bg-teal-700" onClick={() => onAdd(card)}>Add</Button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

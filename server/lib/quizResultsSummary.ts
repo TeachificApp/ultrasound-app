@@ -1,6 +1,8 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import {
+  lmsInlineQuizAttempts,
+  lmsLessons,
   lmsQuizAttempts,
   lmsQuizzes,
   standaloneQuizAttempts,
@@ -13,6 +15,19 @@ import {
 } from "../../shared/quizResultsAnalytics";
 
 type ScoreRow = { score: string | number | null; passed: boolean | null };
+
+export function getInlineModuleResultKind(contentBlocks: unknown, blockId: string): "native_quiz" | "flashcards" | null {
+  let blocks: any[] = [];
+  try {
+    blocks = Array.isArray(contentBlocks) ? contentBlocks as any[] : JSON.parse(String(contentBlocks ?? "[]"));
+  } catch {
+    return null;
+  }
+  const block = blocks.find(candidate => String(candidate?.id) === blockId);
+  if (block?.type === "lesson_flashcard") return "flashcards";
+  if (block?.type === "lesson_quiz" && block?.data?.isSurvey !== true && block?.data?.requireSurveyCompletion !== true) return "native_quiz";
+  return null;
+}
 
 export function aggregateScoresFromRows(rows: ScoreRow[]): QuizResultsKindAnalytics {
   if (rows.length === 0) return emptyQuizResultsKindAnalytics();
@@ -36,7 +51,7 @@ export async function loadMyQuizResultsSummary(
   db: MySql2Database<any>,
   userId: number,
 ): Promise<MyQuizResultsSummary> {
-  const [standaloneRows, lmsRows] = await Promise.all([
+  const [standaloneRows, lmsRows, inlineRows] = await Promise.all([
     db
       .select({
         score: standaloneQuizAttempts.score,
@@ -55,6 +70,16 @@ export async function loadMyQuizResultsSummary(
       .from(lmsQuizAttempts)
       .leftJoin(lmsQuizzes, eq(lmsQuizAttempts.lessonId, lmsQuizzes.lessonId))
       .where(eq(lmsQuizAttempts.userId, userId)),
+    db
+      .select({
+        score: lmsInlineQuizAttempts.score,
+        passed: lmsInlineQuizAttempts.passed,
+        quizBlockId: lmsInlineQuizAttempts.quizBlockId,
+        contentBlocks: lmsLessons.contentBlocks,
+      })
+      .from(lmsInlineQuizAttempts)
+      .innerJoin(lmsLessons, eq(lmsInlineQuizAttempts.lessonId, lmsLessons.id))
+      .where(eq(lmsInlineQuizAttempts.userId, userId)),
   ]);
 
   const nativeStandalone = standaloneRows.filter((r) => r.quizType === "quiz");
@@ -62,10 +87,12 @@ export async function loadMyQuizResultsSummary(
   const flashcardStandalone = standaloneRows.filter((r) => r.quizType === "flashcards");
   const nativeLms = lmsRows.filter((r) => !r.isMockExam);
   const mockLms = lmsRows.filter((r) => r.isMockExam);
+  const nativeInline = inlineRows.filter((row) => getInlineModuleResultKind(row.contentBlocks, row.quizBlockId) === "native_quiz");
+  const flashcardInline = inlineRows.filter((row) => getInlineModuleResultKind(row.contentBlocks, row.quizBlockId) === "flashcards");
 
-  const nativeQuizzes = aggregateScoresFromRows([...nativeStandalone, ...nativeLms]);
+  const nativeQuizzes = aggregateScoresFromRows([...nativeStandalone, ...nativeLms, ...nativeInline]);
   const mockExams = aggregateScoresFromRows([...mockStandalone, ...mockLms]);
-  const flashcards = aggregateScoresFromRows(flashcardStandalone);
+  const flashcards = aggregateScoresFromRows([...flashcardStandalone, ...flashcardInline]);
 
   return {
     hasNativeQuizAttempts: nativeQuizzes.attemptCount > 0,

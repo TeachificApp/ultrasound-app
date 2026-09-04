@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { lmsCourses, lmsLessons, lmsQuizQuestions, lmsQuizzes, questionBank, questionBankFolders } from "../drizzle/schema";
-import { syncLegacyLessonQuizQuestionToBank, syncLessonQuizBlocksToQuestionBank } from "./lib/lessonQuizQuestionBankSync";
+import { syncLegacyLessonQuizQuestionToBank, syncLessonFlashcardBlocksToQuestionBank, syncLessonQuizBlocksToQuestionBank } from "./lib/lessonQuizQuestionBankSync";
 
 const root = process.cwd();
 const helperSource = readFileSync(resolve(root, "server/lib/lessonQuizQuestionBankSync.ts"), "utf8");
@@ -59,6 +59,7 @@ describe("lesson quiz Question Bank synchronization", () => {
 
   it("runs synchronization whenever an administrator saves lesson content blocks", () => {
     expect(courseBuilderSource).toContain("syncLessonQuizBlocksToQuestionBank");
+    expect(courseBuilderSource).toContain("syncLessonFlashcardBlocksToQuestionBank");
     expect(courseBuilderSource).toContain("if (input.contentBlocks !== undefined)");
   });
 
@@ -87,5 +88,24 @@ describe("lesson quiz Question Bank synchronization", () => {
     expect(await syncLegacyLessonQuizQuestionToBank(db, 1, 7)).toEqual({ created: 1, updated: 0 });
     expect(state.folders.map(f => f.name)).toEqual(["Lesson Quiz", "Course Alpha"]);
     expect(state.questions[0]).toMatchObject({ sourceQuizQuestionId: 1, sourceQuizId: 31 });
+  });
+
+  it("creates then updates lesson flashcards in a separate per-course folder without duplicating cards", async () => {
+    const { db, state } = createSyncDb("page");
+    const blocks = JSON.stringify([{ id: "deck-block", type: "lesson_flashcard", data: { cards: [{ front: "What is Doppler?", back: "Frequency shift", hint: "Velocity" }] } }]);
+    expect(await syncLessonFlashcardBlocksToQuestionBank(db, 22, blocks, 7)).toEqual({ created: 1, updated: 0 });
+    expect(state.folders.map(f => f.name)).toEqual(["Lesson Flashcards", "Course Alpha"]);
+    expect(state.questions[0]).toMatchObject({ type: "flashcard", flashcardFront: "What is Doppler?", flashcardBack: "Frequency shift", sourceLessonId: 22, sourceBlockId: "deck-block", sourceQuestionIndex: 0 });
+
+    const changed = JSON.stringify([{ id: "deck-block", type: "lesson_flashcard", data: { cards: [{ front: "What is spectral Doppler?", back: "Frequency shift", hint: "Velocity" }] } }]);
+    expect(await syncLessonFlashcardBlocksToQuestionBank(db, 22, changed, 7)).toEqual({ created: 0, updated: 1 });
+    expect(state.questions).toHaveLength(1);
+    expect(state.questions[0].flashcardFront).toBe("What is spectral Doppler?");
+  });
+
+  it("does not create a Flashcards Question Bank folder when the lesson has no flashcard block", async () => {
+    const { db, state } = createSyncDb("page");
+    expect(await syncLessonFlashcardBlocksToQuestionBank(db, 22, JSON.stringify([{ id: "text", type: "text", data: {} }]), 7)).toEqual({ created: 0, updated: 0 });
+    expect(state.folders).toEqual([]);
   });
 });

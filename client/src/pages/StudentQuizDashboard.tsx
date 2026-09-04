@@ -56,7 +56,15 @@ function AttemptHistoryTable({
   rows,
   emptyLabel,
 }: {
-  rows: Array<{ attempt: { id: number; quizId: number; score: string | null; passed: boolean | null; completedAt: Date | null }; quizTitle: string; quizType?: string }>;
+  rows: Array<{
+    attempt: { id: number; quizId?: number; score: string | null; passed: boolean | null; completedAt: Date | null };
+    quizTitle: string;
+    quizType?: string;
+    courseSlug?: string;
+    courseTitle?: string;
+    lessonId?: number;
+    isLessonModule?: boolean;
+  }>;
   emptyLabel: string;
 }) {
   const [, navigate] = useLocation();
@@ -84,11 +92,14 @@ function AttemptHistoryTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {rows.map(({ attempt, quizTitle, quizType }) => (
+          {rows.map(({ attempt, quizTitle, quizType, courseSlug, courseTitle, lessonId, isLessonModule }) => (
             <tr key={attempt.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 text-gray-900 font-medium">{quizTitle}</td>
+              <td className="px-4 py-3 text-gray-900 font-medium">
+                <p>{quizTitle}</p>
+                {courseTitle && <p className="mt-0.5 text-xs font-normal text-gray-400">{courseTitle} · Lesson module</p>}
+              </td>
               <td className="px-4 py-3 text-center text-xs capitalize text-gray-500">
-                {quizType === "mock_exam" ? "Mock exam" : "Quiz"}
+                {quizType === "mock_exam" ? "Mock exam" : quizType === "flashcards" ? "Flashcards" : "Quiz"}
               </td>
               <td className="px-4 py-3 text-center">
                 <span className={`font-semibold ${attempt.passed ? "text-green-600" : "text-red-500"}`}>
@@ -96,16 +107,18 @@ function AttemptHistoryTable({
                 </span>
               </td>
               <td className="px-4 py-3 text-center">
-                {attempt.passed
+                {quizType === "flashcards"
+                  ? <span className="inline-flex items-center gap-1 text-teal-700 text-xs font-medium">Self-reported</span>
+                  : attempt.passed
                   ? <span className="inline-flex items-center gap-1 text-green-600 text-xs font-medium"><CheckCircle className="w-3.5 h-3.5" />Pass</span>
                   : <span className="inline-flex items-center gap-1 text-red-500 text-xs font-medium"><XCircle className="w-3.5 h-3.5" />Fail</span>}
               </td>
               <td className="px-4 py-3 text-right text-gray-400">{fmtDate(attempt.completedAt ? new Date(attempt.completedAt).getTime() : null)}</td>
               <td className="px-4 py-3 text-right">
-                <Button
-                  size="sm" variant="ghost"
-                  onClick={() => navigate(`/quizzes/${attempt.quizId}/results/${attempt.id}`)}
-                >
+                <Button size="sm" variant="ghost" onClick={() => {
+                  if (isLessonModule && courseSlug && lessonId) navigate(`/courses/${courseSlug}/player?lesson=${lessonId}`);
+                  else if (attempt.quizId) navigate(`/quizzes/${attempt.quizId}/results/${attempt.id}`);
+                }}>
                   View
                 </Button>
               </td>
@@ -140,6 +153,19 @@ export default function StudentQuizDashboard() {
     { quizType: "flashcards" },
     { enabled: !!user && !!summary?.hasFlashcardAttempts && tab === "flashcards" },
   );
+  const { data: inlineModuleHistory, isLoading: loadingInlineModules } = trpc.lmsLearner.getMyInlineModuleAttempts.useQuery(
+    undefined,
+    { enabled: !!user },
+  );
+  const sortByCompletedAt = (rows: any[]) => [...rows].sort((a, b) => {
+    const aTime = a.attempt.completedAt ? new Date(a.attempt.completedAt).getTime() : 0;
+    const bTime = b.attempt.completedAt ? new Date(b.attempt.completedAt).getTime() : 0;
+    return bTime - aTime;
+  });
+  const inlineQuizHistory = (inlineModuleHistory ?? []).filter((row: any) => row.quizType === "quiz");
+  const inlineFlashcardHistory = (inlineModuleHistory ?? []).filter((row: any) => row.quizType === "flashcards");
+  const allNativeHistory = sortByCompletedAt([...(nativeHistory ?? []), ...inlineQuizHistory]);
+  const allFlashcardHistory = sortByCompletedAt([...(flashcardHistory ?? []), ...inlineFlashcardHistory]);
 
   if (authLoading || loadingSummary) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>;
@@ -164,7 +190,7 @@ export default function StudentQuizDashboard() {
           <BookOpen className="w-12 h-12 text-teal-600 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">No quiz results yet</h1>
           <p className="text-sm text-gray-500 mb-6">
-            My Quiz Results appears after you complete at least one native practice quiz. Mock exam attempts are tracked separately once you have quiz results.
+            My Quiz Results appears after you complete a quiz, mock exam, or flashcard deck. Results are private to your signed-in account.
           </p>
           <Button onClick={() => navigate("/education-library")} className="bg-teal-600 hover:bg-teal-700">
             Browse courses
@@ -179,7 +205,7 @@ export default function StudentQuizDashboard() {
       <div className="max-w-4xl mx-auto px-4 py-10">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">My Quiz Results</h1>
-          <p className="text-gray-500 text-sm mt-1">Practice quiz performance and mock exam analytics</p>
+          <p className="text-gray-500 text-sm mt-1">Private practice quiz, mock exam, and flashcard analytics</p>
         </div>
 
         <div className="grid gap-4 mb-8">
@@ -200,10 +226,10 @@ export default function StudentQuizDashboard() {
           </TabsList>
 
           <TabsContent value="native">
-            {loadingNative ? (
+            {loadingNative || loadingInlineModules ? (
               <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
             ) : (
-              <AttemptHistoryTable rows={nativeHistory ?? []} emptyLabel="No native quiz attempts yet" />
+              <AttemptHistoryTable rows={allNativeHistory} emptyLabel="No quiz attempts yet" />
             )}
           </TabsContent>
 
@@ -218,7 +244,7 @@ export default function StudentQuizDashboard() {
           )}
           {summary.hasFlashcardAttempts && (
             <TabsContent value="flashcards">
-              {loadingFlashcards ? <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div> : <AttemptHistoryTable rows={flashcardHistory ?? []} emptyLabel="No flashcard deck attempts yet" />}
+              {loadingFlashcards || loadingInlineModules ? <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div> : <AttemptHistoryTable rows={allFlashcardHistory} emptyLabel="No flashcard deck attempts yet" />}
             </TabsContent>
           )}
         </Tabs>

@@ -47,6 +47,8 @@ export interface MatchingPair {
 
 export interface QuizQuestion {
   id?: string;
+  /** Existing canonical Question Bank row when selected from or saved to the bank. */
+  questionBankId?: number;
   type?: QuestionType;
   question: string;
   options: string[];
@@ -298,10 +300,12 @@ function SaveToBankDialog({
   question,
   open,
   onClose,
+  onSaved,
 }: {
   question: QuizQuestion;
   open: boolean;
   onClose: () => void;
+  onSaved?: (questionBankId: number) => void;
 }) {
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
@@ -334,8 +338,17 @@ function SaveToBankDialog({
   });
 
   const saveMutation = trpc.questionBank.createQuestion.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      onSaved?.(result.id);
       toast.success("Question saved to bank.");
+      onClose();
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+  const updateMutation = trpc.questionBank.updateQuestion.useMutation({
+    onSuccess: () => {
+      if (question.questionBankId) onSaved?.(question.questionBankId);
+      toast.success("Question Bank entry updated.");
       onClose();
     },
     onError: (err: any) => toast.error(err.message),
@@ -379,7 +392,8 @@ function SaveToBankDialog({
       payload.correctAnswer = question.options[question.correctAnswer] ?? "";
     }
 
-    saveMutation.mutate(payload);
+    if (question.questionBankId) updateMutation.mutate({ ...payload, id: question.questionBankId });
+    else saveMutation.mutate(payload);
   };
 
   return (
@@ -475,8 +489,8 @@ function SaveToBankDialog({
 
           <div className="flex gap-2 pt-1">
             <Button size="sm" className="h-8 bg-teal-600 hover:bg-teal-700 text-white text-xs flex-1"
-              disabled={saveMutation.isPending} onClick={handleSave}>
-              {saveMutation.isPending ? "Saving…" : "Save to Bank"}
+              disabled={saveMutation.isPending || updateMutation.isPending} onClick={handleSave}>
+              {saveMutation.isPending || updateMutation.isPending ? "Saving…" : question.questionBankId ? "Update Bank" : "Save to Bank"}
             </Button>
             <Button size="sm" variant="outline" className="h-8 text-xs" onClick={onClose}>Cancel</Button>
           </div>
@@ -1062,7 +1076,12 @@ function QuestionEditor({
       </div>
 
       {saveToBankOpen && (
-        <SaveToBankDialog question={q} open={saveToBankOpen} onClose={() => setSaveToBankOpen(false)} />
+        <SaveToBankDialog
+          question={q}
+          open={saveToBankOpen}
+          onClose={() => setSaveToBankOpen(false)}
+          onSaved={(questionBankId) => setQ(prev => ({ ...prev, questionBankId }))}
+        />
       )}
     </div>
   );
@@ -1381,6 +1400,7 @@ export default function LessonQuizBlockEditor({ data, onChange, handleFileUpload
               }
 
               const q: QuizQuestion = {
+                questionBankId: bankQ.id,
                 type: qType,
                 question: bankQ.question,
                 options: opts.length > 0 ? opts : ["True", "False"],
@@ -1652,6 +1672,8 @@ function QuestionBankPicker({ onAdd }: { onAdd: (q: any) => void }) {
   const { data, isLoading } = trpc.questionBank.listQuestions.useQuery({
     search: debouncedSearch || undefined,
     tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
+    folderId: selectedFolderId ?? undefined,
+    types: ["mcq", "truefalse", "multiselect", "hotspot", "matching"],
     page,
     pageSize: 10,
   });

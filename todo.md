@@ -402,7 +402,8 @@
 - [x] Preserve the original source PDF/PowerPoint and asset references while allowing administrators to edit generated text and visual layout before saving the rich-content block.
 - [x] Add focused document extraction, visual-asset preservation, rich-content editing, and source-file retention regressions.
 - [x] Expose the PDF/PowerPoint conversion action visibly in the current Lesson Editor’s Add Content Block workflow and verify it appends converted blocks without replacing existing content.
-- [ ] Allow Lesson Quiz and Lesson Flashcard modules to select and insert appropriate Question Bank questions or flashcards using the same controlled source-selection workflow as standalone builders.
-- [ ] Record lesson-module quiz attempts and flashcard self-reported Got It Right/Missed outcomes in the signed-in learner’s private My Quiz Results sections, without exposing other learners’ records or class counts.
-- [ ] Add focused authoring, Question Bank preservation, embedded-attempt, flashcard outcome, My Quiz Results, and privacy regressions for lesson modules.
-- [ ] Allow authors to add new lesson-module quiz questions and flashcards into the appropriate Question Bank, with duplicate-safe source linkage and without changing existing learner attempts or source records.
+- [x] Allow Lesson Quiz and Lesson Flashcard modules to select and insert appropriate Question Bank questions or flashcards using the same controlled source-selection workflow as standalone builders.
+- [x] Record lesson-module quiz attempts and flashcard self-reported Got It Right/Missed outcomes in the signed-in learner’s private My Quiz Results sections, without exposing other learners’ records or class counts.
+- [x] Add focused authoring, Question Bank preservation, embedded-attempt, flashcard outcome, My Quiz Results, and privacy regressions for lesson modules.
+- [x] Allow authors to add new lesson-module quiz questions and flashcards into the appropriate Question Bank, with duplicate-safe source linkage and without changing existing learner attempts or source records.
+- [x] Reorder the Content block picker as Text/Rich Text, Image, Video, all AI-generation blocks, then the remaining standard content blocks.

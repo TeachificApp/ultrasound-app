@@ -2291,6 +2291,45 @@ export const lmsLearnerRouter = router({
       return { success: true };
     }),
 
+  /** Return the signed-in learner's own completed embedded quiz and flashcard attempts. */
+  getMyInlineModuleAttempts: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const rows = await db.select({
+      id: lmsInlineQuizAttempts.id,
+      score: lmsInlineQuizAttempts.score,
+      passed: lmsInlineQuizAttempts.passed,
+      submittedAt: lmsInlineQuizAttempts.submittedAt,
+      quizBlockId: lmsInlineQuizAttempts.quizBlockId,
+      lessonId: lmsLessons.id,
+      lessonTitle: lmsLessons.title,
+      contentBlocks: lmsLessons.contentBlocks,
+      courseSlug: lmsCourses.slug,
+      courseTitle: lmsCourses.title,
+    }).from(lmsInlineQuizAttempts)
+      .innerJoin(lmsLessons, eq(lmsInlineQuizAttempts.lessonId, lmsLessons.id))
+      .innerJoin(lmsCourses, eq(lmsInlineQuizAttempts.courseId, lmsCourses.id))
+      .where(eq(lmsInlineQuizAttempts.userId, ctx.user.id))
+      .orderBy(desc(lmsInlineQuizAttempts.submittedAt));
+
+    return rows.flatMap((row) => {
+      let blocks: any[] = [];
+      try { blocks = Array.isArray(row.contentBlocks) ? row.contentBlocks as any[] : JSON.parse(String(row.contentBlocks ?? "[]")); } catch { blocks = []; }
+      const block = blocks.find(candidate => String(candidate?.id) === row.quizBlockId);
+      if (!block || (block.type !== "lesson_quiz" && block.type !== "lesson_flashcard")) return [];
+      if (block.type === "lesson_quiz" && (block.data?.isSurvey === true || block.data?.requireSurveyCompletion === true)) return [];
+      return [{
+        attempt: { id: row.id, score: row.score, passed: row.passed, completedAt: row.submittedAt },
+        quizTitle: block.data?.title?.trim() || `${row.lessonTitle} ${block.type === "lesson_flashcard" ? "Flashcards" : "Quiz"}`,
+        quizType: block.type === "lesson_flashcard" ? "flashcards" : "quiz",
+        courseSlug: row.courseSlug,
+        courseTitle: row.courseTitle,
+        lessonId: row.lessonId,
+        isLessonModule: true,
+      }];
+    });
+  }),
+
   /**
    * Record a passed lesson_quiz content block for CME completion and certificate gates.
    * Inline module quizzes are stored in lesson content rather than lms_quizzes, so their
@@ -2509,6 +2548,73 @@ export const lmsLearnerRouter = router({
         answerValue: lmsInlineQuizResponses.answerValue,
       }).from(lmsInlineQuizResponses).where(eq(lmsInlineQuizResponses.attemptId, attempt.id));
       return { attempt, responses };
+    }),
+
+  /** Record a completed lesson_flashcard module using the learner's Got It/Missed responses. */
+  submitInlineLessonFlashcards: protectedProcedure
+    .input(z.object({
+      lessonId: z.number().int(),
+      courseSlug: z.string(),
+      flashcardBlockId: z.string().min(1).max(128),
+      outcomes: z.array(z.object({
+        cardKey: z.string().regex(/^\d+$/).max(16),
+        gotIt: z.boolean(),
+      })).min(1).max(200),
+      isAdminPreview: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const [enrollment] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments).where(and(
+        eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id),
+      )).limit(1);
+      if (!enrollment && !(input.isAdminPreview && ctx.user.role === "admin")) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const [lesson] = await db.select({ id: lmsLessons.id, courseId: lmsLessons.courseId, contentBlocks: lmsLessons.contentBlocks })
+        .from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson || lesson.courseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
+      let blocks: any[] = [];
+      try { blocks = Array.isArray(lesson.contentBlocks) ? lesson.contentBlocks as any[] : JSON.parse(String(lesson.contentBlocks ?? "[]")); } catch { blocks = []; }
+      const deck = blocks.find(block => block?.type === "lesson_flashcard" && String(block.id) === input.flashcardBlockId);
+      const cards = Array.isArray(deck?.data?.cards) ? deck.data.cards : [];
+      if (!deck || cards.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "This lesson does not contain the selected flashcard deck." });
+
+      const outcomesByIndex = new Map<number, boolean>();
+      for (const outcome of input.outcomes) {
+        const index = Number(outcome.cardKey);
+        if (!Number.isInteger(index) || index < 0 || index >= cards.length || outcomesByIndex.has(index)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "The flashcard result does not match this lesson deck." });
+        }
+        outcomesByIndex.set(index, outcome.gotIt);
+      }
+      if (outcomesByIndex.size !== cards.length) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Mark every flashcard Got It or Missed before recording this deck result." });
+      }
+      const gotItCount = [...outcomesByIndex.values()].filter(Boolean).length;
+      const score = Math.round((gotItCount / cards.length) * 100);
+
+      if (!input.isAdminPreview) {
+        try { await ensureInlineLessonQuizSchema(db); } catch { console.error("[inline lesson flashcards] schema assurance unavailable"); }
+        let attempt: { id: number } | undefined;
+        try {
+          [attempt] = await db.insert(lmsInlineQuizAttempts).values({
+            userId: ctx.user.id, courseId: course.id, lessonId: lesson.id, quizBlockId: input.flashcardBlockId, score, passed: true,
+          }).$returningId();
+          if (!attempt) throw new Error("Missing attempt id");
+          await db.insert(lmsInlineQuizResponses).values(cards.map((card: any, index: number) => ({
+            attemptId: attempt!.id,
+            questionKey: String(index),
+            questionText: String(card.front ?? "Flashcard"),
+            questionType: "flashcard",
+            answerValue: outcomesByIndex.get(index) ? "got_it" : "missed",
+          })));
+        } catch {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Your flashcard result could not be saved. Please try again." });
+        }
+      }
+      return { score, gotItCount, cardCount: cards.length };
     }),
 
   /** Submit quiz answers */

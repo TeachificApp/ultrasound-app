@@ -136,6 +136,7 @@ export const questionBankRouter = router({
       isPreset: z.boolean().optional(),
       presetCategory: z.string().optional(),
       type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"]).optional(),
+      types: z.array(z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"])).min(1).optional(),
       folderId: z.number().int().nullable().optional(),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(25),
@@ -148,6 +149,7 @@ export const questionBankRouter = router({
       const conditions: any[] = [];
       if (input.search) conditions.push(like(questionBank.question, `%${input.search}%`));
       if (input.type) conditions.push(eq(questionBank.type, input.type));
+      if (input.types) conditions.push(inArray(questionBank.type, input.types));
       if (input.folderId !== undefined) {
         if (input.folderId === null) {
           conditions.push(sql`${questionBank.folderId} IS NULL`);

@@ -32,6 +32,35 @@ async function ensureLessonQuizCourseFolder(db: any, courseId: number, adminId: 
   return courseFolder.id;
 }
 
+async function ensureLessonFlashcardCourseFolder(db: any, courseId: number, adminId: number) {
+  const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
+  const courseFolderName = course?.title?.trim() || `Course ${courseId}`;
+
+  let [parent] = await db.select({ id: questionBankFolders.id }).from(questionBankFolders)
+    .where(and(eq(questionBankFolders.name, "Lesson Flashcards"), isNull(questionBankFolders.parentId))).limit(1);
+  if (!parent) {
+    const [created] = await db.insert(questionBankFolders).values({
+      name: "Lesson Flashcards", description: "Flashcards synchronized from course lesson modules.", createdByAdminId: adminId,
+    }).$returningId();
+    parent = { id: created.id };
+  }
+
+  let [courseFolder] = await db.select({ id: questionBankFolders.id }).from(questionBankFolders)
+    .where(and(eq(questionBankFolders.name, courseFolderName), eq(questionBankFolders.parentId, parent.id))).limit(1);
+  if (!courseFolder) {
+    const [created] = await db.insert(questionBankFolders).values({
+      name: courseFolderName, description: `Lesson flashcards for ${courseFolderName}.`, parentId: parent.id, createdByAdminId: adminId,
+    }).$returningId();
+    courseFolder = { id: created.id };
+  }
+  return courseFolder.id;
+}
+
+function positiveQuestionBankId(value: unknown) {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
 /** Persist page-builder lesson_quiz block questions. Re-saving a lesson updates the same source-keyed bank questions. */
 export async function syncLessonQuizBlocksToQuestionBank(db: any, lessonId: number, contentBlocks: string | null | undefined, adminId: number) {
   if (!contentBlocks) return { created: 0, updated: 0 };
@@ -64,9 +93,48 @@ export async function syncLessonQuizBlocksToQuestionBank(db: any, lessonId: numb
         sourceLessonId: lessonId, sourceBlockId: String(block.id ?? "lesson-quiz"), sourceQuestionIndex: index,
         folderId, createdByAdminId: adminId,
       };
-      const [existing] = await db.select({ id: questionBank.id }).from(questionBank).where(and(
-        eq(questionBank.sourceLessonId, lessonId), eq(questionBank.sourceBlockId, values.sourceBlockId), eq(questionBank.sourceQuestionIndex, index),
-      )).limit(1);
+      const canonicalId = positiveQuestionBankId(question.questionBankId);
+      const [existing] = canonicalId
+        ? await db.select({ id: questionBank.id }).from(questionBank).where(eq(questionBank.id, canonicalId)).limit(1)
+        : await db.select({ id: questionBank.id }).from(questionBank).where(and(
+          eq(questionBank.sourceLessonId, lessonId), eq(questionBank.sourceBlockId, values.sourceBlockId), eq(questionBank.sourceQuestionIndex, index),
+        )).limit(1);
+      if (existing) { await db.update(questionBank).set(values).where(eq(questionBank.id, existing.id)); updated += 1; }
+      else { await db.insert(questionBank).values(values); created += 1; }
+    }
+  }
+  return { created, updated };
+}
+
+/** Persist page-builder lesson_flashcard block cards. Re-saving a lesson updates the same source-keyed bank cards. */
+export async function syncLessonFlashcardBlocksToQuestionBank(db: any, lessonId: number, contentBlocks: string | null | undefined, adminId: number) {
+  if (!contentBlocks) return { created: 0, updated: 0 };
+  let blocks: any[];
+  try { blocks = JSON.parse(contentBlocks); } catch { return { created: 0, updated: 0 }; }
+  if (!Array.isArray(blocks)) return { created: 0, updated: 0 };
+  const flashcardBlocks = blocks.filter(block => block?.type === "lesson_flashcard" && Array.isArray(block?.data?.cards));
+  if (flashcardBlocks.length === 0) return { created: 0, updated: 0 };
+  const [lesson] = await db.select({ courseId: lmsLessons.courseId }).from(lmsLessons).where(eq(lmsLessons.id, lessonId)).limit(1);
+  if (!lesson?.courseId) return { created: 0, updated: 0 };
+  const folderId = await ensureLessonFlashcardCourseFolder(db, lesson.courseId, adminId);
+
+  let created = 0, updated = 0;
+  for (const block of flashcardBlocks) {
+    for (const [index, card] of block.data.cards.entries()) {
+      if (!card?.front?.trim() || !card?.back?.trim()) continue;
+      const values = {
+        question: card.front.trim(), type: "flashcard" as const, correctAnswer: "",
+        flashcardFront: card.front.trim(), flashcardBack: card.back.trim(), flashcardHint: card.hint?.trim() || null,
+        questionImageUrl: card.imageUrl ?? null, flashcardBackImageUrl: card.backImageUrl ?? null,
+        sourceLessonId: lessonId, sourceBlockId: String(block.id ?? "lesson-flashcard"), sourceQuestionIndex: index,
+        folderId, createdByAdminId: adminId,
+      };
+      const canonicalId = positiveQuestionBankId(card.questionBankId);
+      const [existing] = canonicalId
+        ? await db.select({ id: questionBank.id }).from(questionBank).where(eq(questionBank.id, canonicalId)).limit(1)
+        : await db.select({ id: questionBank.id }).from(questionBank).where(and(
+          eq(questionBank.sourceLessonId, lessonId), eq(questionBank.sourceBlockId, values.sourceBlockId), eq(questionBank.sourceQuestionIndex, index),
+        )).limit(1);
       if (existing) { await db.update(questionBank).set(values).where(eq(questionBank.id, existing.id)); updated += 1; }
       else { await db.insert(questionBank).values(values); created += 1; }
     }

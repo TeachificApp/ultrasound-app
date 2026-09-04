@@ -75,7 +75,11 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
     undefined,
     { enabled: isAuthenticated },
   );
-  const showQuizResultsLink = Boolean(quizResultsSummary?.hasNativeQuizAttempts);
+  const showQuizResultsLink = Boolean(
+    quizResultsSummary?.hasNativeQuizAttempts
+    || quizResultsSummary?.hasMockExamAttempts
+    || quizResultsSummary?.hasFlashcardAttempts,
+  );
   const isAdmin = (user as any)?.role === "admin";
   const appRoles: string[] = (user as any)?.appRoles ?? [];
   const isPlatformAdmin = appRoles.includes("platform_admin") || isAdmin;

@@ -29,7 +29,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
-import { syncLessonQuizBlocksToQuestionBank } from "../lib/lessonQuizQuestionBankSync";
+import { syncLessonFlashcardBlocksToQuestionBank, syncLessonQuizBlocksToQuestionBank } from "../lib/lessonQuizQuestionBankSync";
 import {
   lmsCourses,
   lmsSections,
@@ -1438,6 +1438,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       if (input.contentBlocks !== undefined) {
         try {
           await syncLessonQuizBlocksToQuestionBank(db, id, input.contentBlocks, ctx.user.id);
+          await syncLessonFlashcardBlocksToQuestionBank(db, id, input.contentBlocks, ctx.user.id);
         } catch (error) {
           console.error("[updateLesson] Question Bank sync failed:", error);
         }

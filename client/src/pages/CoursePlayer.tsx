@@ -1005,41 +1005,78 @@ function InlineLessonQuiz({ data, lessonId, courseSlug, quizBlockId, isAdminPrev
 }
 
 // ─── Inline Lesson Flashcard Deck (for lesson_flashcard content blocks) ───────
-function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: any[]; shuffleCards?: boolean; showHints?: boolean; gotItColor?: string; gotItTextColor?: string; stillLearningColor?: string; stillLearningTextColor?: string } }) {
+function InlineLessonFlashcardDeck({
+  data,
+  lessonId,
+  courseSlug,
+  flashcardBlockId,
+  isAdminPreview = false,
+}: {
+  data: { title?: string; cards?: any[]; shuffleCards?: boolean; showHints?: boolean; gotItColor?: string; gotItTextColor?: string; stillLearningColor?: string; stillLearningTextColor?: string };
+  lessonId: number;
+  courseSlug: string;
+  flashcardBlockId: string;
+  isAdminPreview?: boolean;
+}) {
   const gotItBg = data.gotItColor ?? "#1ab7b4";
   const gotItText = data.gotItTextColor ?? "#ffffff";
   const stillBg = data.stillLearningColor ?? "#f0fdfa";
   const stillText = data.stillLearningTextColor ?? "#189593";
   const cards = data.cards ?? [];
-  const deck = data.shuffleCards ? [...cards].sort(() => Math.random() - 0.5) : cards;
+  const deck = useMemo(() => {
+    const indexed = cards.map((card, sourceIndex) => ({ card, sourceIndex }));
+    return data.shuffleCards ? indexed.sort(() => Math.random() - 0.5) : indexed;
+  }, [cards, data.shuffleCards]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [known, setKnown] = useState<Set<number>>(new Set());
+  const [outcomes, setOutcomes] = useState<Record<number, boolean>>({});
   const [showHint, setShowHint] = useState(false);
+  const recordedAttemptRef = useRef(false);
+  const recordAttempt = trpc.lmsLearner.submitInlineLessonFlashcards.useMutation({
+    onSuccess: (result) => toast.success(`Flashcard result saved: ${result.score}% Got It.`),
+    onError: (error) => {
+      recordedAttemptRef.current = false;
+      toast.error(error.message || "Your flashcard result could not be saved.");
+    },
+  });
 
   if (deck.length === 0) return null;
 
-  const card = deck[currentIndex];
-  const progress = Math.round((known.size / deck.length) * 100);
+  const { card, sourceIndex } = deck[currentIndex];
+  const gotItCount = Object.values(outcomes).filter(Boolean).length;
+  const answeredCount = Object.keys(outcomes).length;
+  const progress = Math.round((answeredCount / deck.length) * 100);
 
   const goNext = () => { setFlipped(false); setShowHint(false); setCurrentIndex(i => Math.min(i + 1, deck.length - 1)); };
   const goPrev = () => { setFlipped(false); setShowHint(false); setCurrentIndex(i => Math.max(i - 1, 0)); };
-  const markKnown = () => { setKnown(k => new Set([...k, currentIndex])); goNext(); };
-  const markUnknown = () => { const next = new Set(known); next.delete(currentIndex); setKnown(next); goNext(); };
+  const markCard = (gotIt: boolean) => {
+    const nextOutcomes = { ...outcomes, [sourceIndex]: gotIt };
+    setOutcomes(nextOutcomes);
+    if (Object.keys(nextOutcomes).length === deck.length && !isAdminPreview && !recordedAttemptRef.current) {
+      recordedAttemptRef.current = true;
+      recordAttempt.mutate({
+        lessonId,
+        courseSlug,
+        flashcardBlockId,
+        outcomes: deck.map(({ sourceIndex: cardIndex }) => ({ cardKey: String(cardIndex), gotIt: Boolean(nextOutcomes[cardIndex]) })),
+      });
+    }
+    goNext();
+  };
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-lg overflow-hidden">
       <div className="px-5 py-3 bg-gradient-to-r from-teal-600 to-teal-500 flex items-center gap-2">
         <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
         <h3 className="text-white font-semibold text-sm">{data.title || "Flashcard Deck"}</h3>
-        <span className="ml-auto text-teal-100 text-xs">{deck.length} cards · {known.size} known</span>
+        <span className="ml-auto text-teal-100 text-xs">{deck.length} cards · {gotItCount} Got It</span>
       </div>
       <div className="p-5">
         {/* Progress bar */}
         <div className="mb-4">
           <div className="flex justify-between text-xs text-gray-500 mb-1">
             <span>Card {currentIndex + 1} of {deck.length}</span>
-            <span>{progress}% known</span>
+            <span>{progress}% reviewed · {gotItCount} Got It</span>
           </div>
           <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
@@ -1084,12 +1121,12 @@ function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: a
           {/* Known/Unknown buttons — always visible */}
           <div className="flex gap-3 justify-center">
             <button
-              onClick={markUnknown}
+              onClick={() => markCard(false)}
               className="flex-1 py-2.5 text-sm rounded-xl border-2 font-semibold shadow-sm transition-all"
               style={{ background: stillBg, color: stillText, borderColor: stillText + "55" }}
             >↺ Still Learning</button>
             <button
-              onClick={markKnown}
+              onClick={() => markCard(true)}
               className="flex-1 py-2.5 text-sm rounded-xl font-semibold shadow-md transition-all"
               style={{ background: gotItBg, color: gotItText }}
             >✓ Got It!</button>
@@ -1101,7 +1138,7 @@ function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: a
               disabled={currentIndex === 0}
               className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
             >← Prev</button>
-            <span className="text-xs text-gray-400">{known.size} of {deck.length} known</span>
+            <span className="text-xs text-gray-400">{answeredCount} of {deck.length} reviewed</span>
             <button
               onClick={goNext}
               disabled={currentIndex === deck.length - 1}
@@ -1109,10 +1146,10 @@ function InlineLessonFlashcardDeck({ data }: { data: { title?: string; cards?: a
             >Next →</button>
           </div>
         </div>
-        {known.size === deck.length && (
+        {answeredCount === deck.length && (
           <div className="mt-3 text-center text-sm text-green-700 font-semibold bg-green-50 rounded-lg py-2 border border-green-200">
-            🎉 You've reviewed all cards!
-            <button className="ml-3 text-xs underline" onClick={() => { setKnown(new Set()); setCurrentIndex(0); setFlipped(false); }}>Start over</button>
+            You reviewed all cards: {gotItCount} Got It, {deck.length - gotItCount} Missed ({Math.round((gotItCount / deck.length) * 100)}% Got It).
+            <button className="ml-3 text-xs underline" onClick={() => { setOutcomes({}); recordedAttemptRef.current = false; setCurrentIndex(0); setFlipped(false); }}>Start over</button>
           </div>
         )}
       </div>
@@ -3131,7 +3168,14 @@ export default function CoursePlayer() {
                             }}
                           />
                         ) : block.type === "lesson_flashcard" ? (
-                          <InlineLessonFlashcardDeck key={block.id} data={block.data as any} />
+                          <InlineLessonFlashcardDeck
+                            key={block.id}
+                            data={block.data as any}
+                            lessonId={lessonData.id}
+                            courseSlug={slug!}
+                            flashcardBlockId={String(block.id)}
+                            isAdminPreview={data?.isAdminPreview ?? false}
+                          />
                         ) : block.type === "lesson_certificate" ? (
                           <CertificatePreviewBlock key={block.id} data={block.data as any} courseSlug={slug!} isAdmin={adminBypass} hasRealEnrollment={!!(data?.enrollment && data.enrollment.id !== -1)} />
                         ) : ["lesson_image_comparison","lesson_drag_sort","lesson_branching","lesson_fill_blank","lesson_annotation","lesson_hotspot","lesson_matching"].includes(block.type) ? (
