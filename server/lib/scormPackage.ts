@@ -297,8 +297,11 @@ export function pickScormPlaybackMode(
 
 
 export function isDirectHtmlScormVersion(version: MediaVersionZipRef): boolean {
-  if (!version.s3Url || isZipStorageRef(version)) return false;
+  if (!version.s3Url) return false;
   const url = version.s3Url.toLowerCase().split("?")[0];
+  // Some legacy recovery records retain the original ZIP filename/MIME metadata
+  // while their active source has already been updated to an extracted launch page.
+  // The actual URL is authoritative for this specific direct-HTML determination.
   return url.endsWith(".html") || url.endsWith(".htm");
 }
 

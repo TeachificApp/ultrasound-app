@@ -96,6 +96,32 @@ describe("resolveScormServePlans — r2_zip_stream", () => {
     expect(zipStreamPlan).toBeUndefined();
   });
 
+  it("uses a direct HTML launch URL when legacy metadata still labels the record as ZIP", () => {
+    const versions: MediaVersionZipRef[] = [
+      {
+        id: 41,
+        s3Url: "https://cdn.example.com/scorm/pediatric-flashcards/index.html",
+        fileName: "Pediatric Echo Flashcards.zip",
+        mimeType: "application/x-zip-compressed",
+        versionNumber: 3,
+        scormExtractionStatus: "skipped",
+        scormExtractedPrefix: null,
+        scormLaunchFile: null,
+        scormExtractionError: "Serving via on-demand ZIP streaming",
+      },
+    ];
+
+    const plans = resolveScormServePlans(versions);
+    expect(plans[0]).toEqual({
+      kind: "direct_html",
+      url: "https://cdn.example.com/scorm/pediatric-flashcards/index.html",
+      launchFile: "index.html",
+      versionId: 41,
+    });
+    const zipStreamIndex = plans.findIndex((plan) => plan.kind === "r2_zip_stream");
+    expect(zipStreamIndex).toBeGreaterThan(0);
+  });
+
   it("r2_extracted plan comes before r2_zip_stream when extraction is done", () => {
     const versions: MediaVersionZipRef[] = [
       {

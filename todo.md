@@ -358,3 +358,8 @@
 - [x] Audit all active-domain password login, magic-link request, token verification, session creation, return-path, and protected-content access flows without sending an email or exposing authentication data.
 - [x] Confirm no separate password-login or magic-link verification defect in the shared audited paths; retain the live iHeartEcho automatic SSO issue as a separate open repair without changing accounts, sessions, passwords, access, or domain-security controls.
 - [x] Add focused cross-domain login and magic-link issuance, verification, redirect, cookie, and protected-content regressions without generating or disclosing real tokens.
+- [ ] Inspect and propose an embedded, Stripe-compatible product-import workflow inside the existing platform Products and Product Types administration that can obtain approved store or supplier product details, images, descriptions, and pricing for local product pages without changing the existing Stripe integration.
+- [ ] Design an approved product-level fulfillment handoff for Printful and/or Bookvault after successful Stripe checkout, preserving existing payment, order, and shipping data safeguards.
+- [ ] Add administrator-controlled selective imported-product landing-page population, local checkout, and fulfillment-source configuration within the current Products workflow only after the compatible source and required credentials are approved.
+- [x] Repair the Pediatric Digital Flashcards SCORM package display and launch path without replacing the uploaded package or changing course access, learner progress, or completion records.
+- [x] Add focused SCORM launch, asset-access, and learner-player regressions for the Pediatric Digital Flashcards package and compatible course-content packages.

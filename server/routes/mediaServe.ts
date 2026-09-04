@@ -546,13 +546,24 @@ for (const slugPath of ["/api/media/:slug/scorm", "/media/:slug/scorm"]) {
     const relativePath = decodeURIComponent(rawRelative);
 
     const serveDirectHtml = (directUrl: string, launchFile: string): boolean => {
-      if (relativePath === "" || relativePath === launchFile) {
-        res.redirect(302, encodeStorageFetchUrl(directUrl));
-        return true;
-      }
+      const targetUrl = relativePath === "" || relativePath === launchFile
+        ? directUrl
+        : (() => {
       const lastSlash = directUrl.lastIndexOf("/");
       const baseUrl = lastSlash >= 0 ? directUrl.substring(0, lastSlash + 1) : directUrl;
-      res.redirect(302, encodeStorageFetchUrl(`${baseUrl}${relativePath}`));
+          return `${baseUrl}${relativePath}`;
+        })();
+      const extension = targetUrl.split("?")[0]?.split(".").pop()?.toLowerCase() ?? "";
+      const mimeByExtension: Record<string, string> = {
+        html: "text/html; charset=utf-8", htm: "text/html; charset=utf-8",
+        js: "application/javascript; charset=utf-8", css: "text/css; charset=utf-8",
+        json: "application/json; charset=utf-8", xml: "application/xml; charset=utf-8",
+        png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+        svg: "image/svg+xml", webp: "image/webp", ico: "image/x-icon",
+        woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", mp4: "video/mp4",
+        mp3: "audio/mpeg", pdf: "application/pdf",
+      };
+      proxyInline(encodeStorageFetchUrl(targetUrl), mimeByExtension[extension] ?? "application/octet-stream", relativePath || launchFile, res);
       return true;
     };
 
@@ -995,14 +1006,9 @@ router.get(slugPath, async (req: Request, res: Response) => {
       res.status(200).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Loading...</title></head><body><script>window.location.replace('${safeUrl}');</script></body></html>`);
     };
 
-    if (version.scormExtractedPrefix?.startsWith("__direct_html__:")) {
-      const directUrl = version.scormExtractedPrefix.replace("__direct_html__:", "");
-      sendHtmlRedirect(encodeStorageFetchUrl(directUrl));
-      return;
-    }
-
     // Always route SCORM through the authenticated /scorm proxy (never redirect to
-    // a public R2 CDN URL — the bucket is private and CDN paths can go stale).
+    // a public CDN URL — direct HTML packages also require MIME normalization and
+    // relative assets must remain beneath the shared /scorm route).
     const q = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
     const scormRelPath = req.path.replace(/\/embed\/?$/, "/scorm/") + q;
     sendHtmlRedirect(publicMediaUrl(req, scormRelPath));
