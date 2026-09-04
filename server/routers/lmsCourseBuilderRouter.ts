@@ -283,8 +283,8 @@ export const lmsCourseBuilderRouter = router({
           await tx.update(lmsLessons).set({
             title: change.title,
             learningObjectives: JSON.stringify(change.learningObjectives),
-            content: change.content || null,
-            videoContent: change.videoContent || null,
+            content: change.content?.trim() ? change.content : lesson.content,
+            videoContent: change.videoContent?.trim() ? change.videoContent : lesson.videoContent,
             contentBlocks: blockResult.contentBlocks,
           }).where(eq(lmsLessons.id, lesson.id));
           applied.push({ lessonId: lesson.id, blockTextChanges: blockResult.appliedCount });

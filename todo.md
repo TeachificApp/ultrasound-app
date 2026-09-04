@@ -377,8 +377,13 @@
 - [ ] Add focused privacy, result grouping, per-attempt, and aggregate analytics regressions without exposing any other learner’s performance data.
 - [ ] Use the existing app Challenge Flashcards “Got it right” or “Missed it” learner marking procedure for LMS Flashcard decks and calculate private Correct % from those recorded card-level responses.
 - [ ] Create an Advanced Cardiac Sonographer Flashcard Deck draft using only existing imported LMS flashcard records, with no lesson change and no non-flashcard Question Bank questions.
+- [ ] Ensure every current app flashcard category has its own LMS Flashcards folder and separate 50-card draft deck sourced only from that category’s imported app flashcards.
 - [x] Repair Lesson Focus Regeneration when valid requests are rejected as incomplete, while preserving review-only drafts and preventing automatic lesson saves.
 - [x] Superseded the ACS lesson-draft request after clarification that ACS work must be Flashcards only; no ACS lesson draft was created or changed.
 - [x] Finish and checkpoint the Ultrasound Physics AI lesson-regeneration repair before resuming any ACS Flashcards work.
 - [ ] Diagnose and repair the actual populated-content Ultrasound Physics Lesson Focus Regeneration failure; do not assume fields are empty or claim success without a populated-case result.
 - [ ] Add a populated-content regeneration regression that preserves review-only drafts and detects the true incomplete-rewrite failure reason without storing raw lesson content.
+- [ ] Repair the explicit Lesson Focus Regeneration draft-apply flow so a generated reviewed draft is written to the intended lesson only after the administrator chooses to apply/save it.
+- [ ] Add focused regression coverage for generation preview, explicit draft application, and no automatic lesson save.
+- [ ] Repair Apply Reviewed Changes when a populated generated lesson draft is acknowledged but not persisted to the selected course lesson.
+- [ ] Add a populated reviewed-draft persistence regression verifying the intended lesson changes only after Apply Reviewed Changes and survives a refresh.
