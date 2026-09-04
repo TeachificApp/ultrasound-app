@@ -191,7 +191,10 @@ async function generateFocusChange(input: {
     const raw = response.choices?.[0]?.message?.content;
     const parsed = typeof raw === "string" ? JSON.parse(stripCodeFences(raw)) : raw;
     const proposal = focusChangeInput.parse({ lessonId: input.lesson.id, ...parsed });
-    assertSubstantiveFocusRegeneration(source, proposal);
+    // Some lessons have optional empty fields or legacy block text that cannot be
+    // regenerated. Keep the draft reviewable when the primary instructional body
+    // and title are substantive; applying it still requires an explicit save.
+    assertSubstantiveFocusRegeneration({ ...source, editableBlockText: source.editableBlockText.filter((block) => block.value.trim()) }, proposal);
     return proposal;
   } catch {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI did not return a complete instructional rewrite for this lesson. Please try again." });

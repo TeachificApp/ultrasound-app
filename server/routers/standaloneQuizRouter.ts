@@ -764,7 +764,7 @@ export const standaloneQuizLearnerRouter = router({
     .input(
       z
         .object({
-          quizType: z.enum(["quiz", "mock_exam"]).optional(),
+          quizType: z.enum(["quiz", "mock_exam", "flashcards"]).optional(),
         })
         .optional(),
     )
@@ -834,7 +834,7 @@ export const standaloneQuizAdminRouter = router({
     .input(z.object({
       search: z.string().optional(),
       status: z.enum(["draft", "published", "archived", "enrollment_closed", "waitlist", "presale"]).optional(),
-      type: z.enum(["quiz", "mock_exam"]).optional(),
+      type: z.enum(["quiz", "mock_exam", "flashcards"]).optional(),
       brand: z.enum(["aaus", "iheartecho"]).optional(),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(25),

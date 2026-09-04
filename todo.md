@@ -370,3 +370,13 @@
 - [ ] Add Flashcard lesson and page content modules with Question Bank selection, group-draw configuration, progress, and learner feedback without changing existing lesson quizzes.
 - [ ] Add AI and approved PDF, PowerPoint, and Word flashcard generation, treating each PDF/PPT page pair as front and back while avoiding direct source references in generated learner content.
 - [ ] Add focused regressions for app-flashcard preservation, import hierarchy, visual authoring, Question Bank storage, configurable delivery, embeds, lesson modules, and AI/document generation.
+- [x] Create one LMS Flashcards starter deck for each imported app challenge category, source each deck from its own Flashcards Question Bank subfolder, and configure 50 cards per attempt.
+- [x] Verify every category deck’s Question Bank assignment and 50-card draw setting while preserving all imported LMS cards and app-source flashcards.
+- [ ] Add private My Quiz Results analytics with distinct Quizzes, Mock Exams, and Flashcards sections, showing per-attempt results and content-type aggregate results only for the signed-in learner.
+- [ ] Show recorded quiz/mock scores and learner self-reported flashcard Correct % results per deck/attempt and as separate all-quizzes, all-mocks, and all-decks aggregates.
+- [ ] Add focused privacy, result grouping, per-attempt, and aggregate analytics regressions without exposing any other learner’s performance data.
+- [ ] Use the existing app Challenge Flashcards “Got it right” or “Missed it” learner marking procedure for LMS Flashcard decks and calculate private Correct % from those recorded card-level responses.
+- [ ] Create an Advanced Cardiac Sonographer Flashcard Deck draft using only existing imported LMS flashcard records, with no lesson change and no non-flashcard Question Bank questions.
+- [x] Repair Lesson Focus Regeneration when valid requests are rejected as incomplete, while preserving review-only drafts and preventing automatic lesson saves.
+- [x] Superseded the ACS lesson-draft request after clarification that ACS work must be Flashcards only; no ACS lesson draft was created or changed.
+- [x] Finish and checkpoint the Ultrasound Physics AI lesson-regeneration repair before resuming any ACS Flashcards work.

@@ -136,6 +136,10 @@ export default function StudentQuizDashboard() {
     { quizType: "mock_exam" },
     { enabled: !!user && !!summary?.hasMockExamAttempts && tab === "mock" },
   );
+  const { data: flashcardHistory, isLoading: loadingFlashcards } = trpc.standaloneQuizLearner.getMyAttempts.useQuery(
+    { quizType: "flashcards" },
+    { enabled: !!user && !!summary?.hasFlashcardAttempts && tab === "flashcards" },
+  );
 
   if (authLoading || loadingSummary) {
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>;
@@ -153,7 +157,7 @@ export default function StudentQuizDashboard() {
     );
   }
 
-  if (!summary?.hasNativeQuizAttempts) {
+  if (!summary?.hasNativeQuizAttempts && !summary?.hasMockExamAttempts && !summary?.hasFlashcardAttempts) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md text-center bg-white rounded-2xl border border-gray-200 p-10">
@@ -183,6 +187,7 @@ export default function StudentQuizDashboard() {
           {summary.hasMockExamAttempts && (
             <AnalyticsCards title="Mock exams" analytics={summary.mockExams} />
           )}
+          {summary.hasFlashcardAttempts && <AnalyticsCards title="Flashcard decks" analytics={summary.flashcards} />}
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
@@ -191,6 +196,7 @@ export default function StudentQuizDashboard() {
             {summary.hasMockExamAttempts && (
               <TabsTrigger value="mock">Mock exam results</TabsTrigger>
             )}
+            {summary.hasFlashcardAttempts && <TabsTrigger value="flashcards">Flashcard results</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="native">
@@ -208,6 +214,11 @@ export default function StudentQuizDashboard() {
               ) : (
                 <AttemptHistoryTable rows={mockHistory ?? []} emptyLabel="No mock exam attempts yet" />
               )}
+            </TabsContent>
+          )}
+          {summary.hasFlashcardAttempts && (
+            <TabsContent value="flashcards">
+              {loadingFlashcards ? <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div> : <AttemptHistoryTable rows={flashcardHistory ?? []} emptyLabel="No flashcard deck attempts yet" />}
             </TabsContent>
           )}
         </Tabs>

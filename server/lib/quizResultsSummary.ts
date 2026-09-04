@@ -31,7 +31,7 @@ export function aggregateScoresFromRows(rows: ScoreRow[]): QuizResultsKindAnalyt
   };
 }
 
-/** Aggregate standalone + LMS attempts, split native quiz vs mock exam. */
+/** Aggregate standalone + LMS attempts, split native quiz, mock exam, and Flashcards. */
 export async function loadMyQuizResultsSummary(
   db: MySql2Database<any>,
   userId: number,
@@ -59,16 +59,20 @@ export async function loadMyQuizResultsSummary(
 
   const nativeStandalone = standaloneRows.filter((r) => r.quizType === "quiz");
   const mockStandalone = standaloneRows.filter((r) => r.quizType === "mock_exam");
+  const flashcardStandalone = standaloneRows.filter((r) => r.quizType === "flashcards");
   const nativeLms = lmsRows.filter((r) => !r.isMockExam);
   const mockLms = lmsRows.filter((r) => r.isMockExam);
 
   const nativeQuizzes = aggregateScoresFromRows([...nativeStandalone, ...nativeLms]);
   const mockExams = aggregateScoresFromRows([...mockStandalone, ...mockLms]);
+  const flashcards = aggregateScoresFromRows(flashcardStandalone);
 
   return {
     hasNativeQuizAttempts: nativeQuizzes.attemptCount > 0,
     hasMockExamAttempts: mockExams.attemptCount > 0,
+    hasFlashcardAttempts: flashcards.attemptCount > 0,
     nativeQuizzes,
     mockExams,
+    flashcards,
   };
 }
