@@ -3,40 +3,13 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-
-const PROFESSION_OPTIONS = [
-  "Sonographer / Ultrasound Technologist",
-  "Cardiologist / Echocardiographer",
-  "Cardiac Sonographer",
-  "Vascular Technologist",
-  "Radiologist",
-  "Radiology Technologist",
-  "Nurse / NP / PA",
-  "Medical Student / Resident",
-  "Educator / Program Director",
-  "Other",
-];
-
-const INTEREST_OPTIONS = [
-  { value: "echo", label: "Echocardiography" },
-  { value: "vascular", label: "Vascular Ultrasound" },
-  { value: "general", label: "General / Abdominal Ultrasound" },
-  { value: "cme", label: "CME / Continuing Education" },
-  { value: "accreditation", label: "Lab Accreditation" },
-  { value: "ai_tools", label: "AI & Clinical Tools" },
-  { value: "new_courses", label: "New Course Announcements" },
-  { value: "events", label: "Webinars & Live Events" },
-];
 
 export default function NewsletterSubscribe() {
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
     email: "",
-    profession: "",
-    interests: [] as string[],
   });
   const [submitted, setSubmitted] = useState(false);
 
@@ -49,27 +22,16 @@ export default function NewsletterSubscribe() {
     },
   });
 
-  const toggleInterest = (value: string) => {
-    setForm(f => ({
-      ...f,
-      interests: f.interests.includes(value)
-        ? f.interests.filter(i => i !== value)
-        : [...f.interests, value],
-    }));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.email) {
-      toast.error("Please enter your email address.");
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
+      toast.error("First name, last name, and email are required.");
       return;
     }
     subscribeMutation.mutate({
-      email: form.email,
-      firstName: form.firstName || undefined,
-      lastName: form.lastName || undefined,
-      profession: form.profession || undefined,
-      interests: form.interests.length > 0 ? form.interests : undefined,
+      email: form.email.trim(),
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
       source: "subscribe_page",
     });
   };
@@ -138,9 +100,10 @@ export default function NewsletterSubscribe() {
           {/* Name row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">First Name</Label>
+              <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">First Name <span className="text-red-500">*</span></Label>
               <Input
                 id="firstName"
+                required
                 placeholder="Jane"
                 value={form.firstName}
                 onChange={e => setForm(f => ({ ...f, firstName: e.target.value }))}
@@ -148,9 +111,10 @@ export default function NewsletterSubscribe() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">Last Name</Label>
+              <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">Last Name <span className="text-red-500">*</span></Label>
               <Input
                 id="lastName"
+                required
                 placeholder="Smith"
                 value={form.lastName}
                 onChange={e => setForm(f => ({ ...f, lastName: e.target.value }))}
@@ -175,42 +139,6 @@ export default function NewsletterSubscribe() {
             />
           </div>
 
-          {/* Profession */}
-          <div className="space-y-1.5">
-            <Label htmlFor="profession" className="text-sm font-medium text-gray-700">Profession</Label>
-            <select
-              id="profession"
-              value={form.profession}
-              onChange={e => setForm(f => ({ ...f, profession: e.target.value }))}
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 focus:border-[#189aa1] focus:outline-none focus:ring-1 focus:ring-[#189aa1]"
-            >
-              <option value="">Select your profession…</option>
-              {PROFESSION_OPTIONS.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Interests */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium text-gray-700">Topics of Interest</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {INTEREST_OPTIONS.map(opt => (
-                <label
-                  key={opt.value}
-                  className="flex items-center gap-2 cursor-pointer group"
-                >
-                  <Checkbox
-                    checked={form.interests.includes(opt.value)}
-                    onCheckedChange={() => toggleInterest(opt.value)}
-                    className="border-gray-300 data-[state=checked]:bg-[#189aa1] data-[state=checked]:border-[#189aa1]"
-                  />
-                  <span className="text-sm text-gray-600 group-hover:text-gray-900">{opt.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
           {/* Submit */}
           <Button
             type="submit"
@@ -221,7 +149,7 @@ export default function NewsletterSubscribe() {
           </Button>
 
           <p className="text-xs text-gray-400 text-center leading-relaxed">
-            By subscribing, you agree to receive educational emails from All About Ultrasound, Inc. dba iHeartEcho.
+            By subscribing, you agree to receive educational and marketing emails from All About Ultrasound, Inc. dba iHeartEcho.
             You can unsubscribe at any time. We respect your privacy and will never share your information.
           </p>
         </form>

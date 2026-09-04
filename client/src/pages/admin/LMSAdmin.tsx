@@ -60,7 +60,7 @@ import CertificateTemplatesAdmin from "./CertificateTemplatesAdmin";
 import LessonBlockEditor from "@/components/LessonBlockEditor";
 import AssignmentBlockEditor from "@/components/AssignmentBlockEditor";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
-import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
+import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, getCatalogItemsForCategory, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import { useLearnLink } from "@/hooks/useLearnLink";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
@@ -4102,7 +4102,7 @@ function CourseOverviewEditor({
               </div>
               <div className="flex-1 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-2 p-3">
-                  {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(item => (
+                  {getCatalogItemsForCategory(activeCategory).map(item => (
                     <button
                       key={item.type}
                       onClick={() => { addBlock(item.type); setAddMenuOpen(false); }}

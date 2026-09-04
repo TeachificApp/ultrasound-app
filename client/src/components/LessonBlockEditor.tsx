@@ -23,7 +23,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
-import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
+import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, getCatalogItemsForCategory, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
 import React, { useImperativeHandle } from "react";
 import {
   X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2, FileUp,
@@ -1077,7 +1077,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
             </div>
             {/* Block grid */}
             <div className="grid grid-cols-3 sm:grid-cols-4 auto-rows-[minmax(124px,auto)] gap-3 p-2 overflow-y-auto flex-1">
-              {BLOCK_CATALOG.filter(b => b.category === activeCategory).map(b => (
+              {getCatalogItemsForCategory(activeCategory).flatMap(b => [
                 <button
                   key={b.type}
                   onClick={() => { addBlock(b.type); setAddMenuOpen(false); }}
@@ -1085,8 +1085,18 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
                 >
                   <span className="shrink-0 text-teal-600 text-2xl">{b.icon}</span>
                   <span className="text-xs leading-4 font-medium break-words">{b.label}</span>
-                </button>
-              ))}
+                </button>,
+                ...(activeCategory === "Content" && b.type === "file_download" && lessonId ? [
+                  <button
+                    key="convert_document"
+                    onClick={() => setPickerTab("convert_document")}
+                    className="flex min-h-[124px] flex-col items-center justify-start gap-2 overflow-hidden rounded-xl border border-teal-100 bg-teal-50/50 p-3 text-center text-teal-700 transition-all hover:border-teal-300 hover:bg-teal-50"
+                  >
+                    <span className="shrink-0 text-2xl"><FileUp className="h-6 w-6" /></span>
+                    <span className="text-xs font-medium leading-4 break-words">Convert File</span>
+                  </button>,
+                ] : []),
+              ])}
             </div>
           </div>
         )}

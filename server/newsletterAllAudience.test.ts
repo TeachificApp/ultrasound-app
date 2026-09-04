@@ -6,6 +6,12 @@ describe("newsletter All Contacts synchronization", () => {
   const routerSource = readFileSync(resolve(import.meta.dirname, "routers/newsletterRouter.ts"), "utf8");
   const helperSource = readFileSync(resolve(import.meta.dirname, "lib/emailListHelper.ts"), "utf8");
 
+  it("requires first name, last name, and email at the public subscription boundary", () => {
+    expect(routerSource).toContain('firstName: z.string().trim().min(1, "First name is required")');
+    expect(routerSource).toContain('lastName: z.string().trim().min(1, "Last name is required")');
+    expect(routerSource).toContain('email: z.string().email().max(255)');
+  });
+
   it("reconciles new, active, and explicitly re-subscribed newsletter contacts to All Contacts", () => {
     expect(routerSource).toContain('source: "newsletter_subscribe"');
     expect(routerSource).toContain('resubscribe: true');

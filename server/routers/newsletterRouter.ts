@@ -28,10 +28,8 @@ export const newsletterRouter = router({
   subscribe: publicProcedure
     .input(z.object({
       email: z.string().email().max(255),
-      firstName: z.string().max(128).optional(),
-      lastName: z.string().max(128).optional(),
-      profession: z.string().max(128).optional(),
-      interests: z.array(z.string()).optional(),
+      firstName: z.string().trim().min(1, "First name is required").max(128),
+      lastName: z.string().trim().min(1, "Last name is required").max(128),
       source: z.string().max(64).optional(),
     }))
     .mutation(async ({ input }) => {
@@ -54,7 +52,7 @@ export const newsletterRouter = router({
 
       if (existing.length > 0) {
         if (existing[0].isActive) {
-          await addToAllContacts(email, [input.firstName, input.lastName].filter(Boolean).join(" ") || null, { source: "newsletter_subscribe" });
+          await addToAllContacts(email, `${input.firstName} ${input.lastName}`, { source: "newsletter_subscribe" });
           // Already active — return success silently (don't reveal subscriber status)
           return {
             success: true,
@@ -74,7 +72,7 @@ export const newsletterRouter = router({
             updatedAt: new Date(),
           })
           .where(eq(newsletterSubscribers.email, email));
-        await addToAllContacts(email, [input.firstName, input.lastName].filter(Boolean).join(" ") || null, { source: "newsletter_subscribe", resubscribe: true });
+        await addToAllContacts(email, `${input.firstName} ${input.lastName}`, { source: "newsletter_subscribe", resubscribe: true });
         return { success: true, alreadySubscribed: false, unsubscribeToken: token };
       }
 
@@ -82,10 +80,10 @@ export const newsletterRouter = router({
       const token = generateToken();
       await db.insert(newsletterSubscribers).values({
         email,
-        firstName: input.firstName ?? null,
-        lastName: input.lastName ?? null,
-        profession: input.profession ?? null,
-        interests: input.interests ?? null,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        profession: null,
+        interests: null,
         source: input.source ?? "subscribe_page",
         subscribedAt: now,
         isActive: 1,
@@ -93,7 +91,7 @@ export const newsletterRouter = router({
       });
 
       // Persist to the campaign-visible All Contacts list before reporting success.
-      const name = [input.firstName, input.lastName].filter(Boolean).join(" ") || email;
+      const name = `${input.firstName} ${input.lastName}`;
       await addToAllContacts(email, name || null, { source: "newsletter_subscribe", resubscribe: true });
 
       // Sync to SendGrid Marketing Contacts separately (fire-and-forget).
@@ -117,7 +115,7 @@ export const newsletterRouter = router({
       // Notify owner of new subscriber
       await notifyOwner({
         title: "New Newsletter Subscriber",
-        content: `${name} (${email}) subscribed to the newsletter${input.profession ? ` — ${input.profession}` : ""}.`,
+        content: `${name} (${email}) subscribed to the newsletter.`,
       }).catch(() => {/* non-blocking */});
 
       return { success: true, alreadySubscribed: false, unsubscribeToken: token };

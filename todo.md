@@ -407,3 +407,8 @@
 - [x] Add focused authoring, Question Bank preservation, embedded-attempt, flashcard outcome, My Quiz Results, and privacy regressions for lesson modules.
 - [x] Allow authors to add new lesson-module quiz questions and flashcards into the appropriate Question Bank, with duplicate-safe source linkage and without changing existing learner attempts or source records.
 - [x] Reorder the Content block picker as Text/Rich Text, Image, Video, all AI-generation blocks, then the remaining standard content blocks.
+- [x] Require First Name, Last Name, and Email on newsletter signup, with no optional newsletter input fields.
+- [x] Verify that Lesson Quiz and Lesson Flashcard module editors visibly expose their Question Bank selection controls and preserve the established Question Bank workflows.
+- [x] Add focused newsletter required-field and lesson-module Question Bank visibility regressions.
+- [x] Correct the rendered Content selector order to show Text, Image, Video, then all AI-generation blocks, matching the catalog rather than the current stale visual order.
+- [x] Group File Upload, File Download, and Convert File consecutively in the Content selector.

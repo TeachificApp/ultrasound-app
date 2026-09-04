@@ -20,6 +20,7 @@ interface Props {
 export default function NewsletterInlineWidget({ dark = false, source = "inline_widget" }: Props) {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [subscribed, setSubscribed] = useState(false);
 
   const subscribeMutation = trpc.newsletter.subscribe.useMutation({
@@ -33,13 +34,14 @@ export default function NewsletterInlineWidget({ dark = false, source = "inline_
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) {
-      toast.error("Please enter your email address.");
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      toast.error("First name, last name, and email are required.");
       return;
     }
     subscribeMutation.mutate({
       email: email.trim(),
-      firstName: firstName.trim() || undefined,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
       source,
     });
   };
@@ -75,14 +77,26 @@ export default function NewsletterInlineWidget({ dark = false, source = "inline_
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
         <Input
           type="text"
-          placeholder="First name (optional)"
+          required
+          aria-label="First Name"
+          placeholder="First Name"
           value={firstName}
           onChange={e => setFirstName(e.target.value)}
           className={`sm:w-32 flex-shrink-0 text-sm h-9 ${dark ? "bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#4ad9e0]" : "border-gray-300 focus:border-[#189aa1]"}`}
         />
         <Input
+          type="text"
+          required
+          aria-label="Last Name"
+          placeholder="Last Name"
+          value={lastName}
+          onChange={e => setLastName(e.target.value)}
+          className={`sm:w-32 flex-shrink-0 text-sm h-9 ${dark ? "bg-white/10 border-white/20 text-white placeholder:text-white/40 focus:border-[#4ad9e0]" : "border-gray-300 focus:border-[#189aa1]"}`}
+        />
+        <Input
           type="email"
           required
+          aria-label="Email Address"
           placeholder="Email address"
           value={email}
           onChange={e => setEmail(e.target.value)}

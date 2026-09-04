@@ -448,6 +448,23 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
 
 export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion", "Funnel", "Smart", "Webinar"];
 
+/** Runtime order for every Content picker. Do not rely on declaration or late push order. */
+export const CONTENT_PICKER_ORDER = [
+  "text", "image", "video", "ai_content", "ai_image",
+  "file_upload", "file_download",
+] as const;
+
+export function getCatalogItemsForCategory(category: string) {
+  const items = BLOCK_CATALOG.filter(item => item.category === category);
+  if (category !== "Content") return items;
+  const priority = new Map(CONTENT_PICKER_ORDER.map((type, index) => [type, index]));
+  return items.sort((left, right) => {
+    const leftRank = priority.get(left.type as typeof CONTENT_PICKER_ORDER[number]) ?? CONTENT_PICKER_ORDER.length;
+    const rightRank = priority.get(right.type as typeof CONTENT_PICKER_ORDER[number]) ?? CONTENT_PICKER_ORDER.length;
+    return leftRank - rightRank;
+  });
+}
+
 // Lesson interactive blocks (quiz + flashcard) — added to Content category
 BLOCK_CATALOG.push(
   { type: "lesson_quiz", label: "Lesson Quiz", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>, category: "Content", defaultData: { title: "Knowledge Check", questions: [], showExplanations: true, passingScore: 70, shuffleQuestions: false } },
@@ -3084,7 +3101,7 @@ function ColumnBlockList({ side, blocks, onUpdate, lessonId, courseId }: {
             ))}
           </div>
           <div className="grid grid-cols-2 gap-1 max-h-40 overflow-y-auto">
-            {BLOCK_CATALOG.filter(c => c.category === addCat && c.type !== "column_layout").map(c => (
+            {getCatalogItemsForCategory(addCat).filter(c => c.type !== "column_layout").map(c => (
               <button key={c.type} onClick={() => {
                 const newBlock: Block = { id: uid(), type: c.type, data: { ...c.defaultData } };
                 onUpdate([...blocks, newBlock]);
@@ -7635,7 +7652,7 @@ function ColumnBlockPickerDialog({ open, onOpenChange, onAddBlock }: {
     { enabled: open && tab === "templates" }
   );
   const categories = Array.from(new Set(BLOCK_CATALOG.filter(b => b.type !== "column_layout").map(b => b.category)));
-  const catalogItems = BLOCK_CATALOG.filter(b => b.type !== "column_layout" && b.category === cat);
+  const catalogItems = getCatalogItemsForCategory(cat).filter(b => b.type !== "column_layout");
   return (
     <Dialog open={open} onOpenChange={v => { onOpenChange(v); if (!v) setSearch(""); }}>
       <DialogContent className="max-w-lg max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden">
@@ -8547,7 +8564,7 @@ export default function LandingPageBuilder() {
   // Also search column_layout children so clicking a child block opens its settings
   const selectedBlock = blocks.find(b => b.id === selectedId) ??
     blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])] : []).find(b => b.id === selectedId);
-  const catalogByCat = BLOCK_CATALOG.filter(c => c.category === activeCat);
+  const catalogByCat = getCatalogItemsForCategory(activeCat);
 
   // Block picker: fetch courses with landing blocks (for "Copy from Other Pages" tab)
   const { data: coursesWithBlocks } = trpc.lmsAdmin.getCoursesWithLandingBlocks.useQuery(
