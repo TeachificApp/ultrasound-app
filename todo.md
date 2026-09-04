@@ -412,3 +412,4 @@
 - [x] Add focused newsletter required-field and lesson-module Question Bank visibility regressions.
 - [x] Correct the rendered Content selector order to show Text, Image, Video, then all AI-generation blocks, matching the catalog rather than the current stale visual order.
 - [x] Group File Upload, File Download, and Convert File consecutively in the Content selector.
+- [x] Increase the PDF/PPTX Convert File upload limit above 25 MB while retaining supported-type checks, server-side bounds, source-file preservation, and focused validation coverage.

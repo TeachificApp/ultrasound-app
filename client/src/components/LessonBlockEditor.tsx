@@ -24,6 +24,9 @@ import {
 } from "@/components/ui/dialog";
 import { Block, BlockType, BlockPreview } from "@/components/BlockPreview";
 import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, getCatalogItemsForCategory, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
+
+const DOCUMENT_CONVERSION_MAX_MB = 50;
+const DOCUMENT_CONVERSION_MAX_BYTES = DOCUMENT_CONVERSION_MAX_MB * 1024 * 1024;
 import React, { useImperativeHandle } from "react";
 import {
   X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2, FileUp,
@@ -457,8 +460,8 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
       toast.error("Choose a PDF or PowerPoint .pptx file.");
       return;
     }
-    if (documentFile.size > 25 * 1024 * 1024) {
-      toast.error("Choose a document no larger than 25 MB.");
+    if (documentFile.size > DOCUMENT_CONVERSION_MAX_BYTES) {
+      toast.error(`Choose a document no larger than ${DOCUMENT_CONVERSION_MAX_MB} MB.`);
       return;
     }
 
@@ -1122,7 +1125,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
             >
               <FileUp className="mb-3 h-8 w-8 text-teal-600" />
               <span className="font-semibold text-slate-800">{documentFile ? documentFile.name : "Choose PDF or PowerPoint (.pptx)"}</span>
-              <span className="mt-1 text-xs text-slate-500">{documentFile ? `${(documentFile.size / (1024 * 1024)).toFixed(1)} MB selected` : "Maximum file size: 25 MB"}</span>
+              <span className="mt-1 text-xs text-slate-500">{documentFile ? `${(documentFile.size / (1024 * 1024)).toFixed(1)} MB selected` : `Maximum file size: ${DOCUMENT_CONVERSION_MAX_MB} MB`}</span>
             </button>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="max-w-md text-xs leading-5 text-slate-500">Conversion adds editable blocks locally. Use the lesson’s standard <strong>Save</strong> action after reviewing them; no existing lesson block is replaced automatically.</p>

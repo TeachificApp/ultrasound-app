@@ -19,4 +19,10 @@ describe("LessonBlockEditor document conversion entry", () => {
     expect(source).toContain("no existing lesson block is replaced automatically");
     expect(source).not.toContain("updateLesson.mutateAsync({\n        id: lessonId,\n        contentBlocks: JSON.stringify(convertedBlocks)");
   });
+
+  it("allows supported conversion files through the shared 50 MB client bound", () => {
+    expect(source).toContain("const DOCUMENT_CONVERSION_MAX_MB = 50");
+    expect(source).toContain("Maximum file size: ${DOCUMENT_CONVERSION_MAX_MB} MB");
+    expect(source).not.toContain("Maximum file size: 25 MB");
+  });
 });

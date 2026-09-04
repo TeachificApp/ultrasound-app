@@ -1,7 +1,8 @@
 import { createCanvas } from "@napi-rs/canvas";
 import type { TeachSlide } from "../../shared/teachPresentation";
 
-export const LESSON_DOCUMENT_MAX_BYTES = 25 * 1024 * 1024;
+export const LESSON_DOCUMENT_MAX_MB = 50;
+export const LESSON_DOCUMENT_MAX_BYTES = LESSON_DOCUMENT_MAX_MB * 1024 * 1024;
 export const LESSON_DOCUMENT_MAX_PAGES = 100;
 
 export type LessonDocumentKind = "pdf" | "pptx";
@@ -83,7 +84,7 @@ export function assertLessonDocumentUpload(fileName: string, mimeType: string, b
     throw new Error("The selected document is empty or invalid.");
   }
   if (byteLength > LESSON_DOCUMENT_MAX_BYTES) {
-    throw new Error("Choose a document no larger than 25 MB.");
+    throw new Error(`Choose a document no larger than ${LESSON_DOCUMENT_MAX_MB} MB.`);
   }
 }
 

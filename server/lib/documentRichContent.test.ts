@@ -5,6 +5,8 @@ import {
   convertPdfToEditableLessonBlocks,
   convertPptxSlidesToEditableLessonBlocks,
   getLessonDocumentKind,
+  LESSON_DOCUMENT_MAX_BYTES,
+  LESSON_DOCUMENT_MAX_MB,
 } from "./documentRichContent";
 
 const source = {
@@ -22,6 +24,12 @@ describe("document rich-content conversion", () => {
     expect(getLessonDocumentKind("image.png", "image/png")).toBeNull();
     expect(() => assertLessonDocumentUpload("image.png", "image/png", 100)).toThrow(/PDF or PowerPoint/i);
     expect(() => assertLessonDocumentUpload("lesson.pdf", "application/pdf", 0)).toThrow(/empty/i);
+  });
+
+  it("allows document conversion uploads through 50 MB and rejects only files above the shared bound", () => {
+    expect(LESSON_DOCUMENT_MAX_MB).toBe(50);
+    expect(() => assertLessonDocumentUpload("lesson.pdf", "application/pdf", LESSON_DOCUMENT_MAX_BYTES)).not.toThrow();
+    expect(() => assertLessonDocumentUpload("lesson.pdf", "application/pdf", LESSON_DOCUMENT_MAX_BYTES + 1)).toThrow(/50 MB/);
   });
 
   it("converts each PowerPoint slide in order into editable text and image blocks with a retained source reference", () => {
