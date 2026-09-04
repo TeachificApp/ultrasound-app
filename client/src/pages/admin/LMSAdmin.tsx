@@ -1264,7 +1264,14 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
   const [addLessonSection, setAddLessonSection] = useState<number | null>(null);
   const [addLessonAtCourseLevel, setAddLessonAtCourseLevel] = useState(false);
   // Restore editLesson from URL on mount (so page refresh re-opens the lesson editor)
-  const urlEditLessonId = (() => { try { const v = new URLSearchParams(window.location.search).get("editLesson"); return v ? Number(v) : null; } catch { return null; } })();
+  const [urlEditLessonId] = useState<number | null>(() => {
+    try {
+      const value = new URLSearchParams(window.location.search).get("editLesson");
+      return value ? Number(value) : null;
+    } catch {
+      return null;
+    }
+  });
   const [editLesson, setEditLesson] = useState<any>(null);
   // Once course data loads, restore editLesson from URL param if present
   const restoredLessonRef = useRef(false);
@@ -1284,13 +1291,13 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
     const params = new URLSearchParams(window.location.search);
     if (editLesson) {
       params.set("editLesson", String(editLesson.id));
-    } else {
+    } else if (!urlEditLessonId || restoredLessonRef.current) {
       params.delete("editLesson");
       params.delete("editLessonTab");
     }
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState(null, "", newUrl);
-  }, [editLesson]);
+  }, [editLesson, urlEditLessonId]);
   // No pendingLessonId needed — AddLessonDialog now passes the full lesson object directly
   const [quizLesson, setQuizLesson] = useState<any>(null);
   const [importMediaSection, setImportMediaSection] = useState<number | null>(null);
@@ -5167,8 +5174,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (!params.get("editLesson")) return;
-    if (activeTab === "content") params.set("editLessonTab", "content");
-    else params.delete("editLessonTab");
+    params.set("editLessonTab", activeTab);
     window.history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
   }, [activeTab, lessonShallow.id]);
 

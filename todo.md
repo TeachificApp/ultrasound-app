@@ -387,3 +387,17 @@
 - [ ] Add focused regression coverage for generation preview, explicit draft application, and no automatic lesson save.
 - [ ] Repair Apply Reviewed Changes when a populated generated lesson draft is acknowledged but not persisted to the selected course lesson.
 - [ ] Add a populated reviewed-draft persistence regression verifying the intended lesson changes only after Apply Reviewed Changes and survives a refresh.
+- [ ] Add a newsletter double-opt-in flow that holds new subscriptions pending confirmation and activates only after valid confirmation, without sending test email.
+- [ ] Replace the proposed double-opt-in flow with an immediate subscription and one-time “You’re in!” welcome notification confirming subscription and requesting inbox whitelisting; do not send a confirmation link.
+- [ ] Update newsletter signup consent text to state educational and marketing emails.
+- [ ] Prepare the confirmation email with inbox-whitelisting guidance and request final approval of audience, sender, subject, and content before enabling delivery.
+- [ ] Add focused confirmation-token, pending-state, activation, consent-copy, and no-email-sent regressions.
+- [ ] Add an editable PDF/PowerPoint-to-rich-content lesson and page block that extracts document text and visual assets into a visually configured draft rather than a standard file viewer.
+- [ ] Convert each PDF page and PowerPoint slide into a separate responsive editable lesson/page content block rather than retaining fixed-page display.
+- [ ] Insert converted editable PDF/PPT page and slide blocks directly into the current lesson after conversion, retaining the original source file and preserving other lesson blocks.
+- [x] Clean up the Add Content Block picker grid so block icons and labels have consistent spacing, wrapping, and touch-friendly row sizing without overlap.
+- [x] Rebuild Add Content Block picker cells so icon and multi-line label layout cannot overlap at the current desktop picker width.
+- [x] Preserve the exact active lesson view across refresh, returning to the same Lesson Editor or Lesson Settings view instead of Course Settings.
+- [x] Add focused picker-cell and lesson-view refresh-state regressions.
+- [ ] Preserve the original source PDF/PowerPoint and asset references while allowing administrators to edit generated text and visual layout before saving the rich-content block.
+- [ ] Add focused document extraction, visual-asset preservation, rich-content editing, and source-file retention regressions.
