@@ -674,3 +674,23 @@ textarea,
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+/* Converted PowerPoint slides embedded in one continuous lesson rich-text block */
+[data-converted-document] [data-pptx-slide-layout] {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+}
+[data-converted-document] [data-pptx-slide-layout] [data-pptx-text-box] {
+  overflow: visible;
+  white-space: normal;
+}
+[data-converted-document] [data-pptx-slide-layout] [data-pptx-image] {
+  max-width: none;
+  margin: 0;
+}
+[data-converted-document] [data-document-page-break] {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 2rem 0;
+}
