@@ -96,6 +96,7 @@ import { parseScheduledTimestamp } from "../../shared/platformTime";
 import { applyEditableBlockText, assertSubstantiveFocusRegeneration, collectEditableBlockText, stripCodeFences, type BlockTextField } from "../lib/lessonFocusRegeneration";
 import { selectCourseFocusRegenerationLessons } from "../lib/courseFocusRegenerationBatch";
 import { parsePptxBuffer } from "../lib/pptxImport";
+import { downloadStorageObject } from "../lib/downloadStorageObject";
 import {
   assertLessonDocumentUpload,
   convertPdfToEditableLessonBlocks,
@@ -1278,8 +1279,8 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       mimeType: z.string().trim().min(1).max(160),
       fileSize: z.number().int().positive().max(LESSON_DOCUMENT_MAX_BYTES),
       includePptxHeadersAndFooters: z.boolean().optional(),
-      // The application JSON body limit is 100 MB; this independently bounds the encoded upload.
-      fileData: z.string().min(1).max(Math.ceil(LESSON_DOCUMENT_MAX_BYTES * 1.37)),
+      storageKey: z.string().trim().min(1).max(512),
+      storageUrl: z.string().trim().min(1).max(2048),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -1293,6 +1294,11 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         .limit(1);
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found." });
 
+      const expectedPrefix = `lms-documents/lesson-${lesson.id}/`;
+      if (!input.storageKey.startsWith(expectedPrefix)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The uploaded document reference is invalid for this lesson." });
+      }
+
       const kind = getLessonDocumentKind(input.fileName, input.mimeType);
       if (!kind) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a PDF or PowerPoint .pptx file." });
@@ -1300,12 +1306,9 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
 
       let buffer: Buffer;
       try {
-        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(input.fileData) || input.fileData.length % 4 !== 0) {
-          throw new Error("Invalid base64");
-        }
-        buffer = Buffer.from(input.fileData, "base64");
+        buffer = await downloadStorageObject(input.storageKey, input.storageUrl);
       } catch {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "The selected document could not be read." });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The uploaded document could not be read from storage." });
       }
       if (!buffer.length || buffer.length !== input.fileSize) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "The selected document size could not be verified." });
@@ -1316,22 +1319,15 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "The selected document is not supported." });
       }
 
-      const cleanFileName = input.fileName
-        .replace(/[^a-zA-Z0-9._-]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 120) || `lesson-document.${kind}`;
-      const token = randomBytes(12).toString("hex");
-      const sourcePrefix = `lms-documents/lesson-${lesson.id}/${token}`;
+      const sourcePrefix = input.storageKey.replace(/\/source-[^/]+$/, "") || expectedPrefix.slice(0, -1);
       const sourceMimeType = kind === "pdf"
         ? "application/pdf"
         : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-      const sourceKey = `${sourcePrefix}/source-${cleanFileName}`;
-      const { url: sourceUrl } = await storagePut(sourceKey, buffer, sourceMimeType);
       const source = {
         fileName: input.fileName,
         mimeType: sourceMimeType,
-        storageKey: sourceKey,
-        storageUrl: sourceUrl,
+        storageKey: input.storageKey,
+        storageUrl: input.storageUrl,
         convertedAt: new Date().toISOString(),
       };
       const uploadImage = async (fileName: string, data: Buffer, mimeType: string) => {
