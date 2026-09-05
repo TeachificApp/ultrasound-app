@@ -29,8 +29,8 @@ describe("LessonBlockEditor document conversion entry", () => {
 
   it("allows converted document blocks to widen the settings panel with a left-edge resize handle", () => {
     expect(source).toContain('useResizableEditorPanel("lesson-block-editor")');
-    expect(source).toContain("handleSettingsPanelMouseDown");
-    expect(source).toContain("Drag the left edge to customize editor width.");
+    expect(source).toContain("maybeExpandForConvertedDocument");
+    expect(source).toContain("Drag the panel edge to resize the editor.");
     expect(source).toContain("isConvertedDocumentBlock(selectedBlock.data)");
   });
 });

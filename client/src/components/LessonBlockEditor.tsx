@@ -135,9 +135,10 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const [saving, setSaving] = useState(false);
   const {
     panelWidth: settingsPanelWidth,
-    ensureWidthForConvertedDocument,
+    maybeExpandForConvertedDocument,
     handleResizeMouseDown: handleSettingsPanelMouseDown,
   } = useResizableEditorPanel("lesson-block-editor");
+  const lastExpandedBlockIdRef = useRef<string | null>(null);
 
   // Refs for scroll-to-new-block
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -617,9 +618,23 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
     null;
 
   useEffect(() => {
-    if (!selectedBlock || !isConvertedDocumentBlock(selectedBlock.data)) return;
-    ensureWidthForConvertedDocument();
-  }, [selectedBlock?.id, selectedBlock?.data, ensureWidthForConvertedDocument]);
+    if (!selectedBlockId) {
+      lastExpandedBlockIdRef.current = null;
+      return;
+    }
+    if (lastExpandedBlockIdRef.current === selectedBlockId) return;
+
+    const block =
+      blocks.find(b => b.id === selectedBlockId) ??
+      blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])] : []).find(b => b.id === selectedBlockId);
+
+    lastExpandedBlockIdRef.current = selectedBlockId;
+    if (block && isConvertedDocumentBlock(block.data)) {
+      maybeExpandForConvertedDocument(selectedBlockId);
+    }
+  // Only react to block selection changes — never re-expand while editing block content.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBlockId]);
 
   const moveBlock = (id: string, dir: -1 | 1) => {
     setBlocks(bs => {
@@ -985,15 +1000,16 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
               style={{ width: settingsPanelWidth }}
             >
               <div
-                className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-col-resize transition-colors hover:bg-teal-400 active:bg-teal-500"
-                title="Drag left to widen the editor panel"
+                className="absolute bottom-0 left-0 top-0 z-20 w-3 -translate-x-1/2 cursor-col-resize touch-none select-none bg-transparent hover:bg-teal-400/40 active:bg-teal-500/50"
+                title="Drag to resize editor panel"
                 onMouseDown={handleSettingsPanelMouseDown}
               />
+              <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-px bg-gray-200" />
               <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3 pl-5">
                 <div>
                   <span className="text-xs font-bold uppercase tracking-wide text-gray-700">Block Settings</span>
                   {isConvertedDocumentBlock(selectedBlock.data) && (
-                    <p className="mt-0.5 text-[10px] leading-4 text-teal-700">Drag the left edge to customize editor width.</p>
+                    <p className="mt-0.5 text-[10px] leading-4 text-teal-700">Drag the panel edge to resize the editor.</p>
                   )}
                 </div>
                 <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700">
