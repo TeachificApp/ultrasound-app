@@ -468,6 +468,124 @@ textarea,
   background-color: transparent;
 }
 
+/* ─── Lesson rich-text display parity ──────────────────────────────────────
+   The lesson preview uses externally stored TipTap HTML, while the authoring
+   panel renders it in .rte-content .tiptap. Keep their defaults aligned but
+   deliberately do not use !important, so imported inline text/background/
+   table styles remain authoritative in the learner-facing display. */
+.rich-text-display {
+  color: inherit;
+  font-family: 'Open Sans', "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.rich-text-display h1 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0.75em 0 0.4em;
+  color: #0e1e2e;
+}
+.rich-text-display h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0.6em 0 0.3em;
+  color: #0e1e2e;
+}
+.rich-text-display h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+  color: #0e4a50;
+}
+.rich-text-display p {
+  margin: 0.3em 0;
+  min-height: 1em;
+}
+.rich-text-display p:empty::after,
+.rich-text-display p:has(br:only-child)::after {
+  content: "\00a0";
+}
+.rich-text-display ul {
+  list-style: disc;
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+.rich-text-display ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+.rich-text-display li {
+  margin: 0.15em 0;
+}
+.rich-text-display blockquote {
+  border-left: 3px solid #149096;
+  padding-left: 0.8em;
+  color: #475569;
+  font-style: italic;
+  margin: 0.5em 0;
+}
+.rich-text-display hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 0.75em 0;
+}
+.rich-text-display a {
+  color: #149096;
+  text-decoration: underline;
+}
+.rich-text-display strong { font-weight: 700; }
+.rich-text-display em { font-style: italic; }
+.rich-text-display u { text-decoration: underline; }
+.rich-text-display s { text-decoration: line-through; }
+.rich-text-display code {
+  background: #f3f4f6;
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+  font-family: monospace;
+  font-size: 0.85em;
+}
+.rich-text-display img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}
+.rich-text-display img.float-left { float: left; margin: 0.5em 1em 0.5em 0; display: inline; }
+.rich-text-display img.float-right { float: right; margin: 0.5em 0 0.5em 1em; display: inline; }
+.rich-text-display img.align-center { margin-left: auto; margin-right: auto; }
+.rich-text-display img.align-left { margin-right: auto; }
+.rich-text-display img.align-right { margin-left: auto; }
+.rich-text-display p:has(img.float-left),
+.rich-text-display p:has(img.float-right) { overflow: hidden; }
+.rich-text-display table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75em 0;
+  overflow: hidden;
+  border-radius: 6px;
+}
+.rich-text-display table td,
+.rich-text-display table th {
+  border: 1px solid #d1d5db;
+  padding: 6px 10px;
+  min-width: 60px;
+  vertical-align: top;
+}
+.rich-text-display table th {
+  background-color: #f0fdfa;
+  font-weight: 600;
+  color: #0e4a50;
+  text-align: left;
+}
+.rich-text-display table tr:nth-child(even) td { background-color: #f9fafb; }
+.rich-text-display table.table-borderless,
+.rich-text-display table.table-borderless td,
+.rich-text-display table.table-borderless th { border: none !important; }
+.rich-text-display table.table-borderless th,
+.rich-text-display table.table-borderless tr:nth-child(even) td { background-color: transparent; }
+
 /* Page Builder Editor Drawer animation */
 @keyframes slideInRight {
   from { transform: translateX(100%); }

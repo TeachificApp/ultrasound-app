@@ -175,7 +175,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
   const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
   const [csvPreview, setCsvPreview] = useState<any>(null);
   const [newQuizTitle, setNewQuizTitle] = useState("");
-  const [newQuizType, setNewQuizType] = useState<"quiz" | "mock_exam">("quiz");
+  const [newQuizType, setNewQuizType] = useState<"quiz" | "mock_exam" | "flashcards">("quiz");
   const [newQuizBrand, setNewQuizBrand] = useState<"aaus" | "iheartecho">("aaus");
   const [folderId, setFolderId] = useState<number | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
@@ -289,6 +289,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
                 <SelectContent>
                   <SelectItem value="quiz">Quiz</SelectItem>
                   <SelectItem value="mock_exam">Mock Exam</SelectItem>
+                  <SelectItem value="flashcards">Flashcards</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1329,7 +1330,7 @@ function QuizList() {
     onError: (e) => toast.error(`Rename failed: ${e.message}`),
   });
 
-  const [newQuiz, setNewQuiz] = useState({ title: "", type: "quiz" as "quiz" | "mock_exam", brand: "aaus" as "aaus" | "iheartecho" });
+  const [newQuiz, setNewQuiz] = useState({ title: "", type: "quiz" as "quiz" | "mock_exam" | "flashcards", brand: "aaus" as "aaus" | "iheartecho" });
 
   const totalPages = data ? Math.ceil(data.total / 20) : 1;
 
@@ -1346,7 +1347,7 @@ function QuizList() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quiz Creator</h1>
-            <p className="text-sm text-gray-500 mt-1">Create and manage standalone quizzes and mock exams</p>
+              <p className="text-sm text-gray-500 mt-1">Create and manage standalone quizzes and mock exams</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate("/admin/quiz-creator/builder/new")} className="border-teal-300 text-teal-700 hover:bg-teal-50">
@@ -1437,6 +1438,7 @@ function QuizList() {
               <SelectItem value="all">All types</SelectItem>
               <SelectItem value="quiz">Quiz</SelectItem>
               <SelectItem value="mock_exam">Mock Exam</SelectItem>
+              <SelectItem value="flashcards">Flashcards</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1526,7 +1528,7 @@ function QuizList() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="capitalize text-gray-700">{quiz.type === "mock_exam" ? "Mock Exam" : "Quiz"}</span>
+                      <span className="capitalize text-gray-700">{quiz.type === "mock_exam" ? "Mock Exam" : quiz.type === "flashcards" ? "Flashcards" : "Quiz"}</span>
                     </td>
                     <td className="px-4 py-3 text-center text-gray-700">{Number(questionCount)}</td>
                     <td className="px-4 py-3 text-center text-gray-700">{Number(attemptCount)}</td>
@@ -1614,6 +1616,7 @@ function QuizList() {
                   <SelectContent>
                     <SelectItem value="quiz">Quiz (instant feedback)</SelectItem>
                     <SelectItem value="mock_exam">Mock Exam (submit all)</SelectItem>
+                    <SelectItem value="flashcards">Flashcards (self-reported review)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

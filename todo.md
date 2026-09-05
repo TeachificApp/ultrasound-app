@@ -426,3 +426,9 @@
 - [x] Ensure converted PowerPoint text is directly editable in the normal rich-text editor and extracted images are placed as responsive editable content rather than non-editable overlays.
 - [x] Repair the header/footer exclusion selection so it removes identified headers and footers from reflowed slide content before insertion.
 - [x] Add focused reflow, direct-editability, responsive-image, spacing, table, and header/footer-exclusion regressions based on the reported failed conversions, without modifying existing lesson blocks automatically.
+- [x] Review `0059_standalone_quiz_schema_sync.sql` against the connected database and deployed Quiz Creator contracts before any production schema action.
+- [x] Verify the standalone-quiz schema synchronization migration is already applied in the connected database: the required columns and flashcards quiz type are present, so no duplicate production schema write is needed before checking Quiz Creator.
+- [x] Repair the mismatch where imported rich-text colors and styling appear correctly in the lesson editor but are not honored by the displayed lesson content, without altering lesson text or source files automatically.
+- [x] Add focused regressions for editor-to-display rich-text style parity, including formatted text and table color preservation.
+- [x] Repair standalone Flashcards quiz creation when the form submits the valid `flashcards` type but the active server validation accepts only quiz and mock exam types.
+- [x] Add focused creation-contract regressions covering quiz, mock exam, and flashcards types without creating quiz records during testing.

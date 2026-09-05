@@ -157,10 +157,12 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 // ─── Shared input schemas ─────────────────────────────────────────────────────
+export const standaloneQuizTypeSchema = z.enum(["quiz", "mock_exam", "flashcards"]);
+
 const quizSettingsInput = z.object({
   title: z.string().min(1).max(255),
   description: z.string().optional().nullable(),
-  type: z.enum(["quiz", "mock_exam"]).default("quiz"),
+  type: standaloneQuizTypeSchema.default("quiz"),
   passingScore: z.number().int().min(0).max(100).default(70),
   timeLimitMinutes: z.number().int().min(1).nullable().optional(),
   shuffleQuestions: z.boolean().default(false),
@@ -1310,7 +1312,7 @@ export const standaloneQuizResultsAdminRouter = router({
     .input(z.object({
       search: z.string().optional(),
       quizId: z.number().int().optional(),
-      quizType: z.enum(["quiz", "mock_exam"]).optional(),
+      quizType: standaloneQuizTypeSchema.optional(),
       dateFrom: z.string().optional(),
       dateTo: z.string().optional(),
       page: z.number().int().min(1).default(1),

@@ -265,7 +265,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           <CC style={{ textAlign: d.align ?? "left" }}>
             <MathContent
               html={html}
-              className="prose"
+              className="rich-text-display"
               style={{}}
             />
           </CC>
