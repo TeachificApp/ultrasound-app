@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  collectDescendantFolderIds,
   flattenQuestionBankFolderTree,
   questionBankFolderOptionLabel,
   scormImportQuestionTagIds,
@@ -38,10 +39,22 @@ describe("questionBankFolders helpers", () => {
     expect(source).toContain("folderId: groupFolderId");
   });
 
+  it("collects descendant folder ids for subtree filtering", () => {
+    const folders = [
+      { id: 1, name: "Parent", parentId: null },
+      { id: 2, name: "Child", parentId: 1 },
+      { id: 3, name: "Grandchild", parentId: 2 },
+      { id: 4, name: "Other", parentId: null },
+    ];
+    expect(collectDescendantFolderIds(folders, 1)).toEqual([1, 2, 3]);
+  });
+
   it("filters Question Bank questions when an administrator opens a folder", () => {
-    const source = readFileSync(resolve(import.meta.dirname, "../client/src/pages/admin/LMSAdmin.tsx"), "utf8");
-    expect(source).toContain("const [selectedFolderId, setSelectedFolderId]");
-    expect(source).toContain("folderId: selectedFolderId");
-    expect(source).toContain("onClick={() => selectFolder(f.id)}");
+    const source = readFileSync(resolve(import.meta.dirname, "routers/questionBankRouter.ts"), "utf8");
+    expect(source).toContain("collectDescendantFolderIds(allFolders, input.folderId)");
+    expect(source).toContain("if (input.isPreset !== undefined) conditions.push(eq(questionBank.isPreset, input.isPreset));");
+    const ui = readFileSync(resolve(import.meta.dirname, "../client/src/pages/admin/LMSAdmin.tsx"), "utf8");
+    expect(ui).toContain("QuestionBankFolderTree");
+    expect(ui).toContain("folderId: selectedFolderId");
   });
 });

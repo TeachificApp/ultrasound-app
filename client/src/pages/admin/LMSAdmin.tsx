@@ -13,7 +13,9 @@
  */
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { cn, stripHtml } from "@/lib/utils";
-import { flattenQuestionBankFolderTree, questionBankFolderOptionLabel } from "@shared/questionBankFolders";
+import { flattenQuestionBankFolderTree, questionBankFolderOptionLabel, questionBankRootFolderIds } from "@shared/questionBankFolders";
+import { QUESTION_BANK_TYPES, QUESTION_BANK_TYPE_BADGE, questionBankTypeLabel, type QuestionBankType } from "@shared/questionBankTypes";
+import { QuestionBankFolderTree } from "@/components/QuestionBankFolderTree";
 import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
 import { formatScheduledInput, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import {
@@ -11147,7 +11149,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
-  const [typeFilter, setTypeFilter] = useState<"" | "mcq" | "truefalse">("");
+  const [typeFilter, setTypeFilter] = useState<"" | QuestionBankType>("");
   const [presetFilter, setPresetFilter] = useState<boolean | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -11180,6 +11182,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const [bulkNewFolderName, setBulkNewFolderName] = useState("");
   const [bulkAddTagIds, setBulkAddTagIds] = useState<number[]>([]);
   const [bulkRemoveTagIds, setBulkRemoveTagIds] = useState<number[]>([]);
+  const [expandedFolderIds, setExpandedFolderIds] = useState<Set<number>>(new Set());
 
   async function handleExportZip() {
     setExportLoading(true);
@@ -11219,7 +11222,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const { data: tagsData, refetch: refetchTags } = trpc.questionBank.listTags.useQuery();
   const tags = tagsData ?? [];
 
-  const { data, isLoading, refetch } = trpc.questionBank.listQuestions.useQuery({
+  const { data, isLoading, refetch, error: questionsError } = trpc.questionBank.listQuestions.useQuery({
     search: debouncedSearch || undefined,
     tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
     type: typeFilter || undefined,
@@ -11237,6 +11240,10 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const { data: foldersData, refetch: refetchFolders, error: foldersError } = trpc.questionBank.listFolders.useQuery();
   const folders = foldersData ?? [];
   const folderTree = useMemo(() => flattenQuestionBankFolderTree(folders), [folders]);
+  useEffect(() => {
+    if (!folders.length || expandedFolderIds.size > 0) return;
+    setExpandedFolderIds(new Set(questionBankRootFolderIds(folders)));
+  }, [folders, expandedFolderIds.size]);
   const createFolder = trpc.questionBank.createFolder.useMutation({
     onSuccess: () => {
       refetchFolders();
@@ -11254,10 +11261,6 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const deleteFolder = trpc.questionBank.deleteFolder.useMutation({
     onSuccess: () => { refetchFolders(); toast.success("Folder deleted"); },
     onError: (e) => toast.error(e.message || "Could not delete folder"),
-  });
-  const reorderFolders = trpc.questionBank.reorderFolders.useMutation({
-    onSuccess: () => refetchFolders(),
-    onError: (e) => toast.error(e.message || "Could not reorder folders"),
   });
   const moveToFolder = trpc.questionBank.moveToFolder.useMutation({
     onSuccess: () => {
@@ -11302,20 +11305,6 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
-  };
-
-  const moveFolder = (folderId: number, direction: "up" | "down") => {
-    const folder = folders.find((f: { id: number }) => f.id === folderId);
-    if (!folder) return;
-    const parentId = folder.parentId ?? null;
-    const siblings = folderTree.filter((f) => (f.parentId ?? null) === parentId);
-    const idx = siblings.findIndex((f) => f.id === folderId);
-    if (idx < 0) return;
-    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= siblings.length) return;
-    const reordered = [...siblings];
-    [reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]];
-    reorderFolders.mutate({ folderIds: reordered.map((f) => f.id) });
   };
 
   const startEditFolder = (folder: { id: number; name: string }) => {
@@ -11401,38 +11390,29 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
               </p>
             )}
             {!foldersError && folders.length === 0 && <p className="text-xs text-purple-600">No folders yet. Create one below.</p>}
-            {folderTree.map((f: any) => {
-              const parentId = f.parentId ?? null;
-              const siblings = folderTree.filter((s: any) => (s.parentId ?? null) === parentId);
-              const siblingIndex = siblings.findIndex((s: any) => s.id === f.id);
-              return (
-              <div key={f.id} className={cn("flex items-center gap-2 px-3 py-2 rounded-lg border", selectedFolderId === f.id ? "bg-purple-100 border-purple-400" : "bg-white border-purple-200")} style={{ marginLeft: `${f.depth * 16}px` }}>
-                <div className="flex flex-col gap-0.5">
-                  <button type="button" disabled={siblingIndex === 0 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "up")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
-                  <button type="button" disabled={siblingIndex === siblings.length - 1 || reorderFolders.isPending} onClick={() => moveFolder(f.id, "down")} className="text-gray-400 hover:text-purple-700 disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
-                </div>
-                <FolderOpen className="w-3.5 h-3.5 text-purple-500 flex-shrink-0" />
-                {editingFolderId === f.id ? (
-                  <Input value={editingFolderName} onChange={e => setEditingFolderName(e.target.value)} className="h-8 text-sm flex-1 bg-white border-purple-200" onKeyDown={e => { if (e.key === "Enter") saveEditFolder(); if (e.key === "Escape") { setEditingFolderId(null); setEditingFolderName(""); } }} autoFocus />
-                ) : (
-                  <button type="button" onClick={() => selectFolder(f.id)} className="text-sm text-gray-800 flex-1 text-left hover:text-purple-700 font-medium">{f.name}{f.questionCount ? <span className="text-xs text-gray-400 ml-2">({f.questionCount})</span> : null}</button>
-                )}
-                <div className="flex items-center gap-1">
-                  {editingFolderId === f.id ? (
-                    <>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-600" onClick={saveEditFolder} disabled={!editingFolderName.trim() || updateFolder.isPending}><CheckCircle className="w-3.5 h-3.5" /></Button>
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setEditingFolderId(null); setEditingFolderName(""); }}><X className="w-3.5 h-3.5" /></Button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" title="Add subfolder" onClick={() => setNewFolderParentId(f.id)} className="text-gray-400 hover:text-purple-700 p-1"><Plus className="w-3.5 h-3.5" /></button>
-                      <button type="button" onClick={() => startEditFolder(f)} className="text-gray-400 hover:text-purple-700 p-1"><Pencil className="w-3.5 h-3.5" /></button>
-                      <button type="button" onClick={() => { if (confirm(`Delete folder "${f.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: f.id }); }} className="text-red-400 hover:text-red-600 p-1"><X className="w-3.5 h-3.5" /></button>
-                    </>
-                  )}
-                </div>
-              </div>
-            );})}
+            {!foldersError && folders.length > 0 && (
+              <QuestionBankFolderTree
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                expandedFolderIds={expandedFolderIds}
+                onToggleFolder={(folderId) => setExpandedFolderIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(folderId)) next.delete(folderId);
+                  else next.add(folderId);
+                  return next;
+                })}
+                onSelectFolder={selectFolder}
+                editingFolderId={editingFolderId}
+                editingFolderName={editingFolderName}
+                onEditingFolderNameChange={setEditingFolderName}
+                onStartEditFolder={startEditFolder}
+                onSaveEditFolder={saveEditFolder}
+                onCancelEditFolder={() => { setEditingFolderId(null); setEditingFolderName(""); }}
+                onDeleteFolder={(folder) => { if (confirm(`Delete folder "${folder.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: folder.id }); }}
+                onAddSubfolder={setNewFolderParentId}
+                accent={standalone ? "teal" : "purple"}
+              />
+            )}
           </div>
           <div className="space-y-2">
             <Label className="text-xs font-medium text-purple-700">Parent folder <span className="text-gray-400 font-normal">(optional)</span></Label>
@@ -11674,10 +11654,11 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
           <Input value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search questions..." className="h-9 pl-8 text-sm" />
           <Eye className="absolute left-2.5 top-2 w-4 h-4 text-gray-400" />
         </div>
-        <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value as any); setPage(1); }} className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm">
+        <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value as "" | QuestionBankType); setPage(1); }} className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm">
           <option value="">All Types</option>
-          <option value="mcq">Multiple Choice</option>
-          <option value="truefalse">True / False</option>
+          {QUESTION_BANK_TYPES.map((entry) => (
+            <option key={entry.value} value={entry.value}>{entry.label}</option>
+          ))}
         </select>
         <button
           onClick={() => { setPresetFilter(p => p === true ? undefined : true); setPage(1); }}
@@ -11779,11 +11760,19 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
       <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
         {isLoading ? (
           <div className="p-12 text-center text-gray-400"><Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" /> Loading questions...</div>
+        ) : questionsError ? (
+          <div className="p-12 text-center text-red-600">
+            <AlertCircle className="w-10 h-10 mx-auto mb-3" />
+            <p className="font-medium">Could not load questions</p>
+            <p className="text-sm mt-1">{questionsError.message}</p>
+          </div>
         ) : questions.length === 0 ? (
           <div className="p-12 text-center text-gray-400">
             <Database className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-            <p className="font-medium text-gray-500">No questions yet</p>
-            <p className="text-sm mt-1">Add questions manually or use AI Generate to populate the bank.</p>
+            <p className="font-medium text-gray-500">No questions match the current filters</p>
+            <p className="text-sm mt-1">
+              {presetFilter ? "Turn off Presets Only to see regular bank questions." : selectedFolderId ? "This folder and its subfolders have no matching questions, or try All questions." : "Add questions manually or use AI Generate to populate the bank."}
+            </p>
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -11806,8 +11795,8 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
                     {q.isPreset && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200 mt-0.5">⭐ Preset{q.presetCategory ? ` · ${q.presetCategory}` : ""}</span>}
                   </td>
                   <td className="px-3 py-2.5">
-                    <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium", q.type === "mcq" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700")}>
-                      {q.type === "mcq" ? "MCQ" : "T/F"}
+                    <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium", QUESTION_BANK_TYPE_BADGE[q.type] ?? "bg-gray-100 text-gray-700")}>
+                      {questionBankTypeLabel(q.type)}
                     </span>
                   </td>
                   <td className="px-3 py-2.5">
@@ -11867,11 +11856,15 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
 }) {
   const isEdit = !!question;
   const [qText, setQText] = useState(question?.question ?? "");
-  const [qType, setQType] = useState<"mcq" | "truefalse">(question?.type ?? "mcq");
+  const [qType, setQType] = useState<QuestionBankType>(question?.type ?? "mcq");
   const [options, setOptions] = useState<{ text: string; imageUrl?: string; videoUrl?: string }[]>(
     question?.options?.length > 0 ? question.options : [{ text: "" }, { text: "" }, { text: "" }, { text: "" }]
   );
   const [correctAnswer, setCorrectAnswer] = useState(question?.correctAnswer ?? "");
+  const [flashcardFront, setFlashcardFront] = useState(question?.flashcardFront ?? question?.question ?? "");
+  const [flashcardBack, setFlashcardBack] = useState(question?.flashcardBack ?? question?.correctAnswer ?? "");
+  const [flashcardHint, setFlashcardHint] = useState(question?.flashcardHint ?? "");
+  const [flashcardBackImageUrl, setFlashcardBackImageUrl] = useState(question?.flashcardBackImageUrl ?? "");
   const [explanation, setExplanation] = useState(question?.explanation ?? "");
   const [qImageUrl, setQImageUrl] = useState(question?.questionImageUrl ?? "");
   const [qVideoUrl, setQVideoUrl] = useState(question?.questionVideoUrl ?? "");
@@ -11883,12 +11876,19 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
   const update = trpc.questionBank.updateQuestion.useMutation({ onSuccess: onSaved });
 
   const handleSave = () => {
-    if (!qText.trim()) return;
+    const isFlashcard = qType === "flashcard";
+    const questionText = isFlashcard ? flashcardFront.trim() : qText.trim();
+    const answerText = isFlashcard ? flashcardBack.trim() : correctAnswer.trim();
+    if (!questionText || (!isFlashcard && !answerText) || (isFlashcard && !flashcardBack.trim())) return;
     const payload = {
-      question: qText.trim(),
+      question: questionText,
       type: qType,
-      options: qType === "mcq" ? options.filter(o => o.text.trim()) : [{ text: "True" }, { text: "False" }],
-      correctAnswer: correctAnswer.trim(),
+      options: qType === "mcq" ? options.filter(o => o.text.trim()) : qType === "truefalse" ? [{ text: "True" }, { text: "False" }] : undefined,
+      correctAnswer: isFlashcard ? flashcardBack.trim() : answerText,
+      flashcardFront: isFlashcard ? flashcardFront.trim() : undefined,
+      flashcardBack: isFlashcard ? flashcardBack.trim() : undefined,
+      flashcardHint: isFlashcard ? flashcardHint.trim() || undefined : undefined,
+      flashcardBackImageUrl: isFlashcard ? flashcardBackImageUrl.trim() || undefined : undefined,
       explanation: explanation.trim() || undefined,
       questionImageUrl: qImageUrl.trim() || undefined,
       questionVideoUrl: qVideoUrl.trim() || undefined,
@@ -11911,14 +11911,37 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
         </div>
         <div className="p-5 space-y-4">
           {/* Type */}
-          <div className="flex gap-2">
-            {(["mcq", "truefalse"] as const).map(t => (
-              <button key={t} onClick={() => setQType(t)} className={cn("px-3 py-1.5 rounded-lg text-sm font-medium border transition-all", qType === t ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-200 hover:border-teal-300")}>
-                {t === "mcq" ? "Multiple Choice" : "True / False"}
+          <div className="flex flex-wrap gap-2">
+            {QUESTION_BANK_TYPES.map((entry) => (
+              <button key={entry.value} onClick={() => setQType(entry.value)} className={cn("px-3 py-1.5 rounded-lg text-sm font-medium border transition-all", qType === entry.value ? "bg-teal-600 text-white border-teal-600" : "bg-white text-gray-600 border-gray-200 hover:border-teal-300")}>
+                {entry.label}
               </button>
             ))}
           </div>
 
+          {qType === "flashcard" ? (
+            <>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Front *</Label>
+                <textarea value={flashcardFront} onChange={e => setFlashcardFront(e.target.value)} rows={3} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Prompt shown on the front of the card..." />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Back *</Label>
+                <textarea value={flashcardBack} onChange={e => setFlashcardBack(e.target.value)} rows={3} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Answer shown on the back of the card..." />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-gray-500 mb-1 block">Hint (optional)</Label>
+                  <Input value={flashcardHint} onChange={e => setFlashcardHint(e.target.value)} placeholder="Optional hint..." className="h-8 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500 mb-1 block">Back image URL (optional)</Label>
+                  <Input value={flashcardBackImageUrl} onChange={e => setFlashcardBackImageUrl(e.target.value)} placeholder="https://..." className="h-8 text-sm" />
+                </div>
+              </div>
+            </>
+          ) : (
+          <>
           {/* Question text */}
           <div>
             <Label className="text-sm font-medium text-gray-700 mb-1 block">Question *</Label>
@@ -11970,6 +11993,8 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
               </div>
             </div>
           )}
+          </>
+          )}
 
           {/* Explanation */}
           <div>
@@ -12008,7 +12033,7 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={!qText.trim() || !correctAnswer.trim() || isPending} onClick={handleSave}>
+          <Button className="bg-teal-600 hover:bg-teal-700 text-white" disabled={(qType === "flashcard" ? !flashcardFront.trim() || !flashcardBack.trim() : !qText.trim() || !correctAnswer.trim()) || isPending} onClick={handleSave}>
             {isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> Saving...</> : isEdit ? "Save Changes" : "Add to Bank"}
           </Button>
         </div>
