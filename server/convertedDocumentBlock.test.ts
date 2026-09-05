@@ -10,8 +10,7 @@ describe("converted document block helpers", () => {
   it("detects converted PDF and PowerPoint rich-text blocks", () => {
     expect(isConvertedDocumentBlock({ sourceDocument: { kind: "pdf" } })).toBe(true);
     expect(isConvertedDocumentBlock({ pptxSlide: { version: 1 } })).toBe(true);
-    expect(isConvertedDocumentBlock({ pdfPage: { version: 1 } })).toBe(true);
-    expect(isConvertedDocumentBlock({ html: '<div data-pdf-page="1"></div>' })).toBe(true);
+    expect(isConvertedDocumentBlock({ html: '<div data-converted-document="1"></div>' })).toBe(true);
     expect(isConvertedDocumentBlock({ html: "<p>Normal lesson text</p>" })).toBe(false);
   });
 

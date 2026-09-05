@@ -6,12 +6,10 @@ const preview = readFileSync(resolve(process.cwd(), "client/src/components/Block
 const settings = readFileSync(resolve(process.cwd(), "client/src/pages/admin/LandingPageBuilder.tsx"), "utf8");
 
 describe("converted document rich-text editing", () => {
-  it("renders converted slide HTML in preview and uses the slide-level editor when pptxSlide is present", () => {
+  it("uses the standard rich-text editor for continuous converted documents", () => {
     expect(preview).toContain("const html = d.html ?? \"\";");
-    expect(settings).toContain("d.pdfPage ? (");
-    expect(settings).toContain("<PdfPageRichTextEditor");
-    expect(settings).toContain("d.pptxSlide ? (");
-    expect(settings).toContain("<PptxSlideRichTextEditor");
-    expect(settings).toContain("pptxRichSlideToHtml(pptxSlide)");
+    expect(settings).toContain("Edit the full converted document in this continuous rich-text field");
+    expect(settings).toContain("<RichTextEditor");
+    expect(settings).not.toMatch(/d\.pptxSlide \? \(/);
   });
 });

@@ -492,7 +492,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
       setSelectedBlockId(convertedBlocks[0].id);
       setDocumentFile(null);
       setAddMenuOpen(false);
-      toast.success(`${result.pageCount} ${result.pageCount === 1 ? "page or slide" : "pages or slides"} converted into ${convertedBlocks.length} editable block${convertedBlocks.length === 1 ? "" : "s"}. Save the lesson to keep them.`);
+      toast.success(`${result.pageCount} ${result.pageCount === 1 ? "page or slide" : "pages or slides"} converted into one continuous rich-text block. Save the lesson to keep it.`);
       if (result.warnings.length > 0) {
         toast.message(`Conversion notes: ${result.warnings.length}. Review the inserted blocks before saving.`);
       }
@@ -1118,7 +1118,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
           <div className="flex flex-col flex-1 overflow-y-auto gap-5 py-3">
             <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4 text-sm text-slate-700">
               <p className="font-semibold text-teal-800">Convert a PDF or PowerPoint into editable lesson content</p>
-              <p className="mt-1.5 leading-6">Each PDF page or PowerPoint slide becomes one editable rich-text block that preserves the page image, backgrounds, positioned text, images, shapes, and tables. The original file is retained as a source reference, and conversion only appends blocks to this lesson.</p>
+              <p className="mt-1.5 leading-6">The entire PDF or PowerPoint is converted into one continuous editable rich-text field that flows inline in the lesson. Page images, text, tables, and slide visuals are included; exclude headers and footers for PowerPoint when prompted.</p>
             </div>
             {documentFile?.name.toLowerCase().endsWith(".pptx") && (
               <fieldset className="rounded-xl border border-slate-200 bg-white p-4">
@@ -1165,7 +1165,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
                 disabled={!documentFile || convertLessonDocument.isPending}
                 className="bg-teal-600 hover:bg-teal-700"
               >
-                {convertLessonDocument.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Converting…</> : <><FileUp className="mr-2 h-4 w-4" /> Convert into Blocks</>}
+                {convertLessonDocument.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Converting…</> : <><FileUp className="mr-2 h-4 w-4" /> Convert to Rich Text</>}
               </Button>
             </div>
           </div>

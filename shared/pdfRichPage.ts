@@ -13,15 +13,23 @@ const escapeHtml = (value: string) => value
 
 const escapeAttribute = (value: string) => escapeHtml(value).replace(/`/g, "&#096;");
 
-export function pdfRichPageToHtml(page: PdfRichPage, pageIndex = 1) {
-  const image = `<figure data-pdf-page-image="1" style="margin:0 0 1rem"><img src="${escapeAttribute(page.imageUrl)}" alt="Page ${pageIndex}" style="max-width:100%;height:auto;display:block;border-radius:8px" /></figure>`;
-  const body = page.bodyHtml?.trim() || "<p></p>";
-  return `<div data-pdf-page="1" style="display:flex;flex-direction:column;gap:1rem">${image}<div data-pdf-editable-text="1">${body}</div></div>`;
-}
-
 export function defaultPdfBodyHtml(paragraphs: string[]) {
   if (!paragraphs.length) return "<p></p>";
   return paragraphs
     .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`)
     .join("");
+}
+
+/** One PDF page section inside a continuous converted document. */
+export function pdfDocumentPageSectionHtml(imageUrl: string, paragraphs: string[], pageIndex = 1) {
+  const image = `<figure data-document-page-image="1" style="margin:0 0 1rem"><img src="${escapeAttribute(imageUrl)}" alt="Page ${pageIndex}" style="max-width:100%;height:auto;display:block;border-radius:8px" /></figure>`;
+  const body = defaultPdfBodyHtml(paragraphs);
+  return `<section data-document-page="${pageIndex}" style="margin:0">${image}${body}</section>`;
+}
+
+export const DOCUMENT_SECTION_BREAK_HTML = '<hr data-document-page-break="1" style="border:none;border-top:1px solid #e5e7eb;margin:2rem 0" />';
+
+export function wrapContinuousDocumentHtml(sections: string[]) {
+  const body = sections.filter(Boolean).join(DOCUMENT_SECTION_BREAK_HTML);
+  return `<div data-converted-document="1" style="display:flex;flex-direction:column;gap:0">${body || "<p></p>"}</div>`;
 }

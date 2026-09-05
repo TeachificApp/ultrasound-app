@@ -1,6 +1,5 @@
 import { createCanvas } from "@napi-rs/canvas";
-import { defaultPdfBodyHtml, pdfRichPageToHtml, type PdfRichPage } from "../../shared/pdfRichPage";
-import { pptxRichSlideToHtml, teachSlideToPptxRichSlide } from "../../shared/pptxRichSlide";
+import { defaultPdfBodyHtml, DOCUMENT_SECTION_BREAK_HTML, pdfDocumentPageSectionHtml, wrapContinuousDocumentHtml } from "../../shared/pdfRichPage";
 import type { TeachSlide, TeachSlideElement } from "../../shared/teachPresentation";
 
 export const LESSON_DOCUMENT_MAX_MB = 50;
@@ -48,7 +47,7 @@ function makeBlockId(prefix: string, index: number, part: number) {
   return `${prefix}-${index}-${part}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function sourceMetadata(source: LessonDocumentSource, kind: LessonDocumentKind, index: number) {
+function sourceMetadata(source: LessonDocumentSource, kind: LessonDocumentKind, pageCount: number) {
   return {
     sourceDocument: {
       fileName: source.fileName,
@@ -57,7 +56,26 @@ function sourceMetadata(source: LessonDocumentSource, kind: LessonDocumentKind, 
       storageUrl: source.storageUrl,
       convertedAt: source.convertedAt,
       kind,
-      index,
+      pageCount,
+    },
+  };
+}
+
+function pptxSlideSectionHtml(slide: TeachSlide, slideIndex: number) {
+  return `<section data-document-slide="${slideIndex}" style="margin:0">${convertPptxSlideToRichTextHtml(slide)}</section>`;
+}
+
+function makeDocumentTextBlock(html: string, source: LessonDocumentSource, kind: LessonDocumentKind, pageCount: number, extra: Record<string, unknown> = {}) {
+  return {
+    id: makeBlockId("document-rich-text", 1, 1),
+    type: "text" as const,
+    data: {
+      html,
+      align: "left",
+      bgColor: "#ffffff",
+      textColor: "#1a1a1a",
+      ...sourceMetadata(source, kind, pageCount),
+      ...extra,
     },
   };
 }
@@ -119,14 +137,12 @@ function pdfReflowParagraphs(items: unknown[], viewport: { width: number; height
   return paragraphs;
 }
 
-/** One editable rich-text page: visual page image plus reflowed text (no overlapping overlays). */
+/** Builds one PDF page section for a continuous converted document. */
 export function convertPdfPageToRichTextHtml(imageUrl: string, paragraphs: string[], pageIndex = 1) {
-  const pdfPage: PdfRichPage = {
-    version: 1,
-    imageUrl,
-    bodyHtml: defaultPdfBodyHtml(paragraphs),
+  return {
+    html: pdfDocumentPageSectionHtml(imageUrl, paragraphs, pageIndex),
+    sectionHtml: pdfDocumentPageSectionHtml(imageUrl, paragraphs, pageIndex),
   };
-  return { html: pdfRichPageToHtml(pdfPage, pageIndex), pdfPage };
 }
 
 function escapeAttribute(value: string) {
@@ -330,7 +346,7 @@ export async function convertPdfToEditableLessonBlocks(
       throw new Error(`This PDF has ${document.numPages} pages. Convert no more than ${LESSON_DOCUMENT_MAX_PAGES} pages at a time.`);
     }
 
-    const blocks: EditableLessonBlock[] = [];
+    const sections: string[] = [];
     for (let pageIndex = 1; pageIndex <= document.numPages; pageIndex += 1) {
       const page = await document.getPage(pageIndex);
       const textContent = await page.getTextContent();
@@ -347,25 +363,15 @@ export async function convertPdfToEditableLessonBlocks(
         Buffer.from(canvasAndContext.canvas.toBuffer("image/png")),
         "image/png",
       );
-      const metadata = sourceMetadata(source, "pdf", pageIndex);
-      const converted = convertPdfPageToRichTextHtml(imageUrl, paragraphs, pageIndex);
-      blocks.push({
-        id: makeBlockId("pdf-page-rich-text", pageIndex, 1),
-        type: "text",
-        data: {
-          html: converted.html,
-          pdfPage: converted.pdfPage,
-          align: "left",
-          bgColor: "#ffffff",
-          textColor: "#1a1a1a",
-          ...metadata,
-        },
-      });
+      sections.push(pdfDocumentPageSectionHtml(imageUrl, paragraphs, pageIndex));
       if (paragraphs.length === 0) {
-        warnings.push(`Page ${pageIndex} has no machine-readable text. Its rendered page image was retained inside the rich-text block and can be replaced or supplemented in the editor.`);
+        warnings.push(`Page ${pageIndex} has no machine-readable text. Its rendered page image was retained in the continuous rich-text block and can be supplemented in the editor.`);
       }
       page.cleanup?.();
     }
+    const blocks: EditableLessonBlock[] = [
+      makeDocumentTextBlock(wrapContinuousDocumentHtml(sections), source, "pdf", document.numPages),
+    ];
     return { blocks, warnings, pageCount: document.numPages };
   } catch (error) {
     if (error instanceof Error && error.message) throw error;
@@ -385,13 +391,12 @@ export function convertPptxSlidesToEditableLessonBlocks(
     throw new Error(`This PowerPoint has ${slides.length} slides. Convert no more than ${LESSON_DOCUMENT_MAX_PAGES} slides at a time.`);
   }
   const warnings: string[] = [];
-  const blocks: EditableLessonBlock[] = [];
   const includeHeadersAndFooters = options.includeHeadersAndFooters !== false;
   const excludedIdsBySlide = includeHeadersAndFooters ? [] : findPptxHeaderFooterElementIds(slides);
   let excludedCount = 0;
+  const sections: string[] = [];
   slides.forEach((slide, slideOffset) => {
     const index = slideOffset + 1;
-    const metadata = sourceMetadata(source, "pptx", index);
     const excludedIds = excludedIdsBySlide[slideOffset] ?? new Set<string>();
     excludedCount += excludedIds.size;
     const filteredSlide = excludedIds.size
@@ -405,20 +410,7 @@ export function convertPptxSlidesToEditableLessonBlocks(
     const images = elements.filter(element => element.type === "image" && typeof element.src === "string" && element.src);
     const shapes = elements.filter(element => element.type === "shape");
 
-    const pptxSlide = teachSlideToPptxRichSlide(filteredSlide);
-    blocks.push({
-      id: makeBlockId("pptx-slide-rich-text", index, 1),
-      type: "text",
-      data: {
-        html: pptxRichSlideToHtml(pptxSlide),
-        align: "left",
-        bgColor: filteredSlide.backgroundColor || "#ffffff",
-        textColor: "#1a1a1a",
-        pptxSlide,
-        pptxConversion: { includeHeadersAndFooters },
-        ...metadata,
-      },
-    });
+    sections.push(pptxSlideSectionHtml(filteredSlide, index));
     if (text.length === 0 && images.length === 0 && shapes.length === 0) {
       warnings.push(`Slide ${index} has no extractable text, image, or visual shape. The original PowerPoint is retained in the lesson source reference.`);
     }
@@ -426,5 +418,14 @@ export function convertPptxSlidesToEditableLessonBlocks(
   if (!includeHeadersAndFooters && excludedCount === 0) {
     warnings.push("No repeated or explicitly named PowerPoint header/footer elements were detected, so all slide elements were retained.");
   }
+  const blocks: EditableLessonBlock[] = [
+    makeDocumentTextBlock(
+      wrapContinuousDocumentHtml(sections),
+      source,
+      "pptx",
+      slides.length,
+      { documentConversion: { includeHeadersAndFooters } },
+    ),
+  ];
   return { blocks, warnings, pageCount: slides.length };
 }
