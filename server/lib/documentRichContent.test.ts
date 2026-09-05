@@ -33,7 +33,7 @@ describe("document rich-content conversion", () => {
     expect(() => assertLessonDocumentUpload("lesson.pdf", "application/pdf", LESSON_DOCUMENT_MAX_BYTES + 1)).toThrow(/50 MB/);
   });
 
-  it("converts an entire PowerPoint into one continuous layout-faithful rich-text block", () => {
+  it("converts an entire PowerPoint into one continuous document rich-text block", () => {
     const result = convertPptxSlidesToEditableLessonBlocks([
       {
         title: "First slide",
@@ -41,9 +41,9 @@ describe("document rich-content conversion", () => {
         sourceWidth: 850,
         sourceHeight: 1100,
         elements: [
-          { type: "text", content: "First lesson point", x: 5, y: 10, width: 70, height: 12, zIndex: 1, style: { fontSize: 22, fontWeight: "bold", fontStyle: "normal", textAlign: "left", color: "#179ca3", backgroundColor: "#ffffff", fontFamily: "Arial" } },
+          { type: "text", content: "First lesson point", x: 5, y: 20, width: 55, height: 12, zIndex: 1, style: { fontSize: 22, fontWeight: "bold", fontStyle: "normal", textAlign: "left", color: "#179ca3", backgroundColor: "#ffffff", fontFamily: "Arial" } },
           { type: "shape", x: 2, y: 2, width: 3, height: 95, zIndex: 2, shape: "rectangle", fill: "#179ca3", stroke: "#179ca3" },
-          { type: "image", src: "https://example.test/first.png", x: 10, y: 20, width: 45, height: 35, zIndex: 3 },
+          { type: "image", src: "https://example.test/first.png", x: 62, y: 20, width: 33, height: 35, zIndex: 3 },
         ],
       },
       {
@@ -62,8 +62,9 @@ describe("document rich-content conversion", () => {
     expect(html).toContain('data-converted-document="1"');
     expect(html).toContain('data-document-slide="1"');
     expect(html).toContain('data-document-slide="2"');
-    expect(html).toContain('data-pptx-slide-layout="1"');
-    expect(html).toContain('data-pptx-text-box="1"');
+    expect(html).toContain('data-pptx-document-slide="1"');
+    expect(html).toContain('data-pptx-columns="1"');
+    expect(html).toContain('width:100%;height:auto');
     expect(html).toContain('src="https://example.test/first.png"');
     expect(html).toContain("First lesson point");
     expect(html).toContain("Second lesson point");
@@ -72,7 +73,7 @@ describe("document rich-content conversion", () => {
     expect((result.blocks[0]?.data.sourceDocument as any).pageCount).toBe(2);
   });
 
-  it("preserves native PowerPoint table cell styling inside layout-faithful slide HTML", () => {
+  it("preserves native PowerPoint table cell styling as a real HTML table", () => {
     const result = convertPptxSlidesToEditableLessonBlocks([{
       title: "Table slide",
       elements: [
@@ -83,10 +84,12 @@ describe("document rich-content conversion", () => {
       ],
     }] as any, { ...source, fileName: "table.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
     const html = String(result.blocks[0]?.data.html);
-    expect(html).toContain('data-pptx-text-box="1"');
+    expect(html).toContain('data-pptx-table="1"');
+    expect(html).toContain("<table");
     expect(html).toContain("Concept");
     expect(html).toContain("Frequency");
     expect(html).toContain("background-color:#179ca3");
+    expect(html).not.toContain("position:absolute");
   });
 
   it("includes headers and footers by default and excludes only repeated or explicitly named edge layers when asked", () => {
