@@ -30,9 +30,12 @@ const DOCUMENT_CONVERSION_MAX_BYTES = DOCUMENT_CONVERSION_MAX_MB * 1024 * 1024;
 import React, { useImperativeHandle } from "react";
 import {
   X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2, FileUp,
-  ChevronLeft, ChevronRight, Bookmark, GripVertical,
+  ChevronLeft, ChevronRight, Bookmark,
 } from "lucide-react";
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
+import { useResizableEditorPanel } from "@/lib/useResizableEditorPanel";
+import { isConvertedDocumentBlock } from "@shared/convertedDocumentBlock";
+import { formatConversionError, uploadLessonDocument } from "@/lib/uploadLessonDocument";
 import { cn } from "@/lib/utils";
 
 export interface LessonBlockEditorHandle {
@@ -131,9 +134,12 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const [pickerTab, setPickerTab] = useState<PickerTab>("catalog");
   const [previewMode, setPreviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Resizable settings panel
-  const [settingsPanelWidth, setSettingsPanelWidth] = useState(320);
-  const isResizingPanel = useRef(false);
+  const {
+    panelWidth: settingsPanelWidth,
+    maybeExpandForConvertedDocument,
+    handleResizeMouseDown: handleSettingsPanelMouseDown,
+  } = useResizableEditorPanel("lesson-block-editor");
+  const lastExpandedBlockIdRef = useRef<string | null>(null);
 
   // Refs for scroll-to-new-block
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -149,6 +155,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const [importPreview, setImportPreview] = useState<{ blocks: any[]; pageTitle: string; blockCount: number } | null>(null);
   const [importSelectedBlocks, setImportSelectedBlocks] = useState<Set<number>>(new Set());
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentUploadProgress, setDocumentUploadProgress] = useState<number | null>(null);
   const [includePptxHeadersAndFooters, setIncludePptxHeadersAndFooters] = useState(true);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   const scrapeUrlMutation = trpc.pageScraper.scrapeUrl.useMutation({
@@ -438,16 +445,6 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
     scrollToBlock(newBlock.id);
   };
 
-  const readFileAsBase64 = async (file: File) => {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const chunkSize = 0x8000;
-    let binary = "";
-    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
-    }
-    return window.btoa(binary);
-  };
-
   const handleDocumentConversion = async () => {
     if (!lessonId) {
       toast.error("Document conversion is available while editing a saved lesson.");
@@ -467,15 +464,19 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
     }
 
     try {
+      setDocumentUploadProgress(0);
       const mimeType = documentFile.type || (documentFile.name.toLowerCase().endsWith(".pdf")
         ? "application/pdf"
         : "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+      const uploaded = await uploadLessonDocument(documentFile, lessonId, setDocumentUploadProgress);
+      setDocumentUploadProgress(null);
       const result = await convertLessonDocument.mutateAsync({
         lessonId,
-        fileName: documentFile.name,
-        mimeType,
-        fileSize: documentFile.size,
-        fileData: await readFileAsBase64(documentFile),
+        fileName: uploaded.fileName,
+        mimeType: uploaded.mimeType || mimeType,
+        fileSize: uploaded.fileSize,
+        storageKey: uploaded.fileKey,
+        storageUrl: uploaded.url,
         includePptxHeadersAndFooters,
       });
       const convertedBlocks = result.blocks as Block[];
@@ -487,13 +488,14 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
       setSelectedBlockId(convertedBlocks[0].id);
       setDocumentFile(null);
       setAddMenuOpen(false);
-      toast.success(`${result.pageCount} ${result.pageCount === 1 ? "page or slide" : "pages or slides"} converted into ${convertedBlocks.length} editable block${convertedBlocks.length === 1 ? "" : "s"}. Save the lesson to keep them.`);
+      toast.success(`${result.pageCount} ${result.pageCount === 1 ? "page or slide" : "pages or slides"} converted into one continuous rich-text block. Save the lesson to keep it.`);
       if (result.warnings.length > 0) {
         toast.message(`Conversion notes: ${result.warnings.length}. Review the inserted blocks before saving.`);
       }
       scrollToBlock(convertedBlocks[0].id);
     } catch (error: any) {
-      toast.error(error?.message || "The document could not be converted.");
+      setDocumentUploadProgress(null);
+      toast.error(formatConversionError(error));
     }
   };
 
@@ -611,6 +613,25 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const selectedBlock = blocks.find(b => b.id === selectedBlockId) ??
     blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])] : []).find(b => b.id === selectedBlockId) ??
     null;
+
+  useEffect(() => {
+    if (!selectedBlockId) {
+      lastExpandedBlockIdRef.current = null;
+      return;
+    }
+    if (lastExpandedBlockIdRef.current === selectedBlockId) return;
+
+    const block =
+      blocks.find(b => b.id === selectedBlockId) ??
+      blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])] : []).find(b => b.id === selectedBlockId);
+
+    lastExpandedBlockIdRef.current = selectedBlockId;
+    if (block && isConvertedDocumentBlock(block.data)) {
+      maybeExpandForConvertedDocument(selectedBlockId);
+    }
+  // Only react to block selection changes — never re-expand while editing block content.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBlockId]);
 
   const moveBlock = (id: string, dir: -1 | 1) => {
     setBlocks(bs => {
@@ -971,54 +992,38 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
 
           {/* Right: Settings panel (resizable) */}
           {!previewMode && selectedBlock && (
-            <>
-              {/* Resize handle */}
+            <div
+              className="relative shrink-0 overflow-y-auto border-l border-gray-200 bg-white"
+              style={{ width: settingsPanelWidth }}
+            >
               <div
-                className="w-1.5 shrink-0 cursor-col-resize bg-gray-100 hover:bg-teal-200 active:bg-teal-300 transition-colors flex items-center justify-center group"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  isResizingPanel.current = true;
-                  const startX = e.clientX;
-                  const startWidth = settingsPanelWidth;
-                  const onMove = (ev: MouseEvent) => {
-                    if (!isResizingPanel.current) return;
-                    const delta = startX - ev.clientX;
-                    setSettingsPanelWidth(Math.max(260, Math.min(700, startWidth + delta)));
-                  };
-                  const onUp = () => {
-                    isResizingPanel.current = false;
-                    document.removeEventListener("mousemove", onMove);
-                    document.removeEventListener("mouseup", onUp);
-                    document.body.style.cursor = "";
-                    document.body.style.userSelect = "";
-                  };
-                  document.addEventListener("mousemove", onMove);
-                  document.addEventListener("mouseup", onUp);
-                  document.body.style.cursor = "col-resize";
-                  document.body.style.userSelect = "none";
-                }}
-              >
-                <GripVertical className="w-3 h-3 text-gray-400 group-hover:text-teal-600" />
-              </div>
-              <div style={{ width: settingsPanelWidth }} className="shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
-                <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                  <span className="text-gray-700 text-xs font-bold uppercase tracking-wide">Block Settings</span>
-                  <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700">
-                    <X className="w-4 h-4" />
-                  </button>
+                className="absolute bottom-0 left-0 top-0 z-20 w-3 -translate-x-1/2 cursor-col-resize touch-none select-none bg-transparent hover:bg-teal-400/40 active:bg-teal-500/50"
+                title="Drag to resize editor panel"
+                onMouseDown={handleSettingsPanelMouseDown}
+              />
+              <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 w-px bg-gray-200" />
+              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3 pl-5">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-700">Block Settings</span>
+                  {isConvertedDocumentBlock(selectedBlock.data) && (
+                    <p className="mt-0.5 text-[10px] leading-4 text-teal-700">Drag the panel edge to resize the editor.</p>
+                  )}
                 </div>
-                <div className="p-3">
-                  <BlockSettings
-                    block={selectedBlock}
-                    onChange={data => updateBlock(selectedBlock.id, data)}
-                    lessonId={lessonId}
-                    courseId={courseId}
-                    lessonTitle={lessonTitle}
-                    courseTitle={courseTitle}
-                  />
-                </div>
+                <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            </>
+              <div className="p-3 pl-5">
+                <BlockSettings
+                  block={selectedBlock}
+                  onChange={data => updateBlock(selectedBlock.id, data)}
+                  lessonId={lessonId}
+                  courseId={courseId}
+                  lessonTitle={lessonTitle}
+                  courseTitle={courseTitle}
+                />
+              </div>
+            </div>
           )}
           </div>{/* end canvas+settings row */}
         </div>
@@ -1110,7 +1115,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
           <div className="flex flex-col flex-1 overflow-y-auto gap-5 py-3">
             <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4 text-sm text-slate-700">
               <p className="font-semibold text-teal-800">Convert a PDF or PowerPoint into editable lesson content</p>
-              <p className="mt-1.5 leading-6">Each PDF page becomes a responsive page image and editable rich-text block. Each PowerPoint slide becomes editable rich text plus its extracted images. The original file is retained as a source reference, and conversion only appends blocks to this lesson.</p>
+              <p className="mt-1.5 leading-6">The entire PDF or PowerPoint is converted into one continuous editable rich-text field that flows inline in the lesson. Page images, text, tables, and slide visuals are included; exclude headers and footers for PowerPoint when prompted.</p>
             </div>
             {documentFile?.name.toLowerCase().endsWith(".pptx") && (
               <fieldset className="rounded-xl border border-slate-200 bg-white p-4">
@@ -1154,10 +1159,16 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
               <Button
                 type="button"
                 onClick={handleDocumentConversion}
-                disabled={!documentFile || convertLessonDocument.isPending}
+                disabled={!documentFile || convertLessonDocument.isPending || documentUploadProgress !== null}
                 className="bg-teal-600 hover:bg-teal-700"
               >
-                {convertLessonDocument.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Converting…</> : <><FileUp className="mr-2 h-4 w-4" /> Convert into Blocks</>}
+                {documentUploadProgress !== null ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading… {documentUploadProgress}%</>
+                ) : convertLessonDocument.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Converting…</>
+                ) : (
+                  <><FileUp className="mr-2 h-4 w-4" /> Convert to Rich Text</>
+                )}
               </Button>
             </div>
           </div>

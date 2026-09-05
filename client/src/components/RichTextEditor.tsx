@@ -257,8 +257,7 @@ const VideoNode = Node.create({
 });
 
 // ─── PowerPoint slide composition nodes ─────────────────────────────────────
-// Convert File emits these nodes inside one text block per PowerPoint slide.
-// The slide remains responsive while text boxes can be edited in place.
+// Convert File embeds layout-faithful PowerPoint slide HTML inside one continuous text block.
 const PptxSlideLayoutNode = Node.create({
   name: "pptxSlideLayout",
   group: "block",

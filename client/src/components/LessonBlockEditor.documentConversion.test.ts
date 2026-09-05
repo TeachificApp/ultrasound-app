@@ -15,8 +15,12 @@ describe("LessonBlockEditor document conversion entry", () => {
 
   it("uses the protected conversion mutation, appends output, and keeps persistence on the normal Save path", () => {
     expect(source).toContain("trpc.lmsAdmin.convertLessonDocument.useMutation()");
+    expect(source).toContain("uploadLessonDocument(documentFile, lessonId");
+    expect(source).toContain("storageKey: uploaded.fileKey");
+    expect(source).toContain("storageUrl: uploaded.url");
+    expect(source).not.toContain("fileData:");
     expect(source).toContain("setBlocks(current => [...current, ...convertedBlocks])");
-    expect(source).toContain("Save the lesson to keep them.");
+    expect(source).toContain("Save the lesson to keep it.");
     expect(source).toContain("no existing lesson block is replaced automatically");
     expect(source).not.toContain("updateLesson.mutateAsync({\n        id: lessonId,\n        contentBlocks: JSON.stringify(convertedBlocks)");
   });
@@ -27,10 +31,8 @@ describe("LessonBlockEditor document conversion entry", () => {
     expect(source).not.toContain("Maximum file size: 25 MB");
   });
 
-  it("asks authors whether PowerPoint headers and footers should be included", () => {
-    expect(source).toContain("PowerPoint header and footer");
-    expect(source).toContain("Include header and footer");
-    expect(source).toContain("Exclude header and footer");
-    expect(source).toContain("includePptxHeadersAndFooters");
+  it("converts the full document into one continuous rich-text block", () => {
+    expect(source).toContain("converted into one continuous rich-text block");
+    expect(source).toContain("Convert to Rich Text");
   });
 });

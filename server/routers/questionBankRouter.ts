@@ -37,7 +37,7 @@ import {
   reorderQuestionBankFolders,
   selectQuestionBankFolders,
 } from "../lib/questionBankFolderQueries";
-import { scormImportQuestionTagIds } from "../../shared/questionBankFolders";
+import { collectDescendantFolderIds, scormImportQuestionTagIds } from "../../shared/questionBankFolders";
 import { applyQuestionBankUpdateToBuilderPayload } from "../lib/visualBuilderQuestionBankSync";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }) {
@@ -154,11 +154,13 @@ export const questionBankRouter = router({
         if (input.folderId === null) {
           conditions.push(sql`${questionBank.folderId} IS NULL`);
         } else {
-          conditions.push(eq(questionBank.folderId, input.folderId));
+          const allFolders = await selectQuestionBankFolders(db);
+          const folderIds = collectDescendantFolderIds(allFolders, input.folderId);
+          conditions.push(inArray(questionBank.folderId, folderIds));
         }
+      }
       if (input.isPreset !== undefined) conditions.push(eq(questionBank.isPreset, input.isPreset));
       if (input.presetCategory) conditions.push(eq(questionBank.presetCategory, input.presetCategory));
-      }
 
       // Tag filter: get question IDs that have ALL the requested tags
       let tagFilteredIds: number[] | null = null;
