@@ -29,7 +29,7 @@ import {
   Eye, EyeOff, Copy, Loader2, AlertTriangle, GripVertical, X,
   Sparkles, Upload, FileSpreadsheet, FolderPlus, Tag, FileUp,
   Database, Radio, TrendingUp, ExternalLink, FileQuestion,
-  Download,
+  Download, AlertCircle,
 } from "lucide-react";
 import { getAdminUrl, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
 import { QuestionBankMediaEditorDialog } from "@/components/QuestionBankMediaEditorDialog";
@@ -1291,7 +1291,7 @@ function QuizList() {
   const [showImport, setShowImport] = useState(false);
   const [showBatchScormImport, setShowBatchScormImport] = useState(false);
 
-  const { data, isLoading, refetch } = trpc.standaloneQuizAdmin.listQuizzes.useQuery({
+  const { data, isLoading, error: quizzesError, refetch } = trpc.standaloneQuizAdmin.listQuizzes.useQuery({
     search: search || undefined,
     status: status !== "all" ? (status as any) : undefined,
     type: type !== "all" ? (type as any) : undefined,
@@ -1368,7 +1368,7 @@ function QuizList() {
         <div className="flex flex-wrap gap-2 mb-6 p-3 bg-white rounded-xl border border-gray-200">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide self-center mr-1">Quick Links:</span>
           <a
-            href={getAdminUrl("/admin/lms?tab=question_bank")}
+            href={getAdminUrl("/question-bank")}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 text-xs font-medium hover:bg-teal-100 transition-colors border border-teal-200"
           >
             <Database className="w-3.5 h-3.5" /> Question Bank
@@ -1437,6 +1437,7 @@ function QuizList() {
               <SelectItem value="all">All types</SelectItem>
               <SelectItem value="quiz">Quiz</SelectItem>
               <SelectItem value="mock_exam">Mock Exam</SelectItem>
+              <SelectItem value="flashcards">Flashcards</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1445,6 +1446,12 @@ function QuizList() {
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           {isLoading ? (
             <div className="p-6 space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+          ) : quizzesError ? (
+            <div className="p-12 text-center text-red-600">
+              <AlertCircle className="w-12 h-12 mx-auto mb-3" />
+              <p className="font-medium">Could not load quizzes</p>
+              <p className="text-sm mt-1">{quizzesError.message}</p>
+            </div>
           ) : !data?.quizzes.length ? (
             <div className="p-12 text-center text-gray-400">
               <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
