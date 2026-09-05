@@ -15,6 +15,14 @@ import {
   CheckSquare, HeartPulse, Layers, Menu, X
 } from "lucide-react";
 import { getLoginUrl } from "@/const";
+import {
+  DiyAccreditationBrandLinks,
+  DiyAccreditationByline,
+  DiyAccreditationCopyright,
+  DiyAccreditationPoweredBy,
+  AAUS_WEB_URL,
+  IHE_WEB_URL,
+} from "@/components/DiyAccreditationBrandAttribution";
 
 const BRAND = "#189aa1";
 const BRAND_DARK = "#0e4a50";
@@ -34,7 +42,7 @@ function NavBar() {
           </div>
           <div>
             <div className="font-bold text-gray-900 text-sm leading-tight" style={{ fontFamily: "Merriweather, serif" }}>DIY Accreditation™</div>
-            <div className="text-[10px] text-gray-400 leading-tight">by All About Ultrasound™</div>
+            <DiyAccreditationByline className="text-[10px]" />
           </div>
         </div>
 
@@ -96,7 +104,7 @@ function Hero() {
         {/* Badge */}
         <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 text-white text-xs font-semibold px-4 py-1.5 rounded-full mb-6 backdrop-blur-sm">
           <Award className="w-3.5 h-3.5" style={{ color: AQUA }} />
-          Powered by All About Ultrasound™ Clinical Intelligence
+          <DiyAccreditationPoweredBy />
         </div>
 
         {/* Headline */}
@@ -400,8 +408,8 @@ const BENEFITS = [
   "Real-time readiness scoring",
   "Multi-site support",
   "Role-based team access",
-  "Expert clinical content from All About Ultrasound™",
-];
+  "brand-links",
+] as const;
 
 function BenefitsStrip() {
   return (
@@ -416,7 +424,13 @@ function BenefitsStrip() {
           {BENEFITS.map((b) => (
             <div key={b} className="flex items-start gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50/50">
               <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: BRAND }} />
-              <span className="text-sm text-gray-700 font-medium">{b}</span>
+              {b === "brand-links" ? (
+                <span className="text-sm text-gray-700 font-medium">
+                  <DiyAccreditationBrandLinks />
+                </span>
+              ) : (
+                <span className="text-sm text-gray-700 font-medium">{b}</span>
+              )}
             </div>
           ))}
         </div>
@@ -533,17 +547,16 @@ function Footer() {
             </div>
             <div>
               <div className="font-bold text-white text-sm">DIY Accreditation™</div>
-              <div className="text-[10px] text-white/40">by All About Ultrasound™</div>
+              <DiyAccreditationByline variant="footer" className="text-[10px] text-white/40" />
             </div>
           </div>
-          <div className="flex gap-6 text-sm">
+          <div className="flex flex-wrap gap-6 text-sm justify-center">
             <Link href="/diy-accreditation-plans" className="hover:text-white transition-colors">Pricing</Link>
             <Link href="/diy-register" className="hover:text-white transition-colors">Register</Link>
-            <a href="https://allaboutultrasound.com" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">All About Ultrasound™</a>
+            <a href={AAUS_WEB_URL} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">All About Ultrasound™</a>
+            <a href={IHE_WEB_URL} target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">iHeartEcho™</a>
           </div>
-          <div className="text-xs text-white/30">
-            © {new Date().getFullYear()} All About Ultrasound™. All rights reserved.
-          </div>
+          <DiyAccreditationCopyright />
         </div>
       </div>
     </footer>
