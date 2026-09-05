@@ -420,3 +420,5 @@
 - [x] Add visual-fidelity and author-usability regressions based on the supplied conversion recording, without modifying existing lesson blocks automatically.
 - [x] Ask authors whether to include or exclude PowerPoint slide headers and footers before conversion, and apply the selected behavior consistently to every generated slide block.
 - [x] Add focused PowerPoint header/footer classification and conversion-choice regressions without changing source files or existing lesson blocks automatically.
+- [x] Remove the unrequested Convert File item from the top Add Content Block menu and keep future top-menu additions limited to explicitly requested items.
+- [x] Add a focused regression proving Convert File is not rendered as a top-level Add Content Block action while its approved conversion workflow remains available elsewhere.

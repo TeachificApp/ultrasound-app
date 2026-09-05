@@ -5,10 +5,11 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(resolve(process.cwd(), "client/src/components/LessonBlockEditor.tsx"), "utf8");
 
 describe("LessonBlockEditor document conversion entry", () => {
-  it("exposes a clear Convert File action only while editing a saved lesson", () => {
-    expect(source).toContain('id: "convert_document"');
-    expect(source).toContain('label: "Convert File"');
-    expect(source).toContain("...(lessonId ? [{ id: \"convert_document\" as const");
+  it("keeps Convert File in the Content catalog instead of the top Add Content Block menu", () => {
+    expect(source).toContain('key="convert_document"');
+    expect(source).toContain(">Convert File</span>");
+    expect(source).toContain('activeCategory === "Content" && b.type === "file_download" && lessonId');
+    expect(source).not.toContain("...(lessonId ? [{ id: \"convert_document\" as const");
     expect(source).toContain("Convert a PDF or PowerPoint into editable lesson content");
   });
 

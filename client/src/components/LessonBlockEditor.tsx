@@ -1041,7 +1041,6 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
             { id: "from_lessons", icon: <BookOpen className="w-3.5 h-3.5" />, label: "Copy" },
             { id: "templates", icon: <Layers className="w-3.5 h-3.5" />, label: "Templates" },
             { id: "import_url", icon: <Globe className="w-3.5 h-3.5" />, label: "Import URL" },
-            ...(lessonId ? [{ id: "convert_document" as const, icon: <FileUp className="w-3.5 h-3.5" />, label: "Convert File" }] : []),
           ] as const).map(tab => (
             <button
               key={tab.id}
