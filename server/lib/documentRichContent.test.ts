@@ -33,7 +33,7 @@ describe("document rich-content conversion", () => {
     expect(() => assertLessonDocumentUpload("lesson.pdf", "application/pdf", LESSON_DOCUMENT_MAX_BYTES + 1)).toThrow(/50 MB/);
   });
 
-  it("converts each PowerPoint slide into one editable rich-text layout block with retained source visuals", () => {
+  it("converts each PowerPoint slide into one reflowed editable rich-text block with responsive media and no absolute overlay", () => {
     const result = convertPptxSlidesToEditableLessonBlocks([
       {
         title: "First slide",
@@ -57,19 +57,35 @@ describe("document rich-content conversion", () => {
 
     expect(result.pageCount).toBe(2);
     expect(result.blocks.map(block => block.type)).toEqual(["text", "text"]);
-    expect(String(result.blocks[0].data.html)).toContain('data-pptx-slide-layout="1"');
-    expect(String(result.blocks[0].data.html)).toContain('data-pptx-text-box="1"');
-    expect(String(result.blocks[0].data.html)).toContain('data-pptx-image="1"');
+    expect(String(result.blocks[0].data.html)).toContain('data-pptx-reflow="1"');
+    expect(String(result.blocks[0].data.html)).toContain('data-pptx-columns="1"');
+    expect(String(result.blocks[0].data.html)).toContain('src="https://example.test/first.png"');
     expect(String(result.blocks[0].data.html)).toContain('data-pptx-shape="1"');
-    expect(String(result.blocks[0].data.html)).toContain("aspect-ratio:850 / 1100");
-    expect(String(result.blocks[0].data.html)).toContain("background-color:#eaffff");
-    expect(String(result.blocks[0].data.html)).toContain("font-family:&#039;Arial&#039;");
+    expect(String(result.blocks[0].data.html)).not.toContain("position:absolute");
+    expect(String(result.blocks[0].data.html)).toContain("<h3");
     expect(String(result.blocks[0].data.html)).toContain("First lesson point");
-    expect((result.blocks[0].data.pptxSlide as any).version).toBe(1);
-    expect((result.blocks[0].data.pptxSlide as any).elements).toHaveLength(3);
+    expect(result.blocks[0].data.pptxSlide).toBeUndefined();
     expect(String(result.blocks[1].data.html)).toContain("Second lesson point");
     expect((result.blocks[0].data.sourceDocument as any).storageUrl).toBe(source.storageUrl);
     expect(result.blocks.some(block => block.type === ("embed" as any))).toBe(false);
+  });
+
+  it("reflows native PowerPoint table cells into an editable HTML table", () => {
+    const result = convertPptxSlidesToEditableLessonBlocks([{
+      title: "Table slide",
+      elements: [
+        { id: "h1", type: "text", sourceName: "Table 1", content: "Concept", x: 5, y: 20, width: 35, height: 5, zIndex: 1, style: { fontWeight: "bold", backgroundColor: "#179ca3", color: "#ffffff" } },
+        { id: "h2", type: "text", sourceName: "Table 1", content: "Impact", x: 45, y: 20, width: 35, height: 5, zIndex: 2, style: { fontWeight: "bold", backgroundColor: "#179ca3", color: "#ffffff" } },
+        { id: "c1", type: "text", sourceName: "Table 1", content: "Frequency", x: 5, y: 30, width: 35, height: 5, zIndex: 3 },
+        { id: "c2", type: "text", sourceName: "Table 1", content: "Resolution", x: 45, y: 30, width: 35, height: 5, zIndex: 4 },
+      ],
+    }] as any, { ...source, fileName: "table.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
+    const html = String(result.blocks[0].data.html);
+    expect(html).toContain("<table");
+    expect(html).toContain("<th");
+    expect(html).toContain("<td");
+    expect(html).toContain("Frequency");
+    expect(html).not.toContain("position:absolute");
   });
 
   it("includes headers and footers by default and excludes only repeated or explicitly named edge layers when asked", () => {

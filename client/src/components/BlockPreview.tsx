@@ -25,7 +25,6 @@ import {
 } from "@shared/mediaRepoDisplay";
 import { isMediaRepoScormViewerPath, parseMediaRepoUrl } from "@/lib/mediaEmbedUrl";
 import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
-import { pptxRichSlideToHtml, type PptxRichSlide } from "@shared/pptxRichSlide";
 
 function assetUrl(url?: string | null): string {
   return resolveAssetUrl(url ?? undefined) ?? url ?? "";
@@ -259,7 +258,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
     }
     case "text":
       {
-        const html = d.pptxSlide ? pptxRichSlideToHtml(d.pptxSlide as PptxRichSlide) : (d.html ?? "");
+        const html = d.html ?? "";
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a" }}
           onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}>

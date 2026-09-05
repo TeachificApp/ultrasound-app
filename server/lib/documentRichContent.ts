@@ -1,6 +1,5 @@
 import { createCanvas } from "@napi-rs/canvas";
-import type { TeachSlide } from "../../shared/teachPresentation";
-import { pptxRichSlideToHtml, teachSlideToPptxRichSlide } from "../../shared/pptxRichSlide";
+import type { TeachSlide, TeachSlideElement } from "../../shared/teachPresentation";
 
 export const LESSON_DOCUMENT_MAX_MB = 50;
 export const LESSON_DOCUMENT_MAX_BYTES = LESSON_DOCUMENT_MAX_MB * 1024 * 1024;
@@ -74,61 +73,81 @@ function escapeAttribute(value: string) {
   return escapeHtml(value).replace(/`/g, "&#096;");
 }
 
-function finitePercent(value: number | undefined, fallback: number) {
-  return Math.min(100, Math.max(0, Number.isFinite(value) ? Number(value) : fallback));
+function elementTextHtml(element: TeachSlideElement) {
+  return element.contentHtml || escapeHtml(element.content ?? "").replace(/\n/g, "<br />");
 }
 
-function safeColor(value: unknown, fallback: string) {
-  return typeof value === "string" && /^#[0-9a-f]{3,8}$/i.test(value.trim()) ? value.trim() : fallback;
+function elementTextBlockHtml(element: TeachSlideElement) {
+  const fontSize = element.style?.fontSize ?? 16;
+  const content = elementTextHtml(element);
+  const color = element.style?.color && /^#[0-9a-f]{3,8}$/i.test(element.style.color) ? `color:${element.style.color};` : "";
+  const background = element.style?.backgroundColor && /^#[0-9a-f]{3,8}$/i.test(element.style.backgroundColor)
+    ? `background:${element.style.backgroundColor};`
+    : "";
+  const style = `${color}${background}margin:0;`;
+  if (fontSize >= 28) return `<h2 style="${style}">${content}</h2>`;
+  if (fontSize >= 21) return `<h3 style="${style}">${content}</h3>`;
+  return background ? `<blockquote style="${style}">${content}</blockquote>` : `<p style="${style}">${content}</p>`;
 }
 
-function safeFontFamily(value: unknown) {
-  if (typeof value !== "string") return "Arial, sans-serif";
-  const clean = value.replace(/[^a-zA-Z0-9 ,_-]/g, "").trim();
-  return clean ? `'${clean}', Arial, sans-serif` : "Arial, sans-serif";
+function elementImageHtml(element: TeachSlideElement) {
+  return element.src
+    ? `<img src="${escapeAttribute(element.src)}" alt="" />`
+    : "";
 }
 
-function richTextFontSize(value: unknown) {
-  const pointSize = typeof value === "number" && Number.isFinite(value) ? Math.min(72, Math.max(8, value)) : 16;
-  const responsiveSize = Math.min(13, Math.max(0.8, pointSize / 8));
-  return `clamp(9px, ${responsiveSize.toFixed(2)}cqw, ${Math.round(pointSize * 1.34)}px)`;
+function elementShapeHtml(element: TeachSlideElement) {
+  const color = element.fill && /^#[0-9a-f]{3,8}$/i.test(element.fill) ? `border-color:${element.fill};` : "";
+  return `<hr data-pptx-shape="1" style="${color}" />`;
 }
 
-function pptxElementStyle(element: TeachSlide["elements"][number], includeTextStyle: boolean) {
-  const base = [
-    "position:absolute",
-    `left:${finitePercent(element.x, 0)}%`,
-    `top:${finitePercent(element.y, 0)}%`,
-    `width:${finitePercent(element.width, 100)}%`,
-    `height:${finitePercent(element.height, 100)}%`,
-    `z-index:${Math.max(1, Math.round(element.zIndex ?? 1))}`,
-    "box-sizing:border-box",
-  ];
-  if (!includeTextStyle) return base.join(";");
-  const style = element.style;
-  base.push(
-    `color:${safeColor(style?.color, "#1a1a1a")}`,
-    `font-family:${safeFontFamily(style?.fontFamily)}`,
-    `font-size:${richTextFontSize(style?.fontSize)}`,
-    `font-weight:${style?.fontWeight === "bold" ? "700" : "400"}`,
-    `font-style:${style?.fontStyle === "italic" ? "italic" : "normal"}`,
-    `text-align:${style?.textAlign ?? "left"}`,
-    `text-decoration:${style?.textDecoration ?? "none"}`,
-    `line-height:${style?.lineHeight ?? 1.2}`,
-    "overflow:hidden",
-    "white-space:normal",
-  );
-  if (style?.backgroundColor) base.push(`background-color:${safeColor(style.backgroundColor, "transparent")}`);
-  return base.join(";");
+function reflowTableHtml(elements: TeachSlideElement[]) {
+  const rows: TeachSlideElement[][] = [];
+  for (const element of [...elements].sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const row = rows.find((candidate) => Math.abs(candidate[0]!.y - element.y) <= Math.max(2, element.height * 0.45));
+    if (row) row.push(element); else rows.push([element]);
+  }
+  const body = rows.map((row, rowIndex) => `<tr>${row.sort((a, b) => a.x - b.x).map((cell) => {
+    const tag = rowIndex === 0 || cell.style?.fontWeight === "bold" ? "th" : "td";
+    const background = cell.style?.backgroundColor && /^#[0-9a-f]{3,8}$/i.test(cell.style.backgroundColor) ? `background:${cell.style.backgroundColor};` : "";
+    const color = cell.style?.color && /^#[0-9a-f]{3,8}$/i.test(cell.style.color) ? `color:${cell.style.color};` : "";
+    return `<${tag} style="border:1px solid #d9e4e7;padding:0.65rem;vertical-align:top;${background}${color}">${elementTextHtml(cell)}</${tag}>`;
+  }).join("")}</tr>`).join("");
+  return `<div style="overflow-x:auto;margin:1.25rem 0"><table style="width:100%;border-collapse:collapse">${body}</table></div>`;
 }
 
-/**
- * Serializes one PowerPoint slide to one responsive rich-text composition.
- * Percent-based geometry preserves visual placement while allowing the slide to
- * scale to the width of a lesson text block.
- */
+function reflowRowHtml(elements: TeachSlideElement[]) {
+  const blocks = [...elements].sort((a, b) => a.x - b.x || a.zIndex - b.zIndex)
+    .map((element) => element.type === "image" ? elementImageHtml(element) : element.type === "shape" ? elementShapeHtml(element) : elementTextBlockHtml(element)).filter(Boolean);
+  if (blocks.length <= 1) return blocks[0] ?? "";
+  return `<table data-pptx-columns="1"><tbody><tr>${blocks.map((block) => `<td>${block}</td>`).join("")}</tr></tbody></table>`;
+}
+
+/** Converts one PPTX slide to normal-flow editable rich text, never an overlay. */
 export function convertPptxSlideToRichTextHtml(slide: TeachSlide) {
-  return pptxRichSlideToHtml(teachSlideToPptxRichSlide(slide));
+  const content = slide.elements.filter((element) => element.type === "text" || element.type === "image" || element.type === "shape");
+  const grouped = new Map<string, TeachSlideElement[]>();
+  for (const element of content.filter((candidate) => candidate.type === "text")) {
+    if (!element.sourceName) continue;
+    const group = grouped.get(element.sourceName) ?? [];
+    group.push(element);
+    grouped.set(element.sourceName, group);
+  }
+  const tableIds = new Set<string>();
+  const tables = [...grouped.entries()]
+    .filter(([name, elements]) => /table/i.test(name) && elements.length >= 4)
+    .map(([, elements]) => {
+      elements.forEach((element) => tableIds.add(element.id));
+      return { y: Math.min(...elements.map((element) => element.y)), html: reflowTableHtml(elements) };
+    });
+  const rows: Array<{ y: number; elements: TeachSlideElement[] }> = [];
+  for (const element of content.filter((candidate) => !tableIds.has(candidate.id)).sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const row = rows.find((candidate) => Math.abs(candidate.y - element.y) <= Math.max(3, element.height * 0.35));
+    if (row) row.elements.push(element); else rows.push({ y: element.y, elements: [element] });
+  }
+  const sections = [...rows.map((row) => ({ y: row.y, html: reflowRowHtml(row.elements) })), ...tables]
+    .sort((a, b) => a.y - b.y).map((section) => section.html).filter(Boolean).join("");
+  return `<div data-pptx-reflow="1" style="display:flex;flex-direction:column;gap:1rem">${sections || "<p></p>"}</div>`;
 }
 
 function headerFooterSignature(element: TeachSlide["elements"][number]) {
@@ -143,8 +162,8 @@ function isHeaderFooterName(name: string | undefined) {
 }
 
 function isEdgeElement(element: TeachSlide["elements"][number]) {
-  const topEdge = element.y <= 8 && element.height <= 14;
-  const bottomEdge = element.y + element.height >= 92 && element.height <= 14;
+  const topEdge = element.y <= 14 && element.height <= 16;
+  const bottomEdge = element.y + element.height >= 86 && element.height <= 16;
   return topEdge || bottomEdge;
 }
 
@@ -161,7 +180,7 @@ export function findPptxHeaderFooterElementIds(slides: TeachSlide[]) {
       repeatedSignatures.set(signature, (repeatedSignatures.get(signature) ?? 0) + 1);
     }
   }
-  const repeatedMinimum = Math.max(2, Math.ceil(slides.length * 0.5));
+  const repeatedMinimum = 2;
   return slides.map((slide) => new Set(slide.elements
     .filter((element) => {
       if (isHeaderFooterName(element.sourceName)) return true;
@@ -360,13 +379,11 @@ export function convertPptxSlidesToEditableLessonBlocks(
     const images = elements.filter(element => element.type === "image" && typeof element.src === "string" && element.src);
     const shapes = elements.filter(element => element.type === "shape");
 
-    const pptxSlide = teachSlideToPptxRichSlide(filteredSlide);
     blocks.push({
       id: makeBlockId("pptx-slide-rich-text", index, 1),
       type: "text",
       data: {
-        html: pptxRichSlideToHtml(pptxSlide),
-        pptxSlide,
+        html: convertPptxSlideToRichTextHtml(filteredSlide),
         align: "left",
         bgColor: filteredSlide.backgroundColor || "#ffffff",
         textColor: "#1a1a1a",

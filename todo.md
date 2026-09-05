@@ -422,3 +422,7 @@
 - [x] Add focused PowerPoint header/footer classification and conversion-choice regressions without changing source files or existing lesson blocks automatically.
 - [x] Remove the unrequested Convert File item from the top Add Content Block menu and keep future top-menu additions limited to explicitly requested items.
 - [x] Add a focused regression proving Convert File is not rendered as a top-level Add Content Block action while its approved conversion workflow remains available elsewhere.
+- [x] Replace positioned PPTX slide overlays with reflowed editable rich text that uses semantic headings, paragraphs, tables, images, responsive columns, and spacing rather than overlapping absolute layers.
+- [x] Ensure converted PowerPoint text is directly editable in the normal rich-text editor and extracted images are placed as responsive editable content rather than non-editable overlays.
+- [x] Repair the header/footer exclusion selection so it removes identified headers and footers from reflowed slide content before insertion.
+- [x] Add focused reflow, direct-editability, responsive-image, spacing, table, and header/footer-exclusion regressions based on the reported failed conversions, without modifying existing lesson blocks automatically.
