@@ -1,7 +1,7 @@
 import React from "react";
 import { FileText, Image as ImageIcon } from "lucide-react";
 import RichTextEditor from "@/components/RichTextEditor";
-import { pdfRichPageToHtml, type PdfRichPage } from "@shared/pdfRichPage";
+import { pdfDocumentPageSectionHtml, wrapContinuousDocumentHtml, type PdfRichPage } from "@shared/pdfRichPage";
 
 type Props = {
   value: PdfRichPage;
@@ -46,5 +46,6 @@ export default function PdfPageRichTextEditor({ value, pageIndex = 1, onChange }
 }
 
 export function syncPdfPageHtml(page: PdfRichPage, pageIndex = 1) {
-  return pdfRichPageToHtml(page, pageIndex);
+  const section = pdfDocumentPageSectionHtml(page.imageUrl, [], pageIndex).replace(/<p><\/p>\s*$/, page.bodyHtml || "<p></p>");
+  return wrapContinuousDocumentHtml([section]);
 }

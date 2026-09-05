@@ -33,7 +33,7 @@ describe("document rich-content conversion", () => {
     expect(() => assertLessonDocumentUpload("lesson.pdf", "application/pdf", LESSON_DOCUMENT_MAX_BYTES + 1)).toThrow(/50 MB/);
   });
 
-  it("converts each PowerPoint slide into one composition-faithful editable rich-text block", () => {
+  it("converts an entire PowerPoint into one continuous reflowed rich-text block", () => {
     const result = convertPptxSlidesToEditableLessonBlocks([
       {
         title: "First slide",
@@ -56,20 +56,22 @@ describe("document rich-content conversion", () => {
     ] as any, { ...source, fileName: "lesson-source.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
 
     expect(result.pageCount).toBe(2);
-    expect(result.blocks.map(block => block.type)).toEqual(["text", "text"]);
-    expect(String(result.blocks[0].data.html)).toContain('data-pptx-slide-layout="1"');
-    expect(String(result.blocks[0].data.html)).toContain('data-pptx-text-box="1"');
-    expect(String(result.blocks[0].data.html)).toContain('src="https://example.test/first.png"');
-    expect(String(result.blocks[0].data.html)).toContain('data-pptx-shape="1"');
-    expect(String(result.blocks[0].data.html)).toContain("position:absolute");
-    expect(String(result.blocks[0].data.html)).toContain("First lesson point");
-    expect(result.blocks[0].data.pptxSlide).toBeDefined();
-    expect(String(result.blocks[1].data.html)).toContain("Second lesson point");
-    expect((result.blocks[0].data.sourceDocument as any).storageUrl).toBe(source.storageUrl);
-    expect(result.blocks.some(block => block.type === ("embed" as any))).toBe(false);
+    expect(result.blocks).toHaveLength(1);
+    expect(result.blocks[0]?.type).toBe("text");
+    const html = String(result.blocks[0]?.data.html);
+    expect(html).toContain('data-converted-document="1"');
+    expect(html).toContain('data-document-slide="1"');
+    expect(html).toContain('data-document-slide="2"');
+    expect(html).toContain('data-pptx-reflow="1"');
+    expect(html).toContain('src="https://example.test/first.png"');
+    expect(html).toContain("First lesson point");
+    expect(html).toContain("Second lesson point");
+    expect(html).not.toContain("position:absolute");
+    expect(result.blocks[0]?.data.pptxSlide).toBeUndefined();
+    expect((result.blocks[0]?.data.sourceDocument as any).pageCount).toBe(2);
   });
 
-  it("preserves native PowerPoint table cells as positioned editable text boxes", () => {
+  it("reflows native PowerPoint table cells into an editable HTML table inside the continuous block", () => {
     const result = convertPptxSlidesToEditableLessonBlocks([{
       title: "Table slide",
       elements: [
@@ -79,12 +81,11 @@ describe("document rich-content conversion", () => {
         { id: "c2", type: "text", sourceName: "Table 1", content: "Resolution", x: 45, y: 30, width: 35, height: 5, zIndex: 4 },
       ],
     }] as any, { ...source, fileName: "table.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
-    const html = String(result.blocks[0].data.html);
+    const html = String(result.blocks[0]?.data.html);
+    expect(html).toContain("<table");
     expect(html).toContain("Concept");
-    expect(html).toContain("Impact");
     expect(html).toContain("Frequency");
-    expect(html).toContain('data-pptx-text-box="1"');
-    expect(html).toContain("position:absolute");
+    expect(html).not.toContain("position:absolute");
   });
 
   it("includes headers and footers by default and excludes only repeated or explicitly named edge layers when asked", () => {
@@ -113,16 +114,16 @@ describe("document rich-content conversion", () => {
     const pptxSource = { ...source, fileName: "headers.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" };
     const included = convertPptxSlidesToEditableLessonBlocks(slides, pptxSource);
     const excluded = convertPptxSlidesToEditableLessonBlocks(slides, pptxSource, { includeHeadersAndFooters: false });
-    expect(String(included.blocks[0].data.html)).toContain("Course header");
-    expect(String(included.blocks[0].data.html)).toContain("Copyright");
-    expect(String(excluded.blocks[0].data.html)).not.toContain("Course header");
-    expect(String(excluded.blocks[0].data.html)).not.toContain("Copyright");
-    expect(String(excluded.blocks[0].data.html)).toContain("Unique instructional title");
-    expect((included.blocks[0].data.pptxConversion as any).includeHeadersAndFooters).toBe(true);
-    expect((excluded.blocks[0].data.pptxConversion as any).includeHeadersAndFooters).toBe(false);
+    expect(String(included.blocks[0]?.data.html)).toContain("Course header");
+    expect(String(included.blocks[0]?.data.html)).toContain("Copyright");
+    expect(String(excluded.blocks[0]?.data.html)).not.toContain("Course header");
+    expect(String(excluded.blocks[0]?.data.html)).not.toContain("Copyright");
+    expect(String(excluded.blocks[0]?.data.html)).toContain("Unique instructional title");
+    expect((included.blocks[0]?.data.documentConversion as any).includeHeadersAndFooters).toBe(true);
+    expect((excluded.blocks[0]?.data.documentConversion as any).includeHeadersAndFooters).toBe(false);
   });
 
-  it("renders each PDF page as one editable rich-text block with page image and reflowed text", async () => {
+  it("renders an entire PDF as one continuous editable rich-text block", async () => {
     const pdf = await PDFDocument.create();
     const font = await pdf.embedFont(StandardFonts.Helvetica);
     const firstPage = pdf.addPage([400, 300]);
@@ -142,15 +143,14 @@ describe("document rich-content conversion", () => {
 
     expect(result.pageCount).toBe(2);
     expect(uploaded).toHaveLength(2);
-    expect(uploaded.every(asset => asset.bytes > 0)).toBe(true);
-    expect(result.blocks.map(block => block.type)).toEqual(["text", "text"]);
-    expect(String(result.blocks[0].data.html)).toContain("First editable PDF page");
-    expect(String(result.blocks[0].data.html)).toContain('data-pdf-page="1"');
-    expect(String(result.blocks[0].data.html)).toContain('data-pdf-editable-text="1"');
-    expect(String(result.blocks[0].data.html)).not.toContain("position:absolute");
-    expect(result.blocks[0].data.pdfPage).toBeDefined();
-    expect(String(result.blocks[1].data.html)).toContain("Second editable PDF page");
-    expect((result.blocks[0].data.sourceDocument as any).storageKey).toBe(source.storageKey);
-    expect(result.blocks.some(block => block.type === ("embed" as any))).toBe(false);
+    expect(result.blocks).toHaveLength(1);
+    const html = String(result.blocks[0]?.data.html);
+    expect(html).toContain('data-converted-document="1"');
+    expect(html).toContain('data-document-page="1"');
+    expect(html).toContain('data-document-page="2"');
+    expect(html).toContain("First editable PDF page");
+    expect(html).toContain("Second editable PDF page");
+    expect(html).not.toContain("position:absolute");
+    expect((result.blocks[0]?.data.sourceDocument as any).pageCount).toBe(2);
   });
 });

@@ -16,7 +16,7 @@ describe("LessonBlockEditor document conversion entry", () => {
   it("uses the protected conversion mutation, appends output, and keeps persistence on the normal Save path", () => {
     expect(source).toContain("trpc.lmsAdmin.convertLessonDocument.useMutation()");
     expect(source).toContain("setBlocks(current => [...current, ...convertedBlocks])");
-    expect(source).toContain("Save the lesson to keep them.");
+    expect(source).toContain("Save the lesson to keep it.");
     expect(source).toContain("no existing lesson block is replaced automatically");
     expect(source).not.toContain("updateLesson.mutateAsync({\n        id: lessonId,\n        contentBlocks: JSON.stringify(convertedBlocks)");
   });
@@ -27,10 +27,8 @@ describe("LessonBlockEditor document conversion entry", () => {
     expect(source).not.toContain("Maximum file size: 25 MB");
   });
 
-  it("allows converted document blocks to widen the settings panel with a left-edge resize handle", () => {
-    expect(source).toContain('useResizableEditorPanel("lesson-block-editor")');
-    expect(source).toContain("maybeExpandForConvertedDocument");
-    expect(source).toContain("Drag the panel edge to resize the editor.");
-    expect(source).toContain("isConvertedDocumentBlock(selectedBlock.data)");
+  it("converts the full document into one continuous rich-text block", () => {
+    expect(source).toContain("converted into one continuous rich-text block");
+    expect(source).toContain("Convert to Rich Text");
   });
 });
