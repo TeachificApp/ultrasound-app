@@ -415,3 +415,6 @@
 - [x] Increase the PDF/PPTX Convert File upload limit above 25 MB while retaining supported-type checks, server-side bounds, source-file preservation, and focused validation coverage.
 - [x] Convert each PowerPoint slide into one editable rich-text lesson block that retains the slide background, positioned formatted text, titles, image assets, and visual composition rather than emitting separate plain text and image blocks.
 - [x] Add focused PowerPoint composition-preservation regressions using the supplied SPI Anatomy of Sound deck structure, without modifying the existing converted lesson until an author explicitly reconverts and saves it.
+- [x] Repair PPTX conversion so source text formatting and grouped visual composition remain faithful in the converted lesson output, rather than flattening or degrading slide elements.
+- [x] Replace cumbersome positioned-fragment editing for converted PPTX slides with manageable slide-level editing controls that preserve the rendered visual composition.
+- [x] Add visual-fidelity and author-usability regressions based on the supplied conversion recording, without modifying existing lesson blocks automatically.

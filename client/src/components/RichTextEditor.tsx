@@ -48,6 +48,26 @@ import {
 
 const COURSE_IMAGE_UPLOAD_TIMEOUT_MS = 120_000;
 
+// Preserve source font sizing and family on imported PowerPoint text runs when
+// authors make edits in the standard rich-text editor.
+const ImportedTextStyle = TextStyle.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      fontSize: {
+        default: null,
+        parseHTML: (element) => element.style.fontSize || null,
+        renderHTML: (attributes) => attributes.fontSize ? { style: `font-size: ${attributes.fontSize}` } : {},
+      },
+      fontFamily: {
+        default: null,
+        parseHTML: (element) => element.style.fontFamily || null,
+        renderHTML: (attributes) => attributes.fontFamily ? { style: `font-family: ${attributes.fontFamily}` } : {},
+      },
+    };
+  },
+});
+
 async function uploadCourseImageFile(file: File): Promise<{ url: string; fileKey?: string }> {
   const fd = new FormData();
   fd.append("file", file);
@@ -809,7 +829,7 @@ export default function RichTextEditor({
         },
       }),
       Underline,
-      TextStyle,
+      ImportedTextStyle,
       Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       ImageResize.configure({ inline: false, allowBase64: true, resizeLimits: { minWidth: 50 } }),

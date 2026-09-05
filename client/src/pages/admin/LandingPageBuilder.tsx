@@ -43,11 +43,13 @@ import { DebouncedInput, DebouncedTextarea } from "@/components/DebouncedInput";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
+import PptxSlideRichTextEditor from "@/components/PptxSlideRichTextEditor";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
 import { BlockPreview } from "@/components/BlockPreview";
 import { isInteractiveMediaPackage, mediaRepoDownloadUrl, mediaRepoScormUrl } from "@shared/mediaRepoDisplay";
 import { resolveRelatedProductsSelectionMode } from "@shared/relatedProductsBlock";
+import { pptxRichSlideToHtml, type PptxRichSlide } from "@shared/pptxRichSlide";
 import {
   ArrowLeft, ArrowRight, Save, Eye, Plus, Trash2, GripVertical, Type, Image, ImageIcon, Video,
   List, Quote, CreditCard, Minus, Columns, X, Palette, AlignLeft,
@@ -3338,6 +3340,14 @@ function TextBlockEditor({ d, set, lessonTitle, courseTitle }: { d: Record<strin
     },
     onError: (err) => toast.error(`AI generation failed: ${err.message}`),
   });
+  if (d.pptxSlide?.version === 1) {
+    const saveSlide = (pptxSlide: PptxRichSlide) => {
+      set("pptxSlide", pptxSlide);
+      set("html", pptxRichSlideToHtml(pptxSlide));
+      set("bgColor", pptxSlide.backgroundColor);
+    };
+    return <PptxSlideRichTextEditor value={d.pptxSlide as PptxRichSlide} onChange={saveSlide} />;
+  }
   return (
     <div className="space-y-3">
       <div>

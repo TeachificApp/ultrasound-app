@@ -23,6 +23,7 @@ describe("pptxImport", () => {
     expect(result.slides[0]?.sourceWidth).toBeGreaterThan(0);
     expect(result.slides[0]?.sourceHeight).toBeGreaterThan(0);
     expect(result.slides[0]?.elements.some((element) => element.type === "text")).toBe(true);
+    expect(result.slides[0]?.elements.find((element) => element.type === "text")?.contentHtml).toContain("font-size:44pt");
   });
 
   it("rejects invalid zip as pptx", async () => {

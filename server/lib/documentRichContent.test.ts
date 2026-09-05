@@ -64,6 +64,8 @@ describe("document rich-content conversion", () => {
     expect(String(result.blocks[0].data.html)).toContain("background-color:#eaffff");
     expect(String(result.blocks[0].data.html)).toContain("font-family:&#039;Arial&#039;");
     expect(String(result.blocks[0].data.html)).toContain("First lesson point");
+    expect((result.blocks[0].data.pptxSlide as any).version).toBe(1);
+    expect((result.blocks[0].data.pptxSlide as any).elements).toHaveLength(3);
     expect(String(result.blocks[1].data.html)).toContain("Second lesson point");
     expect((result.blocks[0].data.sourceDocument as any).storageUrl).toBe(source.storageUrl);
     expect(result.blocks.some(block => block.type === ("embed" as any))).toBe(false);

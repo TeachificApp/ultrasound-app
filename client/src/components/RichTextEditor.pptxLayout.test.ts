@@ -14,5 +14,8 @@ describe("PowerPoint rich-text slide layout nodes", () => {
     expect(source).toContain('name: "pptxShape"');
     expect(source).toContain("PptxSlideLayoutNode,");
     expect(source).toContain("PptxTextBoxNode,");
+    expect(source).toContain("ImportedTextStyle");
+    expect(source).toContain("fontSize:");
+    expect(source).toContain("fontFamily:");
   });
 });

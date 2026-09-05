@@ -87,44 +87,80 @@ function resolveTarget(basePath: string, target: string): string {
   return baseParts.join("/");
 }
 
-function extractTextFromParagraphs(txBody: unknown): { text: string; style: Partial<TeachTextStyle> } {
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function textValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "#text" in value) return String((value as Record<string, unknown>)["#text"] ?? "");
+  return "";
+}
+
+function textRunStyle(rPr: Record<string, unknown> | undefined): Partial<TeachTextStyle> {
+  if (!rPr) return {};
+  const style: Partial<TeachTextStyle> = {};
+  if (rPr["@_sz"]) style.fontSize = Math.round(Number(rPr["@_sz"]) / 100);
+  if (rPr["@_b"] === "1" || rPr["@_b"] === 1) style.fontWeight = "bold";
+  if (rPr["@_i"] === "1" || rPr["@_i"] === 1) style.fontStyle = "italic";
+  const solid = rPr.solidFill as Record<string, unknown> | undefined;
+  const srgb = solid?.srgbClr as Record<string, unknown> | undefined;
+  if (srgb?.["@_val"]) style.color = `#${String(srgb["@_val"]).slice(0, 6)}`;
+  const latin = rPr.latin as Record<string, unknown> | undefined;
+  if (typeof latin?.["@_typeface"] === "string" && latin["@_typeface"].trim()) style.fontFamily = latin["@_typeface"].trim();
+  if (rPr["@_u"] && rPr["@_u"] !== "none") style.textDecoration = "underline";
+  return style;
+}
+
+function richRunHtml(value: string, style: Partial<TeachTextStyle>) {
+  const css = [
+    style.fontSize ? `font-size:${style.fontSize}pt` : "",
+    style.fontWeight === "bold" ? "font-weight:700" : "",
+    style.fontStyle === "italic" ? "font-style:italic" : "",
+    style.color ? `color:${style.color}` : "",
+    style.fontFamily ? `font-family:${style.fontFamily.replace(/[^a-zA-Z0-9 ,_-]/g, "")}` : "",
+    style.textDecoration ? `text-decoration:${style.textDecoration}` : "",
+  ].filter(Boolean).join(";");
+  return `<span${css ? ` style="${css}"` : ""}>${escapeHtml(value)}</span>`;
+}
+
+function extractTextFromParagraphs(txBody: unknown): { text: string; richHtml: string; style: Partial<TeachTextStyle> } {
   const paragraphs = asArray((txBody as Record<string, unknown>)?.p);
   const lines: string[] = [];
+  const htmlLines: string[] = [];
   let style: Partial<TeachTextStyle> = {};
 
   for (const p of paragraphs) {
     const runs = asArray((p as Record<string, unknown>)?.r);
     let line = "";
+    let lineHtml = "";
     for (const r of runs) {
-      const t = (r as Record<string, unknown>)?.t;
-      if (typeof t === "string") line += t;
-      else if (t && typeof t === "object" && "#text" in (t as object)) {
-        line += String((t as Record<string, unknown>)["#text"] ?? "");
-      }
+      const run = r as Record<string, unknown>;
+      const runText = textValue(run.t);
+      line += runText;
       const rPr = (r as Record<string, unknown>)?.rPr as Record<string, unknown> | undefined;
-      if (rPr) {
-        if (rPr["@_sz"]) style.fontSize = Math.round(Number(rPr["@_sz"]) / 100);
-        if (rPr["@_b"] === "1" || rPr["@_b"] === 1) style.fontWeight = "bold";
-        if (rPr["@_i"] === "1" || rPr["@_i"] === 1) style.fontStyle = "italic";
-        const solid = rPr.solidFill as Record<string, unknown> | undefined;
-        const srgb = solid?.srgbClr as Record<string, unknown> | undefined;
-        if (srgb?.["@_val"]) style.color = `#${String(srgb["@_val"]).slice(0, 6)}`;
-        const latin = rPr.latin as Record<string, unknown> | undefined;
-        if (typeof latin?.["@_typeface"] === "string" && latin["@_typeface"].trim()) {
-          style.fontFamily = latin["@_typeface"].trim();
-        }
-        if (rPr["@_u"] && rPr["@_u"] !== "none") style.textDecoration = "underline";
-      }
+      const runStyle = textRunStyle(rPr);
+      style = { ...style, ...runStyle };
+      lineHtml += richRunHtml(runText, runStyle);
     }
     const pPr = (p as Record<string, unknown>)?.pPr as Record<string, unknown> | undefined;
     const algn = pPr?.["@_algn"] as string | undefined;
     if (algn === "ctr") style.textAlign = "center";
     else if (algn === "r") style.textAlign = "right";
     else if (algn === "l") style.textAlign = "left";
-    if (line) lines.push(line);
+    if (line) {
+      lines.push(line);
+      const paragraphCss = style.textAlign ? ` style="display:block;text-align:${style.textAlign}"` : "";
+      htmlLines.push(`<span${paragraphCss}>${lineHtml || "&nbsp;"}</span>`);
+    }
   }
 
-  return { text: lines.join("\n"), style };
+  return { text: lines.join("\n"), richHtml: htmlLines.join("<br />"), style };
 }
 
 function getTransform(spPr: unknown): { x: number; y: number; w: number; h: number } | null {
@@ -197,7 +233,7 @@ async function parseShapeTree(
     if (!xfrm) continue;
 
     const txBody = spObj.txBody;
-    const { text, style } = extractTextFromParagraphs(txBody);
+    const { text, richHtml, style } = extractTextFromParagraphs(txBody);
     if (!text.trim()) continue;
     const fill = parseSolidFill(spPr);
 
@@ -210,6 +246,7 @@ async function parseShapeTree(
       height: emuToPercent(xfrm.h, slideCy),
       zIndex: z++,
       content: text,
+      contentHtml: richHtml,
       style: { ...DEFAULT_TEXT_STYLE, ...style, ...(fill ? { backgroundColor: fill } : {}) },
       entrance: { ...DEFAULT_ANIMATION, trigger: "auto" },
     });
@@ -303,7 +340,7 @@ async function parseShapeTree(
       cells.forEach((cell, cellIndex) => {
         const columnWidth = columns[cellIndex] ?? columns[columns.length - 1] ?? 1;
         const cellObj = cell as Record<string, unknown>;
-        const { text, style } = extractTextFromParagraphs(cellObj.txBody);
+        const { text, richHtml, style } = extractTextFromParagraphs(cellObj.txBody);
         const fill = parseSolidFill(cellObj.tcPr);
         elements.push({
           id: newElementId(),
@@ -314,6 +351,7 @@ async function parseShapeTree(
           height: emuToPercent((xfrm.h * rowHeights[rowIndex]!) / totalRowHeight, slideCy),
           zIndex: z++,
           content: text || " ",
+          contentHtml: richHtml || "&nbsp;",
           style: { ...DEFAULT_TEXT_STYLE, ...style, ...(fill ? { backgroundColor: fill } : {}) },
           entrance: { ...DEFAULT_ANIMATION, trigger: "auto" },
         });

@@ -83,6 +83,8 @@ export interface TeachSlideElement {
   height: number;
   zIndex: number;
   content?: string;
+  /** Run-preserving editable HTML for a text element imported from PowerPoint. */
+  contentHtml?: string;
   style?: TeachTextStyle;
   src?: string;
   video?: TeachVideoSettings;

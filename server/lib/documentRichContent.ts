@@ -1,5 +1,6 @@
 import { createCanvas } from "@napi-rs/canvas";
 import type { TeachSlide } from "../../shared/teachPresentation";
+import { pptxRichSlideToHtml, teachSlideToPptxRichSlide } from "../../shared/pptxRichSlide";
 
 export const LESSON_DOCUMENT_MAX_MB = 50;
 export const LESSON_DOCUMENT_MAX_BYTES = LESSON_DOCUMENT_MAX_MB * 1024 * 1024;
@@ -123,25 +124,7 @@ function pptxElementStyle(element: TeachSlide["elements"][number], includeTextSt
  * scale to the width of a lesson text block.
  */
 export function convertPptxSlideToRichTextHtml(slide: TeachSlide) {
-  const sourceWidth = Number.isFinite(slide.sourceWidth) && slide.sourceWidth! > 0 ? slide.sourceWidth! : 4;
-  const sourceHeight = Number.isFinite(slide.sourceHeight) && slide.sourceHeight! > 0 ? slide.sourceHeight! : 3;
-  const background = safeColor(slide.backgroundColor, "#ffffff");
-  const elements = [...slide.elements].sort((a, b) => a.zIndex - b.zIndex || a.y - b.y || a.x - b.x);
-  const body = elements.map((element) => {
-    if (element.type === "text") {
-      const content = escapeHtml(element.content ?? " ").replace(/\n/g, "<br />");
-      return `<div data-pptx-text-box="1" style="${escapeAttribute(pptxElementStyle(element, true))}">${content || "&nbsp;"}</div>`;
-    }
-    if (element.type === "image" && element.src) {
-      return `<img data-pptx-image="1" src="${escapeAttribute(element.src)}" alt="" style="${escapeAttribute(`${pptxElementStyle(element, false)};object-fit:contain;display:block`)}" />`;
-    }
-    if (element.type === "shape") {
-      const borderRadius = element.shape === "ellipse" ? "50%" : "0";
-      return `<div data-pptx-shape="1" aria-hidden="true" style="${escapeAttribute(`${pptxElementStyle(element, false)};background-color:${safeColor(element.fill, "transparent")};border:1px solid ${safeColor(element.stroke, "transparent")};border-radius:${borderRadius}`)}"></div>`;
-    }
-    return "";
-  }).join("");
-  return `<div data-pptx-slide-layout="1" style="position:relative;width:100%;aspect-ratio:${sourceWidth} / ${sourceHeight};overflow:hidden;background-color:${background};container-type:inline-size;isolation:isolate">${body}</div>`;
+  return pptxRichSlideToHtml(teachSlideToPptxRichSlide(slide));
 }
 
 export function getLessonDocumentKind(fileName: string, mimeType: string): LessonDocumentKind | null {
@@ -325,11 +308,13 @@ export function convertPptxSlidesToEditableLessonBlocks(
     const images = elements.filter(element => element.type === "image" && typeof element.src === "string" && element.src);
     const shapes = elements.filter(element => element.type === "shape");
 
+    const pptxSlide = teachSlideToPptxRichSlide(slide);
     blocks.push({
       id: makeBlockId("pptx-slide-rich-text", index, 1),
       type: "text",
       data: {
-        html: convertPptxSlideToRichTextHtml(slide),
+        html: pptxRichSlideToHtml(pptxSlide),
+        pptxSlide,
         align: "left",
         bgColor: slide.backgroundColor || "#ffffff",
         textColor: "#1a1a1a",
