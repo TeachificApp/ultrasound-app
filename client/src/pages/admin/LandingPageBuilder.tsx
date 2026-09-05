@@ -44,6 +44,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
 import PptxSlideRichTextEditor from "@/components/PptxSlideRichTextEditor";
+import PdfPageRichTextEditor from "@/components/PdfPageRichTextEditor";
+import { pdfRichPageToHtml, type PdfRichPage } from "@shared/pdfRichPage";
 import { pptxRichSlideToHtml, type PptxRichSlide } from "@shared/pptxRichSlide";
 import { isConvertedDocumentBlock } from "@shared/convertedDocumentBlock";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
@@ -3392,7 +3394,16 @@ function TextBlockEditor({ d, set, setMany, lessonTitle, courseTitle }: { d: Rec
             )}
           </div>
         )}
-        {d.pptxSlide ? (
+        {d.pdfPage ? (
+          <PdfPageRichTextEditor
+            value={d.pdfPage as PdfRichPage}
+            pageIndex={typeof (d.sourceDocument as { index?: unknown } | undefined)?.index === "number" ? (d.sourceDocument as { index: number }).index : 1}
+            onChange={(pdfPage) => {
+              const pageIndex = typeof (d.sourceDocument as { index?: unknown } | undefined)?.index === "number" ? (d.sourceDocument as { index: number }).index : 1;
+              setMany({ pdfPage, html: pdfRichPageToHtml(pdfPage, pageIndex) });
+            }}
+          />
+        ) : d.pptxSlide ? (
           <PptxSlideRichTextEditor
             value={d.pptxSlide as PptxRichSlide}
             onChange={(pptxSlide) => {
