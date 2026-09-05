@@ -676,6 +676,31 @@ textarea,
 }
 
 /* Converted PowerPoint slides embedded in one continuous lesson rich-text block */
+[data-converted-document] [data-pptx-document-slide] {
+  width: 100%;
+  max-width: 100%;
+}
+[data-converted-document] [data-pptx-table],
+[data-converted-document] [data-pptx-table] th,
+[data-converted-document] [data-pptx-table] td {
+  border: none !important;
+}
+[data-converted-document] [data-pptx-columns] {
+  border: none;
+}
+[data-converted-document] [data-pptx-columns] img,
+[data-converted-document] [data-pptx-figure] img {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  margin: 0;
+  border: none;
+}
+[data-converted-document] [data-pptx-text-box],
+[data-converted-document] [data-pptx-callout] {
+  border: none;
+  outline: none;
+}
 [data-converted-document] [data-pptx-slide-layout] {
   width: 100%;
   max-width: 100%;

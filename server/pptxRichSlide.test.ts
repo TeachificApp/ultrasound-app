@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { plainTextFromRichHtml, pptxRichSlideToHtml, type PptxRichSlide } from "../shared/pptxRichSlide";
+import { plainTextFromRichHtml, pptxRichSlideToDocumentHtml, pptxRichSlideToHtml, type PptxRichSlide } from "../shared/pptxRichSlide";
 
 describe("PowerPoint rich slide model", () => {
   it("keeps formatted text, visual layers, and responsive slide geometry together", () => {
@@ -23,5 +23,34 @@ describe("PowerPoint rich slide model", () => {
     expect(html).toContain('data-pptx-shape="1"');
     expect(html).toContain('data-pptx-image="1"');
     expect(plainTextFromRichHtml('<span>Styled</span><br />title')).toBe("Styled\ntitle");
+  });
+
+  it("renders lesson-document HTML with real tables, borderless columns, and full-width images", () => {
+    const slide: PptxRichSlide = {
+      version: 1,
+      title: "Document slide",
+      sourceWidth: 9144000,
+      sourceHeight: 6858000,
+      backgroundColor: "#ffffff",
+      elements: [
+        { id: "h1", type: "text", sourceName: "Table 1", content: "Concept", x: 5, y: 20, width: 28, height: 5, zIndex: 1, style: { fontWeight: "bold", backgroundColor: "#179ca3", color: "#ffffff", fontSize: 12, fontStyle: "normal", textAlign: "left" } },
+        { id: "h2", type: "text", sourceName: "Table 1", content: "Impact", x: 35, y: 20, width: 28, height: 5, zIndex: 2, style: { fontWeight: "bold", backgroundColor: "#179ca3", color: "#ffffff", fontSize: 12, fontStyle: "normal", textAlign: "left" } },
+        { id: "c1", type: "text", sourceName: "Table 1", content: "Frequency", x: 5, y: 30, width: 28, height: 5, zIndex: 3, style: { fontSize: 11, fontWeight: "normal", fontStyle: "normal", textAlign: "left", color: "#333333" } },
+        { id: "left", type: "text", content: "Important pulsed wave parameters include PD and PRP.", x: 5, y: 50, width: 55, height: 20, zIndex: 4, style: { fontSize: 14, fontWeight: "normal", fontStyle: "normal", textAlign: "left", color: "#333333" } },
+        { id: "right", type: "image", src: "https://example.test/chart.png", x: 62, y: 50, width: 33, height: 20, zIndex: 5 },
+      ],
+    };
+    const html = pptxRichSlideToDocumentHtml(slide);
+    expect(html).toContain('data-pptx-document-slide="1"');
+    expect(html).toContain('data-pptx-table="1"');
+    expect(html).toContain("<table");
+    expect(html).toContain("Concept");
+    expect(html).toContain("background-color:#179ca3");
+    expect(html).toContain('data-pptx-columns="1"');
+    expect(html).toContain('grid-template-columns:55fr 33fr');
+    expect(html).toContain('width:100%;height:auto');
+    expect(html).toContain('src="https://example.test/chart.png"');
+    expect(html).not.toContain("position:absolute");
+    expect(html).not.toContain('border:1px solid');
   });
 });

@@ -1,6 +1,6 @@
 import { createCanvas } from "@napi-rs/canvas";
 import { defaultPdfBodyHtml, DOCUMENT_SECTION_BREAK_HTML, pdfDocumentPageSectionHtml, wrapContinuousDocumentHtml } from "../../shared/pdfRichPage";
-import { pptxRichSlideToHtml, teachSlideToPptxRichSlide } from "../../shared/pptxRichSlide";
+import { pptxRichSlideToDocumentHtml, teachSlideToPptxRichSlide } from "../../shared/pptxRichSlide";
 import type { TeachSlide, TeachSlideElement } from "../../shared/teachPresentation";
 
 export const LESSON_DOCUMENT_MAX_MB = 50;
@@ -63,7 +63,7 @@ function sourceMetadata(source: LessonDocumentSource, kind: LessonDocumentKind, 
 }
 
 function pptxSlideSectionHtml(slide: TeachSlide, slideIndex: number) {
-  const layoutHtml = pptxRichSlideToHtml(teachSlideToPptxRichSlide(slide));
+  const layoutHtml = pptxRichSlideToDocumentHtml(teachSlideToPptxRichSlide(slide));
   return `<section data-document-slide="${slideIndex}" class="not-prose" style="margin:0">${layoutHtml}</section>`;
 }
 
