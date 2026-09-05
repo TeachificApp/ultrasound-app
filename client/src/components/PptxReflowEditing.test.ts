@@ -5,12 +5,11 @@ import { describe, expect, it } from "vitest";
 const preview = readFileSync(resolve(process.cwd(), "client/src/components/BlockPreview.tsx"), "utf8");
 const settings = readFileSync(resolve(process.cwd(), "client/src/pages/admin/LandingPageBuilder.tsx"), "utf8");
 
-describe("reflowed PowerPoint rich-text editing", () => {
-  it("uses the ordinary HTML renderer and normal rich-text settings instead of the overlay or layer editor", () => {
+describe("converted document rich-text editing", () => {
+  it("renders converted slide HTML in preview and uses the slide-level editor when pptxSlide is present", () => {
     expect(preview).toContain("const html = d.html ?? \"\";");
-    expect(preview).not.toContain("d.pptxSlide ?");
-    expect(settings).toContain("<RichTextEditor");
-    expect(settings).not.toContain("<PptxSlideRichTextEditor");
-    expect(settings).not.toContain("pptxRichSlideToHtml");
+    expect(settings).toContain("d.pptxSlide ? (");
+    expect(settings).toContain("<PptxSlideRichTextEditor");
+    expect(settings).toContain("pptxRichSlideToHtml(pptxSlide)");
   });
 });

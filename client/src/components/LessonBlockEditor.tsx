@@ -1110,7 +1110,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
           <div className="flex flex-col flex-1 overflow-y-auto gap-5 py-3">
             <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4 text-sm text-slate-700">
               <p className="font-semibold text-teal-800">Convert a PDF or PowerPoint into editable lesson content</p>
-              <p className="mt-1.5 leading-6">Each PDF page becomes a responsive page image and editable rich-text block. Each PowerPoint slide becomes editable rich text plus its extracted images. The original file is retained as a source reference, and conversion only appends blocks to this lesson.</p>
+              <p className="mt-1.5 leading-6">Each PDF page or PowerPoint slide becomes one editable rich-text block that preserves the page image, backgrounds, positioned text, images, shapes, and tables. The original file is retained as a source reference, and conversion only appends blocks to this lesson.</p>
             </div>
             {documentFile?.name.toLowerCase().endsWith(".pptx") && (
               <fieldset className="rounded-xl border border-slate-200 bg-white p-4">

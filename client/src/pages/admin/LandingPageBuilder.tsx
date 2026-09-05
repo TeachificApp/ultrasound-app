@@ -43,6 +43,8 @@ import { DebouncedInput, DebouncedTextarea } from "@/components/DebouncedInput";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
+import PptxSlideRichTextEditor from "@/components/PptxSlideRichTextEditor";
+import { pptxRichSlideToHtml, type PptxRichSlide } from "@shared/pptxRichSlide";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
 import { BlockPreview } from "@/components/BlockPreview";
@@ -3327,7 +3329,7 @@ function EnrollmentCounterBlockEditor({ d, set }: { d: Record<string, any>; set:
 // ── AiContentBlockEditor ─────────────────────────────────────────────────────
 // Extracted into its own component so hooks (useState, useMutation) are always
 // called at the top level — never conditionally inside a switch case.
-function TextBlockEditor({ d, set, lessonTitle, courseTitle }: { d: Record<string, any>; set: (field: string, value: any) => void; lessonTitle?: string | null; courseTitle?: string | null }) {
+function TextBlockEditor({ d, set, setMany, lessonTitle, courseTitle }: { d: Record<string, any>; set: (field: string, value: any) => void; setMany: (patch: Record<string, any>) => void; lessonTitle?: string | null; courseTitle?: string | null }) {
   const [aiFormat, setAiFormat] = React.useState<"text" | "outline" | "summary" | "quiz_questions">("text");
   const [aiPanelOpen, setAiPanelOpen] = React.useState(false);
   const generateContent = trpc.lmsAdmin.generateLessonContent.useMutation({
@@ -3389,7 +3391,16 @@ function TextBlockEditor({ d, set, lessonTitle, courseTitle }: { d: Record<strin
             )}
           </div>
         )}
-        <RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={150} maxHeight={400} placeholder="Start typing your content, or use AI Generate above…" />
+        {d.pptxSlide ? (
+          <PptxSlideRichTextEditor
+            value={d.pptxSlide as PptxRichSlide}
+            onChange={(pptxSlide) => {
+              setMany({ pptxSlide, html: pptxRichSlideToHtml(pptxSlide) });
+            }}
+          />
+        ) : (
+          <RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={150} maxHeight={400} placeholder="Start typing your content, or use AI Generate above…" />
+        )}
       </div>
       <BSAlignField data={d} onSet={set} label="Text Alignment" field="align" />
       <BSColorField data={d} onSet={set} label="Background" field="bgColor" />
@@ -4213,7 +4224,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
       return <AiContentBlockEditor d={d} set={set} setMany={setMany} emailMode={emailMode} />;
     }
     case "text": {
-      return <TextBlockEditor d={d} set={set} lessonTitle={lessonTitle} courseTitle={courseTitle} />;
+      return <TextBlockEditor d={d} set={set} setMany={setMany} lessonTitle={lessonTitle} courseTitle={courseTitle} />;
     }
       case "ai_image":
         return (

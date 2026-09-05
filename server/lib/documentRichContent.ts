@@ -1,4 +1,5 @@
 import { createCanvas } from "@napi-rs/canvas";
+import { pptxRichSlideToHtml, teachSlideToPptxRichSlide } from "../../shared/pptxRichSlide";
 import type { TeachSlide, TeachSlideElement } from "../../shared/teachPresentation";
 
 export const LESSON_DOCUMENT_MAX_MB = 50;
@@ -60,13 +61,83 @@ function sourceMetadata(source: LessonDocumentSource, kind: LessonDocumentKind, 
   };
 }
 
-function paragraphsToHtml(heading: string, paragraphs: string[]) {
-  const body = paragraphs
-    .map(paragraph => paragraph.trim())
-    .filter(Boolean)
-    .map(paragraph => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`)
-    .join("");
-  return `<h2>${escapeHtml(heading)}</h2>${body || "<p></p>"}`;
+type PdfPositionedText = {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  fontSize: number;
+};
+
+function positionedPdfTextItems(items: unknown[], viewport: { width: number; height: number }): PdfPositionedText[] {
+  const positioned = items
+    .map((candidate) => {
+      const item = candidate as { str?: unknown; transform?: unknown; width?: unknown; height?: unknown };
+      const text = typeof item.str === "string" ? item.str.trim() : "";
+      const transform = Array.isArray(item.transform) ? item.transform : [];
+      const scaleY = typeof transform[3] === "number" ? Math.abs(transform[3]) : 12;
+      const tx = typeof transform[4] === "number" ? transform[4] : 0;
+      const ty = typeof transform[5] === "number" ? transform[5] : 0;
+      const width = typeof item.width === "number" && item.width > 0
+        ? item.width
+        : Math.max(24, text.length * scaleY * 0.55);
+      return {
+        text,
+        x: tx,
+        y: viewport.height - ty - scaleY,
+        width,
+        fontSize: Math.min(72, Math.max(8, scaleY)),
+      };
+    })
+    .filter(item => item.text);
+
+  const rows: Array<{ y: number; values: PdfPositionedText[] }> = [];
+  for (const item of positioned.sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const row = rows.find(candidate => Math.abs(candidate.y - item.y) <= Math.max(3, item.fontSize * 0.35));
+    if (row) row.values.push(item);
+    else rows.push({ y: item.y, values: [item] });
+  }
+
+  return rows.flatMap((row) => row.values.sort((a, b) => a.x - b.x).map((item) => ({
+    ...item,
+    x: Math.min(100, Math.max(0, (item.x / viewport.width) * 100)),
+    y: Math.min(100, Math.max(0, (item.y / viewport.height) * 100)),
+    width: Math.min(100, Math.max(8, (item.width / viewport.width) * 100)),
+  })));
+}
+
+function pdfTextBoxStyle(box: PdfPositionedText) {
+  const responsiveSize = Math.min(13, Math.max(0.8, box.fontSize / 8));
+  return [
+    "position:absolute",
+    `left:${box.x.toFixed(2)}%`,
+    `top:${box.y.toFixed(2)}%`,
+    `width:${box.width.toFixed(2)}%`,
+    "box-sizing:border-box",
+    `font-size:clamp(9px, ${responsiveSize.toFixed(2)}cqw, ${Math.round(box.fontSize * 1.34)}px)`,
+    "color:#1a1a1a",
+    "overflow:visible",
+    "white-space:normal",
+    "margin:0",
+    "z-index:2",
+  ].join(";");
+}
+
+/** One editable rich-text page that preserves the rendered PDF image and positioned text layers. */
+export function convertPdfPageToRichTextHtml(
+  imageUrl: string,
+  textBoxes: PdfPositionedText[],
+  pageWidth: number,
+  pageHeight: number,
+  bgColor = "#ffffff",
+) {
+  const width = Math.max(1, Math.round(pageWidth));
+  const height = Math.max(1, Math.round(pageHeight));
+  const imageLayer = `<img data-pptx-image="1" src="${escapeAttribute(imageUrl)}" alt="" style="${escapeAttribute("position:absolute;left:0%;top:0%;width:100%;height:100%;z-index:1;object-fit:contain;display:block")}" />`;
+  const textLayers = textBoxes.map((box) => (
+    `<div data-pptx-text-box="1" style="${escapeAttribute(pdfTextBoxStyle(box))}">${escapeHtml(box.text)}</div>`
+  )).join("");
+  return `<div data-pptx-slide-layout="1" style="position:relative;width:100%;aspect-ratio:${width} / ${height};overflow:hidden;background-color:${bgColor};container-type:inline-size;isolation:isolate">${imageLayer}${textLayers}</div>`;
 }
 
 function escapeAttribute(value: string) {
@@ -212,28 +283,6 @@ export function assertLessonDocumentUpload(fileName: string, mimeType: string, b
   }
 }
 
-function asTextLines(items: unknown[]): string[] {
-  const positioned = items
-    .map((candidate) => {
-      const item = candidate as { str?: unknown; transform?: unknown };
-      const text = typeof item.str === "string" ? item.str.trim() : "";
-      const transform = Array.isArray(item.transform) ? item.transform : [];
-      const y = typeof transform[5] === "number" ? transform[5] : 0;
-      const x = typeof transform[4] === "number" ? transform[4] : 0;
-      return { text, x, y };
-    })
-    .filter(item => item.text);
-
-  const rows: Array<{ y: number; values: Array<{ text: string; x: number }> }> = [];
-  for (const item of positioned.sort((a, b) => b.y - a.y || a.x - b.x)) {
-    const row = rows.find(candidate => Math.abs(candidate.y - item.y) <= 3);
-    if (row) row.values.push({ text: item.text, x: item.x });
-    else rows.push({ y: item.y, values: [{ text: item.text, x: item.x }] });
-  }
-  return rows
-    .map(row => row.values.sort((a, b) => a.x - b.x).map(item => item.text).join(" ").replace(/\s+/g, " ").trim())
-    .filter(Boolean);
-}
 
 type PdfCanvasFactory = {
   create: (width: number, height: number) => { canvas: ReturnType<typeof createCanvas>; context: ReturnType<ReturnType<typeof createCanvas>["getContext"]> };
@@ -296,8 +345,8 @@ export async function convertPdfToEditableLessonBlocks(
     for (let pageIndex = 1; pageIndex <= document.numPages; pageIndex += 1) {
       const page = await document.getPage(pageIndex);
       const textContent = await page.getTextContent();
-      const textLines = asTextLines(textContent.items);
       const viewport = page.getViewport({ scale: 1.25 });
+      const textBoxes = positionedPdfTextItems(textContent.items, viewport);
       const canvasAndContext = pdfCanvasFactory.create(Math.ceil(viewport.width), Math.ceil(viewport.height));
       await page.render({
         canvasContext: canvasAndContext.context as never,
@@ -311,32 +360,18 @@ export async function convertPdfToEditableLessonBlocks(
       );
       const metadata = sourceMetadata(source, "pdf", pageIndex);
       blocks.push({
-        id: makeBlockId("pdf-page-image", pageIndex, 1),
-        type: "image",
-        data: {
-          url: imageUrl,
-          alt: `${source.fileName} page ${pageIndex}`,
-          caption: "",
-          align: "center",
-          maxWidth: "100%",
-          showShadow: false,
-          noBorder: false,
-          ...metadata,
-        },
-      });
-      blocks.push({
-        id: makeBlockId("pdf-page-text", pageIndex, 2),
+        id: makeBlockId("pdf-page-rich-text", pageIndex, 1),
         type: "text",
         data: {
-          html: paragraphsToHtml(`Page ${pageIndex}`, textLines),
+          html: convertPdfPageToRichTextHtml(imageUrl, textBoxes, viewport.width, viewport.height),
           align: "left",
           bgColor: "#ffffff",
           textColor: "#1a1a1a",
           ...metadata,
         },
       });
-      if (textLines.length === 0) {
-        warnings.push(`Page ${pageIndex} has no machine-readable text. Its rendered page image was retained and can be replaced or supplemented in the editor.`);
+      if (textBoxes.length === 0) {
+        warnings.push(`Page ${pageIndex} has no machine-readable text. Its rendered page image was retained inside the rich-text block and can be replaced or supplemented in the editor.`);
       }
       page.cleanup?.();
     }
@@ -379,14 +414,16 @@ export function convertPptxSlidesToEditableLessonBlocks(
     const images = elements.filter(element => element.type === "image" && typeof element.src === "string" && element.src);
     const shapes = elements.filter(element => element.type === "shape");
 
+    const pptxSlide = teachSlideToPptxRichSlide(filteredSlide);
     blocks.push({
       id: makeBlockId("pptx-slide-rich-text", index, 1),
       type: "text",
       data: {
-        html: convertPptxSlideToRichTextHtml(filteredSlide),
+        html: pptxRichSlideToHtml(pptxSlide),
         align: "left",
         bgColor: filteredSlide.backgroundColor || "#ffffff",
         textColor: "#1a1a1a",
+        pptxSlide,
         pptxConversion: { includeHeadersAndFooters },
         ...metadata,
       },
