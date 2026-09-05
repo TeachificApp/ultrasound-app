@@ -7,6 +7,7 @@
  *   standaloneQuizAdminRouter    — CRUD, question management, analytics, import/export
  */
 import { TRPCError } from "@trpc/server";
+import { DrizzleQueryError } from "drizzle-orm";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull, isNotNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -828,6 +829,36 @@ export const standaloneQuizLearnerRouter = router({
 });
 
 // ─── Admin Router ─────────────────────────────────────────────────────────────
+
+const STANDALONE_QUIZ_LIST_COLUMNS = {
+  id: standaloneQuizzes.id,
+  title: standaloneQuizzes.title,
+  type: standaloneQuizzes.type,
+  brand: standaloneQuizzes.brand,
+  status: standaloneQuizzes.status,
+  categoryConfig: standaloneQuizzes.categoryConfig,
+  questionsPerAttempt: standaloneQuizzes.questionsPerAttempt,
+  updatedAt: standaloneQuizzes.updatedAt,
+} as const;
+
+function formatStandaloneQuizListQueryError(error: unknown): TRPCError {
+  const causeMessage = error instanceof DrizzleQueryError
+    ? String((error as DrizzleQueryError & { cause?: Error }).cause?.message ?? error.message)
+    : error instanceof Error
+      ? error.message
+      : String(error);
+  if (/unknown column|doesn't exist|failed query/i.test(causeMessage)) {
+    return new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Quiz Creator database schema is out of date. Run drizzle/0059_standalone_quiz_schema_sync.sql on MySQL, then reload this page.",
+    });
+  }
+  return new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: causeMessage || "Could not load quizzes.",
+  });
+}
+
 export const standaloneQuizAdminRouter = router({
   /** List all quizzes */
   listQuizzes: protectedProcedure
@@ -850,20 +881,58 @@ export const standaloneQuizAdminRouter = router({
       if (input.brand) conditions.push(eq(standaloneQuizzes.brand, input.brand));
       const where = conditions.length > 0 ? and(...conditions) : undefined;
       const offset = (input.page - 1) * input.pageSize;
-      const [quizzes, [{ total }]] = await Promise.all([
-        db.select({
-          quiz: standaloneQuizzes,
-          questionCount: sql<number>`(SELECT COUNT(*) FROM standalone_quiz_questions WHERE quiz_id = ${standaloneQuizzes.id})`,
-          attemptCount: sql<number>`(SELECT COUNT(*) FROM standalone_quiz_attempts WHERE quiz_id = ${standaloneQuizzes.id} AND completed_at IS NOT NULL)`,
-        })
-          .from(standaloneQuizzes)
-          .where(where)
-          .orderBy(desc(standaloneQuizzes.updatedAt))
-          .limit(input.pageSize)
-          .offset(offset),
-        db.select({ total: sql<number>`count(*)` }).from(standaloneQuizzes).where(where),
-      ]);
-      return { quizzes, total: Number(total), page: input.page, pageSize: input.pageSize };
+      try {
+        const [rows, [{ total }]] = await Promise.all([
+          db.select(STANDALONE_QUIZ_LIST_COLUMNS)
+            .from(standaloneQuizzes)
+            .where(where)
+            .orderBy(desc(standaloneQuizzes.updatedAt))
+            .limit(input.pageSize)
+            .offset(offset),
+          db.select({ total: sql<number>`count(*)` }).from(standaloneQuizzes).where(where),
+        ]);
+
+        if (rows.length === 0) {
+          return { quizzes: [], total: Number(total), page: input.page, pageSize: input.pageSize };
+        }
+
+        const quizIds = rows.map((row) => row.id);
+        const [questionCounts, attemptCounts] = await Promise.all([
+          db.select({
+            quizId: standaloneQuizQuestions.quizId,
+            count: sql<number>`count(*)`,
+          })
+            .from(standaloneQuizQuestions)
+            .where(inArray(standaloneQuizQuestions.quizId, quizIds))
+            .groupBy(standaloneQuizQuestions.quizId),
+          db.select({
+            quizId: standaloneQuizAttempts.quizId,
+            count: sql<number>`count(*)`,
+          })
+            .from(standaloneQuizAttempts)
+            .where(and(
+              inArray(standaloneQuizAttempts.quizId, quizIds),
+              isNotNull(standaloneQuizAttempts.completedAt),
+            ))
+            .groupBy(standaloneQuizAttempts.quizId),
+        ]);
+
+        const questionCountByQuizId = new Map(questionCounts.map((row) => [row.quizId, Number(row.count)]));
+        const attemptCountByQuizId = new Map(attemptCounts.map((row) => [row.quizId, Number(row.count)]));
+
+        return {
+          quizzes: rows.map((quiz) => ({
+            quiz,
+            questionCount: questionCountByQuizId.get(quiz.id) ?? 0,
+            attemptCount: attemptCountByQuizId.get(quiz.id) ?? 0,
+          })),
+          total: Number(total),
+          page: input.page,
+          pageSize: input.pageSize,
+        };
+      } catch (error) {
+        throw formatStandaloneQuizListQueryError(error);
+      }
     }),
 
   /** Get a single quiz with its questions */

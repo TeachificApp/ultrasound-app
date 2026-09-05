@@ -1280,12 +1280,26 @@ function BatchScormNativeImportDialog({
   );
 }
 
+type QuizListTab = "quiz" | "mock_exam" | "flashcards" | "results";
+
+function quizTypeLabel(type: string) {
+  if (type === "mock_exam") return "Mock Exam";
+  if (type === "flashcards") return "Flashcards";
+  return "Quiz";
+}
+
+function quizTypeEmptyLabel(type: QuizListTab) {
+  if (type === "mock_exam") return "mock exams";
+  if (type === "flashcards") return "flashcard decks";
+  if (type === "quiz") return "quizzes";
+  return "items";
+}
+
 function QuizList() {
   const [, navigate] = useLocation();
-  const [mainView, setMainView] = useState<"quizzes" | "results">("quizzes");
+  const [activeTab, setActiveTab] = useState<QuizListTab>("quiz");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
-  const [type, setType] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -1294,9 +1308,11 @@ function QuizList() {
   const { data, isLoading, error: quizzesError, refetch } = trpc.standaloneQuizAdmin.listQuizzes.useQuery({
     search: search || undefined,
     status: status !== "all" ? (status as any) : undefined,
-    type: type !== "all" ? (type as any) : undefined,
+    type: activeTab === "results" ? undefined : activeTab,
     page,
     pageSize: 20,
+  }, {
+    enabled: activeTab !== "results",
   });
 
   const createMutation = trpc.standaloneQuizAdmin.createQuiz.useMutation({
@@ -1329,7 +1345,7 @@ function QuizList() {
     onError: (e) => toast.error(`Rename failed: ${e.message}`),
   });
 
-  const [newQuiz, setNewQuiz] = useState({ title: "", type: "quiz" as "quiz" | "mock_exam", brand: "aaus" as "aaus" | "iheartecho" });
+  const [newQuiz, setNewQuiz] = useState({ title: "", type: "quiz" as "quiz" | "mock_exam" | "flashcards", brand: "aaus" as "aaus" | "iheartecho" });
 
   const totalPages = data ? Math.ceil(data.total / 20) : 1;
 
@@ -1346,7 +1362,7 @@ function QuizList() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Quiz Creator</h1>
-            <p className="text-sm text-gray-500 mt-1">Create and manage standalone quizzes and mock exams</p>
+            <p className="text-sm text-gray-500 mt-1">Create and manage quizzes, mock exams, and flashcard decks</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => navigate("/admin/quiz-creator/builder/new")} className="border-teal-300 text-teal-700 hover:bg-teal-50">
@@ -1358,7 +1374,7 @@ function QuizList() {
             <Button variant="outline" onClick={() => setShowImport(true)} className="border-orange-300 text-orange-700 hover:bg-orange-50">
               <Upload className="w-4 h-4 mr-2" /> Import Quiz
             </Button>
-            <Button onClick={() => setShowCreate(true)} className="bg-teal-600 hover:bg-teal-700">
+            <Button onClick={() => { setNewQuiz((q) => ({ ...q, type: activeTab === "results" ? "quiz" : activeTab })); setShowCreate(true); }} className="bg-teal-600 hover:bg-teal-700">
               <Plus className="w-4 h-4 mr-2" /> New Quiz
             </Button>
           </div>
@@ -1391,20 +1407,22 @@ function QuizList() {
 
         {/* Main Tabs */}
         <div className="flex gap-2 mb-4 border-b border-gray-200">
-          <button
-            onClick={() => setMainView("quizzes")}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mainView === "quizzes" ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-          >
-            Quizzes & Mock Exams
-          </button>
-          <button
-            onClick={() => setMainView("results")}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${mainView === "results" ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
-          >
-            All Results
-          </button>
+          {([
+            ["quiz", "Quizzes"],
+            ["mock_exam", "Mock Exams"],
+            ["flashcards", "Flashcards"],
+            ["results", "All Results"],
+          ] as const).map(([tab, label]) => (
+            <button
+              key={tab}
+              onClick={() => { setActiveTab(tab); setPage(1); }}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? "border-teal-600 text-teal-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-        {mainView === "results" ? (
+        {activeTab === "results" ? (
           <AllResultsView />
         ) : (<>
         <div className="quiz-list-content">
@@ -1431,15 +1449,6 @@ function QuizList() {
               <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={type} onValueChange={(v) => { setType(v); setPage(1); }}>
-            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="quiz">Quiz</SelectItem>
-              <SelectItem value="mock_exam">Mock Exam</SelectItem>
-              <SelectItem value="flashcards">Flashcards</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Table */}
@@ -1455,8 +1464,8 @@ function QuizList() {
           ) : !data?.quizzes.length ? (
             <div className="p-12 text-center text-gray-400">
               <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">No quizzes yet</p>
-              <p className="text-sm mt-1">Click "New Quiz" to create your first quiz, or "Import Quiz" to import from SCORM or CSV</p>
+              <p className="font-medium">No {quizTypeEmptyLabel(activeTab)} yet</p>
+              <p className="text-sm mt-1">Click "New Quiz" to create your first {quizTypeEmptyLabel(activeTab).replace(/s$/, "")}, or "Import Quiz" to import from SCORM or CSV</p>
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -1533,7 +1542,7 @@ function QuizList() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="capitalize text-gray-700">{quiz.type === "mock_exam" ? "Mock Exam" : "Quiz"}</span>
+                      <span className="capitalize text-gray-700">{quizTypeLabel(quiz.type)}</span>
                     </td>
                     <td className="px-4 py-3 text-center text-gray-700">{Number(questionCount)}</td>
                     <td className="px-4 py-3 text-center text-gray-700">{Number(attemptCount)}</td>
@@ -1621,6 +1630,7 @@ function QuizList() {
                   <SelectContent>
                     <SelectItem value="quiz">Quiz (instant feedback)</SelectItem>
                     <SelectItem value="mock_exam">Mock Exam (submit all)</SelectItem>
+                    <SelectItem value="flashcards">Flashcards</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
