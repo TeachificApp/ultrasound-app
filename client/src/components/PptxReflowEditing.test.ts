@@ -8,6 +8,8 @@ const settings = readFileSync(resolve(process.cwd(), "client/src/pages/admin/Lan
 describe("converted document rich-text editing", () => {
   it("renders converted slide HTML in preview and uses the slide-level editor when pptxSlide is present", () => {
     expect(preview).toContain("const html = d.html ?? \"\";");
+    expect(settings).toContain("d.pdfPage ? (");
+    expect(settings).toContain("<PdfPageRichTextEditor");
     expect(settings).toContain("d.pptxSlide ? (");
     expect(settings).toContain("<PptxSlideRichTextEditor");
     expect(settings).toContain("pptxRichSlideToHtml(pptxSlide)");

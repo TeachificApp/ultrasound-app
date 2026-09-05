@@ -1,4 +1,5 @@
 import { createCanvas } from "@napi-rs/canvas";
+import { defaultPdfBodyHtml, pdfRichPageToHtml, type PdfRichPage } from "../../shared/pdfRichPage";
 import { pptxRichSlideToHtml, teachSlideToPptxRichSlide } from "../../shared/pptxRichSlide";
 import type { TeachSlide, TeachSlideElement } from "../../shared/teachPresentation";
 
@@ -61,83 +62,71 @@ function sourceMetadata(source: LessonDocumentSource, kind: LessonDocumentKind, 
   };
 }
 
-type PdfPositionedText = {
+type PdfTextWord = {
   text: string;
   x: number;
   y: number;
-  width: number;
-  fontSize: number;
+  height: number;
 };
 
-function positionedPdfTextItems(items: unknown[], viewport: { width: number; height: number }): PdfPositionedText[] {
-  const positioned = items
+function pdfReflowParagraphs(items: unknown[], viewport: { width: number; height: number }) {
+  const words: PdfTextWord[] = items
     .map((candidate) => {
-      const item = candidate as { str?: unknown; transform?: unknown; width?: unknown; height?: unknown };
-      const text = typeof item.str === "string" ? item.str.trim() : "";
+      const item = candidate as { str?: unknown; transform?: unknown; height?: unknown };
+      const text = typeof item.str === "string" ? item.str.replace(/\s+/g, " ").trim() : "";
       const transform = Array.isArray(item.transform) ? item.transform : [];
       const scaleY = typeof transform[3] === "number" ? Math.abs(transform[3]) : 12;
       const tx = typeof transform[4] === "number" ? transform[4] : 0;
       const ty = typeof transform[5] === "number" ? transform[5] : 0;
-      const width = typeof item.width === "number" && item.width > 0
-        ? item.width
-        : Math.max(24, text.length * scaleY * 0.55);
+      const height = typeof item.height === "number" && item.height > 0 ? item.height : scaleY;
       return {
         text,
         x: tx,
         y: viewport.height - ty - scaleY,
-        width,
-        fontSize: Math.min(72, Math.max(8, scaleY)),
+        height: Math.min(72, Math.max(8, height)),
       };
     })
-    .filter(item => item.text);
+    .filter((word) => word.text);
 
-  const rows: Array<{ y: number; values: PdfPositionedText[] }> = [];
-  for (const item of positioned.sort((a, b) => a.y - b.y || a.x - b.x)) {
-    const row = rows.find(candidate => Math.abs(candidate.y - item.y) <= Math.max(3, item.fontSize * 0.35));
-    if (row) row.values.push(item);
-    else rows.push({ y: item.y, values: [item] });
+  const rows: Array<{ y: number; lineHeight: number; words: PdfTextWord[] }> = [];
+  for (const word of words.sort((a, b) => a.y - b.y || a.x - b.x)) {
+    const row = rows.find((candidate) => Math.abs(candidate.y - word.y) <= Math.max(4, word.height * 0.45));
+    if (row) {
+      row.words.push(word);
+      row.y = (row.y + word.y) / 2;
+      row.lineHeight = Math.max(row.lineHeight, word.height);
+    } else {
+      rows.push({ y: word.y, lineHeight: word.height, words: [word] });
+    }
   }
 
-  return rows.flatMap((row) => row.values.sort((a, b) => a.x - b.x).map((item) => ({
-    ...item,
-    x: Math.min(100, Math.max(0, (item.x / viewport.width) * 100)),
-    y: Math.min(100, Math.max(0, (item.y / viewport.height) * 100)),
-    width: Math.min(100, Math.max(8, (item.width / viewport.width) * 100)),
-  })));
+  const paragraphs: string[] = [];
+  let buffer: string[] = [];
+  let lastY = -1;
+  let lastLineHeight = 12;
+  for (const row of rows.sort((a, b) => a.y - b.y)) {
+    const line = row.words.sort((a, b) => a.x - b.x).map((word) => word.text).join(" ").replace(/\s+/g, " ").trim();
+    if (!line) continue;
+    if (lastY >= 0 && row.y - lastY > Math.max(10, lastLineHeight * 1.35)) {
+      if (buffer.length) paragraphs.push(buffer.join("\n"));
+      buffer = [];
+    }
+    buffer.push(line);
+    lastY = row.y;
+    lastLineHeight = row.lineHeight;
+  }
+  if (buffer.length) paragraphs.push(buffer.join("\n"));
+  return paragraphs;
 }
 
-function pdfTextBoxStyle(box: PdfPositionedText) {
-  const responsiveSize = Math.min(13, Math.max(0.8, box.fontSize / 8));
-  return [
-    "position:absolute",
-    `left:${box.x.toFixed(2)}%`,
-    `top:${box.y.toFixed(2)}%`,
-    `width:${box.width.toFixed(2)}%`,
-    "box-sizing:border-box",
-    `font-size:clamp(9px, ${responsiveSize.toFixed(2)}cqw, ${Math.round(box.fontSize * 1.34)}px)`,
-    "color:#1a1a1a",
-    "overflow:visible",
-    "white-space:normal",
-    "margin:0",
-    "z-index:2",
-  ].join(";");
-}
-
-/** One editable rich-text page that preserves the rendered PDF image and positioned text layers. */
-export function convertPdfPageToRichTextHtml(
-  imageUrl: string,
-  textBoxes: PdfPositionedText[],
-  pageWidth: number,
-  pageHeight: number,
-  bgColor = "#ffffff",
-) {
-  const width = Math.max(1, Math.round(pageWidth));
-  const height = Math.max(1, Math.round(pageHeight));
-  const imageLayer = `<img data-pptx-image="1" src="${escapeAttribute(imageUrl)}" alt="" style="${escapeAttribute("position:absolute;left:0%;top:0%;width:100%;height:100%;z-index:1;object-fit:contain;display:block")}" />`;
-  const textLayers = textBoxes.map((box) => (
-    `<div data-pptx-text-box="1" style="${escapeAttribute(pdfTextBoxStyle(box))}">${escapeHtml(box.text)}</div>`
-  )).join("");
-  return `<div data-pptx-slide-layout="1" style="position:relative;width:100%;aspect-ratio:${width} / ${height};overflow:hidden;background-color:${bgColor};container-type:inline-size;isolation:isolate">${imageLayer}${textLayers}</div>`;
+/** One editable rich-text page: visual page image plus reflowed text (no overlapping overlays). */
+export function convertPdfPageToRichTextHtml(imageUrl: string, paragraphs: string[], pageIndex = 1) {
+  const pdfPage: PdfRichPage = {
+    version: 1,
+    imageUrl,
+    bodyHtml: defaultPdfBodyHtml(paragraphs),
+  };
+  return { html: pdfRichPageToHtml(pdfPage, pageIndex), pdfPage };
 }
 
 function escapeAttribute(value: string) {
@@ -346,7 +335,7 @@ export async function convertPdfToEditableLessonBlocks(
       const page = await document.getPage(pageIndex);
       const textContent = await page.getTextContent();
       const viewport = page.getViewport({ scale: 1.25 });
-      const textBoxes = positionedPdfTextItems(textContent.items, viewport);
+      const paragraphs = pdfReflowParagraphs(textContent.items, viewport);
       const canvasAndContext = pdfCanvasFactory.create(Math.ceil(viewport.width), Math.ceil(viewport.height));
       await page.render({
         canvasContext: canvasAndContext.context as never,
@@ -359,18 +348,20 @@ export async function convertPdfToEditableLessonBlocks(
         "image/png",
       );
       const metadata = sourceMetadata(source, "pdf", pageIndex);
+      const converted = convertPdfPageToRichTextHtml(imageUrl, paragraphs, pageIndex);
       blocks.push({
         id: makeBlockId("pdf-page-rich-text", pageIndex, 1),
         type: "text",
         data: {
-          html: convertPdfPageToRichTextHtml(imageUrl, textBoxes, viewport.width, viewport.height),
+          html: converted.html,
+          pdfPage: converted.pdfPage,
           align: "left",
           bgColor: "#ffffff",
           textColor: "#1a1a1a",
           ...metadata,
         },
       });
-      if (textBoxes.length === 0) {
+      if (paragraphs.length === 0) {
         warnings.push(`Page ${pageIndex} has no machine-readable text. Its rendered page image was retained inside the rich-text block and can be replaced or supplemented in the editor.`);
       }
       page.cleanup?.();

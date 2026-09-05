@@ -122,7 +122,7 @@ describe("document rich-content conversion", () => {
     expect((excluded.blocks[0].data.pptxConversion as any).includeHeadersAndFooters).toBe(false);
   });
 
-  it("renders each PDF page as one editable rich-text block with preserved page image and positioned text", async () => {
+  it("renders each PDF page as one editable rich-text block with page image and reflowed text", async () => {
     const pdf = await PDFDocument.create();
     const font = await pdf.embedFont(StandardFonts.Helvetica);
     const firstPage = pdf.addPage([400, 300]);
@@ -145,8 +145,10 @@ describe("document rich-content conversion", () => {
     expect(uploaded.every(asset => asset.bytes > 0)).toBe(true);
     expect(result.blocks.map(block => block.type)).toEqual(["text", "text"]);
     expect(String(result.blocks[0].data.html)).toContain("First editable PDF page");
-    expect(String(result.blocks[0].data.html)).toContain('data-pptx-slide-layout="1"');
-    expect(String(result.blocks[0].data.html)).toContain('data-pptx-image="1"');
+    expect(String(result.blocks[0].data.html)).toContain('data-pdf-page="1"');
+    expect(String(result.blocks[0].data.html)).toContain('data-pdf-editable-text="1"');
+    expect(String(result.blocks[0].data.html)).not.toContain("position:absolute");
+    expect(result.blocks[0].data.pdfPage).toBeDefined();
     expect(String(result.blocks[1].data.html)).toContain("Second editable PDF page");
     expect((result.blocks[0].data.sourceDocument as any).storageKey).toBe(source.storageKey);
     expect(result.blocks.some(block => block.type === ("embed" as any))).toBe(false);

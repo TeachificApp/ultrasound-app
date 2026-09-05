@@ -2,8 +2,9 @@ export function isConvertedDocumentBlock(data: Record<string, unknown> | null | 
   if (!data) return false;
   if (data.sourceDocument) return true;
   if (data.pptxSlide) return true;
+  if (data.pdfPage) return true;
   const html = typeof data.html === "string" ? data.html : "";
-  return html.includes("data-pptx-slide-layout");
+  return html.includes("data-pdf-page") || html.includes("data-pptx-slide-layout");
 }
 
 export const CONVERTED_DOCUMENT_PANEL_WIDTH_RATIO = 0.65;
