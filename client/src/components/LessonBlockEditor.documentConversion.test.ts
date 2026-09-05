@@ -25,4 +25,11 @@ describe("LessonBlockEditor document conversion entry", () => {
     expect(source).toContain("Maximum file size: ${DOCUMENT_CONVERSION_MAX_MB} MB");
     expect(source).not.toContain("Maximum file size: 25 MB");
   });
+
+  it("asks authors whether PowerPoint headers and footers should be included", () => {
+    expect(source).toContain("PowerPoint header and footer");
+    expect(source).toContain("Include header and footer");
+    expect(source).toContain("Exclude header and footer");
+    expect(source).toContain("includePptxHeadersAndFooters");
+  });
 });

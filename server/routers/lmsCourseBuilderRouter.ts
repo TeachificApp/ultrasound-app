@@ -1277,6 +1277,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       fileName: z.string().trim().min(1).max(180),
       mimeType: z.string().trim().min(1).max(160),
       fileSize: z.number().int().positive().max(LESSON_DOCUMENT_MAX_BYTES),
+      includePptxHeadersAndFooters: z.boolean().optional(),
       // The application JSON body limit is 100 MB; this independently bounds the encoded upload.
       fileData: z.string().min(1).max(Math.ceil(LESSON_DOCUMENT_MAX_BYTES * 1.37)),
     }))
@@ -1346,6 +1347,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
           : convertPptxSlidesToEditableLessonBlocks(
               (await parsePptxBuffer(buffer, uploadImage)).slides,
               source,
+              { includeHeadersAndFooters: input.includePptxHeadersAndFooters !== false },
             );
         return { ...result, source };
       } catch (error) {

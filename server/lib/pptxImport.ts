@@ -186,6 +186,13 @@ function parseSolidFill(node: unknown): string | undefined {
   return undefined;
 }
 
+function sourceShapeName(node: unknown, property: string): string | undefined {
+  const container = node && typeof node === "object" ? (node as Record<string, unknown>)[property] : undefined;
+  const cNvPr = container && typeof container === "object" ? (container as Record<string, unknown>).cNvPr as Record<string, unknown> | undefined : undefined;
+  const name = cNvPr?.["@_name"];
+  return typeof name === "string" && name.trim() ? name.trim().slice(0, 180) : undefined;
+}
+
 function parseBackground(cSld: unknown): { backgroundColor?: string; backgroundImage?: string } {
   if (!cSld || typeof cSld !== "object") return {};
   const bg = (cSld as Record<string, unknown>).bg as Record<string, unknown> | undefined;
@@ -247,6 +254,7 @@ async function parseShapeTree(
       zIndex: z++,
       content: text,
       contentHtml: richHtml,
+      sourceName: sourceShapeName(spObj, "nvSpPr"),
       style: { ...DEFAULT_TEXT_STYLE, ...style, ...(fill ? { backgroundColor: fill } : {}) },
       entrance: { ...DEFAULT_ANIMATION, trigger: "auto" },
     });
@@ -305,6 +313,7 @@ async function parseShapeTree(
       height: emuToPercent(xfrm.h, slideCy),
       zIndex: z++,
       src,
+      sourceName: sourceShapeName(picObj, "nvPicPr"),
       entrance: { ...DEFAULT_ANIMATION, type: "zoomIn", trigger: "auto" },
     });
   }
@@ -352,6 +361,7 @@ async function parseShapeTree(
           zIndex: z++,
           content: text || " ",
           contentHtml: richHtml || "&nbsp;",
+          sourceName: sourceShapeName(frame, "nvGraphicFramePr"),
           style: { ...DEFAULT_TEXT_STYLE, ...style, ...(fill ? { backgroundColor: fill } : {}) },
           entrance: { ...DEFAULT_ANIMATION, trigger: "auto" },
         });
@@ -383,6 +393,7 @@ async function parseShapeTree(
       shape: preset === "ellipse" ? "ellipse" : "rectangle",
       fill: fill ?? "#179ca322",
       stroke: fill ?? "#179ca3",
+      sourceName: sourceShapeName(spObj, "nvSpPr"),
       entrance: { ...DEFAULT_ANIMATION, trigger: "auto" },
     });
   }

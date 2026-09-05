@@ -149,6 +149,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const [importPreview, setImportPreview] = useState<{ blocks: any[]; pageTitle: string; blockCount: number } | null>(null);
   const [importSelectedBlocks, setImportSelectedBlocks] = useState<Set<number>>(new Set());
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [includePptxHeadersAndFooters, setIncludePptxHeadersAndFooters] = useState(true);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   const scrapeUrlMutation = trpc.pageScraper.scrapeUrl.useMutation({
     onSuccess: (data) => {
@@ -475,6 +476,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
         mimeType,
         fileSize: documentFile.size,
         fileData: await readFileAsBase64(documentFile),
+        includePptxHeadersAndFooters,
       });
       const convertedBlocks = result.blocks as Block[];
       if (!convertedBlocks.length) {
@@ -1111,12 +1113,33 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
               <p className="font-semibold text-teal-800">Convert a PDF or PowerPoint into editable lesson content</p>
               <p className="mt-1.5 leading-6">Each PDF page becomes a responsive page image and editable rich-text block. Each PowerPoint slide becomes editable rich text plus its extracted images. The original file is retained as a source reference, and conversion only appends blocks to this lesson.</p>
             </div>
+            {documentFile?.name.toLowerCase().endsWith(".pptx") && (
+              <fieldset className="rounded-xl border border-slate-200 bg-white p-4">
+                <legend className="px-1 text-sm font-semibold text-slate-800">PowerPoint header and footer</legend>
+                <p className="mb-3 text-xs leading-5 text-slate-500">Choose whether recurring slide headers, footers, slide numbers, and named header/footer elements are included in the converted rich-text blocks.</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className={cn("cursor-pointer rounded-lg border p-3 text-sm transition-colors", includePptxHeadersAndFooters ? "border-teal-500 bg-teal-50 text-teal-900" : "border-slate-200 bg-white text-slate-700")}>
+                    <input className="sr-only" type="radio" name="pptx-header-footer" checked={includePptxHeadersAndFooters} onChange={() => setIncludePptxHeadersAndFooters(true)} />
+                    <span className="block font-semibold">Include header and footer</span>
+                    <span className="mt-1 block text-xs leading-4">Keep every slide visual element.</span>
+                  </label>
+                  <label className={cn("cursor-pointer rounded-lg border p-3 text-sm transition-colors", !includePptxHeadersAndFooters ? "border-teal-500 bg-teal-50 text-teal-900" : "border-slate-200 bg-white text-slate-700")}>
+                    <input className="sr-only" type="radio" name="pptx-header-footer" checked={!includePptxHeadersAndFooters} onChange={() => setIncludePptxHeadersAndFooters(false)} />
+                    <span className="block font-semibold">Exclude header and footer</span>
+                    <span className="mt-1 block text-xs leading-4">Remove only repeated or explicitly named header/footer layers.</span>
+                  </label>
+                </div>
+              </fieldset>
+            )}
             <input
               ref={documentFileInputRef}
               type="file"
               accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx"
               className="hidden"
-              onChange={event => setDocumentFile(event.target.files?.[0] ?? null)}
+              onChange={event => {
+                setDocumentFile(event.target.files?.[0] ?? null);
+                setIncludePptxHeadersAndFooters(true);
+              }}
             />
             <button
               type="button"

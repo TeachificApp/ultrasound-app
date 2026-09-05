@@ -30,6 +30,10 @@ export type DocumentConversionResult = {
 
 export type DocumentImageUploader = (fileName: string, data: Buffer, mimeType: string) => Promise<string>;
 
+export type PptxConversionOptions = {
+  includeHeadersAndFooters?: boolean;
+};
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -125,6 +129,45 @@ function pptxElementStyle(element: TeachSlide["elements"][number], includeTextSt
  */
 export function convertPptxSlideToRichTextHtml(slide: TeachSlide) {
   return pptxRichSlideToHtml(teachSlideToPptxRichSlide(slide));
+}
+
+function headerFooterSignature(element: TeachSlide["elements"][number]) {
+  const content = typeof element.content === "string" ? element.content.replace(/\s+/g, " ").trim().toLowerCase() : "";
+  const name = element.sourceName?.trim().toLowerCase() ?? "";
+  const src = typeof element.src === "string" ? element.src.split("/").pop()?.toLowerCase() ?? "" : "";
+  return [element.type, name, content, src, element.shape ?? "", element.fill ?? "", Math.round(element.x), Math.round(element.y), Math.round(element.width), Math.round(element.height)].join("|");
+}
+
+function isHeaderFooterName(name: string | undefined) {
+  return !!name && /\b(header|footer|slide\s*(?:number|no\.?|#)|date|copyright)\b/i.test(name);
+}
+
+function isEdgeElement(element: TeachSlide["elements"][number]) {
+  const topEdge = element.y <= 8 && element.height <= 14;
+  const bottomEdge = element.y + element.height >= 92 && element.height <= 14;
+  return topEdge || bottomEdge;
+}
+
+/**
+ * Finds only low-risk repeated header/footer elements. A unique slide title is
+ * never classified merely because it sits near the top edge.
+ */
+export function findPptxHeaderFooterElementIds(slides: TeachSlide[]) {
+  const repeatedSignatures = new Map<string, number>();
+  for (const slide of slides) {
+    for (const element of slide.elements) {
+      if (!isEdgeElement(element) || isHeaderFooterName(element.sourceName)) continue;
+      const signature = headerFooterSignature(element);
+      repeatedSignatures.set(signature, (repeatedSignatures.get(signature) ?? 0) + 1);
+    }
+  }
+  const repeatedMinimum = Math.max(2, Math.ceil(slides.length * 0.5));
+  return slides.map((slide) => new Set(slide.elements
+    .filter((element) => {
+      if (isHeaderFooterName(element.sourceName)) return true;
+      return isEdgeElement(element) && (repeatedSignatures.get(headerFooterSignature(element)) ?? 0) >= repeatedMinimum;
+    })
+    .map((element) => element.id)));
 }
 
 export function getLessonDocumentKind(fileName: string, mimeType: string): LessonDocumentKind | null {
@@ -290,6 +333,7 @@ export async function convertPdfToEditableLessonBlocks(
 export function convertPptxSlidesToEditableLessonBlocks(
   slides: TeachSlide[],
   source: LessonDocumentSource,
+  options: PptxConversionOptions = {},
 ): DocumentConversionResult {
   if (!slides.length) throw new Error("The PowerPoint does not contain any readable slides.");
   if (slides.length > LESSON_DOCUMENT_MAX_PAGES) {
@@ -297,10 +341,18 @@ export function convertPptxSlidesToEditableLessonBlocks(
   }
   const warnings: string[] = [];
   const blocks: EditableLessonBlock[] = [];
+  const includeHeadersAndFooters = options.includeHeadersAndFooters !== false;
+  const excludedIdsBySlide = includeHeadersAndFooters ? [] : findPptxHeaderFooterElementIds(slides);
+  let excludedCount = 0;
   slides.forEach((slide, slideOffset) => {
     const index = slideOffset + 1;
     const metadata = sourceMetadata(source, "pptx", index);
-    const elements = [...slide.elements].sort((a, b) => a.y - b.y || a.x - b.x || a.zIndex - b.zIndex);
+    const excludedIds = excludedIdsBySlide[slideOffset] ?? new Set<string>();
+    excludedCount += excludedIds.size;
+    const filteredSlide = excludedIds.size
+      ? { ...slide, elements: slide.elements.filter((element) => !excludedIds.has(element.id)) }
+      : slide;
+    const elements = [...filteredSlide.elements].sort((a, b) => a.y - b.y || a.x - b.x || a.zIndex - b.zIndex);
     const text = elements
       .filter(element => element.type === "text")
       .map(element => typeof element.content === "string" ? element.content.trim() : "")
@@ -308,7 +360,7 @@ export function convertPptxSlidesToEditableLessonBlocks(
     const images = elements.filter(element => element.type === "image" && typeof element.src === "string" && element.src);
     const shapes = elements.filter(element => element.type === "shape");
 
-    const pptxSlide = teachSlideToPptxRichSlide(slide);
+    const pptxSlide = teachSlideToPptxRichSlide(filteredSlide);
     blocks.push({
       id: makeBlockId("pptx-slide-rich-text", index, 1),
       type: "text",
@@ -316,8 +368,9 @@ export function convertPptxSlidesToEditableLessonBlocks(
         html: pptxRichSlideToHtml(pptxSlide),
         pptxSlide,
         align: "left",
-        bgColor: slide.backgroundColor || "#ffffff",
+        bgColor: filteredSlide.backgroundColor || "#ffffff",
         textColor: "#1a1a1a",
+        pptxConversion: { includeHeadersAndFooters },
         ...metadata,
       },
     });
@@ -325,5 +378,8 @@ export function convertPptxSlidesToEditableLessonBlocks(
       warnings.push(`Slide ${index} has no extractable text, image, or visual shape. The original PowerPoint is retained in the lesson source reference.`);
     }
   });
+  if (!includeHeadersAndFooters && excludedCount === 0) {
+    warnings.push("No repeated or explicitly named PowerPoint header/footer elements were detected, so all slide elements were retained.");
+  }
   return { blocks, warnings, pageCount: slides.length };
 }

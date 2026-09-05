@@ -4,6 +4,7 @@ import {
   assertLessonDocumentUpload,
   convertPdfToEditableLessonBlocks,
   convertPptxSlidesToEditableLessonBlocks,
+  findPptxHeaderFooterElementIds,
   getLessonDocumentKind,
   LESSON_DOCUMENT_MAX_BYTES,
   LESSON_DOCUMENT_MAX_MB,
@@ -69,6 +70,41 @@ describe("document rich-content conversion", () => {
     expect(String(result.blocks[1].data.html)).toContain("Second lesson point");
     expect((result.blocks[0].data.sourceDocument as any).storageUrl).toBe(source.storageUrl);
     expect(result.blocks.some(block => block.type === ("embed" as any))).toBe(false);
+  });
+
+  it("includes headers and footers by default and excludes only repeated or explicitly named edge layers when asked", () => {
+    const slides = [
+      {
+        title: "First slide",
+        elements: [
+          { id: "one-header", type: "text", content: "Course header", sourceName: "Header text", x: 3, y: 2, width: 60, height: 4, zIndex: 1 },
+          { id: "one-title", type: "text", content: "Unique instructional title", x: 8, y: 10, width: 80, height: 8, zIndex: 2 },
+          { id: "one-footer", type: "text", content: "Copyright", sourceName: "Footer", x: 6, y: 94, width: 40, height: 4, zIndex: 3 },
+        ],
+      },
+      {
+        title: "Second slide",
+        elements: [
+          { id: "two-header", type: "text", content: "Course header", sourceName: "Header text", x: 3, y: 2, width: 60, height: 4, zIndex: 1 },
+          { id: "two-title", type: "text", content: "Another instructional title", x: 8, y: 10, width: 80, height: 8, zIndex: 2 },
+          { id: "two-footer", type: "text", content: "Copyright", sourceName: "Footer", x: 6, y: 94, width: 40, height: 4, zIndex: 3 },
+        ],
+      },
+    ] as any;
+    expect(findPptxHeaderFooterElementIds(slides).map(ids => [...ids].sort())).toEqual([
+      ["one-footer", "one-header"],
+      ["two-footer", "two-header"],
+    ]);
+    const pptxSource = { ...source, fileName: "headers.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" };
+    const included = convertPptxSlidesToEditableLessonBlocks(slides, pptxSource);
+    const excluded = convertPptxSlidesToEditableLessonBlocks(slides, pptxSource, { includeHeadersAndFooters: false });
+    expect(String(included.blocks[0].data.html)).toContain("Course header");
+    expect(String(included.blocks[0].data.html)).toContain("Copyright");
+    expect(String(excluded.blocks[0].data.html)).not.toContain("Course header");
+    expect(String(excluded.blocks[0].data.html)).not.toContain("Copyright");
+    expect(String(excluded.blocks[0].data.html)).toContain("Unique instructional title");
+    expect((included.blocks[0].data.pptxConversion as any).includeHeadersAndFooters).toBe(true);
+    expect((excluded.blocks[0].data.pptxConversion as any).includeHeadersAndFooters).toBe(false);
   });
 
   it("renders each PDF page as a preserved editable image plus editable rich text without inserting a PDF viewer", async () => {

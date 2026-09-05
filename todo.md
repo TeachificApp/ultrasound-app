@@ -418,3 +418,5 @@
 - [x] Repair PPTX conversion so source text formatting and grouped visual composition remain faithful in the converted lesson output, rather than flattening or degrading slide elements.
 - [x] Replace cumbersome positioned-fragment editing for converted PPTX slides with manageable slide-level editing controls that preserve the rendered visual composition.
 - [x] Add visual-fidelity and author-usability regressions based on the supplied conversion recording, without modifying existing lesson blocks automatically.
+- [x] Ask authors whether to include or exclude PowerPoint slide headers and footers before conversion, and apply the selected behavior consistently to every generated slide block.
+- [x] Add focused PowerPoint header/footer classification and conversion-choice regressions without changing source files or existing lesson blocks automatically.

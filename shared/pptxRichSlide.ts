@@ -1,6 +1,6 @@
 import type { TeachSlide, TeachSlideElement, TeachTextStyle } from "./teachPresentation";
 
-export type PptxRichSlideElement = Pick<TeachSlideElement, "id" | "type" | "x" | "y" | "width" | "height" | "zIndex" | "content" | "contentHtml" | "style" | "src" | "shape" | "fill" | "stroke">;
+export type PptxRichSlideElement = Pick<TeachSlideElement, "id" | "type" | "x" | "y" | "width" | "height" | "zIndex" | "content" | "contentHtml" | "sourceName" | "style" | "src" | "shape" | "fill" | "stroke">;
 
 export type PptxRichSlide = {
   version: 1;
@@ -84,6 +84,7 @@ export function teachSlideToPptxRichSlide(slide: TeachSlide): PptxRichSlide {
       zIndex: element.zIndex,
       content: element.content,
       contentHtml: element.contentHtml,
+      sourceName: element.sourceName,
       style: element.style,
       src: element.src,
       shape: element.shape,

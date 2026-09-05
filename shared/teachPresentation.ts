@@ -85,6 +85,8 @@ export interface TeachSlideElement {
   content?: string;
   /** Run-preserving editable HTML for a text element imported from PowerPoint. */
   contentHtml?: string;
+  /** Original PowerPoint shape name, retained for safe conversion decisions. */
+  sourceName?: string;
   style?: TeachTextStyle;
   src?: string;
   video?: TeachVideoSettings;
