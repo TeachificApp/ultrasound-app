@@ -18,21 +18,28 @@ export function readStoredEditorPanelWidth(storageKey: string) {
 
 export function useResizableEditorPanel(storageKey: string) {
   const [panelWidth, setPanelWidth] = useState(() => readStoredEditorPanelWidth(storageKey));
+  const panelWidthRef = useRef(panelWidth);
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const userResizedRef = useRef(false);
+
+  panelWidthRef.current = panelWidth;
 
   const persistWidth = useCallback((width: number) => {
     const next = clampEditorSettingsPanelWidth(width);
     setPanelWidth(next);
+    panelWidthRef.current = next;
     if (typeof window !== "undefined") {
       window.localStorage.setItem(`${STORAGE_PREFIX}${storageKey}`, String(next));
     }
     return next;
   }, [storageKey]);
 
-  const ensureWidthForConvertedDocument = useCallback(() => {
+  const maybeExpandForConvertedDocument = useCallback((_blockId: string) => {
+    if (userResizedRef.current) return;
     const preferred = preferredConvertedDocumentPanelWidth();
-    persistWidth(Math.max(panelWidth, preferred));
-  }, [panelWidth, persistWidth]);
+    if (panelWidthRef.current >= preferred) return;
+    persistWidth(preferred);
+  }, [persistWidth]);
 
   useEffect(() => {
     const onResize = () => {
@@ -44,7 +51,9 @@ export function useResizableEditorPanel(storageKey: string) {
 
   const handleResizeMouseDown = useCallback((event: ReactMouseEvent) => {
     event.preventDefault();
-    dragRef.current = { startX: event.clientX, startWidth: panelWidth };
+    event.stopPropagation();
+    userResizedRef.current = true;
+    dragRef.current = { startX: event.clientX, startWidth: panelWidthRef.current };
     const onMove = (moveEvent: MouseEvent) => {
       if (!dragRef.current) return;
       const delta = dragRef.current.startX - moveEvent.clientX;
@@ -61,12 +70,12 @@ export function useResizableEditorPanel(storageKey: string) {
     document.addEventListener("mouseup", onUp);
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
-  }, [panelWidth, persistWidth]);
+  }, [persistWidth]);
 
   return {
     panelWidth,
     setPanelWidth: persistWidth,
-    ensureWidthForConvertedDocument,
+    maybeExpandForConvertedDocument,
     handleResizeMouseDown,
   };
 }
