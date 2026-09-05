@@ -33,7 +33,7 @@ describe("document rich-content conversion", () => {
     expect(() => assertLessonDocumentUpload("lesson.pdf", "application/pdf", LESSON_DOCUMENT_MAX_BYTES + 1)).toThrow(/50 MB/);
   });
 
-  it("converts an entire PowerPoint into one continuous reflowed rich-text block", () => {
+  it("converts an entire PowerPoint into one continuous layout-faithful rich-text block", () => {
     const result = convertPptxSlidesToEditableLessonBlocks([
       {
         title: "First slide",
@@ -62,16 +62,17 @@ describe("document rich-content conversion", () => {
     expect(html).toContain('data-converted-document="1"');
     expect(html).toContain('data-document-slide="1"');
     expect(html).toContain('data-document-slide="2"');
-    expect(html).toContain('data-pptx-reflow="1"');
+    expect(html).toContain('data-pptx-slide-layout="1"');
+    expect(html).toContain('data-pptx-text-box="1"');
     expect(html).toContain('src="https://example.test/first.png"');
     expect(html).toContain("First lesson point");
     expect(html).toContain("Second lesson point");
-    expect(html).not.toContain("position:absolute");
+    expect(html).toContain("class=\"not-prose\"");
     expect(result.blocks[0]?.data.pptxSlide).toBeUndefined();
     expect((result.blocks[0]?.data.sourceDocument as any).pageCount).toBe(2);
   });
 
-  it("reflows native PowerPoint table cells into an editable HTML table inside the continuous block", () => {
+  it("preserves native PowerPoint table cell styling inside layout-faithful slide HTML", () => {
     const result = convertPptxSlidesToEditableLessonBlocks([{
       title: "Table slide",
       elements: [
@@ -82,10 +83,10 @@ describe("document rich-content conversion", () => {
       ],
     }] as any, { ...source, fileName: "table.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
     const html = String(result.blocks[0]?.data.html);
-    expect(html).toContain("<table");
+    expect(html).toContain('data-pptx-text-box="1"');
     expect(html).toContain("Concept");
     expect(html).toContain("Frequency");
-    expect(html).not.toContain("position:absolute");
+    expect(html).toContain("background-color:#179ca3");
   });
 
   it("includes headers and footers by default and excludes only repeated or explicitly named edge layers when asked", () => {
