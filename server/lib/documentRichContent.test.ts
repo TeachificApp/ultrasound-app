@@ -32,14 +32,17 @@ describe("document rich-content conversion", () => {
     expect(() => assertLessonDocumentUpload("lesson.pdf", "application/pdf", LESSON_DOCUMENT_MAX_BYTES + 1)).toThrow(/50 MB/);
   });
 
-  it("converts each PowerPoint slide in order into editable text and image blocks with a retained source reference", () => {
+  it("converts each PowerPoint slide into one editable rich-text layout block with retained source visuals", () => {
     const result = convertPptxSlidesToEditableLessonBlocks([
       {
         title: "First slide",
         backgroundColor: "#eaffff",
+        sourceWidth: 850,
+        sourceHeight: 1100,
         elements: [
-          { type: "text", content: "First lesson point", x: 5, y: 10, zIndex: 1 },
-          { type: "image", src: "https://example.test/first.png", x: 10, y: 20, zIndex: 2 },
+          { type: "text", content: "First lesson point", x: 5, y: 10, width: 70, height: 12, zIndex: 1, style: { fontSize: 22, fontWeight: "bold", fontStyle: "normal", textAlign: "left", color: "#179ca3", backgroundColor: "#ffffff", fontFamily: "Arial" } },
+          { type: "shape", x: 2, y: 2, width: 3, height: 95, zIndex: 2, shape: "rectangle", fill: "#179ca3", stroke: "#179ca3" },
+          { type: "image", src: "https://example.test/first.png", x: 10, y: 20, width: 45, height: 35, zIndex: 3 },
         ],
       },
       {
@@ -52,10 +55,17 @@ describe("document rich-content conversion", () => {
     ] as any, { ...source, fileName: "lesson-source.pptx", mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation" });
 
     expect(result.pageCount).toBe(2);
-    expect(result.blocks.map(block => block.type)).toEqual(["text", "image", "text"]);
+    expect(result.blocks.map(block => block.type)).toEqual(["text", "text"]);
+    expect(String(result.blocks[0].data.html)).toContain('data-pptx-slide-layout="1"');
+    expect(String(result.blocks[0].data.html)).toContain('data-pptx-text-box="1"');
+    expect(String(result.blocks[0].data.html)).toContain('data-pptx-image="1"');
+    expect(String(result.blocks[0].data.html)).toContain('data-pptx-shape="1"');
+    expect(String(result.blocks[0].data.html)).toContain("aspect-ratio:850 / 1100");
+    expect(String(result.blocks[0].data.html)).toContain("background-color:#eaffff");
+    expect(String(result.blocks[0].data.html)).toContain("font-family:&#039;Arial&#039;");
     expect(String(result.blocks[0].data.html)).toContain("First lesson point");
-    expect(String(result.blocks[2].data.html)).toContain("Second lesson point");
-    expect((result.blocks[1].data.sourceDocument as any).storageUrl).toBe(source.storageUrl);
+    expect(String(result.blocks[1].data.html)).toContain("Second lesson point");
+    expect((result.blocks[0].data.sourceDocument as any).storageUrl).toBe(source.storageUrl);
     expect(result.blocks.some(block => block.type === ("embed" as any))).toBe(false);
   });
 

@@ -413,3 +413,5 @@
 - [x] Correct the rendered Content selector order to show Text, Image, Video, then all AI-generation blocks, matching the catalog rather than the current stale visual order.
 - [x] Group File Upload, File Download, and Convert File consecutively in the Content selector.
 - [x] Increase the PDF/PPTX Convert File upload limit above 25 MB while retaining supported-type checks, server-side bounds, source-file preservation, and focused validation coverage.
+- [x] Convert each PowerPoint slide into one editable rich-text lesson block that retains the slide background, positioned formatted text, titles, image assets, and visual composition rather than emitting separate plain text and image blocks.
+- [x] Add focused PowerPoint composition-preservation regressions using the supplied SPI Anatomy of Sound deck structure, without modifying the existing converted lesson until an author explicitly reconverts and saves it.

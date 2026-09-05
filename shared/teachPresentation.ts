@@ -120,6 +120,9 @@ export interface TeachBackgroundGradient {
 export interface TeachSlide {
   id: string;
   title: string;
+  /** Original PowerPoint slide canvas size in EMUs, retained for responsive imports. */
+  sourceWidth?: number;
+  sourceHeight?: number;
   notes?: string;
   backgroundColor?: string;
   backgroundImage?: string;

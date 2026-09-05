@@ -17,6 +17,14 @@ describe("pptxImport", () => {
     expect(result.masterSlides.length).toBeGreaterThan(0);
   });
 
+  it("retains source dimensions and visual text elements for responsive rich-text conversion", async () => {
+    const buffer = await buildMinimalTestPptx([{ title: "Layout title", body: "Layout text" }]);
+    const result = await parsePptxBuffer(buffer);
+    expect(result.slides[0]?.sourceWidth).toBeGreaterThan(0);
+    expect(result.slides[0]?.sourceHeight).toBeGreaterThan(0);
+    expect(result.slides[0]?.elements.some((element) => element.type === "text")).toBe(true);
+  });
+
   it("rejects invalid zip as pptx", async () => {
     await expect(parsePptxBuffer(Buffer.from("not a zip"))).rejects.toThrow();
   });

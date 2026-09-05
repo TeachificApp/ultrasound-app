@@ -65,6 +65,85 @@ function paragraphsToHtml(heading: string, paragraphs: string[]) {
   return `<h2>${escapeHtml(heading)}</h2>${body || "<p></p>"}`;
 }
 
+function escapeAttribute(value: string) {
+  return escapeHtml(value).replace(/`/g, "&#096;");
+}
+
+function finitePercent(value: number | undefined, fallback: number) {
+  return Math.min(100, Math.max(0, Number.isFinite(value) ? Number(value) : fallback));
+}
+
+function safeColor(value: unknown, fallback: string) {
+  return typeof value === "string" && /^#[0-9a-f]{3,8}$/i.test(value.trim()) ? value.trim() : fallback;
+}
+
+function safeFontFamily(value: unknown) {
+  if (typeof value !== "string") return "Arial, sans-serif";
+  const clean = value.replace(/[^a-zA-Z0-9 ,_-]/g, "").trim();
+  return clean ? `'${clean}', Arial, sans-serif` : "Arial, sans-serif";
+}
+
+function richTextFontSize(value: unknown) {
+  const pointSize = typeof value === "number" && Number.isFinite(value) ? Math.min(72, Math.max(8, value)) : 16;
+  const responsiveSize = Math.min(13, Math.max(0.8, pointSize / 8));
+  return `clamp(9px, ${responsiveSize.toFixed(2)}cqw, ${Math.round(pointSize * 1.34)}px)`;
+}
+
+function pptxElementStyle(element: TeachSlide["elements"][number], includeTextStyle: boolean) {
+  const base = [
+    "position:absolute",
+    `left:${finitePercent(element.x, 0)}%`,
+    `top:${finitePercent(element.y, 0)}%`,
+    `width:${finitePercent(element.width, 100)}%`,
+    `height:${finitePercent(element.height, 100)}%`,
+    `z-index:${Math.max(1, Math.round(element.zIndex ?? 1))}`,
+    "box-sizing:border-box",
+  ];
+  if (!includeTextStyle) return base.join(";");
+  const style = element.style;
+  base.push(
+    `color:${safeColor(style?.color, "#1a1a1a")}`,
+    `font-family:${safeFontFamily(style?.fontFamily)}`,
+    `font-size:${richTextFontSize(style?.fontSize)}`,
+    `font-weight:${style?.fontWeight === "bold" ? "700" : "400"}`,
+    `font-style:${style?.fontStyle === "italic" ? "italic" : "normal"}`,
+    `text-align:${style?.textAlign ?? "left"}`,
+    `text-decoration:${style?.textDecoration ?? "none"}`,
+    `line-height:${style?.lineHeight ?? 1.2}`,
+    "overflow:hidden",
+    "white-space:normal",
+  );
+  if (style?.backgroundColor) base.push(`background-color:${safeColor(style.backgroundColor, "transparent")}`);
+  return base.join(";");
+}
+
+/**
+ * Serializes one PowerPoint slide to one responsive rich-text composition.
+ * Percent-based geometry preserves visual placement while allowing the slide to
+ * scale to the width of a lesson text block.
+ */
+export function convertPptxSlideToRichTextHtml(slide: TeachSlide) {
+  const sourceWidth = Number.isFinite(slide.sourceWidth) && slide.sourceWidth! > 0 ? slide.sourceWidth! : 4;
+  const sourceHeight = Number.isFinite(slide.sourceHeight) && slide.sourceHeight! > 0 ? slide.sourceHeight! : 3;
+  const background = safeColor(slide.backgroundColor, "#ffffff");
+  const elements = [...slide.elements].sort((a, b) => a.zIndex - b.zIndex || a.y - b.y || a.x - b.x);
+  const body = elements.map((element) => {
+    if (element.type === "text") {
+      const content = escapeHtml(element.content ?? " ").replace(/\n/g, "<br />");
+      return `<div data-pptx-text-box="1" style="${escapeAttribute(pptxElementStyle(element, true))}">${content || "&nbsp;"}</div>`;
+    }
+    if (element.type === "image" && element.src) {
+      return `<img data-pptx-image="1" src="${escapeAttribute(element.src)}" alt="" style="${escapeAttribute(`${pptxElementStyle(element, false)};object-fit:contain;display:block`)}" />`;
+    }
+    if (element.type === "shape") {
+      const borderRadius = element.shape === "ellipse" ? "50%" : "0";
+      return `<div data-pptx-shape="1" aria-hidden="true" style="${escapeAttribute(`${pptxElementStyle(element, false)};background-color:${safeColor(element.fill, "transparent")};border:1px solid ${safeColor(element.stroke, "transparent")};border-radius:${borderRadius}`)}"></div>`;
+    }
+    return "";
+  }).join("");
+  return `<div data-pptx-slide-layout="1" style="position:relative;width:100%;aspect-ratio:${sourceWidth} / ${sourceHeight};overflow:hidden;background-color:${background};container-type:inline-size;isolation:isolate">${body}</div>`;
+}
+
 export function getLessonDocumentKind(fileName: string, mimeType: string): LessonDocumentKind | null {
   const normalizedName = fileName.trim().toLowerCase();
   const normalizedMime = mimeType.trim().toLowerCase();
@@ -247,37 +326,18 @@ export function convertPptxSlidesToEditableLessonBlocks(
     const shapes = elements.filter(element => element.type === "shape");
 
     blocks.push({
-      id: makeBlockId("pptx-slide-text", index, 1),
+      id: makeBlockId("pptx-slide-rich-text", index, 1),
       type: "text",
       data: {
-        html: paragraphsToHtml(slide.title || `Slide ${index}`, text),
+        html: convertPptxSlideToRichTextHtml(slide),
         align: "left",
         bgColor: slide.backgroundColor || "#ffffff",
         textColor: "#1a1a1a",
         ...metadata,
       },
     });
-    images.forEach((image, imageOffset) => {
-      blocks.push({
-        id: makeBlockId("pptx-slide-image", index, imageOffset + 2),
-        type: "image",
-        data: {
-          url: image.src,
-          alt: `${source.fileName} slide ${index} image ${imageOffset + 1}`,
-          caption: "",
-          align: "center",
-          maxWidth: "100%",
-          showShadow: false,
-          noBorder: false,
-          ...metadata,
-        },
-      });
-    });
-    if (text.length === 0 && images.length === 0) {
-      warnings.push(`Slide ${index} has no extractable text or image. The original PowerPoint is retained in the lesson source reference.`);
-    }
-    if (shapes.length > 0) {
-      warnings.push(`Slide ${index} contains ${shapes.length} vector shape${shapes.length === 1 ? "" : "s"} that could not be promoted as individual responsive blocks. Its text, images, and original source reference were retained.`);
+    if (text.length === 0 && images.length === 0 && shapes.length === 0) {
+      warnings.push(`Slide ${index} has no extractable text, image, or visual shape. The original PowerPoint is retained in the lesson source reference.`);
     }
   });
   return { blocks, warnings, pageCount: slides.length };

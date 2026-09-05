@@ -25,6 +25,9 @@ const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
   removeNSPrefix: true,
+  // A PowerPoint text run can be a single literal space. Preserve it so text
+  // does not collapse together after slide composition is converted to HTML.
+  trimValues: false,
   isArray: (name) =>
     ["sldId", "sldMasterId", "sp", "pic", "p", "r", "Relationship"].includes(name),
 });
@@ -106,6 +109,11 @@ function extractTextFromParagraphs(txBody: unknown): { text: string; style: Part
         const solid = rPr.solidFill as Record<string, unknown> | undefined;
         const srgb = solid?.srgbClr as Record<string, unknown> | undefined;
         if (srgb?.["@_val"]) style.color = `#${String(srgb["@_val"]).slice(0, 6)}`;
+        const latin = rPr.latin as Record<string, unknown> | undefined;
+        if (typeof latin?.["@_typeface"] === "string" && latin["@_typeface"].trim()) {
+          style.fontFamily = latin["@_typeface"].trim();
+        }
+        if (rPr["@_u"] && rPr["@_u"] !== "none") style.textDecoration = "underline";
       }
     }
     const pPr = (p as Record<string, unknown>)?.pPr as Record<string, unknown> | undefined;
@@ -191,6 +199,7 @@ async function parseShapeTree(
     const txBody = spObj.txBody;
     const { text, style } = extractTextFromParagraphs(txBody);
     if (!text.trim()) continue;
+    const fill = parseSolidFill(spPr);
 
     elements.push({
       id: newElementId(),
@@ -201,7 +210,7 @@ async function parseShapeTree(
       height: emuToPercent(xfrm.h, slideCy),
       zIndex: z++,
       content: text,
-      style: { ...DEFAULT_TEXT_STYLE, ...style },
+      style: { ...DEFAULT_TEXT_STYLE, ...style, ...(fill ? { backgroundColor: fill } : {}) },
       entrance: { ...DEFAULT_ANIMATION, trigger: "auto" },
     });
   }
@@ -263,9 +272,61 @@ async function parseShapeTree(
     });
   }
 
+  // Native PowerPoint tables are graphic frames. Promote their cells to
+  // positioned text elements so the rich-text import retains editable table
+  // labels, values, and cell backgrounds inside the slide composition.
+  for (const graphicFrame of asArray(tree.graphicFrame)) {
+    const frame = graphicFrame as Record<string, unknown>;
+    const xfrm = getTransform({ xfrm: frame.xfrm });
+    const graphic = frame.graphic as Record<string, unknown> | undefined;
+    const graphicData = graphic?.graphicData as Record<string, unknown> | undefined;
+    const table = graphicData?.tbl as Record<string, unknown> | undefined;
+    if (!xfrm || !table) continue;
+
+    const columns = asArray((table.tblGrid as Record<string, unknown> | undefined)?.gridCol)
+      .map(column => Number((column as Record<string, unknown>)["@_w"] ?? 0))
+      .filter(width => Number.isFinite(width) && width > 0);
+    const rows = asArray(table.tr);
+    if (!columns.length || !rows.length) continue;
+
+    const totalColumnWidth = columns.reduce((sum, width) => sum + width, 0);
+    const rowHeights = rows.map(row => {
+      const height = Number((row as Record<string, unknown>)["@_h"] ?? 0);
+      return Number.isFinite(height) && height > 0 ? height : 1;
+    });
+    const totalRowHeight = rowHeights.reduce((sum, height) => sum + height, 0);
+    let rowOffset = 0;
+
+    rows.forEach((row, rowIndex) => {
+      const cells = asArray((row as Record<string, unknown>).tc);
+      let columnOffset = 0;
+      cells.forEach((cell, cellIndex) => {
+        const columnWidth = columns[cellIndex] ?? columns[columns.length - 1] ?? 1;
+        const cellObj = cell as Record<string, unknown>;
+        const { text, style } = extractTextFromParagraphs(cellObj.txBody);
+        const fill = parseSolidFill(cellObj.tcPr);
+        elements.push({
+          id: newElementId(),
+          type: "text",
+          x: emuToPercent(xfrm.x + (xfrm.w * columnOffset) / totalColumnWidth, slideCx),
+          y: emuToPercent(xfrm.y + (xfrm.h * rowOffset) / totalRowHeight, slideCy),
+          width: emuToPercent((xfrm.w * columnWidth) / totalColumnWidth, slideCx),
+          height: emuToPercent((xfrm.h * rowHeights[rowIndex]!) / totalRowHeight, slideCy),
+          zIndex: z++,
+          content: text || " ",
+          style: { ...DEFAULT_TEXT_STYLE, ...style, ...(fill ? { backgroundColor: fill } : {}) },
+          entrance: { ...DEFAULT_ANIMATION, trigger: "auto" },
+        });
+        columnOffset += columnWidth;
+      });
+      rowOffset += rowHeights[rowIndex]!;
+    });
+  }
+
   for (const sp of asArray(tree.sp)) {
     const spObj = sp as Record<string, unknown>;
-    if (spObj.txBody) continue;
+    const { text } = extractTextFromParagraphs(spObj.txBody);
+    if (text.trim()) continue;
     const spPr = spObj.spPr;
     const xfrm = getTransform(spPr);
     if (!xfrm) continue;
@@ -317,6 +378,8 @@ async function parseSlideXml(
   return {
     id: newSlideId(),
     title,
+    sourceWidth: slideCx,
+    sourceHeight: slideCy,
     notes: notesText ?? "",
     backgroundColor: bg.backgroundColor ?? "#ffffff",
     backgroundImage: bg.backgroundImage,

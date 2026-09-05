@@ -236,6 +236,81 @@ const VideoNode = Node.create({
   },
 });
 
+// ─── PowerPoint slide composition nodes ─────────────────────────────────────
+// Convert File emits these nodes inside one text block per PowerPoint slide.
+// The slide remains responsive while text boxes can be edited in place.
+const PptxSlideLayoutNode = Node.create({
+  name: "pptxSlideLayout",
+  group: "block",
+  content: "pptxElement*",
+  isolating: true,
+  defining: true,
+
+  addAttributes() {
+    return { slideStyle: { default: "" } };
+  },
+  parseHTML() {
+    return [{ tag: "div[data-pptx-slide-layout]", getAttrs: (el: HTMLElement) => ({ slideStyle: el.getAttribute("style") ?? "" }) }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    const { slideStyle, ...rest } = HTMLAttributes;
+    return ["div", mergeAttributes({ "data-pptx-slide-layout": "1", style: slideStyle ?? "" }, rest), 0];
+  },
+});
+
+const PptxTextBoxNode = Node.create({
+  name: "pptxTextBox",
+  group: "pptxElement",
+  content: "inline*",
+  defining: true,
+
+  addAttributes() {
+    return { boxStyle: { default: "" } };
+  },
+  parseHTML() {
+    return [{ tag: "div[data-pptx-text-box]", getAttrs: (el: HTMLElement) => ({ boxStyle: el.getAttribute("style") ?? "" }) }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    const { boxStyle, ...rest } = HTMLAttributes;
+    return ["div", mergeAttributes({ "data-pptx-text-box": "1", style: boxStyle ?? "" }, rest), 0];
+  },
+});
+
+const PptxImageNode = Node.create({
+  name: "pptxImage",
+  group: "pptxElement",
+  atom: true,
+  draggable: true,
+
+  addAttributes() {
+    return { src: { default: "" }, alt: { default: "" }, imageStyle: { default: "" } };
+  },
+  parseHTML() {
+    return [{ tag: "img[data-pptx-image]", getAttrs: (el: HTMLElement) => ({ src: el.getAttribute("src") ?? "", alt: el.getAttribute("alt") ?? "", imageStyle: el.getAttribute("style") ?? "" }) }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    const { imageStyle, ...rest } = HTMLAttributes;
+    return ["img", mergeAttributes({ "data-pptx-image": "1", style: imageStyle ?? "" }, rest)];
+  },
+});
+
+const PptxShapeNode = Node.create({
+  name: "pptxShape",
+  group: "pptxElement",
+  atom: true,
+
+  addAttributes() {
+    return { shapeStyle: { default: "" } };
+  },
+  parseHTML() {
+    return [{ tag: "div[data-pptx-shape]", getAttrs: (el: HTMLElement) => ({ shapeStyle: el.getAttribute("style") ?? "" }) }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    const { shapeStyle, ...rest } = HTMLAttributes;
+    return ["div", mergeAttributes({ "data-pptx-shape": "1", "aria-hidden": "true", style: shapeStyle ?? "" }, rest)];
+  },
+});
+
 // ─── Custom CTA Button TipTap Node ──────────────────────────────────────────
 // TipTap v3 strips data-* attributes from unknown <span> elements.
 // This inline atom node preserves all CTA button attributes through parse/serialize.
@@ -738,6 +813,10 @@ export default function RichTextEditor({
       Color,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       ImageResize.configure({ inline: false, allowBase64: true, resizeLimits: { minWidth: 50 } }),
+      PptxSlideLayoutNode,
+      PptxTextBoxNode,
+      PptxImageNode,
+      PptxShapeNode,
       VideoNode,
       CtaButtonNode,
       Link.configure({
