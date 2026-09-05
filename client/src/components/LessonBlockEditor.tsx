@@ -35,6 +35,7 @@ import {
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
 import { useResizableEditorPanel } from "@/lib/useResizableEditorPanel";
 import { isConvertedDocumentBlock } from "@shared/convertedDocumentBlock";
+import { formatConversionError, uploadLessonDocument } from "@/lib/uploadLessonDocument";
 import { cn } from "@/lib/utils";
 
 export interface LessonBlockEditorHandle {
@@ -154,6 +155,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const [importPreview, setImportPreview] = useState<{ blocks: any[]; pageTitle: string; blockCount: number } | null>(null);
   const [importSelectedBlocks, setImportSelectedBlocks] = useState<Set<number>>(new Set());
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentUploadProgress, setDocumentUploadProgress] = useState<number | null>(null);
   const [includePptxHeadersAndFooters, setIncludePptxHeadersAndFooters] = useState(true);
   const documentFileInputRef = useRef<HTMLInputElement>(null);
   const scrapeUrlMutation = trpc.pageScraper.scrapeUrl.useMutation({
@@ -443,16 +445,6 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
     scrollToBlock(newBlock.id);
   };
 
-  const readFileAsBase64 = async (file: File) => {
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const chunkSize = 0x8000;
-    let binary = "";
-    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
-    }
-    return window.btoa(binary);
-  };
-
   const handleDocumentConversion = async () => {
     if (!lessonId) {
       toast.error("Document conversion is available while editing a saved lesson.");
@@ -472,15 +464,19 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
     }
 
     try {
+      setDocumentUploadProgress(0);
       const mimeType = documentFile.type || (documentFile.name.toLowerCase().endsWith(".pdf")
         ? "application/pdf"
         : "application/vnd.openxmlformats-officedocument.presentationml.presentation");
+      const uploaded = await uploadLessonDocument(documentFile, lessonId, setDocumentUploadProgress);
+      setDocumentUploadProgress(null);
       const result = await convertLessonDocument.mutateAsync({
         lessonId,
-        fileName: documentFile.name,
-        mimeType,
-        fileSize: documentFile.size,
-        fileData: await readFileAsBase64(documentFile),
+        fileName: uploaded.fileName,
+        mimeType: uploaded.mimeType || mimeType,
+        fileSize: uploaded.fileSize,
+        storageKey: uploaded.fileKey,
+        storageUrl: uploaded.url,
         includePptxHeadersAndFooters,
       });
       const convertedBlocks = result.blocks as Block[];
@@ -498,7 +494,8 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
       }
       scrollToBlock(convertedBlocks[0].id);
     } catch (error: any) {
-      toast.error(error?.message || "The document could not be converted.");
+      setDocumentUploadProgress(null);
+      toast.error(formatConversionError(error));
     }
   };
 
@@ -1162,10 +1159,16 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
               <Button
                 type="button"
                 onClick={handleDocumentConversion}
-                disabled={!documentFile || convertLessonDocument.isPending}
+                disabled={!documentFile || convertLessonDocument.isPending || documentUploadProgress !== null}
                 className="bg-teal-600 hover:bg-teal-700"
               >
-                {convertLessonDocument.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Converting…</> : <><FileUp className="mr-2 h-4 w-4" /> Convert to Rich Text</>}
+                {documentUploadProgress !== null ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading… {documentUploadProgress}%</>
+                ) : convertLessonDocument.isPending ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Converting…</>
+                ) : (
+                  <><FileUp className="mr-2 h-4 w-4" /> Convert to Rich Text</>
+                )}
               </Button>
             </div>
           </div>
