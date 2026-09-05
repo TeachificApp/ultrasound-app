@@ -11,6 +11,7 @@ describe("PowerPoint slide-level editor", () => {
     expect(source).toContain("Edit selected text layer");
     expect(source).toContain("plainTextFromRichHtml");
     expect(source).toContain("pptxRichSlideToHtml(value)");
-    expect(source).toContain("Image URL");
+    expect(source).toContain("maxHeight={720}");
+    expect(source).toContain("className=\"w-full bg-white shadow-sm");
   });
 });

@@ -45,6 +45,7 @@ import { toast } from "sonner";
 import RichTextEditor from "@/components/RichTextEditor";
 import PptxSlideRichTextEditor from "@/components/PptxSlideRichTextEditor";
 import { pptxRichSlideToHtml, type PptxRichSlide } from "@shared/pptxRichSlide";
+import { isConvertedDocumentBlock } from "@shared/convertedDocumentBlock";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { FUNNEL_TEMPLATES, getFunnelTemplateBlocks } from "@/lib/funnelTemplates";
 import { BlockPreview } from "@/components/BlockPreview";
@@ -3399,7 +3400,13 @@ function TextBlockEditor({ d, set, setMany, lessonTitle, courseTitle }: { d: Rec
             }}
           />
         ) : (
-          <RichTextEditor value={d.html ?? ""} onChange={(html) => set("html", html)} minHeight={150} maxHeight={400} placeholder="Start typing your content, or use AI Generate above…" />
+          <RichTextEditor
+            value={d.html ?? ""}
+            onChange={(html) => set("html", html)}
+            minHeight={isConvertedDocumentBlock(d) ? 240 : 150}
+            maxHeight={isConvertedDocumentBlock(d) ? 720 : 400}
+            placeholder="Start typing your content, or use AI Generate above…"
+          />
         )}
       </div>
       <BSAlignField data={d} onSet={set} label="Text Alignment" field="align" />

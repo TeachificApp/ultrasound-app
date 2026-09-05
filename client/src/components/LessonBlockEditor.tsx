@@ -30,9 +30,11 @@ const DOCUMENT_CONVERSION_MAX_BYTES = DOCUMENT_CONVERSION_MAX_MB * 1024 * 1024;
 import React, { useImperativeHandle } from "react";
 import {
   X, Plus, Save, Eye, EyeOff, Copy, BookOpen, Search, ExternalLink, Layers, Globe, Loader2, FileUp,
-  ChevronLeft, ChevronRight, Bookmark, GripVertical,
+  ChevronLeft, ChevronRight, Bookmark,
 } from "lucide-react";
 import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, SaveAsTemplateButton } from "@/components/BlockTemplateLibrary";
+import { useResizableEditorPanel } from "@/lib/useResizableEditorPanel";
+import { isConvertedDocumentBlock } from "@shared/convertedDocumentBlock";
 import { cn } from "@/lib/utils";
 
 export interface LessonBlockEditorHandle {
@@ -131,9 +133,11 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
   const [pickerTab, setPickerTab] = useState<PickerTab>("catalog");
   const [previewMode, setPreviewMode] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Resizable settings panel
-  const [settingsPanelWidth, setSettingsPanelWidth] = useState(320);
-  const isResizingPanel = useRef(false);
+  const {
+    panelWidth: settingsPanelWidth,
+    ensureWidthForConvertedDocument,
+    handleResizeMouseDown: handleSettingsPanelMouseDown,
+  } = useResizableEditorPanel("lesson-block-editor");
 
   // Refs for scroll-to-new-block
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -612,6 +616,11 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
     blocks.flatMap(b => b.type === "column_layout" ? [...(b.data?.leftBlocks ?? []), ...(b.data?.rightBlocks ?? [])] : []).find(b => b.id === selectedBlockId) ??
     null;
 
+  useEffect(() => {
+    if (!selectedBlock || !isConvertedDocumentBlock(selectedBlock.data)) return;
+    ensureWidthForConvertedDocument();
+  }, [selectedBlock?.id, selectedBlock?.data, ensureWidthForConvertedDocument]);
+
   const moveBlock = (id: string, dir: -1 | 1) => {
     setBlocks(bs => {
       const idx = bs.findIndex(b => b.id === id);
@@ -971,54 +980,37 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
 
           {/* Right: Settings panel (resizable) */}
           {!previewMode && selectedBlock && (
-            <>
-              {/* Resize handle */}
+            <div
+              className="relative shrink-0 overflow-y-auto border-l border-gray-200 bg-white"
+              style={{ width: settingsPanelWidth }}
+            >
               <div
-                className="w-1.5 shrink-0 cursor-col-resize bg-gray-100 hover:bg-teal-200 active:bg-teal-300 transition-colors flex items-center justify-center group"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  isResizingPanel.current = true;
-                  const startX = e.clientX;
-                  const startWidth = settingsPanelWidth;
-                  const onMove = (ev: MouseEvent) => {
-                    if (!isResizingPanel.current) return;
-                    const delta = startX - ev.clientX;
-                    setSettingsPanelWidth(Math.max(260, Math.min(700, startWidth + delta)));
-                  };
-                  const onUp = () => {
-                    isResizingPanel.current = false;
-                    document.removeEventListener("mousemove", onMove);
-                    document.removeEventListener("mouseup", onUp);
-                    document.body.style.cursor = "";
-                    document.body.style.userSelect = "";
-                  };
-                  document.addEventListener("mousemove", onMove);
-                  document.addEventListener("mouseup", onUp);
-                  document.body.style.cursor = "col-resize";
-                  document.body.style.userSelect = "none";
-                }}
-              >
-                <GripVertical className="w-3 h-3 text-gray-400 group-hover:text-teal-600" />
-              </div>
-              <div style={{ width: settingsPanelWidth }} className="shrink-0 bg-white border-l border-gray-200 overflow-y-auto">
-                <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                  <span className="text-gray-700 text-xs font-bold uppercase tracking-wide">Block Settings</span>
-                  <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700">
-                    <X className="w-4 h-4" />
-                  </button>
+                className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-col-resize transition-colors hover:bg-teal-400 active:bg-teal-500"
+                title="Drag left to widen the editor panel"
+                onMouseDown={handleSettingsPanelMouseDown}
+              />
+              <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3 pl-5">
+                <div>
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-700">Block Settings</span>
+                  {isConvertedDocumentBlock(selectedBlock.data) && (
+                    <p className="mt-0.5 text-[10px] leading-4 text-teal-700">Drag the left edge to customize editor width.</p>
+                  )}
                 </div>
-                <div className="p-3">
-                  <BlockSettings
-                    block={selectedBlock}
-                    onChange={data => updateBlock(selectedBlock.id, data)}
-                    lessonId={lessonId}
-                    courseId={courseId}
-                    lessonTitle={lessonTitle}
-                    courseTitle={courseTitle}
-                  />
-                </div>
+                <button onClick={() => setSelectedBlockId(null)} className="text-gray-400 hover:text-gray-700">
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            </>
+              <div className="p-3 pl-5">
+                <BlockSettings
+                  block={selectedBlock}
+                  onChange={data => updateBlock(selectedBlock.id, data)}
+                  lessonId={lessonId}
+                  courseId={courseId}
+                  lessonTitle={lessonTitle}
+                  courseTitle={courseTitle}
+                />
+              </div>
+            </div>
           )}
           </div>{/* end canvas+settings row */}
         </div>
