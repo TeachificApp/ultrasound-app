@@ -36,7 +36,7 @@ export default function PptxSlideRichTextEditor({ value, onChange }: Props) {
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-100 p-2">
         <div
-          className="mx-auto max-w-[520px] bg-white shadow-sm [&_[data-pptx-text-box]]:m-0 [&_[data-pptx-image]]:max-w-none"
+          className="w-full bg-white shadow-sm [&_[data-pptx-text-box]]:m-0 [&_[data-pptx-image]]:max-w-none"
           dangerouslySetInnerHTML={{ __html: pptxRichSlideToHtml(value) }}
         />
       </div>
@@ -62,8 +62,8 @@ export default function PptxSlideRichTextEditor({ value, onChange }: Props) {
           <RichTextEditor
             value={selected.contentHtml ?? selected.content ?? ""}
             onChange={(contentHtml) => updateElement(selected.id, { contentHtml, content: plainTextFromRichHtml(contentHtml, selected.content ?? "") })}
-            minHeight={120}
-            maxHeight={300}
+            minHeight={180}
+            maxHeight={720}
             placeholder="Edit this PowerPoint text layer…"
           />
         </div>

@@ -27,10 +27,10 @@ describe("LessonBlockEditor document conversion entry", () => {
     expect(source).not.toContain("Maximum file size: 25 MB");
   });
 
-  it("asks authors whether PowerPoint headers and footers should be included", () => {
-    expect(source).toContain("PowerPoint header and footer");
-    expect(source).toContain("Include header and footer");
-    expect(source).toContain("Exclude header and footer");
-    expect(source).toContain("includePptxHeadersAndFooters");
+  it("allows converted document blocks to widen the settings panel with a left-edge resize handle", () => {
+    expect(source).toContain('useResizableEditorPanel("lesson-block-editor")');
+    expect(source).toContain("handleSettingsPanelMouseDown");
+    expect(source).toContain("Drag the left edge to customize editor width.");
+    expect(source).toContain("isConvertedDocumentBlock(selectedBlock.data)");
   });
 });
