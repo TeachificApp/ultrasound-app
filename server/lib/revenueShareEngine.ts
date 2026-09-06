@@ -99,10 +99,25 @@ export interface RevenueShareContext {
 export interface PartnerShare {
   partnerId: number;
   assignmentId: number;
-  stripeAccountId: string;
+  stripeAccountId: string | null;
+  canTransfer: boolean;
+  pendingReason: string | null;
   shareAmountCents: number;
   sharePercentage: number;
   label: string | null;
+}
+
+export function getPartnerShareDisposition(partner: {
+  stripeAccountId?: string | null;
+  onboardingStatus?: string | null;
+}): Pick<PartnerShare, "canTransfer" | "pendingReason"> {
+  if (!partner.stripeAccountId) {
+    return { canTransfer: false, pendingReason: "Partner has no connected Stripe account" };
+  }
+  if (partner.onboardingStatus !== "active") {
+    return { canTransfer: false, pendingReason: "Partner Stripe onboarding is not complete" };
+  }
+  return { canTransfer: true, pendingReason: null };
 }
 
 /**
@@ -155,8 +170,7 @@ export async function calculateRevenueShares(
   const shares: PartnerShare[] = [];
   for (const assignment of assignments) {
     const partner = partnerMap.get(assignment.partnerId);
-    // Only include partners who have completed Stripe onboarding
-    if (!partner?.stripeAccountId || partner.onboardingStatus !== "active") continue;
+    const disposition = getPartnerShareDisposition(partner ?? {});
 
     const pct = parseFloat(String(assignment.percentage));
     const shareAmountCents = Math.floor((ctx.grossAmountCents * pct) / 100);
@@ -165,7 +179,8 @@ export async function calculateRevenueShares(
     shares.push({
       partnerId: assignment.partnerId,
       assignmentId: assignment.id,
-      stripeAccountId: partner.stripeAccountId,
+      stripeAccountId: partner?.stripeAccountId ?? null,
+      ...disposition,
       shareAmountCents,
       sharePercentage: pct,
       label: assignment.label,
@@ -195,7 +210,7 @@ export async function executeRevenueShareTransfers(ctx: RevenueShareContext): Pr
   }
 
   if (shares.length === 0) {
-    console.log(`[RevenueShare] No active assignments for course ${ctx.courseId ?? "global"}`);
+    console.log(`[RevenueShare] No assignments for course ${ctx.courseId ?? "global"}`);
     return;
   }
 
@@ -203,6 +218,23 @@ export async function executeRevenueShareTransfers(ctx: RevenueShareContext): Pr
   const now = Date.now();
 
   for (const share of shares) {
+    const paymentMatches = [
+      ctx.paymentIntentId ? eq(revenueShareLedger.paymentIntentId, ctx.paymentIntentId) : null,
+      ctx.checkoutSessionId ? eq(revenueShareLedger.checkoutSessionId, ctx.checkoutSessionId) : null,
+    ].filter(Boolean);
+    if (paymentMatches.length > 0) {
+      const [existing] = await db
+        .select({ id: revenueShareLedger.id })
+        .from(revenueShareLedger)
+        .where(and(
+          eq(revenueShareLedger.partnerId, share.partnerId),
+          eq(revenueShareLedger.assignmentId, share.assignmentId),
+          or(...paymentMatches as [ReturnType<typeof eq>, ...ReturnType<typeof eq>[]]),
+        ))
+        .limit(1);
+      if (existing) continue;
+    }
+
     // Insert ledger entry as "processing"
     let ledgerId: number | null = null;
     try {
@@ -220,13 +252,20 @@ export async function executeRevenueShareTransfers(ctx: RevenueShareContext): Pr
           sharePercentage: String(share.sharePercentage),
           shareAmount: share.shareAmountCents,
           currency: ctx.currency,
-          status: "processing",
+          status: share.canTransfer ? "processing" : "pending",
+          errorMessage: share.pendingReason,
           createdAt: now,
           updatedAt: now,
         });
       ledgerId = (inserted as any).insertId ?? null;
     } catch (dbErr) {
       console.error("[RevenueShare] Failed to insert ledger entry:", dbErr);
+      continue;
+    }
+
+    // Keep an auditable pending entry until the partner completes Stripe onboarding.
+    if (!share.canTransfer || !share.stripeAccountId) {
+      console.warn(`[RevenueShare] Pending partner share ${share.partnerId}: ${share.pendingReason}`);
       continue;
     }
 
