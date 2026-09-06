@@ -7517,6 +7517,10 @@ export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
   readAloudEnabled: boolean("read_aloud_enabled").default(false).notNull(),
   readAloudVoice: mysqlEnum("read_aloud_voice", ["female", "male"]).default("female").notNull(),
   allowRetakes: boolean("allow_retakes").default(true).notNull(),
+  // Optional creator policy used by the current Quiz Creator (for example,
+  // `enrolled_if_incomplete`). Kept nullable so existing quizzes preserve
+  // their established retake behavior until an author selects a policy.
+  allowRetakesType: varchar("allow_retakes_type", { length: 64 }),
   maxAttempts: int("max_attempts"),
   accessType: mysqlEnum("access_type", ["public", "enrolled", "members_only"]).default("enrolled").notNull(),
   brand: mysqlEnum("brand", ["aaus", "iheartecho"]).default("aaus").notNull(),
@@ -7526,6 +7530,7 @@ export const standaloneQuizzes = mysqlTable("standalone_quizzes", {
   sharedInSonoQuiz: boolean("shared_in_sono_quiz").default(false).notNull(),
   // Result visibility toggles
   showGroupNames: boolean("show_group_names").default(true).notNull(),
+  showPerQuestionScore: boolean("show_per_question_score").default(true).notNull(),
   showPerQuestionResult: boolean("show_per_question_result").default(true).notNull(),
   showOnlyPercentage: boolean("show_only_percentage").default(false).notNull(),
   // Per-group question draw config: JSON array of { folderId, folderName, count }

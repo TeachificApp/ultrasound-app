@@ -432,6 +432,8 @@
 - [x] Add focused regressions for editor-to-display rich-text style parity, including formatted text and table color preservation.
 - [x] Repair standalone Flashcards quiz creation when the form submits the valid `flashcards` type but the active server validation accepts only quiz and mock exam types.
 - [x] Add focused creation-contract regressions covering quiz, mock exam, and flashcards types without creating quiz records during testing.
+- [x] Diagnose and repair the standalone Flashcards quiz database-insert failure shown after the client and server accepted the `flashcards` type, without creating duplicate or test quiz records.
+- [x] Add focused schema-contract coverage for standalone Flashcards quiz creation and existing quiz preservation.
 - [x] Audit the reported $29.97 transaction display so cents are formatted correctly and do not appear as $2,997.
 - [x] Trace the configured Judith Buckland 25% revenue-share allocation and related Stripe payment, transfer, or application-fee records without moving funds.
 - [x] Repair the verified cents-reporting defect and preserve future assigned partner shares as pending ledger entries when Stripe onboarding is incomplete, without moving funds.
