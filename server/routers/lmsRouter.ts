@@ -2949,7 +2949,9 @@ export const lmsLearnerRouter = router({
         : effectivePrice * input.seats) + (orderBumpCheckout?.amount ?? 0);
       const [orderResult] = await db.insert(lmsOrders).values({
         userId: ctx.user.id, courseId: course.id,
-        amount: orderAmount,
+        // lms_orders.amount is always stored in integer cents. Stripe completion
+        // reaffirms this value from amount_total before reporting or fulfillment.
+        amount: Math.round(Number(orderAmount) * 100),
         affiliateId: null, seats: input.seats, status: "pending",
       }).$returningId();
 

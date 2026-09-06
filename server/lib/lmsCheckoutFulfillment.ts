@@ -401,6 +401,9 @@ export async function reconcileLmsCheckoutFromStripeSession(
       status: "paid",
       userId,
       stripeSessionId: sessionId,
+      ...(amountTotal > 0 ? { amount: amountTotal } : {}),
+      ...(session.currency ? { currency: session.currency as string } : {}),
+      ...(paymentIntentFromSession ? { stripePaymentIntentId: paymentIntentFromSession } : {}),
       ...(stripeSubscriptionId ? { stripeSubscriptionId } : {}),
     }).where(eq(lmsOrders.id, orderId));
     notes.push(`Order #${orderId} marked paid`);

@@ -440,3 +440,6 @@
 - [x] Preserve future shares as pending ledger entries when partner onboarding is incomplete, while routing an eligible single active partner’s share directly from the same customer charge at payment time.
 - [x] Configure eligible future revenue-share sales as a single customer charge with Stripe payment-time transfer data, sending the assigned partner share directly from that same charge and retaining the platform remainder without any second customer charge.
 - [x] Add focused payment-time split, customer-single-charge, active-partner, multi-partner fallback, and incomplete-onboarding regressions before enabling the new checkout behavior.
+- [x] Repair the Sales tab display so stored-cent amounts such as 2997 render as $29.97 across every visible reporting view.
+- [x] Trace and repair the empty Analytics tab data contract, query, or client-state path without altering payment, order, revenue-share, or learner records.
+- [x] Add focused regressions for Sales cents formatting and populated administrator analytics rendering.

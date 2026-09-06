@@ -18,13 +18,14 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "sonner";
+import { formatCentsAsCurrency } from "@/lib/formatMoney";
 import {
   Copy, ExternalLink, Code2, Link2, DollarSign, Users, TrendingUp,
   RefreshCw, XCircle, ChevronLeft, ChevronRight, User, BookOpen, ShoppingBag,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtMoney(dollars: number, currency = "usd") {
+function fmtDollars(dollars: number, currency = "usd") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(dollars);
 }
 function fmtDate(d: Date | string | null) {
@@ -75,7 +76,7 @@ function CheckoutLinksSection({ courseId }: { courseId: number }) {
                 {(link as any).sublabel && <p className="text-xs text-muted-foreground">{(link as any).sublabel}</p>}
               </div>
               <Badge variant="outline" className="text-xs shrink-0">{link.pricingType}</Badge>
-              {link.price > 0 && <span className="text-sm font-semibold text-teal-700 shrink-0">{fmtMoney(link.price)}</span>}
+              {link.price > 0 && <span className="text-sm font-semibold text-teal-700 shrink-0">{fmtDollars(link.price)}</span>}
               {link.price === 0 && <span className="text-sm font-semibold text-green-600 shrink-0">Free</span>}
             </div>
             <div className="px-4 py-3 space-y-2">
@@ -189,7 +190,7 @@ function StudentProfileDrawer({
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span>{fmtDate(o.createdAt)}</span>
-                      <span className="font-semibold text-foreground">{fmtMoney(o.amount, o.currency)}</span>
+                      <span className="font-semibold text-foreground">{formatCentsAsCurrency(o.amount, o.currency)}</span>
                       {o.stripeSubscriptionId && <span className="text-teal-600">Subscription</span>}
                     </div>
                   </div>
@@ -224,7 +225,7 @@ function RefundDialog({
         </DialogHeader>
         <div className="space-y-3 py-2">
           <p className="text-sm text-muted-foreground">
-            This will issue a full refund of <strong>{order ? fmtMoney(order.amount, order.currency) : ""}</strong> to the customer via Stripe.
+            This will issue a full refund of <strong>{order ? formatCentsAsCurrency(order.amount, order.currency) : ""}</strong> to the customer via Stripe.
           </p>
           <div className="space-y-1.5">
             <Label className="text-xs">Reason</Label>
@@ -311,7 +312,7 @@ function SalesTable({ courseId }: { courseId: number }) {
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <DollarSign className="h-3.5 w-3.5 text-teal-600" /> Total Revenue
           </div>
-          <p className="text-lg font-bold text-teal-700">{fmtMoney(data.totalRevenue)}</p>
+          <p className="text-lg font-bold text-teal-700">{formatCentsAsCurrency(data.totalRevenue)}</p>
         </div>
         <div className="rounded-lg border bg-white p-3 space-y-1">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -323,7 +324,7 @@ function SalesTable({ courseId }: { courseId: number }) {
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <TrendingUp className="h-3.5 w-3.5 text-teal-600" /> This Page
           </div>
-          <p className="text-lg font-bold">{fmtMoney(runningTotal)}</p>
+          <p className="text-lg font-bold">{formatCentsAsCurrency(runningTotal)}</p>
         </div>
       </div>
 
@@ -358,7 +359,7 @@ function SalesTable({ courseId }: { courseId: number }) {
                     </button>
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(o.createdAt)}</td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-sm">{fmtMoney(o.amount, o.currency)}</td>
+                  <td className="px-3 py-2.5 text-right font-semibold text-sm">{formatCentsAsCurrency(o.amount, o.currency)}</td>
                   <td className="px-3 py-2.5 text-center"><StatusBadge status={o.status} /></td>
                   <td className="px-3 py-2.5 text-center">
                     {o.enrollment ? (

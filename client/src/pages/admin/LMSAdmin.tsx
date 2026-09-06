@@ -8406,20 +8406,26 @@ function EnrollmentExportTab() {
 // ─── Analytics Tab ────────────────────────────────────────────────────────────
 
 function AnalyticsTab() {
-  const { data, isLoading } = trpc.lmsAdmin.getAnalytics.useQuery();
-  const { data: orders, isLoading: ordersLoading } = trpc.lmsAdmin.getOrders.useQuery({ page: 1, pageSize: 10 });
+  const { data, isLoading, isError, error, refetch } = trpc.lmsAdmin.getAnalytics.useQuery();
+  const {
+    data: orders,
+    isLoading: ordersLoading,
+    isError: ordersError,
+    error: ordersQueryError,
+    refetch: refetchOrders,
+  } = trpc.lmsAdmin.getOrders.useQuery({ page: 1, pageSize: 10 });
 
   return (
     <div className="space-y-6">
       {isLoading ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
-      ) : data && (
+      ) : data ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: "Total Courses", value: data.totalCourses, icon: <BookOpen className="w-5 h-5 text-teal-500" /> },
             { label: "Enrollments", value: data.totalEnrollments, icon: <Users className="w-5 h-5 text-blue-500" /> },
             { label: "Completions", value: data.completions, icon: <CheckCircle className="w-5 h-5 text-green-500" /> },
-            { label: "Revenue", value: `$${Number(data.totalRevenue).toFixed(0)}`, icon: <DollarSign className="w-5 h-5 text-yellow-500" /> },
+            { label: "Revenue", value: formatCentsAsCurrency(data.totalRevenue), icon: <DollarSign className="w-5 h-5 text-yellow-500" /> },
           ].map(stat => (
             <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
               {stat.icon}
@@ -8430,9 +8436,20 @@ function AnalyticsTab() {
             </div>
           ))}
         </div>
+      ) : (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900" role="alert">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold">Analytics could not load.</p>
+              <p className="mt-1 text-amber-800">{isError ? error.message : "No analytics response was returned."}</p>
+            </div>
+            <Button size="sm" variant="outline" className="shrink-0 bg-white" onClick={() => void refetch()}>
+              Retry
+            </Button>
+          </div>
+        </div>
       )}
 
-      {/* Top courses */}
       {data?.topCourses && data.topCourses.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="font-semibold text-gray-900 mb-4 text-sm">Top Courses by Enrollment</h3>
@@ -8447,7 +8464,6 @@ function AnalyticsTab() {
         </div>
       )}
 
-      {/* Recent orders */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900 text-sm">Recent Orders</h3>
@@ -8465,6 +8481,8 @@ function AnalyticsTab() {
           <tbody className="divide-y divide-gray-100">
             {ordersLoading ? (
               <tr><td colSpan={5} className="px-4 py-4 text-center text-gray-400 text-xs">Loading...</td></tr>
+            ) : ordersError ? (
+              <tr><td colSpan={5} className="px-4 py-4 text-center text-red-600 text-xs">{ordersQueryError.message} <button type="button" className="ml-2 underline" onClick={() => void refetchOrders()}>Retry</button></td></tr>
             ) : (orders?.orders ?? []).map((o: any) => (
               <tr key={o.id} className="hover:bg-gray-50">
                 <td className="px-4 py-2.5 text-gray-700">{o.user?.displayName || o.user?.name || o.user?.email || "—"}</td>
@@ -8478,7 +8496,7 @@ function AnalyticsTab() {
             ))}
           </tbody>
         </table>
-        {(orders?.orders ?? []).length === 0 && !ordersLoading && (
+        {(orders?.orders ?? []).length === 0 && !ordersLoading && !ordersError && (
           <div className="text-center py-8 text-gray-400 text-sm">No orders yet</div>
         )}
       </div>
