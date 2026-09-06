@@ -3039,6 +3039,22 @@ export const lmsLearnerRouter = router({
           seats: input.seats,
         });
         const isUpgradeBump = orderBumpCheckout?.bumpMode === "upgrade";
+        // Stripe supports one destination transfer on a PaymentIntent. When this
+        // purchase has one active partner and no promotion/bump ambiguity, route
+        // the configured share from the same customer charge immediately.
+        const paymentTimeShare = !input.promoCode && !orderBumpCheckout && !isUpgradeBump
+          ? await (await import("../lib/revenueShareEngine")).resolvePaymentTimeRevenueShare({
+              courseId: course.id,
+              grossAmountCents: resolveCourseOfferCheckoutCents(effectivePrice) * input.seats,
+            })
+          : null;
+        const paymentTimeShareMetadata = paymentTimeShare ? {
+          revenue_share_payment_time: "true",
+          revenue_share_partner_id: String(paymentTimeShare.partnerId),
+          revenue_share_assignment_id: String(paymentTimeShare.assignmentId),
+          revenue_share_amount_cents: String(paymentTimeShare.shareAmountCents),
+          revenue_share_percentage: String(paymentTimeShare.sharePercentage),
+        } : {};
         session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
@@ -3048,8 +3064,17 @@ export const lmsLearnerRouter = router({
             : [lineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: ctx.user.id.toString(),
-          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}) },
-          payment_intent_data: { description: `${productName} — One-Time Purchase` },
+          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}), ...paymentTimeShareMetadata },
+          payment_intent_data: {
+            description: `${productName} — One-Time Purchase`,
+            ...(paymentTimeShare ? {
+              transfer_data: {
+                destination: paymentTimeShare.stripeAccountId,
+                amount: paymentTimeShare.shareAmountCents,
+              },
+              metadata: paymentTimeShareMetadata,
+            } : {}),
+          },
           ...shippingOptions,
         }, { idempotencyKey: `${idempotencyBase}-one-time` });
 

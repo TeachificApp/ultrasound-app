@@ -107,6 +107,14 @@ export interface PartnerShare {
   label: string | null;
 }
 
+export interface PaymentTimeRevenueShare {
+  partnerId: number;
+  assignmentId: number;
+  stripeAccountId: string;
+  shareAmountCents: number;
+  sharePercentage: number;
+}
+
 export function getPartnerShareDisposition(partner: {
   stripeAccountId?: string | null;
   onboardingStatus?: string | null;
@@ -118,6 +126,51 @@ export function getPartnerShareDisposition(partner: {
     return { canTransfer: false, pendingReason: "Partner Stripe onboarding is not complete" };
   }
   return { canTransfer: true, pendingReason: null };
+}
+
+/**
+ * A Stripe PaymentIntent can route one destination amount from the same customer
+ * charge. Return that split only when exactly one active revenue partner is
+ * eligible; all other cases remain on the safeguarded ledger path.
+ */
+export async function resolvePaymentTimeRevenueShare(input: {
+  courseId: number;
+  grossAmountCents: number;
+}): Promise<PaymentTimeRevenueShare | null> {
+  const db = await getDb();
+  if (!db || input.grossAmountCents < 1) return null;
+
+  const assignments = await db
+    .select({
+      assignmentId: revenueShareAssignments.id,
+      partnerId: revenueShareAssignments.partnerId,
+      percentage: revenueShareAssignments.percentage,
+      stripeAccountId: revenueSharePartners.stripeAccountId,
+      onboardingStatus: revenueSharePartners.onboardingStatus,
+    })
+    .from(revenueShareAssignments)
+    .leftJoin(revenueSharePartners, eq(revenueSharePartners.id, revenueShareAssignments.partnerId))
+    .where(and(
+      eq(revenueShareAssignments.active, true),
+      or(eq(revenueShareAssignments.courseId, input.courseId), isNull(revenueShareAssignments.courseId)),
+    ));
+
+  if (assignments.length !== 1) return null;
+  const assignment = assignments[0];
+  const disposition = getPartnerShareDisposition(assignment);
+  if (!disposition.canTransfer || !assignment.stripeAccountId) return null;
+
+  const sharePercentage = Number(assignment.percentage);
+  const shareAmountCents = Math.floor((input.grossAmountCents * sharePercentage) / 100);
+  if (!Number.isFinite(sharePercentage) || shareAmountCents < 1 || shareAmountCents >= input.grossAmountCents) return null;
+
+  return {
+    partnerId: assignment.partnerId,
+    assignmentId: assignment.assignmentId,
+    stripeAccountId: assignment.stripeAccountId,
+    shareAmountCents,
+    sharePercentage,
+  };
 }
 
 /**

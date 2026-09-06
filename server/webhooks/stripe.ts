@@ -17,7 +17,7 @@
 import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -266,19 +266,57 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
       }
     }
     console.log(`[Stripe] LMS checkout fulfilled: user ${userId}, course ${courseId}, ${result.notes.join(", ")}`);
-    // ── Revenue Share: fire transfers to partners (non-blocking) ──
+    // ── Revenue Share: record payment-time split or use the safeguarded fallback ──
     try {
-      const { executeRevenueShareTransfers } = await import("../lib/revenueShareEngine");
       const [courseRow3] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
-      await executeRevenueShareTransfers({
-        courseId,
-        grossAmountCents: (session.amount_total as number) ?? 0,
-        currency: (session.currency as string) ?? "usd",
-        paymentIntentId: (session.payment_intent as string) ?? null,
-        checkoutSessionId: session.id as string,
-        customerEmail: (session.customer_email as string) ?? (session.customer_details as any)?.email ?? null,
-        courseTitle: courseRow3?.title ?? null,
-      });
+      const paymentTimeSplit = meta.revenue_share_payment_time === "true";
+      if (paymentTimeSplit) {
+        const partnerId = Number(meta.revenue_share_partner_id);
+        const assignmentId = Number(meta.revenue_share_assignment_id);
+        const shareAmount = Number(meta.revenue_share_amount_cents);
+        const sharePercentage = meta.revenue_share_percentage;
+        if (Number.isInteger(partnerId) && Number.isInteger(assignmentId) && Number.isInteger(shareAmount) && shareAmount > 0 && sharePercentage) {
+          const [existing] = await db.select({ id: revenueShareLedger.id })
+            .from(revenueShareLedger)
+            .where(and(
+              eq(revenueShareLedger.partnerId, partnerId),
+              eq(revenueShareLedger.assignmentId, assignmentId),
+              eq(revenueShareLedger.checkoutSessionId, session.id as string),
+            ))
+            .limit(1);
+          if (!existing) {
+            const now = Date.now();
+            await db.insert(revenueShareLedger).values({
+              partnerId,
+              assignmentId,
+              courseId,
+              courseTitle: courseRow3?.title ?? null,
+              paymentIntentId: (session.payment_intent as string) ?? null,
+              checkoutSessionId: session.id as string,
+              customerEmail: (session.customer_email as string) ?? (session.customer_details as any)?.email ?? null,
+              grossAmount: (session.amount_total as number) ?? 0,
+              sharePercentage,
+              shareAmount,
+              currency: (session.currency as string) ?? "usd",
+              status: "paid",
+              paidAt: now,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+      } else {
+        const { executeRevenueShareTransfers } = await import("../lib/revenueShareEngine");
+        await executeRevenueShareTransfers({
+          courseId,
+          grossAmountCents: (session.amount_total as number) ?? 0,
+          currency: (session.currency as string) ?? "usd",
+          paymentIntentId: (session.payment_intent as string) ?? null,
+          checkoutSessionId: session.id as string,
+          customerEmail: (session.customer_email as string) ?? (session.customer_details as any)?.email ?? null,
+          courseTitle: courseRow3?.title ?? null,
+        });
+      }
     } catch (rsErr) {
       console.error("[RevenueShare] Non-blocking transfer error:", rsErr);
     }

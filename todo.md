@@ -436,3 +436,7 @@
 - [x] Trace the configured Judith Buckland 25% revenue-share allocation and related Stripe payment, transfer, or application-fee records without moving funds.
 - [x] Repair the verified cents-reporting defect and preserve future assigned partner shares as pending ledger entries when Stripe onboarding is incomplete, without moving funds.
 - [ ] After explicit authorization, refresh Judith Buckland’s Stripe Connect status and, if active, backfill and transfer the verified historical 25% revenue-share amount using reviewed order-level evidence.
+- [ ] Retry the user-authorized $7.49 Judith Buckland share for the latest $29.97 sale only after sufficient available platform Stripe balance exists; Stripe confirmed her account is payout-enabled, but the initial transfer was declined for insufficient platform funds. Earlier historical orders remain explicitly excluded.
+- [x] Preserve future shares as pending ledger entries when partner onboarding is incomplete, while routing an eligible single active partner’s share directly from the same customer charge at payment time.
+- [x] Configure eligible future revenue-share sales as a single customer charge with Stripe payment-time transfer data, sending the assigned partner share directly from that same charge and retaining the platform remainder without any second customer charge.
+- [x] Add focused payment-time split, customer-single-charge, active-partner, multi-partner fallback, and incomplete-onboarding regressions before enabling the new checkout behavior.
