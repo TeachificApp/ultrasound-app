@@ -187,10 +187,13 @@ export function emailBlockToHtml(block: Block): string {
       // Users can narrow via the Image Width selector in block settings.
       const rawWidth = (d.maxWidth as string) ?? "100%";
       const imgWidth = rawWidth === "auto" ? "100%" : rawWidth;
-      const link = (d.linkUrl as string) ?? "";
+      // linkUrl is the active Image block setting. `link` and `href` retain
+      // destination URLs authored in compatible legacy campaign/template blocks.
+      const linkValue = (d.linkUrl as string) ?? (d.link as string) ?? (d.href as string) ?? "";
+      const link = toAbsoluteUrl(linkValue);
       const shadow = d.showShadow ? "box-shadow:0 2px 8px rgba(0,0,0,0.12);" : "";
       const img = `<img src="${url}" alt="${alt}" style="max-width:100%;width:${imgWidth};display:block;border-radius:8px;${shadow}" />`;
-      const wrapped = link ? `<a href="${link}" style="text-decoration:none;">${img}</a>` : img;
+      const wrapped = link !== "#" ? `<a href="${link}" style="text-decoration:none;">${img}</a>` : img;
       return `<table width="100%" cellpadding="0" cellspacing="0" style="margin:12px 0;"><tr><td align="${align}">${wrapped}</td></tr></table>`;
     }
     case "hero": {

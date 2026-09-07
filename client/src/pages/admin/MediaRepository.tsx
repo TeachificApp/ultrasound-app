@@ -1539,13 +1539,16 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
                   <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <p className="text-sm font-medium">{extractResult.totalInserted} question{extractResult.totalInserted !== 1 ? "s" : ""} extracted successfully!</p>
+                  <div>
+                    <p className="text-sm font-medium">{extractResult.totalInserted + extractResult.totalUpdated} question{extractResult.totalInserted + extractResult.totalUpdated !== 1 ? "s" : ""} processed successfully.</p>
+                    <p className="text-xs text-green-700/80 mt-0.5">{extractResult.totalInserted} added · {extractResult.totalUpdated} existing question{extractResult.totalUpdated !== 1 ? "s" : ""} updated without duplication</p>
+                  </div>
                 </div>
                 <div className="space-y-1">
                   {extractResult.results.map((r, i) => (
                     <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-gray-100 last:border-0">
                       <span className="text-gray-700 font-medium">{r.groupName}</span>
-                      <span className="text-teal-600">{r.inserted} question{r.inserted !== 1 ? "s" : ""}</span>
+                      <span className="text-teal-600">{r.inserted + r.updated} processed <span className="text-gray-500">({r.inserted} added{r.updated ? ` · ${r.updated} updated` : ""})</span></span>
                     </div>
                   ))}
                 </div>

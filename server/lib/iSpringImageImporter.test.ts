@@ -75,4 +75,27 @@ describe("uploadISpringMediaFromZip", () => {
     expect(storagePut).toHaveBeenCalledWith(expect.stringMatching(/question\.png$/), image, "image/png");
     expect(storagePut).toHaveBeenCalledWith(expect.stringMatching(/feedback\.mp4$/), video, "video/mp4");
   });
+
+  it("resolves a source PNG reference to the matching archived JPG and preserves the actual MIME type", async () => {
+    const image = Buffer.from([0xff, 0xd8, 0xff]);
+    const result = await uploadISpringMediaFromZip([
+      { entryName: "quiz/data/images/img-fetal.jpg", getData: () => image },
+    ], ["storage://images/img-fetal.png"]);
+
+    expect(result.get("storage://images/img-fetal.png")).toContain("img-fetal.jpg");
+    expect(storagePut).toHaveBeenCalledWith(expect.stringMatching(/img-fetal\.jpg$/), image, "image/jpeg");
+  });
+
+  it("tries matching image extensions beneath an extracted Media Repository prefix", async () => {
+    const image = Buffer.from([0xff, 0xd8, 0xff]);
+    downloadStorageObject.mockImplementation(async (key: string) => {
+      if (key === "scorm/source/data/images/img-fetal.jpg") return image;
+      throw new Error("not found");
+    });
+
+    const result = await uploadISpringMediaFromExtractedPrefix("scorm/source", ["storage://images/img-fetal.png"]);
+
+    expect(result.get("storage://images/img-fetal.png")).toContain("img-fetal.jpg");
+    expect(storagePut).toHaveBeenCalledWith(expect.stringMatching(/img-fetal\.jpg$/), image, "image/jpeg");
+  });
 });

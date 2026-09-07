@@ -932,6 +932,8 @@ export const questionBankRouter = router({
               questionVideoUrl: questionBank.questionVideoUrl,
               feedbackImageUrl: questionBank.feedbackImageUrl,
               feedbackVideoUrl: questionBank.feedbackVideoUrl,
+              hotspotMarkers: questionBank.hotspotMarkers,
+              correctAnswers: questionBank.correctAnswers,
             })
             .from(questionBank)
             .where(and(
@@ -959,6 +961,8 @@ export const questionBankRouter = router({
               questionVideoUrl: existingQuestion.questionVideoUrl ?? questionVideoUrl,
               feedbackImageUrl: existingQuestion.feedbackImageUrl ?? feedbackImageUrl,
               feedbackVideoUrl: existingQuestion.feedbackVideoUrl ?? feedbackVideoUrl,
+              hotspotMarkers: existingQuestion.hotspotMarkers ?? (q.hotspotMarkers ? JSON.stringify(q.hotspotMarkers) : null),
+              correctAnswers: existingQuestion.correctAnswers ?? q.correctAnswers ?? null,
             };
             const mergedOptionsJson = JSON.stringify(mergedOptions);
             const optionsChanged = mergedOptionsJson !== JSON.stringify(existingOptions);
@@ -984,6 +988,8 @@ export const questionBankRouter = router({
             questionVideoUrl,
             feedbackImageUrl,
             feedbackVideoUrl,
+            hotspotMarkers: q.hotspotMarkers ? JSON.stringify(q.hotspotMarkers) : null,
+            correctAnswers: q.correctAnswers ?? null,
             folderId: groupFolderId,
             createdByAdminId: ctx.user.id,
           }).$returningId();

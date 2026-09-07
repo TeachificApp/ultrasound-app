@@ -95,4 +95,48 @@ describe("parseQuizFromHtml", () => {
     expect(parsed.allImageRefs).toEqual(expect.arrayContaining(["data/images/question.png", "data/images/choice.png", "data/images/feedback.png"]));
     expect(parsed.allVideoRefs).toEqual(expect.arrayContaining(["data/video/question.mp4", "data/video/choice.webm", "data/video/feedback.mp4"]));
   });
+
+  it("retains nested attachment, feedback, and hotspot media used by Media Repository iSpring exports", () => {
+    const parsed = parseISpringDataBlob(JSON.stringify({
+      d: {
+        T: "Registry review",
+        sl: { g: [{ i: "images", T: "FETAL IMAGES", S: [
+          {
+            i: "image-question",
+            tp: "MultipleChoice",
+            D: { h: "<p>Identify this anatomy.</p>" },
+            at: {
+              i: { i: "storage://images/stem.png" },
+              v: { i: "storage://videos/stem.mp4", pi: "storage://images/stem-poster.jpg" },
+            },
+            C: { chs: [{ t: { h: "Answer" }, c: true }] },
+            s: { F: { c: { v: { r: [{ assetId: "storage://images/correct-feedback.png" }] } } } },
+          },
+          {
+            i: "hotspot-question",
+            tp: "Hotspot",
+            D: { h: "<p>Select the structure.</p>" },
+            C: {
+              i: "storage://images/hotspot.png",
+              a: [{ t: "Target", c: true, r: { x: 5000, y: 2500, w: 1200, h: 900 } }],
+            },
+          },
+        ] }] },
+      },
+    }));
+
+    const [imageQuestion, hotspotQuestion] = parsed.groups[0].questions;
+    expect(imageQuestion.questionImageRefs).toEqual(expect.arrayContaining([
+      "storage://images/stem.png",
+      "storage://images/stem-poster.jpg",
+    ]));
+    expect(imageQuestion.questionVideoRefs).toContain("storage://videos/stem.mp4");
+    expect(imageQuestion.feedbackImageRefs).toContain("storage://images/correct-feedback.png");
+    expect(hotspotQuestion).toMatchObject({
+      type: "hotspot",
+      questionImageRefs: ["storage://images/hotspot.png"],
+      hotspotMarkers: [{ isCorrect: true, shape: "rect", x: 50, y: 25, width: 12, height: 9 }],
+    });
+    expect(parsed.allImageRefs).toEqual(expect.arrayContaining(["storage://images/hotspot.png", "storage://images/correct-feedback.png"]));
+  });
 });

@@ -61,6 +61,10 @@ import {
   recordEmailCampaignEvent,
 } from "../lib/emailCampaignTracking";
 import {
+  campaignEventDestination,
+  parseCampaignEventMetadata,
+} from "../lib/emailCampaignAnalytics";
+import {
   buildListUnsubscribeApiUrl,
   buildUnsubscribePageUrl,
   ensureEmailCampaignEventsTable,
@@ -1392,19 +1396,20 @@ Rules:
         GROUP BY eventType
       `)) as [{ eventType: string; uniqueCnt: number }[], unknown];
 
-      const [topLinksRaw] = (await db.execute(sql`
-        SELECT
-          CASE
-            WHEN metadata LIKE '{%' THEN JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.url'))
-            ELSE metadata
-          END as url,
-          COUNT(*) as clicks
+      const [clickMetadataRaw] = (await db.execute(sql`
+        SELECT metadata
         FROM emailCampaignEvents
-        WHERE campaignId = ${input.campaignId} AND eventType = 'click' AND metadata IS NOT NULL
-        GROUP BY url
-        ORDER BY clicks DESC
-        LIMIT 10
-      `)) as [{ url: string; clicks: number }[], unknown];
+        WHERE campaignId = ${input.campaignId} AND eventType = 'click'
+      `)) as [{ metadata: string | null }[], unknown];
+      const topLinkCounts = new Map<string, number>();
+      for (const event of Array.isArray(clickMetadataRaw) ? clickMetadataRaw : []) {
+        const destination = campaignEventDestination(event.metadata);
+        topLinkCounts.set(destination, (topLinkCounts.get(destination) ?? 0) + 1);
+      }
+      const topLinks = [...topLinkCounts.entries()]
+        .map(([url, clicks]) => ({ url, clicks }))
+        .sort((a, b) => b.clicks - a.clicks || a.url.localeCompare(b.url))
+        .slice(0, 10);
 
       let ordersRaw: { orderCount: number; revenueCents: number }[] = [];
       if (!(await isRestrictedManager(ctx.user.id))) try {
@@ -1425,22 +1430,11 @@ Rules:
         console.error("[EmailCampaign] orders attribution query failed (non-fatal):", err);
       }
 
-      let variantRaw: { variant: string; eventType: string; cnt: number }[] = [];
-      try {
-        const [_variantRaw] = (await db.execute(sql`
-          SELECT
-            JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.variant')) as variant,
-            eventType,
-            COUNT(*) as cnt
-          FROM emailCampaignEvents
-          WHERE campaignId = ${input.campaignId}
-            AND metadata LIKE '%"variant"%'
-          GROUP BY variant, eventType
-        `)) as [{ variant: string; eventType: string; cnt: number }[], unknown];
-        variantRaw = Array.isArray(_variantRaw) ? _variantRaw : [];
-      } catch (err) {
-        console.error("[EmailCampaign] variant stats query failed (non-fatal):", err);
-      }
+      const [variantEventsRaw] = (await db.execute(sql`
+        SELECT eventType, metadata
+        FROM emailCampaignEvents
+        WHERE campaignId = ${input.campaignId}
+      `)) as [{ eventType: string; metadata: string | null }[], unknown];
 
       const events = Array.isArray(eventsRaw) ? eventsRaw : [];
       const uniqueEvents = Array.isArray(uniqueRaw) ? uniqueRaw : [];
@@ -1449,19 +1443,21 @@ Rules:
       const totalUnsubscribes = Number(events.find((e) => e.eventType === "unsubscribe")?.cnt ?? 0);
       const uniqueOpens = Number(uniqueEvents.find((e) => e.eventType === "open")?.uniqueCnt ?? 0);
       const uniqueClicks = Number(uniqueEvents.find((e) => e.eventType === "click")?.uniqueCnt ?? 0);
+      const uniqueUnsubscribes = Number(uniqueEvents.find((e) => e.eventType === "unsubscribe")?.uniqueCnt ?? 0);
       const sent = campaign.recipientCount ?? 0;
 
       const variantStats: Record<string, { opens: number; clicks: number }> = {};
-      for (const row of Array.isArray(variantRaw) ? variantRaw : []) {
-        if (!row.variant) continue;
-        if (!variantStats[row.variant]) variantStats[row.variant] = { opens: 0, clicks: 0 };
-        if (row.eventType === "open") variantStats[row.variant].opens += Number(row.cnt);
-        if (row.eventType === "click") variantStats[row.variant].clicks += Number(row.cnt);
+      for (const event of Array.isArray(variantEventsRaw) ? variantEventsRaw : []) {
+        const variant = parseCampaignEventMetadata(event.metadata).variant;
+        if (!variant) continue;
+        if (!variantStats[variant]) variantStats[variant] = { opens: 0, clicks: 0 };
+        if (event.eventType === "open") variantStats[variant].opens += 1;
+        if (event.eventType === "click") variantStats[variant].clicks += 1;
       }
 
       const openRate = sent > 0 ? Math.round((uniqueOpens / sent) * 100) : 0;
       const clickRate = sent > 0 ? Math.round((uniqueClicks / sent) * 100) : 0;
-      const unsubscribeRate = sent > 0 ? Math.round((totalUnsubscribes / sent) * 100) : 0;
+      const unsubscribeRate = sent > 0 ? Math.round((uniqueUnsubscribes / sent) * 100) : 0;
 
       return {
         campaignId: campaign.id,
@@ -1481,10 +1477,7 @@ Rules:
         openRate,
         clickRate,
         unsubscribeRate,
-        topLinks: (Array.isArray(topLinksRaw) ? topLinksRaw : []).map((r) => ({
-          url: r.url,
-          clicks: Number(r.clicks),
-        })),
+        topLinks,
         ...(await isRestrictedManager(ctx.user.id)
           ? {}
           : { orders: {
@@ -1517,12 +1510,13 @@ Rules:
         SELECT
           e.recipientKey,
           e.eventType,
+          e.metadata,
           e.country,
           e.region,
           e.city,
           e.createdAt,
-          COALESCE(u.name, u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as displayName,
-          COALESCE(u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as email,
+          u.name as displayName,
+          u.email as email,
           u.id as userId
         FROM emailCampaignEvents e
         LEFT JOIN users u ON u.id = e.userId
@@ -1543,17 +1537,21 @@ Rules:
       `)) as [{ total: number }[], unknown];
 
       return {
-        recipients: (Array.isArray(rows) ? rows : []).map((r) => ({
-          recipientKey: r.recipientKey,
-          eventType: r.eventType,
-          displayName: r.displayName ?? r.email ?? r.recipientKey,
-          email: r.email,
-          userId: r.userId,
-          country: r.country,
-          region: r.region,
-          city: r.city,
-          timestamp: r.createdAt,
-        })),
+        recipients: (Array.isArray(rows) ? rows : []).map((r) => {
+          const metadata = parseCampaignEventMetadata(r.metadata);
+          const email = r.email ?? metadata.recipientEmail;
+          return {
+            recipientKey: r.recipientKey,
+            eventType: r.eventType,
+            displayName: r.displayName ?? email ?? r.recipientKey,
+            email,
+            userId: r.userId,
+            country: r.country,
+            region: r.region,
+            city: r.city,
+            timestamp: r.createdAt,
+          };
+        }),
         total: Number((Array.isArray(countRaw) ? countRaw[0] : null)?.total ?? 0),
       };
     }),
@@ -2011,65 +2009,58 @@ Rules:
       await assertAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      // Per-link aggregate: URL, total clicks, unique clickers
-      const [linksRaw] = (await db.execute(sql`
-        SELECT
-          CASE
-            WHEN metadata LIKE '{%' THEN JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.url'))
-            ELSE metadata
-          END as url,
-          COUNT(*) as totalClicks,
-          COUNT(DISTINCT recipientKey) as uniqueClickers
-        FROM emailCampaignEvents
-        WHERE campaignId = ${input.campaignId}
-          AND eventType = 'click'
-          AND metadata IS NOT NULL
-        GROUP BY url
-        ORDER BY totalClicks DESC
-      `)) as [{ url: string; totalClicks: number; uniqueClickers: number }[], unknown];
       // Per-click detail: who clicked what and when
       const [detailRaw] = (await db.execute(sql`
         SELECT
           e.recipientKey,
-          CASE
-            WHEN e.metadata LIKE '{%' THEN JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.url'))
-            ELSE e.metadata
-          END as url,
+          e.metadata,
           e.createdAt,
           e.country,
           e.region,
           e.city,
-          COALESCE(u.name, u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as displayName,
-          COALESCE(u.email, JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.recipient'))) as email,
+          u.name as displayName,
+          u.email as email,
           u.id as userId
         FROM emailCampaignEvents e
         LEFT JOIN users u ON u.id = e.userId
         WHERE e.campaignId = ${input.campaignId}
           AND e.eventType = 'click'
-          AND e.metadata IS NOT NULL
         ORDER BY e.createdAt DESC
         LIMIT 2000
       `)) as [{
-        recipientKey: string; url: string; createdAt: Date;
+        recipientKey: string; metadata: string | null; createdAt: Date;
         country: string | null; region: string | null; city: string | null;
         displayName: string | null; email: string | null; userId: number | null;
       }[], unknown];
-      const links = (Array.isArray(linksRaw) ? linksRaw : []).map((r) => ({
-        url: r.url ?? "(unknown)",
-        totalClicks: Number(r.totalClicks),
-        uniqueClickers: Number(r.uniqueClickers),
-      }));
-      const detail = (Array.isArray(detailRaw) ? detailRaw : []).map((r) => ({
-        url: r.url ?? "(unknown)",
-        recipientKey: r.recipientKey,
-        displayName: r.displayName ?? r.email ?? r.recipientKey,
-        email: r.email ?? null,
-        userId: r.userId ?? null,
-        country: r.country ?? null,
-        region: r.region ?? null,
-        city: r.city ?? null,
-        timestamp: r.createdAt,
-      }));
+      const detail = (Array.isArray(detailRaw) ? detailRaw : []).map((r) => {
+        const metadata = parseCampaignEventMetadata(r.metadata);
+        const email = r.email ?? metadata.recipientEmail;
+        return {
+          url: campaignEventDestination(r.metadata),
+          recipientKey: r.recipientKey,
+          displayName: r.displayName ?? email ?? r.recipientKey,
+          email: email ?? null,
+          userId: r.userId ?? null,
+          country: r.country ?? null,
+          region: r.region ?? null,
+          city: r.city ?? null,
+          timestamp: r.createdAt,
+        };
+      });
+      const grouped = new Map<string, { totalClicks: number; recipientKeys: Set<string> }>();
+      for (const click of detail) {
+        const entry = grouped.get(click.url) ?? { totalClicks: 0, recipientKeys: new Set<string>() };
+        entry.totalClicks += 1;
+        entry.recipientKeys.add(click.recipientKey);
+        grouped.set(click.url, entry);
+      }
+      const links = [...grouped.entries()]
+        .map(([url, summary]) => ({
+          url,
+          totalClicks: summary.totalClicks,
+          uniqueClickers: summary.recipientKeys.size,
+        }))
+        .sort((a, b) => b.totalClicks - a.totalClicks || a.url.localeCompare(b.url));
       return { links, detail };
     }),
 
@@ -2113,6 +2104,61 @@ Rules:
           region: r.region ?? "",
           city: r.city ?? "",
         })),
+      };
+    }),
+
+  // ── Admin: complete campaign event export ─────────────────────────────────
+  exportCampaignEvents: protectedProcedure
+    .input(z.object({ campaignId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+
+      const [campaign] = await db
+        .select({ id: emailCampaigns.id })
+        .from(emailCampaigns)
+        .where(eq(emailCampaigns.id, input.campaignId))
+        .limit(1);
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const [rows] = (await db.execute(sql`
+        SELECT
+          e.recipientKey,
+          e.eventType,
+          e.metadata,
+          e.createdAt,
+          e.country,
+          e.region,
+          e.city,
+          u.name as displayName,
+          u.email as email
+        FROM emailCampaignEvents e
+        LEFT JOIN users u ON u.id = e.userId
+        WHERE e.campaignId = ${input.campaignId}
+        ORDER BY e.createdAt DESC
+      `)) as [{
+        recipientKey: string; eventType: string; metadata: string | null; createdAt: Date;
+        country: string | null; region: string | null; city: string | null;
+        displayName: string | null; email: string | null;
+      }[], unknown];
+
+      return {
+        rows: (Array.isArray(rows) ? rows : []).map((row) => {
+          const metadata = parseCampaignEventMetadata(row.metadata);
+          const email = row.email ?? metadata.recipientEmail;
+          return {
+            eventType: row.eventType,
+            displayName: row.displayName ?? email ?? "",
+            email: email ?? "",
+            destinationUrl: metadata.destinationUrl ?? "",
+            variant: metadata.variant ?? "",
+            timestamp: row.createdAt,
+            country: row.country ?? "",
+            region: row.region ?? "",
+            city: row.city ?? "",
+          };
+        }),
       };
     }),
 

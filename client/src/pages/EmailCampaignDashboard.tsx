@@ -240,34 +240,42 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
     { campaignId },
     { enabled: activeTab === "links" }
   );
-  const { refetch: fetchExport, isFetching: exportFetching } = trpc.emailCampaign.exportClickEvents.useQuery(
+  const { refetch: fetchExport, isFetching: exportFetching } = trpc.emailCampaign.exportCampaignEvents.useQuery(
     { campaignId },
     { enabled: false }
   );
 
+  const csvCell = (value: string | number | null | undefined) => {
+    const raw = value == null ? "" : String(value);
+    const formulaSafe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    return `"${formulaSafe.replace(/"/g, '""')}"`;
+  };
+
   const handleExportCsv = async () => {
     const result = await fetchExport();
     const rows = result.data?.rows ?? [];
-    if (rows.length === 0) { toast.error("No click events to export."); return; }
-    const header = ["Recipient Name", "Email", "Link URL", "Timestamp", "Country", "Region", "City"];
+    if (rows.length === 0) { toast.error("No campaign events to export."); return; }
+    const header = ["Recipient Name", "Email", "Event", "Destination URL", "Variant", "Timestamp", "Country", "Region", "City"];
     const csvRows = rows.map((r) => [
-      `"${(r.displayName ?? "").replace(/"/g, '""')}"`,
-      `"${(r.email ?? "").replace(/"/g, '""')}"`,
-      `"${(r.url ?? "").replace(/"/g, '""')}"`,
-      `"${r.timestamp ? new Date(r.timestamp).toLocaleString() : ""}"`,
-      `"${(r.country ?? "").replace(/"/g, '""')}"`,
-      `"${(r.region ?? "").replace(/"/g, '""')}"`,
-      `"${(r.city ?? "").replace(/"/g, '""')}"`,
+      csvCell(r.displayName),
+      csvCell(r.email),
+      csvCell(r.eventType),
+      csvCell(r.destinationUrl),
+      csvCell(r.variant),
+      csvCell(r.timestamp ? new Date(r.timestamp).toLocaleString() : ""),
+      csvCell(r.country),
+      csvCell(r.region),
+      csvCell(r.city),
     ].join(","));
     const csv = [header.join(","), ...csvRows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `campaign-${campaignId}-clicks.csv`;
+    a.download = `campaign-${campaignId}-events.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success(`Exported ${rows.length} click events`);
+    toast.success(`Exported ${rows.length} campaign events`);
   };
   const createSegmentMutation = trpc.emailCampaign.createSegmentFromCampaign.useMutation({
     onSuccess: (data) => {
@@ -619,7 +627,7 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
                 <p className="text-xs text-gray-500">{linkData?.links.length ?? 0} unique link{(linkData?.links.length ?? 0) !== 1 ? "s" : ""} clicked · {linkData?.detail.length ?? 0} total clicks</p>
                 <Button size="sm" variant="outline" className="text-xs gap-1.5" onClick={handleExportCsv} disabled={exportFetching}>
                   {exportFetching ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                  Export CSV
+                  Export All Event Data
                 </Button>
               </div>
               {linksLoading ? (

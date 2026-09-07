@@ -473,3 +473,11 @@
 - [x] Repair the manual SCORM Question Bank importer so supported package image and video references in question stems, answer choices, and feedback are uploaded and displayed on the corresponding saved Question Bank record.
 - [x] Validate the corrected manual SCORM import path with representative image and video source references, without starting a bulk re-extraction.
 - [x] Verify the exact Media Repository per-quiz Question Bank extraction route: its Save Questions action passes the selected media asset to the extracted-prefix media importer, which maps parsed image and video references to the saved Question Bank record and learner-style preview.
+- [x] Trace and repair Email Campaign image URL-link handling across editor insertion, draft persistence, publish, preview, and outbound HTML rendering so linked images remain clickable in delivered email.
+- [x] Add focused regressions for valid image URL links, safe URL sanitization, draft/published campaign persistence, and outgoing email HTML anchor/image output without sending an email.
+- [x] Provide a safe, sender-configuration-neutral Email Campaign deliverability improvement checklist without changing DNS, sender authentication, subscriptions, suppression, or campaign records.
+- [x] Audit and repair Email Campaign analytics calculations so overview, recipient, geography, and link metrics are derived consistently from authorized recorded campaign events.
+- [x] Replace link-only campaign analytics export with a complete authorized export of recorded delivery-relevant campaign events and available metadata, including opens, clicks, unsubscribes, timestamps, destinations, and non-sensitive location fields where captured.
+- [x] Add focused accuracy, deduplication, filter, and complete-export regressions for campaign analytics without exposing data across campaigns or to non-administrators.
+- [x] Remove the confirmed Media Repository SCORM per-group extraction cap that imported only 200 of at least 300 source multiple-choice questions, while preserving source grouping and avoiding duplicate Question Bank records.
+- [x] Repair the affected Media Repository SCORM package’s question-to-image and question-to-video attachment mapping, then add a source-specific regression for the reported 20/300/40/22 group structure and supported media references.

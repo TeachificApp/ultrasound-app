@@ -14,12 +14,49 @@ function normalizeZipPath(p: string): string {
     .replace(/^\/+/, "");
 }
 
+function isVideoPath(filePath: string): boolean {
+  return /\.(mp4|m4v|webm|mov|wmv|avi|m3u8)(?:$|[?#])/i.test(filePath);
+}
+
 function findZipEntry(entries: ZipEntryLike[], relativePath: string): ZipEntryLike | undefined {
   const target = normalizeZipPath(relativePath);
-  return entries.find((e) => {
-    const name = normalizeZipPath(e.entryName);
+  const exact = entries.find((entry) => {
+    const name = normalizeZipPath(entry.entryName);
     return name === target || name.endsWith(`/${target}`);
   });
+  if (exact) return exact;
+
+  // iSpring may leave a stale extension in quiz metadata while archiving the
+  // same image under another supported image extension. Exact matches win.
+  const targetBase = target.replace(/\.[a-z0-9]+$/i, "");
+  return entries.find((entry) => {
+    const name = normalizeZipPath(entry.entryName);
+    const nameBase = name.replace(/\.[a-z0-9]+$/i, "");
+    return nameBase === targetBase || nameBase.endsWith(`/${targetBase}`);
+  });
+}
+
+function mediaPathCandidates(ref: string): string[] {
+  const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
+  const rootCandidates = [
+    `data/${withoutScheme}`,
+    withoutScheme,
+    `data/storage/${withoutScheme}`,
+  ];
+  const extensionMatch = /\.[a-z0-9]+$/i.exec(withoutScheme);
+  if (!extensionMatch) return rootCandidates;
+  const extensions = isVideoPath(withoutScheme)
+    ? ["mp4", "m4v", "webm", "mov", "wmv", "avi", "m3u8"]
+    : ["jpg", "jpeg", "png", "gif", "webp", "svg"];
+  const stem = withoutScheme.slice(0, -extensionMatch[0].length);
+  return [...new Set([
+    ...rootCandidates,
+    ...extensions.flatMap((extension) => [
+      `data/${stem}.${extension}`,
+      `${stem}.${extension}`,
+      `data/storage/${stem}.${extension}`,
+    ]),
+  ])];
 }
 
 function mimeFromPath(filePath: string): string {
@@ -48,18 +85,11 @@ export async function uploadISpringMediaFromZip(
   mediaRefs: string[],
 ): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
-  const uniqueRefs = [...new Set(mediaRefs)];
 
-  for (const ref of uniqueRefs) {
+  for (const ref of [...new Set(mediaRefs)]) {
     const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
-    const candidates = [
-      `data/${withoutScheme}`,
-      withoutScheme,
-      `data/storage/${withoutScheme}`,
-    ];
-
     let entry: ZipEntryLike | undefined;
-    for (const candidate of candidates) {
+    for (const candidate of mediaPathCandidates(ref)) {
       entry = findZipEntry(entries, candidate);
       if (entry) break;
     }
@@ -68,7 +98,7 @@ export async function uploadISpringMediaFromZip(
     const buf = entry.getData();
     if (!buf.length) continue;
 
-    const fileName = withoutScheme.split("/").pop() ?? "image.png";
+    const fileName = normalizeZipPath(entry.entryName).split("/").pop() ?? withoutScheme.split("/").pop() ?? "image.png";
     const key = `question-bank/ispring/${Date.now()}-${Math.random().toString(36).slice(2)}-${fileName}`;
     const { url } = await storagePut(key, buf, mimeFromPath(fileName));
     urlMap.set(ref, url);
@@ -80,9 +110,7 @@ export async function uploadISpringMediaFromZip(
 export function rewriteStorageRefs(text: string, urlMap: Map<string, string>): string {
   if (!text || urlMap.size === 0) return text;
   let out = text;
-  for (const [ref, url] of urlMap) {
-    out = out.split(ref).join(url);
-  }
+  for (const [ref, url] of urlMap) out = out.split(ref).join(url);
   return out;
 }
 
@@ -92,28 +120,26 @@ export async function uploadISpringMediaFromExtractedPrefix(
   mediaRefs: string[],
 ): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
-  const uniqueRefs = [...new Set(mediaRefs)];
 
-  for (const ref of uniqueRefs) {
+  for (const ref of [...new Set(mediaRefs)]) {
     const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
-    const keys = [
-      `${prefix}/data/${withoutScheme}`,
-      `${prefix}/${withoutScheme}`,
-      `${prefix}/data/storage/${withoutScheme}`,
-    ];
-
     let buf: Buffer | null = null;
-    for (const key of keys) {
+    let resolvedKey: string | null = null;
+    for (const candidate of mediaPathCandidates(ref)) {
+      const key = `${prefix}/${candidate}`.replace(/\/+/g, "/");
       try {
         buf = await downloadStorageObject(key);
-        if (buf.length > 0) break;
+        if (buf.length > 0) {
+          resolvedKey = key;
+          break;
+        }
       } catch {
         buf = null;
       }
     }
     if (!buf?.length) continue;
 
-    const fileName = withoutScheme.split("/").pop() ?? "image.png";
+    const fileName = resolvedKey?.split("/").pop() ?? withoutScheme.split("/").pop() ?? "image.png";
     const storageKey = `question-bank/ispring/${Date.now()}-${Math.random().toString(36).slice(2)}-${fileName}`;
     const { url } = await storagePut(storageKey, buf, mimeFromPath(fileName));
     urlMap.set(ref, url);

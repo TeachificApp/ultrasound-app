@@ -16,4 +16,11 @@ describe("Media Repository SCORM Question Bank extraction", () => {
     expect(source).toContain("associated media (images and videos)");
     expect(source).toContain("Package ready to save");
   });
+
+  it("reports all processed questions, including existing records updated with recovered media", () => {
+    expect(source).toContain("extractResult.totalInserted + extractResult.totalUpdated");
+    expect(source).toContain("processed successfully.");
+    expect(source).toContain("r.inserted + r.updated");
+    expect(source).toContain("existing question");
+  });
 });

@@ -19,7 +19,7 @@ export interface ParsedAnswer {
 export interface ParsedQuestion {
   id: string;
   ispringType: string;
-  type: "mcq" | "truefalse";
+  type: "mcq" | "truefalse" | "hotspot";
   questionHtml: string;
   questionText: string;
   answers: ParsedAnswer[];
@@ -32,6 +32,17 @@ export interface ParsedQuestion {
   questionVideoRefs: string[];
   feedbackImageRefs: string[];
   feedbackVideoRefs: string[];
+  hotspotMarkers?: Array<{
+    id: string;
+    label: string;
+    isCorrect: boolean;
+    shape: "rect";
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>;
+  correctAnswers?: string;
 }
 
 export interface ParsedGroup {
@@ -118,11 +129,34 @@ function getTextFromDBlock(d: any): { html: string; text: string } {
 }
 
 function getDeclaredMediaRefs(block: any): string[] {
-  if (!block || !Array.isArray(block.r)) return [];
-  return block.r
-    .filter((value: unknown): value is string => typeof value === "string")
-    .map(normalizeMediaRef)
-    .filter((ref): ref is string => Boolean(ref));
+  return getNestedMediaRefs(block?.r);
+}
+
+/**
+ * iSpring stores media in a mixture of direct resource arrays and nested
+ * attachment/feedback objects (for example `at.i.i`, `at.v.i`, and
+ * `s.F.c.v.r[].assetId`). Traverse those structures without assuming one
+ * export-version-specific layout.
+ */
+function getNestedMediaRefs(value: unknown): string[] {
+  const refs = new Set<string>();
+  const visit = (entry: unknown) => {
+    if (typeof entry === "string") {
+      const direct = normalizeMediaRef(entry);
+      if (direct) refs.add(direct);
+      for (const ref of extractMediaRefsFromHtml(entry)) refs.add(ref);
+      return;
+    }
+    if (Array.isArray(entry)) {
+      entry.forEach(visit);
+      return;
+    }
+    if (entry && typeof entry === "object") {
+      Object.values(entry as Record<string, unknown>).forEach(visit);
+    }
+  };
+  visit(value);
+  return [...refs];
 }
 
 function parseChoices(chs: any[]): ParsedAnswer[] {
@@ -132,6 +166,7 @@ function parseChoices(chs: any[]): ParsedAnswer[] {
     const mediaRefs = [...new Set([
       ...extractMediaRefsFromHtml(html),
       ...getDeclaredMediaRefs(ch.t),
+      ...getNestedMediaRefs(ch),
     ])];
     const imageRef = mediaRefs.find((ref) => !isVideoRef(ref));
     const videoRef = mediaRefs.find(isVideoRef);
@@ -159,6 +194,8 @@ function getFeedback(q: any): { html: string; text: string; refs: string[] } {
       ...extractMediaRefsFromHtml(incorrectHtml),
       ...getDeclaredMediaRefs(correctValue),
       ...getDeclaredMediaRefs(incorrectValue),
+      ...getNestedMediaRefs(correctValue),
+      ...getNestedMediaRefs(incorrectValue),
     ])],
   };
 }
@@ -169,7 +206,13 @@ function parseQuestion(q: any): ParsedQuestion | null {
 
   const { html: questionHtml, text: questionText } = getTextFromDBlock(q.D);
   const feedback = getFeedback(q);
-  const questionRefs = [...new Set([...extractMediaRefsFromHtml(questionHtml), ...getDeclaredMediaRefs(q.D)])];
+  const questionRefs = [...new Set([
+    ...extractMediaRefsFromHtml(questionHtml),
+    ...getDeclaredMediaRefs(q.D),
+    ...getNestedMediaRefs(q.D),
+    ...getNestedMediaRefs(q.at),
+    ...getNestedMediaRefs(q.tp === "Hotspot" ? q.C?.i : null),
+  ])];
   const feedbackRefs = [...new Set([...extractMediaRefsFromHtml(feedback.html), ...feedback.refs])];
 
   const withMedia = (answers: ParsedAnswer[]) => {
@@ -245,6 +288,56 @@ function parseQuestion(q: any): ParsedQuestion | null {
       explanationHtml: feedback.html,
       explanationText: feedback.text,
       ...withMedia(answers),
+    };
+  }
+
+  if (tp === "Hotspot") {
+    const answers = Array.isArray(q.C?.a) ? q.C.a : [];
+    const toPercent = (value: unknown) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return 0;
+      const percent = numeric > 100 ? numeric / 100 : numeric;
+      return Math.max(0, Math.min(100, percent));
+    };
+    const markers = answers.map((answer: any, index: number) => {
+      const region = answer?.r ?? {};
+      return {
+        id: `${q.i ?? "hotspot"}-${index + 1}`,
+        label: stripHtml(answer?.t ?? answer?.l ?? ""),
+        isCorrect: answer?.c !== false,
+        shape: "rect" as const,
+        x: toPercent(region.x),
+        y: toPercent(region.y),
+        width: toPercent(region.w),
+        height: toPercent(region.h),
+      };
+    });
+    const correctMarkerIndexes = markers
+      .map((marker, index) => marker.isCorrect ? index : -1)
+      .filter((index) => index >= 0);
+    const imageRef = getNestedMediaRefs(q.C?.i).find((ref) => !isVideoRef(ref));
+    const hotspotRefs = [...new Set([
+      ...getNestedMediaRefs(q.C),
+      ...(imageRef ? [imageRef] : []),
+    ])];
+    return {
+      id: q.i ?? "",
+      ispringType: tp,
+      type: "hotspot",
+      questionHtml,
+      questionText,
+      answers: [],
+      correctAnswer: "",
+      correctAnswers: JSON.stringify(correctMarkerIndexes),
+      explanationHtml: feedback.html,
+      explanationText: feedback.text,
+      hotspotMarkers: markers,
+      imageRefs: [...new Set([...withMedia([]).imageRefs, ...hotspotRefs.filter((ref) => !isVideoRef(ref))])],
+      videoRefs: [...new Set([...withMedia([]).videoRefs, ...hotspotRefs.filter(isVideoRef)])],
+      questionImageRefs: imageRef ? [imageRef] : questionRefs.filter((ref) => !isVideoRef(ref)),
+      questionVideoRefs: questionRefs.filter(isVideoRef),
+      feedbackImageRefs: feedbackRefs.filter((ref) => !isVideoRef(ref)),
+      feedbackVideoRefs: feedbackRefs.filter(isVideoRef),
     };
   }
 
