@@ -85,6 +85,8 @@ interface SendEmailOptions {
   listUnsubscribeUrl?: string;
   /** Optional file attachments */
   attachments?: EmailAttachment[];
+  /** Bypass SendGrid suppression lists (magic link, password reset, etc.) */
+  bypassSuppressions?: boolean;
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
@@ -119,6 +121,13 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
         click_tracking: { enable: false },
         open_tracking: { enable: false },
       },
+      ...(opts.bypassSuppressions
+        ? {
+            mail_settings: {
+              bypass_list_management: { enable: true },
+            },
+          }
+        : {}),
       ...(opts.attachments && opts.attachments.length > 0 ? {
         attachments: opts.attachments.map(a => ({
           content: a.content,
