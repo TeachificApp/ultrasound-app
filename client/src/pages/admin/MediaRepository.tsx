@@ -1672,7 +1672,7 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                   </div>
                 )}
                 <p className="text-xs text-gray-500">
-                  All questions in this file will be extracted with their associated media (images, audio) and saved as native question bank questions.
+                  All questions in this file will be extracted with their associated media (images and videos) and saved as native Question Bank questions.
                 </p>
                 {/* Folder selection */}
                 <div className="space-y-2">

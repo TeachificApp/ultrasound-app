@@ -472,3 +472,4 @@
 - [x] Add focused regressions for SCORM source-media extraction, duplicate-safe reconciliation, and learner-player-style Question Bank preview behavior.
 - [x] Repair the manual SCORM Question Bank importer so supported package image and video references in question stems, answer choices, and feedback are uploaded and displayed on the corresponding saved Question Bank record.
 - [x] Validate the corrected manual SCORM import path with representative image and video source references, without starting a bulk re-extraction.
+- [x] Verify the exact Media Repository per-quiz Question Bank extraction route: its Save Questions action passes the selected media asset to the extracted-prefix media importer, which maps parsed image and video references to the saved Question Bank record and learner-style preview.

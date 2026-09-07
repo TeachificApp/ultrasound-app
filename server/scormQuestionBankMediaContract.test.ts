@@ -6,7 +6,11 @@ describe("SCORM Question Bank media contract", () => {
   const source = fs.readFileSync(path.resolve(process.cwd(), "server/routers/questionBankRouter.ts"), "utf8");
 
   it("uploads both parsed image and video references and persists media to matching Question Bank fields", () => {
+    expect(source).toContain("mediaAssetId: z.number().int().optional()");
+    expect(source).toContain("loadScormImportFromMediaAsset(input.mediaAssetId)");
+    expect(source).toContain("source.extractedPrefix");
     expect(source).toContain("parsed.allVideoRefs");
+    expect(source).toContain("parsed.allImageRefs");
     expect(source).toContain("uploadISpringMediaFromZip");
     expect(source).toContain("uploadISpringMediaFromExtractedPrefix");
     expect(source).toContain("questionImageUrl");
