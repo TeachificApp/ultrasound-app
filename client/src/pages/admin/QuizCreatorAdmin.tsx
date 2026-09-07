@@ -138,19 +138,6 @@ function FolderTagPicker({
 }
 
 // --- File upload helpers ---
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      const comma = result.indexOf(",");
-      resolve(comma >= 0 ? result.slice(comma + 1) : result);
-    };
-    reader.onerror = () => reject(reader.error ?? new Error("Failed to read file"));
-    reader.readAsDataURL(file);
-  });
-}
-
 async function parseUploadQuizFileResponse(res: Response) {
   const text = await res.text();
   if (!text.trim()) {
@@ -172,6 +159,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [scormPreview, setScormPreview] = useState<any>(null);
+  const [scormImportStorageKey, setScormImportStorageKey] = useState<string | null>(null);
   const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
   const [csvPreview, setCsvPreview] = useState<any>(null);
   const [newQuizTitle, setNewQuizTitle] = useState("");
@@ -193,7 +181,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
   const importCsvMut = trpc.questionBank.importCsvToBank.useMutation();
 
   const reset = () => {
-    setFile(null); setScormPreview(null); setScormSelectedGroups(new Set());
+    setFile(null); setScormPreview(null); setScormImportStorageKey(null); setScormSelectedGroups(new Set());
     setCsvPreview(null); setNewQuizTitle("");
     setFolderId(null); setNewFolderName(""); setTagIds([]);
   };
@@ -207,6 +195,8 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
       const res = await fetch("/api/upload-quiz-bank-file", { method: "POST", body: fd, credentials: "include" });
       const json = await parseUploadQuizFileResponse(res);
       if (json.type === "scorm") {
+        if (!json.importStorageKey) throw new Error("SCORM upload did not return a storage key");
+        setScormImportStorageKey(json.importStorageKey);
         setScormPreview(json.preview);
         setScormSelectedGroups(new Set(json.preview.groups.map((g: any) => g.id)));
         if (!newQuizTitle) setNewQuizTitle(json.preview.quizTitle || f.name.replace(/\.[^.]+$/, ""));
@@ -217,6 +207,7 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
     } catch (e: any) {
       toast.error(e.message);
       setFile(null);
+      setScormImportStorageKey(null);
     } finally {
       setUploading(false);
     }
@@ -227,9 +218,9 @@ function ImportQuizDialog({ open, onClose, onCreated }: { open: boolean; onClose
     try {
       const quiz = await createQuizMut.mutateAsync({ title: newQuizTitle.trim(), type: newQuizType, brand: newQuizBrand });
 
-      if (importTab === "scorm" && scormPreview && file) {
+      if (importTab === "scorm" && scormPreview && scormImportStorageKey) {
         const result = await scormConfirmMut.mutateAsync({
-          bufferBase64: await fileToBase64(file),
+          importStorageKey: scormImportStorageKey,
           groupIds: Array.from(scormSelectedGroups),
           extraTagIds: tagIds.length > 0 ? tagIds : undefined,
           folderId: folderId ?? undefined,
@@ -532,6 +523,7 @@ export function AddQuestionsDialog({
   const [scormFile, setScormFile] = useState<File | null>(null);
   const [scormUploading, setScormUploading] = useState(false);
   const [scormPreview, setScormPreview] = useState<any>(null);
+  const [scormImportStorageKey, setScormImportStorageKey] = useState<string | null>(null);
   const [scormSelectedGroups, setScormSelectedGroups] = useState<Set<string>>(new Set());
   const [scormFolderId, setScormFolderId] = useState<number | null>(null);
   const [scormNewFolderName, setScormNewFolderName] = useState("");
@@ -634,7 +626,7 @@ export function AddQuestionsDialog({
     setBankFolderId(""); setBankTagId("");
     setAITopic(""); setAIGenerated(null); setAISelectedIds(new Set()); setAITagIds([]);
     setAIFolderId(null); setAINewFolderName(""); setAIGroupId(""); setAiSourceFiles([]); setAiSourceUrl(""); setAiSourceUploading(false);
-    setScormFile(null); setScormPreview(null); setScormSelectedGroups(new Set());
+    setScormFile(null); setScormPreview(null); setScormImportStorageKey(null); setScormSelectedGroups(new Set());
     setScormFolderId(null); setScormNewFolderName(""); setScormTagIds([]);
     setCsvFile(null); setCsvPreview(null); setCsvFolderId(null); setCsvNewFolderName(""); setCsvTagIds([]);
     setMlSearch(""); setMlSelectedAssetId(null); setMlPreview(null); setMlSelectedGroups(new Set());
@@ -648,9 +640,11 @@ export function AddQuestionsDialog({
       const res = await fetch("/api/upload-quiz-bank-file", { method: "POST", body: fd, credentials: "include" });
       const json = await parseUploadQuizFileResponse(res);
       if (json.type !== "scorm") throw new Error("Not a valid SCORM file");
+      if (!json.importStorageKey) throw new Error("SCORM upload did not return a storage key");
+      setScormImportStorageKey(json.importStorageKey);
       setScormPreview(json.preview);
       setScormSelectedGroups(new Set(json.preview.groups.map((g: any) => g.id)));
-    } catch (e: any) { toast.error(e.message); setScormFile(null); }
+    } catch (e: any) { toast.error(e.message); setScormFile(null); setScormImportStorageKey(null); }
     finally { setScormUploading(false); }
   };
 
@@ -701,9 +695,9 @@ export function AddQuestionsDialog({
   };
 
   const handleScormImport = async () => {
-    if (!scormPreview || !scormFile) return;
+    if (!scormPreview || !scormImportStorageKey) return;
     scormConfirmMut.mutate({
-      bufferBase64: await fileToBase64(scormFile),
+      importStorageKey: scormImportStorageKey,
       groupIds: Array.from(scormSelectedGroups),
       extraTagIds: scormTagIds.length > 0 ? scormTagIds : undefined,
       folderId: scormFolderId ?? undefined,
@@ -988,7 +982,7 @@ export function AddQuestionsDialog({
                 <span className="text-sm text-gray-500">{scormSelectedGroups.size} group(s) selected</span>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={() => { onClose(); resetAll(); }}>Cancel</Button>
-                  <Button disabled={scormSelectedGroups.size === 0 || scormConfirmMut.isPending || !scormFile} onClick={() => { void handleScormImport(); }} className="bg-orange-600 hover:bg-orange-700">
+                  <Button disabled={scormSelectedGroups.size === 0 || scormConfirmMut.isPending || !scormImportStorageKey} onClick={() => { void handleScormImport(); }} className="bg-orange-600 hover:bg-orange-700">
                     {scormConfirmMut.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
                     Import to Bank & Quiz
                   </Button>

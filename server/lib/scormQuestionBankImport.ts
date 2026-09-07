@@ -18,6 +18,12 @@ import {
 import { downloadStorageObject } from "./downloadStorageObject";
 import { loadLatestMediaVersionBuffer } from "./loadMediaVersionBuffer";
 
+const SCORM_IMPORT_STORAGE_PREFIX = "question-bank-imports/";
+
+export function isScormImportStorageKey(storageKey: string): boolean {
+  return storageKey.startsWith(SCORM_IMPORT_STORAGE_PREFIX) && !storageKey.includes("..");
+}
+
 export type ZipEntryLike = { entryName: string; getData: () => Buffer };
 
 export interface ScormImportSource {
@@ -148,8 +154,8 @@ export async function loadScormImportFromMediaAsset(mediaAssetId: number): Promi
   return { parsed, zipEntries };
 }
 
-export async function loadScormImportFromBase64(bufferBase64: string): Promise<ScormImportSource> {
-  const zipBuffer = Buffer.from(bufferBase64, "base64");
+/** Parse a SCORM/.quiz ZIP buffer for Question Bank import. */
+export async function loadScormImportFromBuffer(zipBuffer: Buffer): Promise<ScormImportSource> {
   if (!zipBuffer.length) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "SCORM file data is empty" });
   }
@@ -206,4 +212,17 @@ export async function loadScormImportFromBase64(bufferBase64: string): Promise<S
   }
   const AdmZip = (await import("adm-zip")).default;
   return { parsed, zipEntries: new AdmZip(zipBuffer).getEntries() };
+}
+
+export async function loadScormImportFromBase64(bufferBase64: string): Promise<ScormImportSource> {
+  return loadScormImportFromBuffer(Buffer.from(bufferBase64, "base64"));
+}
+
+/** Load a staged SCORM package uploaded via /api/upload-quiz-bank-file. */
+export async function loadScormImportFromStorageKey(storageKey: string): Promise<ScormImportSource> {
+  if (!isScormImportStorageKey(storageKey)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid SCORM import storage key" });
+  }
+  const zipBuffer = await downloadStorageObject(storageKey);
+  return loadScormImportFromBuffer(zipBuffer);
 }
