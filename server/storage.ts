@@ -121,7 +121,17 @@ async function forgePut(
       `Storage upload failed (${response.status} ${response.statusText}): ${message}`
     );
   }
-  const url = (await response.json()).url;
+  const contentTypeHeader = response.headers.get("content-type") ?? "";
+  if (!contentTypeHeader.toLowerCase().includes("application/json")) {
+    throw new Error(
+      "Storage upload returned an unexpected non-JSON response. Verify the storage backend configuration."
+    );
+  }
+  const payload = await response.json() as { url?: unknown };
+  if (typeof payload.url !== "string" || !payload.url) {
+    throw new Error("Storage upload response did not include a usable file URL.");
+  }
+  const url = payload.url;
   mirrorToR2(key, data, contentType).catch(() => {});
   return { key, url };
 }

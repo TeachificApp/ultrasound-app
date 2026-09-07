@@ -481,3 +481,5 @@
 - [x] Add focused accuracy, deduplication, filter, and complete-export regressions for campaign analytics without exposing data across campaigns or to non-administrators.
 - [x] Remove the confirmed Media Repository SCORM per-group extraction cap that imported only 200 of at least 300 source multiple-choice questions, while preserving source grouping and avoiding duplicate Question Bank records.
 - [x] Repair the affected Media Repository SCORM package’s question-to-image and question-to-video attachment mapping, then add a source-specific regression for the reported 20/300/40/22 group structure and supported media references.
+- [x] Trace and repair the Media Repository SCORM Save Questions request that returns an HTML document where the tRPC client expects JSON, without creating or duplicating Question Bank records.
+- [x] Add a focused response-contract regression for Media Repository SCORM Save Questions, then verify the deployed retry reaches the authorized JSON procedure response.

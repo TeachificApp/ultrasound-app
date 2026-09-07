@@ -24,6 +24,14 @@ function hasForgeCredentials(): boolean {
 export function resolveStorageBackend(): StorageBackend {
   const mode = (process.env.STORAGE_BACKEND ?? "auto").toLowerCase();
 
+  // Railway is the production media host. Prefer its configured R2 bucket even
+  // when a legacy Forge mode remains in environment variables from a prior host.
+  // This avoids sending binary SCORM assets to an AI/Forge endpoint that is not
+  // a storage API and can return an HTML document instead of the upload JSON.
+  if (isRailwayPrimaryHost() && hasR2Credentials()) {
+    return "r2";
+  }
+
   if (mode === "r2") {
     if (!hasR2Credentials()) {
       throw new Error(

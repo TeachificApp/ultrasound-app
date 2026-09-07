@@ -25,6 +25,9 @@ describe("resolveStorageBackend", () => {
       "CF_R2_PUBLIC_URL",
       "BUILT_IN_FORGE_API_URL",
       "BUILT_IN_FORGE_API_KEY",
+      "RAILWAY_PRIMARY",
+      "RAILWAY_ENVIRONMENT",
+      "DATABASE_URL",
     ]) {
       saved[key] = process.env[key];
       delete process.env[key];
@@ -58,6 +61,13 @@ describe("resolveStorageBackend", () => {
     process.env.STORAGE_BACKEND = "forge";
     Object.assign(process.env, FORGE_ENV);
     expect(resolveStorageBackend()).toBe("forge");
+  });
+
+  it("uses R2 on Railway even when a legacy Forge storage mode remains", () => {
+    process.env.STORAGE_BACKEND = "forge";
+    process.env.RAILWAY_PRIMARY = "true";
+    Object.assign(process.env, R2_ENV, FORGE_ENV);
+    expect(resolveStorageBackend()).toBe("r2");
   });
 
   it("throws when no backend is configured", () => {
