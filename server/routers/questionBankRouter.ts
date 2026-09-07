@@ -22,7 +22,7 @@ import {
   mediaAssets,
   mediaVersions,
 } from "../../drizzle/schema";
-import { rewriteStorageRefs, uploadISpringImagesFromZip, uploadISpringImagesFromExtractedPrefix } from "../lib/iSpringImageImporter";
+import { rewriteStorageRefs, uploadISpringMediaFromZip, uploadISpringMediaFromExtractedPrefix } from "../lib/iSpringImageImporter";
 import { loadScormImportFromMediaAsset, loadScormImportFromBase64 } from "../lib/scormQuestionBankImport";
 import * as XLSX from "xlsx";
 import fs from "fs";
@@ -855,9 +855,10 @@ export const questionBankRouter = router({
         : await loadScormImportFromBase64(input.bufferBase64!);
       const parsed = source.parsed;
 
-      const imageMap = source.extractedPrefix
-        ? await uploadISpringImagesFromExtractedPrefix(source.extractedPrefix, parsed.allImageRefs)
-        : await uploadISpringImagesFromZip(source.zipEntries, parsed.allImageRefs);
+      const mediaRefs = [...new Set([...parsed.allImageRefs, ...parsed.allVideoRefs])];
+      const mediaMap = source.extractedPrefix
+        ? await uploadISpringMediaFromExtractedPrefix(source.extractedPrefix, mediaRefs)
+        : await uploadISpringMediaFromZip(source.zipEntries, mediaRefs);
 
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {
@@ -875,7 +876,7 @@ export const questionBankRouter = router({
         : parsed.groups;
 
       const tagIds = scormImportQuestionTagIds(input.extraTagIds);
-      const results: { groupName: string; inserted: number }[] = [];
+      const results: { groupName: string; inserted: number; updated: number }[] = [];
       const questionBankIds: number[] = [];
 
       for (const group of groups) {
@@ -896,26 +897,82 @@ export const questionBankRouter = router({
           createdByAdminId: ctx.user.id,
         });
         let inserted = 0;
+        let updated = 0;
 
         for (const q of group.questions) {
           const questionText = plainTextFromISpringContent(
             q.questionText,
             q.questionHtml,
-            (value) => rewriteStorageRefs(value, imageMap),
+            (value) => rewriteStorageRefs(value, mediaMap),
           );
           const options = q.answers.map(a => ({
             text: plainTextFromISpringContent(
               a.text,
               a.html,
-              (value) => rewriteStorageRefs(value, imageMap),
+              (value) => rewriteStorageRefs(value, mediaMap),
             ),
-            ...(a.imageRef ? { imageUrl: imageMap.get(a.imageRef) ?? a.imageRef } : {}),
+            ...(a.imageRef ? { imageUrl: mediaMap.get(a.imageRef) ?? a.imageRef } : {}),
+            ...(a.videoRef ? { videoUrl: mediaMap.get(a.videoRef) ?? a.videoRef } : {}),
           }));
           const explanation = plainTextFromISpringContent(
             q.explanationText,
             q.explanationHtml,
-            (value) => rewriteStorageRefs(value, imageMap),
+            (value) => rewriteStorageRefs(value, mediaMap),
           ) || null;
+          const questionImageUrl = q.questionImageRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
+          const questionVideoUrl = q.questionVideoRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
+          const feedbackImageUrl = q.feedbackImageRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
+          const feedbackVideoUrl = q.feedbackVideoRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
+
+          const [existingQuestion] = await db
+            .select({
+              id: questionBank.id,
+              options: questionBank.options,
+              questionImageUrl: questionBank.questionImageUrl,
+              questionVideoUrl: questionBank.questionVideoUrl,
+              feedbackImageUrl: questionBank.feedbackImageUrl,
+              feedbackVideoUrl: questionBank.feedbackVideoUrl,
+            })
+            .from(questionBank)
+            .where(and(
+              eq(questionBank.question, questionText),
+              eq(questionBank.type, q.type),
+              eq(questionBank.correctAnswer, q.correctAnswer),
+              eq(questionBank.folderId, groupFolderId),
+            ))
+            .limit(1);
+
+          if (existingQuestion) {
+            const existingOptions = typeof existingQuestion.options === "string"
+              ? (() => { try { const parsedOptions = JSON.parse(existingQuestion.options); return Array.isArray(parsedOptions) ? parsedOptions : []; } catch { return []; } })()
+              : Array.isArray(existingQuestion.options) ? existingQuestion.options : [];
+            const mergedOptions = options.map((option, index) => {
+              const existingOption = existingOptions[index] ?? {};
+              return {
+                ...option,
+                ...(existingOption.imageUrl && !option.imageUrl ? { imageUrl: existingOption.imageUrl } : {}),
+                ...(existingOption.videoUrl && !option.videoUrl ? { videoUrl: existingOption.videoUrl } : {}),
+              };
+            });
+            const updatedMedia = {
+              questionImageUrl: existingQuestion.questionImageUrl ?? questionImageUrl,
+              questionVideoUrl: existingQuestion.questionVideoUrl ?? questionVideoUrl,
+              feedbackImageUrl: existingQuestion.feedbackImageUrl ?? feedbackImageUrl,
+              feedbackVideoUrl: existingQuestion.feedbackVideoUrl ?? feedbackVideoUrl,
+            };
+            const mergedOptionsJson = JSON.stringify(mergedOptions);
+            const optionsChanged = mergedOptionsJson !== JSON.stringify(existingOptions);
+            const mediaChanged = Object.entries(updatedMedia).some(([key, value]) => value !== (existingQuestion as any)[key]);
+            if (optionsChanged || mediaChanged) {
+              await db.update(questionBank).set({
+                ...(optionsChanged ? { options: mergedOptionsJson } : {}),
+                ...updatedMedia,
+              }).where(eq(questionBank.id, existingQuestion.id));
+              updated++;
+            }
+            questionBankIds.push(existingQuestion.id);
+            continue;
+          }
 
           const [result] = await db.insert(questionBank).values({
             question: questionText,
@@ -923,6 +980,10 @@ export const questionBankRouter = router({
             options: JSON.stringify(options),
             correctAnswer: q.correctAnswer,
             explanation,
+            questionImageUrl,
+            questionVideoUrl,
+            feedbackImageUrl,
+            feedbackVideoUrl,
             folderId: groupFolderId,
             createdByAdminId: ctx.user.id,
           }).$returningId();
@@ -937,11 +998,12 @@ export const questionBankRouter = router({
           inserted++;
         }
 
-        results.push({ groupName, inserted });
+        results.push({ groupName, inserted, updated });
       }
 
       const totalInserted = results.reduce((sum, r) => sum + r.inserted, 0);
-      return { results, totalInserted, questionBankIds };
+      const totalUpdated = results.reduce((sum, r) => sum + r.updated, 0);
+      return { results, totalInserted, totalUpdated, questionBankIds };
     }),
 
   // ─── Folder CRUD ─────────────────────────────────────────────────────────────

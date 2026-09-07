@@ -13,6 +13,7 @@ export interface ParsedAnswer {
   html: string;
   isCorrect: boolean;
   imageRef?: string;
+  videoRef?: string;
 }
 
 export interface ParsedQuestion {
@@ -26,6 +27,11 @@ export interface ParsedQuestion {
   explanationHtml: string;
   explanationText: string;
   imageRefs: string[];
+  videoRefs: string[];
+  questionImageRefs: string[];
+  questionVideoRefs: string[];
+  feedbackImageRefs: string[];
+  feedbackVideoRefs: string[];
 }
 
 export interface ParsedGroup {
@@ -38,6 +44,7 @@ export interface ParsedQuiz {
   title: string;
   groups: ParsedGroup[];
   allImageRefs: string[];
+  allVideoRefs: string[];
 }
 
 /**
@@ -69,7 +76,7 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-function extractImageRefs(html: string): string[] {
+function extractStorageRefs(html: string): string[] {
   const refs: string[] = [];
   const re = /storage:\/\/[^\s"'<>)]+/g;
   let m: RegExpExecArray | null;
@@ -79,6 +86,10 @@ function extractImageRefs(html: string): string[] {
   return [...new Set(refs)];
 }
 
+function isVideoRef(ref: string): boolean {
+  return /\.(mp4|m4v|webm|mov|wmv|avi|m3u8)(?:$|[?#])/i.test(ref);
+}
+
 function getTextFromDBlock(d: any): { html: string; text: string } {
   if (!d) return { html: "", text: "" };
   const html = d.h ?? "";
@@ -86,25 +97,36 @@ function getTextFromDBlock(d: any): { html: string; text: string } {
   return { html, text };
 }
 
+function getDeclaredStorageRefs(block: any): string[] {
+  if (!block || !Array.isArray(block.r)) return [];
+  return block.r.filter((value: unknown): value is string => typeof value === "string" && value.startsWith("storage://"));
+}
+
 function parseChoices(chs: any[]): ParsedAnswer[] {
   if (!Array.isArray(chs)) return [];
   return chs.map((ch: any) => {
     const { html, text } = getTextFromDBlock(ch.t);
-    const imageRef = ch.t?.r?.[0] ?? undefined;
+    const assetRef = ch.t?.r?.[0] ?? undefined;
     return {
       text: text || stripHtml(html),
       html,
       isCorrect: ch.c === true,
-      imageRef,
+      ...(assetRef && isVideoRef(assetRef) ? { videoRef: assetRef } : assetRef ? { imageRef: assetRef } : {}),
     };
   });
 }
 
-function getFeedback(q: any): { html: string; text: string } {
-  const correctHtml = q?.s?.F?.c?.v?.h ?? "";
-  const incorrectHtml = q?.s?.F?.ic?.v?.h ?? "";
+function getFeedback(q: any): { html: string; text: string; refs: string[] } {
+  const correctValue = q?.s?.F?.c?.v;
+  const incorrectValue = q?.s?.F?.ic?.v;
+  const correctHtml = correctValue?.h ?? "";
+  const incorrectHtml = incorrectValue?.h ?? "";
   const html = correctHtml || incorrectHtml;
-  return { html, text: stripHtml(html) };
+  return {
+    html,
+    text: stripHtml(html),
+    refs: [...new Set([...getDeclaredStorageRefs(correctValue), ...getDeclaredStorageRefs(incorrectValue)])],
+  };
 }
 
 function parseQuestion(q: any): ParsedQuestion | null {
@@ -113,7 +135,29 @@ function parseQuestion(q: any): ParsedQuestion | null {
 
   const { html: questionHtml, text: questionText } = getTextFromDBlock(q.D);
   const feedback = getFeedback(q);
-  const imageRefs = extractImageRefs(questionHtml);
+  const questionRefs = [...new Set([...extractStorageRefs(questionHtml), ...getDeclaredStorageRefs(q.D)])];
+  const feedbackRefs = [...new Set([...extractStorageRefs(feedback.html), ...feedback.refs])];
+
+  const withMedia = (answers: ParsedAnswer[]) => {
+    const answerRefs = answers.flatMap((answer) => [
+      ...extractStorageRefs(answer.html),
+      ...(answer.imageRef ? [answer.imageRef] : []),
+      ...(answer.videoRef ? [answer.videoRef] : []),
+    ]);
+    const questionImageRefs = questionRefs.filter((ref) => !isVideoRef(ref));
+    const questionVideoRefs = questionRefs.filter(isVideoRef);
+    const feedbackImageRefs = feedbackRefs.filter((ref) => !isVideoRef(ref));
+    const feedbackVideoRefs = feedbackRefs.filter(isVideoRef);
+    const allRefs = [...questionRefs, ...feedbackRefs, ...answerRefs];
+    return {
+      imageRefs: [...new Set(allRefs.filter((ref) => !isVideoRef(ref)))],
+      videoRefs: [...new Set(allRefs.filter(isVideoRef))],
+      questionImageRefs,
+      questionVideoRefs,
+      feedbackImageRefs,
+      feedbackVideoRefs,
+    };
+  };
 
   if (tp === "MultipleChoice" || tp === "MultipleResponse") {
     const answers = parseChoices(q.C?.chs ?? []);
@@ -130,7 +174,7 @@ function parseQuestion(q: any): ParsedQuestion | null {
       correctAnswer: correctAnswers.map((a) => a.text).join("|"),
       explanationHtml: feedback.html,
       explanationText: feedback.text,
-      imageRefs,
+      ...withMedia(answers),
     };
   }
 
@@ -152,7 +196,7 @@ function parseQuestion(q: any): ParsedQuestion | null {
         correctAnswer: trueFirst.find((a) => a.isCorrect)?.text ?? "True",
         explanationHtml: feedback.html,
         explanationText: feedback.text,
-        imageRefs,
+        ...withMedia(trueFirst),
       };
     }
     const correctAnswer = answers.find((a) => a.isCorrect)?.text ?? answers[0]?.text ?? "True";
@@ -166,7 +210,7 @@ function parseQuestion(q: any): ParsedQuestion | null {
       correctAnswer,
       explanationHtml: feedback.html,
       explanationText: feedback.text,
-      imageRefs,
+      ...withMedia(answers),
     };
   }
 
@@ -222,6 +266,7 @@ export function parseISpringDataBlob(jsonStr: string): ParsedQuiz {
   const rawGroups: any[] = sl.g ?? [];
 
   const allImageRefs: string[] = [];
+  const allVideoRefs: string[] = [];
   const groups: ParsedGroup[] = [];
 
   for (const rawGroup of rawGroups) {
@@ -235,8 +280,10 @@ export function parseISpringDataBlob(jsonStr: string): ParsedQuiz {
       if (parsed) {
         questions.push(parsed);
         allImageRefs.push(...parsed.imageRefs);
+        allVideoRefs.push(...parsed.videoRefs);
         for (const a of parsed.answers) {
           if (a.imageRef) allImageRefs.push(a.imageRef);
+          if (a.videoRef) allVideoRefs.push(a.videoRef);
         }
       }
     }
@@ -250,6 +297,7 @@ export function parseISpringDataBlob(jsonStr: string): ParsedQuiz {
     title,
     groups,
     allImageRefs: [...new Set(allImageRefs)],
+    allVideoRefs: [...new Set(allVideoRefs)],
   };
 }
 

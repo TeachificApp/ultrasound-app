@@ -17,6 +17,7 @@ import { formatCentsAsCurrency } from "@/lib/formatMoney";
 import { flattenQuestionBankFolderTree, questionBankFolderOptionLabel, questionBankRootFolderIds } from "@shared/questionBankFolders";
 import { QUESTION_BANK_TYPES, QUESTION_BANK_TYPE_BADGE, questionBankTypeLabel, type QuestionBankType } from "@shared/questionBankTypes";
 import { QuestionBankFolderTree } from "@/components/QuestionBankFolderTree";
+import { QuestionBankQuestionPreviewDialog } from "@/components/QuestionBankQuestionPreviewDialog";
 import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
 import { formatScheduledInput, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import {
@@ -11173,6 +11174,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editingQuestion, setEditingQuestion] = useState<any | null>(null);
+  const [previewingQuestion, setPreviewingQuestion] = useState<any | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showTagManager, setShowTagManager] = useState(false);
@@ -11305,7 +11307,8 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
       setShowScormImport(false);
       setScormPreview(null);
       setScormAssetId(null);
-      alert(`Imported ${data.totalInserted} questions from ${data.results.length} group(s)!`);
+      const updateSuffix = data.totalUpdated > 0 ? ` Updated media on ${data.totalUpdated} matching question(s).` : "";
+      alert(`Imported ${data.totalInserted} new question(s) from ${data.results.length} group(s).${updateSuffix}`);
     },
     onError: (e) => alert(`Import failed: ${e.message}`),
   });
@@ -11830,6 +11833,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
                   </td>
                   <td className="px-3 py-2.5 text-right">
                     <div className="flex gap-1 justify-end">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-teal-700 hover:bg-teal-50" title="Preview question" onClick={() => setPreviewingQuestion(q)}><Eye className="w-3.5 h-3.5" /></Button>
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingQuestion(q)}><Edit2 className="w-3.5 h-3.5" /></Button>
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => { if (confirm("Delete this question?")) deleteQ.mutate({ id: q.id }); }}><Trash2 className="w-3.5 h-3.5" /></Button>
                     </div>
@@ -11853,6 +11857,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
       )}
 
       {/* Create/Edit Dialog */}
+      <QuestionBankQuestionPreviewDialog question={previewingQuestion} open={!!previewingQuestion} onOpenChange={(open) => { if (!open) setPreviewingQuestion(null); }} />
       {(showCreate || editingQuestion) && (
         <QuestionBankEditDialog
           question={editingQuestion}

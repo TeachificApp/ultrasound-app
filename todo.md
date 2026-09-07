@@ -443,6 +443,9 @@
 - [x] Repair Railway Question Bank insertion for SCORM-extracted questions by reconciling the complete extractor insert contract with the live schema, without re-extracting packages or changing existing Question Bank records.
 - [x] Add focused SCORM Question Bank save-contract and Railway schema-alignment regressions, then verify the live insert contract without creating test questions.
 - [x] Preserve native SCORM question types during Question Bank extraction and verify that schema compatibility for flashcards never creates flashcard records from SCORM quizzes.
+- [x] Add an individual preview action for each Question Bank question, allowing administrators to inspect rendered question text, answers, feedback, and attached media without entering edit mode.
+- [x] Repair SCORM Question Bank media import so extracted image and video references are uploaded or retained safely and associated with their imported questions.
+- [x] Add focused individual-preview, SCORM-image, SCORM-video, media-reference, and existing-question-preservation regressions.
 - [x] Audit the reported $29.97 transaction display so cents are formatted correctly and do not appear as $2,997.
 - [x] Trace the configured Judith Buckland 25% revenue-share allocation and related Stripe payment, transfer, or application-fee records without moving funds.
 - [x] Repair the verified cents-reporting defect and preserve future assigned partner shares as pending ledger entries when Stripe onboarding is incomplete, without moving funds.

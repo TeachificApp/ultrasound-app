@@ -24,17 +24,24 @@ function mimeFromPath(filePath: string): string {
     gif: "image/gif",
     webp: "image/webp",
     svg: "image/svg+xml",
+    mp4: "video/mp4",
+    m4v: "video/x-m4v",
+    webm: "video/webm",
+    mov: "video/quicktime",
+    wmv: "video/x-ms-wmv",
+    avi: "video/x-msvideo",
+    m3u8: "application/vnd.apple.mpegurl",
   };
   return map[ext] ?? "image/png";
 }
 
 /** Map storage:// refs to uploaded CDN URLs. */
-export async function uploadISpringImagesFromZip(
+export async function uploadISpringMediaFromZip(
   entries: ZipEntryLike[],
-  imageRefs: string[],
+  mediaRefs: string[],
 ): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
-  const uniqueRefs = [...new Set(imageRefs)];
+  const uniqueRefs = [...new Set(mediaRefs)];
 
   for (const ref of uniqueRefs) {
     const withoutScheme = ref.replace(/^storage:\/\//, "");
@@ -73,12 +80,12 @@ export function rewriteStorageRefs(text: string, urlMap: Map<string, string>): s
 }
 
 /** Upload iSpring images from an already-extracted SCORM R2 prefix. */
-export async function uploadISpringImagesFromExtractedPrefix(
+export async function uploadISpringMediaFromExtractedPrefix(
   prefix: string,
-  imageRefs: string[],
+  mediaRefs: string[],
 ): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
-  const uniqueRefs = [...new Set(imageRefs)];
+  const uniqueRefs = [...new Set(mediaRefs)];
 
   for (const ref of uniqueRefs) {
     const withoutScheme = ref.replace(/^storage:\/\//, "");
@@ -107,3 +114,8 @@ export async function uploadISpringImagesFromExtractedPrefix(
 
   return urlMap;
 }
+
+/** @deprecated Use MIME-aware uploadISpringMediaFromZip. */
+export const uploadISpringImagesFromZip = uploadISpringMediaFromZip;
+/** @deprecated Use MIME-aware uploadISpringMediaFromExtractedPrefix. */
+export const uploadISpringImagesFromExtractedPrefix = uploadISpringMediaFromExtractedPrefix;
