@@ -33,6 +33,7 @@ import { fetchAiGenerationSourceUrl } from "../lib/aiWebSource";
 import { buildAiQuestionBankInsertValues } from "../lib/aiQuestionBankPersistence";
 import { plainTextFromISpring } from "../lib/questionBankImportSanitize";
 import {
+  deleteQuestionBankFolderTree,
   insertQuestionBankFolder,
   reorderQuestionBankFolders,
   selectQuestionBankFolders,
@@ -920,19 +921,11 @@ export const questionBankRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      // Unset folder_id on questions in this folder
-      await db.update(questionBank).set({ folderId: null }).where(eq(questionBank.folderId, input.id));
-      // Promote child folders to this folder's parent (or root)
-      const [folder] = await db
-        .select({ parentId: questionBankFolders.parentId })
-        .from(questionBankFolders)
-        .where(eq(questionBankFolders.id, input.id))
-        .limit(1);
-      await db.update(questionBankFolders)
-        .set({ parentId: folder?.parentId ?? null })
-        .where(eq(questionBankFolders.parentId, input.id));
-      await db.delete(questionBankFolders).where(eq(questionBankFolders.id, input.id));
-      return { ok: true };
+      const deletedCount = await deleteQuestionBankFolderTree(db, input.id);
+      if (deletedCount === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Folder not found" });
+      }
+      return { ok: true, deletedFolderCount: deletedCount };
     }),
 
   reorderFolders: protectedProcedure

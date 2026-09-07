@@ -33,7 +33,7 @@ describe("questionBankFolders helpers", () => {
   });
 
   it("uses each imported SCORM group as a created or reused subfolder", () => {
-    const source = readFileSync(resolve(import.meta.dirname, "routers/questionBankRouter.ts"), "utf8");
+    const source = readFileSync(resolve(import.meta.dirname, "lib/scormQuestionBankCommit.ts"), "utf8");
     expect(source).toContain("const groupFolderId = existingGroupFolder?.id ?? await insertQuestionBankFolder");
     expect(source).toContain("parentId: resolvedFolderId");
     expect(source).toContain("folderId: groupFolderId");
@@ -56,5 +56,14 @@ describe("questionBankFolders helpers", () => {
     const ui = readFileSync(resolve(import.meta.dirname, "../client/src/pages/admin/LMSAdmin.tsx"), "utf8");
     expect(ui).toContain("QuestionBankFolderTree");
     expect(ui).toContain("folderId: selectedFolderId");
+  });
+
+  it("deletes a folder and all descendant subfolders instead of reparenting children", () => {
+    const routerSource = readFileSync(resolve(import.meta.dirname, "routers/questionBankRouter.ts"), "utf8");
+    const querySource = readFileSync(resolve(import.meta.dirname, "lib/questionBankFolderQueries.ts"), "utf8");
+    expect(routerSource).toContain("deleteQuestionBankFolderTree");
+    expect(querySource).toContain("collectDescendantFolderIds(allFolders, folderId)");
+    expect(querySource).toContain("inArray(questionBank.folderId, folderIds)");
+    expect(querySource).not.toContain("Promote child folders");
   });
 });

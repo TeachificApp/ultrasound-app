@@ -6108,7 +6108,7 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
                   />
                 </div>
                 <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                  onClick={() => { if (confirm(`Delete folder "${f.name}"? Questions will be unassigned.`)) deleteFolder.mutate({ id: f.id }); }}>
+                  onClick={() => { if (confirm(`Delete folder "${f.name}" and all subfolders? Questions will be unassigned, not deleted.`)) deleteFolder.mutate({ id: f.id }); }}>
                   <Trash2 className="w-3 h-3" />
                 </Button>
               </div>
@@ -11430,7 +11430,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
                 onStartEditFolder={startEditFolder}
                 onSaveEditFolder={saveEditFolder}
                 onCancelEditFolder={() => { setEditingFolderId(null); setEditingFolderName(""); }}
-                onDeleteFolder={(folder) => { if (confirm(`Delete folder "${folder.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: folder.id }); }}
+                onDeleteFolder={(folder) => { if (confirm(`Delete folder "${folder.name}" and all subfolders? Questions will be unassigned, not deleted.`)) deleteFolder.mutate({ id: folder.id }); }}
                 onAddSubfolder={setNewFolderParentId}
                 accent={standalone ? "teal" : "purple"}
               />
