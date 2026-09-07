@@ -434,6 +434,9 @@
 - [x] Add focused creation-contract regressions covering quiz, mock exam, and flashcards types without creating quiz records during testing.
 - [x] Diagnose and repair the standalone Flashcards quiz database-insert failure shown after the client and server accepted the `flashcards` type, without creating duplicate or test quiz records.
 - [x] Add focused schema-contract coverage for standalone Flashcards quiz creation and existing quiz preservation.
+- [x] Reconcile every standalone Flashcards quiz insert field with the live service database after the approved two-column migration did not resolve the reported production error.
+- [x] Verify the live Learn service database target and correct only the confirmed remaining standalone-quiz creation mismatch, without creating test or duplicate quizzes.
+- [x] Apply the approved additive Railway MySQL alignment for the five missing standalone-quiz fields and `flashcards` enum value, then verify the live Quiz Creator insert contract without creating a test quiz.
 - [x] Audit the reported $29.97 transaction display so cents are formatted correctly and do not appear as $2,997.
 - [x] Trace the configured Judith Buckland 25% revenue-share allocation and related Stripe payment, transfer, or application-fee records without moving funds.
 - [x] Repair the verified cents-reporting defect and preserve future assigned partner shares as pending ledger entries when Stripe onboarding is incomplete, without moving funds.
