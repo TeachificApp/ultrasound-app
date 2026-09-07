@@ -1,6 +1,7 @@
-import { and, asc, eq, sql } from "drizzle-orm";
-import { questionBankFolders } from "../../drizzle/schema";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { questionBank, questionBankFolders } from "../../drizzle/schema";
 import type { getDb } from "../db";
+import { collectDescendantFolderIds } from "../../shared/questionBankFolders";
 import { ensureQuestionBankFoldersSchema } from "./ensureQuestionBankFoldersSchema";
 import { extractExecuteRows } from "./ensureLmsCoursesSchema";
 
@@ -111,4 +112,15 @@ export async function reorderQuestionBankFolders(db: Db, folderIds: number[]): P
       db.update(questionBankFolders).set({ sortOrder: index }).where(eq(questionBankFolders.id, id)),
     ),
   );
+}
+
+/** Delete a folder and every descendant subfolder; questions stay in the bank unassigned. */
+export async function deleteQuestionBankFolderTree(db: Db, folderId: number): Promise<number> {
+  const allFolders = await selectQuestionBankFolders(db);
+  const folderIds = collectDescendantFolderIds(allFolders, folderId);
+  if (folderIds.length === 0) return 0;
+
+  await db.update(questionBank).set({ folderId: null }).where(inArray(questionBank.folderId, folderIds));
+  await db.delete(questionBankFolders).where(inArray(questionBankFolders.id, folderIds));
+  return folderIds.length;
 }
