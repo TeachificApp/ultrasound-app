@@ -79,30 +79,85 @@ function mimeFromPath(filePath: string): string {
   return map[ext] ?? "image/png";
 }
 
+const DEFAULT_MEDIA_UPLOAD_CONCURRENCY = 8;
+
+async function mapWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  if (items.length === 0) return;
+  let index = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (index < items.length) {
+      const current = items[index++];
+      await fn(current);
+    }
+  }));
+}
+
+async function uploadSingleMediaRef(
+  entries: ZipEntryLike[],
+  ref: string,
+): Promise<[string, string] | null> {
+  const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
+  let entry: ZipEntryLike | undefined;
+  for (const candidate of mediaPathCandidates(ref)) {
+    entry = findZipEntry(entries, candidate);
+    if (entry) break;
+  }
+  if (!entry) return null;
+
+  const buf = entry.getData();
+  if (!buf.length) return null;
+
+  const fileName = normalizeZipPath(entry.entryName).split("/").pop() ?? withoutScheme.split("/").pop() ?? "image.png";
+  const key = `question-bank/ispring/${Date.now()}-${Math.random().toString(36).slice(2)}-${fileName}`;
+  const { url } = await storagePut(key, buf, mimeFromPath(fileName));
+  return [ref, url];
+}
+
+async function uploadSingleMediaRefFromPrefix(
+  prefix: string,
+  ref: string,
+): Promise<[string, string] | null> {
+  const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
+  let buf: Buffer | null = null;
+  let resolvedKey: string | null = null;
+  for (const candidate of mediaPathCandidates(ref)) {
+    const key = `${prefix}/${candidate}`.replace(/\/+/g, "/");
+    try {
+      buf = await downloadStorageObject(key);
+      if (buf.length > 0) {
+        resolvedKey = key;
+        break;
+      }
+    } catch {
+      buf = null;
+    }
+  }
+  if (!buf?.length) return null;
+
+  const fileName = resolvedKey?.split("/").pop() ?? withoutScheme.split("/").pop() ?? "image.png";
+  const storageKey = `question-bank/ispring/${Date.now()}-${Math.random().toString(36).slice(2)}-${fileName}`;
+  const { url } = await storagePut(storageKey, buf, mimeFromPath(fileName));
+  return [ref, url];
+}
+
 /** Map package or storage:// media refs to uploaded Question Bank URLs. */
 export async function uploadISpringMediaFromZip(
   entries: ZipEntryLike[],
   mediaRefs: string[],
+  concurrency = DEFAULT_MEDIA_UPLOAD_CONCURRENCY,
 ): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
+  const uniqueRefs = [...new Set(mediaRefs)];
 
-  for (const ref of [...new Set(mediaRefs)]) {
-    const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
-    let entry: ZipEntryLike | undefined;
-    for (const candidate of mediaPathCandidates(ref)) {
-      entry = findZipEntry(entries, candidate);
-      if (entry) break;
-    }
-    if (!entry) continue;
-
-    const buf = entry.getData();
-    if (!buf.length) continue;
-
-    const fileName = normalizeZipPath(entry.entryName).split("/").pop() ?? withoutScheme.split("/").pop() ?? "image.png";
-    const key = `question-bank/ispring/${Date.now()}-${Math.random().toString(36).slice(2)}-${fileName}`;
-    const { url } = await storagePut(key, buf, mimeFromPath(fileName));
-    urlMap.set(ref, url);
-  }
+  await mapWithConcurrency(uniqueRefs, concurrency, async (ref) => {
+    const uploaded = await uploadSingleMediaRef(entries, ref);
+    if (uploaded) urlMap.set(uploaded[0], uploaded[1]);
+  });
 
   return urlMap;
 }
@@ -118,32 +173,15 @@ export function rewriteStorageRefs(text: string, urlMap: Map<string, string>): s
 export async function uploadISpringMediaFromExtractedPrefix(
   prefix: string,
   mediaRefs: string[],
+  concurrency = DEFAULT_MEDIA_UPLOAD_CONCURRENCY,
 ): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
+  const uniqueRefs = [...new Set(mediaRefs)];
 
-  for (const ref of [...new Set(mediaRefs)]) {
-    const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
-    let buf: Buffer | null = null;
-    let resolvedKey: string | null = null;
-    for (const candidate of mediaPathCandidates(ref)) {
-      const key = `${prefix}/${candidate}`.replace(/\/+/g, "/");
-      try {
-        buf = await downloadStorageObject(key);
-        if (buf.length > 0) {
-          resolvedKey = key;
-          break;
-        }
-      } catch {
-        buf = null;
-      }
-    }
-    if (!buf?.length) continue;
-
-    const fileName = resolvedKey?.split("/").pop() ?? withoutScheme.split("/").pop() ?? "image.png";
-    const storageKey = `question-bank/ispring/${Date.now()}-${Math.random().toString(36).slice(2)}-${fileName}`;
-    const { url } = await storagePut(storageKey, buf, mimeFromPath(fileName));
-    urlMap.set(ref, url);
-  }
+  await mapWithConcurrency(uniqueRefs, concurrency, async (ref) => {
+    const uploaded = await uploadSingleMediaRefFromPrefix(prefix, ref);
+    if (uploaded) urlMap.set(uploaded[0], uploaded[1]);
+  });
 
   return urlMap;
 }

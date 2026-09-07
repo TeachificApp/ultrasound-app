@@ -5,8 +5,8 @@ import path from "path";
 describe("Media Repository SCORM Question Bank extraction", () => {
   const source = fs.readFileSync(path.resolve(process.cwd(), "client/src/pages/admin/MediaRepository.tsx"), "utf8");
 
-  it("uses the same Question Bank SCORM confirmation route with the selected Media Repository asset", () => {
-    expect(source).toContain("trpc.questionBank.confirmScormImport.useMutation");
+  it("uses the REST SCORM confirm route with the selected Media Repository asset", () => {
+    expect(source).toContain("/api/question-bank/scorm-import/confirm");
     expect(source).toContain("mediaAssetId: asset.id");
     expect(source).toContain("Save Questions");
     expect(source).toContain("scormExtractionReady");
