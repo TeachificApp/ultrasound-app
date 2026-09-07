@@ -1,4 +1,7 @@
+/** Password resets retain the longer anti-abuse cooldown. */
 export const AUTH_EMAIL_COOLDOWN_MS = 5 * 60 * 1000;
+/** Magic links may be resent quickly when a learner changes devices. */
+export const AUTH_MAGIC_LINK_COOLDOWN_MS = 60 * 1000;
 export const AUTH_EMAIL_MAX_PER_ADDRESS_HOUR = 3;
 export const AUTH_EMAIL_MAX_PER_IP_HOUR = 15;
 

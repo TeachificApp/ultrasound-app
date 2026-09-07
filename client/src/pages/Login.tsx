@@ -68,6 +68,7 @@ export default function Login() {
   const [lastName, setLastName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [sent, setSent] = useState(false);
+  const [magicLinkDeliveryStatus, setMagicLinkDeliveryStatus] = useState<"sent" | "cooldown" | "unavailable" | null>(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [sessionReplacementToken, setSessionReplacementToken] = useState<string | null>(null);
@@ -133,7 +134,10 @@ export default function Login() {
 
   // ── Magic link mutation ──
   const requestMutation = trpc.auth.requestMagicLink.useMutation({
-    onSuccess: () => setSent(true),
+    onSuccess: (result) => {
+      setMagicLinkDeliveryStatus(result.deliveryStatus);
+      setSent(true);
+    },
   });
 
   // ── Register mutation ──
@@ -151,6 +155,7 @@ export default function Login() {
     e.preventDefault();
     const trimmed = normalizeAuthEmail(email);
     if (!trimmed || requestMutation.isPending) return;
+    setMagicLinkDeliveryStatus(null);
     requestMutation.mutate({ email: trimmed, origin: window.location.origin, returnTo });
   };
 
@@ -355,23 +360,29 @@ export default function Login() {
               </div>
               <div>
                 <h2 className="text-xl font-black mb-2" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>
-                  Check your inbox
+                  {magicLinkDeliveryStatus === "sent" ? "Check your inbox" : "Request received"}
                 </h2>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  If <span className="font-semibold text-gray-700">{email.trim()}</span> is registered, a sign-in link is on its way.
+                  {magicLinkDeliveryStatus === "sent" ? (
+                    <>If <span className="font-semibold text-gray-700">{email.trim()}</span> is registered, a sign-in link is on its way.</>
+                  ) : magicLinkDeliveryStatus === "cooldown" ? (
+                    <>A sign-in link was requested recently. For security, please wait about <span className="font-semibold text-gray-700">one minute</span> before requesting another link.</>
+                  ) : (
+                    <>We could not prepare a sign-in email right now. Please try again shortly.</>
+                  )}
                 </p>
               </div>
               <div className="inline-flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-left w-full">
                 <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-700 leading-relaxed space-y-1">
-                  <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>
+                  {magicLinkDeliveryStatus === "sent" && <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>}
                   <p>Didn't request this? Someone may have entered your email by mistake — you can ignore the message.</p>
                   <p>&#128236; <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder &mdash; the email comes from <span className="font-medium">{BRAND_NAME}</span>.</p>
                 </div>
               </div>
               <div className="space-y-3 pt-2">
                 <button
-                  onClick={() => { setSent(false); setEmail(""); requestMutation.reset(); }}
+                  onClick={() => { setSent(false); setEmail(""); setMagicLinkDeliveryStatus(null); requestMutation.reset(); }}
                   className="text-sm font-medium hover:underline block mx-auto"
                   style={{ color: "#189aa1" }}
                 >

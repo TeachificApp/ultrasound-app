@@ -585,7 +585,11 @@ export const appRouter = router({
           ipAddress,
         });
         if (!rateLimit.allowed) {
-          return { success: true };
+          return {
+            success: true,
+            deliveryStatus: "cooldown" as const,
+            retryAfterMs: rateLimit.reason === "cooldown" ? 60_000 : undefined,
+          };
         }
         let user = await getUserByEmail(email);
 
@@ -605,7 +609,7 @@ export const appRouter = router({
 
         // Preserve a generic response even if an underlying account operation
         // cannot complete, so the endpoint never exposes account existence.
-        if (!user) return { success: true };
+        if (!user) return { success: true, deliveryStatus: "unavailable" as const };
 
         const token = crypto.randomBytes(48).toString('hex');
         const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
@@ -652,7 +656,7 @@ export const appRouter = router({
         const deliveryEmail = resolveAuthDeliveryEmail(user, email);
         if (!deliveryEmail) {
           console.error(`[auth] Magic-link delivery skipped: user ${user.id} has no deliverable email`);
-          return { success: true };
+          return { success: true, deliveryStatus: "unavailable" as const };
         }
         const { ensureTransactionalEmailDelivery } = await import('./lib/ensureTransactionalEmailDelivery');
         await ensureTransactionalEmailDelivery(deliveryEmail);
@@ -678,7 +682,7 @@ export const appRouter = router({
           userId: user.id,
         });
 
-        return { success: true };
+        return { success: true, deliveryStatus: "sent" as const };
       }),
 
     // ─── Email + Password Login ──────────────────────────────────────────────

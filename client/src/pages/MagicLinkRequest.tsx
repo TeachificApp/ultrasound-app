@@ -16,15 +16,20 @@ const LOGO = import.meta.env.VITE_APP_LOGO as string;
 export default function MagicLinkRequest() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [deliveryStatus, setDeliveryStatus] = useState<"sent" | "cooldown" | "unavailable" | null>(null);
 
   const requestMutation = trpc.auth.requestMagicLink.useMutation({
-    onSuccess: () => setSent(true),
+    onSuccess: (result) => {
+      setDeliveryStatus(result.deliveryStatus);
+      setSent(true);
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = normalizeAuthEmail(email);
     if (!trimmed) return;
+    setDeliveryStatus(null);
     requestMutation.mutate({ email: trimmed, origin: window.location.origin });
   };
 
@@ -143,17 +148,21 @@ export default function MagicLinkRequest() {
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-                    Check your inbox
+                    {deliveryStatus === "sent" ? "Check your inbox" : "Request received"}
                   </h2>
                   <p className="text-sm text-gray-500 mt-2 leading-relaxed">
-                    If{" "}
-                    <span className="font-semibold text-gray-700">{email.trim()}</span>{" "}
-                    is registered, a sign-in link is on its way.
+                    {deliveryStatus === "sent" ? (
+                      <>If <span className="font-semibold text-gray-700">{email.trim()}</span> is registered, a sign-in link is on its way.</>
+                    ) : deliveryStatus === "cooldown" ? (
+                      <>A sign-in link was requested recently. For security, please wait about <span className="font-semibold text-gray-700">one minute</span> before requesting another link.</>
+                    ) : (
+                      <>We could not prepare a sign-in email right now. Please try again shortly.</>
+                    )}
                   </p>
                   <div className="mt-3 inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                     <Zap className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
                     <p className="text-xs text-amber-700">
-                      The link expires in <strong>15 minutes</strong> and can only be used once.
+                      {deliveryStatus === "sent" ? <>The link expires in <strong>15 minutes</strong> and can only be used once.</> : <>The existing device session remains unchanged.</>}
                     </p>
                   </div>
                   <p className="text-xs text-gray-400 mt-2">
@@ -166,7 +175,7 @@ export default function MagicLinkRequest() {
 
                 <div className="pt-2 space-y-2">
                   <button
-                    onClick={() => { setSent(false); setEmail(""); requestMutation.reset(); }}
+                    onClick={() => { setSent(false); setEmail(""); setDeliveryStatus(null); requestMutation.reset(); }}
                     className="text-sm text-[#189aa1] hover:underline block mx-auto"
                   >
                     Try a different email address

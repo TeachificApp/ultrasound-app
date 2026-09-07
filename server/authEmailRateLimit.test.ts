@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   AUTH_EMAIL_COOLDOWN_MS,
+  AUTH_MAGIC_LINK_COOLDOWN_MS,
   AUTH_EMAIL_MAX_PER_ADDRESS_HOUR,
   AUTH_EMAIL_MAX_PER_IP_HOUR,
   normalizeAuthEmailForRateLimit,
@@ -20,8 +21,9 @@ vi.mock("../server/db", () => ({
 }));
 
 describe("auth email rate limit constants", () => {
-  it("uses a 5-minute cooldown and hourly caps", () => {
+  it("uses a 1-minute magic-link cooldown, a 5-minute reset cooldown, and hourly caps", () => {
     expect(AUTH_EMAIL_COOLDOWN_MS).toBe(5 * 60 * 1000);
+    expect(AUTH_MAGIC_LINK_COOLDOWN_MS).toBe(60 * 1000);
     expect(AUTH_EMAIL_MAX_PER_ADDRESS_HOUR).toBe(3);
     expect(AUTH_EMAIL_MAX_PER_IP_HOUR).toBe(15);
   });

@@ -1,6 +1,7 @@
 import { and, eq, gte, sql } from "drizzle-orm";
 import {
   AUTH_EMAIL_COOLDOWN_MS,
+  AUTH_MAGIC_LINK_COOLDOWN_MS,
   AUTH_EMAIL_MAX_PER_ADDRESS_HOUR,
   AUTH_EMAIL_MAX_PER_IP_HOUR,
   normalizeAuthEmailForRateLimit,
@@ -43,7 +44,10 @@ export async function checkAuthEmailRateLimit(input: {
   const email = normalizeAuthEmailForRateLimit(input.email);
   const now = Date.now();
   const hourAgo = new Date(now - HOUR_MS);
-  const cooldownSince = new Date(now - AUTH_EMAIL_COOLDOWN_MS);
+  const cooldownMs = input.type === "magic_link"
+    ? AUTH_MAGIC_LINK_COOLDOWN_MS
+    : AUTH_EMAIL_COOLDOWN_MS;
+  const cooldownSince = new Date(now - cooldownMs);
 
   try {
     const [hourlyEmail] = await db.select({ count: sql<number>`count(*)` })

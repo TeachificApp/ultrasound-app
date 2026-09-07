@@ -449,6 +449,8 @@
 - [x] Add a non-admin single-active-device session policy that detects an existing active session on another device and presents a clear user choice to continue here or remain signed in there.
 - [x] Keep Platform Admin accounts exempt from the single-device policy while retaining existing authentication and session-security safeguards.
 - [x] Add focused regressions for existing-device detection, user-declined replacement, confirmed session replacement, old-device invalidation, and Platform Admin multi-device exemption.
+- [x] Repair magic-link request delivery when the account has an active session, keeping the second-device confirmation strictly after link verification rather than blocking email issuance.
+- [x] Add focused regressions for magic-link request acceptance with an active session and the preserved post-verification session-replacement choice.
 - [x] Audit the reported $29.97 transaction display so cents are formatted correctly and do not appear as $2,997.
 - [x] Trace the configured Judith Buckland 25% revenue-share allocation and related Stripe payment, transfer, or application-fee records without moving funds.
 - [x] Repair the verified cents-reporting defect and preserve future assigned partner shares as pending ledger entries when Stripe onboarding is incomplete, without moving funds.
