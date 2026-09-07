@@ -17,6 +17,10 @@ export function useAuth(options?: UseAuthOptions) {
     retry: false,
     refetchOnWindowFocus: false,
   });
+  const sessionStateQuery = trpc.auth.sessionState.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
   const logout = useCallback(async () => {
     try {
@@ -48,6 +52,7 @@ export function useAuth(options?: UseAuthOptions) {
   }, [utils]);
 
   const state = useMemo(() => {
+    const sessionConflict = sessionStateQuery.data?.status === "session_conflict";
     localStorage.setItem(
       "manus-runtime-user-info",
       JSON.stringify(meQuery.data)
@@ -56,17 +61,21 @@ export function useAuth(options?: UseAuthOptions) {
       user: meQuery.data ?? null,
       loading: meQuery.isLoading,
       error: meQuery.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      isAuthenticated: Boolean(meQuery.data) && !sessionConflict,
+      sessionConflict,
+      sessionReplacementToken: sessionConflict ? sessionStateQuery.data?.sessionReplacementToken ?? null : null,
     };
   }, [
     meQuery.data,
     meQuery.error,
     meQuery.isLoading,
+    sessionStateQuery.data,
   ]);
 
   useEffect(() => {
     if (!redirectOnUnauthenticated) return;
     if (meQuery.isLoading) return;
+    if (sessionStateQuery.isLoading || state.sessionConflict) return;
     if (state.user) return;
     if (typeof window === "undefined") return;
     if (window.location.pathname === redirectPath) return;
@@ -76,6 +85,8 @@ export function useAuth(options?: UseAuthOptions) {
     redirectOnUnauthenticated,
     redirectPath,
     meQuery.isLoading,
+    sessionStateQuery.isLoading,
+    state.sessionConflict,
     state.user,
   ]);
 

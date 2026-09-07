@@ -12,6 +12,9 @@ const accessSource = source("client/src/pages/AccessLinkCallback.tsx");
 const ssoRouteSource = source("server/routes/ssoAuto.ts");
 const ssoExchangeSource = source("server/lib/ssoExchange.ts");
 const sdkSource = source("server/_core/sdk.ts");
+const rootRouterSource = source("server/routers.ts");
+const appSource = source("client/src/App.tsx");
+const authHookSource = source("client/src/_core/hooks/useAuth.ts");
 
 describe("single active device policy", () => {
   it("keeps one opaque active session per ordinary user and exempts Platform Admins", () => {
@@ -52,5 +55,17 @@ describe("single active device policy", () => {
     expect(ssoRouteSource).toContain("sessionId: row.sessionId");
     expect(ssoExchangeSource).toContain("sessionId: row.sessionId");
     expect(ssoExchangeSource).toContain("redeemed.sessionId");
+  });
+
+  it("detects competing existing sessions before a protected-route redirect can hide the choice", () => {
+    expect(policySource).toContain("reconcileExistingDeviceSession");
+    expect(policySource).toContain("getExistingSessionConflict");
+    expect(rootRouterSource).toContain("sessionState");
+    expect(rootRouterSource).toContain("session_conflict");
+    expect(authHookSource).toContain("state.sessionConflict");
+    expect(appSource).toContain("ActiveDeviceSessionGuard");
+    expect(appSource).toContain("/api/auth/active-device-status");
+    expect(appSource).toContain("Stay signed in there");
+    expect(appSource).toContain("Log out other device and sign in here");
   });
 });

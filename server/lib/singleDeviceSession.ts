@@ -25,6 +25,11 @@ export type PreparedUserSession =
   | { status: "issued"; sessionId: string }
   | { status: "replacement_required"; sessionReplacementToken: string };
 
+export type ExistingDeviceSessionStatus =
+  | { status: "active"; sessionId: string; shouldRefreshCookie: boolean }
+  | { status: "replacement_required"; sessionReplacementToken: string }
+  | { status: "exempt" };
+
 function sessionSecret(): Uint8Array {
   if (!ENV.cookieSecret) throw new Error("Session secret is not configured");
   return new TextEncoder().encode(ENV.cookieSecret);
@@ -143,6 +148,70 @@ export async function prepareUserSession(
     status: "replacement_required",
     sessionReplacementToken: await createReplacementToken(user.id, newSessionId(), deviceHash),
   };
+}
+
+/**
+ * Reconcile an existing signed-in browser during application bootstrap. This
+ * lets legacy cookies enter the policy on their next use rather than leaving
+ * two ordinary-user sessions usable until a separate new login occurs.
+ */
+export async function reconcileExistingDeviceSession(
+  db: Db,
+  user: Pick<User, "id" | "role">,
+  currentSessionId: string | null,
+  deviceId?: string,
+): Promise<ExistingDeviceSessionStatus> {
+  if (await isPlatformAdminUser(db, user)) return { status: "exempt" };
+
+  const [active] = await db
+    .select({ sessionId: userActiveSessions.sessionId, deviceHash: userActiveSessions.deviceHash })
+    .from(userActiveSessions)
+    .where(eq(userActiveSessions.userId, user.id))
+    .limit(1);
+
+  const deviceHash = hashDeviceId(deviceId);
+  if (!active) {
+    const sessionId = currentSessionId ?? newSessionId();
+    await activateSession(db, user.id, sessionId, deviceHash);
+    return { status: "active", sessionId, shouldRefreshCookie: !currentSessionId };
+  }
+
+  // First-party SSO preserves the signed session ID. Do not mistake separate
+  // subdomain localStorage namespaces for separate physical devices.
+  if (currentSessionId && active.sessionId === currentSessionId) {
+    return { status: "active", sessionId: active.sessionId, shouldRefreshCookie: false };
+  }
+
+  // A browser already known by its opaque local identifier can safely adopt
+  // the active session while a different browser must make the explicit choice.
+  if (deviceHash && active.deviceHash === deviceHash) {
+    return {
+      status: "active",
+      sessionId: active.sessionId,
+      shouldRefreshCookie: currentSessionId !== active.sessionId,
+    };
+  }
+
+  return {
+    status: "replacement_required",
+    sessionReplacementToken: await createReplacementToken(user.id, newSessionId(), deviceHash),
+  };
+}
+
+/** Detect a stale signed cookie so public auth bootstrap can surface a choice. */
+export async function getExistingSessionConflict(
+  db: Db,
+  user: Pick<User, "id" | "role">,
+  currentSessionId: string | undefined,
+): Promise<string | null> {
+  if (!currentSessionId || await isPlatformAdminUser(db, user)) return null;
+  const [active] = await db
+    .select({ sessionId: userActiveSessions.sessionId })
+    .from(userActiveSessions)
+    .where(eq(userActiveSessions.userId, user.id))
+    .limit(1);
+  if (!active || active.sessionId === currentSessionId) return null;
+  return createReplacementToken(user.id, newSessionId(), null);
 }
 
 /** Confirm the author-selected replacement and issue the only active user session. */

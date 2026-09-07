@@ -65,7 +65,7 @@ import { parse as parseCookieHeader } from "cookie";
 import { sdk } from "./sdk";
 import { resolveSessionFromCookies } from "../lib/resolveSessionCookie";
 import { getUserByOpenId } from "../db";
-import { releaseAuthenticatedSession } from "../lib/singleDeviceSession";
+import { issueApprovedUserSession, reconcileExistingDeviceSession, releaseAuthenticatedSession } from "../lib/singleDeviceSession";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -703,6 +703,39 @@ async function startServer() {
     }
     clearSessionCookies(res, req);
     res.json({ success: true });
+  });
+  // Reconciles existing local sessions on app load. It is intentionally outside
+  // tRPC because a stale signed session is rejected by the protected request
+  // gate before a normal authenticated procedure can surface the user choice.
+  app.post("/api/auth/active-device-status", async (req, res) => {
+    try {
+      const cookies = new Map(Object.entries(parseCookieHeader(req.headers.cookie ?? "")));
+      const resolved = await resolveSessionFromCookies(cookies, (value) => sdk.verifySession(value));
+      if (!resolved) return res.json({ status: "anonymous" });
+      const db = await getDb();
+      const user = db ? await getUserByOpenId(resolved.session.openId) : null;
+      if (!db || !user) return res.json({ status: "anonymous" });
+      const body = req.body as { deviceId?: unknown; host?: unknown } | undefined;
+      const deviceId = typeof body?.deviceId === "string" ? body.deviceId : undefined;
+      const host = typeof body?.host === "string" ? body.host : undefined;
+      const outcome = await reconcileExistingDeviceSession(db, user, resolved.session.sessionId ?? null, deviceId);
+      if (outcome.status === "replacement_required") {
+        return res.status(409).json({ status: outcome.status, sessionReplacementToken: outcome.sessionReplacementToken });
+      }
+      if (outcome.status === "active" && outcome.shouldRefreshCookie) {
+        await issueApprovedUserSession({
+          req,
+          res,
+          openId: resolved.session.openId,
+          name: user.name ?? user.email ?? "User",
+          sessionId: outcome.sessionId,
+          hostnameOverride: host,
+        });
+      }
+      return res.json({ status: outcome.status });
+    } catch {
+      return res.status(503).json({ status: "unavailable" });
+    }
   });
   // Google OAuth2 routes for per-form Google Sheets integration
   registerGoogleOAuthRoutes(app);

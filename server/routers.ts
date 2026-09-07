@@ -196,6 +196,27 @@ export const appRouter = router({
   community: communityRouter,
 
   auth: router({
+    sessionState: publicProcedure.query(async ({ ctx }) => {
+      if (ctx.user) return { status: "authenticated" as const };
+      try {
+        const { parse } = await import("cookie");
+        const { resolveSessionFromCookies } = await import("./lib/resolveSessionCookie");
+        const { sdk } = await import("./_core/sdk");
+        const { getDb, getUserByOpenId } = await import("./db");
+        const { getExistingSessionConflict } = await import("./lib/singleDeviceSession");
+        const cookies = new Map(Object.entries(parse(ctx.req.headers.cookie ?? "")));
+        const resolved = await resolveSessionFromCookies(cookies, (value) => sdk.verifySession(value));
+        if (!resolved?.session.sessionId) return { status: "anonymous" as const };
+        const [db, user] = await Promise.all([getDb(), getUserByOpenId(resolved.session.openId)]);
+        if (!db || !user) return { status: "anonymous" as const };
+        const sessionReplacementToken = await getExistingSessionConflict(db, user, resolved.session.sessionId);
+        return sessionReplacementToken
+          ? { status: "session_conflict" as const, sessionReplacementToken }
+          : { status: "authenticated" as const };
+      } catch {
+        return { status: "anonymous" as const };
+      }
+    }),
     me: publicProcedure.query(async opts => {
       if (!opts.ctx.user) return null;
       // Backfill the base "user" role for any existing user who may be missing it

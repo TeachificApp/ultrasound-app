@@ -8,7 +8,7 @@ import NotFound from "@/pages/NotFound";
 import MediaRedirect from "@/pages/MediaRedirect";
 import { Redirect, Route, Switch, useLocation, useParams } from "wouter";
 import { HardRedirect } from "@/components/HardRedirect";
-import { useEffect, lazy, Suspense } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { trpc } from "./lib/trpc";
 import ErrorBoundary from "./components/ErrorBoundary";
 import DemoModeBanner from "./components/DemoModeBanner";
@@ -24,6 +24,9 @@ import { MetaPixel } from "./components/MetaPixel";
 import UpgradePrompt from "./components/UpgradePrompt";
 import { SsoRedirect } from "./components/SsoRedirect";
 import { useAuth } from "./_core/hooks/useAuth";
+import { getOrCreateDeviceId } from "./lib/deviceSession";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog";
+import { Button } from "./components/ui/button";
 import { usePageViewTracker } from "./hooks/useAnalytics";
 import { useSsoConsumer } from "./hooks/useSsoConsumer";
 import { useCrossDomainSso } from "./hooks/useCrossDomainSso";
@@ -1401,6 +1404,108 @@ function UpgradePromptWrapper() {
 }
 
 /**
+ * Runs once at application bootstrap for signed-in browsers. It brings legacy
+ * sessions into the ordinary-user one-device policy and blocks a conflicting
+ * browser until the user explicitly chooses the device to keep active.
+ */
+function ActiveDeviceSessionGuard() {
+  const { isAuthenticated, sessionConflict, sessionReplacementToken } = useAuth();
+  const [replacementToken, setReplacementToken] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+
+  useEffect(() => {
+    if (sessionConflict && sessionReplacementToken) {
+      setReplacementToken(sessionReplacementToken);
+    }
+  }, [sessionConflict, sessionReplacementToken]);
+
+  useEffect(() => {
+    if (!isAuthenticated || replacementToken) return;
+    let cancelled = false;
+    fetch("/api/auth/active-device-status", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "X-App-Hostname": window.location.hostname,
+      },
+      body: JSON.stringify({
+        deviceId: getOrCreateDeviceId(),
+        host: window.location.hostname,
+      }),
+    })
+      .then(async response => ({ response, body: await response.json() as { status?: string; sessionReplacementToken?: string } }))
+      .then(({ response, body }) => {
+        if (!cancelled && response.status === 409 && body.status === "replacement_required" && body.sessionReplacementToken) {
+          setReplacementToken(body.sessionReplacementToken);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isAuthenticated, replacementToken]);
+
+  const stayOnOtherDevice = async () => {
+    setResolving(true);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: { "X-App-Hostname": window.location.hostname },
+      });
+    } finally {
+      window.location.href = "/login?logout=1";
+    }
+  };
+
+  const continueOnThisDevice = async () => {
+    if (!replacementToken || resolving) return;
+    setResolving(true);
+    try {
+      const response = await fetch("/api/auth/confirm-session-replacement", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-App-Hostname": window.location.hostname,
+        },
+        body: JSON.stringify({
+          sessionReplacementToken: replacementToken,
+          host: window.location.hostname,
+        }),
+      });
+      if (response.ok) window.location.reload();
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  return (
+    <Dialog open={Boolean(replacementToken)}>
+      <DialogContent
+        className="max-w-md"
+        onPointerDownOutside={event => event.preventDefault()}
+        onEscapeKeyDown={event => event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>Choose your active device</DialogTitle>
+          <DialogDescription>
+            This account is currently signed in on another device. Choose which device should keep the active session.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="gap-2 sm:justify-between">
+          <Button type="button" variant="outline" onClick={stayOnOtherDevice} disabled={resolving}>
+            Stay signed in there
+          </Button>
+          <Button type="button" onClick={continueOnThisDevice} disabled={resolving}>
+            Log out other device and sign in here
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * AccreditationDivisionRouter — Routes shown only on accreditation.iheartecho.com.
  * Hub for all DIY Accreditation tools.
  */
@@ -1494,6 +1599,7 @@ function App() {
         <TooltipProvider>
           <MetaPixel />
           <Toaster />
+          <ActiveDeviceSessionGuard />
           <LegacyPasswordSetupRedirect />
           {onMarketingStaging ? (
             <MarketingSiteRouter />
