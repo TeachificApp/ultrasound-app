@@ -4,7 +4,14 @@ import { storagePut } from "../storage";
 export type ZipEntryLike = { entryName: string; getData: () => Buffer };
 
 function normalizeZipPath(p: string): string {
-  return p.replace(/\\/g, "/").replace(/^\/+/, "");
+  const withoutQuery = p.split(/[?#]/, 1)[0] ?? "";
+  const decoded = (() => {
+    try { return decodeURIComponent(withoutQuery); } catch { return withoutQuery; }
+  })();
+  return decoded
+    .replace(/\\/g, "/")
+    .replace(/^\.\//, "")
+    .replace(/^\/+/, "");
 }
 
 function findZipEntry(entries: ZipEntryLike[], relativePath: string): ZipEntryLike | undefined {
@@ -35,7 +42,7 @@ function mimeFromPath(filePath: string): string {
   return map[ext] ?? "image/png";
 }
 
-/** Map storage:// refs to uploaded CDN URLs. */
+/** Map package or storage:// media refs to uploaded Question Bank URLs. */
 export async function uploadISpringMediaFromZip(
   entries: ZipEntryLike[],
   mediaRefs: string[],
@@ -44,7 +51,7 @@ export async function uploadISpringMediaFromZip(
   const uniqueRefs = [...new Set(mediaRefs)];
 
   for (const ref of uniqueRefs) {
-    const withoutScheme = ref.replace(/^storage:\/\//, "");
+    const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
     const candidates = [
       `data/${withoutScheme}`,
       withoutScheme,
@@ -79,7 +86,7 @@ export function rewriteStorageRefs(text: string, urlMap: Map<string, string>): s
   return out;
 }
 
-/** Upload iSpring images from an already-extracted SCORM R2 prefix. */
+/** Upload iSpring images and videos from an already-extracted SCORM storage prefix. */
 export async function uploadISpringMediaFromExtractedPrefix(
   prefix: string,
   mediaRefs: string[],
@@ -88,7 +95,7 @@ export async function uploadISpringMediaFromExtractedPrefix(
   const uniqueRefs = [...new Set(mediaRefs)];
 
   for (const ref of uniqueRefs) {
-    const withoutScheme = ref.replace(/^storage:\/\//, "");
+    const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
     const keys = [
       `${prefix}/data/${withoutScheme}`,
       `${prefix}/${withoutScheme}`,

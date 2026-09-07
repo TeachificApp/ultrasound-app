@@ -466,3 +466,9 @@
 - [x] Repair the Sales tab display so stored-cent amounts such as 2997 render as $29.97 across every visible reporting view.
 - [x] Trace and repair the empty Analytics tab data contract, query, or client-state path without altering payment, order, revenue-share, or learner records.
 - [x] Add focused regressions for Sales cents formatting and populated administrator analytics rendering.
+- [x] Defer automatic SCORM inventory and source-wide Question Bank re-extraction to the administrator’s existing manual Media Repository workflow, per the user’s instruction; existing question records remain unchanged.
+- [x] Retain the existing administrator-controlled per-package Question Bank extraction path rather than adding a bulk re-extraction operation, per the user’s instruction.
+- [x] Make the Question Bank individual preview render with the actual learner quiz-player presentation, including media, answer interactions, and the existing visual style, without creating an attempt or result record.
+- [x] Add focused regressions for SCORM source-media extraction, duplicate-safe reconciliation, and learner-player-style Question Bank preview behavior.
+- [x] Repair the manual SCORM Question Bank importer so supported package image and video references in question stems, answer choices, and feedback are uploaded and displayed on the corresponding saved Question Bank record.
+- [x] Validate the corrected manual SCORM import path with representative image and video source references, without starting a bulk re-extraction.

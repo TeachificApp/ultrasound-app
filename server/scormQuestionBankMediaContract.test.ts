@@ -14,6 +14,7 @@ describe("SCORM Question Bank media contract", () => {
     expect(source).toContain("feedbackImageUrl");
     expect(source).toContain("feedbackVideoUrl");
     expect(source).toContain("videoUrl: mediaMap.get(a.videoRef)");
+    expect(source).toContain("imageUrl: mediaMap.get(a.imageRef)");
   });
 
   it("keeps the parser-provided native SCORM question type for persistence", () => {

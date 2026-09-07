@@ -61,4 +61,38 @@ describe("parseQuizFromHtml", () => {
     expect(question.feedbackImageRefs).toContain("storage://feedback.png");
     expect(parsed.allVideoRefs).toEqual(expect.arrayContaining(["storage://question.mp4", "storage://choice.webm"]));
   });
+
+  it("retains packaged image and video paths embedded in iSpring question, answer, and feedback HTML", () => {
+    const parsed = parseISpringDataBlob(JSON.stringify({
+      d: {
+        T: "Local package media quiz",
+        sl: { g: [{ i: "media", T: "Media", S: [{
+          i: "q-local-media",
+          tp: "MultipleChoice",
+          D: {
+            h: '<p>Identify this view.</p><img src="data/images/question.png"><video poster="data/images/poster.jpg" src="data/video/question.mp4"></video>',
+            r: ["data/images/declared-question.webp"],
+          },
+          C: { chs: [{
+            t: { h: '<img src="data/images/choice.png"><video src="data/video/choice.webm"></video>' },
+            c: true,
+          }] },
+          s: { F: { c: { v: { h: '<p>Correct.</p><img src="data/images/feedback.png" style="background-image:url(data/images/feedback-bg.svg)"><video src="data/video/feedback.mp4"></video>' } } } },
+        }] }] },
+      },
+    }));
+
+    const question = parsed.groups[0].questions[0];
+    expect(question.questionImageRefs).toEqual(expect.arrayContaining([
+      "data/images/question.png",
+      "data/images/poster.jpg",
+      "data/images/declared-question.webp",
+    ]));
+    expect(question.questionVideoRefs).toContain("data/video/question.mp4");
+    expect(question.answers[0]).toMatchObject({ imageRef: "data/images/choice.png", videoRef: "data/video/choice.webm" });
+    expect(question.feedbackImageRefs).toEqual(expect.arrayContaining(["data/images/feedback.png", "data/images/feedback-bg.svg"]));
+    expect(question.feedbackVideoRefs).toContain("data/video/feedback.mp4");
+    expect(parsed.allImageRefs).toEqual(expect.arrayContaining(["data/images/question.png", "data/images/choice.png", "data/images/feedback.png"]));
+    expect(parsed.allVideoRefs).toEqual(expect.arrayContaining(["data/video/question.mp4", "data/video/choice.webm", "data/video/feedback.mp4"]));
+  });
 });

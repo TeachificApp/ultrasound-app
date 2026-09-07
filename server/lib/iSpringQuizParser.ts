@@ -76,18 +76,38 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-function extractStorageRefs(html: string): string[] {
-  const refs: string[] = [];
-  const re = /storage:\/\/[^\s"'<>)]+/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    refs.push(m[0]);
-  }
-  return [...new Set(refs)];
-}
-
 function isVideoRef(ref: string): boolean {
   return /\.(mp4|m4v|webm|mov|wmv|avi|m3u8)(?:$|[?#])/i.test(ref);
+}
+
+function isSupportedMediaRef(ref: string): boolean {
+  return /^storage:\/\//i.test(ref)
+    || /\.(png|jpe?g|gif|webp|svg|mp4|m4v|webm|mov|wmv|avi|m3u8)(?:$|[?#])/i.test(ref);
+}
+
+function normalizeMediaRef(ref: string): string | null {
+  const normalized = ref.trim().replace(/^['"]|['"]$/g, "");
+  if (!normalized || normalized.startsWith("data:") || normalized.startsWith("#")) return null;
+  return isSupportedMediaRef(normalized) ? normalized : null;
+}
+
+/**
+ * iSpring can declare package media in its JSON resource list or embed it as
+ * `src`, `poster`, `href`, CSS `url()`, and lazy-load attributes in its HTML.
+ * Collect each supported local or absolute image/video reference once so the
+ * import step can copy package assets into durable Question Bank storage.
+ */
+function extractMediaRefsFromHtml(html: string): string[] {
+  if (!html) return [];
+  const refs: string[] = [];
+  const storageRe = /storage:\/\/[^\s"'<>)]+/g;
+  const attributeRe = /(?:src|href|poster|data-src|data-poster)\s*=\s*["']([^"']+)["']/gi;
+  const cssUrlRe = /url\(\s*(['"]?)([^'"\s)]+)\1\s*\)/gi;
+  let match: RegExpExecArray | null;
+  while ((match = storageRe.exec(html)) !== null) refs.push(match[0]);
+  while ((match = attributeRe.exec(html)) !== null) refs.push(match[1]);
+  while ((match = cssUrlRe.exec(html)) !== null) refs.push(match[2]);
+  return [...new Set(refs.map(normalizeMediaRef).filter((ref): ref is string => Boolean(ref)))];
 }
 
 function getTextFromDBlock(d: any): { html: string; text: string } {
@@ -97,21 +117,30 @@ function getTextFromDBlock(d: any): { html: string; text: string } {
   return { html, text };
 }
 
-function getDeclaredStorageRefs(block: any): string[] {
+function getDeclaredMediaRefs(block: any): string[] {
   if (!block || !Array.isArray(block.r)) return [];
-  return block.r.filter((value: unknown): value is string => typeof value === "string" && value.startsWith("storage://"));
+  return block.r
+    .filter((value: unknown): value is string => typeof value === "string")
+    .map(normalizeMediaRef)
+    .filter((ref): ref is string => Boolean(ref));
 }
 
 function parseChoices(chs: any[]): ParsedAnswer[] {
   if (!Array.isArray(chs)) return [];
   return chs.map((ch: any) => {
     const { html, text } = getTextFromDBlock(ch.t);
-    const assetRef = ch.t?.r?.[0] ?? undefined;
+    const mediaRefs = [...new Set([
+      ...extractMediaRefsFromHtml(html),
+      ...getDeclaredMediaRefs(ch.t),
+    ])];
+    const imageRef = mediaRefs.find((ref) => !isVideoRef(ref));
+    const videoRef = mediaRefs.find(isVideoRef);
     return {
       text: text || stripHtml(html),
       html,
       isCorrect: ch.c === true,
-      ...(assetRef && isVideoRef(assetRef) ? { videoRef: assetRef } : assetRef ? { imageRef: assetRef } : {}),
+      ...(imageRef ? { imageRef } : {}),
+      ...(videoRef ? { videoRef } : {}),
     };
   });
 }
@@ -125,7 +154,12 @@ function getFeedback(q: any): { html: string; text: string; refs: string[] } {
   return {
     html,
     text: stripHtml(html),
-    refs: [...new Set([...getDeclaredStorageRefs(correctValue), ...getDeclaredStorageRefs(incorrectValue)])],
+    refs: [...new Set([
+      ...extractMediaRefsFromHtml(correctHtml),
+      ...extractMediaRefsFromHtml(incorrectHtml),
+      ...getDeclaredMediaRefs(correctValue),
+      ...getDeclaredMediaRefs(incorrectValue),
+    ])],
   };
 }
 
@@ -135,12 +169,12 @@ function parseQuestion(q: any): ParsedQuestion | null {
 
   const { html: questionHtml, text: questionText } = getTextFromDBlock(q.D);
   const feedback = getFeedback(q);
-  const questionRefs = [...new Set([...extractStorageRefs(questionHtml), ...getDeclaredStorageRefs(q.D)])];
-  const feedbackRefs = [...new Set([...extractStorageRefs(feedback.html), ...feedback.refs])];
+  const questionRefs = [...new Set([...extractMediaRefsFromHtml(questionHtml), ...getDeclaredMediaRefs(q.D)])];
+  const feedbackRefs = [...new Set([...extractMediaRefsFromHtml(feedback.html), ...feedback.refs])];
 
   const withMedia = (answers: ParsedAnswer[]) => {
     const answerRefs = answers.flatMap((answer) => [
-      ...extractStorageRefs(answer.html),
+      ...extractMediaRefsFromHtml(answer.html),
       ...(answer.imageRef ? [answer.imageRef] : []),
       ...(answer.videoRef ? [answer.videoRef] : []),
     ]);
