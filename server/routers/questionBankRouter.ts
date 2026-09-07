@@ -23,7 +23,7 @@ import {
   mediaVersions,
 } from "../../drizzle/schema";
 import { rewriteStorageRefs, uploadISpringMediaFromZip, uploadISpringMediaFromExtractedPrefix } from "../lib/iSpringImageImporter";
-import { loadScormImportFromMediaAsset, loadScormImportFromBase64 } from "../lib/scormQuestionBankImport";
+import { loadScormImportFromMediaAsset, loadScormImportFromBase64, loadScormImportFromStorageKey } from "../lib/scormQuestionBankImport";
 import * as XLSX from "xlsx";
 import fs from "fs";
 import path from "path";
@@ -31,7 +31,7 @@ import os from "os";
 import { AI_SOURCE_BLIND_WRITING_RULE, buildAiSourceMessage, hasDirectAiSourceReference } from "../lib/aiSourceFile";
 import { fetchAiGenerationSourceUrl } from "../lib/aiWebSource";
 import { buildAiQuestionBankInsertValues } from "../lib/aiQuestionBankPersistence";
-import { plainTextFromISpring, plainTextFromISpringContent } from "../lib/questionBankImportSanitize";
+import { plainTextFromISpring, plainTextFromISpringContent, richTextFromISpringContent } from "../lib/questionBankImportSanitize";
 import {
   insertQuestionBankFolder,
   reorderQuestionBankFolders,
@@ -834,7 +834,9 @@ export const questionBankRouter = router({
   confirmScormImport: protectedProcedure
     .input(z.object({
       mediaAssetId: z.number().int().optional(),
-      /** Direct upload from Quiz Creator — base64-encoded .quiz/.zip bytes */
+      /** Staged upload from /api/upload-quiz-bank-file — avoids base64 tRPC body limits */
+      importStorageKey: z.string().min(1).optional(),
+      /** @deprecated Prefer importStorageKey — base64-encoded .quiz/.zip bytes hit proxy limits */
       bufferBase64: z.string().optional(),
       groupIds: z.array(z.string()).optional(),
       extraTagIds: z.array(z.number().int()).optional(),
@@ -842,8 +844,11 @@ export const questionBankRouter = router({
       newFolderName: z.string().max(200).optional(),
       parentFolderId: z.number().int().optional(),
     }).refine(
-      (v) => (v.mediaAssetId != null && v.mediaAssetId > 0) || !!v.bufferBase64?.length,
-      { message: "Provide mediaAssetId or bufferBase64 for SCORM import" }
+      (v) =>
+        (v.mediaAssetId != null && v.mediaAssetId > 0)
+        || !!v.importStorageKey?.length
+        || !!v.bufferBase64?.length,
+      { message: "Provide mediaAssetId, importStorageKey, or bufferBase64 for SCORM import" }
     ))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -852,7 +857,9 @@ export const questionBankRouter = router({
 
       const source = input.mediaAssetId
         ? await loadScormImportFromMediaAsset(input.mediaAssetId)
-        : await loadScormImportFromBase64(input.bufferBase64!);
+        : input.importStorageKey
+          ? await loadScormImportFromStorageKey(input.importStorageKey)
+          : await loadScormImportFromBase64(input.bufferBase64!);
       const parsed = source.parsed;
 
       const mediaRefs = [...new Set([...parsed.allImageRefs, ...parsed.allVideoRefs])];
@@ -900,7 +907,7 @@ export const questionBankRouter = router({
         let updated = 0;
 
         for (const q of group.questions) {
-          const questionText = plainTextFromISpringContent(
+          const questionText = richTextFromISpringContent(
             q.questionText,
             q.questionHtml,
             (value) => rewriteStorageRefs(value, mediaMap),

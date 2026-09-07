@@ -1,7 +1,17 @@
 import AdmZip from "adm-zip";
 import { TRPCError } from "@trpc/server";
-import { describe, expect, it } from "vitest";
-import { loadScormImportFromBase64 } from "./scormQuestionBankImport";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  isScormImportStorageKey,
+  loadScormImportFromBase64,
+  loadScormImportFromStorageKey,
+} from "./scormQuestionBankImport";
+
+const { downloadStorageObject } = vi.hoisted(() => ({
+  downloadStorageObject: vi.fn(),
+}));
+
+vi.mock("./downloadStorageObject", () => ({ downloadStorageObject }));
 
 function createZipBase64(entries: Record<string, string | Buffer>): string {
   const zip = new AdmZip();
@@ -80,5 +90,31 @@ describe("loadScormImportFromBase64", () => {
       code: "BAD_REQUEST",
       message: expect.stringMatching(/Not a valid iSpring quiz/i),
     } satisfies Partial<TRPCError>);
+  });
+});
+
+describe("loadScormImportFromStorageKey", () => {
+  beforeEach(() => {
+    downloadStorageObject.mockReset();
+  });
+
+  it("rejects storage keys outside the staged import prefix", async () => {
+    await expect(loadScormImportFromStorageKey("lms-documents/other.zip")).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: expect.stringMatching(/Invalid SCORM import storage key/i),
+    } satisfies Partial<TRPCError>);
+  });
+
+  it("loads a staged package from storage using the same parser as base64 imports", async () => {
+    const quizZip = quizMakerZipFixture();
+    const buffer = Buffer.from(quizZip, "base64");
+    downloadStorageObject.mockResolvedValue(buffer);
+
+    const result = await loadScormImportFromStorageKey("question-bank-imports/42/abc/quiz.quiz");
+
+    expect(isScormImportStorageKey("question-bank-imports/42/abc/quiz.quiz")).toBe(true);
+    expect(downloadStorageObject).toHaveBeenCalledWith("question-bank-imports/42/abc/quiz.quiz");
+    expect(result.parsed.title).toBe("Adult Echo Knowledge Check");
+    expect(result.zipEntries.length).toBeGreaterThan(0);
   });
 });

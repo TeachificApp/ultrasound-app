@@ -7,12 +7,15 @@ describe("SCORM Question Bank media contract", () => {
 
   it("uploads both parsed image and video references and persists media to matching Question Bank fields", () => {
     expect(source).toContain("mediaAssetId: z.number().int().optional()");
+    expect(source).toContain("importStorageKey: z.string().min(1).optional()");
+    expect(source).toContain("loadScormImportFromStorageKey(input.importStorageKey)");
     expect(source).toContain("loadScormImportFromMediaAsset(input.mediaAssetId)");
     expect(source).toContain("source.extractedPrefix");
     expect(source).toContain("parsed.allVideoRefs");
     expect(source).toContain("parsed.allImageRefs");
     expect(source).toContain("uploadISpringMediaFromZip");
     expect(source).toContain("uploadISpringMediaFromExtractedPrefix");
+    expect(source).toContain("richTextFromISpringContent");
     expect(source).toContain("questionImageUrl");
     expect(source).toContain("questionVideoUrl");
     expect(source).toContain("feedbackImageUrl");
