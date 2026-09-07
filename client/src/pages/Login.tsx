@@ -15,12 +15,14 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Mail, Loader2, Stethoscope, BookOpen, Shield, CheckCircle2, Zap, ArrowLeft, GraduationCap, Award, Users, Eye, EyeOff, Lock, UserPlus, KeyRound } from "lucide-react";
 import { isCombinedBrandingDomain, isIHeartEchoDomain, isLearnDomain, MEMBERS_APP_URL } from "@/hooks/useSubdomain";
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import { toast } from "sonner";
 import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
 import { getAuthPageBrandName, getAuthPageLogoUrl } from "@/lib/authPageBrand";
+import { getOrCreateDeviceId } from "@/lib/deviceSession";
 
 type LoginMode = "magic" | "password" | "register";
 
@@ -68,6 +70,8 @@ export default function Login() {
   const [sent, setSent] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [sessionReplacementToken, setSessionReplacementToken] = useState<string | null>(null);
+  const [replacingSession, setReplacingSession] = useState(false);
 
   // Read returnTo from URL so magic link redirects back after login.
   // Sanitize: never redirect back to auth pages (would cause a loop).
@@ -97,6 +101,19 @@ export default function Login() {
       "",
       window.location.pathname + (clean ? `?${clean}` : "") + window.location.hash,
     );
+  }, []);
+
+  // A passwordless login on a different device reaches this page with a short-
+  // lived server-signed replacement choice. Remove it from the address bar once
+  // loaded so it is not retained in browser history or shared accidentally.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const replacementToken = params.get("session_replace");
+    if (!replacementToken) return;
+    setSessionReplacementToken(replacementToken);
+    params.delete("session_replace");
+    const clean = params.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${clean ? `?${clean}` : ""}`);
   }, []);
 
   // Clear stale Manus-era JWT cookies so magic-link sessions can stick after Railway migration.
@@ -155,9 +172,18 @@ export default function Login() {
           email: trimmed,
           password,
           host: window.location.hostname,
+          deviceId: getOrCreateDeviceId(),
         }),
       });
-      const data = (await resp.json()) as { error?: string };
+      const data = (await resp.json()) as {
+        error?: string;
+        requiresSessionReplacement?: boolean;
+        sessionReplacementToken?: string;
+      };
+      if (resp.status === 409 && data.requiresSessionReplacement && data.sessionReplacementToken) {
+        setSessionReplacementToken(data.sessionReplacementToken);
+        return;
+      }
       if (!resp.ok) {
         const message = data.error || "Sign-in failed. Please check your credentials.";
         setPasswordError(message);
@@ -172,6 +198,36 @@ export default function Login() {
       toast.error(message);
     } finally {
       setPasswordLoading(false);
+    }
+  };
+
+  const confirmSessionReplacement = async () => {
+    if (!sessionReplacementToken || replacingSession) return;
+    setReplacingSession(true);
+    try {
+      const resp = await fetch("/api/auth/confirm-session-replacement", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "X-App-Hostname": window.location.hostname,
+        },
+        body: JSON.stringify({ sessionReplacementToken, host: window.location.hostname }),
+      });
+      const data = (await resp.json()) as { error?: string };
+      if (!resp.ok) {
+        const message = data.error || "Unable to complete sign-in. Please try again.";
+        setPasswordError(message);
+        toast.error(message);
+        setSessionReplacementToken(null);
+        return;
+      }
+      clearSsoSessionLocks();
+      window.location.href = postLoginUrl;
+    } catch {
+      toast.error("Unable to complete sign-in. Please try again.");
+    } finally {
+      setReplacingSession(false);
     }
   };
 
@@ -674,6 +730,25 @@ export default function Login() {
         </div>
         </div>
       </div>
+      <Dialog open={Boolean(sessionReplacementToken)} onOpenChange={(open) => !open && setSessionReplacementToken(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose your active device</DialogTitle>
+            <DialogDescription>
+              Your account is currently signed in on another device. Keep that session active, or sign it out and continue on this device.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+            <Button variant="outline" onClick={() => setSessionReplacementToken(null)} disabled={replacingSession}>
+              Stay signed in there
+            </Button>
+            <Button className="bg-[#189aa1] hover:bg-[#137d84]" onClick={confirmSessionReplacement} disabled={replacingSession}>
+              {replacingSession ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Log out other device and sign in here
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

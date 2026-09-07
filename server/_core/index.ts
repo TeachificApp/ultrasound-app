@@ -61,6 +61,11 @@ import { cmeExpiryCheckHandler } from "../scheduled/cmeExpiryCheck";
 import { stripeSubscriptionSyncHandler } from "../scheduled/stripeSubscriptionSync";
 import { clearSessionCookies, getSessionCookieOptions } from "./cookies";
 import { COOKIE_NAME, DEMO_COOKIE_NAME } from "../../shared/const";
+import { parse as parseCookieHeader } from "cookie";
+import { sdk } from "./sdk";
+import { resolveSessionFromCookies } from "../lib/resolveSessionCookie";
+import { getUserByOpenId } from "../db";
+import { releaseAuthenticatedSession } from "../lib/singleDeviceSession";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -684,7 +689,18 @@ async function startServer() {
   // Included Items embed widget routes (membership/bundle items iframe + JS loader)
   registerIncludedItemsEmbedRoutes(app);
   // Dedicated logout route — bypasses tRPC batching so Set-Cookie clear is never merged with other responses
-  app.post("/api/auth/logout", (req, res) => {
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      const cookies = new Map(Object.entries(parseCookieHeader(req.headers.cookie ?? "")));
+      const resolved = await resolveSessionFromCookies(cookies, (value) => sdk.verifySession(value));
+      const db = await getDb();
+      if (resolved && db) {
+        const user = await getUserByOpenId(resolved.session.openId);
+        if (user) await releaseAuthenticatedSession(db, user.id, resolved.session.sessionId);
+      }
+    } catch {
+      // A cookie may already be expired or replaced. Cookie clearing below remains safe.
+    }
     clearSessionCookies(res, req);
     res.json({ success: true });
   });

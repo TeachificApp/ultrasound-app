@@ -2,6 +2,7 @@ import { AXIOS_TIMEOUT_MS, COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } from "@sh
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
+import * as crypto from "crypto";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
@@ -49,6 +50,8 @@ export type SessionPayload = {
   openId: string;
   appId: string;
   name: string;
+  /** Opaque server-checked identifier for non-admin active-device sessions. */
+  sessionId?: string;
 };
 
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
@@ -209,13 +212,14 @@ class SDKServer {
    */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string } = {}
+    options: { expiresInMs?: number; name?: string; sessionId?: string } = {}
   ): Promise<string> {
     return this.signSession(
       {
         openId,
         appId: ENV.appId,
         name: options.name || "",
+        sessionId: options.sessionId ?? crypto.randomBytes(32).toString("base64url"),
       },
       options
     );
@@ -234,6 +238,7 @@ class SDKServer {
       openId: payload.openId,
       appId: payload.appId,
       name: payload.name,
+      ...(payload.sessionId ? { sid: payload.sessionId } : {}),
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setExpirationTime(expirationSeconds)
@@ -242,7 +247,7 @@ class SDKServer {
 
   async verifySession(
     cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string } | null> {
+  ): Promise<{ openId: string; appId: string; name: string; sessionId?: string } | null> {
     if (!cookieValue) {
       console.warn("[Auth] Missing session cookie");
       return null;
@@ -253,7 +258,7 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name } = payload as Record<string, unknown>;
+      const { openId, appId, name, sid } = payload as Record<string, unknown>;
 
       const resolvedAppId = isNonEmptyString(appId) ? appId : ENV.appId;
       const resolvedName = isNonEmptyString(name) ? name : "User";
@@ -267,6 +272,7 @@ class SDKServer {
         openId,
         appId: resolvedAppId,
         name: resolvedName,
+        sessionId: isNonEmptyString(sid) ? sid : undefined,
       };
     } catch (error) {
       const message = String(error);
@@ -369,6 +375,14 @@ class SDKServer {
 
     if (!user) {
       throw ForbiddenError("User not found");
+    }
+
+    // Ordinary users have one server-authorized active browser session. Platform
+    // Admins remain exempt so administrative recovery and oversight workflows are
+    // never blocked by this learner-account policy.
+    const { isAuthenticatedSessionActive } = await import("../lib/singleDeviceSession");
+    if (!(await isAuthenticatedSessionActive(await db.getDb(), user, session.sessionId))) {
+      throw ForbiddenError("This account was signed in on another device. Please sign in again.");
     }
 
     await db.upsertUser({

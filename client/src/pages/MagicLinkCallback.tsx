@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getOrCreateDeviceId } from "@/lib/deviceSession";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -39,6 +40,8 @@ export default function MagicLinkCallback() {
     const returnTo = params.get("returnTo");
     const host = window.location.hostname;
     const query = new URLSearchParams({ token, host });
+    const deviceId = getOrCreateDeviceId();
+    if (deviceId) query.set("deviceId", deviceId);
     if (returnTo && returnTo.startsWith("/")) {
       query.set("returnTo", returnTo);
     }

@@ -16,6 +16,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { ssoTokens, userRoles, diyOrganizations, diySubscriptions } from "../../drizzle/schema";
 import { redeemSsoTokenAndSetCookies } from "../lib/ssoExchange";
+import { getSignedSessionId } from "../lib/singleDeviceSession";
 
 const SSO_TOKEN_TTL_MS = 60_000; // 60 seconds
 
@@ -123,11 +124,12 @@ export const ssoRouter = router({
       }
 
       const expiresAt = new Date(Date.now() + SSO_TOKEN_TTL_MS);
+      const sessionId = await getSignedSessionId(ctx.req);
       const tokens: string[] = [];
       for (let i = 0; i < input.count; i++) {
         const token = crypto.randomBytes(48).toString("hex");
         tokens.push(token);
-        await db.insert(ssoTokens).values({ token, userId: ctx.user.id, expiresAt });
+        await db.insert(ssoTokens).values({ token, userId: ctx.user.id, sessionId, expiresAt });
       }
       return { tokens, allowed: true };
     }),
@@ -137,7 +139,8 @@ export const ssoRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const token = crypto.randomBytes(48).toString("hex");
     const expiresAt = new Date(Date.now() + SSO_TOKEN_TTL_MS);
-    await db.insert(ssoTokens).values({ token, userId: ctx.user.id, expiresAt });
+    const sessionId = await getSignedSessionId(ctx.req);
+    await db.insert(ssoTokens).values({ token, userId: ctx.user.id, sessionId, expiresAt });
     return { token };
   }),
 

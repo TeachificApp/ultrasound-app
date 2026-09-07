@@ -14,7 +14,7 @@ type Db = NonNullable<Awaited<ReturnType<typeof import("../db").getDb>>>;
 export async function redeemSsoToken(
   db: Db,
   token: string,
-): Promise<{ userId: number; openId: string } | null> {
+): Promise<{ userId: number; openId: string; sessionId: string | null } | null> {
   const now = new Date();
   const [row] = await db
     .select()
@@ -36,7 +36,7 @@ export async function redeemSsoToken(
   if (!user) return null;
 
   const openId = await ensureUserOpenId(db, user);
-  return { userId: user.id, openId };
+  return { userId: user.id, openId, sessionId: row.sessionId };
 }
 
 export async function setSessionCookiesForUser(
@@ -44,12 +44,14 @@ export async function setSessionCookiesForUser(
   res: Response,
   openId: string,
   displayName: string,
+  sessionId?: string | null,
   hostnameOverride?: string,
 ): Promise<void> {
   const sessionToken = await sdk.signSession({
     openId,
     appId: ENV.appId,
     name: displayName || "User",
+    ...(sessionId ? { sessionId } : {}),
   });
   setAuthSessionCookies(req, res, sessionToken, hostnameOverride);
 }
@@ -67,6 +69,6 @@ export async function redeemSsoTokenAndSetCookies(
   const [user] = await db.select().from(users).where(eq(users.id, redeemed.userId)).limit(1);
   const displayName = user?.name ?? user?.email ?? "User";
 
-  await setSessionCookiesForUser(req, res, redeemed.openId, displayName, hostnameOverride);
+  await setSessionCookiesForUser(req, res, redeemed.openId, displayName, redeemed.sessionId, hostnameOverride);
   return { userId: redeemed.userId };
 }

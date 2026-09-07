@@ -64,7 +64,7 @@ describe("ssoExchange", () => {
 
 describe("setSessionCookiesForUser", () => {
   it("sets both SameSite=None and Lax cookies", async () => {
-    const res = { cookie: vi.fn() };
+    const res = { cookie: vi.fn(), clearCookie: vi.fn() };
     const req = {
       headers: { "x-app-hostname": "app.iheartecho.com" },
       protocol: "https",
@@ -76,6 +76,7 @@ describe("setSessionCookiesForUser", () => {
       res as any,
       "email:user@example.com",
       "Test",
+      "active-session-id",
       "app.iheartecho.com",
     );
 

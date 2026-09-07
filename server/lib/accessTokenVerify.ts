@@ -8,8 +8,12 @@ import { users, accessTokenUses, ipSecurityFlags } from "../../drizzle/schema";
 import { ensureUserOpenId } from "./ensureUserOpenId";
 import { setAuthSessionCookies } from "./setAuthSessionCookies";
 import { withAuthPending } from "./sendAuthRedirectHtml";
+import { activatePreparedUserSession, prepareUserSession } from "./singleDeviceSession";
 
-export type AccessVerifyStatus = "success" | "invalid" | "revoked" | "db_unavailable";
+export type AccessVerifyResult =
+  | { status: "success" }
+  | { status: "invalid" | "revoked" | "db_unavailable" }
+  | { status: "replacement_required"; sessionReplacementToken: string };
 
 const ALLOWED_ACCESS_REDIRECT_HOSTS = new Set([
   "learn.allaboutultrasound.com",
@@ -59,9 +63,10 @@ export async function completeAccessTokenLogin(
   res: Response,
   token: string,
   hostParam?: string,
-): Promise<AccessVerifyStatus> {
+  deviceId?: string,
+): Promise<AccessVerifyResult> {
   const db = await (await import("../db")).getDb();
-  if (!db) return "db_unavailable";
+  if (!db) return { status: "db_unavailable" };
 
   const result = await db
     .select()
@@ -70,7 +75,7 @@ export async function completeAccessTokenLogin(
     .limit(1);
 
   const user = result[0];
-  if (!user) return "invalid";
+  if (!user) return { status: "invalid" };
 
   const ip = clientIp(req);
   const userAgent = (req.headers["user-agent"] as string) || "";
@@ -107,7 +112,7 @@ export async function completeAccessTokenLogin(
     console.warn(
       `[access-verify] IP abuse detected for user ${user.id} (${user.email}) — ${distinctIps.size} distinct IPs in 24h. Token revoked.`,
     );
-    return "revoked";
+    return { status: "revoked" };
   }
 
   const openId = await ensureUserOpenId(db, user);
@@ -120,9 +125,19 @@ export async function completeAccessTokenLogin(
 
   await ensureUserRole(user.id);
 
+  const preparedSession = await prepareUserSession(db, user, deviceId);
+  if (preparedSession.status === "replacement_required") {
+    return {
+      status: "replacement_required",
+      sessionReplacementToken: preparedSession.sessionReplacementToken,
+    };
+  }
+  await activatePreparedUserSession(db, user, preparedSession.sessionId, deviceId);
+
   const sessionToken = await sdk.createSessionToken(openId, {
     name: user.name ?? user.email ?? "User",
     expiresInMs: ONE_YEAR_MS,
+    sessionId: preparedSession.sessionId,
   });
   const accessHostname = resolveAuthHostname(req, hostParam);
   setAuthSessionCookies(req, res, sessionToken, accessHostname);
@@ -136,5 +151,5 @@ export async function completeAccessTokenLogin(
     method: "access_token",
   });
 
-  return "success";
+  return { status: "success" };
 }

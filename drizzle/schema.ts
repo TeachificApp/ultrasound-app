@@ -5040,11 +5040,26 @@ export const ssoTokens = mysqlTable("sso_tokens", {
   id: int("id").autoincrement().primaryKey(),
   token: varchar("token", { length: 128 }).notNull().unique(),
   userId: int("user_id").notNull(),
+  /** Carries the already-approved browser session through first-party SSO. */
+  sessionId: varchar("session_id", { length: 96 }),
   usedAt: timestamp("used_at"),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 export type SsoToken = typeof ssoTokens.$inferSelect;
+
+// ─── Non-admin active device session ─────────────────────────────────────────
+// One row per user. Replacing this opaque session id invalidates the old signed
+// cookie at the central authentication boundary. Platform Admins are exempt.
+export const userActiveSessions = mysqlTable("user_active_sessions", {
+  userId: int("user_id").primaryKey(),
+  sessionId: varchar("session_id", { length: 96 }).notNull(),
+  /** SHA-256 hash of a browser-local opaque device identifier; never the raw value. */
+  deviceHash: varchar("device_hash", { length: 128 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type UserActiveSession = typeof userActiveSessions.$inferSelect;
 
 // ─── Lesson Comments ─────────────────────────────────────────────────────────
 export const lessonComments = mysqlTable("lesson_comments", {

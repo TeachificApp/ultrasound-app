@@ -4,6 +4,7 @@ export type VerifiedSession = {
   openId: string;
   appId: string;
   name: string;
+  sessionId?: string;
 };
 
 /**

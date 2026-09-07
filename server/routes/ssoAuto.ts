@@ -205,6 +205,7 @@ export function registerSsoAutoRoute(app: Express) {
         openId,
         appId: ENV.appId,
         name: user.name ?? user.email ?? "User",
+        ...(row.sessionId ? { sessionId: row.sessionId } : {}),
       });
 
       const cookieHostname = resolveCookieHostname(req);
@@ -366,7 +367,12 @@ export function registerSsoAutoRoute(app: Express) {
 
       const token = crypto.randomBytes(48).toString("hex");
       const expiresAt = new Date(Date.now() + 60_000); // 60-second TTL
-      await db.insert(ssoTokens).values({ token, userId: user.id, expiresAt });
+      await db.insert(ssoTokens).values({
+        token,
+        userId: user.id,
+        sessionId: session.sessionId ?? null,
+        expiresAt,
+      });
 
       // Append ?sso=TOKEN to the return URL
       const redirectUrl = new URL(returnUrl);
