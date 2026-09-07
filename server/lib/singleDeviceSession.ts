@@ -110,7 +110,10 @@ export async function activatePreparedUserSession(
   sessionId: string,
   deviceId?: string,
 ): Promise<void> {
-  if (ENV.authBackend !== "local" || await isPlatformAdminUser(db, user)) return;
+  // This policy applies to all locally signed user sessions. Railway has used
+  // different AUTH_BACKEND values during cutover, so that deployment setting
+  // must not turn a confirmed active-device replacement into a no-op.
+  if (await isPlatformAdminUser(db, user)) return;
   await activateSession(db, user.id, sessionId, hashDeviceId(deviceId));
 }
 
@@ -120,7 +123,7 @@ export async function prepareUserSession(
   user: Pick<User, "id" | "role">,
   deviceId?: string,
 ): Promise<PreparedUserSession> {
-  if (ENV.authBackend !== "local" || await isPlatformAdminUser(db, user)) {
+  if (await isPlatformAdminUser(db, user)) {
     return { status: "issued", sessionId: newSessionId() };
   }
 
@@ -176,7 +179,12 @@ export async function isAuthenticatedSessionActive(
   user: Pick<User, "id" | "role">,
   sessionId: string | undefined,
 ): Promise<boolean> {
-  if (ENV.authBackend !== "local" || await isPlatformAdminUser(db, user)) return true;
+  // Cookies without a locally signed session identifier predate this policy
+  // or belong to the legacy managed-auth path. They cannot be compared to a
+  // server-side active-device record safely, so keep their compatibility until
+  // the account completes a current local sign-in. Every current local login
+  // carries `sessionId` and is enforced regardless of AUTH_BACKEND config.
+  if (await isPlatformAdminUser(db, user) || !sessionId) return true;
   const [active] = await db
     .select({ sessionId: userActiveSessions.sessionId })
     .from(userActiveSessions)

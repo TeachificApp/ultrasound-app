@@ -40,6 +40,12 @@ describe("single active device policy", () => {
     expect(policySource).toContain("eq(userActiveSessions.sessionId, sessionId)");
   });
 
+  it("does not let an AUTH_BACKEND deployment setting bypass locally signed ordinary-user sessions", () => {
+    expect(policySource).not.toContain('ENV.authBackend !== "local"');
+    expect(policySource).toContain("Every current local login");
+    expect(sdkSource).toContain("isAuthenticatedSessionActive");
+  });
+
   it("preserves an approved session identifier during first-party SSO", () => {
     expect(sdkSource).toContain("sessionId: options.sessionId ??");
     expect(ssoRouteSource).toContain("sessionId: session.sessionId ?? null");

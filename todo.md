@@ -451,6 +451,8 @@
 - [x] Add focused regressions for existing-device detection, user-declined replacement, confirmed session replacement, old-device invalidation, and Platform Admin multi-device exemption.
 - [x] Repair magic-link request delivery when the account has an active session, keeping the second-device confirmation strictly after link verification rather than blocking email issuance.
 - [x] Add focused regressions for magic-link request acceptance with an active session and the preserved post-verification session-replacement choice.
+- [x] Trace and repair the failed non-admin prior-session invalidation that allowed two simultaneous active device sessions after a confirmed replacement choice.
+- [x] Add focused end-to-end enforcement regressions proving the replaced ordinary-user device is rejected by the central authenticated-request gate while Platform Admin sessions remain exempt.
 - [x] Audit the reported $29.97 transaction display so cents are formatted correctly and do not appear as $2,997.
 - [x] Trace the configured Judith Buckland 25% revenue-share allocation and related Stripe payment, transfer, or application-fee records without moving funds.
 - [x] Repair the verified cents-reporting defect and preserve future assigned partner shares as pending ledger entries when Stripe onboarding is incomplete, without moving funds.
