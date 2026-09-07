@@ -440,6 +440,9 @@
 - [x] Repair the direct Quiz Creator editor lookup for newly created standalone Flashcards quizzes so `/admin/quiz-creator/:id` loads the saved quiz without modifying quiz records or questions.
 - [x] Add focused route and retrieval regressions for Flashcards editor loading alongside existing quiz and mock-exam records.
 - [x] Add the missing Railway `standalone_quiz_widget_launches` table required by the existing direct editor lookup, then confirm the new Flashcards quiz opens without creating widget or quiz records.
+- [x] Repair Railway Question Bank insertion for SCORM-extracted questions by reconciling the complete extractor insert contract with the live schema, without re-extracting packages or changing existing Question Bank records.
+- [x] Add focused SCORM Question Bank save-contract and Railway schema-alignment regressions, then verify the live insert contract without creating test questions.
+- [x] Preserve native SCORM question types during Question Bank extraction and verify that schema compatibility for flashcards never creates flashcard records from SCORM quizzes.
 - [x] Audit the reported $29.97 transaction display so cents are formatted correctly and do not appear as $2,997.
 - [x] Trace the configured Judith Buckland 25% revenue-share allocation and related Stripe payment, transfer, or application-fee records without moving funds.
 - [x] Repair the verified cents-reporting defect and preserve future assigned partner shares as pending ledger entries when Stripe onboarding is incomplete, without moving funds.
