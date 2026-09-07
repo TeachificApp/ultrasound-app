@@ -6108,7 +6108,7 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
                   />
                 </div>
                 <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                  onClick={() => { if (confirm(`Delete folder "${f.name}" and all subfolders? Questions will be unassigned, not deleted.`)) deleteFolder.mutate({ id: f.id }); }}>
+                  onClick={() => requestDeleteFolder({ id: f.id, name: f.name })}>
                   <Trash2 className="w-3 h-3" />
                 </Button>
               </div>
@@ -11204,6 +11204,8 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const [bulkAddTagIds, setBulkAddTagIds] = useState<number[]>([]);
   const [bulkRemoveTagIds, setBulkRemoveTagIds] = useState<number[]>([]);
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<number>>(new Set());
+  const [folderPendingDelete, setFolderPendingDelete] = useState<{ id: number; name: string } | null>(null);
+  const [folderQuestionDisposition, setFolderQuestionDisposition] = useState<"unassign" | "delete">("unassign");
 
   async function handleExportZip() {
     setExportLoading(true);
@@ -11280,9 +11282,32 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
     onError: (e) => toast.error(e.message || "Could not update folder"),
   });
   const deleteFolder = trpc.questionBank.deleteFolder.useMutation({
-    onSuccess: () => { refetchFolders(); toast.success("Folder deleted"); },
+    onSuccess: (data, variables) => {
+      refetchFolders();
+      refetch();
+      setFolderPendingDelete(null);
+      setFolderQuestionDisposition("unassign");
+      if (variables.questionDisposition === "delete") {
+        toast.success(`Deleted ${data.deletedFolderCount} folder(s) and ${data.affectedQuestionCount} question(s)`);
+      } else {
+        toast.success(`Deleted ${data.deletedFolderCount} folder(s)${data.affectedQuestionCount ? `; ${data.affectedQuestionCount} question(s) unassigned` : ""}`);
+      }
+    },
     onError: (e) => toast.error(e.message || "Could not delete folder"),
   });
+
+  const requestDeleteFolder = (folder: { id: number; name: string }) => {
+    setFolderQuestionDisposition("unassign");
+    setFolderPendingDelete(folder);
+  };
+
+  const confirmDeleteFolder = () => {
+    if (!folderPendingDelete) return;
+    deleteFolder.mutate({
+      id: folderPendingDelete.id,
+      questionDisposition: folderQuestionDisposition,
+    });
+  };
   const moveToFolder = trpc.questionBank.moveToFolder.useMutation({
     onSuccess: () => {
       refetch();
@@ -11430,7 +11455,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
                 onStartEditFolder={startEditFolder}
                 onSaveEditFolder={saveEditFolder}
                 onCancelEditFolder={() => { setEditingFolderId(null); setEditingFolderName(""); }}
-                onDeleteFolder={(folder) => { if (confirm(`Delete folder "${folder.name}" and all subfolders? Questions will be unassigned, not deleted.`)) deleteFolder.mutate({ id: folder.id }); }}
+                onDeleteFolder={(folder) => requestDeleteFolder(folder)}
                 onAddSubfolder={setNewFolderParentId}
                 accent={standalone ? "teal" : "purple"}
               />
@@ -11866,6 +11891,52 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
           onSaved={() => { refetch(); setShowCreate(false); setEditingQuestion(null); }}
         />
       )}
+
+      <Dialog open={!!folderPendingDelete} onOpenChange={(open) => { if (!open && !deleteFolder.isPending) { setFolderPendingDelete(null); setFolderQuestionDisposition("unassign"); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete folder{folderPendingDelete ? `: ${folderPendingDelete.name}` : ""}</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the selected folder and all subfolders inside it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-sm font-medium text-gray-800">What should happen to questions in these folders?</p>
+            <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+              <input
+                type="radio"
+                name="folder-question-disposition"
+                className="mt-1"
+                checked={folderQuestionDisposition === "unassign"}
+                onChange={() => setFolderQuestionDisposition("unassign")}
+              />
+              <span>
+                <span className="block text-sm font-medium text-gray-900">Keep in Question Bank</span>
+                <span className="block text-xs text-gray-500 mt-0.5">Questions stay in the bank with no folder assigned.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border border-red-200 p-3 cursor-pointer hover:bg-red-50/40">
+              <input
+                type="radio"
+                name="folder-question-disposition"
+                className="mt-1"
+                checked={folderQuestionDisposition === "delete"}
+                onChange={() => setFolderQuestionDisposition("delete")}
+              />
+              <span>
+                <span className="block text-sm font-medium text-red-800">Delete questions permanently</span>
+                <span className="block text-xs text-red-700/80 mt-0.5">Questions in this folder tree will be removed from the Question Bank.</span>
+              </span>
+            </label>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={deleteFolder.isPending} onClick={() => { setFolderPendingDelete(null); setFolderQuestionDisposition("unassign"); }}>Cancel</Button>
+            <Button variant="destructive" disabled={deleteFolder.isPending} onClick={confirmDeleteFolder}>
+              {deleteFolder.isPending ? "Deleting…" : "Delete folder"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

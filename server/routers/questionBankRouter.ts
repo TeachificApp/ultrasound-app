@@ -916,16 +916,19 @@ export const questionBankRouter = router({
     }),
 
   deleteFolder: protectedProcedure
-    .input(z.object({ id: z.number().int() }))
+    .input(z.object({
+      id: z.number().int(),
+      questionDisposition: z.enum(["unassign", "delete"]).default("unassign"),
+    }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const deletedCount = await deleteQuestionBankFolderTree(db, input.id);
-      if (deletedCount === 0) {
+      const result = await deleteQuestionBankFolderTree(db, input.id, input.questionDisposition);
+      if (result.deletedFolderCount === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Folder not found" });
       }
-      return { ok: true, deletedFolderCount: deletedCount };
+      return { ok: true, ...result };
     }),
 
   reorderFolders: protectedProcedure
