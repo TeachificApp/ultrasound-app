@@ -127,3 +127,38 @@ describe("sendTransactionalEmail", () => {
     expect(ok).toBe(false);
   });
 });
+
+describe("listSmtpComChannels", () => {
+  const originalEnv = { ...process.env };
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    global.fetch = originalFetch;
+  });
+
+  it("returns error when API key is missing", async () => {
+    const { listSmtpComChannels } = await import("./lib/email/providers/smtpcomChannels");
+    delete process.env.SMTPCOM_API_KEY;
+    const result = await listSmtpComChannels();
+    expect(result.ok).toBe(false);
+    expect(result.channels).toEqual([]);
+  });
+
+  it("parses channel list from SMTP.com API", async () => {
+    const { listSmtpComChannels } = await import("./lib/email/providers/smtpcomChannels");
+    process.env.SMTPCOM_API_KEY = "test-key";
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          status: "success",
+          data: { items: [{ name: "transactional", label: "Transactional" }] },
+        }),
+    }) as typeof fetch;
+
+    const result = await listSmtpComChannels();
+    expect(result.ok).toBe(true);
+    expect(result.channels).toEqual([{ name: "transactional", label: "Transactional" }]);
+  });
+});

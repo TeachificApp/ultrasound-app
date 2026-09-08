@@ -212,7 +212,23 @@ async function startServer() {
   // Temporary debug endpoint to diagnose email provider configuration
   app.get("/api/debug/email-status", async (_req, res) => {
     const { emailProviderStatus } = await import("../lib/email/providerConfig");
-    res.json({ ...emailProviderStatus(), deployedAt: new Date().toISOString() });
+    const { listSmtpComChannels } = await import("../lib/email/providers/smtpcomChannels");
+    const status = emailProviderStatus();
+    const smtpcomChannels =
+      status.smtpcom.hasApiKey && !status.smtpcom.hasChannel
+        ? await listSmtpComChannels()
+        : undefined;
+    res.json({
+      ...status,
+      smtpcomChannels,
+      setupHint:
+        status.provider === "smtpcom" && !status.configured
+          ? status.smtpcom.hasApiKey && !status.smtpcom.hasChannel
+            ? "Set SMTPCOM_CHANNEL to one of the channel names returned in smtpcomChannels (or from your SMTP.com dashboard)."
+            : "Set EMAIL_PROVIDER=smtpcom, SMTPCOM_API_KEY, and SMTPCOM_CHANNEL."
+          : undefined,
+      deployedAt: new Date().toISOString(),
+    });
   });
   // Temporary debug endpoint to test sending an email via configured provider
   app.get("/api/debug/test-email", async (req, res) => {

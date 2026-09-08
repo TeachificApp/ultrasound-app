@@ -101,7 +101,7 @@ Use when `EMAIL_PROVIDER=smtpcom`. Sender defaults fall back to `SENDGRID_FROM_*
 | Variable | Description |
 |----------|-------------|
 | `SMTPCOM_API_KEY` | SMTP.com API key ([smtp.com](https://www.smtp.com/)) |
-| `SMTPCOM_CHANNEL` | Channel name from your SMTP.com account |
+| `SMTPCOM_CHANNEL` | Channel name from your SMTP.com account (see **Settings → Channels** in SMTP.com, or `GET /api/debug/email-status` after deploy — it lists available channels when the API key is set) |
 | `SMTPCOM_FROM_EMAIL` | Sender email (optional; falls back to `SENDGRID_FROM_EMAIL`) |
 | `SMTPCOM_FROM_NAME` | Sender display name (optional; falls back to `SENDGRID_FROM_NAME`) |
 
