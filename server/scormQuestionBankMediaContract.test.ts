@@ -38,7 +38,7 @@ describe("SCORM Question Bank media contract", () => {
   });
 
   it("halts before Question Bank writes when SCORM media preparation fails", () => {
-    expect(source).toContain("SCORM media could not be prepared, so no Question Bank records were saved.");
-    expect(source).toContain("[QuestionBank] SCORM media preparation failed:");
+    expect(commitSource).toContain("SCORM media could not be prepared, so no Question Bank records were saved.");
+    expect(commitSource).toContain("[QuestionBank] SCORM media preparation failed:");
   });
 });

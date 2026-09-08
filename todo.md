@@ -494,5 +494,5 @@
 - [ ] Add focused transport-selection and safe no-send failure regressions for SMTP transactional email without exposing credentials or sending messages.
 - [x] Investigate and repair the Media Repository authorization mismatch that returns Forbidden when Vanessa, an administrator, uploads video; preserve least privilege and do not change her account, role, or files during diagnosis.
 - [x] Add focused role/permission regressions for authorized administrator video upload and verify the corrected path does not weaken access for ordinary users.
-- [ ] Preserve and reconcile the uncheckpointed Media Repository upload-authorization and SCORM diagnostic repairs with the newer GitHub main SMTP and SCORM changes, without discarding either code path or changing production records.
-- [ ] Run focused merged-path validation and checkpoint the reconciled GitHub-main code before asking for live Media Repository upload or SCORM import retries.
+- [x] Preserve and reconcile the uncheckpointed Media Repository upload-authorization and SCORM diagnostic repairs with the newer GitHub main SMTP and SCORM changes, without discarding either code path or changing production records.
+- [x] Run focused merged-path validation and checkpoint the reconciled GitHub-main code before asking for live Media Repository upload or SCORM import retries.
