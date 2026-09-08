@@ -8,8 +8,8 @@ describe("SCORM media storage response contract", () => {
 
     expect(backend).toContain("isRailwayPrimaryHost() && hasR2Credentials()");
     expect(backend).toContain('return "r2"');
-    expect(storage).toContain("Storage upload returned an unexpected non-JSON response");
-    expect(storage).toContain("Storage upload response did not include a usable file URL");
-    expect(storage).toContain("contentTypeHeader.toLowerCase().includes(\"application/json\")");
+    expect(storage).toContain("Storage ${operation} returned an unexpected non-JSON response");
+    expect(storage).toContain("Storage ${operation} response did not include a usable file URL");
+    expect(storage).toContain("export async function readStorageUrlResponse");
   });
 });

@@ -32,4 +32,9 @@ describe("SCORM Question Bank media contract", () => {
     expect(source).toContain("totalUpdated");
     expect(source).toContain("continue;");
   });
+
+  it("halts before Question Bank writes when SCORM media preparation fails", () => {
+    expect(source).toContain("SCORM media could not be prepared, so no Question Bank records were saved.");
+    expect(source).toContain("[QuestionBank] SCORM media preparation failed:");
+  });
 });

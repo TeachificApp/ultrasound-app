@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildInitialMediaVersionExtractionFields } from "./uploadMediaRepo";
+import {
+  buildInitialMediaVersionExtractionFields,
+  hasMediaRepositoryUploadAccess,
+} from "./uploadMediaRepo";
 
 describe("media upload extraction state", () => {
   it("marks a new document version skipped at upload time", () => {
@@ -31,5 +34,22 @@ describe("media upload extraction state", () => {
       scormExtractionStatus: "skipped",
       scormExtractionError: "Empty archive or file: upload a non-empty replacement before SCORM extraction can run",
     });
+  });
+});
+
+describe("Media Repository upload authorization", () => {
+  it("allows account-level and assigned Platform Admin upload access", () => {
+    expect(hasMediaRepositoryUploadAccess("admin", [])).toBe(true);
+    expect(hasMediaRepositoryUploadAccess("user", ["platform_admin"])).toBe(true);
+  });
+
+  it("allows the limited Platform Manager content-creation role to upload media", () => {
+    expect(hasMediaRepositoryUploadAccess("user", ["platform_manager"])).toBe(true);
+  });
+
+  it("continues to reject ordinary users and unrelated assigned roles", () => {
+    expect(hasMediaRepositoryUploadAccess("user", [])).toBe(false);
+    expect(hasMediaRepositoryUploadAccess("user", ["diy_admin"])).toBe(false);
+    expect(hasMediaRepositoryUploadAccess(null, ["premium_user"])).toBe(false);
   });
 });

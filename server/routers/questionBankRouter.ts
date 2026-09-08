@@ -856,9 +856,20 @@ export const questionBankRouter = router({
       const parsed = source.parsed;
 
       const mediaRefs = [...new Set([...parsed.allImageRefs, ...parsed.allVideoRefs])];
-      const mediaMap = source.extractedPrefix
-        ? await uploadISpringMediaFromExtractedPrefix(source.extractedPrefix, mediaRefs)
-        : await uploadISpringMediaFromZip(source.zipEntries, mediaRefs);
+      let mediaMap: Map<string, string>;
+      try {
+        mediaMap = source.extractedPrefix
+          ? await uploadISpringMediaFromExtractedPrefix(source.extractedPrefix, mediaRefs)
+          : await uploadISpringMediaFromZip(source.zipEntries, mediaRefs);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "unknown media storage error";
+        // Do not log source package content, storage keys, URLs, or user/session data.
+        console.error(`[QuestionBank] SCORM media preparation failed: ${detail}`);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "SCORM media could not be prepared, so no Question Bank records were saved. Check the server log for the media-preparation stage and storage configuration.",
+        });
+      }
 
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {

@@ -36,7 +36,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
-import { mediaAssets, mediaVersions, mediaUploadSessions } from "../../drizzle/schema";
+import { mediaAssets, mediaVersions, mediaUploadSessions, userRoles } from "../../drizzle/schema";
 import { detectBrandFromHostname } from "../../shared/brands";
 
 export function buildInitialMediaVersionExtractionFields(params: {
@@ -169,10 +169,30 @@ async function detectScormInZip(zipBuffer: Buffer): Promise<boolean> {
   }
 }
 
+export function hasMediaRepositoryUploadAccess(
+  accountRole: string | null | undefined,
+  assignedRoles: string[],
+): boolean {
+  return accountRole === "admin"
+    || assignedRoles.includes("platform_admin")
+    || assignedRoles.includes("platform_manager");
+}
+
 async function authenticateAdmin(req: Request): Promise<{ id: number; role: string } | null> {
   try {
     const user = await sdk.authenticateRequest(req) as any;
-    if (user?.role === "admin") return user;
+    if (!user?.id) return null;
+    if (user.role === "admin") return user;
+
+    const db = await getDb();
+    if (!db) return null;
+    const assignedRoles = await db
+      .select({ role: userRoles.role })
+      .from(userRoles)
+      .where(eq(userRoles.userId, user.id));
+    if (hasMediaRepositoryUploadAccess(user.role, assignedRoles.map((row) => row.role))) {
+      return user;
+    }
   } catch {}
   return null;
 }
