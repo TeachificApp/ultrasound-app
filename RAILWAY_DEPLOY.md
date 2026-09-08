@@ -77,6 +77,14 @@ Set these in your Railway service's **Variables** tab:
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
 
+### Email provider
+
+Set `EMAIL_PROVIDER` to choose the transactional email backend. SendGrid remains the default; marketing contacts, suppressions, and webhooks still use SendGrid when configured.
+
+| Variable | Description |
+|----------|-------------|
+| `EMAIL_PROVIDER` | `sendgrid` (default) or `smtpcom` |
+
 ### SendGrid
 
 | Variable | Description |
@@ -84,6 +92,18 @@ Set these in your Railway service's **Variables** tab:
 | `SENDGRID_API_KEY` | SendGrid API key |
 | `SENDGRID_FROM_EMAIL` | Sender email address |
 | `SENDGRID_FROM_NAME` | Sender display name |
+| `SENDGRID_WEBHOOK_PUBLIC_KEY` | Inbound event webhook verification (optional) |
+
+### SMTP.com
+
+Use when `EMAIL_PROVIDER=smtpcom`. Sender defaults fall back to `SENDGRID_FROM_*` if `SMTPCOM_FROM_*` are unset.
+
+| Variable | Description |
+|----------|-------------|
+| `SMTPCOM_API_KEY` | SMTP.com API key ([smtp.com](https://www.smtp.com/)) |
+| `SMTPCOM_CHANNEL` | Channel name from your SMTP.com account |
+| `SMTPCOM_FROM_EMAIL` | Sender email (optional; falls back to `SENDGRID_FROM_EMAIL`) |
+| `SMTPCOM_FROM_NAME` | Sender display name (optional; falls back to `SENDGRID_FROM_NAME`) |
 
 ### Thinkific
 

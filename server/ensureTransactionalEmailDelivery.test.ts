@@ -7,21 +7,39 @@ vi.mock("./lib/sendgridSuppressions", () => ({
   clearSendGridSuppressionLists: vi.fn(),
 }));
 
+vi.mock("./lib/email/providerConfig", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./lib/email/providerConfig")>();
+  return {
+    ...actual,
+    isSendGridProvider: vi.fn(() => true),
+  };
+});
+
 import {
   getSendGridSuppressionStatus,
   isSendGridDeliveryBlocked,
   clearSendGridSuppressionLists,
 } from "./lib/sendgridSuppressions";
+import { isSendGridProvider } from "./lib/email/providerConfig";
 
 describe("ensureTransactionalEmailDelivery", () => {
   beforeEach(() => {
     vi.mocked(getSendGridSuppressionStatus).mockReset();
     vi.mocked(isSendGridDeliveryBlocked).mockReset();
     vi.mocked(clearSendGridSuppressionLists).mockReset();
+    vi.mocked(isSendGridProvider).mockReturnValue(true);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("skips SendGrid suppression checks when provider is not sendgrid", async () => {
+    vi.mocked(isSendGridProvider).mockReturnValue(false);
+    const result = await ensureTransactionalEmailDelivery("user@example.com");
+    expect(result.cleared).toBe(false);
+    expect(getSendGridSuppressionStatus).not.toHaveBeenCalled();
+    expect(clearSendGridSuppressionLists).not.toHaveBeenCalled();
   });
 
   it("skips clearing when SendGrid is not blocking delivery", async () => {

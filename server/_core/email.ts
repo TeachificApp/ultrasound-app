@@ -1,15 +1,16 @@
 /**
- * SendGrid transactional email helper
- * API: POST https://api.sendgrid.com/v3/mail/send
- * Auth: Authorization: Bearer <SENDGRID_API_KEY>
- *
- * Brand-aware: pass brandMode to use brand-specific sender and templates.
+ * Transactional email helper with SendGrid or SMTP.com provider support.
+ * Set EMAIL_PROVIDER=sendgrid (default) or EMAIL_PROVIDER=smtpcom.
  */
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
 import { getDb } from "../db";
 import { eq } from "drizzle-orm";
 import { users, emailSendLog as emailSendLogTable } from "../../drizzle/schema";
+import { sendTransactionalEmail } from "../lib/email/sendTransactionalEmail";
+import type { EmailAttachment, EmailRecipient, SendEmailOptions } from "../lib/email/types";
+
+export type { EmailAttachment, EmailRecipient, SendEmailOptions };
 
 /** Infer email type from subject line for logging purposes */
 function inferEmailType(subject: string): string {
@@ -52,114 +53,13 @@ async function _logEmailSend(to: EmailRecipient, subject: string, status: "sent"
   }
 }
 
-const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
-
-interface EmailRecipient {
-  name: string;
-  email: string;
-}
-
-interface EmailAttachment {
-  /** Base64-encoded file content */
-  content: string;
-  /** MIME type, e.g. "application/pdf" */
-  type: string;
-  /** File name shown in the email client */
-  filename: string;
-  /** SendGrid disposition: "attachment" (default) or "inline" */
-  disposition?: "attachment" | "inline";
-}
-
-interface SendEmailOptions {
-  to: EmailRecipient;
-  subject: string;
-  htmlBody: string;
-  previewText?: string;
-  /** Brand mode for sender override. Defaults to "aaus" if not provided. */
-  brandMode?: BrandMode;
-  /** Override sender name (campaign sender profiles) */
-  fromName?: string;
-  /** Override sender email (campaign sender profiles) */
-  fromEmail?: string;
-  /** List-Unsubscribe header value (RFC 8058 one-click) */
-  listUnsubscribeUrl?: string;
-  /** Optional file attachments */
-  attachments?: EmailAttachment[];
-}
-
 export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  const brandConfig = getBrandDisplayConfig(opts.brandMode || "aaus");
-  // Use brand-specific sender, but allow env override for verified domain constraints
-  const senderEmail = process.env.SENDGRID_FROM_EMAIL || brandConfig.senderEmail;
-  const senderName = brandConfig.senderName;
-
-  if (!apiKey) {
-    console.warn("[email] SENDGRID_API_KEY not set \u2014 skipping email send");
-    return false;
-  }
-
-  try {
-    const payload = {
-      personalizations: [
-        {
-          to: [{ name: opts.to.name, email: opts.to.email }],
-          subject: opts.subject,
-        },
-      ],
-      from: { name: opts.fromName || senderName, email: opts.fromEmail || senderEmail },
-      reply_to: { name: opts.fromName || senderName, email: opts.fromEmail || senderEmail },
-      content: [
-        {
-          type: "text/html",
-          value: opts.htmlBody,
-        },
-      ],
-      tracking_settings: {
-        click_tracking: { enable: false },
-        open_tracking: { enable: false },
-      },
-      ...(opts.attachments && opts.attachments.length > 0 ? {
-        attachments: opts.attachments.map(a => ({
-          content: a.content,
-          type: a.type,
-          filename: a.filename,
-          disposition: a.disposition ?? "attachment",
-        })),
-      } : {}),
-      ...(opts.listUnsubscribeUrl ? {
-        headers: {
-          "List-Unsubscribe": `<${opts.listUnsubscribeUrl}>`,
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-        },
-      } : {}),
-    };
-
-    const res = await fetch(SENDGRID_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      console.error(`[email] SendGrid API error ${res.status}: ${text}`);
-      _logEmailSend(opts.to, opts.subject, "failed").catch(() => {});
-      return false;
-    }
-
-    console.log(`[email] Sent "${opts.subject}" to ${opts.to.email} [brand=${opts.brandMode || "aaus"}]`);
-    _logEmailSend(opts.to, opts.subject, "sent").catch(() => {});
-    return true;
-  } catch (err) {
-    console.error("[email] Failed to send email:", err);
-    _logEmailSend(opts.to, opts.subject, "failed").catch(() => {});
-    return false;
-  }
+  const sent = await sendTransactionalEmail(opts);
+  _logEmailSend(opts.to, opts.subject, sent ? "sent" : "failed").catch(() => {});
+  return sent;
 }
+
+// Legacy block removed — provider dispatch lives in server/lib/email/
 
 // \u2500\u2500\u2500 Email Templates \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
