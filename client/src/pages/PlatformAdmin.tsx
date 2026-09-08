@@ -1156,7 +1156,7 @@ function SendTestEmailPanel() {
           Send Test Email
         </CardTitle>
         <p className="text-xs text-gray-500 mt-1">
-          Send a test email to verify that your SendGrid API key and sender configuration are working correctly.
+          Send a test email to verify that your configured email provider (SendGrid or SMTP.com) and sender settings are working correctly.
           The test email is logged in the email send log just like a real email.
         </p>
       </CardHeader>
