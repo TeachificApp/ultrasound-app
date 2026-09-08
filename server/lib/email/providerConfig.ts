@@ -1,11 +1,12 @@
 import { getBrandDisplayConfig, type BrandMode } from "@shared/brands";
 import type { EmailProviderId, ResolvedEmailSender } from "./types";
 
-/** Active transactional email provider (default: sendgrid). */
+/** Active transactional email provider (default: smtpcom / SMTP.com). */
 export function getEmailProviderId(): EmailProviderId {
-  const raw = (process.env.EMAIL_PROVIDER ?? "sendgrid").trim().toLowerCase();
-  if (raw === "smtpcom" || raw === "smtp.com" || raw === "smtp_com") return "smtpcom";
-  return "sendgrid";
+  const raw = (process.env.EMAIL_PROVIDER ?? "smtpcom").trim().toLowerCase();
+  if (raw === "sendgrid") return "sendgrid";
+  if (raw === "smtpcom" || raw === "smtp.com" || raw === "smtp_com" || raw === "smtp") return "smtpcom";
+  return "smtpcom";
 }
 
 export function isSendGridProvider(): boolean {

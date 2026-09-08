@@ -1,6 +1,6 @@
 /**
  * Transactional email helper with SendGrid or SMTP.com provider support.
- * Set EMAIL_PROVIDER=sendgrid (default) or EMAIL_PROVIDER=smtpcom.
+ * Set EMAIL_PROVIDER=smtpcom (default) or EMAIL_PROVIDER=sendgrid.
  */
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";

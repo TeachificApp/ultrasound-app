@@ -13,8 +13,13 @@ describe("email provider config", () => {
     process.env = { ...originalEnv };
   });
 
-  it("defaults to sendgrid", () => {
+  it("defaults to smtpcom", () => {
     delete process.env.EMAIL_PROVIDER;
+    expect(getEmailProviderId()).toBe("smtpcom");
+  });
+
+  it("accepts sendgrid when explicitly set", () => {
+    process.env.EMAIL_PROVIDER = "sendgrid";
     expect(getEmailProviderId()).toBe("sendgrid");
   });
 
