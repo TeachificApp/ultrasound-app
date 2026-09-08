@@ -13,7 +13,7 @@ export type QuestionBankFolderRow = {
 
 type QuestionBankFolderTreeProps = {
   folders: QuestionBankFolderRow[];
-  selectedFolderId?: number;
+  selectedFolderId?: number | null;
   expandedFolderIds: Set<number>;
   onToggleFolder: (folderId: number) => void;
   onSelectFolder: (folderId: number) => void;
