@@ -48,7 +48,7 @@ import {
   Sparkles, Loader2, Eye, EyeOff, Save, X, FolderOpen, Monitor, Video, FileText, CheckSquare, Settings2,
   User, Lock, ListChecks, Award, PlayCircle, ArrowRight, UserPlus, UserX, RefreshCw,
   Package, Layers, Globe, Radio, Tag, LayoutGrid, ShoppingBag, GraduationCap, TrendingUp,
-  Layout as LayoutTemplate, Database, FileQuestion,
+  Layout as LayoutTemplate, Database, FileQuestion, Inbox,
   Hash, Shield, Flag, Pin, Megaphone, Bell, MessageSquare, Star, Zap, XCircle,
   Repeat, Film, CalendarRange, ExternalLink, Link2, Mail, Activity, Briefcase,
   Percent, Search, Presentation,
@@ -6108,7 +6108,7 @@ function QuizBuilderInline({ lesson, courseId }: { lesson: any; courseId?: numbe
                   />
                 </div>
                 <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                  onClick={() => { if (confirm(`Delete folder "${f.name}"? Questions will be unassigned.`)) deleteFolder.mutate({ id: f.id }); }}>
+                  onClick={() => requestDeleteFolder({ id: f.id, name: f.name })}>
                   <Trash2 className="w-3 h-3" />
                 </Button>
               </div>
@@ -11172,6 +11172,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const [typeFilter, setTypeFilter] = useState<"" | QuestionBankType>("");
   const [presetFilter, setPresetFilter] = useState<boolean | undefined>(undefined);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [editingQuestion, setEditingQuestion] = useState<any | null>(null);
   const [previewingQuestion, setPreviewingQuestion] = useState<any | null>(null);
@@ -11179,7 +11180,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showTagManager, setShowTagManager] = useState(false);
   const [showFolderManager, setShowFolderManager] = useState(standalone);
-  const [selectedFolderId, setSelectedFolderId] = useState<number | undefined>(undefined);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null | undefined>(undefined);
   const [aiTopic, setAITopic] = useState("");
   const [aiCount, setAICount] = useState(10);
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
@@ -11204,6 +11205,8 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const [bulkAddTagIds, setBulkAddTagIds] = useState<number[]>([]);
   const [bulkRemoveTagIds, setBulkRemoveTagIds] = useState<number[]>([]);
   const [expandedFolderIds, setExpandedFolderIds] = useState<Set<number>>(new Set());
+  const [folderPendingDelete, setFolderPendingDelete] = useState<{ id: number; name: string } | null>(null);
+  const [folderQuestionDisposition, setFolderQuestionDisposition] = useState<"unassign" | "delete">("unassign");
 
   async function handleExportZip() {
     setExportLoading(true);
@@ -11250,7 +11253,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
     isPreset: presetFilter,
     folderId: selectedFolderId,
     page,
-    pageSize: 25,
+    pageSize,
   });
 
   const deleteQ = trpc.questionBank.deleteQuestion.useMutation({ onSuccess: () => { refetch(); setSelectedIds(new Set()); } });
@@ -11280,9 +11283,32 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
     onError: (e) => toast.error(e.message || "Could not update folder"),
   });
   const deleteFolder = trpc.questionBank.deleteFolder.useMutation({
-    onSuccess: () => { refetchFolders(); toast.success("Folder deleted"); },
+    onSuccess: (data, variables) => {
+      refetchFolders();
+      refetch();
+      setFolderPendingDelete(null);
+      setFolderQuestionDisposition("unassign");
+      if (variables.questionDisposition === "delete") {
+        toast.success(`Deleted ${data.deletedFolderCount} folder(s) and ${data.affectedQuestionCount} question(s)`);
+      } else {
+        toast.success(`Deleted ${data.deletedFolderCount} folder(s)${data.affectedQuestionCount ? `; ${data.affectedQuestionCount} question(s) unassigned` : ""}`);
+      }
+    },
     onError: (e) => toast.error(e.message || "Could not delete folder"),
   });
+
+  const requestDeleteFolder = (folder: { id: number; name: string }) => {
+    setFolderQuestionDisposition("unassign");
+    setFolderPendingDelete(folder);
+  };
+
+  const confirmDeleteFolder = () => {
+    if (!folderPendingDelete) return;
+    deleteFolder.mutate({
+      id: folderPendingDelete.id,
+      questionDisposition: folderQuestionDisposition,
+    });
+  };
   const moveToFolder = trpc.questionBank.moveToFolder.useMutation({
     onSuccess: () => {
       refetch();
@@ -11319,7 +11345,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
 
   const questions = data?.questions ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.ceil(total / 25);
+  const totalPages = Math.ceil(total / pageSize);
 
   const toggleSelect = (id: number) => {
     setSelectedIds(prev => {
@@ -11342,11 +11368,17 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
 
   const selectedQuestionIds = [...selectedIds];
 
-  const selectFolder = (folderId: number | undefined) => {
+  const selectFolder = (folderId: number | null | undefined) => {
     setSelectedFolderId(folderId);
     setPage(1);
     setSelectedIds(new Set());
   };
+
+  const folderScopeLabel = selectedFolderId === null
+    ? " unassigned"
+    : selectedFolderId
+      ? " in selected folder"
+      : " total";
 
   const applyBulkFolderMove = () => {
     if (!bulkFolderValue || selectedQuestionIds.length === 0) return;
@@ -11375,7 +11407,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
       <div className={cn("flex items-center justify-between", standalone && "lg:col-span-2")}>
         <div>
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Database className="w-5 h-5 text-teal-600" /> Question Bank</h2>
-          <p className="text-sm text-gray-500 mt-0.5">{total} question{total !== 1 ? "s" : ""}{selectedFolderId ? " in selected folder" : " total"}</p>
+          <p className="text-sm text-gray-500 mt-0.5">{total} question{total !== 1 ? "s" : ""}{folderScopeLabel}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setShowTagManager(p => !p)} className="gap-1.5"><Tag className="w-3.5 h-3.5" /> Tags</Button>
@@ -11401,10 +11433,15 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
             {!standalone && <Button size="sm" variant="ghost" onClick={() => setShowFolderManager(false)}><X className="w-3.5 h-3.5" /></Button>}
           </div>
           <div className={cn("space-y-2 overflow-y-auto", standalone ? "max-h-[calc(100vh-17rem)] pr-1" : "max-h-48")}>
-            {standalone && (
-              <button type="button" onClick={() => selectFolder(undefined)} className={cn("w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors", selectedFolderId === undefined ? "bg-teal-600 text-white shadow-sm" : "text-gray-700 hover:bg-white")}>
-                <Database className="w-3.5 h-3.5" /> All questions
-              </button>
+            {(standalone || showFolderManager) && (
+              <div className="space-y-1">
+                <button type="button" onClick={() => selectFolder(undefined)} className={cn("w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors", selectedFolderId === undefined ? (standalone ? "bg-teal-600 text-white shadow-sm" : "bg-purple-600 text-white shadow-sm") : "text-gray-700 hover:bg-white")}>
+                  <Database className="w-3.5 h-3.5" /> All questions
+                </button>
+                <button type="button" onClick={() => selectFolder(null)} className={cn("w-full flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors", selectedFolderId === null ? (standalone ? "bg-teal-600 text-white shadow-sm" : "bg-purple-600 text-white shadow-sm") : "text-gray-700 hover:bg-white")}>
+                  <Inbox className="w-3.5 h-3.5" /> Unassigned
+                </button>
+              </div>
             )}
             {foldersError && (
               <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -11430,7 +11467,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
                 onStartEditFolder={startEditFolder}
                 onSaveEditFolder={saveEditFolder}
                 onCancelEditFolder={() => { setEditingFolderId(null); setEditingFolderName(""); }}
-                onDeleteFolder={(folder) => { if (confirm(`Delete folder "${folder.name}"? Questions will not be deleted.`)) deleteFolder.mutate({ id: folder.id }); }}
+                onDeleteFolder={(folder) => requestDeleteFolder(folder)}
                 onAddSubfolder={setNewFolderParentId}
                 accent={standalone ? "teal" : "purple"}
               />
@@ -11688,6 +11725,16 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
         >
           ⭐ Presets Only
         </button>
+        <button
+          onClick={() => { selectFolder(selectedFolderId === null ? undefined : null); }}
+          className={cn("h-9 px-3 rounded-md border text-sm font-medium transition-all gap-1.5 inline-flex items-center", selectedFolderId === null ? "bg-teal-600 text-white border-teal-600" : "bg-white text-teal-700 border-teal-300 hover:bg-teal-50")}
+        >
+          <Inbox className="w-3.5 h-3.5" /> Unassigned only
+        </button>
+        <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} className="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm">
+          <option value={25}>25 / page</option>
+          <option value={100}>100 / page</option>
+        </select>
         <div className="flex flex-wrap gap-1.5">
           {tags.map(tag => (
             <button key={tag.id} onClick={() => { setSelectedTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id]); setPage(1); }}
@@ -11793,7 +11840,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
             <Database className="w-10 h-10 mx-auto mb-3 text-gray-300" />
             <p className="font-medium text-gray-500">No questions match the current filters</p>
             <p className="text-sm mt-1">
-              {presetFilter ? "Turn off Presets Only to see regular bank questions." : selectedFolderId ? "This folder and its subfolders have no matching questions, or try All questions." : "Add questions manually or use AI Generate to populate the bank."}
+              {presetFilter ? "Turn off Presets Only to see regular bank questions." : selectedFolderId === null ? "No unassigned questions match the current filters." : selectedFolderId ? "This folder and its subfolders have no matching questions, or try All questions." : "Add questions manually or use AI Generate to populate the bank."}
             </p>
           </div>
         ) : (
@@ -11846,13 +11893,15 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {total > 0 && (
         <div className="flex items-center justify-between text-sm text-gray-500">
-          <span>Showing {(page - 1) * 25 + 1}–{Math.min(page * 25, total)} of {total}</span>
-          <div className="flex gap-1">
-            <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="w-3.5 h-3.5" /></Button>
-            <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="w-3.5 h-3.5" /></Button>
-          </div>
+          <span>Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}</span>
+          {totalPages > 1 && (
+            <div className="flex gap-1">
+              <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="w-3.5 h-3.5" /></Button>
+              <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="w-3.5 h-3.5" /></Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -11866,6 +11915,52 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
           onSaved={() => { refetch(); setShowCreate(false); setEditingQuestion(null); }}
         />
       )}
+
+      <Dialog open={!!folderPendingDelete} onOpenChange={(open) => { if (!open && !deleteFolder.isPending) { setFolderPendingDelete(null); setFolderQuestionDisposition("unassign"); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete folder{folderPendingDelete ? `: ${folderPendingDelete.name}` : ""}</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the selected folder and all subfolders inside it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-sm font-medium text-gray-800">What should happen to questions in these folders?</p>
+            <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 cursor-pointer hover:bg-gray-50">
+              <input
+                type="radio"
+                name="folder-question-disposition"
+                className="mt-1"
+                checked={folderQuestionDisposition === "unassign"}
+                onChange={() => setFolderQuestionDisposition("unassign")}
+              />
+              <span>
+                <span className="block text-sm font-medium text-gray-900">Keep in Question Bank</span>
+                <span className="block text-xs text-gray-500 mt-0.5">Questions stay in the bank with no folder assigned.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border border-red-200 p-3 cursor-pointer hover:bg-red-50/40">
+              <input
+                type="radio"
+                name="folder-question-disposition"
+                className="mt-1"
+                checked={folderQuestionDisposition === "delete"}
+                onChange={() => setFolderQuestionDisposition("delete")}
+              />
+              <span>
+                <span className="block text-sm font-medium text-red-800">Delete questions permanently</span>
+                <span className="block text-xs text-red-700/80 mt-0.5">Questions in this folder tree will be removed from the Question Bank.</span>
+              </span>
+            </label>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={deleteFolder.isPending} onClick={() => { setFolderPendingDelete(null); setFolderQuestionDisposition("unassign"); }}>Cancel</Button>
+            <Button variant="destructive" disabled={deleteFolder.isPending} onClick={confirmDeleteFolder}>
+              {deleteFolder.isPending ? "Deleting…" : "Delete folder"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

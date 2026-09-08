@@ -22,8 +22,8 @@ import {
   mediaAssets,
   mediaVersions,
 } from "../../drizzle/schema";
-import { rewriteStorageRefs, uploadISpringMediaFromZip, uploadISpringMediaFromExtractedPrefix } from "../lib/iSpringImageImporter";
-import { loadScormImportFromMediaAsset, loadScormImportFromBase64 } from "../lib/scormQuestionBankImport";
+import { commitScormImportToQuestionBank } from "../lib/scormQuestionBankCommit";
+import { loadScormImportFromMediaAsset } from "../lib/scormQuestionBankImport";
 import * as XLSX from "xlsx";
 import fs from "fs";
 import path from "path";
@@ -31,8 +31,9 @@ import os from "os";
 import { AI_SOURCE_BLIND_WRITING_RULE, buildAiSourceMessage, hasDirectAiSourceReference } from "../lib/aiSourceFile";
 import { fetchAiGenerationSourceUrl } from "../lib/aiWebSource";
 import { buildAiQuestionBankInsertValues } from "../lib/aiQuestionBankPersistence";
-import { plainTextFromISpring, plainTextFromISpringContent } from "../lib/questionBankImportSanitize";
+import { plainTextFromISpring } from "../lib/questionBankImportSanitize";
 import {
+  deleteQuestionBankFolderTree,
   insertQuestionBankFolder,
   reorderQuestionBankFolders,
   selectQuestionBankFolders,
@@ -834,7 +835,9 @@ export const questionBankRouter = router({
   confirmScormImport: protectedProcedure
     .input(z.object({
       mediaAssetId: z.number().int().optional(),
-      /** Direct upload from Quiz Creator — base64-encoded .quiz/.zip bytes */
+      /** Staged upload from /api/upload-quiz-bank-file — avoids base64 tRPC body limits */
+      importStorageKey: z.string().min(1).optional(),
+      /** @deprecated Prefer importStorageKey — base64-encoded .quiz/.zip bytes hit proxy limits */
       bufferBase64: z.string().optional(),
       groupIds: z.array(z.string()).optional(),
       extraTagIds: z.array(z.number().int()).optional(),
@@ -842,185 +845,17 @@ export const questionBankRouter = router({
       newFolderName: z.string().max(200).optional(),
       parentFolderId: z.number().int().optional(),
     }).refine(
-      (v) => (v.mediaAssetId != null && v.mediaAssetId > 0) || !!v.bufferBase64?.length,
-      { message: "Provide mediaAssetId or bufferBase64 for SCORM import" }
+      (v) =>
+        (v.mediaAssetId != null && v.mediaAssetId > 0)
+        || !!v.importStorageKey?.length
+        || !!v.bufferBase64?.length,
+      { message: "Provide mediaAssetId, importStorageKey, or bufferBase64 for SCORM import" }
     ))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const source = input.mediaAssetId
-        ? await loadScormImportFromMediaAsset(input.mediaAssetId)
-        : await loadScormImportFromBase64(input.bufferBase64!);
-      const parsed = source.parsed;
-
-      const mediaRefs = [...new Set([...parsed.allImageRefs, ...parsed.allVideoRefs])];
-      let mediaMap: Map<string, string>;
-      try {
-        mediaMap = source.extractedPrefix
-          ? await uploadISpringMediaFromExtractedPrefix(source.extractedPrefix, mediaRefs)
-          : await uploadISpringMediaFromZip(source.zipEntries, mediaRefs);
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : "unknown media storage error";
-        // Do not log source package content, storage keys, URLs, or user/session data.
-        console.error(`[QuestionBank] SCORM media preparation failed: ${detail}`);
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "SCORM media could not be prepared, so no Question Bank records were saved. Check the server log for the media-preparation stage and storage configuration.",
-        });
-      }
-
-      let resolvedFolderId: number | null = null;
-      if (input.newFolderName?.trim()) {
-        resolvedFolderId = await insertQuestionBankFolder(db, {
-          name: input.newFolderName.trim(),
-          parentId: input.parentFolderId ?? null,
-          createdByAdminId: ctx.user.id,
-        });
-      } else if (input.folderId) {
-        resolvedFolderId = input.folderId;
-      }
-
-      const groups = input.groupIds && input.groupIds.length > 0
-        ? parsed.groups.filter(g => input.groupIds!.includes(g.id))
-        : parsed.groups;
-
-      const tagIds = scormImportQuestionTagIds(input.extraTagIds);
-      const results: { groupName: string; inserted: number; updated: number }[] = [];
-      const questionBankIds: number[] = [];
-
-      for (const group of groups) {
-        const groupName = plainTextFromISpring(group.name) || `Group ${results.length + 1}`;
-        const [existingGroupFolder] = await db
-          .select({ id: questionBankFolders.id })
-          .from(questionBankFolders)
-          .where(and(
-            eq(questionBankFolders.name, groupName),
-            resolvedFolderId === null
-              ? sql`${questionBankFolders.parentId} IS NULL`
-              : eq(questionBankFolders.parentId, resolvedFolderId),
-          ))
-          .limit(1);
-        const groupFolderId = existingGroupFolder?.id ?? await insertQuestionBankFolder(db, {
-          name: groupName,
-          parentId: resolvedFolderId,
-          createdByAdminId: ctx.user.id,
-        });
-        let inserted = 0;
-        let updated = 0;
-
-        for (const q of group.questions) {
-          const questionText = plainTextFromISpringContent(
-            q.questionText,
-            q.questionHtml,
-            (value) => rewriteStorageRefs(value, mediaMap),
-          );
-          const options = q.answers.map(a => ({
-            text: plainTextFromISpringContent(
-              a.text,
-              a.html,
-              (value) => rewriteStorageRefs(value, mediaMap),
-            ),
-            ...(a.imageRef ? { imageUrl: mediaMap.get(a.imageRef) ?? a.imageRef } : {}),
-            ...(a.videoRef ? { videoUrl: mediaMap.get(a.videoRef) ?? a.videoRef } : {}),
-          }));
-          const explanation = plainTextFromISpringContent(
-            q.explanationText,
-            q.explanationHtml,
-            (value) => rewriteStorageRefs(value, mediaMap),
-          ) || null;
-          const questionImageUrl = q.questionImageRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
-          const questionVideoUrl = q.questionVideoRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
-          const feedbackImageUrl = q.feedbackImageRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
-          const feedbackVideoUrl = q.feedbackVideoRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
-
-          const [existingQuestion] = await db
-            .select({
-              id: questionBank.id,
-              options: questionBank.options,
-              questionImageUrl: questionBank.questionImageUrl,
-              questionVideoUrl: questionBank.questionVideoUrl,
-              feedbackImageUrl: questionBank.feedbackImageUrl,
-              feedbackVideoUrl: questionBank.feedbackVideoUrl,
-              hotspotMarkers: questionBank.hotspotMarkers,
-              correctAnswers: questionBank.correctAnswers,
-            })
-            .from(questionBank)
-            .where(and(
-              eq(questionBank.question, questionText),
-              eq(questionBank.type, q.type),
-              eq(questionBank.correctAnswer, q.correctAnswer),
-              eq(questionBank.folderId, groupFolderId),
-            ))
-            .limit(1);
-
-          if (existingQuestion) {
-            const existingOptions = typeof existingQuestion.options === "string"
-              ? (() => { try { const parsedOptions = JSON.parse(existingQuestion.options); return Array.isArray(parsedOptions) ? parsedOptions : []; } catch { return []; } })()
-              : Array.isArray(existingQuestion.options) ? existingQuestion.options : [];
-            const mergedOptions = options.map((option, index) => {
-              const existingOption = existingOptions[index] ?? {};
-              return {
-                ...option,
-                ...(existingOption.imageUrl && !option.imageUrl ? { imageUrl: existingOption.imageUrl } : {}),
-                ...(existingOption.videoUrl && !option.videoUrl ? { videoUrl: existingOption.videoUrl } : {}),
-              };
-            });
-            const updatedMedia = {
-              questionImageUrl: existingQuestion.questionImageUrl ?? questionImageUrl,
-              questionVideoUrl: existingQuestion.questionVideoUrl ?? questionVideoUrl,
-              feedbackImageUrl: existingQuestion.feedbackImageUrl ?? feedbackImageUrl,
-              feedbackVideoUrl: existingQuestion.feedbackVideoUrl ?? feedbackVideoUrl,
-              hotspotMarkers: existingQuestion.hotspotMarkers ?? (q.hotspotMarkers ? JSON.stringify(q.hotspotMarkers) : null),
-              correctAnswers: existingQuestion.correctAnswers ?? q.correctAnswers ?? null,
-            };
-            const mergedOptionsJson = JSON.stringify(mergedOptions);
-            const optionsChanged = mergedOptionsJson !== JSON.stringify(existingOptions);
-            const mediaChanged = Object.entries(updatedMedia).some(([key, value]) => value !== (existingQuestion as any)[key]);
-            if (optionsChanged || mediaChanged) {
-              await db.update(questionBank).set({
-                ...(optionsChanged ? { options: mergedOptionsJson } : {}),
-                ...updatedMedia,
-              }).where(eq(questionBank.id, existingQuestion.id));
-              updated++;
-            }
-            questionBankIds.push(existingQuestion.id);
-            continue;
-          }
-
-          const [result] = await db.insert(questionBank).values({
-            question: questionText,
-            type: q.type,
-            options: JSON.stringify(options),
-            correctAnswer: q.correctAnswer,
-            explanation,
-            questionImageUrl,
-            questionVideoUrl,
-            feedbackImageUrl,
-            feedbackVideoUrl,
-            hotspotMarkers: q.hotspotMarkers ? JSON.stringify(q.hotspotMarkers) : null,
-            correctAnswers: q.correctAnswers ?? null,
-            folderId: groupFolderId,
-            createdByAdminId: ctx.user.id,
-          }).$returningId();
-
-          if (tagIds.length > 0) {
-            await db.insert(questionBankTagMap).values(
-              tagIds.map(tid => ({ questionId: result.id, tagId: tid }))
-            );
-          }
-
-          questionBankIds.push(result.id);
-          inserted++;
-        }
-
-        results.push({ groupName, inserted, updated });
-      }
-
-      const totalInserted = results.reduce((sum, r) => sum + r.inserted, 0);
-      const totalUpdated = results.reduce((sum, r) => sum + r.updated, 0);
-      return { results, totalInserted, totalUpdated, questionBankIds };
+      return commitScormImportToQuestionBank(db, ctx.user.id, input);
     }),
 
   // ─── Folder CRUD ─────────────────────────────────────────────────────────────
@@ -1081,24 +916,19 @@ export const questionBankRouter = router({
     }),
 
   deleteFolder: protectedProcedure
-    .input(z.object({ id: z.number().int() }))
+    .input(z.object({
+      id: z.number().int(),
+      questionDisposition: z.enum(["unassign", "delete"]).default("unassign"),
+    }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      // Unset folder_id on questions in this folder
-      await db.update(questionBank).set({ folderId: null }).where(eq(questionBank.folderId, input.id));
-      // Promote child folders to this folder's parent (or root)
-      const [folder] = await db
-        .select({ parentId: questionBankFolders.parentId })
-        .from(questionBankFolders)
-        .where(eq(questionBankFolders.id, input.id))
-        .limit(1);
-      await db.update(questionBankFolders)
-        .set({ parentId: folder?.parentId ?? null })
-        .where(eq(questionBankFolders.parentId, input.id));
-      await db.delete(questionBankFolders).where(eq(questionBankFolders.id, input.id));
-      return { ok: true };
+      const result = await deleteQuestionBankFolderTree(db, input.id, input.questionDisposition);
+      if (result.deletedFolderCount === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Folder not found" });
+      }
+      return { ok: true, ...result };
     }),
 
   reorderFolders: protectedProcedure

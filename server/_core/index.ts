@@ -21,6 +21,7 @@ import { registerUploadLessonDocumentRoute } from "../routes/uploadLessonDocumen
 import { registerProcessRichTextHtmlRoute } from "../routes/processRichTextHtml";
 import { registerReconstructMathRoute } from "../routes/reconstructMath";
 import { registerUploadQuizBankFileRoute } from "../routes/uploadQuizBankFile";
+import { registerScormQuestionBankImportRoute } from "../routes/scormQuestionBankImportRoute";
 import { registerUploadAiGenerationSourceRoute } from "../routes/uploadAiGenerationSource";
 import quizImportRouter from "../quizImportRoutes";
 import questionBankExportRouter from "../routes/questionBankExport";
@@ -208,27 +209,42 @@ async function startServer() {
     const db = await getDb();
     res.json({ hasDbUrl, dbUrlPrefix, dbConnected: !!db });
   });
-  // Temporary debug endpoint to diagnose email/SendGrid configuration
+  // Temporary debug endpoint to diagnose email provider configuration
   app.get("/api/debug/email-status", async (_req, res) => {
-    const hasSendGridKey = !!process.env.SENDGRID_API_KEY;
-    const keyPrefix = process.env.SENDGRID_API_KEY?.substring(0, 7) || "NOT SET";
-    const fromEmail = process.env.SENDGRID_FROM_EMAIL || "NOT SET";
-    const fromName = process.env.SENDGRID_FROM_NAME || "NOT SET";
-    res.json({ hasSendGridKey, keyPrefix, fromEmail, fromName, deployedAt: new Date().toISOString() });
+    const { emailProviderStatus } = await import("../lib/email/providerConfig");
+    const { listSmtpComChannels } = await import("../lib/email/providers/smtpcomChannels");
+    const status = emailProviderStatus();
+    const smtpcomChannels =
+      status.smtpcom.hasApiKey && !status.smtpcom.hasChannel
+        ? await listSmtpComChannels()
+        : undefined;
+    res.json({
+      ...status,
+      smtpcomChannels,
+      setupHint:
+        status.provider === "smtpcom" && !status.configured
+          ? status.smtpcom.hasApiKey && !status.smtpcom.hasChannel
+            ? "Set SMTPCOM_CHANNEL to one of the channel names returned in smtpcomChannels (or from your SMTP.com dashboard)."
+            : "Set SMTPCOM_API_KEY and SMTPCOM_CHANNEL (SMTP.com is the default provider)."
+          : undefined,
+      deployedAt: new Date().toISOString(),
+    });
   });
-  // Temporary debug endpoint to test sending an email via SendGrid
+  // Temporary debug endpoint to test sending an email via configured provider
   app.get("/api/debug/test-email", async (req, res) => {
     const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
     if (denyUnlessDebugAuthorized(req, res)) return;
     const to = req.query.to as string;
     if (!to) return res.status(400).json({ error: "Pass ?to=your@email.com" });
     const { sendEmail } = await import("./email");
+    const { getEmailProviderId } = await import("../lib/email/providerConfig");
+    const provider = getEmailProviderId();
     const result = await sendEmail({
       to: { name: "Test", email: to },
       subject: "UltrasoundAssist™ Email Test",
-      htmlBody: "<h2>Email is working!</h2><p>If you see this, SendGrid is correctly configured.</p>",
+      htmlBody: `<h2>Email is working!</h2><p>If you see this, your ${provider} email provider is correctly configured.</p>`,
     });
-    res.json({ sent: result, to, timestamp: new Date().toISOString() });
+    res.json({ sent: result, provider, to, timestamp: new Date().toISOString() });
   });
   app.get("/api/debug/password-reset-lookup", async (req, res) => {
     const email = String(req.query.email ?? "").trim().toLowerCase();
@@ -659,6 +675,7 @@ async function startServer() {
   registerReconstructMathRoute(app);
   // Quiz bank direct file upload (SCORM .quiz, CSV, XLSX — bypasses media library)
   registerUploadQuizBankFileRoute(app);
+  registerScormQuestionBankImportRoute(app);
   registerUploadAiGenerationSourceRoute(app);
   // Quiz bank import REST routes (preview, confirm-native, csv-template, xlsx template)
   app.use("/api/quiz", quizImportRouter);

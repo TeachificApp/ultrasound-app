@@ -4,24 +4,30 @@
  * Accepts a .quiz (iSpring SCORM ZIP) or .csv/.xlsx file directly from the browser
  * without requiring it to be stored in the media library first.
  *
- * For SCORM .quiz files: parses the ZIP and returns a preview (groups + question counts).
+ * For SCORM .quiz files: parses the ZIP, stages the package in storage, and returns
+ * a preview plus importStorageKey for confirmScormImport (avoids base64 tRPC limits).
  * For CSV/XLSX files: returns the raw base64 content for the client to pass to importCsvToBank.
  *
  * Returns:
- *   { type: "scorm", preview: { quizTitle, groups, totalQuestions } }
+ *   { type: "scorm", importStorageKey, preview: { quizTitle, groups, totalQuestions } }
  *   { type: "csv", data: "base64:...", rowCount: number, columns: string[] }
  */
 import { Router, Request, Response } from "express";
 import multer from "multer";
+import { randomBytes } from "crypto";
 import { sdk } from "../_core/sdk";
 import { parseISpringQuizFromBuffer } from "../lib/iSpringQuizParser";
+import { storagePut } from "../storage";
 import * as XLSX from "xlsx";
 
 const router = Router();
 
+const SCORM_MAX_BYTES = 200 * 1024 * 1024;
+const CSV_MAX_BYTES = 50 * 1024 * 1024;
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  limits: { fileSize: SCORM_MAX_BYTES },
   fileFilter: (_req, file, cb) => {
     const allowed = [
       "application/zip",
@@ -41,6 +47,15 @@ const upload = multer({
   },
 });
 
+function safeImportFileName(originalname: string): string {
+  const ext = originalname.includes(".") ? originalname.slice(originalname.lastIndexOf(".")).toLowerCase() : "";
+  const base = originalname
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${base || "quiz-package"}${ext}`;
+}
+
 router.post(
   "/api/upload-quiz-bank-file",
   upload.single("file"),
@@ -57,7 +72,7 @@ router.post(
         return;
       }
 
-      const { originalname, buffer } = req.file;
+      const { originalname, buffer, size } = req.file;
       const ext = (originalname ?? "").split(".").pop()?.toLowerCase() ?? "";
 
       // ─── SCORM / .quiz ZIP ────────────────────────────────────────────────
@@ -69,8 +84,15 @@ router.post(
           res.status(400).json({ error: `Not a valid iSpring quiz ZIP: ${e.message}` });
           return;
         }
+
+        const token = randomBytes(12).toString("hex");
+        const importStorageKey = `question-bank-imports/${user.id}/${token}/${safeImportFileName(originalname)}`;
+        await storagePut(importStorageKey, buffer, "application/zip");
+
         res.json({
           type: "scorm",
+          importStorageKey,
+          fileSize: size,
           preview: {
             quizTitle: parsed.title,
             groups: parsed.groups.map(g => ({
@@ -89,6 +111,11 @@ router.post(
             totalQuestions: parsed.groups.reduce((sum, g) => sum + g.questions.length, 0),
           },
         });
+        return;
+      }
+
+      if (size > CSV_MAX_BYTES) {
+        res.status(400).json({ error: `CSV/Excel uploads must be ${CSV_MAX_BYTES / (1024 * 1024)} MB or smaller.` });
         return;
       }
 

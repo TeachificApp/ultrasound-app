@@ -1,6 +1,7 @@
-import { and, asc, eq, sql } from "drizzle-orm";
-import { questionBankFolders } from "../../drizzle/schema";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { questionBank, questionBankFolders, questionBankTagMap } from "../../drizzle/schema";
 import type { getDb } from "../db";
+import { collectDescendantFolderIds } from "../../shared/questionBankFolders";
 import { ensureQuestionBankFoldersSchema } from "./ensureQuestionBankFoldersSchema";
 import { extractExecuteRows } from "./ensureLmsCoursesSchema";
 
@@ -111,4 +112,34 @@ export async function reorderQuestionBankFolders(db: Db, folderIds: number[]): P
       db.update(questionBankFolders).set({ sortOrder: index }).where(eq(questionBankFolders.id, id)),
     ),
   );
+}
+
+/** Delete a folder and every descendant subfolder. */
+export type QuestionBankFolderQuestionDisposition = "unassign" | "delete";
+
+export async function deleteQuestionBankFolderTree(
+  db: Db,
+  folderId: number,
+  questionDisposition: QuestionBankFolderQuestionDisposition = "unassign",
+): Promise<{ deletedFolderCount: number; affectedQuestionCount: number }> {
+  const allFolders = await selectQuestionBankFolders(db);
+  const folderIds = collectDescendantFolderIds(allFolders, folderId);
+  if (folderIds.length === 0) return { deletedFolderCount: 0, affectedQuestionCount: 0 };
+
+  const questionRows = await db
+    .select({ id: questionBank.id })
+    .from(questionBank)
+    .where(inArray(questionBank.folderId, folderIds));
+  const questionIds = questionRows.map((row) => row.id);
+  const affectedQuestionCount = questionIds.length;
+
+  if (questionDisposition === "delete" && questionIds.length > 0) {
+    await db.delete(questionBankTagMap).where(inArray(questionBankTagMap.questionId, questionIds));
+    await db.delete(questionBank).where(inArray(questionBank.id, questionIds));
+  } else if (questionIds.length > 0) {
+    await db.update(questionBank).set({ folderId: null }).where(inArray(questionBank.folderId, folderIds));
+  }
+
+  await db.delete(questionBankFolders).where(inArray(questionBankFolders.id, folderIds));
+  return { deletedFolderCount: folderIds.length, affectedQuestionCount };
 }

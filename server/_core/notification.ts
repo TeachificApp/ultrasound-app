@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
-import { ENV } from "./env";
+import { sendEmail } from "./email";
+import { isEmailProviderConfigured } from "../lib/email/providerConfig";
 import { logAdminNotification } from "../lib/logAdminNotification";
-import { getPlatformAdminNotificationEmail, getPlatformAdminRecipient } from "../lib/platformAdminNotification";
+import { getPlatformAdminNotificationEmail } from "../lib/platformAdminNotification";
 
 export type NotificationPayload = {
   title: string;
@@ -34,7 +35,7 @@ const validatePayload = (input: NotificationPayload): NotificationPayload => {
 };
 
 /**
- * Send a plain-text admin alert email via SendGrid to the platform admin address.
+ * Send a plain-text admin alert email via the configured provider to the platform admin address.
  *
  * This is the PRIMARY admin notification channel. It delivers to PLATFORM_ADMIN_EMAIL
  * (defaults to admin@allaboutultrasound.com) regardless of which Manus account owns
@@ -44,16 +45,10 @@ const validatePayload = (input: NotificationPayload): NotificationPayload => {
  * Call this directly via sendAdminAlert() for fire-and-forget admin emails.
  */
 export async function sendAdminAlert(title: string, content: string): Promise<void> {
-  const sendgridKey = process.env.SENDGRID_API_KEY;
-  // Use a "from" address that is different from the "to" address to avoid spam filters
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@allaboutultrasound.com";
-  const fromName = process.env.SENDGRID_FROM_NAME || "All About Ultrasound";
-  // PLATFORM_ADMIN_EMAIL is the single source of truth for who receives admin alerts.
-  // Set this env var to the client's email address for consulting projects.
   const adminEmail = getPlatformAdminNotificationEmail();
 
-  if (!sendgridKey) {
-    console.warn("[Notification] SENDGRID_API_KEY not set — admin alert email skipped.");
+  if (!isEmailProviderConfigured()) {
+    console.warn("[Notification] Email provider not configured — admin alert email skipped.");
     return;
   }
 
@@ -67,28 +62,15 @@ export async function sendAdminAlert(title: string, content: string): Promise<vo
     </div>
   `;
 
-  try {
-    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${sendgridKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        personalizations: [{ to: [getPlatformAdminRecipient("Admin")] }],
-        from: { email: fromEmail, name: fromName },
-        subject: `[Admin Alert] ${title}`,
-        content: [{ type: "text/html", value: htmlBody }],
-      }),
-    });
-    if (!response.ok) {
-      const detail = await response.text().catch(() => "");
-      console.warn(`[Notification] Admin alert email failed (${response.status}): ${detail}`);
-    } else {
-      console.log(`[Notification] Admin alert email sent to ${adminEmail}: ${title}`);
-    }
-  } catch (err) {
-    console.warn("[Notification] Admin alert email error:", err);
+  const sent = await sendEmail({
+    to: { name: "Admin", email: adminEmail },
+    subject: `[Admin Alert] ${title}`,
+    htmlBody,
+  });
+  if (sent) {
+    console.log(`[Notification] Admin alert email sent to ${adminEmail}: ${title}`);
+  } else {
+    console.warn(`[Notification] Admin alert email failed for ${adminEmail}: ${title}`);
   }
 }
 
@@ -109,7 +91,7 @@ export async function notifyOwner(
 ): Promise<boolean> {
   const { title, content } = validatePayload(payload);
 
-  // PRIMARY: Send admin alert email to PLATFORM_ADMIN_EMAIL via SendGrid.
+  // PRIMARY: Send admin alert email to PLATFORM_ADMIN_EMAIL via configured provider.
   // This is the reliable channel for client-facing admin notifications.
   // Fire-and-forget — never blocks the main flow.
   if (!options?.skipAdminEmail) {
@@ -119,5 +101,5 @@ export async function notifyOwner(
   // Log to the in-app admin notifications DB (fire-and-forget, never throws)
   logAdminNotification({ title, content, source: "system" }).catch(() => {});
 
-  return Boolean(process.env.SENDGRID_API_KEY);
+  return isEmailProviderConfigured();
 }

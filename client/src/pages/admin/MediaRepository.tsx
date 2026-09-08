@@ -94,6 +94,19 @@ const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
   html: "HTML", scorm: "SCORM", zip: "ZIP", lms: "LMS", other: "Other",
 };
 
+async function parseJsonResponse(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text.trim()) throw new Error("Empty response from server");
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+      throw new Error("The import timed out or the server returned an error page. Try again in a moment.");
+    }
+    throw new Error("Invalid server response during import");
+  }
+}
+
 const MEDIA_TYPE_ICONS: Record<MediaType, React.ReactNode> = {
   image: <FileImage className="w-4 h-4" />,
   video: <FileVideo className="w-4 h-4" />,
@@ -990,8 +1003,9 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   const [extractFolderMode, setExtractFolderMode] = useState<"new" | "existing">("new");
   const [extractNewFolderName, setExtractNewFolderName] = useState("");
   const [extractFolderId, setExtractFolderId] = useState<number | null>(null);
-  const [extractResult, setExtractResult] = useState<{ totalInserted: number; results: { groupName: string; inserted: number }[] } | null>(null);
+  const [extractResult, setExtractResult] = useState<{ totalInserted: number; totalUpdated: number; results: { groupName: string; inserted: number; updated: number }[] } | null>(null);
   const [extractError, setExtractError] = useState<string | null>(null);
+  const [extractConfirming, setExtractConfirming] = useState(false);
 
   const { data, refetch } = trpc.mediaRepo.getAsset.useQuery(
     { id: assetId! },
@@ -1064,14 +1078,6 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   const previewExtractMutation = trpc.questionBank.previewScormImport.useMutation({
     onError: (e) => toast.error(`Preview failed: ${e.message}`),
   });
-  const confirmExtractMutation = trpc.questionBank.confirmScormImport.useMutation({
-    onSuccess: (res) => {
-      setExtractResult(res as any);
-      setExtractError(null);
-      toast.success(`Extracted ${(res as any).totalInserted} questions to Question Bank!`);
-    },
-    onError: (e) => setExtractError(e.message),
-  });
   const { data: bankFolders } = trpc.questionBank.listFolders.useQuery();
   const reExtractMutation = trpc.mediaRepo.reExtractScorm.useMutation({
     onSuccess: () => { refetch(); onRefresh(); },
@@ -1111,6 +1117,33 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
   });
   const scormExtractionReady = scormStage === "not_required" || scormStage === "ready";
   const scormExtractionBlocked = !scormExtractionReady;
+
+  const handleConfirmExtract = async () => {
+    setExtractError(null);
+    setExtractConfirming(true);
+    try {
+      const res = await fetch("/api/question-bank/scorm-import/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          mediaAssetId: asset.id,
+          includeQuestionBankIds: false,
+          ...(extractFolderMode === "new" && extractNewFolderName.trim()
+            ? { newFolderName: extractNewFolderName.trim() }
+            : { folderId: extractFolderId ?? undefined }),
+        }),
+      });
+      const json = await parseJsonResponse(res);
+      if (!res.ok) throw new Error(json.error ?? "Import failed");
+      setExtractResult(json);
+      toast.success(`Extracted ${json.totalInserted} question${json.totalInserted !== 1 ? "s" : ""} to Question Bank!`);
+    } catch (e: any) {
+      setExtractError(e?.message ?? "Import failed");
+    } finally {
+      setExtractConfirming(false);
+    }
+  };
 
   return (
     <>
@@ -1720,17 +1753,10 @@ function AssetDetailDialog({ assetId, onClose, onRefresh, autoReExtract }: Asset
                   <Button
                     size="sm"
                     className="bg-teal-600 hover:bg-teal-700 text-white"
-                    disabled={confirmExtractMutation.isPending || !!extractError || !scormExtractionReady || (extractFolderMode === "new" && !extractNewFolderName.trim())}
-                    onClick={() => {
-                      confirmExtractMutation.mutate({
-                        mediaAssetId: asset.id,
-                        ...(extractFolderMode === "new" && extractNewFolderName.trim()
-                          ? { newFolderName: extractNewFolderName.trim() }
-                          : { folderId: extractFolderId ?? undefined }),
-                      });
-                    }}
+                    disabled={extractConfirming || !!extractError || !scormExtractionReady || (extractFolderMode === "new" && !extractNewFolderName.trim())}
+                    onClick={() => { void handleConfirmExtract(); }}
                   >
-                    {confirmExtractMutation.isPending ? (
+                    {extractConfirming ? (
                       <><RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />Extracting…</>
                     ) : /flashcard deck/i.test(extractError ?? "") ? (
                       <><BookOpen className="w-3 h-3 mr-1.5" />Flashcard Deck — Not a Quiz</>
