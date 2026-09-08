@@ -496,3 +496,6 @@
 - [x] Add focused role/permission regressions for authorized administrator video upload and verify the corrected path does not weaken access for ordinary users.
 - [x] Preserve and reconcile the uncheckpointed Media Repository upload-authorization and SCORM diagnostic repairs with the newer GitHub main SMTP and SCORM changes, without discarding either code path or changing production records.
 - [x] Run focused merged-path validation and checkpoint the reconciled GitHub-main code before asking for live Media Repository upload or SCORM import retries.
+- [x] Repair membership-plan card vertical spacing and responsive purchase-button sizing so all call-to-action labels remain visible without changing pricing, plan availability, or checkout behavior.
+- [x] Add focused layout regression coverage for full membership-button labels and consistent CTA placement across plan cards.
+- [ ] Visually validate the membership-plan CTA spacing and full labels on the live desktop and phone breakpoints after deployment; the local preview did not render this public route.
