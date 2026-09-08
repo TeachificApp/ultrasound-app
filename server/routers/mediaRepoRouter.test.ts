@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getDbMock } = vi.hoisted(() => ({ getDbMock: vi.fn() }));
+const { getDbMock, getUserRolesMock } = vi.hoisted(() => ({ getDbMock: vi.fn(), getUserRolesMock: vi.fn() }));
 
-vi.mock("../db", () => ({ getDb: getDbMock }));
+vi.mock("../db", () => ({ getDb: getDbMock, getUserRoles: getUserRolesMock }));
 vi.mock("../_core/email", () => ({ sendEmail: vi.fn() }));
 
 import { mediaRepoRouter } from "./mediaRepoRouter";
@@ -38,6 +38,8 @@ function makeDb(statusRows: Array<{ status: string; count: number }>) {
 describe("mediaRepo.getScormBackfillSummary", () => {
   beforeEach(() => {
     getDbMock.mockReset();
+    getUserRolesMock.mockReset();
+    getUserRolesMock.mockResolvedValue([]);
   });
 
   it("returns live queued, extracting, ready, and failed counts from latest package versions", async () => {

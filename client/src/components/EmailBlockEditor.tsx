@@ -1011,6 +1011,94 @@ function defaultBlock(type: BlockType): Block {
   };
 }
 
+type EmailRepositoryMediaType = "image" | "video" | "audio";
+
+/**
+ * Lets authorized campaign authors reuse an existing Media Repository asset.
+ * The server owns the authorization decision; this component only writes the
+ * selected current-version URL into the block's established `url` field.
+ */
+function EmailMediaRepositoryPicker({
+  block,
+  onSelect,
+}: {
+  block: Block;
+  onSelect: (asset: { id: number; title: string; s3Url: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const mediaType: EmailRepositoryMediaType = block.type === "video"
+    ? "video"
+    : block.type === "audio"
+      ? "audio"
+      : "image";
+  const queryInput = useMemo(() => ({ mediaType, page: 1, pageSize: 48 }), [mediaType]);
+  const { data, isLoading, error } = trpc.mediaRepo.listAssets.useQuery(queryInput, { enabled: open });
+
+  return (
+    <>
+      <div className="mt-3 rounded-lg border border-teal-100 bg-teal-50/60 p-2.5">
+        <p className="text-[11px] font-semibold text-teal-800">Media Repository</p>
+        <p className="mt-0.5 text-[10px] leading-snug text-teal-700">
+          Reuse an approved {mediaType} from the shared library. The selected file stays managed in Media Repository.
+        </p>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="mt-2 h-7 border-teal-300 bg-white px-2 text-xs text-teal-700 hover:bg-teal-100"
+          onClick={() => setOpen(true)}
+        >
+          <ImageIcon className="mr-1 h-3.5 w-3.5" /> Choose from Media Repository
+        </Button>
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Choose {mediaType} from Media Repository</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Selecting an item updates only this campaign block. It does not change the library item or send the campaign.
+          </p>
+          <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
+            {isLoading && <p className="py-6 text-center text-sm text-muted-foreground">Loading approved media…</p>}
+            {error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">Media Repository could not be loaded: {error.message}</p>}
+            {!isLoading && !error && !data?.assets.length && (
+              <p className="py-6 text-center text-sm text-muted-foreground">No {mediaType} files are available in Media Repository.</p>
+            )}
+            {data?.assets.map((asset) => {
+              const url = asset.currentVersion?.s3Url;
+              if (!url) return null;
+              return (
+                <button
+                  type="button"
+                  key={asset.id}
+                  className="flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left transition-colors hover:border-teal-400 hover:bg-teal-50"
+                  onClick={() => {
+                    onSelect({ id: asset.id, title: asset.title, s3Url: url });
+                    setOpen(false);
+                  }}
+                >
+                  {mediaType === "image" ? (
+                    <img src={url} alt="" className="h-12 w-16 shrink-0 rounded object-cover" />
+                  ) : (
+                    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded bg-slate-100 text-xs font-semibold uppercase text-slate-500">{mediaType}</div>
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-800">{asset.title}</span>
+                    <span className="block truncate text-xs text-slate-500">{asset.currentVersion?.fileName ?? "Current version"}</span>
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-teal-700">Use media</span>
+                </button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 interface EmailBlockEditorProps {
   initialBlocks: Block[];
@@ -1388,12 +1476,24 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
                   onChange={(data) => updateBlock(selectedBlock.id, data)}
                 />
               ) : (
-                <BlockSettings
-                  block={selectedBlock}
-                  onChange={(data) => updateBlock(selectedBlock.id, data)}
-                  emailMode={selectedBlock.type === "ai_content"}
-              />
-            )}
+                <>
+                  <BlockSettings
+                    block={selectedBlock}
+                    onChange={(data) => updateBlock(selectedBlock.id, data)}
+                    emailMode={selectedBlock.type === "ai_content"}
+                  />
+                  {["image", "ai_image", "video", "audio"].includes(selectedBlock.type) && (
+                    <EmailMediaRepositoryPicker
+                      block={selectedBlock}
+                      onSelect={(asset) => updateBlock(selectedBlock.id, {
+                        url: asset.s3Url,
+                        alt: selectedBlock.data?.alt || asset.title,
+                        mediaAssetId: asset.id,
+                      })}
+                    />
+                  )}
+                </>
+              )}
           </div>
         </div>
       </>

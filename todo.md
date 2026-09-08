@@ -499,3 +499,6 @@
 - [x] Repair membership-plan card vertical spacing and responsive purchase-button sizing so all call-to-action labels remain visible without changing pricing, plan availability, or checkout behavior.
 - [x] Add focused layout regression coverage for full membership-button labels and consistent CTA placement across plan cards.
 - [ ] Visually validate the membership-plan CTA spacing and full labels on the live desktop and phone breakpoints after deployment; the local preview did not render this public route.
+- [x] Ensure every Platform Admin can browse and upload in Media Repository through the same effective-role policy, while ordinary users remain denied.
+- [x] Ensure authorized Platform Admins can select and reuse existing Media Repository items in Email Campaigns, pages, and courses without requiring a content change or granting cross-user media access.
+- [x] Add focused cross-surface Platform Admin browse/upload/media-picker regressions and ordinary-user denial coverage.
