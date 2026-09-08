@@ -61,9 +61,13 @@ describe("questionBankFolders helpers", () => {
   it("deletes a folder and all descendant subfolders instead of reparenting children", () => {
     const routerSource = readFileSync(resolve(import.meta.dirname, "routers/questionBankRouter.ts"), "utf8");
     const querySource = readFileSync(resolve(import.meta.dirname, "lib/questionBankFolderQueries.ts"), "utf8");
+    const ui = readFileSync(resolve(import.meta.dirname, "../client/src/pages/admin/LMSAdmin.tsx"), "utf8");
+    expect(routerSource).toContain("questionDisposition: z.enum([\"unassign\", \"delete\"])");
     expect(routerSource).toContain("deleteQuestionBankFolderTree");
     expect(querySource).toContain("collectDescendantFolderIds(allFolders, folderId)");
-    expect(querySource).toContain("inArray(questionBank.folderId, folderIds)");
+    expect(querySource).toContain("questionDisposition === \"delete\"");
     expect(querySource).not.toContain("Promote child folders");
+    expect(ui).toContain("What should happen to questions in these folders?");
+    expect(ui).toContain("questionDisposition: folderQuestionDisposition");
   });
 });
