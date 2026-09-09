@@ -37,94 +37,14 @@ import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { getStoredAffiliateCode } from "@/pages/AffiliateRedirect";
 import { getFirstPublishedPreviewLesson, isPublishedPreviewLesson } from "@shared/coursePreviewEligibility";
-import { shouldRouteWorkshopCtaToCheckout } from "@shared/workshopPricing";
 import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from "@shared/availabilityPresentation";
+import { handleCtaBtnClick } from "@/lib/ctaUtils";
+export { handleCtaBtnClick };
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 import { isScheduledDeadlineOpen, scheduledWallTimeToUtc } from "@shared/platformTime";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Click-delegation handler for [data-cta-btn] elements inserted via the rich text CTA button dialog.
- * Attach as onClick on any container that renders dangerouslySetInnerHTML rich text.
- */
-export function handleCtaBtnClick(
-  e: React.MouseEvent<HTMLElement>,
-  onEnroll?: () => void,
-  onEnrollWithOption?: (pricingOptionId: number | undefined) => void,
-  onCheckoutPage?: (pricingOptionId?: number) => void,
-  /** Called instead of waitlist/sold-out modal when button has data-soldout-override set */
-  onSoldOutOverride?: (overrideUrl: string) => void,
-) {
-  const target = (e.target as HTMLElement).closest("[data-cta-btn]") as HTMLElement | null;
-  if (!target) return;
-  e.preventDefault();
-  e.stopPropagation();
-  const action = target.dataset.action ?? "url";
-  if (shouldRouteWorkshopCtaToCheckout(action, target.textContent ?? undefined)) {
-    if (onCheckoutPage) onCheckoutPage(undefined);
-    else onEnroll?.();
-    return;
-  }
-  // Sold-out override: if the button has a soldout-override URL and we're in
-  // sold-out/waitlist mode (caller provides onSoldOutOverride), use it.
-  const soldOutOverrideUrl = target.dataset.soldoutOverride;
-  if (soldOutOverrideUrl && onSoldOutOverride) {
-    onSoldOutOverride(soldOutOverrideUrl);
-    return;
-  }
-  if (action === "url") {
-    const link = target.dataset.link;
-    if (link && link !== "#") window.open(link, "_blank", "noopener,noreferrer");
-  } else if (action === "send_email") {
-    const email = target.dataset.email;
-    if (email) window.location.href = `mailto:${email}`;
-  } else if (action === "phone") {
-    const phone = target.dataset.phone;
-    if (phone) window.location.href = `tel:${phone.replace(/\s/g, "")}`;
-  } else if (action === "scroll_to_section") {
-    const anchor = target.dataset.anchor;
-    if (anchor) {
-      const el = document.getElementById(anchor.replace(/^#/, ""));
-      if (el) el.scrollIntoView({ behavior: "smooth" });
-    }
-  } else if (action === "open_popup") {
-    const popup = target.dataset.popup;
-    if (popup) {
-      const w = 800, h = 600;
-      const left = window.screenX + (window.outerWidth - w) / 2;
-      const top = window.screenY + (window.outerHeight - h) / 2;
-      window.open(popup, "_blank", `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=yes`);
-    }
-  } else if (action === "download_file") {
-    const dl = target.dataset.download;
-    if (dl) window.open(dl, "_blank", "noopener,noreferrer");
-  } else if (action === "direct_checkout" || action === "group_purchase") {
-    if (onCheckoutPage) onCheckoutPage(undefined);
-    else onEnroll?.();
-  } else if (action === "free_enrollment") {
-    // free_enrollment: the data-product-type and data-product-id attributes carry the target
-    // The actual mutation is handled by onFreeEnroll callback passed from the page
-    const productType = target.dataset.productType;
-    const productId = target.dataset.productId ? Number(target.dataset.productId) : undefined;
-    (onEnroll as any)?.(productType, productId);
-  } else if (action === "pricing_option") {
-    const rawId = target.dataset.pricingOption;
-    const poId = rawId ? Number(rawId) : undefined;
-    if (onCheckoutPage) {
-      onCheckoutPage(poId);
-    } else if (onEnrollWithOption) {
-      onEnrollWithOption(poId);
-    } else {
-      onEnroll?.();
-    }
-  } else if (action === "enroll_next_available") {
-    // Directs to checkout for the next available instance/cohort — same as direct_checkout
-    if (onCheckoutPage) onCheckoutPage(undefined);
-    else onEnroll?.();
-  }
-}
 
 /** Content container: constrains inner content to max-width with page margins.
  * Backgrounds on the outer block div always bleed full-width.

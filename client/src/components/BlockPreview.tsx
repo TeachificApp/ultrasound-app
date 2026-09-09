@@ -14,7 +14,7 @@ import { Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
-import { handleCtaBtnClick } from "@/pages/CourseLanding";
+import { handleCtaBtnClick } from "@/lib/ctaUtils";
 import { applyVideoTrim } from "@/lib/videoTrim";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 import {

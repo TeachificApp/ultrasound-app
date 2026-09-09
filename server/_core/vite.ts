@@ -179,6 +179,20 @@ export function serveStatic(app: Express) {
     res.sendFile(path.resolve(distPath, "sw-clear.html"));
   });
 
+  // Fingerprinted Vite assets — long-lived immutable cache (filename changes each deploy).
+  app.use(
+    "/assets",
+    express.static(path.join(distPath, "assets"), {
+      index: false,
+      etag: true,
+      maxAge: "365d",
+      immutable: true,
+      setHeaders(res) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      },
+    }),
+  );
+
   app.use(express.static(distPath, { index: false }));
 
   // Use regex route so /media/* paths are structurally excluded — they can NEVER

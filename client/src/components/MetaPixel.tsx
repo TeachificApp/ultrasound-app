@@ -7,9 +7,10 @@
  *   - app.iheartecho.com          → ihe pixel
  *   - learn.allaboutultrasound.com → learn pixel
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { isLearnDomain, isIHeartEchoDomain } from "@/hooks/useSubdomain";
+import { deferUntilIdle } from "@/lib/deferUntilIdle";
 
 declare global {
   interface Window {
@@ -51,7 +52,11 @@ function injectPixel(pixelId: string) {
 }
 
 export function MetaPixel() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => deferUntilIdle(() => setReady(true)), []);
+
   const { data: pixelIds } = trpc.siteSettings.getPixelIds.useQuery(undefined, {
+    enabled: ready,
     staleTime: 1000 * 60 * 60, // cache for 1 hour
     retry: false,
   });
