@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { STATIC_NAVIGATOR_DATA } from "@/lib/navigatorStaticData";
+import { useAdminBrand } from "@/hooks/useAdminBrand";
+import BrandAdminBadge from "@/components/BrandAdminBadge";
 import {
   DndContext,
   closestCenter,
@@ -424,6 +426,7 @@ function SortableSectionCard({
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function NavigatorEditor() {
+  const adminBrand = useAdminBrand();
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const authLoading = false;
@@ -741,10 +744,17 @@ export default function NavigatorEditor() {
     <Layout>
       <div style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }} className="py-8">
         <div className="container">
-          <h1 className="text-2xl md:text-3xl font-black text-white" style={{ fontFamily: "Merriweather, serif" }}>
-            Navigator Editor
-          </h1>
-          <p className="text-[#4ad9e0] text-sm mt-1">Edit protocol checklists for all Navigator modules</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl md:text-3xl font-black text-white" style={{ fontFamily: "Merriweather, serif" }}>
+              Navigator Editor
+            </h1>
+            <BrandAdminBadge brand={adminBrand} />
+          </div>
+          <p className="text-[#4ad9e0] text-sm mt-1">
+            {adminBrand === "iheartecho"
+              ? "Edit echocardiography protocol checklists for Navigator modules"
+              : "Edit protocol checklists for all Navigator modules"}
+          </p>
         </div>
       </div>
 
