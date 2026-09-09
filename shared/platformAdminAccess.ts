@@ -3,7 +3,7 @@ import {
   resolvePlatformAdminEmail,
 } from "./platformAdminEmail";
 
-/** Accounts that must always have users.role=admin and platform_admin. */
+/** Accounts that must always have users.role=admin and platform_admin in user_roles. */
 export const PLATFORM_ADMIN_ACCOUNT_EMAILS = [DEFAULT_PLATFORM_ADMIN_EMAIL] as const;
 
 export function normalizePlatformAdminEmail(email: string): string {
