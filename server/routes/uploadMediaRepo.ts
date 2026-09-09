@@ -34,10 +34,11 @@ import {
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
 } from "@aws-sdk/client-s3";
-import { sdk } from "../_core/sdk";
+import { authenticatePlatformMediaAdmin } from "../lib/platformMediaAuth";
 import { getDb } from "../db";
-import { mediaAssets, mediaVersions, mediaUploadSessions, userRoles } from "../../drizzle/schema";
+import { mediaAssets, mediaVersions, mediaUploadSessions } from "../../drizzle/schema";
 import { detectBrandFromHostname } from "../../shared/brands";
+import { hasPlatformManagerAccess } from "../../shared/platformManagerAccess";
 
 export function buildInitialMediaVersionExtractionFields(params: {
   mediaType: string;
@@ -173,28 +174,7 @@ export function hasMediaRepositoryUploadAccess(
   accountRole: string | null | undefined,
   assignedRoles: string[],
 ): boolean {
-  return accountRole === "admin"
-    || assignedRoles.includes("platform_admin")
-    || assignedRoles.includes("platform_manager");
-}
-
-async function authenticateAdmin(req: Request): Promise<{ id: number; role: string } | null> {
-  try {
-    const user = await sdk.authenticateRequest(req) as any;
-    if (!user?.id) return null;
-    if (user.role === "admin") return user;
-
-    const db = await getDb();
-    if (!db) return null;
-    const assignedRoles = await db
-      .select({ role: userRoles.role })
-      .from(userRoles)
-      .where(eq(userRoles.userId, user.id));
-    if (hasMediaRepositoryUploadAccess(user.role, assignedRoles.map((row) => row.role))) {
-      return user;
-    }
-  } catch {}
-  return null;
+  return hasPlatformManagerAccess(accountRole ?? "", assignedRoles);
 }
 
 // Threshold: files above this use R2 multipart, below use Forge API single-shot
@@ -208,7 +188,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // ── /api/upload-media-repo/init ──────────────────────────────────────────────
 router.post("/api/upload-media-repo/init", async (req: Request, res: Response) => {
-  const user = await authenticateAdmin(req);
+  const user = await authenticatePlatformMediaAdmin(req);
   if (!user) {
     res.status(401).json({ error: "Unauthorized" }); return;
   }
@@ -328,7 +308,7 @@ router.post(
   upload.single("chunk"),
   async (req: Request, res: Response) => {
    try {
-    const user = await authenticateAdmin(req);
+    const user = await authenticatePlatformMediaAdmin(req);
     if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
     if (!req.file) { res.status(400).json({ error: "No chunk provided" }); return; }
@@ -658,7 +638,7 @@ router.post(
   "/api/upload-media-repo",
   uploadLegacy.single("file"),
   async (req: Request, res: Response) => {
-    const user = await authenticateAdmin(req);
+    const user = await authenticatePlatformMediaAdmin(req);
     if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
     if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
 
@@ -767,7 +747,7 @@ router.post(
 
 // ── Admin endpoint to trigger SCORM extraction for existing assets ───────────
 router.post("/api/upload-media-repo/extract-scorm", async (req: Request, res: Response) => {
-  const user = await authenticateAdmin(req);
+  const user = await authenticatePlatformMediaAdmin(req);
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const db = await getDb();
