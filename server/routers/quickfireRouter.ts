@@ -46,6 +46,7 @@ import {
   IHE_QUESTION_CATEGORIES,
   CROSS_BRAND_CATEGORIES,
   getBrandCategoryConfig,
+  getChallengeCategoriesForBrand,
 } from "../../shared/quickfireCategories";
 import { ensureTodaySet, parseDailySetIds } from "../lib/quickfireDailySet";
 
@@ -2643,18 +2644,21 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
     }),
 
   /** Admin: get next queued challenge + questions per category for card generator */
-  adminGetCardGeneratorData: adminProcedure.query(async () => {
+  adminGetCardGeneratorData: adminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const brand = ctx.brand as "aaus" | "iheartecho";
+    const categories = getChallengeCategoriesForBrand(brand);
 
     const results = await Promise.all(
-      (CHALLENGE_CATEGORIES as readonly string[]).map(async (cat) => {
+      categories.map(async (cat) => {
         const [challenge] = await db
           .select()
           .from(quickfireChallenges)
           .where(
             and(
               eq(quickfireChallenges.category, cat as any),
+              eq(quickfireChallenges.brand, brand),
               inArray(quickfireChallenges.status, ["queued", "scheduled", "live", "draft"] as any[])
             )
           )
@@ -2701,10 +2705,13 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
    */
   adminGetCardGeneratorForDate: adminProcedure
     .input(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { date } = input;
+      const brand = ctx.brand as "aaus" | "iheartecho";
+      const brandCfg = getBrandCategoryConfig(brand);
+      const categories = brandCfg.categories;
 
       // Helper: fetch full question rows by IDs
       async function fetchQuestions(ids: number[]) {
@@ -2728,7 +2735,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
       const [setRow] = await db
         .select()
         .from(quickfireDailySets)
-        .where(eq(quickfireDailySets.setDate, date))
+        .where(and(eq(quickfireDailySets.setDate, date), eq(quickfireDailySets.brand, brand)))
         .limit(1);
 
       // 2. Get challenges published on this date for titles
@@ -2738,19 +2745,20 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
         .where(
           and(
             eq(quickfireChallenges.publishDate, date),
+            eq(quickfireChallenges.brand, brand),
             inArray(quickfireChallenges.status, ["live", "archived"] as any[])
           )
         );
       const challengeByCategory = new Map(publishedChallenges.map((c) => [c.category as string, c]));
 
       if (setRow) {
-        const questionMap = parseDailySetIds(setRow.questionIds);
+        const questionMap = parseDailySetIds(setRow.questionIds, brand);
         const allIds = Object.values(questionMap).filter((id): id is number => id !== null);
         const allQuestions = await fetchQuestions(allIds);
         const qMap = new Map(allQuestions.map((q) => [q.id, q]));
 
-        const results = (CHALLENGE_CATEGORIES as readonly string[]).map((cat) => {
-          const key = CAT_KEY[cat as ChallengeCategory] ?? cat.toLowerCase();
+        const results = categories.map((cat) => {
+          const key = brandCfg.catKey[cat] ?? cat.toLowerCase();
           const qId = questionMap[key] ?? null;
           const q = qId !== null ? qMap.get(qId) : undefined;
           const challenge = challengeByCategory.get(cat) ?? null;
@@ -2791,9 +2799,10 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
    * Admin: list dates that have daily sets or published challenges, up to 30 days back.
    * Returns array of YYYY-MM-DD strings in descending order (newest first).
    */
-  adminListCardGeneratorDates: adminProcedure.query(async () => {
+  adminListCardGeneratorDates: adminProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const brand = ctx.brand as "aaus" | "iheartecho";
 
     const today = todayDateStr();
     const cutoffDate = new Date();
@@ -2803,11 +2812,18 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
     const [setRows, challengeRows] = await Promise.all([
       db.select({ setDate: quickfireDailySets.setDate })
         .from(quickfireDailySets)
-        .where(and(gte(quickfireDailySets.setDate, cutoff), lte(quickfireDailySets.setDate, today))),
+        .where(
+          and(
+            eq(quickfireDailySets.brand, brand),
+            gte(quickfireDailySets.setDate, cutoff),
+            lte(quickfireDailySets.setDate, today)
+          )
+        ),
       db.select({ publishDate: quickfireChallenges.publishDate })
         .from(quickfireChallenges)
         .where(
           and(
+            eq(quickfireChallenges.brand, brand),
             inArray(quickfireChallenges.status, ["live", "archived"] as any[]),
             gte(quickfireChallenges.publishDate, cutoff),
             lte(quickfireChallenges.publishDate, today)

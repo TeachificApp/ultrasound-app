@@ -69,6 +69,8 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import CaseEditorDialog from "@/components/CaseEditorDialog";
 import { formatViewCount } from "@/lib/caseViewCount";
+import { useAdminBrand } from "@/hooks/useAdminBrand";
+import BrandAdminBadge from "@/components/BrandAdminBadge";
 
 type TabType = "pending" | "all" | "analytics";
 
@@ -553,6 +555,7 @@ function CaseViewAnalytics() {
 export default function AdminCaseManagement() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated } = useAuth();
+  const adminBrand = useAdminBrand();
   const utils = trpc.useUtils();
 
   const [tab, setTab] = useState<TabType>("pending");
@@ -882,10 +885,17 @@ export default function AdminCaseManagement() {
               <ChevronLeft className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-                Case Management
-              </h1>
-              <p className="text-xs text-gray-400">Review and approve member-submitted ultrasound cases</p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
+                  Case Management
+                </h1>
+                <BrandAdminBadge brand={adminBrand} />
+              </div>
+              <p className="text-xs text-gray-400">
+                {adminBrand === "iheartecho"
+                  ? "Review and approve member-submitted echocardiography cases"
+                  : "Review and approve member-submitted ultrasound cases"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
