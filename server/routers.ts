@@ -375,7 +375,10 @@ export const appRouter = router({
         context: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const { userHasPlatformMediaAccess } = await import("./lib/platformMediaAuth");
+        if (!(await userHasPlatformMediaAccess(ctx.user.id, ctx.user.role))) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
+        }
         // Strip data URI prefix by finding the ";base64," marker.
         // Mime type may contain semicolons and commas
         // (e.g. "data:audio/webm;codecs=opus;base64,...")

@@ -41,6 +41,7 @@ describe("Media Repository upload authorization", () => {
   it("allows account-level and assigned Platform Admin upload access", () => {
     expect(hasMediaRepositoryUploadAccess("admin", [])).toBe(true);
     expect(hasMediaRepositoryUploadAccess("user", ["platform_admin"])).toBe(true);
+    expect(hasMediaRepositoryUploadAccess("user", ["platform_owner"])).toBe(true);
   });
 
   it("allows the limited Platform Manager content-creation role to upload media", () => {
