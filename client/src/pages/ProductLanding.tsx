@@ -24,6 +24,7 @@ import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { PURCHASE_ACCESS_LABEL, productAccessHref } from "@/lib/accessCta";
 import React, { useState, useEffect, useRef } from "react";
 import { ImageLinkWrapper, BlockPreview, type Block } from "@/components/BlockPreview";
+import { useDirectCheckout } from "@/lib/directCheckout";
 import { MathContent } from "@/components/MathContent";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 import { resolveScheduledCountdownTarget } from "@shared/platformTime";
@@ -100,8 +101,9 @@ const CC = ({ children, className = "", ...rest }: React.HTMLAttributes<HTMLDivE
 );
 
 // ─── Block Renderer ───────────────────────────────────────────────────────────
-function RenderBlock({ block, onBuy, buying, price, slug, hasPurchased }: {
+function RenderBlock({ block, onBuy, buying, price, slug, hasPurchased, onDirectCheckout }: {
   block: Block; onBuy: () => void; buying: boolean; price: string; slug: string; hasPurchased?: boolean;
+  onDirectCheckout?: (productType: string, productId: number, promoCode?: string) => void | Promise<void>;
 }) {
   const d = block.data;
   switch (block.type) {
@@ -306,7 +308,7 @@ function RenderBlock({ block, onBuy, buying, price, slug, hasPurchased }: {
     }
     default:
       // Delegate all other block types to the shared BlockPreview renderer
-      return <BlockPreview block={block} />;
+      return <BlockPreview block={block} onEnroll={onBuy} onCheckoutPage={onBuy} onDirectCheckout={onDirectCheckout} />;
   }
 }
 
@@ -382,6 +384,7 @@ export default function ProductLanding() {
   );
   const { runGuarded, isGuarded } = useCheckoutClickGuard();
   const buying = checkoutMut.isPending || isGuarded;
+  const handleDirectCheckout = useDirectCheckout();
 
   // Workshop redirect: if the physical product is not found or archived, check if there's a workshop with the same slug.
   // IMPORTANT: must be declared before any early returns to satisfy React hooks rules.
@@ -478,7 +481,7 @@ export default function ProductLanding() {
         <div className="min-h-screen bg-white">
           {blocks.map(block => (
             <div key={block.id}>
-              <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={displayPrice} slug={slug!} hasPurchased={hasPurchased} />
+              <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={displayPrice} slug={slug!} hasPurchased={hasPurchased} onDirectCheckout={handleDirectCheckout} />
             </div>
           ))}
           <div className="max-w-2xl mx-auto px-4 py-12">
@@ -523,7 +526,7 @@ export default function ProductLanding() {
       <div className="min-h-screen bg-white">
         {blocks.map(block => (
           <div key={block.id}>
-            <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={displayPrice} slug={slug!} hasPurchased={hasPurchased} />
+            <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={displayPrice} slug={slug!} hasPurchased={hasPurchased} onDirectCheckout={handleDirectCheckout} />
           </div>
         ))}
         {/* Pricing options selector below blocks if multiple options */}

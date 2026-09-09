@@ -14,7 +14,7 @@ import { Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import { ButtonSubtext } from "@/lib/ctaSubtext";
-import { handleCtaBtnClick } from "@/lib/ctaUtils";
+import { ctaCheckoutDataAttrs, handleCtaBtnClick, type DirectCheckoutHandler } from "@/lib/ctaUtils";
 import { applyVideoTrim } from "@/lib/videoTrim";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 import {
@@ -124,9 +124,11 @@ export const CC = ({ children, className = "", ...rest }: React.HTMLAttributes<H
   <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${className}`.trim()} {...rest}>{children}</div>
 );
 
-export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnroll, onCheckoutPage }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number; onEnroll?: (...args: any[]) => void; onCheckoutPage?: (...args: any[]) => void }) {
+export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnroll, onCheckoutPage, onDirectCheckout }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number; onEnroll?: (...args: any[]) => void; onCheckoutPage?: (...args: any[]) => void; onDirectCheckout?: DirectCheckoutHandler }) {
   const { user } = useAuth();
   const d = block.data ?? {};
+  const handleBlockCtaClick = (e: React.MouseEvent<HTMLElement>) =>
+    handleCtaBtnClick(e, onEnroll, undefined, onCheckoutPage, undefined, onDirectCheckout);
   // Pre-compute pass-through URL for url_embed blocks (hooks must be at top level, not inside switch)
   const urlEmbedSrc = useMemo(() => {
     if (block.type !== "url_embed") return "";
@@ -198,7 +200,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         <div
           className="relative px-4 sm:px-8 py-10 sm:py-16 overflow-hidden w-full box-border"
           style={{ ...heroBg, ...heroTopBorderStyle, ...heroBottomBorderStyle, color: d.textColor ?? "#fff", textAlign: hasInlineMedia && isHorizontal ? "left" as const : (d.align ?? "left"), cursor: heroClickHandler ? "pointer" : undefined, minHeight: `${heroMinHeight}px`, ...(heroMaxHeight ? { maxHeight: heroMaxHeight, overflow: "hidden" } : {}) }}
-          onClick={e => { handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage); if (!( e.target as HTMLElement).closest('[data-cta-btn]')) heroClickHandler?.(); }}
+          onClick={e => { handleBlockCtaClick(e as React.MouseEvent<HTMLElement>); if (!( e.target as HTMLElement).closest('[data-cta-btn]')) heroClickHandler?.(); }}
         >
           {bgType === "video" && d.videoUrl && (
             <video autoPlay muted loop playsInline className="absolute inset-0 w-full h-full object-cover opacity-60"><source src={d.videoUrl} /></video>
@@ -228,6 +230,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                       data-soldout-override={(btn as any).soldOutOverrideUrl || undefined}
                       data-product-type={(btn as any).behavior === "free_enrollment" ? ((btn as any).freeEnrollProductType ?? "membership") : undefined}
                       data-product-id={(btn as any).behavior === "free_enrollment" ? ((btn as any).freeEnrollProductId ?? "") : undefined}
+                      {...ctaCheckoutDataAttrs({ checkoutProductType: (btn as any).checkoutProductType, checkoutProductId: (btn as any).checkoutProductId, checkoutPromoCode: (btn as any).checkoutPromoCode })}
                       className={`px-5 sm:px-8 py-2.5 sm:py-3 rounded-lg font-semibold text-base sm:text-lg shadow-lg w-full sm:w-auto cursor-pointer ${btn.animation && btn.animation !== "none" ? `animate-${btn.animation}-btn` : ""}`}
                       style={btn.style === "outline" ? { backgroundColor: "transparent", color: btn.color, border: `2px solid ${btn.color}` } : { backgroundColor: btn.color, color: btn.textColor }}>
                       {btn.text}
@@ -261,7 +264,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         const html = d.html ?? "";
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}>
+          onClick={handleBlockCtaClick}>
           <CC style={{ textAlign: d.align ?? "left" }}>
             <MathContent
               html={html}
@@ -610,6 +613,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           data-action={pricingCtaBeh}
           data-link={pricingCtaBeh === "url" ? (d.ctaUrl ?? "") : undefined}
           data-soldout-override={d.soldOutOverrideUrl || undefined}
+          {...ctaCheckoutDataAttrs({ checkoutProductType: d.checkoutProductType, checkoutProductId: d.checkoutProductId, checkoutPromoCode: d.checkoutPromoCode })}
           className={`inline-block px-10 py-4 rounded-xl font-bold text-lg shadow-lg cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
           style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
         >
@@ -617,7 +621,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         </button>
       );
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC className="text-center">
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#fff" }} onClick={handleBlockCtaClick}><CC className="text-center">
           {d.headline && <h2 className="text-3xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6 max-w-xl mx-auto" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {priceAbove && priceBlock}
@@ -631,7 +635,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
     case "cta_standalone": {
       const standaloneCtaBeh = d.ctaBehavior ?? (d.ctaLink && d.ctaLink.startsWith("http") ? "url" : "direct_checkout");
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC style={{ textAlign: d.align ?? "center" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={handleBlockCtaClick}><CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -643,6 +647,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             data-action={standaloneCtaBeh}
             data-link={standaloneCtaBeh === "url" ? (d.ctaLink ?? "") : undefined}
             data-soldout-override={d.soldOutOverrideUrl || undefined}
+            {...ctaCheckoutDataAttrs({ checkoutProductType: d.checkoutProductType, checkoutProductId: d.checkoutProductId, checkoutPromoCode: d.checkoutPromoCode })}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
           >{d.ctaText ?? "Get Started"}</button>
@@ -683,7 +688,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
     case "cta_optin": {
       const optinCtaBeh = d.ctaBehavior ?? "direct_checkout";
       return (
-        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC style={{ textAlign: d.align ?? "center" }}>
+        <div className="py-8 sm:py-12" style={{ backgroundColor: d.bgColor ?? "#f0fafa" }} onClick={handleBlockCtaClick}><CC style={{ textAlign: d.align ?? "center" }}>
           {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-gray-600 mb-6" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {(d.showStrikethrough && d.strikethroughPrice) && (
@@ -699,6 +704,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             data-action={optinCtaBeh}
             data-link={optinCtaBeh === "url" ? (d.ctaLink ?? "") : undefined}
             data-soldout-override={d.soldOutOverrideUrl || undefined}
+            {...ctaCheckoutDataAttrs({ checkoutProductType: d.checkoutProductType, checkoutProductId: d.checkoutProductId, checkoutPromoCode: d.checkoutPromoCode })}
             className={`inline-block px-8 py-3 rounded-lg font-semibold shadow cursor-pointer ${d.ctaAnimation && d.ctaAnimation !== "none" ? `animate-${d.ctaAnimation}-btn` : ""}`}
             style={{ backgroundColor: d.ctaColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
           >{d.ctaText ?? "Get Access"}</button>
@@ -742,8 +748,8 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       );
     }
     case "urgency_offer": {
-      if (onEnroll || onCheckoutPage) {
-        return <UrgencyOfferLiveBlock d={d} onEnroll={onEnroll} onCheckoutPage={onCheckoutPage} />;
+      if (onEnroll || onCheckoutPage || onDirectCheckout) {
+        return <UrgencyOfferLiveBlock d={d} onEnroll={onEnroll} onCheckoutPage={onCheckoutPage} onDirectCheckout={onDirectCheckout} />;
       }
       const cMode = d.countdownMode ?? "on_load";
       const cUnits = cMode === "event" ? ["Days", "Hours", "Minutes", "Seconds"] : ["Hours", "Minutes", "Seconds"];
@@ -998,7 +1004,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       };
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC>
+          onClick={handleBlockCtaClick}><CC>
           <div className="flex flex-col md:flex-row gap-8 items-center">
             <div className="min-w-0" style={{ flex: `${d.leftRatio ?? 50} 1 0%` }}>{renderCol("left")}</div>
             <div className="min-w-0" style={{ flex: `${100 - (d.leftRatio ?? 50)} 1 0%` }}>{renderCol("right")}</div>
@@ -1010,7 +1016,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const cols = d.columns ?? [{ html: "" }, { html: "" }];
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC>
+          onClick={handleBlockCtaClick}><CC>
           <div className="grid" style={{ gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: `${d.gap ?? 32}px` }}>
             {cols.map((col: any, i: number) => (
               <div key={i} className="prose" dangerouslySetInnerHTML={{ __html: col.html ?? "" }} />
@@ -1023,7 +1029,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const divStyle = d.showDividers ? { borderRightWidth: `${d.dividerWidth ?? 1}px`, borderRightStyle: d.dividerStyle ?? "solid", borderRightColor: d.dividerColor ?? "#e5e7eb", borderRadius: d.dividerRadius ? `${d.dividerRadius}px` : undefined } : {};
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff" }}
-          onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}><CC>
+          onClick={handleBlockCtaClick}><CC>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-stretch">
             <div className="prose prose-sm pr-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col1Html ?? "" }} />
             <div className="prose prose-sm px-4" style={divStyle} dangerouslySetInnerHTML={{ __html: d.col2Html ?? "" }} />
@@ -1461,10 +1467,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         if (beh === "scroll_to_section" && tier.ctaScrollAnchor) attrs["data-anchor"] = tier.ctaScrollAnchor;
         if (beh === "open_popup" && tier.ctaPopupUrl) attrs["data-popup"] = tier.ctaPopupUrl;
         if (beh === "download_file" && tier.ctaDownloadUrl) attrs["data-download"] = tier.ctaDownloadUrl;
+        Object.assign(attrs, ctaCheckoutDataAttrs({ checkoutProductType: tier.checkoutProductType, checkoutProductId: tier.checkoutProductId }));
         return attrs;
       };
       return (
-        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }}><CC>
+        <div className="py-8 sm:py-10" style={{ backgroundColor: d.bgColor ?? "#f8fffe" }} onClick={handleBlockCtaClick}><CC>
           {d.headline && <h2 className="text-2xl font-bold mb-2 text-center text-gray-900" dangerouslySetInnerHTML={{ __html: d.headline }} />}
           {d.subtext && <p className="text-center text-gray-500 mb-8 text-sm" dangerouslySetInnerHTML={{ __html: d.subtext }} />}
           {!d.subtext && d.headline && <div className="mb-8" />}
@@ -2241,10 +2248,12 @@ function UrgencyOfferLiveBlock({
   d,
   onEnroll,
   onCheckoutPage,
+  onDirectCheckout,
 }: {
   d: Record<string, any>;
   onEnroll?: () => void;
   onCheckoutPage?: (pricingOptionId?: number) => void;
+  onDirectCheckout?: DirectCheckoutHandler;
 }) {
   const countdownMode: "on_load" | "event" = d.countdownMode === "event" ? "event" : "on_load";
   const targetDate = d.countdownTargetDate || d.targetDate;
@@ -2262,7 +2271,7 @@ function UrgencyOfferLiveBlock({
     <div
       className={`px-8 py-10 ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`}
       style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.accentColor ?? "#179ca3") : undefined }}
-      onClick={e => handleCtaBtnClick(e as React.MouseEvent<HTMLElement>, onEnroll, undefined, onCheckoutPage)}
+      onClick={(e) => handleCtaBtnClick(e, onEnroll, undefined, onCheckoutPage, undefined, onDirectCheckout)}
     >
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
@@ -2297,6 +2306,7 @@ function UrgencyOfferLiveBlock({
               data-popup={ctaBehavior === "open_popup" ? (d.ctaPopupUrl ?? "") : undefined}
               data-download={ctaBehavior === "download_file" ? (d.ctaDownloadUrl ?? "") : undefined}
               data-pricing-option={ctaBehavior === "pricing_option" && d.ctaPricingOptionId ? String(d.ctaPricingOptionId) : undefined}
+              {...ctaCheckoutDataAttrs({ checkoutProductType: d.checkoutProductType, checkoutProductId: d.checkoutProductId, checkoutPromoCode: d.checkoutPromoCode })}
               className="inline-flex items-center gap-2 px-10 py-4 rounded-xl font-bold text-lg shadow-lg cursor-pointer"
               style={{ backgroundColor: d.ctaColor ?? d.accentColor ?? "#179ca3", color: d.ctaTextColor ?? "#fff" }}
             >

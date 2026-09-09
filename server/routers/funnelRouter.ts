@@ -12,6 +12,36 @@ import { eq, and, asc, desc, sql, inArray, or, like, isNotNull, gte } from "driz
 import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEngine";
 import { computeFunnelCheckoutTotalCents } from "../lib/checkoutPricing";
 import { getStripeClient } from "../lib/stripeClient";
+import { isScheduledDeadlineOpen } from "../../shared/platformTime";
+
+/** Pick the next purchasable workshop instance for direct-checkout redirects. */
+function pickWorkshopCheckoutInstance(instances: Array<{
+  id: number;
+  availableForPurchase: boolean;
+  status: string;
+  salesOpenDate: Date | null;
+  salesCloseDate: Date | null;
+  enrollmentCloseDate?: Date | null;
+  startDate: Date;
+  timezone?: string | null;
+  capacity?: number | null;
+  enrolledCount?: number | null;
+}>) {
+  const now = new Date();
+  const onSale = instances.filter((instance) => {
+    if (!instance.availableForPurchase) return false;
+    if (instance.status !== "published" && instance.status !== "presale") return false;
+    if (instance.salesOpenDate && now < instance.salesOpenDate) return false;
+    const closeDate = instance.salesCloseDate ?? instance.enrollmentCloseDate ?? instance.startDate;
+    if (!isScheduledDeadlineOpen(closeDate, instance.timezone, now)) return false;
+    if (instance.capacity != null && (instance.enrolledCount ?? 0) >= instance.capacity) return false;
+    return true;
+  });
+  return onSale.find(i => i.startDate && new Date(i.startDate) >= now)
+    ?? onSale.find(i => i.status === "published" || i.status === "presale")
+    ?? onSale[0]
+    ?? null;
+}
 
 function slugify(text: string): string {
   return text
@@ -1793,7 +1823,7 @@ export const funnelPublicRouter = router({
   createDirectCheckout: publicProcedure
     .input(
       z.object({
-        productType: z.enum(["course", "quiz", "cohort", "download", "product", "bundle"]),
+        productType: z.enum(["course", "quiz", "cohort", "download", "product", "bundle", "workshop", "webinar", "membership"]),
         productId: z.number().int().positive(),
         origin: z.string(),
         email: z.string().email().optional(),
@@ -1805,6 +1835,56 @@ export const funnelPublicRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      // Embedded checkout pages — redirect instead of hosted Stripe session
+      if (input.productType === "workshop") {
+        const [workshop] = await db.select({ id: workshops.id, slug: workshops.slug, isFree: workshops.isFree })
+          .from(workshops).where(eq(workshops.id, input.productId)).limit(1);
+        if (!workshop) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop not found" });
+        if (workshop.isFree) throw new TRPCError({ code: "BAD_REQUEST", message: "Workshop is free — use free enrollment" });
+        const instances = await db.select({
+          id: workshopInstances.id,
+          availableForPurchase: workshopInstances.availableForPurchase,
+          status: workshopInstances.status,
+          salesOpenDate: workshopInstances.salesOpenDate,
+          salesCloseDate: workshopInstances.salesCloseDate,
+          enrollmentCloseDate: workshopInstances.enrollmentCloseDate,
+          startDate: workshopInstances.startDate,
+          timezone: workshopInstances.timezone,
+          capacity: workshopInstances.capacity,
+          enrolledCount: workshopInstances.enrolledCount,
+        }).from(workshopInstances).where(eq(workshopInstances.workshopId, workshop.id)).orderBy(asc(workshopInstances.startDate));
+        const instance = pickWorkshopCheckoutInstance(instances);
+        if (!instance) throw new TRPCError({ code: "BAD_REQUEST", message: "No available workshop dates. Please check back later." });
+        return {
+          checkoutUrl: `${input.origin}/checkout/workshop/${workshop.slug}?instance=${instance.id}`,
+          freeSuccess: false,
+          successUrl: null,
+        };
+      }
+      if (input.productType === "webinar") {
+        const [webinar] = await db.select({ id: webinars.id, slug: webinars.slug, isFree: webinars.isFree })
+          .from(webinars).where(eq(webinars.id, input.productId)).limit(1);
+        if (!webinar) throw new TRPCError({ code: "NOT_FOUND", message: "Webinar not found" });
+        if (webinar.isFree) throw new TRPCError({ code: "BAD_REQUEST", message: "Webinar is free — use free enrollment" });
+        return {
+          checkoutUrl: `${input.origin}/checkout/${webinar.slug}?type=webinar`,
+          freeSuccess: false,
+          successUrl: null,
+        };
+      }
+      if (input.productType === "membership") {
+        const [plan] = await db.select({ id: membershipPlans.id, slug: membershipPlans.slug, price: membershipPlans.price })
+          .from(membershipPlans).where(eq(membershipPlans.id, input.productId)).limit(1);
+        if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+        if (!plan.price || Number(plan.price) === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Membership is free — use free enrollment" });
+        return {
+          checkoutUrl: `${input.origin}/checkout/${plan.slug}?type=membership`,
+          freeSuccess: false,
+          successUrl: null,
+        };
+      }
+
       const stripe = getStripeClient();
       // ── Resolve product details ──────────────────────────────────────────────
       let productName = "";
