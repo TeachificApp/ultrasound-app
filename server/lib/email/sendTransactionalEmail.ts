@@ -1,21 +1,34 @@
-import { getEmailProviderId, isEmailProviderConfigured, resolveEmailSender } from "./providerConfig";
+import {
+  getEmailProviderId,
+  isEmailProviderConfigured,
+  resolveEffectiveEmailProvider,
+  resolveEmailSender,
+} from "./providerConfig";
 import { sendViaSendGrid } from "./providers/sendgrid";
 import { sendViaSmtpCom } from "./providers/smtpcom";
 import type { SendEmailOptions } from "./types";
 
 export async function sendTransactionalEmail(opts: SendEmailOptions): Promise<boolean> {
-  if (!isEmailProviderConfigured()) {
-    const provider = getEmailProviderId();
+  const preferred = getEmailProviderId();
+  const provider = resolveEffectiveEmailProvider();
+
+  if (!isEmailProviderConfigured() || !provider) {
     const hint =
-      provider === "smtpcom"
-        ? "SMTPCOM_API_KEY and SMTPCOM_CHANNEL"
-        : "SENDGRID_API_KEY";
-    console.warn(`[email] ${hint} not set — skipping email send (provider=${provider})`);
+      preferred === "smtpcom"
+        ? "SMTPCOM_API_KEY and SMTPCOM_CHANNEL (or SENDGRID_API_KEY fallback)"
+        : "SENDGRID_API_KEY (or SMTPCOM credentials fallback)";
+    console.warn(`[email] No email provider configured — skipping send (preferred=${preferred})`);
+    console.warn(`[email] Set ${hint}`);
     return false;
   }
 
-  const provider = getEmailProviderId();
-  const sender = resolveEmailSender(opts);
+  if (provider !== preferred) {
+    console.warn(
+      `[email] Preferred provider "${preferred}" is not fully configured — falling back to "${provider}"`,
+    );
+  }
+
+  const sender = resolveEmailSender({ ...opts, provider });
 
   try {
     const result =

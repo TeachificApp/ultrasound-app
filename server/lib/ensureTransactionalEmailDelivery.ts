@@ -24,7 +24,8 @@ const emptySuppressionStatus = (): SendGridSuppressionStatus => ({
 /**
  * Auth emails (magic link, password reset) must deliver even if the address was
  * previously unsubscribed or bounced. Clear SendGrid suppressions when the user
- * explicitly requests a sign-in email (SendGrid provider only).
+ * explicitly requests a sign-in email when SendGrid is the effective provider
+ * (including SendGrid fallback when SMTP.com is preferred but not configured).
  */
 export async function ensureTransactionalEmailDelivery(
   deliveryEmail: string,
