@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cohort Group Student Guide</title>
+  <style>
+    :root {
+      --teal: #179ca3;
+      --teal-dark: #0d7a80;
+      --ink: #1f2937;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --bg: #f8fafc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
+      line-height: 1.55;
+      margin: 0;
+      padding: 0;
+      background: white;
+    }
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 56px;
+    }
+    .cover {
+      text-align: center;
+      padding: 36px 0 48px;
+      border-bottom: 3px solid var(--teal);
+      margin-bottom: 36px;
+    }
+    .cover .brand {
+      color: var(--teal);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .cover h1 {
+      font-size: 32px;
+      line-height: 1.2;
+      margin: 0 0 12px;
+      color: var(--ink);
+    }
+    .cover p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+    h2 {
+      color: var(--teal-dark);
+      font-size: 22px;
+      margin: 36px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #d1fae5;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 16px;
+      margin: 20px 0 8px;
+      color: var(--ink);
+      page-break-after: avoid;
+    }
+    p, li { font-size: 14px; }
+    p { margin: 0 0 10px; }
+    ul, ol { margin: 8px 0 16px; padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    .callout {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      border-left: 4px solid var(--teal);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .callout strong { color: var(--teal-dark); }
+    .steps {
+      counter-reset: step;
+      list-style: none;
+      padding-left: 0;
+    }
+    .steps li {
+      counter-increment: step;
+      position: relative;
+      padding-left: 40px;
+      margin-bottom: 14px;
+    }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--teal);
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .url {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      word-break: break-all;
+      margin: 8px 0 14px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 18px;
+      font-size: 13px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f0fdfa;
+      color: var(--teal-dark);
+      font-weight: 600;
+    }
+    .toc {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 22px;
+      margin-bottom: 28px;
+    }
+    .toc h2 { margin-top: 0; border: none; font-size: 18px; }
+    .toc ol { margin-bottom: 0; }
+    .footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+    @media print {
+      .page { padding: 32px 40px; }
+      h2 { page-break-before: auto; }
+      .section { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="cover">
+      <div class="brand">All About Ultrasound™ | iHeartEcho™ Learning Platform</div>
+      <h1>Cohort Group Student Guide</h1>
+      <p>How to sign in, join live sessions, participate in group discussions, and watch session replays</p>
+    </div>
+
+    <div class="toc section">
+      <h2>Contents</h2>
+      <ol>
+        <li>Getting started — accessing the learning site</li>
+        <li>Finding your cohort course</li>
+        <li>Opening your cohort hub</li>
+        <li>Live sessions</li>
+        <li>Group discussions</li>
+        <li>Replay videos</li>
+        <li>Quick reference &amp; troubleshooting</li>
+      </ol>
+    </div>
+
+    <div class="callout">
+      <strong>Important:</strong> Cohort courses (live sessions, discussions, and replays) are accessed on the
+      <strong>Learning Platform</strong> at <strong>learn.allaboutultrasound.com</strong>.
+      Use this site — not the clinical app — for your cohort activities.
+    </div>
+
+    <h2>1. Getting started — accessing the learning site</h2>
+
+    <h3>Sign in</h3>
+    <ol class="steps">
+      <li>Open your web browser (Chrome, Safari, Firefox, or Edge recommended).</li>
+      <li>Go to the sign-in page:</li>
+    </ol>
+    <div class="url">https://learn.allaboutultrasound.com/login</div>
+    <ol class="steps" start="3">
+      <li>Sign in using one of these methods:
+        <ul>
+          <li><strong>Password:</strong> Enter your email and password, then click <strong>Sign in with password</strong>.</li>
+          <li><strong>Magic link:</strong> Choose <strong>Send Magic Link</strong>, enter your email, then click the link sent to your inbox (valid for 15 minutes).</li>
+        </ul>
+      </li>
+      <li>If you are new, click <strong>Create an account</strong> and complete registration.</li>
+      <li>Forgot your password? Use <strong>Forgot password?</strong> on the login page to reset it by email.</li>
+    </ol>
+
+    <h3>One-click access from your enrollment email</h3>
+    <p>After you enroll, you may receive a welcome email with a <strong>direct access link</strong>. Click that link to sign in automatically and go straight to your course — no separate login step required.</p>
+
+    <h2>2. Finding your cohort course</h2>
+    <ol class="steps">
+      <li>After signing in, open <strong>My Dashboard</strong>:</li>
+    </ol>
+    <div class="url">https://learn.allaboutultrasound.com/my-dashboard</div>
+    <ol class="steps" start="2">
+      <li>Select the <strong>My Content</strong> tab (if not already selected).</li>
+      <li>Under <strong>Courses</strong>, find your cohort course card.</li>
+      <li>Click <strong>Continue Learning</strong> to open the course player, or <strong>Overview</strong> for the course summary page.</li>
+    </ol>
+
+    <div class="callout">
+      If you already purchased the course, the course landing page may show a banner:
+      <em>“You already have access to this content.”</em> Click <strong>Continue Learning</strong> there as well.
+    </div>
+
+    <h2>3. Opening your cohort hub</h2>
+    <p>Your <strong>cohort hub</strong> is where live sessions, discussions, replays, assignments, and resources for your group are organized.</p>
+
+    <h3>Three ways to get there</h3>
+    <table>
+      <thead>
+        <tr><th>From</th><th>What to click</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Course player</strong><br><small>Left sidebar while viewing lessons</small></td>
+          <td>Click <strong>My Cohort</strong> (calendar icon)</td>
+        </tr>
+        <tr>
+          <td><strong>Course overview</strong></td>
+          <td>Click the top tab <strong>My Cohort</strong></td>
+        </tr>
+        <tr>
+          <td><strong>Direct link</strong><br><small>Your school may share this URL</small></td>
+          <td><code>/cohort/[course-id]</code> on learn.allaboutultrasound.com</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>At the top of your cohort hub you will see:</p>
+    <ul>
+      <li>Your <strong>course name</strong> and a <strong>Cohort</strong> badge</li>
+      <li>Your <strong>cohort group name</strong> (for example, “September 2026”)</li>
+      <li>Counts for upcoming sessions, past sessions, assignments, and recordings</li>
+    </ul>
+
+    <h3>Main tabs in your cohort hub</h3>
+    <table>
+      <thead>
+        <tr><th>Tab</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Live Sessions</strong></td><td>Schedule and join live classes</td></tr>
+        <tr><td><strong>Calendar</strong></td><td>Month/week/day view; download calendar file</td></tr>
+        <tr><td><strong>Assignments</strong></td><td>Cohort assignments from your instructor</td></tr>
+        <tr><td><strong>Replays</strong></td><td>Recorded session videos</td></tr>
+        <tr><td><strong>Resources</strong></td><td>Downloads and reference materials</td></tr>
+        <tr><td><strong>Discussions</strong></td><td>Private group discussion thread</td></tr>
+      </tbody>
+    </table>
+
+    <h2>4. Live sessions</h2>
+
+    <h3>View your schedule</h3>
+    <ol class="steps">
+      <li>Open your cohort hub (see Section 3).</li>
+      <li>Click the <strong>Live Sessions</strong> tab.</li>
+      <li>Review <strong>Upcoming</strong> sessions and <strong>Past Sessions</strong>.</li>
+    </ol>
+
+    <h3>Add sessions to your personal calendar</h3>
+    <p>On an upcoming session card, click <strong>Add to Google Calendar</strong>, or open the <strong>Calendar</strong> tab and use <strong>Download ICS</strong> to import all sessions into Outlook, Apple Calendar, or another app.</p>
+
+    <h3>Join a live session</h3>
+    <ol class="steps">
+      <li>Return to <strong>Live Sessions</strong> shortly before class.</li>
+      <li>When the join window opens, the session card shows <strong>Live Now</strong> (green).</li>
+      <li>Click <strong>Join Live Session</strong> or <strong>Join Now</strong>.</li>
+      <li>Your browser opens the meeting (Zoom, Teams, or the link provided by your instructor) in a new tab.</li>
+    </ol>
+
+    <div class="callout">
+      <strong>Join window:</strong> The <strong>Join Live Session</strong> button becomes available
+      <strong>15 minutes before</strong> the scheduled start time and stays available until the session ends.
+      Before that window, the button may show <em>“Join Live Session (opens 15 min before)”</em>.
+    </div>
+
+    <h3>If a recording is attached to a past session</h3>
+    <p>Some past session cards include <strong>Watch Recording</strong>, which opens the recording directly. Session replays are also collected in the <strong>Replays</strong> tab (Section 6).</p>
+
+    <h2>5. Group discussions</h2>
+
+    <p>Cohort <strong>Discussions</strong> are private to your assigned cohort group. They are separate from the public Community area on the platform.</p>
+
+    <h3>How to participate</h3>
+    <ol class="steps">
+      <li>Open your cohort hub.</li>
+      <li>Click the <strong>Discussions</strong> tab.</li>
+      <li>Read posts from classmates and instructors.</li>
+      <li>Type in the composer (<em>“Share something with your cohort…”</em>).</li>
+      <li>Optionally click <strong>+ Add Image/Video</strong> to attach media.</li>
+      <li>Click <strong>Post</strong> to publish your message.</li>
+    </ol>
+
+    <h3>Notifications</h3>
+    <p>Use the <strong>Notifications On</strong> / <strong>Notifications Off</strong> toggle at the top of the Discussions tab to control email alerts for new posts in your group.</p>
+
+    <h3>If discussions are not available</h3>
+    <table>
+      <thead>
+        <tr><th>Message you see</th><th>What it means</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><em>“You are not assigned to a cohort group yet.”</em></td>
+          <td>You are enrolled in the course but not placed in a group yet. Contact your program administrator.</td>
+        </tr>
+        <tr>
+          <td><em>“No discussions yet. Be the first to post!”</em></td>
+          <td>Your group is ready — start the conversation.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>6. Replay videos</h2>
+
+    <h3>Browse replays</h3>
+    <ol class="steps">
+      <li>Open your cohort hub.</li>
+      <li>Click the <strong>Replays</strong> tab.</li>
+      <li>Browse recordings in <strong>grid</strong> or <strong>list</strong> view.</li>
+      <li>Each card shows the title, linked session name, date, and duration.</li>
+    </ol>
+
+    <h3>Watch a replay</h3>
+    <ol class="steps">
+      <li>Click any recording card.</li>
+      <li>The replay player page opens with the video, title, and session details.</li>
+      <li>Your watch progress is saved automatically.</li>
+      <li>Click <strong>Back to Replays</strong> to return to the full list.</li>
+    </ol>
+
+    <div class="callout">
+      If the <strong>Replays</strong> tab is empty, your instructor has not published recordings yet.
+      Check back after live sessions — replays appear here once uploaded.
+    </div>
+
+    <h2>7. Quick reference &amp; troubleshooting</h2>
+
+    <h3>Bookmark these pages</h3>
+    <table>
+      <thead>
+        <tr><th>Page</th><th>URL pattern</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Sign in</td><td><code>https://learn.allaboutultrasound.com/login</code></td></tr>
+        <tr><td>My Dashboard</td><td><code>https://learn.allaboutultrasound.com/my-dashboard</code></td></tr>
+        <tr><td>Course player</td><td><code>https://learn.allaboutultrasound.com/courses/[course-slug]/player</code></td></tr>
+        <tr><td>Cohort hub — Live Sessions</td><td><code>https://learn.allaboutultrasound.com/cohort/[course-id]?tab=sessions</code></td></tr>
+        <tr><td>Cohort hub — Replays</td><td><code>https://learn.allaboutultrasound.com/cohort/[course-id]?tab=replays</code></td></tr>
+        <tr><td>Cohort hub — Discussions</td><td><code>https://learn.allaboutultrasound.com/cohort/[course-id]?tab=discussions</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Common issues</h3>
+    <table>
+      <thead>
+        <tr><th>Problem</th><th>Solution</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Cannot see my cohort</td>
+          <td>Sign in at <strong>learn.allaboutultrasound.com</strong>. Confirm you are enrolled and open <strong>My Cohort</strong> from the course player or overview.</td>
+        </tr>
+        <tr>
+          <td>Join button is disabled</td>
+          <td>Wait until 15 minutes before the session start time. Add the session to your calendar so you do not miss the window.</td>
+        </tr>
+        <tr>
+          <td>No discussions tab content</td>
+          <td>Ask your administrator to confirm you are assigned to the correct cohort group.</td>
+        </tr>
+        <tr>
+          <td>No replays listed</td>
+          <td>Recordings are added by your instructor after each session. Check the <strong>Replays</strong> tab again later.</td>
+        </tr>
+        <tr>
+          <td>Magic link expired</td>
+          <td>Request a new link from the login page, or sign in with your password.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Need help?</h3>
+    <p>Contact your course administrator or program coordinator with your registered email address and cohort group name. For login issues, use <strong>Forgot password?</strong> on the sign-in page first.</p>
+
+    <div class="footer">
+      All About Ultrasound™ | iHeartEcho™ Learning Platform — Cohort Group Student Guide<br>
+      learn.allaboutultrasound.com
+    </div>
+  </div>
+</body>
+</html>
