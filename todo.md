@@ -483,3 +483,26 @@
 - [x] Repair the affected Media Repository SCORM package’s question-to-image and question-to-video attachment mapping, then add a source-specific regression for the reported 20/300/40/22 group structure and supported media references.
 - [x] Trace and repair the Media Repository SCORM Save Questions request that returns an HTML document where the tRPC client expects JSON, without creating or duplicating Question Bank records.
 - [x] Add a focused response-contract regression for Media Repository SCORM Save Questions, then verify the deployed retry reaches the authorized JSON procedure response.
+- [ ] Identify the live Railway response source for the persistent Media Repository Save Questions HTML-versus-JSON failure after checkpoint 57a37866, without re-importing or changing Question Bank records.
+- [ ] Repair and verify the actual deployed request-routing or runtime configuration mismatch, then request one controlled duplicate-safe Save Questions retry for the affected package.
+- [ ] Keep GitHub main as the source of truth for application code and verify the GitHub-connected Railway deployment advances to the current approved main revision before further live SCORM import testing.
+- [ ] Inspect the confirmed active Railway deployment logs and the internal Media Repository Save Questions sequence to identify the remaining HTML response source after the current GitHub main commit deployed successfully.
+- [ ] Verify whether Email Campaign sends use SendGrid API, SMTP, or another transport; reconcile the actual provider message identifiers and event reporting path with the statistics dashboard the administrator is checking, without sending mail or changing provider configuration.
+- [ ] Preserve a safe SendGrid provider correlation identifier for future Email Campaign sends and expose a privacy-safe delivery-status reconciliation path, without sending email, importing provider event data, or altering historical campaign records.
+- [ ] Add safe stage-specific logging and user-facing error classification for Media Repository SCORM media import failures so the remaining internal HTML response source can be identified without logging storage keys, session data, or package content.
+- [ ] Inventory and validate available SMTP configuration for transactional email, then route transactional messages through SMTP while retaining the separate Email Campaign delivery/analytics path unless explicitly changed.
+- [ ] Add focused transport-selection and safe no-send failure regressions for SMTP transactional email without exposing credentials or sending messages.
+- [x] Investigate and repair the Media Repository authorization mismatch that returns Forbidden when Vanessa, an administrator, uploads video; preserve least privilege and do not change her account, role, or files during diagnosis.
+- [x] Add focused role/permission regressions for authorized administrator video upload and verify the corrected path does not weaken access for ordinary users.
+- [x] Preserve and reconcile the uncheckpointed Media Repository upload-authorization and SCORM diagnostic repairs with the newer GitHub main SMTP and SCORM changes, without discarding either code path or changing production records.
+- [x] Run focused merged-path validation and checkpoint the reconciled GitHub-main code before asking for live Media Repository upload or SCORM import retries.
+- [x] Repair membership-plan card vertical spacing and responsive purchase-button sizing so all call-to-action labels remain visible without changing pricing, plan availability, or checkout behavior.
+- [x] Add focused layout regression coverage for full membership-button labels and consistent CTA placement across plan cards.
+- [ ] Visually validate the membership-plan CTA spacing and full labels on the live desktop and phone breakpoints after deployment; the local preview did not render this public route.
+- [x] Ensure every Platform Admin can browse and upload in Media Repository through the same effective-role policy, while ordinary users remain denied.
+- [x] Ensure authorized Platform Admins can select and reuse existing Media Repository items in Email Campaigns, pages, and courses without requiring a content change or granting cross-user media access.
+- [x] Add focused cross-surface Platform Admin browse/upload/media-picker regressions and ordinary-user denial coverage.
+- [x] Inspect the affected user’s account eligibility, active authentication state, password/magic-link request history, and non-sensitive provider delivery evidence for the reported two-day sign-in failure, without sending or disclosing a login link.
+- [x] Repair only the verified user-facing authentication defect, add a focused regression, and request explicit approval before resending a login or password-recovery email.
+- [x] Remove every pre-registration or pending-account authentication block so all existing accounts with a deliverable email may use valid password login, magic-link recovery, or password reset without exposing account existence.
+- [x] Add focused password-login, magic-link, and password-reset regressions proving pending administrative metadata does not block valid account recovery or weaken credential validation.

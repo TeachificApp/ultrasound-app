@@ -262,13 +262,13 @@ export default function Premium() {
       <Button
         onClick={() => runGuarded(onPay)}
         disabled={isPending || isGuarded}
-        className={`font-bold px-5 py-2.5 text-sm rounded-xl w-full ${styles[variant]}`}
+        className={`flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-normal rounded-xl px-3 py-2.5 text-center text-sm font-bold leading-tight ${styles[variant]}`}
         style={gradients[variant] ? { background: gradients[variant] } : undefined}
       >
         {isPending ? (
           <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Processing…</>
         ) : (
-          <><Crown className="w-4 h-4 mr-1.5" />{label}</>
+          <><Crown className="h-4 w-4 shrink-0" />{label}</>
         )}
       </Button>
     );
@@ -277,7 +277,7 @@ export default function Premium() {
   function SignInBtn() {
     return (
       <a href="/login">
-        <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-5 py-2.5 text-sm rounded-xl w-full">
+        <Button className="flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-normal rounded-xl bg-[#189aa1] px-3 py-2.5 text-center text-sm font-bold leading-tight text-white hover:bg-[#147a80]">
           Sign In to Get Started
         </Button>
       </a>
@@ -287,8 +287,8 @@ export default function Premium() {
   function ResumeBtn() {
     return (
       <a href={premiumResumeHref(brand)}>
-        <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-5 py-2.5 text-sm rounded-xl w-full">
-          <ArrowRight className="w-4 h-4 mr-1.5" />{SUBSCRIPTION_RESUME_LABEL}
+        <Button className="flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-normal rounded-xl bg-[#189aa1] px-3 py-2.5 text-center text-sm font-bold leading-tight text-white hover:bg-[#147a80]">
+          <ArrowRight className="h-4 w-4 shrink-0" />{SUBSCRIPTION_RESUME_LABEL}
         </Button>
       </a>
     );
@@ -302,7 +302,7 @@ export default function Premium() {
         style={{ background: "linear-gradient(135deg, #0e1e2e 0%, #0e4a50 60%, #189aa1 100%)" }}
       >
         <div className="relative container py-14 md:py-20">
-          <div className="max-w-5xl mx-auto text-center">
+          <div className="max-w-6xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-white/10 border border-white/30 rounded-full px-4 py-1.5 mb-4">
               <Crown className="w-4 h-4 text-white" />
               <span className="text-sm text-white font-semibold">{badgeLabel}</span>
@@ -352,17 +352,17 @@ export default function Premium() {
             )}
 
             {/* ── Pricing Cards ─────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-left w-full">
+            <div className="grid w-full grid-cols-1 gap-4 text-left sm:grid-cols-2 xl:grid-cols-4 mb-6">
 
               {/* 1. Monthly — single app */}
-              <div className="bg-white rounded-2xl shadow-lg px-5 py-6 flex flex-col min-h-[260px]">
+              <div className="flex min-h-[292px] flex-col rounded-2xl bg-white px-5 py-6 shadow-lg">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Monthly</div>
                 <div className="text-3xl sm:text-4xl font-black text-[#189aa1] mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
                   $9.97
                 </div>
                 <div className="text-gray-400 text-xs mb-1">per month · cancel anytime</div>
                 <div className="text-[10px] text-gray-400 mb-4">{appName} only</div>
-                <div className="mt-auto">
+                <div className="mt-auto pt-4">
                   {loading ? (
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-xs py-2">
                       <div className="w-3 h-3 border-2 border-[#189aa1] border-t-transparent rounded-full animate-spin" />
@@ -384,7 +384,7 @@ export default function Premium() {
               </div>
 
               {/* 2. Annual — single app */}
-              <div className="bg-white rounded-2xl shadow-2xl px-5 py-6 flex flex-col relative min-h-[260px] border-2 border-[#189aa1]">
+              <div className="relative flex min-h-[292px] flex-col rounded-2xl border-2 border-[#189aa1] bg-white px-5 py-6 shadow-2xl">
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-[#189aa1] text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
                   <Crown className="w-3 h-3" /> Best Value
                 </div>
@@ -399,7 +399,7 @@ export default function Premium() {
                 <div className="text-[10px] text-gray-400 mb-4">
                   Full annual access — cancel anytime.
                 </div>
-                <div className="mt-auto">
+                <div className="mt-auto pt-4">
                   {loading ? (
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-xs py-2">
                       <div className="w-3 h-3 border-2 border-[#189aa1] border-t-transparent rounded-full animate-spin" />
@@ -421,7 +421,7 @@ export default function Premium() {
               </div>
 
               {/* 3. Dual Monthly */}
-              <div className="bg-white rounded-2xl shadow-lg px-5 py-6 flex flex-col border border-gray-100 min-h-[260px]">
+              <div className="flex min-h-[292px] flex-col rounded-2xl border border-gray-100 bg-white px-5 py-6 shadow-lg">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Both Apps · Monthly</div>
                 <div className="text-3xl sm:text-4xl font-black text-[#189aa1] mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
                   $12.99
@@ -431,7 +431,7 @@ export default function Premium() {
                   <Infinity className="w-3 h-3" />
                   UltrasoundAssist™ + EchoAssist™
                 </div>
-                <div className="mt-auto">
+                <div className="mt-auto pt-4">
                   {loading ? (
                     <div className="flex items-center justify-center gap-2 text-gray-400 text-xs py-2">
                       <div className="w-3 h-3 border-2 border-[#189aa1] border-t-transparent rounded-full animate-spin" />
@@ -451,7 +451,7 @@ export default function Premium() {
               </div>
 
               {/* 4. Dual Annual — BEST VALUE */}
-              <div className="rounded-2xl shadow-2xl px-5 py-6 flex flex-col relative overflow-hidden min-h-[260px]"
+              <div className="relative flex min-h-[292px] flex-col overflow-hidden rounded-2xl px-5 py-6 shadow-2xl"
                 style={{ background: "linear-gradient(135deg, #0e1e2e, #0e4a50)" }}>
                 <div className="absolute top-2 right-2 flex items-center gap-1 bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                   <><Crown className="w-2.5 h-2.5" /> Best Value</>
@@ -470,7 +470,7 @@ export default function Premium() {
                 <div className="text-[10px] text-white/40 mb-4">
                   Full annual access to both apps — cancel anytime.
                 </div>
-                <div className="mt-auto">
+                <div className="mt-auto pt-4">
                   {loading ? (
                     <div className="flex items-center justify-center gap-2 text-white/50 text-xs py-2">
                       <div className="w-3 h-3 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
@@ -480,18 +480,18 @@ export default function Premium() {
                     <Button
                       onClick={() => dualAnnual.mutate({ origin: window.location.origin })}
                       disabled={dualAnnual.isPending}
-                      className="font-bold px-5 py-2.5 text-sm rounded-xl w-full text-white"
+                      className="flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-normal rounded-xl px-3 py-2.5 text-center text-sm font-bold leading-tight text-white"
                       style={{ background: "linear-gradient(90deg, #189aa1, #f59e0b)" }}
                     >
                       {dualAnnual.isPending ? (
                         <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Processing…</>
                       ) : (
-                        <><Crown className="w-4 h-4 mr-1.5" />Get Annual — Both Apps</>
+                        <><Crown className="h-4 w-4 shrink-0" />Get Annual — Both Apps</>
                       )}
                     </Button>
                   ) : (
                     <a href="/login">
-                      <Button className="font-bold px-5 py-2.5 text-sm rounded-xl w-full text-white"
+                      <Button className="flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-normal rounded-xl px-3 py-2.5 text-center text-sm font-bold leading-tight text-white"
                         style={{ background: "linear-gradient(90deg, #189aa1, #f59e0b)" }}>
                         Sign In to Get Started
                       </Button>

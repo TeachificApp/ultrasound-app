@@ -972,7 +972,7 @@ function LMSRouter() {
         <Route path="/admin/communities/:communityId/sales-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunitySalesPageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/communities/:communityId/experience-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityExperiencePageBuilder /></RoleGuard>}</Route>
         <Route path="/admin/memberships">{() => { window.location.replace("/admin/members?tab=memberships"); return null; }}</Route>
-                <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
+                <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/contacts">{() => { window.location.replace("/admin/funnels?tab=contacts"); return null; }}</Route>
         <Route path="/admin/educator-leads">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><AdminEducatorLeads /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/sharing-monitor">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><SharingMonitor /></Suspense></RoleGuard>}</Route>
@@ -1183,7 +1183,7 @@ function IHeartEchoRouter() {
           { base: "/admin/challenge-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard> },
           { base: "/admin/social-content", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard> },
         ])}
-        <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
+        <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/general-forms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>

@@ -45,6 +45,17 @@ function tokenExpiry(hours = 24): Date {
   return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
 
+/**
+ * Pre-registration is administrative metadata, never a sign-in barrier.
+ * Successful password verification or a valid reset token proves control of
+ * the account and converts any legacy pending record into a normal account.
+ */
+export function shouldClearPendingAfterCredentialVerification(user: {
+  isPending?: boolean | null;
+}): boolean {
+  return Boolean(user.isPending);
+}
+
 /** Issue a session cookie for a user identified by their synthetic openId */
 async function issueSession(
   req: Parameters<typeof getSessionCookieOptions>[0],
@@ -284,18 +295,18 @@ export const emailAuthRouter = router({
           message: "This account was created with Google/Microsoft/Apple. Please use social sign-in.",
         });
       }
-      if (user.isPending) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Your account has been pre-registered but not yet activated. Please complete registration.",
-        });
-      }
-
       const passwordMatch = await bcrypt.compare(input.password, user.passwordHash);
       if (!passwordMatch) throw invalidError;
 
-      // Update last signed in
-      await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
+      // Pending is never a sign-in barrier. A successful password comparison
+      // is the credential proof required to clear legacy administrative state.
+      await db
+        .update(users)
+        .set({
+          lastSignedIn: new Date(),
+          ...(shouldClearPendingAfterCredentialVerification(user) ? { isPending: false } : {}),
+        })
+        .where(eq(users.id, user.id));
 
       // Issue session
       await issueSession(ctx.req, ctx.res, openId, user.name ?? "");
@@ -479,6 +490,7 @@ export const emailAuthRouter = router({
           passwordResetToken: null,
           passwordResetExpiry: null,
           emailVerified: true, // Resetting password confirms ownership of email
+          isPending: false, // A valid reset token confirms the pre-registered mailbox owner
         })
         .where(eq(users.id, user.id));
 

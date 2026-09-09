@@ -16,6 +16,31 @@ import {
 
 type StorageConfig = { baseUrl: string; apiKey: string };
 
+type StorageUrlPayload = { url?: unknown };
+
+export async function readStorageUrlResponse(
+  response: Response,
+  operation: "upload" | "download URL",
+): Promise<string> {
+  const body = await response.text().catch(() => "");
+  if (!response.ok) {
+    throw new Error(`Storage ${operation} failed (${response.status} ${response.statusText}).`);
+  }
+
+  let payload: StorageUrlPayload;
+  try {
+    payload = JSON.parse(body) as StorageUrlPayload;
+  } catch {
+    throw new Error(
+      `Storage ${operation} returned an unexpected non-JSON response. Verify the storage backend configuration.`
+    );
+  }
+  if (typeof payload.url !== "string" || !payload.url) {
+    throw new Error(`Storage ${operation} response did not include a usable file URL.`);
+  }
+  return payload.url;
+}
+
 function getStorageConfig(): StorageConfig {
   const baseUrl = ENV.forgeApiUrl;
   const apiKey = ENV.forgeApiKey;
@@ -49,7 +74,7 @@ async function buildDownloadUrl(
     method: "GET",
     headers: buildAuthHeaders(apiKey),
   });
-  return (await response.json()).url;
+  return readStorageUrlResponse(response, "download URL");
 }
 
 function ensureTrailingSlash(value: string): string {
@@ -115,23 +140,7 @@ async function forgePut(
     body: formData,
   });
 
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
-  }
-  const contentTypeHeader = response.headers.get("content-type") ?? "";
-  if (!contentTypeHeader.toLowerCase().includes("application/json")) {
-    throw new Error(
-      "Storage upload returned an unexpected non-JSON response. Verify the storage backend configuration."
-    );
-  }
-  const payload = await response.json() as { url?: unknown };
-  if (typeof payload.url !== "string" || !payload.url) {
-    throw new Error("Storage upload response did not include a usable file URL.");
-  }
-  const url = payload.url;
+  const url = await readStorageUrlResponse(response, "upload");
   mirrorToR2(key, data, contentType).catch(() => {});
   return { key, url };
 }
