@@ -1,36 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { isVerifiedPendingEmailAccount } from "./routers/emailAuthRouter";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { shouldClearPendingAfterCredentialVerification } from "./routers/emailAuthRouter";
 
-describe("verified pending email-account activation", () => {
-  it("recognizes only an email-verified pending account with an existing password", () => {
-    expect(isVerifiedPendingEmailAccount({
+const source = () => readFileSync(resolve(process.cwd(), "server/routers/emailAuthRouter.ts"), "utf8");
+
+describe("pending account recovery", () => {
+  it("clears a pending marker only after a caller has already completed credential verification", () => {
+    expect(shouldClearPendingAfterCredentialVerification({
       isPending: true,
-      emailVerified: true,
-      passwordHash: "$2b$12$already-established-password-hash",
     })).toBe(true);
   });
 
-  it("does not auto-activate a pending account before email verification", () => {
-    expect(isVerifiedPendingEmailAccount({
-      isPending: true,
-      emailVerified: false,
-      passwordHash: "$2b$12$already-established-password-hash",
-    })).toBe(false);
-  });
-
-  it("does not auto-activate an account with no password", () => {
-    expect(isVerifiedPendingEmailAccount({
-      isPending: true,
-      emailVerified: true,
-      passwordHash: null,
-    })).toBe(false);
-  });
-
-  it("keeps active and non-pending accounts outside the activation path", () => {
-    expect(isVerifiedPendingEmailAccount({
+  it("leaves active accounts outside the activation update", () => {
+    expect(shouldClearPendingAfterCredentialVerification({
       isPending: false,
-      emailVerified: true,
-      passwordHash: "$2b$12$already-established-password-hash",
     })).toBe(false);
+  });
+
+  it("does not retain a pre-registration rejection in the password login path", () => {
+    const emailAuth = source();
+
+    expect(emailAuth).not.toContain("Your account has been pre-registered but not yet activated");
+    expect(emailAuth).toContain("shouldClearPendingAfterCredentialVerification(user)");
+    expect(emailAuth).toContain("const passwordMatch = await bcrypt.compare");
+  });
+
+  it("allows password reset and magic-link handlers to operate without pending-account guards", () => {
+    const emailAuth = source();
+    const magicLink = readFileSync(resolve(process.cwd(), "server/routes/authLogin.ts"), "utf8");
+
+    expect(emailAuth).toMatch(/resetPassword:[\s\S]*?isPending: false/);
+    expect(magicLink).not.toContain("isPending");
   });
 });

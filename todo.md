@@ -504,3 +504,5 @@
 - [x] Add focused cross-surface Platform Admin browse/upload/media-picker regressions and ordinary-user denial coverage.
 - [x] Inspect the affected user’s account eligibility, active authentication state, password/magic-link request history, and non-sensitive provider delivery evidence for the reported two-day sign-in failure, without sending or disclosing a login link.
 - [x] Repair only the verified user-facing authentication defect, add a focused regression, and request explicit approval before resending a login or password-recovery email.
+- [x] Remove every pre-registration or pending-account authentication block so all existing accounts with a deliverable email may use valid password login, magic-link recovery, or password reset without exposing account existence.
+- [x] Add focused password-login, magic-link, and password-reset regressions proving pending administrative metadata does not block valid account recovery or weaken credential validation.

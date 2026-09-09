@@ -46,18 +46,14 @@ function tokenExpiry(hours = 24): Date {
 }
 
 /**
- * A pending flag normally represents an administrator pre-registration. A
- * verified email account that already has a password is not safely treated as
- * unactivated: the user has proved mailbox control and completed credential
- * setup. Permit that narrow legacy state to self-activate only after password
- * verification (or completion of a valid reset token).
+ * Pre-registration is administrative metadata, never a sign-in barrier.
+ * Successful password verification or a valid reset token proves control of
+ * the account and converts any legacy pending record into a normal account.
  */
-export function isVerifiedPendingEmailAccount(user: {
+export function shouldClearPendingAfterCredentialVerification(user: {
   isPending?: boolean | null;
-  emailVerified?: boolean | null;
-  passwordHash?: string | null;
 }): boolean {
-  return Boolean(user.isPending && user.emailVerified && user.passwordHash);
+  return Boolean(user.isPending);
 }
 
 /** Issue a session cookie for a user identified by their synthetic openId */
@@ -299,23 +295,16 @@ export const emailAuthRouter = router({
           message: "This account was created with Google/Microsoft/Apple. Please use social sign-in.",
         });
       }
-      if (user.isPending && !isVerifiedPendingEmailAccount(user)) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Your account has been pre-registered but not yet activated. Please complete registration.",
-        });
-      }
-
       const passwordMatch = await bcrypt.compare(input.password, user.passwordHash);
       if (!passwordMatch) throw invalidError;
 
-      // A verified legacy pre-registration with a valid password can safely
-      // activate itself only after credential verification succeeds.
+      // Pending is never a sign-in barrier. A successful password comparison
+      // is the credential proof required to clear legacy administrative state.
       await db
         .update(users)
         .set({
           lastSignedIn: new Date(),
-          ...(isVerifiedPendingEmailAccount(user) ? { isPending: false } : {}),
+          ...(shouldClearPendingAfterCredentialVerification(user) ? { isPending: false } : {}),
         })
         .where(eq(users.id, user.id));
 
