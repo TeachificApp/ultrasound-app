@@ -502,3 +502,5 @@
 - [x] Ensure every Platform Admin can browse and upload in Media Repository through the same effective-role policy, while ordinary users remain denied.
 - [x] Ensure authorized Platform Admins can select and reuse existing Media Repository items in Email Campaigns, pages, and courses without requiring a content change or granting cross-user media access.
 - [x] Add focused cross-surface Platform Admin browse/upload/media-picker regressions and ordinary-user denial coverage.
+- [x] Inspect the affected user’s account eligibility, active authentication state, password/magic-link request history, and non-sensitive provider delivery evidence for the reported two-day sign-in failure, without sending or disclosing a login link.
+- [x] Repair only the verified user-facing authentication defect, add a focused regression, and request explicit approval before resending a login or password-recovery email.

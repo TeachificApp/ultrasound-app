@@ -45,6 +45,21 @@ function tokenExpiry(hours = 24): Date {
   return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
 
+/**
+ * A pending flag normally represents an administrator pre-registration. A
+ * verified email account that already has a password is not safely treated as
+ * unactivated: the user has proved mailbox control and completed credential
+ * setup. Permit that narrow legacy state to self-activate only after password
+ * verification (or completion of a valid reset token).
+ */
+export function isVerifiedPendingEmailAccount(user: {
+  isPending?: boolean | null;
+  emailVerified?: boolean | null;
+  passwordHash?: string | null;
+}): boolean {
+  return Boolean(user.isPending && user.emailVerified && user.passwordHash);
+}
+
 /** Issue a session cookie for a user identified by their synthetic openId */
 async function issueSession(
   req: Parameters<typeof getSessionCookieOptions>[0],
@@ -284,7 +299,7 @@ export const emailAuthRouter = router({
           message: "This account was created with Google/Microsoft/Apple. Please use social sign-in.",
         });
       }
-      if (user.isPending) {
+      if (user.isPending && !isVerifiedPendingEmailAccount(user)) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "Your account has been pre-registered but not yet activated. Please complete registration.",
@@ -294,8 +309,15 @@ export const emailAuthRouter = router({
       const passwordMatch = await bcrypt.compare(input.password, user.passwordHash);
       if (!passwordMatch) throw invalidError;
 
-      // Update last signed in
-      await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
+      // A verified legacy pre-registration with a valid password can safely
+      // activate itself only after credential verification succeeds.
+      await db
+        .update(users)
+        .set({
+          lastSignedIn: new Date(),
+          ...(isVerifiedPendingEmailAccount(user) ? { isPending: false } : {}),
+        })
+        .where(eq(users.id, user.id));
 
       // Issue session
       await issueSession(ctx.req, ctx.res, openId, user.name ?? "");
@@ -479,6 +501,7 @@ export const emailAuthRouter = router({
           passwordResetToken: null,
           passwordResetExpiry: null,
           emailVerified: true, // Resetting password confirms ownership of email
+          isPending: false, // A valid reset token confirms the pre-registered mailbox owner
         })
         .where(eq(users.id, user.id));
 
