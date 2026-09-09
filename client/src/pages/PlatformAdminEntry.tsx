@@ -1,6 +1,14 @@
+import { lazy, Suspense } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
-import PlatformManagerDashboard from "./PlatformManagerDashboard";
-import PlatformAdmin from "./PlatformAdmin";
+
+const PlatformAdmin = lazy(() => import("./PlatformAdmin"));
+const PlatformManagerDashboard = lazy(() => import("./PlatformManagerDashboard"));
+
+const adminFallback = (
+  <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
+    Loading administrative access…
+  </div>
+);
 
 export default function PlatformAdminEntry() {
   const { user, loading } = useAuth();
@@ -10,8 +18,12 @@ export default function PlatformAdminEntry() {
     && user?.role !== "admin";
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">Loading administrative access…</div>;
+    return adminFallback;
   }
 
-  return isRestrictedManager ? <PlatformManagerDashboard /> : <PlatformAdmin />;
+  return (
+    <Suspense fallback={adminFallback}>
+      {isRestrictedManager ? <PlatformManagerDashboard /> : <PlatformAdmin />}
+    </Suspense>
+  );
 }

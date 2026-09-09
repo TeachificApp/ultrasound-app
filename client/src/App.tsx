@@ -31,8 +31,8 @@ import { usePageViewTracker } from "./hooks/useAnalytics";
 import { useSsoConsumer } from "./hooks/useSsoConsumer";
 import { useCrossDomainSso } from "./hooks/useCrossDomainSso";
 import { useSsoBridge } from "./hooks/useSsoBridge";
-import PlatformAdmin from "./pages/PlatformAdmin";
 import PlatformAdminEntry from "./pages/PlatformAdminEntry";
+import { deferUntilIdle } from "@/lib/deferUntilIdle";
 import { perBrandAdminRouteElements, perBrandUserRouteElements } from "./routes/perBrandRouteHelpers";
 import { getSitePageDomain } from "@/lib/sitePageDomain";
 import { RESERVED_SITE_SLUGS } from "@shared/sitePagesConstants";
@@ -80,9 +80,14 @@ const FunnelPageEditor = lazy(() => import("./pages/admin/FunnelPageEditor"));
 const ContactsAdmin = lazy(() => import("./pages/admin/ContactsAdmin"));
 const AdminLessonComments = lazy(() => import("./pages/admin/AdminLessonComments"));
 const SharingMonitor = lazy(() => import("./pages/admin/SharingMonitor"));
-// Eager — marketing funnel pages must render outside the Router outer Suspense boundary.
-import PublicFunnelPage from "./pages/PublicFunnelPage";
-import StandaloneLandingPage from "./pages/StandaloneLandingPage";
+const PublicFunnelPage = lazy(() => import("./pages/PublicFunnelPage"));
+const StandaloneLandingPage = lazy(() => import("./pages/StandaloneLandingPage"));
+
+const funnelPageFallback = (
+  <div className="flex items-center justify-center min-h-[50vh]">
+    <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+  </div>
+);
 
 // ── Digital Downloads ──────────────────────────────────────────────────────────
 const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
@@ -685,7 +690,11 @@ function Router() {
         <Route path="/privacy">{() => <Suspense fallback={pageFallback}><PublicSitePage slug="privacy" /></Suspense>}</Route>
         <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
         {/* ── Public Funnel Pages (catch-all — must be last before NotFound) ── */}
-        <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
+        <Route path="/p/:slug">{() => (
+          <Suspense fallback={funnelPageFallback}>
+            <StandaloneLandingPage />
+          </Suspense>
+        )}</Route>
         <Route path="/:slug/:pageSlug">{() => <PublicFunnelPageRoute />}</Route>
         <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>
         <Route component={NotFound} />
@@ -988,7 +997,7 @@ function LMSRouter() {
         <Route path="/admin/general-forms/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><GeneralFormBuilder /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><PlatformAdminEntry /></RoleGuard>}</Route>
         {/* Auth pages (needed for login flow) */}
         <Route path="/login" component={Login} />
         <Route path="/forgot-password" component={ForgotPassword} />
@@ -1027,7 +1036,11 @@ function LMSRouter() {
             <Route path="/contact" component={() => { window.location.replace("https://www.allaboutultrasound.com/contact.html"); return null; }} />
             <Route path="/teach-with-us">{() => <Suspense fallback={pageFallback}><EducatorLeadForm /></Suspense>}</Route>
             {/* Funnel pages — catch-all last */}
-            <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
+            <Route path="/p/:slug">{() => (
+              <Suspense fallback={funnelPageFallback}>
+                <StandaloneLandingPage />
+              </Suspense>
+            )}</Route>
             <Route path="/:slug/:pageSlug">{() => <PublicFunnelPageRoute />}</Route>
             <Route path="/:slug"><FunnelRootRedirect /></Route>
             <Route component={NotFound} />
@@ -1058,7 +1071,7 @@ function IHeartEchoRouter() {
         {/* ── Public ────────────────────────────────────────────────────── */}
         <Route path="/" component={IHeartEchoHome} />
         <Route path="/login" component={Login} />
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><PlatformAdminEntry /></RoleGuard>}</Route>
         <Route path="/register" component={Register} />
         <Route path="/verify-email" component={VerifyEmail} />
         <Route path="/forgot-password" component={ForgotPassword} />
@@ -1275,7 +1288,11 @@ function IHeartEchoRouter() {
         <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
         <Route path="/community/members/:userId" component={CommunityProfile} />
         <Route path="/community/:slug" component={CommunityFeed} />
-        <Route path="/p/:slug">{() => <StandaloneLandingPage />}</Route>
+        <Route path="/p/:slug">{() => (
+          <Suspense fallback={funnelPageFallback}>
+            <StandaloneLandingPage />
+          </Suspense>
+        )}</Route>
         <Route path="/:slug/:pageSlug">{() => <PublicFunnelPageRoute />}</Route>
         <Route path="/:slug">{() => <FunnelRootRedirect />}</Route>
 
@@ -1315,7 +1332,11 @@ function PublicFunnelPageRoute() {
   if (slug === "admin" || slug === "p" || RESERVED_FUNNEL_SLUGS.has(slug)) {
     return <NotFound />;
   }
-  return <PublicFunnelPage />;
+  return (
+    <Suspense fallback={funnelPageFallback}>
+      <PublicFunnelPage />
+    </Suspense>
+  );
 }
 
 /**
@@ -1422,6 +1443,7 @@ function ActiveDeviceSessionGuard() {
   useEffect(() => {
     if (!isAuthenticated || replacementToken) return;
     let cancelled = false;
+    const cancelDefer = deferUntilIdle(() => {
     fetch("/api/auth/active-device-status", {
       method: "POST",
       credentials: "include",
@@ -1441,7 +1463,8 @@ function ActiveDeviceSessionGuard() {
         }
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    });
+    return () => { cancelled = true; cancelDefer(); };
   }, [isAuthenticated, replacementToken]);
 
   const stayOnOtherDevice = async () => {
@@ -1543,7 +1566,7 @@ function AccreditationDivisionRouter() {
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/admin/form-builder/:id">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>
         <Route path="/lab-admin">{() => <RoleGuard roles={["diy_admin"]} allowAdmin={false}><LabAdmin /></RoleGuard>}</Route>
-        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PlatformAdmin /></RoleGuard>}</Route>
+        <Route path="/platform-admin">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><PlatformAdminEntry /></RoleGuard>}</Route>
         <Route path="/admin/diy-accreditation">{() => <RoleGuard roles={["diy_admin", "platform_admin", "accreditation_manager"]} allowAdmin={true}><DIYAccreditationAdmin /></RoleGuard>}</Route>
         <Route path="/accreditation-readiness">{() => <RoleGuard roles={["diy_user", "diy_admin"]} allowAdmin={true}><AccreditationReadiness /></RoleGuard>}</Route>
         {/* ── Public Form Renderer ─────────────────────────────────────────── */}

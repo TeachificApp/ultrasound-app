@@ -10,10 +10,11 @@
  * broadcast to re-fire on every reload, wasting tokens and causing race conditions.
  * The broadcast flag has a 30-minute TTL so it re-broadcasts after a while.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { broadcastStorageKey } from "@/lib/ssoSession";
+import { deferUntilIdle } from "@/lib/deferUntilIdle";
 
 /** How long to suppress re-broadcast after a successful broadcast (30 minutes) */
 const BROADCAST_TTL_MS = 30 * 60 * 1000;
@@ -114,9 +115,12 @@ export function useCrossDomainSso() {
   const { user, loading } = useAuth();
   const issueTokens = trpc.sso.issueTokens.useMutation();
   const lastUserId = useRef<number | null>(null);
+  const [ssoReady, setSsoReady] = useState(false);
+
+  useEffect(() => deferUntilIdle(() => setSsoReady(true)), []);
 
   useEffect(() => {
-    if (loading) return;
+    if (!ssoReady || loading) return;
 
     if (!user) {
       lastUserId.current = null;
@@ -151,5 +155,5 @@ export function useCrossDomainSso() {
         },
       },
     );
-  }, [loading, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ssoReady, loading, user]); // eslint-disable-line react-hooks/exhaustive-deps
 }

@@ -3,9 +3,10 @@
  * Wraps tRPC mutations for page views, video events, and quiz attempts.
  * All calls are fire-and-forget (errors are silently swallowed).
  */
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
+import { deferUntilIdle } from "@/lib/deferUntilIdle";
 
 // Stable session ID for the current browser tab
 function getSessionId(): string {
@@ -23,8 +24,13 @@ export function usePageViewTracker() {
   const pageViewMut = trpc.analyticsTrack.pageView.useMutation();
   const prevPath = useRef<string | null>(null);
   const enterTime = useRef<number>(Date.now());
+  const [trackingReady, setTrackingReady] = useState(false);
+
+  useEffect(() => deferUntilIdle(() => setTrackingReady(true)), []);
 
   useEffect(() => {
+    if (!trackingReady) return;
+
     const now = Date.now();
     const sessionId = getSessionId();
 
@@ -48,7 +54,7 @@ export function usePageViewTracker() {
     prevPath.current = location;
     enterTime.current = now;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location]);
+  }, [location, trackingReady]);
 }
 
 /** Returns functions to track video events and quiz attempts from CoursePlayer. */

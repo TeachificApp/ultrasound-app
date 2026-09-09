@@ -1,3 +1,5 @@
+import { shouldRouteWorkshopCtaToCheckout } from "@shared/workshopPricing";
+
 /**
  * Shared CTA button click handler.
  * Extracted from CourseLanding to avoid circular static imports with
@@ -23,6 +25,11 @@ export function handleCtaBtnClick(
   e.preventDefault();
   e.stopPropagation();
   const action = target.dataset.action ?? "url";
+  if (shouldRouteWorkshopCtaToCheckout(action, target.textContent ?? undefined)) {
+    if (onCheckoutPage) onCheckoutPage(undefined);
+    else onEnroll?.();
+    return;
+  }
 
   // Sold-out override: if the button has a soldout-override URL and we're in
   // sold-out/waitlist mode (caller provides onSoldOutOverride), use it.
