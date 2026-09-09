@@ -2822,13 +2822,8 @@ export const adminUserRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const existing = await db.select().from(userRoles)
-        .where(and(eq(userRoles.userId, input.userId), eq(userRoles.role, input.role))).limit(1);
-      if (existing.length === 0) {
-        await db.insert(userRoles).values({ userId: input.userId, role: input.role, assignedByUserId: ctx.user.id });
-      }
+      const { assignRole } = await import("../db");
+      await assignRole(input.userId, input.role, ctx.user.id);
       return { success: true };
     }),
 
@@ -2840,10 +2835,9 @@ export const adminUserRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       if (input.role === "user") throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot remove the base user role" });
-      await db.delete(userRoles).where(and(eq(userRoles.userId, input.userId), eq(userRoles.role, input.role)));
+      const { removeRole } = await import("../db");
+      await removeRole(input.userId, input.role);
       return { success: true };
     }),
 

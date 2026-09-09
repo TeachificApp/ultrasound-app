@@ -21,6 +21,8 @@ describe("ensureUserAccessAccounting", () => {
     expect(source).toContain("platform_owner");
     expect(source).toContain("ensurePlatformOwnerAccess");
     expect(source).toContain("ensurePlatformAdminAccountAccess");
+    expect(source).toContain("ensurePlatformStaffLegacyAdminRole");
+    expect(source).toContain("platformStaffMissingLegacyAdminRole");
     expect(source).toContain("backfillUserOpenIds");
   });
 

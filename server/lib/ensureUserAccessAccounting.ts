@@ -16,6 +16,7 @@ export type UserAccessAudit = {
   usersMissingOpenId: number;
   usersMissingBaseRole: number;
   adminUsersMissingPlatformAdmin: number;
+  platformStaffMissingLegacyAdminRole: number;
   platformOwnersMissingOwnerRole: number;
   platformOwnersMissingPlatformAdmin: number;
   activeEnrollments: number;
@@ -32,6 +33,7 @@ export type UserAccessReconcileResult = {
   platformOwnerRolesBackfilled: number;
   platformOwnerAdminRolesBackfilled: number;
   platformOwnerAdminFlagsSet: number;
+  platformStaffLegacyAdminFlagsSet: number;
   openIdsBackfilled: number;
   openIdBackfillSkipped: number;
   openIdBackfillErrors: number;
@@ -133,6 +135,55 @@ export async function ensurePlatformAdminAccountAccess(
   };
 }
 
+/** Idempotent: anyone with platform_admin/platform_owner gets users.role = admin. */
+export async function ensurePlatformStaffLegacyAdminRole(
+  db: Db | null | undefined,
+): Promise<{ legacyAdminFlagsSet: number }> {
+  if (!db) return { legacyAdminFlagsSet: 0 };
+
+  const beforeMissing = await scalarCount(
+    db,
+    sql`SELECT COUNT(*) AS c FROM users u
+        WHERE (u.role IS NULL OR u.role != 'admin')
+          AND EXISTS (
+            SELECT 1 FROM userRoles ur
+            WHERE ur.userId = u.id
+              AND ur.role IN ('platform_admin', 'platform_owner')
+          )`,
+  );
+
+  const update = await db.execute(sql`
+    UPDATE users u
+    SET role = 'admin'
+    WHERE (u.role IS NULL OR u.role != 'admin')
+      AND EXISTS (
+        SELECT 1 FROM userRoles ur
+        WHERE ur.userId = u.id
+          AND ur.role IN ('platform_admin', 'platform_owner')
+      )
+  `);
+  const legacyAdminFlagsSet = Number((update as { affectedRows?: number }).affectedRows ?? 0);
+
+  const afterMissing = await scalarCount(
+    db,
+    sql`SELECT COUNT(*) AS c FROM users u
+        WHERE (u.role IS NULL OR u.role != 'admin')
+          AND EXISTS (
+            SELECT 1 FROM userRoles ur
+            WHERE ur.userId = u.id
+              AND ur.role IN ('platform_admin', 'platform_owner')
+          )`,
+  );
+
+  if (legacyAdminFlagsSet > 0) {
+    console.log(
+      `[ensurePlatformStaffLegacyAdminRole] set users.role=admin for ${legacyAdminFlagsSet} platform staff (remaining=${afterMissing}, was=${beforeMissing})`,
+    );
+  }
+
+  return { legacyAdminFlagsSet };
+}
+
 /** Idempotent: platform/site owners always get users.role=admin, platform_owner, and platform_admin. */
 export async function ensurePlatformOwnerAccess(
   db: Db | null | undefined,
@@ -230,6 +281,7 @@ export async function auditUserAccess(db: Db | null | undefined): Promise<UserAc
     usersMissingOpenId,
     usersMissingBaseRole,
     adminUsersMissingPlatformAdmin,
+    platformStaffMissingLegacyAdminRole,
     platformOwnersMissingOwnerRole,
     platformOwnersMissingPlatformAdmin,
     activeEnrollments,
@@ -265,6 +317,16 @@ export async function auditUserAccess(db: Db | null | undefined): Promise<UserAc
             AND NOT EXISTS (
               SELECT 1 FROM userRoles ur
               WHERE ur.userId = u.id AND ur.role IN ('platform_admin', 'platform_owner')
+            )`,
+    ),
+    scalarCount(
+      db,
+      sql`SELECT COUNT(*) AS c FROM users u
+          WHERE (u.role IS NULL OR u.role != 'admin')
+            AND EXISTS (
+              SELECT 1 FROM userRoles ur
+              WHERE ur.userId = u.id
+                AND ur.role IN ('platform_admin', 'platform_owner')
             )`,
     ),
     scalarCount(
@@ -328,6 +390,7 @@ export async function auditUserAccess(db: Db | null | undefined): Promise<UserAc
     usersMissingOpenId,
     usersMissingBaseRole,
     adminUsersMissingPlatformAdmin,
+    platformStaffMissingLegacyAdminRole,
     platformOwnersMissingOwnerRole,
     platformOwnersMissingPlatformAdmin,
     activeEnrollments,
@@ -388,6 +451,7 @@ export async function ensureUserAccessAccounting(
 
   const ownerAccess = await ensurePlatformOwnerAccess(db);
   const platformAdminAccess = await ensurePlatformAdminAccountAccess(db);
+  const platformStaffLegacy = await ensurePlatformStaffLegacyAdminRole(db);
 
   const { backfillUserOpenIds } = await import("./backfillUserOpenIds");
   const openIdResult = await backfillUserOpenIds(db);
@@ -401,10 +465,11 @@ export async function ensureUserAccessAccounting(
     platformAdminAccess.adminRolesBackfilled > 0 ||
     platformAdminAccess.adminFlagsSet > 0 ||
     platformAdminAccess.usersEnsured > 0 ||
+    platformStaffLegacy.legacyAdminFlagsSet > 0 ||
     openIdResult.updated > 0
   ) {
     console.log(
-      `[ensureUserAccessAccounting] baseRoles=${baseRolesBackfilled}, platformAdmin=${platformAdminRolesBackfilled}, platformOwner=${ownerAccess.ownerRolesBackfilled}, ownerPlatformAdmin=${ownerAccess.adminRolesBackfilled}, ownerAdminFlags=${ownerAccess.adminFlagsSet}, platformAdminAccounts=${platformAdminAccess.adminRolesBackfilled}, platformAdminUsersEnsured=${platformAdminAccess.usersEnsured}, openIds=${openIdResult.updated}`,
+      `[ensureUserAccessAccounting] baseRoles=${baseRolesBackfilled}, platformAdmin=${platformAdminRolesBackfilled}, platformOwner=${ownerAccess.ownerRolesBackfilled}, ownerPlatformAdmin=${ownerAccess.adminRolesBackfilled}, ownerAdminFlags=${ownerAccess.adminFlagsSet}, platformAdminAccounts=${platformAdminAccess.adminRolesBackfilled}, platformAdminUsersEnsured=${platformAdminAccess.usersEnsured}, platformStaffLegacyAdmin=${platformStaffLegacy.legacyAdminFlagsSet}, openIds=${openIdResult.updated}`,
     );
   }
 
@@ -414,6 +479,7 @@ export async function ensureUserAccessAccounting(
     platformOwnerRolesBackfilled: ownerAccess.ownerRolesBackfilled,
     platformOwnerAdminRolesBackfilled: ownerAccess.adminRolesBackfilled,
     platformOwnerAdminFlagsSet: ownerAccess.adminFlagsSet,
+    platformStaffLegacyAdminFlagsSet: platformStaffLegacy.legacyAdminFlagsSet,
     openIdsBackfilled: openIdResult.updated,
     openIdBackfillSkipped: openIdResult.skipped,
     openIdBackfillErrors: openIdResult.errors,

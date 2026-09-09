@@ -1966,6 +1966,48 @@ export async function getReadinessAutoChecks(labId: number): Promise<Record<stri
 
 export type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "platform_manager" | "accreditation_manager" | "education_manager" | "education_admin" | "education_student" | "platform_owner" | "platform_moderator" | "instructor" | "team_admin" | "affiliate";
 
+/** App roles that require legacy users.role = "admin" (JWT / upload guards). */
+export const PLATFORM_LEGACY_ADMIN_ROLES: readonly AppRole[] = ["platform_admin", "platform_owner"];
+
+function userShouldHaveLegacyAdminRole(
+  appRoles: readonly AppRole[],
+  openId: string | null | undefined,
+): boolean {
+  return appRoles.some((role) => PLATFORM_LEGACY_ADMIN_ROLES.includes(role))
+    || openId === ENV.ownerOpenId;
+}
+
+/**
+ * Keep users.role aligned with platform_admin / platform_owner assignments.
+ * Platform staff must have users.role = "admin", not "user".
+ */
+export async function syncLegacyAdminRole(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const [user] = await db
+    .select({ role: users.role, openId: users.openId })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!user) return false;
+
+  const appRoles = await getUserRoles(userId);
+  const shouldBeAdmin = userShouldHaveLegacyAdminRole(appRoles, user.openId);
+
+  if (shouldBeAdmin && user.role !== "admin") {
+    await db.update(users).set({ role: "admin" }).where(eq(users.id, userId));
+    return true;
+  }
+
+  if (!shouldBeAdmin && user.role === "admin" && user.openId !== ENV.ownerOpenId) {
+    await db.update(users).set({ role: "user" }).where(eq(users.id, userId));
+    return true;
+  }
+
+  return false;
+}
+
 /** Return all roles assigned to a user */
 export async function getUserRoles(userId: number): Promise<AppRole[]> {
   const db = await getDb();
@@ -2002,9 +2044,11 @@ export async function assignRole(
     assignedByUserId,
     grantedByLabId: grantedByLabId ?? null,
   });
-  // Sync isPremium flag when premium_user role is granted
   if (role === "premium_user") {
     await setPremiumStatus(userId, true, "admin");
+  }
+  if (PLATFORM_LEGACY_ADMIN_ROLES.includes(role)) {
+    await syncLegacyAdminRole(userId);
   }
 }
 
@@ -2014,9 +2058,11 @@ export async function removeRole(userId: number, role: AppRole): Promise<void> {
   if (!db) return;
   await db.delete(userRoles)
     .where(and(eq(userRoles.userId, userId), eq(userRoles.role, role)));
-  // Sync isPremium flag when premium_user role is revoked
   if (role === "premium_user") {
     await setPremiumStatus(userId, false, "admin");
+  }
+  if (PLATFORM_LEGACY_ADMIN_ROLES.includes(role)) {
+    await syncLegacyAdminRole(userId);
   }
 }
 
