@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { hasPlatformManagerAccess } from "../../shared/platformManagerAccess";
-import { buildInitialMediaVersionExtractionFields } from "./uploadMediaRepo";
+import {
+  buildInitialMediaVersionExtractionFields,
+  hasMediaRepositoryUploadAccess,
+} from "./uploadMediaRepo";
 
 describe("media upload extraction state", () => {
   it("marks a new document version skipped at upload time", () => {
@@ -37,17 +39,18 @@ describe("media upload extraction state", () => {
 
 describe("Media Repository upload authorization", () => {
   it("allows account-level and assigned Platform Admin upload access", () => {
-    expect(hasPlatformManagerAccess("admin", [])).toBe(true);
-    expect(hasPlatformManagerAccess("user", ["platform_admin"])).toBe(true);
+    expect(hasMediaRepositoryUploadAccess("admin", [])).toBe(true);
+    expect(hasMediaRepositoryUploadAccess("user", ["platform_admin"])).toBe(true);
+    expect(hasMediaRepositoryUploadAccess("user", ["platform_owner"])).toBe(true);
   });
 
   it("allows the limited Platform Manager content-creation role to upload media", () => {
-    expect(hasPlatformManagerAccess("user", ["platform_manager"])).toBe(true);
+    expect(hasMediaRepositoryUploadAccess("user", ["platform_manager"])).toBe(true);
   });
 
   it("continues to reject ordinary users and unrelated assigned roles", () => {
-    expect(hasPlatformManagerAccess("user", [])).toBe(false);
-    expect(hasPlatformManagerAccess("user", ["diy_admin"])).toBe(false);
-    expect(hasPlatformManagerAccess(null, ["premium_user"])).toBe(false);
+    expect(hasMediaRepositoryUploadAccess("user", [])).toBe(false);
+    expect(hasMediaRepositoryUploadAccess("user", ["diy_admin"])).toBe(false);
+    expect(hasMediaRepositoryUploadAccess(null, ["premium_user"])).toBe(false);
   });
 });

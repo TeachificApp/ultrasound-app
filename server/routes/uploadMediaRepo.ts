@@ -38,6 +38,7 @@ import { authenticatePlatformMediaAdmin } from "../lib/platformMediaAuth";
 import { getDb } from "../db";
 import { mediaAssets, mediaVersions, mediaUploadSessions } from "../../drizzle/schema";
 import { detectBrandFromHostname } from "../../shared/brands";
+import { hasPlatformManagerAccess } from "../../shared/platformManagerAccess";
 
 export function buildInitialMediaVersionExtractionFields(params: {
   mediaType: string;
@@ -167,6 +168,13 @@ async function detectScormInZip(zipBuffer: Buffer): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export function hasMediaRepositoryUploadAccess(
+  accountRole: string | null | undefined,
+  assignedRoles: string[],
+): boolean {
+  return hasPlatformManagerAccess(accountRole ?? "", assignedRoles);
 }
 
 // Threshold: files above this use R2 multipart, below use Forge API single-shot

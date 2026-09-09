@@ -1,5 +1,6 @@
 /**
  * Platform media access — upload/list/manage Media Repository and campaign assets.
+ * Matches mediaRepoRouter.assertPlatformAdmin role checks.
  */
 import type { Request } from "express";
 import { eq } from "drizzle-orm";
@@ -32,6 +33,7 @@ export async function userHasPlatformMediaAccess(
   return user?.openId === ownerId;
 }
 
+/** REST routes: authenticate cookie session and verify platform media access. */
 export async function authenticatePlatformMediaAdmin(
   req: Request,
 ): Promise<PlatformMediaUser | null> {
