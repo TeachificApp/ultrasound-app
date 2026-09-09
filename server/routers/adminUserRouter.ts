@@ -2415,12 +2415,13 @@ export const adminUserRouter = router({
         ORDER BY created_at DESC
         LIMIT ${input.pageSize} OFFSET ${offset}
       `) as any;
+      const { parseDbUtcTimestamp } = await import("../../shared/platformTime");
       const logins = (Array.isArray(rows) ? rows : []).map((r: any) => ({
         id: Number(r.id),
         ipAddress: r.ipAddress as string | null,
         userAgent: r.userAgent as string | null,
         country: r.country as string | null,
-        createdAt: r.createdAt,
+        createdAt: parseDbUtcTimestamp(r.createdAt),
       }));
       return { logins, total, totalPages: Math.ceil(total / input.pageSize) };
     }),
@@ -2474,6 +2475,7 @@ export const adminUserRouter = router({
         ORDER BY createdAt DESC
         LIMIT ${input.pageSize} OFFSET ${offset}
       `) as any;
+      const { parseDbUtcTimestamp } = await import("../../shared/platformTime");
       const events = (Array.isArray(rows) ? rows : []).map((r: any) => ({
         id: Number(r.id),
         eventType: String(r.eventType),
@@ -2481,7 +2483,7 @@ export const adminUserRouter = router({
         path: r.path as string | null,
         ipAddress: r.ipAddress as string | null,
         metadata: r.metadata,
-        createdAt: r.createdAt,
+        createdAt: parseDbUtcTimestamp(r.createdAt),
       }));
       return { events, total, totalPages: Math.ceil(total / input.pageSize) };
     }),
