@@ -27,7 +27,8 @@ import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import React, { useState, useEffect } from "react";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
-import { handleCtaBtnClick } from "@/lib/ctaUtils";
+import { handleCtaBtnClick, type DirectCheckoutHandler } from "@/lib/ctaUtils";
+import { useDirectCheckout } from "@/lib/directCheckout";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 import { formatWorkshopDollars, shouldRouteWorkshopCtaToCheckout } from "../../../shared/workshopPricing";
@@ -362,6 +363,8 @@ export default function WorkshopLanding() {
 
   // checkoutMutation kept for free-enrollment path via handleCta (pricingOptions flow)
   // For instance-specific paid checkout, we navigate to /checkout/workshop/:slug?instance=<id>
+  const handleDirectCheckout = useDirectCheckout();
+
   const checkoutMutation = trpc.workshopLearner.createEmbeddedCheckoutSession.useMutation({
     onSuccess: (res: any) => {
       if (res.free) {
@@ -495,6 +498,7 @@ export default function WorkshopLanding() {
       undefined,
       (pricingOptionId?: number) => handleCta(pricingOptionId),
       undefined,
+      handleDirectCheckout,
     );
   }
 
@@ -624,6 +628,7 @@ export default function WorkshopLanding() {
                           instanceId={nextUpcoming.id}
                           accentColor={accentColor}
                           onRegister={() => handleInstanceRegister(nextUpcoming.id)}
+                          onDirectCheckout={handleDirectCheckout}
                           enrollNowText={enrollNowText}
                           showEnrollNow={showEnrollNow}
                         />
@@ -741,6 +746,7 @@ export default function WorkshopLanding() {
                             instanceId={inst.id}
                             accentColor={accentColor}
                             onRegister={() => handleInstanceRegister(inst.id)}
+                            onDirectCheckout={handleDirectCheckout}
                             enrollNowText={enrollNowText}
                             showEnrollNow={showEnrollNow}
                           />
@@ -859,6 +865,9 @@ export default function WorkshopLanding() {
               <BlockPreview
                 key={block.id}
                 block={block}
+                onEnroll={(isWaitlistMode || isAllSoldOut) ? openWaitlistOrNotify : () => enrollMutation.mutate({ workshopId: workshop!.id })}
+                onCheckoutPage={(pricingOptionId?: number) => handleCta(pricingOptionId)}
+                onDirectCheckout={handleDirectCheckout}
               />
             );
           })}
@@ -1012,6 +1021,7 @@ export default function WorkshopLanding() {
         open={selectedInstanceId !== null}
         instanceId={selectedInstanceId}
         onClose={() => setSelectedInstanceId(null)}
+        onDirectCheckout={handleDirectCheckout}
         onRegister={() => {
           const id = selectedInstanceId;
           setSelectedInstanceId(null);
@@ -1026,7 +1036,7 @@ export default function WorkshopLanding() {
 // Renders a landing block for a public page. Unlike BlockPreview, it renders
 // remaining_seats with live data (no preview flag), auto-binding the current
 // workshop instance id from context when no sourceId is saved on the block.
-function PublicLandingBlock({ block, instanceId, onRegister }: { block: any; instanceId: number | null; onRegister?: () => void }) {
+function PublicLandingBlock({ block, instanceId, onRegister, onDirectCheckout }: { block: any; instanceId: number | null; onRegister?: () => void; onDirectCheckout?: DirectCheckoutHandler }) {
   if (block.type === "remaining_seats") {
     const rsData = { ...block.data };
     if (instanceId && (!rsData.sourceId || Number(rsData.sourceId) === 0)) {
@@ -1037,7 +1047,7 @@ function PublicLandingBlock({ block, instanceId, onRegister }: { block: any; ins
   }
   // Pass onRegister as both onEnroll and onCheckoutPage so CTA buttons
   // inside instance landing blocks (e.g. "Save My Seat") trigger checkout
-  return <BlockPreview block={block} onEnroll={onRegister} onCheckoutPage={onRegister} />;
+  return <BlockPreview block={block} onEnroll={onRegister} onCheckoutPage={onRegister} onDirectCheckout={onDirectCheckout} />;
 }
 // ─── Workshop Instance Detail Modal ──────────────────────────────────────────
 // Full-page modal that fetches and renders a workshop instance's landing blocks.
@@ -1046,11 +1056,13 @@ function WorkshopInstanceDetailModal({
   instanceId,
   onClose,
   onRegister,
+  onDirectCheckout,
 }: {
   open: boolean;
   instanceId: number | null;
   onClose: () => void;
   onRegister: () => void;
+  onDirectCheckout?: DirectCheckoutHandler;
 }) {
   const { data, isLoading, error } = trpc.workshop.getInstancePage.useQuery(
     { instanceId: instanceId! },
@@ -1188,7 +1200,7 @@ function WorkshopInstanceDetailModal({
               ) : (
                 <div>
           {(data.landingBlocks as any[]).map((block: any) => (
-            <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} onRegister={onRegister} />
+            <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} onRegister={onRegister} onDirectCheckout={onDirectCheckout} />
           ))}
                 </div>
               )}
@@ -1206,12 +1218,14 @@ function WorkshopInstanceEmbedSection({
   instanceId,
   accentColor,
   onRegister,
+  onDirectCheckout,
   enrollNowText,
   showEnrollNow,
 }: {
   instanceId: number;
   accentColor: string;
   onRegister: () => void;
+  onDirectCheckout?: DirectCheckoutHandler;
   enrollNowText: string;
   showEnrollNow: boolean;
 }) {
@@ -1335,7 +1349,7 @@ function WorkshopInstanceEmbedSection({
       ) : (
         <div>
           {(data.landingBlocks as any[]).map((block: any) => (
-            <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} onRegister={onRegister} />
+            <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} onRegister={onRegister} onDirectCheckout={onDirectCheckout} />
           ))}
           {showEnrollNow && !instanceIsSoldOut && (
             <div className="text-center py-6">

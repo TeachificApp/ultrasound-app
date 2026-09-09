@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Calendar, Clock, Users, Video, Bell, CheckCircle } from "lucide-react";
 import type { Block } from "@/components/BlockPreview";
 import { BlockPreview } from "@/components/BlockPreview";
+import { useDirectCheckout } from "@/lib/directCheckout";
 import type { UserParamSource } from "@/lib/userUrlParams";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
@@ -48,7 +49,7 @@ export function formatTime(ts: number | null | undefined, tz?: string | null): s
 
 // ─── RenderBlock ──────────────────────────────────────────────────────────────
 function RenderBlock({
-  block, webinar, onRegister, registering, ctaText, price, isRegistered, isDraft, onDraftNotify, user,
+  block, webinar, onRegister, registering, ctaText, price, isRegistered, isDraft, onDraftNotify, user, onDirectCheckout,
 }: {
   block: Block;
   webinar: any;
@@ -60,6 +61,7 @@ function RenderBlock({
   isDraft: boolean;
   onDraftNotify: () => void;
   user?: UserParamSource | null;
+  onDirectCheckout?: (productType: string, productId: number, promoCode?: string) => void | Promise<void>;
 }) {
   const d = block.data ?? {};
   const isEnrollBtn = (btn: any) => {
@@ -152,10 +154,10 @@ function RenderBlock({
     case "webinar_host_bio":
     case "webinar_replay":
     case "webinar_agenda":
-      return <BlockPreview block={block} />;
+      return <BlockPreview block={block} onEnroll={onRegister} onCheckoutPage={onRegister} onDirectCheckout={onDirectCheckout} />;
 
     default:
-      return <BlockPreview block={block} />;
+      return <BlockPreview block={block} onEnroll={onRegister} onCheckoutPage={onRegister} onDirectCheckout={onDirectCheckout} />;
   }
 }
 
@@ -321,6 +323,7 @@ export default function WebinarLanding() {
   });
 
   const registering = registerMut.isPending;
+  const handleDirectCheckout = useDirectCheckout();
 
   // Pre-fill notify modal with user info
   useEffect(() => {
@@ -426,6 +429,7 @@ export default function WebinarLanding() {
               isDraft={isDraft}
               onDraftNotify={handleDraftNotify}
               user={user as UserParamSource | null}
+              onDirectCheckout={handleDirectCheckout}
             />
           ))}
         </div>
