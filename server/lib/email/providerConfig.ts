@@ -1,7 +1,7 @@
 import { getBrandDisplayConfig, type BrandMode } from "@shared/brands";
 import type { EmailProviderId, ResolvedEmailSender } from "./types";
 
-/** Active transactional email provider (default: smtpcom / SMTP.com). */
+/** Active transactional email provider preference (default: smtpcom / SMTP.com). */
 export function getEmailProviderId(): EmailProviderId {
   const raw = (process.env.EMAIL_PROVIDER ?? "smtpcom").trim().toLowerCase();
   if (raw === "sendgrid") return "sendgrid";
@@ -9,29 +9,51 @@ export function getEmailProviderId(): EmailProviderId {
   return "smtpcom";
 }
 
+export function isSmtpComConfigured(): boolean {
+  return !!(process.env.SMTPCOM_API_KEY?.trim() && process.env.SMTPCOM_CHANNEL?.trim());
+}
+
+export function isSendGridConfigured(): boolean {
+  return !!process.env.SENDGRID_API_KEY?.trim();
+}
+
+/**
+ * Provider actually used to send mail. Prefers configured SMTP.com when selected,
+ * otherwise falls back to SendGrid (and vice versa) so auth emails keep working.
+ */
+export function resolveEffectiveEmailProvider(): EmailProviderId | null {
+  const preferred = getEmailProviderId();
+  if (preferred === "smtpcom") {
+    if (isSmtpComConfigured()) return "smtpcom";
+    if (isSendGridConfigured()) return "sendgrid";
+    return null;
+  }
+  if (isSendGridConfigured()) return "sendgrid";
+  if (isSmtpComConfigured()) return "smtpcom";
+  return null;
+}
+
 export function isSendGridProvider(): boolean {
-  return getEmailProviderId() === "sendgrid";
+  return resolveEffectiveEmailProvider() === "sendgrid";
 }
 
 export function isSmtpComProvider(): boolean {
-  return getEmailProviderId() === "smtpcom";
+  return resolveEffectiveEmailProvider() === "smtpcom";
 }
 
 export function isEmailProviderConfigured(): boolean {
-  const provider = getEmailProviderId();
-  if (provider === "smtpcom") {
-    return !!(process.env.SMTPCOM_API_KEY?.trim() && process.env.SMTPCOM_CHANNEL?.trim());
-  }
-  return !!process.env.SENDGRID_API_KEY?.trim();
+  return resolveEffectiveEmailProvider() !== null;
 }
 
 export function resolveEmailSender(opts: {
   brandMode?: BrandMode;
   fromName?: string;
   fromEmail?: string;
+  /** Override which provider's from-env vars to use (defaults to effective provider). */
+  provider?: EmailProviderId;
 }): ResolvedEmailSender {
   const brandConfig = getBrandDisplayConfig(opts.brandMode || "aaus");
-  const provider = getEmailProviderId();
+  const provider = opts.provider ?? resolveEffectiveEmailProvider() ?? getEmailProviderId();
 
   const defaultEmail =
     provider === "smtpcom"
@@ -50,12 +72,15 @@ export function resolveEmailSender(opts: {
 }
 
 export function emailProviderStatus() {
-  const provider = getEmailProviderId();
+  const preferred = getEmailProviderId();
+  const effective = resolveEffectiveEmailProvider();
   return {
-    provider,
-    configured: isEmailProviderConfigured(),
+    provider: preferred,
+    effectiveProvider: effective,
+    configured: effective !== null,
+    usingFallback: effective !== null && effective !== preferred,
     sendgrid: {
-      hasApiKey: !!process.env.SENDGRID_API_KEY,
+      hasApiKey: isSendGridConfigured(),
       keyPrefix: process.env.SENDGRID_API_KEY?.substring(0, 7) || "NOT SET",
       fromEmail: process.env.SENDGRID_FROM_EMAIL || "NOT SET",
       fromName: process.env.SENDGRID_FROM_NAME || "NOT SET",

@@ -225,7 +225,7 @@ async function startServer() {
         status.provider === "smtpcom" && !status.configured
           ? status.smtpcom.hasApiKey && !status.smtpcom.hasChannel
             ? "Set SMTPCOM_CHANNEL to one of the channel names returned in smtpcomChannels (or from your SMTP.com dashboard)."
-            : "Set SMTPCOM_API_KEY and SMTPCOM_CHANNEL (SMTP.com is the default provider)."
+            : "Set SMTPCOM_API_KEY and SMTPCOM_CHANNEL, or ensure SENDGRID_API_KEY is set for fallback."
           : undefined,
       deployedAt: new Date().toISOString(),
     });

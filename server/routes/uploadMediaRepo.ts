@@ -34,7 +34,7 @@ import {
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
 } from "@aws-sdk/client-s3";
-import { sdk } from "../_core/sdk";
+import { authenticatePlatformMediaAdmin } from "../lib/platformMediaAuth";
 import { getDb } from "../db";
 import { mediaAssets, mediaVersions, mediaUploadSessions } from "../../drizzle/schema";
 import { detectBrandFromHostname } from "../../shared/brands";
@@ -169,14 +169,6 @@ async function detectScormInZip(zipBuffer: Buffer): Promise<boolean> {
   }
 }
 
-async function authenticateAdmin(req: Request): Promise<{ id: number; role: string } | null> {
-  try {
-    const user = await sdk.authenticateRequest(req) as any;
-    if (user?.role === "admin") return user;
-  } catch {}
-  return null;
-}
-
 // Threshold: files above this use R2 multipart, below use Forge API single-shot
 // Set to 20 MB to match the Forge API proxy upload limit
 const LARGE_FILE_THRESHOLD = 20 * 1024 * 1024; // 20 MB
@@ -188,7 +180,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // ── /api/upload-media-repo/init ──────────────────────────────────────────────
 router.post("/api/upload-media-repo/init", async (req: Request, res: Response) => {
-  const user = await authenticateAdmin(req);
+  const user = await authenticatePlatformMediaAdmin(req);
   if (!user) {
     res.status(401).json({ error: "Unauthorized" }); return;
   }
@@ -308,7 +300,7 @@ router.post(
   upload.single("chunk"),
   async (req: Request, res: Response) => {
    try {
-    const user = await authenticateAdmin(req);
+    const user = await authenticatePlatformMediaAdmin(req);
     if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
     if (!req.file) { res.status(400).json({ error: "No chunk provided" }); return; }
@@ -638,7 +630,7 @@ router.post(
   "/api/upload-media-repo",
   uploadLegacy.single("file"),
   async (req: Request, res: Response) => {
-    const user = await authenticateAdmin(req);
+    const user = await authenticatePlatformMediaAdmin(req);
     if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
     if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
 
@@ -747,7 +739,7 @@ router.post(
 
 // ── Admin endpoint to trigger SCORM extraction for existing assets ───────────
 router.post("/api/upload-media-repo/extract-scorm", async (req: Request, res: Response) => {
-  const user = await authenticateAdmin(req);
+  const user = await authenticatePlatformMediaAdmin(req);
   if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   const db = await getDb();
