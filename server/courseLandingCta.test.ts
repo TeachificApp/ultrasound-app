@@ -31,6 +31,7 @@ describe("course landing CTA wiring", () => {
     expect(courseLandingSource).toContain("onCheckoutPage={onCheckoutPage ?? onEnroll}");
     expect(courseLandingSource).toContain('case "urgency_offer"');
     expect(courseLandingSource).toContain("return <TickerBlock data={d} />");
+    expect(courseLandingSource).toContain('import { shouldRouteWorkshopCtaToCheckout } from "@shared/workshopPricing"');
     expect(courseLandingSource).toContain("shouldRouteWorkshopCtaToCheckout");
   });
 
