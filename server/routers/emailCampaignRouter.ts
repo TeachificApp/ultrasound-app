@@ -69,6 +69,10 @@ import {
   buildUnsubscribePageUrl,
   ensureEmailCampaignEventsTable,
 } from "../lib/campaignUnsubscribe";
+import { AiContentGenerationSourcesSchema, hasAiContentGenerationSources } from "../../shared/aiContentSources";
+import { buildRichTextAiUserContent, targetWordCountPromptLine } from "../lib/aiContentSources";
+import { countRenderedWords, enforceTargetWordCount, trimHtmlToWordCount } from "../lib/lessonContentGeneration";
+import { enforceTargetWordCountOnEmailBlocks } from "../lib/richTextAiGeneration";
 
 // ─── Campaign metrics helper ──────────────────────────────────────────────────
 
@@ -391,7 +395,7 @@ export const emailCampaignRouter = router({
 // ─── AI Email Copy Generator ───────────────────────────────────────────────
 generateEmailCopy: protectedProcedure
   .input(z.object({
-    brief: z.string().min(5).max(2000),
+    brief: z.string().min(1).max(2000),
     tone: z.enum(["professional", "enthusiastic", "educational", "urgent", "friendly"]).default("professional"),
     emailType: z.enum(["announcement", "promotion", "newsletter", "course_launch", "event", "follow_up"]).default("announcement"),
     brandName: z.string().optional(),
@@ -399,9 +403,12 @@ generateEmailCopy: protectedProcedure
     ctaUrl: z.string().optional(),
     generateBannerImage: z.boolean().default(false),
     includeEmoji: z.boolean().default(false),
-  }))
+  }).merge(AiContentGenerationSourcesSchema))
   .mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx.user.id);
+    if (!input.brief.trim() && !hasAiContentGenerationSources(input)) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Enter a brief or provide source material (text, URL, or files)." });
+    }
     const brand = input.brandName || "All About Ultrasound";
     const toneMap: Record<string, string> = {
       professional: "professional and authoritative",
@@ -425,11 +432,14 @@ generateEmailCopy: protectedProcedure
       ? "Use relevant emojis inline within the text (1-3 per block, placed naturally within sentences, not just at the start)."
       : "Do NOT include any emojis in the generated content.";
     const systemPrompt = `You are an expert email copywriter for ${brand}, a medical ultrasound education platform. Write compelling, professional email campaigns for healthcare professionals (sonographers, physicians, nurses, radiologists). Use US English spelling. Return ONLY a valid JSON object.`;
+    const wordCountSection = input.targetWordCount
+      ? `\nTotal body word count: all heading and text block HTML combined should be approximately ${input.targetWordCount} readable words (excluding HTML tags).${targetWordCountPromptLine(input.targetWordCount)}`
+      : "";
     const userPrompt = `Write a ${typeMap[input.emailType]} email with a ${toneMap[input.tone]} tone.
 
 Brief / key content: ${input.brief}
 ${ctaSection}
-Emoji style: ${emojiInstruction}
+Emoji style: ${emojiInstruction}${wordCountSection}
 
 Return a JSON object with exactly these fields:
 {
@@ -451,10 +461,15 @@ Rules:
 - Keep content focused, scannable, relevant to ultrasound/medical education professionals
 - imagePrompt: describe a clean, professional banner image for a medical education email (no text in image)`;
 
+    const userContent = await buildRichTextAiUserContent(userPrompt, {
+      sourceText: input.sourceText,
+      sourceUrls: input.sourceUrls,
+      sourceFiles: input.sourceFiles,
+    });
     const response = await invokeLLM({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: "user", content: userContent as any },
       ],
       response_format: {
         type: "json_schema",
@@ -499,7 +514,10 @@ Rules:
 
     // Add unique IDs to blocks
     const { nanoid } = await import("nanoid");
-    const blocks = (parsed.blocks ?? []).map((b: any) => ({ ...b, id: nanoid() }));
+    let blocks = (parsed.blocks ?? []).map((b: any) => ({ ...b, id: nanoid() }));
+    if (input.targetWordCount) {
+      blocks = enforceTargetWordCountOnEmailBlocks(blocks, input.targetWordCount);
+    }
 
     // Optionally generate banner image
     let imageUrl: string | null = null;
@@ -537,12 +555,12 @@ generateEmailBlock: protectedProcedure
     blockId: z.string().optional(), // client-side only, echoed back for block lookup
     blockType: z.enum(["heading", "text", "button", "quote"]),
     currentHtml: z.string().optional(),
-    instruction: z.string().min(3).max(1000),
+    instruction: z.string().min(1).max(1000),
     tone: z.enum(["professional", "enthusiastic", "educational", "urgent", "friendly"]).default("professional"),
     emailContext: z.string().optional(), // brief summary of the overall email for context
     generateBlockImage: z.boolean().default(false),
     includeEmoji: z.boolean().default(false),
-  }))
+  }).merge(AiContentGenerationSourcesSchema))
   .mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx.user.id);
     const toneMap: Record<string, string> = {
@@ -564,10 +582,13 @@ generateEmailBlock: protectedProcedure
       ? "\nEmoji: Include 1-2 relevant emojis placed naturally inline within the text."
       : "\nEmoji: Do NOT include any emojis.";
     const systemPrompt = `You are an expert email copywriter for All About Ultrasound, a medical ultrasound education platform. Write compelling content for healthcare professionals. Use US English spelling. Return ONLY a valid JSON object.`;
+    const wordCountSection = input.targetWordCount
+      ? `\nOutput length:${targetWordCountPromptLine(input.targetWordCount)}`
+      : "";
     const userPrompt = `Rewrite or generate a ${input.blockType} block for a medical education email.
 Tone: ${toneMap[input.tone]}
 Block type: ${blockGuide[input.blockType]}
-Instruction: ${input.instruction}${contextSection}${currentSection}${emojiBlockInstruction}
+Instruction: ${input.instruction}${contextSection}${currentSection}${emojiBlockInstruction}${wordCountSection}
 
 Return a JSON object with exactly one field:
 { "html": "the generated HTML content" }
@@ -579,10 +600,18 @@ Rules:
 - For quote: use <blockquote> tag
 - Keep it concise and relevant to ultrasound/medical education`;
 
+    if (!input.instruction.trim() && !hasAiContentGenerationSources(input)) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Enter an instruction or provide source material (text, URL, or files)." });
+    }
+    const userContent = await buildRichTextAiUserContent(userPrompt, {
+      sourceText: input.sourceText,
+      sourceUrls: input.sourceUrls,
+      sourceFiles: input.sourceFiles,
+    });
     const response = await invokeLLM({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
+        { role: "user", content: userContent as any },
       ],
       response_format: {
         type: "json_schema",
@@ -623,7 +652,50 @@ Rules:
         console.error("[AI Email Block] Image generation failed:", e);
       }
     }
-    return { html: parsed.html ?? "", blockId: input.blockId ?? null, imageUrl: blockImageUrl };
+    let html = parsed.html ?? "";
+    if (input.targetWordCount && input.blockType !== "button") {
+      html = await enforceTargetWordCount(
+        html,
+        input.targetWordCount,
+        async (draft, wordsNeeded) => {
+          const extendPrompt = `The draft below is only ${countRenderedWords(draft).toLocaleString("en-US")} readable words and needs about ${wordsNeeded.toLocaleString("en-US")} more. Continue this ${input.blockType} block with non-duplicative HTML only.\n\nCURRENT DRAFT:\n${draft}`;
+          const extendContent = await buildRichTextAiUserContent(extendPrompt, {
+            sourceText: input.sourceText,
+            sourceUrls: input.sourceUrls,
+            sourceFiles: input.sourceFiles,
+          });
+          const extendResponse = await invokeLLM({
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: extendContent as any },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "block_content",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: { html: { type: "string" } },
+                  required: ["html"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+          const extendRaw = extendResponse.choices[0]?.message?.content ?? "{}";
+          try {
+            return JSON.parse(extendRaw).html ?? "";
+          } catch {
+            return "";
+          }
+        },
+      );
+      if (countRenderedWords(html) > Math.ceil(input.targetWordCount * 1.1)) {
+        html = trimHtmlToWordCount(html, Math.ceil(input.targetWordCount * 1.1));
+      }
+    }
+    return { html, blockId: input.blockId ?? null, imageUrl: blockImageUrl };
   }),
   // ── User: interest preferences ────────────────────────────────────────────
 
