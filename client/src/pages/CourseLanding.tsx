@@ -43,6 +43,7 @@ export { handleCtaBtnClick };
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 import { isScheduledDeadlineOpen, scheduledWallTimeToUtc } from "@shared/platformTime";
+import { shouldRouteWorkshopCtaToCheckout } from "@shared/workshopPricing";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
