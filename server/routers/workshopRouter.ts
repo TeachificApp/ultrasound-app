@@ -660,6 +660,12 @@ export const workshopLearnerRouter = router({
         orderBumpId: orderBumpCheckout?.metadata?.order_bump_id,
         bumpMode: orderBumpCheckout?.bumpMode,
       });
+      const { metadata: workshopShareMetadata, paymentIntentData: workshopShareIntentData } =
+        await (await import("../lib/revenueShareEngine")).applyRevenueShareToCheckoutSession({
+          courseId: workshop.id,
+          grossAmountCents: priceInCents,
+          excludePaymentTime: Boolean(orderBumpCheckout),
+        });
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
@@ -677,8 +683,9 @@ export const workshopLearnerRouter = router({
           customer_email: userEmail ?? "",
           ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}),
           ...orderBumpCheckout?.metadata,
+          ...workshopShareMetadata,
         },
-        payment_intent_data: { description: `${workshop.title} — Workshop Registration` },
+        payment_intent_data: { description: `${workshop.title} — Workshop Registration`, ...workshopShareIntentData },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=workshop`,
       }, { idempotencyKey: workshopCheckoutIdempotencyKey });
 

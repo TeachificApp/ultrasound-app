@@ -115,6 +115,72 @@ export interface PaymentTimeRevenueShare {
   sharePercentage: number;
 }
 
+type AssignmentWithPartner = {
+  assignmentId: number;
+  partnerId: number;
+  percentage: string | number;
+  stripeAccountId: string | null;
+  onboardingStatus: string | null;
+  label?: string | null;
+};
+
+export function buildPaymentTimeRevenueShareMetadata(share: PaymentTimeRevenueShare): Record<string, string> {
+  return {
+    revenue_share_payment_time: "true",
+    revenue_share_partner_id: String(share.partnerId),
+    revenue_share_assignment_id: String(share.assignmentId),
+    revenue_share_amount_cents: String(share.shareAmountCents),
+    revenue_share_percentage: String(share.sharePercentage),
+  };
+}
+
+export function buildPaymentTimeRevenueShareCheckoutOptions(share: PaymentTimeRevenueShare | null): {
+  metadata: Record<string, string>;
+  paymentIntentData: Record<string, unknown>;
+} {
+  if (!share) return { metadata: {}, paymentIntentData: {} };
+  const metadata = buildPaymentTimeRevenueShareMetadata(share);
+  return {
+    metadata,
+    paymentIntentData: {
+      transfer_data: {
+        destination: share.stripeAccountId,
+        amount: share.shareAmountCents,
+      },
+      metadata,
+    },
+  };
+}
+
+/** Course-specific assignments win; otherwise fall back to global (courseId IS NULL). */
+export async function fetchActiveAssignmentsForCourse(courseId: number): Promise<AssignmentWithPartner[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const baseSelect = {
+    assignmentId: revenueShareAssignments.id,
+    partnerId: revenueShareAssignments.partnerId,
+    percentage: revenueShareAssignments.percentage,
+    stripeAccountId: revenueSharePartners.stripeAccountId,
+    onboardingStatus: revenueSharePartners.onboardingStatus,
+    label: revenueShareAssignments.label,
+  };
+
+  const courseSpecific = await db
+    .select(baseSelect)
+    .from(revenueShareAssignments)
+    .leftJoin(revenueSharePartners, eq(revenueSharePartners.id, revenueShareAssignments.partnerId))
+    .where(and(eq(revenueShareAssignments.active, true), eq(revenueShareAssignments.courseId, courseId)));
+
+  if (courseSpecific.length > 0) return courseSpecific;
+
+  return db
+    .select(baseSelect)
+    .from(revenueShareAssignments)
+    .leftJoin(revenueSharePartners, eq(revenueSharePartners.id, revenueShareAssignments.partnerId))
+    .where(and(eq(revenueShareAssignments.active, true), isNull(revenueShareAssignments.courseId)));
+}
+
 export function getPartnerShareDisposition(partner: {
   stripeAccountId?: string | null;
   onboardingStatus?: string | null;
@@ -137,24 +203,9 @@ export async function resolvePaymentTimeRevenueShare(input: {
   courseId: number;
   grossAmountCents: number;
 }): Promise<PaymentTimeRevenueShare | null> {
-  const db = await getDb();
-  if (!db || input.grossAmountCents < 1) return null;
+  if (input.grossAmountCents < 1) return null;
 
-  const assignments = await db
-    .select({
-      assignmentId: revenueShareAssignments.id,
-      partnerId: revenueShareAssignments.partnerId,
-      percentage: revenueShareAssignments.percentage,
-      stripeAccountId: revenueSharePartners.stripeAccountId,
-      onboardingStatus: revenueSharePartners.onboardingStatus,
-    })
-    .from(revenueShareAssignments)
-    .leftJoin(revenueSharePartners, eq(revenueSharePartners.id, revenueShareAssignments.partnerId))
-    .where(and(
-      eq(revenueShareAssignments.active, true),
-      or(eq(revenueShareAssignments.courseId, input.courseId), isNull(revenueShareAssignments.courseId)),
-    ));
-
+  const assignments = await fetchActiveAssignmentsForCourse(input.courseId);
   if (assignments.length !== 1) return null;
   const assignment = assignments[0];
   const disposition = getPartnerShareDisposition(assignment);
@@ -183,47 +234,39 @@ export async function calculateRevenueShares(
   const db = await getDb();
   if (!db) return [];
 
-  // Find assignments: course-specific first, then global (courseId IS NULL)
-  const assignments = await db
-    .select({
-      id: revenueShareAssignments.id,
-      partnerId: revenueShareAssignments.partnerId,
-      courseId: revenueShareAssignments.courseId,
-      percentage: revenueShareAssignments.percentage,
-      label: revenueShareAssignments.label,
-    })
-    .from(revenueShareAssignments)
-    .where(
-      and(
-        eq(revenueShareAssignments.active, true),
-        ctx.courseId
-          ? or(
-              eq(revenueShareAssignments.courseId, ctx.courseId),
-              isNull(revenueShareAssignments.courseId)
-            )
-          : isNull(revenueShareAssignments.courseId)
-      )
-    );
+  const assignmentRows = ctx.courseId
+    ? await fetchActiveAssignmentsForCourse(ctx.courseId)
+    : await db
+        .select({
+          assignmentId: revenueShareAssignments.id,
+          partnerId: revenueShareAssignments.partnerId,
+          percentage: revenueShareAssignments.percentage,
+          stripeAccountId: revenueSharePartners.stripeAccountId,
+          onboardingStatus: revenueSharePartners.onboardingStatus,
+          label: revenueShareAssignments.label,
+        })
+        .from(revenueShareAssignments)
+        .leftJoin(revenueSharePartners, eq(revenueSharePartners.id, revenueShareAssignments.partnerId))
+        .where(and(eq(revenueShareAssignments.active, true), isNull(revenueShareAssignments.courseId)));
 
-  if (assignments.length === 0) return [];
+  if (assignmentRows.length === 0) return [];
 
-  // Load partner Stripe account IDs
-  const partnerIds = [...new Set(assignments.map((a) => a.partnerId))];
-  const partners = await db
-    .select({
-      id: revenueSharePartners.id,
-      stripeAccountId: revenueSharePartners.stripeAccountId,
-      onboardingStatus: revenueSharePartners.onboardingStatus,
-    })
-    .from(revenueSharePartners)
-    .where(inArray(revenueSharePartners.id, partnerIds));
+  const assignments = assignmentRows.map(row => ({
+    id: row.assignmentId,
+    partnerId: row.partnerId,
+    percentage: row.percentage,
+    label: row.label,
+  }));
 
-  const partnerMap = new Map(partners.map((p) => [p.id, p]));
+  const partnerMap = new Map(assignmentRows.map(row => [row.partnerId, row]));
 
   const shares: PartnerShare[] = [];
   for (const assignment of assignments) {
     const partner = partnerMap.get(assignment.partnerId);
-    const disposition = getPartnerShareDisposition(partner ?? {});
+    const disposition = getPartnerShareDisposition({
+      stripeAccountId: partner?.stripeAccountId,
+      onboardingStatus: partner?.onboardingStatus,
+    });
 
     const pct = parseFloat(String(assignment.percentage));
     const shareAmountCents = Math.floor((ctx.grossAmountCents * pct) / 100);
@@ -250,6 +293,85 @@ export async function calculateRevenueShares(
  * Creates a ledger entry for each partner, then fires the Stripe transfer.
  * Non-blocking: errors are logged but don't fail the main checkout flow.
  */
+/** Attach payment-time destination split metadata/options when exactly one partner qualifies. */
+export async function applyRevenueShareToCheckoutSession(input: {
+  courseId: number;
+  grossAmountCents: number;
+  excludePaymentTime?: boolean;
+}) {
+  if (input.excludePaymentTime || input.grossAmountCents < 1) {
+    return buildPaymentTimeRevenueShareCheckoutOptions(null);
+  }
+  const share = await resolvePaymentTimeRevenueShare({
+    courseId: input.courseId,
+    grossAmountCents: input.grossAmountCents,
+  });
+  return buildPaymentTimeRevenueShareCheckoutOptions(share);
+}
+
+/** Webhook helper: record payment-time ledger entry or run post-payment transfers. */
+export async function recordRevenueShareFromCompletedCheckout(input: {
+  session: Record<string, unknown>;
+  courseId: number;
+  courseTitle?: string | null;
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const meta = (input.session.metadata as Record<string, string>) ?? {};
+  const paymentTimeSplit = meta.revenue_share_payment_time === "true";
+  if (paymentTimeSplit) {
+    const partnerId = Number(meta.revenue_share_partner_id);
+    const assignmentId = Number(meta.revenue_share_assignment_id);
+    const shareAmount = Number(meta.revenue_share_amount_cents);
+    const sharePercentage = meta.revenue_share_percentage;
+    if (Number.isInteger(partnerId) && Number.isInteger(assignmentId) && Number.isInteger(shareAmount) && shareAmount > 0 && sharePercentage) {
+      const sessionId = input.session.id as string;
+      const [existing] = await db.select({ id: revenueShareLedger.id })
+        .from(revenueShareLedger)
+        .where(and(
+          eq(revenueShareLedger.partnerId, partnerId),
+          eq(revenueShareLedger.assignmentId, assignmentId),
+          eq(revenueShareLedger.checkoutSessionId, sessionId),
+        ))
+        .limit(1);
+      if (!existing) {
+        const now = Date.now();
+        await db.insert(revenueShareLedger).values({
+          partnerId,
+          assignmentId,
+          courseId: input.courseId,
+          courseTitle: input.courseTitle ?? null,
+          paymentIntentId: (input.session.payment_intent as string) ?? null,
+          checkoutSessionId: sessionId,
+          customerEmail: (input.session.customer_email as string) ?? (input.session.customer_details as any)?.email ?? null,
+          grossAmount: (input.session.amount_total as number) ?? 0,
+          sharePercentage,
+          shareAmount,
+          currency: (input.session.currency as string) ?? "usd",
+          status: "paid",
+          paidAt: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+    }
+    return;
+  }
+
+  await executeRevenueShareTransfers({
+    courseId: input.courseId,
+    grossAmountCents: (input.session.amount_total as number) ?? 0,
+    currency: (input.session.currency as string) ?? "usd",
+    paymentIntentId: typeof input.session.payment_intent === "string"
+      ? input.session.payment_intent
+      : (input.session.payment_intent as { id?: string } | undefined)?.id ?? null,
+    checkoutSessionId: input.session.id as string,
+    customerEmail: (input.session.customer_email as string) ?? (input.session.customer_details as any)?.email ?? null,
+    courseTitle: input.courseTitle ?? null,
+  });
+}
+
 export async function executeRevenueShareTransfers(ctx: RevenueShareContext): Promise<void> {
   const db = await getDb();
   if (!db) return;
