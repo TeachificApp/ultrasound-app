@@ -44,7 +44,8 @@ import { enrichCohortResources } from "../lib/cohortResources";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
-import { countRenderedWords, extendFullLessonDraft, fullLessonWordsRemaining, isCompleteFullLesson, MIN_FULL_LESSON_WORDS, TARGET_FULL_LESSON_WORDS } from "../lib/lessonContentGeneration";
+import { AiContentGenerationSourcesSchema } from "../../shared/aiContentSources";
+import { generateRichTextHtmlContent } from "../lib/richTextAiGeneration";
 import {
   lmsCourses,
   lmsSections,
@@ -677,49 +678,23 @@ export const lmsRouter = router({
   // ── AI Lesson Content Generator ──────────────────────────────────────────
   generateLessonContent: protectedProcedure
     .input(z.object({
-      lessonTitle: z.string().min(1),
+      lessonTitle: z.string().default(""),
       courseTitle: z.string().optional(),
       format: z.enum(["full_lesson", "text", "outline", "summary", "quiz_questions"]).default("text"),
-    }))
+    }).merge(AiContentGenerationSourcesSchema))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
-      const formatInstructions: Record<string, string> = {
-        full_lesson: `Write a complete, publication-ready lesson of at least ${MIN_FULL_LESSON_WORDS.toLocaleString("en-US")} readable words, excluding HTML markup. Target approximately ${TARGET_FULL_LESSON_WORDS.toLocaleString("en-US")} readable words so the minimum is met. Use a meaningful clinical introduction; clearly labeled sections for anatomy or physiology where relevant, scanning technique, interpretation, common pitfalls, and clinical pearls; and a concise conclusion. Use <h2>, <h3>, <p>, and <ul>/<li> tags. Do not include <html>, <head>, or <body> tags.`,
-        text: "Write comprehensive, well-structured lesson content in HTML format. Use <h2>, <h3>, <p>, and <ul>/<li> tags where appropriate. Do not include <html>, <head>, or <body> tags.",
-        outline: "Create a detailed lesson outline in HTML format with main sections as <h2> headings, sub-points as <h3> headings, and key learning objectives as a <ul> list at the top.",
-        summary: "Write a concise summary of the key concepts for this lesson in HTML format. Use <p> for intro and <ul><li> bullet points for the main takeaways.",
-        quiz_questions: "Generate 5 quiz questions with answers for this lesson in HTML format. Format as <ol> with each <li> containing the question in <strong> and the answer in a <p> below it.",
-      };
-      const instruction = formatInstructions[input.format];
-      const generate = async (revisionInstruction?: string) => {
-        const response = await invokeLLM({
-          // Prefer Forge when it is configured, but use the Railway-held Manus API
-          // key through the constrained non-interactive fallback when it is not.
-          transport: "auto",
-          maxTokens: input.format === "full_lesson" ? 6000 : 4000,
-          messages: [
-            {
-              role: "system",
-              content: `You are an expert medical ultrasound educator creating content for All About Ultrasound™ and iHeartEcho™ online learning platforms. Generate high-quality, clinically accurate lesson content for ultrasound and echocardiography education. ${instruction} Return only the HTML fragment — no markdown code fences, no surrounding tags.`,
-            },
-            {
-              role: "user",
-              content: `Generate lesson content for the lesson titled: "${input.lessonTitle}"${input.courseTitle ? ` (part of the course "${input.courseTitle}")` : ""}.${revisionInstruction ? `\n\n${revisionInstruction}` : ""}`,
-            },
-          ],
-        });
-        const content = (response.choices?.[0]?.message?.content ?? "") as string;
-        return content.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-      };
-
-      const initialDraft = await generate();
-      const cleaned = input.format === "full_lesson"
-        ? await extendFullLessonDraft(initialDraft, draft => generate(`The draft below is only ${countRenderedWords(draft).toLocaleString("en-US")} readable words and needs ${fullLessonWordsRemaining(draft).toLocaleString("en-US")} additional words to reach the full-lesson target. Write ONLY new, non-duplicative HTML sections that continue this exact lesson. Do not restart, summarize, mention the prior draft, or include markdown fences. Preserve the lesson topic and add clinically useful depth through scanning technique, interpretation, pitfalls, and practical clinical pearls.\n\nCURRENT DRAFT:\n${draft}`))
-        : initialDraft;
-      if (input.format === "full_lesson" && !isCompleteFullLesson(cleaned)) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `AI returned an incomplete full lesson. Full lessons require at least ${MIN_FULL_LESSON_WORDS.toLocaleString("en-US")} words; please generate again.` });
-      }
-      return { content: cleaned, wordCount: countRenderedWords(cleaned) };
+      return generateRichTextHtmlContent({
+        lessonTitle: input.lessonTitle,
+        courseTitle: input.courseTitle,
+        format: input.format,
+        sources: {
+          sourceText: input.sourceText,
+          sourceUrls: input.sourceUrls,
+          sourceFiles: input.sourceFiles,
+        },
+        targetWordCount: input.targetWordCount,
+      });
     }),
   generatePromoContent: protectedProcedure
     .input(z.object({
@@ -729,7 +704,7 @@ export const lmsRouter = router({
       productUrl: z.string().optional(),
       prompt: z.string().optional(),
       format: z.enum(["promo_block", "announcement", "feature_list"]).default("promo_block"),
-    }))
+    }).merge(AiContentGenerationSourcesSchema))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
@@ -774,15 +749,19 @@ export const lmsRouter = router({
         announcement: "Write a brief announcement paragraph in HTML format (1-2 <p> tags) suitable for a newsletter or social post. Include the product name, key benefit, and a hyperlink to the landing page URL. No markdown, no surrounding tags.",
         feature_list: "Write a feature/benefit list in HTML format. Use a short intro <p>, then a <ul> with 4-6 <li> items highlighting key features and benefits. Include a call-to-action hyperlink to the landing page URL at the end. No markdown, no surrounding tags.",
       };
-      const response = await invokeLLM({
-        messages: [
-          { role: "system", content: "You are an expert marketing copywriter for All About Ultrasound™ and iHeartEcho™, medical ultrasound education platforms. Write compelling, professional promotional content for healthcare professionals (sonographers, physicians, nurses). Use US English spelling. Return only the HTML fragment. CRITICAL: Always use the EXACT price provided in the product details — never modify, round, or reformat it. If the price is $2297.00, write $2297.00 exactly." },
-          { role: "user", content: `Write promotional content for this product:\n${productDetails}${urlSection}${promptSection}\n\nIMPORTANT: Use the exact price shown above. Do not modify or reformat the price.\n\nFormat: ${formatInstructions[input.format]}` },
-        ],
+      const promoResult = await generateRichTextHtmlContent({
+        lessonTitle: input.productName,
+        format: "text",
+        sources: {
+          sourceText: input.sourceText,
+          sourceUrls: input.sourceUrls,
+          sourceFiles: input.sourceFiles,
+        },
+        targetWordCount: input.targetWordCount,
+        extraSystemInstruction: "You are an expert marketing copywriter. Write compelling, professional promotional content for healthcare professionals (sonographers, physicians, nurses). Use US English spelling. CRITICAL: Always use the EXACT price provided in the product details — never modify, round, or reformat it.",
+        userContextSuffix: `\n\nProduct details:\n${productDetails}${urlSection}${promptSection}\n\nIMPORTANT: Use the exact price shown above. Do not modify or reformat the price.\n\nFormat: ${formatInstructions[input.format]}`,
       });
-      const rawContent = (response.choices?.[0]?.message?.content ?? "") as string;
-      const cleanedContent = rawContent.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
-      return { content: cleanedContent, landingPageUrl };
+      return { content: promoResult.content, landingPageUrl, wordCount: promoResult.wordCount };
     }),
   // ─── AI Image Generator ──────────────────────────────────────────────────
   generateAiImage: protectedProcedure
