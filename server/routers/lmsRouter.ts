@@ -1219,8 +1219,10 @@ export const lmsPublicRouter = router({
         visibleCohortGroups.find(g => g.isFeaturedOnLanding) ??
         nextUpcomingOpen ??
         visibleCohortGroups[0] ?? null;
-      // hasOpenGroup: true only if at least one group is on sale (date-valid AND not at capacity)
-      const hasOpenGroup = visibleCohortGroups.some(isCohortGroupOnSale);
+      // hasOpenGroup: true only if course registration is still open AND at least one group is on sale
+      const isCourseEnrollmentOpen =
+        !course.enrollmentCloseDate || isScheduledDeadlineOpen(course.enrollmentCloseDate, "America/New_York", now);
+      const hasOpenGroup = isCourseEnrollmentOpen && visibleCohortGroups.some(isCohortGroupOnSale);
       // soldOutGroups: date-valid but at capacity
       const soldOutGroups = visibleCohortGroups.filter(isCohortGroupSoldOut);
       // Include all non-archived cohort groups so the Live Sessions Auto block can show them

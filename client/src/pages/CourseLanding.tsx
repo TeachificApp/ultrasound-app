@@ -1845,8 +1845,8 @@ export default function CourseLanding() {
       return;
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
+    if (showWaitlistCta) { handleWaitlistCta(); return; }
     if (isEnrollmentClosed) return; // Enrollment is closed — do nothing
-    if (showWaitlistCta) return; // All cohort groups are sold out — show waitlist instead
     setEnrolling(true);
     try {
       // If a secondary pricing option is selected, use it; otherwise use primary course pricing
@@ -1878,8 +1878,8 @@ export default function CourseLanding() {
       return;
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
+    if (showWaitlistCta) { handleWaitlistCta(); return; }
     if (isEnrollmentClosed) return;
-    if (showWaitlistCta) return; // All cohort groups are sold out — show waitlist instead
     setEnrolling(true);
     // Also sync the UI selection state so the checkout modal shows the right option
     if (pricingOptionId !== undefined) setSelectedPricingOptionId(pricingOptionId);
@@ -1958,12 +1958,15 @@ export default function CourseLanding() {
   // Keep ref in sync so the mutation callback (declared before early returns) can access featuredGroup
   featuredGroupRef.current = featuredGroup;
   const hasOpenGroup = (course as any).hasOpenGroup ?? true;
+  const isCohortCourse = ((course as any).cohortGroups?.length ?? 0) > 0 || !!featuredGroup;
   // isWaitlistMode: admin explicitly enabled waitlist on featuredGroup AND no open group exists
   const isWaitlistMode = !enrollment && !!(featuredGroup?.waitlistEnabled && !hasOpenGroup);
   // isAllGroupsClosed: no open groups (all sold out or enrollment-closed) — always show waitlist lead capture
-  const isAllGroupsClosed = !enrollment && !hasOpenGroup && !isEnrollmentClosed && ((course as any).cohortGroups?.length ?? 0) > 0;
-  // Either explicit waitlist mode OR all groups closed → show waitlist CTA
-  const showWaitlistCta = isProductWaitlist || isWaitlistMode || isAllGroupsClosed;
+  const isAllGroupsClosed = !enrollment && !hasOpenGroup && ((course as any).cohortGroups?.length ?? 0) > 0;
+  // Course-level registration deadline passed — auto-switch cohort courses to waitlist capture
+  const isEnrollmentClosedWaitlist = !enrollment && isEnrollmentClosed && isCohortCourse;
+  // Either explicit waitlist mode OR all groups closed OR registration period ended → show waitlist CTA
+  const showWaitlistCta = isProductWaitlist || isWaitlistMode || isAllGroupsClosed || isEnrollmentClosedWaitlist;
   const waitlistCtaLabel = isProductWaitlist ? "Join the Waitlist" : (featuredGroup?.waitlistCtaLabel || "Join the Waitlist");
   const isSubscriptionCourse =
     course?.pricingType === "subscription" ||
@@ -1982,6 +1985,10 @@ export default function CourseLanding() {
   const handleEnrollOrWaitlist = () => {
     if (showWaitlistCta) { handleWaitlistCta(); return; }
     handleEnrollGuarded();
+  };
+  const handleCheckoutOrWaitlist = (pricingOptionId?: number) => {
+    if (showWaitlistCta) { handleWaitlistCta(); return; }
+    handleGoToCheckoutPage(pricingOptionId);
   };
 
   // Enrollment countdown: days remaining until close (only for cohorts, not yet closed, not enrolled)
@@ -2034,8 +2041,22 @@ export default function CourseLanding() {
           />
         )}
         {EnrollmentCountdownBanner}
+        {/* Registration deadline passed — cohort courses switch to waitlist capture */}
+        {isEnrollmentClosedWaitlist && !isWaitlistMode && !isAllGroupsClosed && (
+          <div className="w-full bg-teal-50 border-b border-teal-200 py-3 px-4">
+            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-teal-800">
+                <Bell className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                {featuredGroup?.waitlistHeading || "Registration for this class has closed — join the waitlist to be notified when new dates open."}
+              </div>
+              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white flex-shrink-0" onClick={handleWaitlistCta}>
+                {waitlistCtaLabel}
+              </Button>
+            </div>
+          </div>
+        )}
         {/* Sold-out / waitlist banner — shown when all cohort groups are sold out or enrollment-closed */}
-        {isAllGroupsClosed && !isWaitlistMode && (
+        {isAllGroupsClosed && !isWaitlistMode && !isEnrollmentClosedWaitlist && (
           <div className="w-full bg-amber-50 border-b border-amber-200 py-3 px-4">
             <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
@@ -2075,10 +2096,10 @@ export default function CourseLanding() {
             <div key={block.id} style={{ marginTop: block.data?.marginTop || undefined, marginBottom: block.data?.marginBottom || undefined, paddingTop: block.data?.paddingTop || undefined, paddingBottom: block.data?.paddingBottom || undefined, paddingLeft: block.data?.paddingLeft || undefined, paddingRight: block.data?.paddingRight || undefined }}>
               {bwMaxCL ? (
                 <div style={{ maxWidth: bwMaxCL, marginLeft: "auto", marginRight: "auto", width: "100%" }}>
-                  <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} onDraftNotify={() => { setDnName(user?.name ?? ""); setDnEmail((user as any)?.email ?? ""); setDnSubmitted(false); setDraftNotifyOpen(true); }} />
+                  <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleCheckoutOrWaitlist} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} onDraftNotify={() => { setDnName(user?.name ?? ""); setDnEmail((user as any)?.email ?? ""); setDnSubmitted(false); setDraftNotifyOpen(true); }} />
                 </div>
               ) : (
-                <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleGoToCheckoutPage} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} onDraftNotify={() => { setDnName(user?.name ?? ""); setDnEmail((user as any)?.email ?? ""); setDnSubmitted(false); setDraftNotifyOpen(true); }} />
+                <RenderBlock block={block} course={course} onEnroll={handleEnrollGuarded} onEnrollWithOption={handleEnrollWithOptionGuarded} enrolling={checkoutBusy} ctaText={ctaText} price={price} selectedPricingOptionId={selectedPricingOptionId} onSelectPricingOption={setSelectedPricingOptionId} slug={slug} enrollment={enrollment} user={user} onFreePreviewClick={handleFreePreviewClick} onCheckoutPage={handleCheckoutOrWaitlist} onFreeEnroll={handleFreeEnroll} onOpenGroupDetail={setSelectedCohortGroupId} onSoldOutOverride={showWaitlistCta ? (url: string) => window.open(url, "_blank", "noopener,noreferrer") : undefined} isDraft={isDraft} onDraftNotify={() => { setDnName(user?.name ?? ""); setDnEmail((user as any)?.email ?? ""); setDnSubmitted(false); setDraftNotifyOpen(true); }} />
               )}
             </div>
           );
@@ -2288,13 +2309,13 @@ export default function CourseLanding() {
               )}
               {pricingType === "free" && <p className="text-xs text-gray-500">No payment required</p>}
             </div>
-            {isEnrollmentClosed ? (
-              <Button className="w-full font-semibold" size="lg" disabled variant="outline">
-                Enrollment Closed
-              </Button>
-            ) : isWaitlistMode ? (
+            {showWaitlistCta ? (
               <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleWaitlistCta}>
                 <Bell className="w-4 h-4 mr-2" />{waitlistCtaLabel}
+              </Button>
+            ) : isEnrollmentClosed ? (
+              <Button className="w-full font-semibold" size="lg" disabled variant="outline">
+                Enrollment Closed
               </Button>
             ) : (
               <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold" size="lg" onClick={handleEnrollGuarded} disabled={checkoutBusy}>
