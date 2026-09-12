@@ -269,54 +269,12 @@ async function handleLmsCheckoutCompleted(session: Record<string, unknown>) {
     // ── Revenue Share: record payment-time split or use the safeguarded fallback ──
     try {
       const [courseRow3] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, courseId)).limit(1);
-      const paymentTimeSplit = meta.revenue_share_payment_time === "true";
-      if (paymentTimeSplit) {
-        const partnerId = Number(meta.revenue_share_partner_id);
-        const assignmentId = Number(meta.revenue_share_assignment_id);
-        const shareAmount = Number(meta.revenue_share_amount_cents);
-        const sharePercentage = meta.revenue_share_percentage;
-        if (Number.isInteger(partnerId) && Number.isInteger(assignmentId) && Number.isInteger(shareAmount) && shareAmount > 0 && sharePercentage) {
-          const [existing] = await db.select({ id: revenueShareLedger.id })
-            .from(revenueShareLedger)
-            .where(and(
-              eq(revenueShareLedger.partnerId, partnerId),
-              eq(revenueShareLedger.assignmentId, assignmentId),
-              eq(revenueShareLedger.checkoutSessionId, session.id as string),
-            ))
-            .limit(1);
-          if (!existing) {
-            const now = Date.now();
-            await db.insert(revenueShareLedger).values({
-              partnerId,
-              assignmentId,
-              courseId,
-              courseTitle: courseRow3?.title ?? null,
-              paymentIntentId: (session.payment_intent as string) ?? null,
-              checkoutSessionId: session.id as string,
-              customerEmail: (session.customer_email as string) ?? (session.customer_details as any)?.email ?? null,
-              grossAmount: (session.amount_total as number) ?? 0,
-              sharePercentage,
-              shareAmount,
-              currency: (session.currency as string) ?? "usd",
-              status: "paid",
-              paidAt: now,
-              createdAt: now,
-              updatedAt: now,
-            });
-          }
-        }
-      } else {
-        const { executeRevenueShareTransfers } = await import("../lib/revenueShareEngine");
-        await executeRevenueShareTransfers({
-          courseId,
-          grossAmountCents: (session.amount_total as number) ?? 0,
-          currency: (session.currency as string) ?? "usd",
-          paymentIntentId: (session.payment_intent as string) ?? null,
-          checkoutSessionId: session.id as string,
-          customerEmail: (session.customer_email as string) ?? (session.customer_details as any)?.email ?? null,
-          courseTitle: courseRow3?.title ?? null,
-        });
-      }
+      const { recordRevenueShareFromCompletedCheckout } = await import("../lib/revenueShareEngine");
+      await recordRevenueShareFromCompletedCheckout({
+        session,
+        courseId,
+        courseTitle: courseRow3?.title ?? null,
+      });
     } catch (rsErr) {
       console.error("[RevenueShare] Non-blocking transfer error:", rsErr);
     }
@@ -835,6 +793,17 @@ ${locationStr ? `<p style="margin:0;font-size:14px;color:#0e4a50;"><strong>Locat
     }
   } catch (emailErr) {
     console.error(`[Stripe] Failed to send workshop confirmation email:`, emailErr);
+  }
+
+  try {
+    const { recordRevenueShareFromCompletedCheckout } = await import("../lib/revenueShareEngine");
+    await recordRevenueShareFromCompletedCheckout({
+      session,
+      courseId: workshopId,
+      courseTitle: workshopTitle,
+    });
+  } catch (rsErr) {
+    console.error("[RevenueShare] Workshop transfer error:", rsErr);
   }
 
   console.log(`[Stripe] Workshop enrollment recorded: user ${userId}, workshop ${workshopId}, instance ${instanceId}`);

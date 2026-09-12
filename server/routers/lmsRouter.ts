@@ -3046,19 +3046,12 @@ export const lmsLearnerRouter = router({
         // Stripe supports one destination transfer on a PaymentIntent. When this
         // purchase has one active partner and no promotion/bump ambiguity, route
         // the configured share from the same customer charge immediately.
-        const paymentTimeShare = !input.promoCode && !orderBumpCheckout && !isUpgradeBump
-          ? await (await import("../lib/revenueShareEngine")).resolvePaymentTimeRevenueShare({
-              courseId: course.id,
-              grossAmountCents: resolveCourseOfferCheckoutCents(effectivePrice) * input.seats,
-            })
-          : null;
-        const paymentTimeShareMetadata = paymentTimeShare ? {
-          revenue_share_payment_time: "true",
-          revenue_share_partner_id: String(paymentTimeShare.partnerId),
-          revenue_share_assignment_id: String(paymentTimeShare.assignmentId),
-          revenue_share_amount_cents: String(paymentTimeShare.shareAmountCents),
-          revenue_share_percentage: String(paymentTimeShare.sharePercentage),
-        } : {};
+        const { metadata: paymentTimeShareMetadata, paymentIntentData: paymentTimeShareIntentData } =
+          await (await import("../lib/revenueShareEngine")).applyRevenueShareToCheckoutSession({
+            courseId: course.id,
+            grossAmountCents: resolveCourseOfferCheckoutCents(effectivePrice) * input.seats,
+            excludePaymentTime: Boolean(input.promoCode || orderBumpCheckout || isUpgradeBump),
+          });
         session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
@@ -3071,13 +3064,7 @@ export const lmsLearnerRouter = router({
           metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}), ...paymentTimeShareMetadata },
           payment_intent_data: {
             description: `${productName} — One-Time Purchase`,
-            ...(paymentTimeShare ? {
-              transfer_data: {
-                destination: paymentTimeShare.stripeAccountId,
-                amount: paymentTimeShare.shareAmountCents,
-              },
-              metadata: paymentTimeShareMetadata,
-            } : {}),
+            ...paymentTimeShareIntentData,
           },
           ...shippingOptions,
         }, { idempotencyKey: `${idempotencyBase}-one-time` });
@@ -3368,6 +3355,12 @@ export const lmsLearnerRouter = router({
           ? { price: effectiveStripePriceId, quantity: 1 }
           : { price_data: { currency: course.currency, product_data: { name: productName, description: course.subtitle ?? undefined }, unit_amount: Math.round(Number(effectivePrice) * 100) }, quantity: 1 };
         const isUpgradeBump2 = orderBumpCheckout?.bumpMode === "upgrade";
+        const { metadata: guestShareMetadata, paymentIntentData: guestShareIntentData } =
+          await (await import("../lib/revenueShareEngine")).applyRevenueShareToCheckoutSession({
+            courseId: course.id,
+            grossAmountCents: resolveCourseOfferCheckoutCents(effectivePrice),
+            excludePaymentTime: Boolean(input.promoCode || orderBumpCheckout),
+          });
         session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: input.email,
@@ -3377,8 +3370,8 @@ export const lmsLearnerRouter = router({
             : [lineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
           client_reference_id: user.id.toString(),
-          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump2 ? { bump_mode: "upgrade" } : {}) },
-          payment_intent_data: { description: `${productName} — One-Time Purchase` },
+          metadata: { ...commonMeta, pricing_option_id: input.pricingOptionId?.toString() ?? "", ...(isUpgradeBump2 ? { bump_mode: "upgrade" } : {}), ...guestShareMetadata },
+          payment_intent_data: { description: `${productName} — One-Time Purchase`, ...guestShareIntentData },
           ...shippingOptions,
         }, { idempotencyKey: `${guestIdempotencyBase}-one-time` });
       } else if (pricingType === "subscription") {
@@ -4790,6 +4783,12 @@ export const lmsLearnerRouter = router({
         }
 
         const sessionMode = (pricingType === "subscription" || pricingType === "payment_plan") ? "subscription" : "payment";
+        const embeddedOptionShare = sessionMode === "payment"
+          ? await (await import("../lib/revenueShareEngine")).applyRevenueShareToCheckoutSession({
+              courseId: course.id,
+              grossAmountCents: courseDollarsToStripeCents(displayPrice),
+            })
+          : { metadata: {}, paymentIntentData: {} };
         const session = await stripe.checkout.sessions.create({
           ui_mode: "embedded",
           mode: sessionMode,
@@ -4797,9 +4796,9 @@ export const lmsLearnerRouter = router({
           return_url: returnUrl,
           customer_email: ctx.user?.email ?? undefined,
           allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
+          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}), ...embeddedOptionShare.metadata },
           ...(sessionMode === "payment"
-            ? { payment_intent_data: { description: `${course.title} — One-Time Purchase` } }
+            ? { payment_intent_data: { description: `${course.title} — One-Time Purchase`, ...embeddedOptionShare.paymentIntentData } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
         });
         const terms1 = resolveCheckoutTerms(course, orgSettings);
@@ -4871,6 +4870,12 @@ export const lmsLearnerRouter = router({
       }
 
       const sessionMode = (pricingType === "subscription" || pricingType === "payment_plan") ? "subscription" : "payment";
+      const embeddedPrimaryShare = sessionMode === "payment"
+        ? await (await import("../lib/revenueShareEngine")).applyRevenueShareToCheckoutSession({
+            courseId: course.id,
+            grossAmountCents: courseDollarsToStripeCents(displayPrice),
+          })
+        : { metadata: {}, paymentIntentData: {} };
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: sessionMode,
@@ -4878,9 +4883,9 @@ export const lmsLearnerRouter = router({
         return_url: returnUrl,
         customer_email: ctx.user?.email ?? undefined,
         allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
+          metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}), ...embeddedPrimaryShare.metadata },
           ...(sessionMode === "payment"
-            ? { payment_intent_data: { description: `${course.title} — One-Time Purchase` } }
+            ? { payment_intent_data: { description: `${course.title} — One-Time Purchase`, ...embeddedPrimaryShare.paymentIntentData } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
       });
       const terms2 = resolveCheckoutTerms(course, orgSettings);

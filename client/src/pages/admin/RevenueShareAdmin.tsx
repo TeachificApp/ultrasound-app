@@ -624,7 +624,7 @@ function AssignmentsTab() {
             <Button
               onClick={() => createMutation.mutate({
                 partnerId: Number(form.partnerId),
-                productId: Number(form.productId),
+                courseId: Number(form.productId),
                 productType: form.productType,
                 percentage: Number(form.percentage),
               })}
