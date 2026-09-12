@@ -8432,6 +8432,9 @@ export const revenueShareLedger = mysqlTable("revenue_share_ledger", {
   status: mysqlEnum("status", ["pending", "processing", "paid", "failed", "cancelled"]).notNull().default("pending"),
   errorMessage: text("error_message"),
   paidAt: bigint("paid_at", { mode: "number" }),
+  processMethod: mysqlEnum("process_method", ["payment_time", "stripe_transfer", "manual"]),
+  autoProcessedAt: bigint("auto_processed_at", { mode: "number" }),
+  processedByUserId: int("processed_by_user_id"),
   createdAt: bigint("created_at", { mode: "number" }).notNull().default(0),
   updatedAt: bigint("updated_at", { mode: "number" }).notNull().default(0),
 });
