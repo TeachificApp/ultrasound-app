@@ -40,6 +40,17 @@ function fmtDate(ts: number | null | undefined) {
   if (!ts) return "—";
   return new Date(ts).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
+function fmtDateTime(ts: number | null | undefined) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString("en-US", {
+    month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+  });
+}
+const PROCESS_METHOD_LABELS: Record<string, string> = {
+  payment_time: "Auto (checkout split)",
+  stripe_transfer: "Auto (Stripe transfer)",
+  manual: "Manual (admin)",
+};
 function statusBadge(status: string) {
   const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
     pending: { label: "Pending Setup", variant: "secondary" },
@@ -643,30 +654,64 @@ function AssignmentsTab() {
 // ─── Ledger Tab ───────────────────────────────────────────────────────────────
 function LedgerTab() {
   const [filterPartnerId, setFilterPartnerId] = useState<string>("all");
+  const [manualEntry, setManualEntry] = useState<any | null>(null);
+  const [manualPct, setManualPct] = useState("");
+  const utils = trpc.useUtils();
+
   const { data: partners = [] } = trpc.revenueShare.listPartners.useQuery();
   const { data: ledgerData, isLoading } = trpc.revenueShare.getLedger.useQuery({
     partnerId: filterPartnerId !== "all" ? Number(filterPartnerId) : undefined,
   });
-  // getLedger returns { entries: [...], total: N } — extract the array defensively
   const ledger: any[] = Array.isArray(ledgerData) ? ledgerData : (ledgerData as any)?.entries ?? [];
-  const retryMutation = trpc.revenueShare.retryFailedTransfer.useMutation({
-    onSuccess: () => toast.success("Transfer retried"),
+
+  const pctNum = parseFloat(manualPct);
+  const { data: preview } = trpc.revenueShare.previewManualPayout.useQuery(
+    { ledgerId: manualEntry?.id ?? 0, sharePercentage: pctNum },
+    { enabled: !!manualEntry && Number.isFinite(pctNum) && pctNum > 0 && pctNum < 100 },
+  );
+
+  const processOneMutation = trpc.revenueShare.processManualLedgerPayout.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Paid ${fmtMoney(data.shareAmount ?? 0)} to partner`);
+      utils.revenueShare.getLedger.invalidate();
+      setManualEntry(null);
+    },
     onError: (e) => toast.error(e.message),
   });
   const manualPayoutMutation = trpc.revenueShare.processManualPayout.useMutation({
-    onSuccess: (data: any) => toast.success(`Processed ${data?.processed ?? 0} transfer(s)`),
+    onSuccess: (data: any) => {
+      const msg = [`Processed ${data?.processed ?? 0} transfer(s)`];
+      if (data?.skipped) msg.push(`${data.skipped} skipped (auto-processed)`);
+      if (data?.errors?.length) msg.push(`${data.errors.length} failed`);
+      toast.success(msg.join(", "));
+      utils.revenueShare.getLedger.invalidate();
+    },
     onError: (e) => toast.error(e.message),
   });
 
+  function openManualDialog(entry: any) {
+    setManualEntry(entry);
+    setManualPct(String(parseFloat(String(entry.sharePercentage)) || ""));
+  }
+
+  function canProcessEntry(entry: any) {
+    if (entry.processMethod === "payment_time") return false;
+    if (entry.status === "paid") return false;
+    if (entry.status === "processing" || entry.status === "cancelled") return false;
+    return entry.status === "pending" || entry.status === "failed";
+  }
+
   const totalPaid = ledger.filter((r: any) => r.status === "paid").reduce((s: number, r: any) => s + (r.shareAmount ?? 0), 0);
-  const totalPending = ledger.filter((r: any) => r.status === "pending").reduce((s: number, r: any) => s + (r.shareAmount ?? 0), 0);
+  const totalPending = ledger.filter((r: any) => r.status === "pending" || r.status === "failed").reduce((s: number, r: any) => s + (r.shareAmount ?? 0), 0);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-semibold">Payout Ledger</h2>
-          <p className="text-sm text-muted-foreground">All revenue share transfers — paid, pending, and failed.</p>
+          <p className="text-sm text-muted-foreground">
+            Track auto-processed payouts and manually process pending shares. Auto-processed entries cannot be reprocessed.
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={filterPartnerId} onValueChange={setFilterPartnerId}>
@@ -685,7 +730,7 @@ function LedgerTab() {
             className="gap-1.5"
           >
             <RefreshCw className={`h-4 w-4 ${manualPayoutMutation.isPending ? "animate-spin" : ""}`} />
-            Process Pending
+            Process All Pending
           </Button>
         </div>
       </div>
@@ -724,52 +769,151 @@ function LedgerTab() {
                 <TableHead>Partner</TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead>Gross</TableHead>
-                <TableHead>Partner Share</TableHead>
+                <TableHead>Share</TableHead>
+                <TableHead>Processing</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ledger.map((r: any) => (
-                <TableRow key={r.id}>
-                  <TableCell>
-                    <div className="font-medium">{r.partnerName}</div>
-                    <div className="text-xs text-muted-foreground">{r.partnerEmail}</div>
-                  </TableCell>
-                  <TableCell className="text-sm">{r.productTitle ?? `ID: ${r.productId}`}</TableCell>
-                  <TableCell className="font-mono text-sm">{fmtMoney(r.grossAmount)}</TableCell>
-                  <TableCell className="font-mono text-sm font-semibold text-[#189aa1]">{fmtMoney(r.shareAmount)}</TableCell>
-                  <TableCell>
-                    <Badge variant={
-                      r.status === "paid" ? "default" :
-                      r.status === "failed" ? "destructive" : "secondary"
-                    }>
-                      {r.status === "paid" ? <CheckCircle className="h-3 w-3 mr-1" /> :
-                       r.status === "failed" ? <AlertCircle className="h-3 w-3 mr-1" /> :
-                       <Clock className="h-3 w-3 mr-1" />}
-                      {r.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{fmtDate(r.paidAt ?? r.createdAt)}</TableCell>
-                  <TableCell className="text-right">
-                    {r.status === "failed" && (
-                      <Button
-                        size="sm" variant="outline"
-                        onClick={() => retryMutation.mutate({ ledgerId: r.id })}
-                        disabled={retryMutation.isPending}
-                        className="text-xs gap-1"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" /> Retry
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {ledger.map((r: any) => {
+                const isAuto = r.processMethod === "payment_time" || r.processMethod === "stripe_transfer";
+                const autoAt = r.autoProcessedAt ?? (isAuto ? r.paidAt : null);
+                return (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      <div className="font-medium">{r.partnerName}</div>
+                      <div className="text-xs text-muted-foreground">{r.partnerEmail}</div>
+                    </TableCell>
+                    <TableCell className="text-sm">{r.courseTitle ?? (r.courseId ? `Course #${r.courseId}` : "—")}</TableCell>
+                    <TableCell className="font-mono text-sm">{fmtMoney(r.grossAmount)}</TableCell>
+                    <TableCell>
+                      <div className="font-mono text-sm font-semibold text-[#189aa1]">{fmtMoney(r.shareAmount)}</div>
+                      <div className="text-xs text-muted-foreground">{r.sharePercentage}%</div>
+                    </TableCell>
+                    <TableCell>
+                      {r.processMethod ? (
+                        <div className="space-y-0.5">
+                          <Badge variant={isAuto ? "default" : "outline"} className="text-xs">
+                            {PROCESS_METHOD_LABELS[r.processMethod] ?? r.processMethod}
+                          </Badge>
+                          {isAuto && autoAt && (
+                            <div className="text-xs text-muted-foreground">Auto: {fmtDateTime(autoAt)}</div>
+                          )}
+                          {r.processMethod === "manual" && r.paidAt && (
+                            <div className="text-xs text-muted-foreground">Manual: {fmtDateTime(r.paidAt)}</div>
+                          )}
+                        </div>
+                      ) : r.status === "paid" ? (
+                        <span className="text-xs text-muted-foreground">Legacy auto</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        r.status === "paid" ? "default" :
+                        r.status === "failed" ? "destructive" : "secondary"
+                      }>
+                        {r.status === "paid" ? <CheckCircle className="h-3 w-3 mr-1" /> :
+                         r.status === "failed" ? <AlertCircle className="h-3 w-3 mr-1" /> :
+                         <Clock className="h-3 w-3 mr-1" />}
+                        {r.status}
+                      </Badge>
+                      {r.errorMessage && (
+                        <div className="text-xs text-destructive mt-1 max-w-[180px] truncate" title={r.errorMessage}>
+                          {r.errorMessage}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">{fmtDate(r.paidAt ?? r.createdAt)}</TableCell>
+                    <TableCell className="text-right">
+                      {canProcessEntry(r) ? (
+                        <Button
+                          size="sm" variant="outline"
+                          onClick={() => openManualDialog(r)}
+                          className="text-xs gap-1"
+                        >
+                          <DollarSign className="h-3.5 w-3.5" /> Process
+                        </Button>
+                      ) : isAuto && r.status === "paid" ? (
+                        <span className="text-xs text-muted-foreground">Auto-processed</span>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </Card>
       )}
+
+      <Dialog open={!!manualEntry} onOpenChange={(open) => { if (!open) setManualEntry(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manual Partner Payout</DialogTitle>
+          </DialogHeader>
+          {manualEntry && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm space-y-1">
+                <div><span className="text-muted-foreground">Partner:</span> {manualEntry.partnerName}</div>
+                <div><span className="text-muted-foreground">Product:</span> {manualEntry.courseTitle ?? "—"}</div>
+                <div><span className="text-muted-foreground">Gross sale:</span> {fmtMoney(manualEntry.grossAmount)}</div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Revenue share percentage</Label>
+                <div className="relative">
+                  <Input
+                    type="number" min="0.01" max="99.99" step="0.5"
+                    value={manualPct}
+                    onChange={e => setManualPct(e.target.value)}
+                    className="pr-8"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                </div>
+                <p className="text-xs text-muted-foreground">Adjust the percentage before sending the Stripe transfer.</p>
+              </div>
+              {preview && (
+                <div className="rounded-lg border p-3 text-sm">
+                  {!preview.allowed ? (
+                    <p className="text-destructive">{preview.reason}</p>
+                  ) : (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Partner payout</span>
+                        <span className="font-semibold text-[#189aa1]">{fmtMoney(preview.shareAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <span>Platform keeps</span>
+                        <span>{fmtMoney(preview.grossAmount - preview.shareAmount)}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualEntry(null)}>Cancel</Button>
+            <Button
+              className="bg-[#189aa1] hover:bg-[#147a80]"
+              disabled={
+                processOneMutation.isPending ||
+                !manualEntry ||
+                !preview?.allowed ||
+                !Number.isFinite(pctNum)
+              }
+              onClick={() => processOneMutation.mutate({
+                ledgerId: manualEntry!.id,
+                sharePercentage: pctNum,
+              })}
+            >
+              {processOneMutation.isPending ? "Processing…" : "Process Payout"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
