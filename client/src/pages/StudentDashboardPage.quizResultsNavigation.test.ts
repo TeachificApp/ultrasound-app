@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 
 const source = readFileSync(resolve(import.meta.dirname, "StudentDashboardPage.tsx"), "utf8");
 const layoutSource = readFileSync(resolve(import.meta.dirname, "../components/LMSLayout.tsx"), "utf8");
+const resultsSource = readFileSync(resolve(import.meta.dirname, "StudentQuizDashboard.tsx"), "utf8");
 
 describe("My Content quiz-results navigation", () => {
   it("keeps Quizzes in My Content and renders My Quiz Results only for completed standalone-system quiz attempts", () => {
@@ -13,6 +14,11 @@ describe("My Content quiz-results navigation", () => {
     expect(source).toContain('My Quiz Results');
     expect(source).toContain('contentKind === "standalone_quiz"');
     expect(source).toContain('contentKind === "standalone_result"');
+    expect(source).toContain("buildStudentDashboardUrl,");
+    expect(source).toContain('from "@shared/studentDashboardUrls"');
+    expect(resultsSource).toContain("summary?.hasStandaloneSystemQuizAttempts");
+    expect(resultsSource).toContain("standaloneOnly ? (nativeHistory ?? [])");
+    expect(resultsSource).not.toContain("getMyStandaloneQuizResults");
   });
 
   it("does not expose Quizzes or My Quiz Results in the shared top/profile layout", () => {

@@ -515,3 +515,5 @@
 - [x] Repair missing UltrasoundAssist and EchoAssist membership/course card images on the learner dashboard without changing memberships, pricing, subscriptions, or access.
 - [x] Add focused brand-card image-source and fallback regressions for the learner dashboard.
 - [ ] Validate on the deployed learner dashboard that entitled standalone quizzes, LMS quiz courses, learner-only standalone results, and both brand-card images render correctly.
+- [x] Repair the My Dashboard runtime crash caused by an undefined `buildStudentDashboardUrl` reference before validating the learner quiz-result rows.
+- [x] Add focused regression coverage proving the My Content quiz card actions resolve their dashboard URL helper and completed standalone result rows leave loading state.

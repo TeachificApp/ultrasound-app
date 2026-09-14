@@ -762,37 +762,6 @@ export const standaloneQuizLearnerRouter = router({
     return loadMyQuizResultsSummary(db, ctx.user.id);
   }),
 
-  /**
-   * Lean, learner-only history for the My Content → Quizzes results tab.
-   * This is intentionally standalone-system-only: LMS lesson quiz attempts
-   * remain in their course/lesson completion and reporting flows.
-   */
-  getMyStandaloneQuizResults: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    return db
-      .select({
-        attempt: {
-          id: standaloneQuizAttempts.id,
-          quizId: standaloneQuizAttempts.quizId,
-          score: standaloneQuizAttempts.score,
-          passed: standaloneQuizAttempts.passed,
-          completedAt: standaloneQuizAttempts.completedAt,
-        },
-        quizTitle: standaloneQuizzes.title,
-        quizType: standaloneQuizzes.type,
-      })
-      .from(standaloneQuizAttempts)
-      .innerJoin(standaloneQuizzes, eq(standaloneQuizAttempts.quizId, standaloneQuizzes.id))
-      .where(and(
-        eq(standaloneQuizAttempts.userId, ctx.user.id),
-        isNotNull(standaloneQuizAttempts.completedAt),
-        eq(standaloneQuizzes.type, "quiz"),
-      ))
-      .orderBy(desc(standaloneQuizAttempts.completedAt))
-      .limit(100);
-  }),
-
   /** Get all completed attempts for this user (for My Quizzes history tab) */
   getMyAttempts: protectedProcedure
     .input(

@@ -142,11 +142,13 @@ export function StudentQuizResultsPanel({ standaloneOnly = false }: { standalone
 
   const { data: nativeHistory, isLoading: loadingNative } = trpc.standaloneQuizLearner.getMyAttempts.useQuery(
     { quizType: "quiz" },
-    { enabled: !!user && !standaloneOnly && Boolean(summary?.hasNativeQuizAttempts) },
-  );
-  const { data: standaloneHistory, isLoading: loadingStandalone } = trpc.standaloneQuizLearner.getMyStandaloneQuizResults.useQuery(
-    undefined,
-    { enabled: !!user && standaloneOnly && Boolean(summary?.hasStandaloneSystemQuizAttempts) },
+    {
+      enabled: !!user && Boolean(
+        standaloneOnly
+          ? summary?.hasStandaloneSystemQuizAttempts
+          : summary?.hasNativeQuizAttempts,
+      ),
+    },
   );
 
   const { data: mockHistory, isLoading: loadingMock } = trpc.standaloneQuizLearner.getMyAttempts.useQuery(
@@ -168,7 +170,7 @@ export function StudentQuizResultsPanel({ standaloneOnly = false }: { standalone
   });
   const inlineQuizHistory = (inlineModuleHistory ?? []).filter((row: any) => row.quizType === "quiz");
   const inlineFlashcardHistory = (inlineModuleHistory ?? []).filter((row: any) => row.quizType === "flashcards");
-  const allNativeHistory = sortByCompletedAt(standaloneOnly ? (standaloneHistory ?? []) : [...(nativeHistory ?? []), ...inlineQuizHistory]);
+  const allNativeHistory = sortByCompletedAt(standaloneOnly ? (nativeHistory ?? []) : [...(nativeHistory ?? []), ...inlineQuizHistory]);
   const allFlashcardHistory = sortByCompletedAt([...(flashcardHistory ?? []), ...inlineFlashcardHistory]);
 
   if (authLoading || loadingSummary) {
@@ -234,7 +236,7 @@ export function StudentQuizResultsPanel({ standaloneOnly = false }: { standalone
           </TabsList>
 
           <TabsContent value="native">
-            {standaloneOnly ? loadingStandalone : loadingNative || loadingInlineModules ? (
+            {standaloneOnly ? loadingNative : loadingNative || loadingInlineModules ? (
               <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
             ) : (
               <AttemptHistoryTable rows={allNativeHistory} emptyLabel="No quiz attempts yet" />

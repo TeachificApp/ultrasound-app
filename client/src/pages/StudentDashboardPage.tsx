@@ -40,6 +40,7 @@ import { isMembersDomain, isLearnDomain, LEARN_APP_URL, APP_URL, IHEARTECHO_APP_
 import { formatInTimeZone, isInstantExpired, isValidInstant, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import {
   STUDENT_DASHBOARD_CONTENT_TABS,
+  buildStudentDashboardUrl,
   type StudentDashboardContentTab,
 } from "@shared/studentDashboardUrls";
 import { StudentQuizResultsPanel } from "@/pages/StudentQuizDashboard";

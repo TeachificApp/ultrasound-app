@@ -22,18 +22,19 @@ describe("My Content quiz library and standalone results", () => {
 
   it("returns learner-only completed standalone quiz rows for the in-content results tab", () => {
     const router = read("server/routers/standaloneQuizRouter.ts");
-    expect(router).toContain("getMyStandaloneQuizResults: protectedProcedure.query");
+    expect(router).toContain("getMyAttempts: protectedProcedure");
     expect(router).toContain("eq(standaloneQuizAttempts.userId, ctx.user.id)");
     expect(router).toContain("isNotNull(standaloneQuizAttempts.completedAt)");
-    expect(router).toContain('eq(standaloneQuizzes.type, "quiz")');
+    expect(router).toContain("if (input?.quizType) conditions.push(eq(standaloneQuizzes.type, input.quizType));");
   });
 
-  it("uses the standalone-only endpoint for My Quiz Results and leaves lesson modules outside it", () => {
+  it("uses the established standalone quiz attempt query for My Quiz Results and leaves lesson modules outside it", () => {
     const results = read("client/src/pages/StudentQuizDashboard.tsx");
-    expect(results).toContain("trpc.standaloneQuizLearner.getMyStandaloneQuizResults.useQuery");
-    expect(results).toContain("enabled: !!user && standaloneOnly");
-    expect(results).toContain("enabled: !!user && !standaloneOnly");
-    expect(results).toContain("standaloneOnly ? (standaloneHistory ?? [])");
+    expect(results).toContain('trpc.standaloneQuizLearner.getMyAttempts.useQuery');
+    expect(results).toContain('{ quizType: "quiz" }');
+    expect(results).toContain("summary?.hasStandaloneSystemQuizAttempts");
+    expect(results).toContain("standaloneOnly ? (nativeHistory ?? [])");
+    expect(results).not.toContain("getMyStandaloneQuizResults");
   });
 
   it("uses dashboard-safe image assets for both brand membership cards", () => {
