@@ -61,12 +61,15 @@ export function buildStudentDashboardUrl(opts?: {
   origin?: typeof APP_STUDENT_DASHBOARD_ORIGIN | typeof LEARN_APP_ORIGIN | "relative";
   tab?: StudentDashboardMainTab;
   contentTab?: StudentDashboardContentTab;
+  quizView?: "library" | "results";
 }) {
   const origin = opts?.origin === "relative" ? "" : (opts?.origin ?? APP_STUDENT_DASHBOARD_ORIGIN);
   const params = new URLSearchParams();
-  const tab = opts?.tab ?? (opts?.contentTab ? "content" : undefined);
+  const contentTab = opts?.quizView ? "quizzes" : opts?.contentTab;
+  const tab = opts?.tab ?? (contentTab ? "content" : undefined);
   if (tab) params.set("tab", tab);
-  if (opts?.contentTab) params.set("contentTab", opts.contentTab);
+  if (contentTab) params.set("contentTab", contentTab);
+  if (opts?.quizView) params.set("quizView", opts.quizView);
   const qs = params.toString();
   return `${origin}/my-dashboard${qs ? `?${qs}` : ""}`;
 }

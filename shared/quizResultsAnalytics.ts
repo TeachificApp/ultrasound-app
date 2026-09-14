@@ -9,11 +9,14 @@ export type QuizResultsKindAnalytics = {
 };
 
 export type MyQuizResultsSummary = {
-  /** Show My Quiz Results nav/tab when the learner has at least one native quiz attempt. */
+  /** Legacy aggregate that includes standalone, LMS, and inline native quiz attempts. */
   hasNativeQuizAttempts: boolean;
+  /** Show the My Content → Quizzes results tab only after a completed standalone-system quiz attempt. */
+  hasStandaloneSystemQuizAttempts: boolean;
   hasMockExamAttempts: boolean;
   hasFlashcardAttempts: boolean;
   nativeQuizzes: QuizResultsKindAnalytics;
+  standaloneSystemQuizzes: QuizResultsKindAnalytics;
   mockExams: QuizResultsKindAnalytics;
   flashcards: QuizResultsKindAnalytics;
 };

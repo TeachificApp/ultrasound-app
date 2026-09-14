@@ -42,6 +42,7 @@ import {
   STUDENT_DASHBOARD_CONTENT_TABS,
   type StudentDashboardContentTab,
 } from "@shared/studentDashboardUrls";
+import { StudentQuizResultsPanel } from "@/pages/StudentQuizDashboard";
 
 export function resolveDashboardSubscriptionCancelledAt(
   stripeSubscriptionId: string | null | undefined,
@@ -830,37 +831,56 @@ function CommunityProfileSection({ userId }: { userId: number }) {
 // ─── My Content Tab ───────────────────────────────────────────────────────────
 
 type ContentSubTab = StudentDashboardContentTab;
+type QuizContentView = "library" | "results";
 
-function parseDashboardTabs(search: string): { initialTab: Tab; initialContentTab?: ContentSubTab } {
+function parseDashboardTabs(search: string): { initialTab: Tab; initialContentTab?: ContentSubTab; initialQuizView?: QuizContentView } {
   const params = new URLSearchParams(search);
   const rawTab = params.get("tab");
   const rawContentTab = params.get("contentTab");
+  const rawQuizView = params.get("quizView");
 
   let initialContentTab: ContentSubTab | undefined;
   if (rawContentTab && STUDENT_DASHBOARD_CONTENT_TABS.has(rawContentTab as ContentSubTab)) {
     initialContentTab = rawContentTab as ContentSubTab;
   }
+  const initialQuizView = initialContentTab === "quizzes" && (rawQuizView === "results" || rawQuizView === "library")
+    ? rawQuizView
+    : undefined;
 
   if (rawTab && VALID_TABS.includes(rawTab as Tab)) {
-    return { initialTab: rawTab as Tab, initialContentTab };
+    return { initialTab: rawTab as Tab, initialContentTab, initialQuizView };
   }
 
   if (rawTab === "cohorts") {
-    return { initialTab: "content", initialContentTab: initialContentTab ?? "courses" };
+    return { initialTab: "content", initialContentTab: initialContentTab ?? "courses", initialQuizView };
   }
 
   if (rawTab && STUDENT_DASHBOARD_CONTENT_TABS.has(rawTab as ContentSubTab)) {
-    return { initialTab: "content", initialContentTab: rawTab as ContentSubTab };
+    return {
+      initialTab: "content",
+      initialContentTab: rawTab as ContentSubTab,
+      initialQuizView: rawTab === "quizzes" ? initialQuizView : undefined,
+    };
   }
 
-  return { initialTab: "content", initialContentTab };
+  return { initialTab: "content", initialContentTab, initialQuizView };
 }
 
-function MyContentTab({ initialContentTab }: { initialContentTab?: ContentSubTab }) {
+function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTab?: ContentSubTab; initialQuizView?: QuizContentView }) {
   const { data: profile } = trpc.dashboard.getProfile.useQuery();
   const { data, isLoading, isError, error, refetch } = trpc.dashboard.getMyContent.useQuery();
   const [contentTab, setContentTab] = useState<ContentSubTab>(initialContentTab ?? "courses");
+  const [quizView, setQuizView] = useState<QuizContentView>(initialQuizView ?? "library");
   const [autoTabSet, setAutoTabSet] = useState(Boolean(initialContentTab));
+  const { data: quizResultsSummary } = trpc.standaloneQuizLearner.getMyQuizResultsSummary.useQuery(
+    undefined,
+    { enabled: contentTab === "quizzes" },
+  );
+  const hasStandaloneSystemQuizResults = Boolean(quizResultsSummary?.hasStandaloneSystemQuizAttempts);
+
+  useEffect(() => {
+    if (!hasStandaloneSystemQuizResults && quizView === "results") setQuizView("library");
+  }, [hasStandaloneSystemQuizResults, quizView]);
 
   // Auto-select first non-empty tab once data loads
   useEffect(() => {
@@ -1008,8 +1028,31 @@ function MyContentTab({ initialContentTab }: { initialContentTab?: ContentSubTab
 
       {/* Quizzes */}
       {contentTab === "quizzes" && (
-        <div>
-          {(data?.quizzes.length ?? 0) === 0 ? (
+        <div className="space-y-5">
+          <div className="inline-flex rounded-xl border border-teal-100 bg-teal-50/60 p-1" role="tablist" aria-label="Quiz content">
+            <button
+              role="tab"
+              aria-selected={quizView === "library"}
+              onClick={() => setQuizView("library")}
+              className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${quizView === "library" ? "bg-white text-teal-700 shadow-sm" : "text-gray-600 hover:text-teal-700"}`}
+            >
+              My Quizzes
+            </button>
+            {hasStandaloneSystemQuizResults && (
+              <button
+                role="tab"
+                aria-selected={quizView === "results"}
+                onClick={() => setQuizView("results")}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${quizView === "results" ? "bg-white text-teal-700 shadow-sm" : "text-gray-600 hover:text-teal-700"}`}
+              >
+                My Quiz Results
+              </button>
+            )}
+          </div>
+
+          {quizView === "results" && hasStandaloneSystemQuizResults ? (
+            <StudentQuizResultsPanel standaloneOnly />
+          ) : (data?.quizzes.length ?? 0) === 0 ? (
             <EmptyState icon={ClipboardCheck} title="No quizzes yet" description="Purchase or enroll in a quiz to see it here." />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2612,8 +2655,8 @@ export default function StudentDashboardPage() {
     ...(isPartner ? [{ key: "revenue_partner" as Tab, label: "Revenue", icon: DollarSign }] : []),
   ];
 
-  // Parse ?tab= / ?contentTab= from URL
-  const { initialTab, initialContentTab } = parseDashboardTabs(search);
+  // Parse ?tab= / ?contentTab= / ?quizView= from URL
+  const { initialTab, initialContentTab, initialQuizView } = parseDashboardTabs(search);
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   // Fresh login via magic link / SSO exchange — drop stale SSO locks and cached auth
@@ -2782,7 +2825,7 @@ export default function StudentDashboardPage() {
 
           {/* Tab Content */}
           {activeTab === "profile"       && <ProfileTab />}
-          {activeTab === "content"       && <MyContentTab initialContentTab={initialContentTab} />}
+          {activeTab === "content"       && <MyContentTab initialContentTab={initialContentTab} initialQuizView={initialQuizView} />}
           {activeTab === "subscriptions" && <SubscriptionsTab />}
           {activeTab === "purchases"     && <PurchasesTab />}
           {activeTab === "certificates"  && <CertificatesTab />}

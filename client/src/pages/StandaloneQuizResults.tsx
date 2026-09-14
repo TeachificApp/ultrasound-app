@@ -13,6 +13,13 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, XCircle, ArrowLeft, RotateCcw, BookOpen, Trophy } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { buildStudentDashboardUrl } from "@shared/studentDashboardUrls";
+
+const QUIZ_RESULTS_DASHBOARD_HREF = buildStudentDashboardUrl({
+  origin: "relative",
+  contentTab: "quizzes",
+  quizView: "results",
+});
 
 function ScoreRing({ score, passed }: { score: number; passed: boolean }) {
   const r = 54;
@@ -61,7 +68,7 @@ export default function StandaloneQuizResults() {
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 text-center px-4">
         <BookOpen className="w-12 h-12 text-gray-300" />
         <h2 className="text-xl font-bold text-gray-700">Results not found</h2>
-        <Button variant="outline" onClick={() => navigate("/my-quizzes")}>My Quizzes</Button>
+        <Button variant="outline" onClick={() => navigate(QUIZ_RESULTS_DASHBOARD_HREF)}>My Quizzes</Button>
       </div>
     );
   }
@@ -94,8 +101,8 @@ export default function StandaloneQuizResults() {
       <div className="max-w-3xl mx-auto px-4 py-10">
         {/* Header */}
         <div className="flex items-center gap-3 mb-8">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/my-quizzes")}>
-            <ArrowLeft className="w-4 h-4 mr-1" /> My Quizzes
+          <Button variant="ghost" size="sm" onClick={() => navigate(QUIZ_RESULTS_DASHBOARD_HREF)}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> My Quiz Results
           </Button>
         </div>
 
@@ -141,8 +148,8 @@ export default function StandaloneQuizResults() {
                 <RotateCcw className="w-4 h-4 mr-2" /> Retake
               </Button>
             )}
-            <Button onClick={() => navigate("/my-quizzes")} className="bg-teal-600 hover:bg-teal-700">
-              My Quizzes
+            <Button onClick={() => navigate(QUIZ_RESULTS_DASHBOARD_HREF)} className="bg-teal-600 hover:bg-teal-700">
+              My Quiz Results
             </Button>
           </div>
         </div>

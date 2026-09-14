@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ALL_USER_QUIZZES_HREF,
-  ensureAllUserQuizzesNavigation,
+  removeQuizNavigationItems,
 } from "./quizNavigation";
 
 describe("all-user Quizzes navigation", () => {
@@ -9,19 +9,24 @@ describe("all-user Quizzes navigation", () => {
     expect(ALL_USER_QUIZZES_HREF).toBe("/my-dashboard?tab=content&contentTab=quizzes");
   });
 
-  it("adds Quizzes when a managed header has omitted it", () => {
-    const items = ensureAllUserQuizzesNavigation([
+  it("does not add Quizzes when a managed header has omitted it", () => {
+    const items = removeQuizNavigationItems([
       { label: "Education Library", href: "/education-library" },
     ]);
 
     expect(items).toEqual([
       { label: "Education Library", href: "/education-library" },
-      { label: "Quizzes", href: ALL_USER_QUIZZES_HREF },
     ]);
   });
 
-  it("does not duplicate an existing legacy or canonical Quizzes link", () => {
-    expect(ensureAllUserQuizzesNavigation([{ label: "Quizzes", href: "/my-dashboard?tab=quizzes" }])).toHaveLength(1);
-    expect(ensureAllUserQuizzesNavigation([{ label: "Learning", href: ALL_USER_QUIZZES_HREF }])).toHaveLength(1);
+  it("removes top/profile quiz and results destinations while retaining unrelated items", () => {
+    expect(removeQuizNavigationItems([
+      { label: "Quizzes", href: "/my-dashboard?tab=quizzes" },
+      { label: "My Quiz Results", href: "/my-quizzes" },
+      { label: "Learning", href: ALL_USER_QUIZZES_HREF },
+      { label: "Community", href: "/community/all-about-ultrasound" },
+    ])).toEqual([
+      { label: "Community", href: "/community/all-about-ultrasound" },
+    ]);
   });
 });

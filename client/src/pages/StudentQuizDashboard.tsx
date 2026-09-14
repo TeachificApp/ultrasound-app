@@ -130,7 +130,7 @@ function AttemptHistoryTable({
   );
 }
 
-export default function StudentQuizDashboard() {
+export function StudentQuizResultsPanel({ standaloneOnly = false }: { standaloneOnly?: boolean }) {
   const [, navigate] = useLocation();
   const { user, isLoading: authLoading } = useAuth();
   const [tab, setTab] = useState("native");
@@ -142,20 +142,20 @@ export default function StudentQuizDashboard() {
 
   const { data: nativeHistory, isLoading: loadingNative } = trpc.standaloneQuizLearner.getMyAttempts.useQuery(
     { quizType: "quiz" },
-    { enabled: !!user && !!summary?.hasNativeQuizAttempts },
+    { enabled: !!user && Boolean(standaloneOnly ? summary?.hasStandaloneSystemQuizAttempts : summary?.hasNativeQuizAttempts) },
   );
 
   const { data: mockHistory, isLoading: loadingMock } = trpc.standaloneQuizLearner.getMyAttempts.useQuery(
     { quizType: "mock_exam" },
-    { enabled: !!user && !!summary?.hasMockExamAttempts && tab === "mock" },
+    { enabled: !!user && !standaloneOnly && !!summary?.hasMockExamAttempts && tab === "mock" },
   );
   const { data: flashcardHistory, isLoading: loadingFlashcards } = trpc.standaloneQuizLearner.getMyAttempts.useQuery(
     { quizType: "flashcards" },
-    { enabled: !!user && !!summary?.hasFlashcardAttempts && tab === "flashcards" },
+    { enabled: !!user && !standaloneOnly && !!summary?.hasFlashcardAttempts && tab === "flashcards" },
   );
   const { data: inlineModuleHistory, isLoading: loadingInlineModules } = trpc.lmsLearner.getMyInlineModuleAttempts.useQuery(
     undefined,
-    { enabled: !!user },
+    { enabled: !!user && !standaloneOnly },
   );
   const sortByCompletedAt = (rows: any[]) => [...rows].sort((a, b) => {
     const aTime = a.attempt.completedAt ? new Date(a.attempt.completedAt).getTime() : 0;
@@ -164,7 +164,7 @@ export default function StudentQuizDashboard() {
   });
   const inlineQuizHistory = (inlineModuleHistory ?? []).filter((row: any) => row.quizType === "quiz");
   const inlineFlashcardHistory = (inlineModuleHistory ?? []).filter((row: any) => row.quizType === "flashcards");
-  const allNativeHistory = sortByCompletedAt([...(nativeHistory ?? []), ...inlineQuizHistory]);
+  const allNativeHistory = sortByCompletedAt(standaloneOnly ? (nativeHistory ?? []) : [...(nativeHistory ?? []), ...inlineQuizHistory]);
   const allFlashcardHistory = sortByCompletedAt([...(flashcardHistory ?? []), ...inlineFlashcardHistory]);
 
   if (authLoading || loadingSummary) {
@@ -183,14 +183,18 @@ export default function StudentQuizDashboard() {
     );
   }
 
-  if (!summary?.hasNativeQuizAttempts && !summary?.hasMockExamAttempts && !summary?.hasFlashcardAttempts) {
+  const hasVisibleResults = standaloneOnly
+    ? Boolean(summary?.hasStandaloneSystemQuizAttempts)
+    : Boolean(summary?.hasNativeQuizAttempts || summary?.hasMockExamAttempts || summary?.hasFlashcardAttempts);
+
+  if (!hasVisibleResults) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className={`${standaloneOnly ? "" : "min-h-screen bg-gray-50"} flex items-center justify-center px-4`}>
         <div className="max-w-md text-center bg-white rounded-2xl border border-gray-200 p-10">
           <BookOpen className="w-12 h-12 text-teal-600 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-gray-900 mb-2">No quiz results yet</h1>
           <p className="text-sm text-gray-500 mb-6">
-            My Quiz Results appears after you complete a quiz, mock exam, or flashcard deck. Results are private to your signed-in account.
+            My Quiz Results appears after you complete a standalone system quiz. Results are private to your signed-in account.
           </p>
           <Button onClick={() => navigate("/education-library")} className="bg-teal-600 hover:bg-teal-700">
             Browse courses
@@ -201,28 +205,28 @@ export default function StudentQuizDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-10">
+    <div className={standaloneOnly ? "" : "min-h-screen bg-gray-50"}>
+      <div className={standaloneOnly ? "max-w-4xl mx-auto" : "max-w-4xl mx-auto px-4 py-10"}>
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">My Quiz Results</h1>
-          <p className="text-gray-500 text-sm mt-1">Private practice quiz, mock exam, and flashcard analytics</p>
+          <p className="text-gray-500 text-sm mt-1">{standaloneOnly ? "Private results for completed standalone system quizzes" : "Private practice quiz, mock exam, and flashcard analytics"}</p>
         </div>
 
         <div className="grid gap-4 mb-8">
-          <AnalyticsCards title="Native quizzes" analytics={summary.nativeQuizzes} />
-          {summary.hasMockExamAttempts && (
+          <AnalyticsCards title={standaloneOnly ? "Standalone quizzes" : "Native quizzes"} analytics={standaloneOnly ? summary.standaloneSystemQuizzes : summary.nativeQuizzes} />
+          {!standaloneOnly && summary.hasMockExamAttempts && (
             <AnalyticsCards title="Mock exams" analytics={summary.mockExams} />
           )}
-          {summary.hasFlashcardAttempts && <AnalyticsCards title="Flashcard decks" analytics={summary.flashcards} />}
+          {!standaloneOnly && summary.hasFlashcardAttempts && <AnalyticsCards title="Flashcard decks" analytics={summary.flashcards} />}
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="mb-6">
             <TabsTrigger value="native">Quiz results</TabsTrigger>
-            {summary.hasMockExamAttempts && (
+            {!standaloneOnly && summary.hasMockExamAttempts && (
               <TabsTrigger value="mock">Mock exam results</TabsTrigger>
             )}
-            {summary.hasFlashcardAttempts && <TabsTrigger value="flashcards">Flashcard results</TabsTrigger>}
+            {!standaloneOnly && summary.hasFlashcardAttempts && <TabsTrigger value="flashcards">Flashcard results</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="native">
@@ -233,7 +237,7 @@ export default function StudentQuizDashboard() {
             )}
           </TabsContent>
 
-          {summary.hasMockExamAttempts && (
+          {!standaloneOnly && summary.hasMockExamAttempts && (
             <TabsContent value="mock">
               {loadingMock ? (
                 <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div>
@@ -242,7 +246,7 @@ export default function StudentQuizDashboard() {
               )}
             </TabsContent>
           )}
-          {summary.hasFlashcardAttempts && (
+          {!standaloneOnly && summary.hasFlashcardAttempts && (
             <TabsContent value="flashcards">
               {loadingFlashcards || loadingInlineModules ? <div className="space-y-3">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div> : <AttemptHistoryTable rows={allFlashcardHistory} emptyLabel="No flashcard deck attempts yet" />}
             </TabsContent>
@@ -251,4 +255,8 @@ export default function StudentQuizDashboard() {
       </div>
     </div>
   );
+}
+
+export default function StudentQuizDashboard() {
+  return <StudentQuizResultsPanel />;
 }

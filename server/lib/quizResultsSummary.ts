@@ -91,14 +91,17 @@ export async function loadMyQuizResultsSummary(
   const flashcardInline = inlineRows.filter((row) => getInlineModuleResultKind(row.contentBlocks, row.quizBlockId) === "flashcards");
 
   const nativeQuizzes = aggregateScoresFromRows([...nativeStandalone, ...nativeLms, ...nativeInline]);
+  const standaloneSystemQuizzes = aggregateScoresFromRows(nativeStandalone);
   const mockExams = aggregateScoresFromRows([...mockStandalone, ...mockLms]);
   const flashcards = aggregateScoresFromRows([...flashcardStandalone, ...flashcardInline]);
 
   return {
     hasNativeQuizAttempts: nativeQuizzes.attemptCount > 0,
+    hasStandaloneSystemQuizAttempts: standaloneSystemQuizzes.attemptCount > 0,
     hasMockExamAttempts: mockExams.attemptCount > 0,
     hasFlashcardAttempts: flashcards.attemptCount > 0,
     nativeQuizzes,
+    standaloneSystemQuizzes,
     mockExams,
     flashcards,
   };

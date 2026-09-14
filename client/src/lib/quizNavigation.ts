@@ -8,21 +8,24 @@ export const ALL_USER_QUIZZES_HREF = buildStudentDashboardUrl({
 });
 
 function isQuizNavigationItem(item: SiteNavLinkItem): boolean {
-  if (item.label.trim().toLowerCase() === "quizzes") return true;
+  const normalizedLabel = item.label.trim().toLowerCase();
+  if (normalizedLabel === "quizzes" || normalizedLabel === "my quiz results") return true;
 
   try {
     const href = new URL(item.href, "https://learn.allaboutultrasound.com");
-    return href.searchParams.get("contentTab") === "quizzes" || href.searchParams.get("tab") === "quizzes";
+    return href.pathname === "/my-quizzes"
+      || href.searchParams.get("contentTab") === "quizzes"
+      || href.searchParams.get("tab") === "quizzes";
   } catch {
     return false;
   }
 }
 
 /**
- * Keeps Quizzes available even when a CMS-managed header overrides the default
- * navigation. My Quiz Results remains a separate, results-only menu item.
+ * Quiz discovery belongs only inside My Dashboard → My Content. Strip legacy
+ * or CMS-managed quiz links from top and profile navigation until a future
+ * explicit navigation request approves one.
  */
-export function ensureAllUserQuizzesNavigation(items: SiteNavLinkItem[]): SiteNavLinkItem[] {
-  if (items.some(isQuizNavigationItem)) return items;
-  return [...items, { label: "Quizzes", href: ALL_USER_QUIZZES_HREF }];
+export function removeQuizNavigationItems(items: SiteNavLinkItem[]): SiteNavLinkItem[] {
+  return items.filter((item) => !isQuizNavigationItem(item));
 }

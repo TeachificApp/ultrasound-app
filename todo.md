@@ -506,3 +506,6 @@
 - [x] Repair only the verified user-facing authentication defect, add a focused regression, and request explicit approval before resending a login or password-recovery email.
 - [x] Remove every pre-registration or pending-account authentication block so all existing accounts with a deliverable email may use valid password login, magic-link recovery, or password reset without exposing account existence.
 - [x] Add focused password-login, magic-link, and password-reset regressions proving pending administrative metadata does not block valid account recovery or weaken credential validation.
+- [x] Remove the unapproved Quizzes top-navigation link and both Quizzes/My Quiz Results profile-menu entries; do not add top or side navigation links without explicit approval.
+- [x] Keep Quizzes available only inside My Dashboard → My Content, and show My Quiz Results there only to learners with recorded standalone-system quiz results.
+- [x] Add focused navigation and standalone-result visibility regressions for the corrected discovery rules.

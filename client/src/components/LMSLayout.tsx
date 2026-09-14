@@ -9,8 +9,8 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
-  GraduationCap, FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users, DollarSign, Briefcase, ClipboardCheck
+  FolderOpen, ExternalLink, LayoutDashboard,
+  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users, DollarSign, Briefcase
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -24,9 +24,8 @@ const MEMBERS_URL = "https://members.allaboutultrasound.com";
 import { getAdminUrl, APP_URL } from "@/hooks/useSubdomain";
 import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
 import { SiteNavHeaderLinks, SiteNavProfileLinks } from "@/components/SiteNavLinks";
-import { trpc } from "@/lib/trpc";
 import { STUDENT_DASHBOARD_PATH } from "@shared/studentDashboardUrls";
-import { ALL_USER_QUIZZES_HREF, ensureAllUserQuizzesNavigation } from "@/lib/quizNavigation";
+import { removeQuizNavigationItems } from "@/lib/quizNavigation";
 const AAUS_APP_URL = "https://app.allaboutultrasound.com";
 
 interface NavItem {
@@ -42,7 +41,6 @@ const IHE_SITE_URL = "https://www.iheartecho.com";
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Education Library", href: "/education-library", icon: <BookOpen className="w-4 h-4" /> },
-  { label: "Quizzes", href: ALL_USER_QUIZZES_HREF, icon: <ClipboardCheck className="w-4 h-4" /> },
   { label: "Workshops", href: "/workshops", icon: <Briefcase className="w-4 h-4" /> },
   { label: "Community", href: "/community/all-about-ultrasound", icon: <Users className="w-4 h-4" /> },
 ];
@@ -56,8 +54,9 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
     href: item.href,
     external: item.external,
   })));
-  const headerNavItems = ensureAllUserQuizzesNavigation(managedHeaderNavItems);
-  const { items: profileNavItems } = useSiteNavMenu("profile", []);
+  const headerNavItems = removeQuizNavigationItems(managedHeaderNavItems);
+  const { items: managedProfileNavItems } = useSiteNavMenu("profile", []);
+  const profileNavItems = removeQuizNavigationItems(managedProfileNavItems);
 
   // Funnel pages (/:slug/:pageSlug) should render without the LMS header.
   // Detect by checking: two path segments, not starting with any known system prefix.
@@ -71,15 +70,6 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
   })();
 
   const { isAuthenticated, user, loading: authLoading, logout } = useAuth();
-  const { data: quizResultsSummary } = trpc.standaloneQuizLearner.getMyQuizResultsSummary.useQuery(
-    undefined,
-    { enabled: isAuthenticated },
-  );
-  const showQuizResultsLink = Boolean(
-    quizResultsSummary?.hasNativeQuizAttempts
-    || quizResultsSummary?.hasMockExamAttempts
-    || quizResultsSummary?.hasFlashcardAttempts,
-  );
   const isAdmin = (user as any)?.role === "admin";
   const appRoles: string[] = (user as any)?.appRoles ?? [];
   const isPlatformAdmin = appRoles.includes("platform_admin") || isAdmin;
@@ -258,22 +248,6 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                       >
                         <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
                       </a>
-                      <a
-                        href={ALL_USER_QUIZZES_HREF}
-                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        onClick={() => setAccountOpen(false)}
-                      >
-                        <ClipboardCheck className="w-3.5 h-3.5 text-teal-600" /> Quizzes
-                      </a>
-                      {showQuizResultsLink && (
-                        <a
-                          href="/my-quizzes"
-                          className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                          onClick={() => setAccountOpen(false)}
-                        >
-                          <GraduationCap className="w-3.5 h-3.5 text-teal-600" /> My Quiz Results
-                        </a>
-                      )}
                       <SiteNavProfileLinks
                         items={profileNavItems}
                         location={location}
