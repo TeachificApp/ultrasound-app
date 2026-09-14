@@ -509,3 +509,9 @@
 - [x] Remove the unapproved Quizzes top-navigation link and both Quizzes/My Quiz Results profile-menu entries; do not add top or side navigation links without explicit approval.
 - [x] Keep Quizzes available only inside My Dashboard → My Content, and show My Quiz Results there only to learners with recorded standalone-system quiz results.
 - [x] Add focused navigation and standalone-result visibility regressions for the corrected discovery rules.
+- [x] Repair My Content → Quizzes so a learner sees entitled standalone quizzes and courses flagged as quizzes rather than an empty My Quizzes list.
+- [x] Repair My Quiz Results so completed standalone-system quiz attempts render actual learner-only result records instead of blank placeholder rows; lesson-embedded quizzes must not reveal, populate, or count toward this tab.
+- [x] Add focused entitlement, quiz-course classification, lesson-quiz exclusion, result-display, and learner-privacy regressions for the corrected My Content quiz experience.
+- [x] Repair missing UltrasoundAssist and EchoAssist membership/course card images on the learner dashboard without changing memberships, pricing, subscriptions, or access.
+- [x] Add focused brand-card image-source and fallback regressions for the learner dashboard.
+- [ ] Validate on the deployed learner dashboard that entitled standalone quizzes, LMS quiz courses, learner-only standalone results, and both brand-card images render correctly.

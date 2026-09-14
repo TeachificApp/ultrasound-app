@@ -11,6 +11,8 @@ describe("My Content quiz-results navigation", () => {
     expect(source).toContain("hasStandaloneSystemQuizAttempts");
     expect(source).toContain("<StudentQuizResultsPanel standaloneOnly />");
     expect(source).toContain('My Quiz Results');
+    expect(source).toContain('contentKind === "standalone_quiz"');
+    expect(source).toContain('contentKind === "standalone_result"');
   });
 
   it("does not expose Quizzes or My Quiz Results in the shared top/profile layout", () => {

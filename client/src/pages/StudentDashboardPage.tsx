@@ -1072,7 +1072,11 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                   cancelAtPeriodEnd={(q as any).cancelAtPeriodEnd ?? false}
                   stripePeriodEnd={(q as any).stripePeriodEnd ?? null}
                   subscriptionCancelledAt={resolveDashboardSubscriptionCancelledAt((q as any).stripeSubscriptionId, (q as any).accessExpiresAt)}
-                  actions={[
+                  actions={(q as any).contentKind === "standalone_result" ? [
+                    { label: "View Results", icon: ClipboardCheck, href: buildStudentDashboardUrl({ tab: "content", contentTab: "quizzes", quizView: "results" }) },
+                  ] : (q as any).contentKind === "standalone_quiz" && (q as any).courseSlug && (q as any).lessonId ? [
+                    { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player?lesson=${(q as any).lessonId}` },
+                  ] : [
                     { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
                   ]}
                 />
@@ -2100,7 +2104,14 @@ function ContentCard({
       {/* Cover image */}
       <div className="relative h-36 bg-gradient-to-br from-teal-50 to-teal-100 overflow-hidden flex-shrink-0">
         {thumbnail ? (
-          <img src={thumbnail} alt={title} className="w-full h-full object-cover" />
+          <img
+            src={thumbnail}
+            alt={title}
+            className="w-full h-full object-cover"
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+            }}
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <BookOpen className="w-10 h-10 text-teal-300" />

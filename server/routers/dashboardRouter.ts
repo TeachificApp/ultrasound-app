@@ -46,6 +46,10 @@ import {
   digitalBundles,
   manualInvoices,
   deferredCheckoutSessions,
+  lmsLessons,
+  lmsSections,
+  standaloneQuizAttempts,
+  standaloneQuizzes,
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray, sql, or, isNotNull, gte } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
@@ -296,6 +300,105 @@ export const dashboardRouter = router({
       completedAt: e.completedAt,
       progressPct: e.progressPct,
     }));
+
+    // Standalone Quiz Creator quizzes are available only through a learner's
+    // enrolled course lesson. Keep their discovery inside My Content rather
+    // than exposing the Quiz Creator catalog or unrelated published quizzes.
+    const activeEnrollmentByCourseId = new Map(activeEnrollments.map((enrollment) => [enrollment.courseId, enrollment]));
+    const activeCourseIds = [...activeEnrollmentByCourseId.keys()];
+    const standaloneAssignmentColumns = {
+      quizId: standaloneQuizzes.id,
+      quizTitle: standaloneQuizzes.title,
+      quizBrand: standaloneQuizzes.brand,
+      quizCover: standaloneQuizzes.coverImageUrl,
+      quizStatus: standaloneQuizzes.status,
+      lessonId: lmsLessons.id,
+    } as const;
+    const [directStandaloneAssignments, sectionStandaloneAssignments, attemptedStandaloneQuizzes] = await Promise.all([
+      activeCourseIds.length > 0
+        ?
+          db.select({ ...standaloneAssignmentColumns, courseId: lmsLessons.courseId })
+            .from(lmsLessons)
+            .innerJoin(standaloneQuizzes, eq(lmsLessons.standaloneQuizId, standaloneQuizzes.id))
+            .where(and(
+              eq(lmsLessons.type, "standalone_quiz"),
+              inArray(lmsLessons.courseId, activeCourseIds),
+              eq(standaloneQuizzes.status, "published"),
+            ))
+        : Promise.resolve([]),
+      activeCourseIds.length > 0
+        ?
+          db.select({ ...standaloneAssignmentColumns, courseId: lmsSections.courseId })
+            .from(lmsLessons)
+            .innerJoin(lmsSections, eq(lmsLessons.sectionId, lmsSections.id))
+            .innerJoin(standaloneQuizzes, eq(lmsLessons.standaloneQuizId, standaloneQuizzes.id))
+            .where(and(
+              eq(lmsLessons.type, "standalone_quiz"),
+              inArray(lmsSections.courseId, activeCourseIds),
+              eq(standaloneQuizzes.status, "published"),
+            ))
+        : Promise.resolve([]),
+          db.select({
+            quizId: standaloneQuizzes.id,
+            quizTitle: standaloneQuizzes.title,
+            quizBrand: standaloneQuizzes.brand,
+            quizCover: standaloneQuizzes.coverImageUrl,
+            quizStatus: standaloneQuizzes.status,
+          })
+            .from(standaloneQuizAttempts)
+            .innerJoin(standaloneQuizzes, eq(standaloneQuizAttempts.quizId, standaloneQuizzes.id))
+            .where(and(
+              eq(standaloneQuizAttempts.userId, ctx.user.id),
+              isNotNull(standaloneQuizAttempts.completedAt),
+              eq(standaloneQuizzes.status, "published"),
+            )),
+        ]);
+
+    const standaloneQuizLibrary = new Map<number, any>();
+    for (const assignment of [...directStandaloneAssignments, ...sectionStandaloneAssignments]) {
+      if (!assignment.courseId) continue;
+      const enrollment = activeEnrollmentByCourseId.get(assignment.courseId);
+      if (!enrollment || standaloneQuizLibrary.has(assignment.quizId)) continue;
+      standaloneQuizLibrary.set(assignment.quizId, {
+        courseId: assignment.quizId,
+        quizId: assignment.quizId,
+        lessonId: assignment.lessonId,
+        courseTitle: assignment.quizTitle,
+        courseSlug: enrollment.courseSlug,
+        courseBrand: assignment.quizBrand,
+        courseThumbnail: assignment.quizCover,
+        contentKind: "standalone_quiz" as const,
+        enrollmentId: enrollment.enrollmentId,
+        enrolledAt: enrollment.enrolledAt,
+        completedAt: enrollment.completedAt,
+        progressPct: enrollment.progressPct,
+        accessExpiresAt: enrollment.accessExpiresAt,
+        enrollmentSource: enrollment.enrollmentSource,
+      });
+    }
+
+    // Retain an existing learner's completed standalone quiz in My Quizzes even
+    // if its current course assignment is no longer active. It is a results-only
+    // card, never a new route for discovering or opening an unassigned quiz.
+    for (const attemptedQuiz of attemptedStandaloneQuizzes) {
+      if (standaloneQuizLibrary.has(attemptedQuiz.quizId)) continue;
+      standaloneQuizLibrary.set(attemptedQuiz.quizId, {
+        courseId: attemptedQuiz.quizId,
+        quizId: attemptedQuiz.quizId,
+        lessonId: null,
+        courseTitle: attemptedQuiz.quizTitle,
+        courseSlug: null,
+        courseBrand: attemptedQuiz.quizBrand,
+        courseThumbnail: attemptedQuiz.quizCover,
+        contentKind: "standalone_result" as const,
+        enrollmentId: null,
+        enrolledAt: null,
+        completedAt: null,
+        progressPct: null,
+        accessExpiresAt: null,
+        enrollmentSource: "standalone_result" as const,
+      });
+    }
 
     // Enrich enrollments that have a stripeSubscriptionId with live Stripe data (cancelAtPeriodEnd, currentPeriodEnd)
     const enrichedEnrollments = await Promise.all(
@@ -683,12 +786,8 @@ export const dashboardRouter = router({
       iheartecho: { premium: "EchoAssist™ Premium", free: "EchoAssist™ Free", basic: "EchoAssist™ Basic" },
     };
     const BRAND_COVER_IMAGES: Record<string, string> = {
-      aaus: resolveAssetUrl(
-        "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp",
-      )!,
-      iheartecho: resolveAssetUrl(
-        "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/ihe-hero-MNscA4NaWNyxrdkewtLGLG.webp",
-      )!,
+      aaus: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/dashboard-brand-covers/ultrasoundassist-premium.webp",
+      iheartecho: "https://pub-1f4b81c70d1f49cb8817cc2abbb92288.r2.dev/dashboard-brand-covers/echoassist-premium.webp",
     };
     const brandMembershipCards = brandMembershipRows.map(m => ({
       type: "brand" as const,
@@ -704,7 +803,7 @@ export const dashboardRouter = router({
 
     return resolveAssetUrls({
       courses: [...coursesWithCerts, ...membershipCourses, ...bundleCourses],
-      quizzes: [...quizzes, ...membershipQuizzes, ...bundleQuizzes],
+      quizzes: [...quizzes, ...standaloneQuizLibrary.values(), ...membershipQuizzes, ...bundleQuizzes],
       downloads: [
         ...downloads,
         ...digitalPurchaseRows,
