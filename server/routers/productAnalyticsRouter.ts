@@ -18,6 +18,11 @@ import {
   physicalProducts, physicalProductOrders, users, funnels, funnelPages,
   manualInvoices, workshopEnrollments, workshops, webinarRegistrations, webinars,
 } from "../../drizzle/schema";
+import {
+  getAdministratorTransactionStatus,
+  summarizeCompletedPayments,
+  type PaymentTransactionSource,
+} from "../lib/paymentState";
 
 async function assertAdmin(ctx: any) {
   if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -52,7 +57,7 @@ export const productAnalyticsRouter = router({
       if (input.type === "all" || input.type === "course") {
         const courses = await db.execute(sql`
           SELECT c.id, c.title, c.created_at AS createdAt,
-            COUNT(DISTINCT lo.id) AS purchaseCount,
+            COUNT(DISTINCT CASE WHEN lo.status = 'paid' THEN lo.id END) AS purchaseCount,
             COALESCE(SUM(CASE WHEN lo.status = 'paid' THEN lo.amount ELSE 0 END), 0) AS revenue
           FROM lms_courses c
           LEFT JOIN lms_orders lo ON lo.course_id = c.id
@@ -154,7 +159,7 @@ export const productAnalyticsRouter = router({
       if (input.type === "all" || input.type === "funnel") {
         const funnelData = await db.execute(sql`
           SELECT f.id, f.name AS title, f.created_at AS createdAt,
-            COUNT(DISTINCT fp2.id) AS purchaseCount,
+            COUNT(DISTINCT CASE WHEN fp2.status = 'paid' THEN fp2.id END) AS purchaseCount,
             COALESCE(SUM(CASE WHEN fp2.status = 'paid' THEN fp2.amount_paid ELSE 0 END), 0) AS revenue
           FROM funnels f
           LEFT JOIN funnel_purchases fp2 ON fp2.source_funnel_id = f.id
@@ -419,7 +424,7 @@ export const productAnalyticsRouter = router({
     .query(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
-      if (!db) return { transactions: [], total: 0, totalSpent: 0 };
+      if (!db) return { transactions: [], total: 0, totalRecords: 0, totalSpent: 0 };
       console.log(`[getUserTransactions] userId=${input.userId} page=${input.page}`);
       try {
         // Fetch each source table individually using Drizzle ORM (avoids UNION ALL column-name issues)
@@ -449,6 +454,7 @@ export const productAnalyticsRouter = router({
             currency: lmsOrders.currency,
             status: lmsOrders.status,
             stripePaymentIntentId: lmsOrders.stripePaymentIntentId,
+            stripeSessionId: lmsOrders.stripeSessionId,
             stripeSubscriptionId: lmsOrders.stripeSubscriptionId,
             purchasedAt: lmsOrders.createdAt,
           })
@@ -534,7 +540,7 @@ export const productAnalyticsRouter = router({
         // Normalize all rows into a unified shape
         type TxnRow = {
           transactionId: number;
-          sourceTable: string;
+          sourceTable: PaymentTransactionSource;
           productName: string;
           productType: string;
           amountPaid: number;
@@ -544,6 +550,7 @@ export const productAnalyticsRouter = router({
           purchasedAt: Date;
           orderType: string;
           // Extended fields for invoice/receipt
+          hasStripeReference?: boolean;
           invoiceNumber: string | null;
           paymentSource: string | null;
           notes: string | null;
@@ -578,6 +585,7 @@ export const productAnalyticsRouter = router({
             stripePaymentIntentId: r.stripePaymentIntentId ?? null,
             purchasedAt: r.purchasedAt ? new Date(r.purchasedAt) : new Date(),
             orderType: r.stripeSubscriptionId ? 'subscription' : 'one_time',
+            hasStripeReference: Boolean(r.stripePaymentIntentId || r.stripeSessionId || r.stripeSubscriptionId),
             invoiceNumber: null,
             paymentSource: 'stripe',
             notes: null,
@@ -681,19 +689,24 @@ export const productAnalyticsRouter = router({
           })),
         ];
 
-        // Sort by purchasedAt desc
-        allTxns.sort((a, b) => b.purchasedAt.getTime() - a.purchasedAt.getTime());
+        // Keep all records in the administrator-only member history for audit,
+        // but money/count totals must use only confirmed monetary payments.
+        const transactionsForAdminHistory = allTxns.map((transaction) => ({
+          ...transaction,
+          status: getAdministratorTransactionStatus(transaction),
+        }));
+        transactionsForAdminHistory.sort((a, b) => b.purchasedAt.getTime() - a.purchasedAt.getTime());
 
-        const total = allTxns.length;
-        const totalSpent = allTxns.reduce((sum, t) => sum + t.amountPaid, 0);
+        const { total, totalSpent } = summarizeCompletedPayments(allTxns);
+        const totalRecords = transactionsForAdminHistory.length;
         const offset = (input.page - 1) * input.pageSize;
-        const txns = allTxns.slice(offset, offset + input.pageSize);
+        const txns = transactionsForAdminHistory.slice(offset, offset + input.pageSize);
 
-        console.log(`[getUserTransactions] userId=${uid} total=${total} spent=${totalSpent} page=${input.page} returning=${txns.length}`);
-        return { transactions: txns, total, totalSpent };
+        console.log(`[getUserTransactions] userId=${uid} completedTotal=${total} historyRecords=${totalRecords} spent=${totalSpent} page=${input.page} returning=${txns.length}`);
+        return { transactions: txns, total, totalRecords, totalSpent };
       } catch (err: any) {
         console.error(`[getUserTransactions] Error for userId=${input.userId}:`, err?.message ?? err);
-        return { transactions: [], total: 0, totalSpent: 0 };
+        return { transactions: [], total: 0, totalRecords: 0, totalSpent: 0 };
       }
     }),
 
@@ -782,4 +795,3 @@ export const productAnalyticsRouter = router({
       return { success: true, invoiceNumber: invoiceNum };
     }),
 });
-

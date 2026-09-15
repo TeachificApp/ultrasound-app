@@ -2535,6 +2535,7 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
   const STATUS_COLORS: Record<string, string> = {
     paid: "bg-green-100 text-green-700", pending: "bg-yellow-100 text-yellow-700",
     refunded: "bg-gray-100 text-gray-600", failed: "bg-red-100 text-red-700",
+    abandoned: "bg-amber-100 text-amber-800",
     completed: "bg-green-100 text-green-700", fulfilled: "bg-green-100 text-green-700",
     open: "bg-blue-50 text-blue-600",
   };
@@ -2587,7 +2588,7 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
           </div>
           <div>
             <div className="text-xl font-bold text-gray-900">{data?.total ?? 0}</div>
-            <div className="text-xs text-gray-500">Total Transactions</div>
+            <div className="text-xs text-gray-500">Completed Transactions</div>
           </div>
         </div>
       </div>
@@ -2661,17 +2662,17 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
             </tbody>
           </table>
         </div>
-        {data && data.total > 50 && (
+        {data && (data.totalRecords ?? data.total) > 50 && (
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
             <span className="text-xs text-gray-500">
-              Showing {((page - 1) * 50) + 1}–{Math.min(page * 50, data.total)} of {data.total}
+              Showing {((page - 1) * 50) + 1}–{Math.min(page * 50, data.totalRecords ?? data.total)} of {data.totalRecords ?? data.total} history records
             </span>
             <div className="flex items-center gap-2">
               <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 hover:bg-gray-50 disabled:opacity-40">
                 <ChevronLeft className="w-3.5 h-3.5" /> Prev
               </button>
-              <button disabled={page * 50 >= data.total} onClick={() => setPage(p => p + 1)}
+              <button disabled={page * 50 >= (data.totalRecords ?? data.total)} onClick={() => setPage(p => p + 1)}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border border-gray-200 hover:bg-gray-50 disabled:opacity-40">
                 Next <ChevronRight className="w-3.5 h-3.5" />
               </button>

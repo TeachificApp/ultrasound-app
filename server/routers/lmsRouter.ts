@@ -39,6 +39,7 @@ import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { buildCmeCertificateFileKey } from "../lib/cmeCertificateFilename";
 import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
+import { toCheckoutAmountCents } from "../lib/paymentState";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
@@ -2953,7 +2954,7 @@ export const lmsLearnerRouter = router({
         userId: ctx.user.id, courseId: course.id,
         // lms_orders.amount is always stored in integer cents. Stripe completion
         // reaffirms this value from amount_total before reporting or fulfillment.
-        amount: Math.round(Number(orderAmount) * 100),
+        amount: toCheckoutAmountCents(orderAmount),
         affiliateId: null, seats: input.seats, status: "pending",
       }).$returningId();
 
@@ -3018,6 +3019,10 @@ export const lmsLearnerRouter = router({
               } else if (existingPromo.enrollmentType === "free_preview") {
                 await db.update(lmsEnrollments).set({ enrollmentType: isPresale ? "presale" : "full" }).where(eq(lmsEnrollments.id, existingPromo.id));
               }
+              // This provisional row was created before discount resolution. A
+              // fully discounted enrollment has no Stripe payment to reconcile.
+              await db.update(lmsOrders).set({ status: "failed" })
+                .where(and(eq(lmsOrders.id, orderResult.id), eq(lmsOrders.status, "pending")));
               return { freeEnrollment: true, courseSlug: course.slug, url: null };
             }
           }
@@ -3032,6 +3037,7 @@ export const lmsLearnerRouter = router({
       const idempotencyDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
       const idempotencyBase = `checkout-${ctx.user.id}-${course.id}-${input.pricingOptionId ?? 0}-${idempotencyDate}`;
 
+      try {
       if (pricingType === "one_time") {
         // If the option has a pre-created Stripe Price ID, use it directly
         const lineItem = buildCourseOfferStripeLineItem({
@@ -3173,6 +3179,13 @@ export const lmsLearnerRouter = router({
       if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
       await db.update(lmsOrders).set({ stripeSessionId: session.id }).where(eq(lmsOrders.id, orderResult.id));
       return { checkoutUrl: session.url };
+      } catch (checkoutError) {
+        // Preserve a nonfinancial audit record, but never leave a local order
+        // pending when its checkout session could not be created or attached.
+        await db.update(lmsOrders).set({ status: "failed" })
+          .where(and(eq(lmsOrders.id, orderResult.id), eq(lmsOrders.status, "pending")));
+        throw checkoutError;
+      }
     }),
 
   /**
@@ -3310,7 +3323,7 @@ export const lmsLearnerRouter = router({
         : effectivePrice * 1) + (orderBumpCheckout?.amount ?? 0);
       const [orderResult] = await db.insert(lmsOrders).values({
         userId: user.id, courseId: course.id,
-        amount: orderAmount, affiliateId: null, seats: 1, status: "pending",
+        amount: toCheckoutAmountCents(orderAmount), affiliateId: null, seats: 1, status: "pending",
       }).$returningId();
 
       const commonMeta = {
@@ -3350,6 +3363,7 @@ export const lmsLearnerRouter = router({
       const guestIdempotencyBase = `guest-checkout-${user.id}-${course.id}-${input.pricingOptionId ?? 0}-${guestIdempotencyDate}`;
 
       let session: any;
+      try {
       if (pricingType === "one_time") {
         const lineItem = effectiveStripePriceId
           ? { price: effectiveStripePriceId, quantity: 1 }
@@ -3406,6 +3420,12 @@ export const lmsLearnerRouter = router({
       if (!session) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
       await db.update(lmsOrders).set({ stripeSessionId: session.id }).where(eq(lmsOrders.id, orderResult.id));
       return { checkoutUrl: session.url, enrolled: false };
+      } catch (checkoutError) {
+        // A guest provisional row without an attached session is not a payment.
+        await db.update(lmsOrders).set({ status: "failed" })
+          .where(and(eq(lmsOrders.id, orderResult.id), eq(lmsOrders.status, "pending")));
+        throw checkoutError;
+      }
     }),
 
   /** Upgrade-prompt checkout — supports course / download / physical product with optional promo code */
