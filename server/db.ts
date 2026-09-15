@@ -221,11 +221,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   if (isNewOAuthUser) {
     const newRow = await db.select({ id: users.id }).from(users).where(eq(users.openId, user.openId)).limit(1);
     if (newRow[0]) {
-      import("./lib/communityAutoJoin").then(({ fireCommunityWorkflowRules }) => {
-        fireCommunityWorkflowRules(newRow[0].id, { type: "any_signup" }).catch(() => {});
-      }).catch(() => {});
-      import("./lib/ensureFreeMembership").then(({ ensureFreeMembership }) => {
-        ensureFreeMembership(newRow[0].id).catch(() => {});
+      import("./lib/onUserAccountReady").then(({ onNewUserRegistered }) => {
+        onNewUserRegistered(newRow[0].id);
       }).catch(() => {});
     }
   }
@@ -433,11 +430,8 @@ export async function getOrCreateUserByEmail(opts: {
   const newUser = await getUserByEmail(normalised);
     if (!newUser) throw new Error(`Failed to create user for ${normalised}`);
   // Fire community workflow rules for brand-new email-based signups (fire-and-forget)
-  import("./lib/communityAutoJoin").then(({ fireCommunityWorkflowRules }) => {
-    fireCommunityWorkflowRules(newUser!.id, { type: "any_signup" }).catch(() => {});
-  }).catch(() => {});
-  import("./lib/ensureFreeMembership").then(({ ensureFreeMembership }) => {
-    ensureFreeMembership(newUser!.id).catch(() => {});
+  import("./lib/onUserAccountReady").then(({ onNewUserRegistered }) => {
+    onNewUserRegistered(newUser!.id);
   }).catch(() => {});
   return { user: newUser as any, isNew: true, resetToken };
 }
