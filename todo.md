@@ -526,3 +526,7 @@
 - [x] Make learner My Content areas default to a course-card presentation while preserving the existing authorized content set and access actions.
 - [x] Add an accessible learner-controlled card/list view toggle and search across visible My Content items without changing content records or entitlements.
 - [x] Add focused regressions for default card view, view-mode switching, search filtering, responsive behavior, and authorized-content preservation.
+- [ ] Confirm the current GitHub main revision and identify any Cursor-originated payment-state edits before making further changes.
+- [ ] Exclude all non-completed payments, including pending and open records, from learner spending, administrator revenue, and transaction-count totals across affected interfaces.
+- [ ] Audit stale pending payment records with read-only provider and application evidence, then request explicit authorization before changing any record or payment state.
+- [ ] Add focused payment-status, aggregate-total, transaction-count, and stale-pending regressions without changing payment, enrollment, entitlement, or ledger records during validation.
