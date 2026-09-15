@@ -390,6 +390,10 @@ class SDKServer {
       lastSignedIn: signedInAt,
     });
 
+    import("../lib/onUserAccountReady").then(({ onUserAccountReady }) => {
+      onUserAccountReady(user.id);
+    }).catch(() => {});
+
     return user;
   }
 }

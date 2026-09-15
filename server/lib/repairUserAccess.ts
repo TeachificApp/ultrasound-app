@@ -39,6 +39,9 @@ export async function repairUserAccess(
 
   const accessToken = await regenerateAccessToken(user.id);
 
+  const { onUserAccountReady } = await import("./onUserAccountReady");
+  onUserAccountReady(user.id);
+
   let enrollmentEmailsSent = 0;
   const resendEnrollment = options.resendEnrollment !== false;
   if (resendEnrollment) {

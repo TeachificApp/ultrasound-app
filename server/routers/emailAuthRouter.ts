@@ -69,6 +69,13 @@ async function issueSession(
   });
   const cookieOptions = getSessionCookieOptions(req);
   res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+
+  const { getUserByOpenId } = await import("../db");
+  const sessionUser = await getUserByOpenId(openId);
+  if (sessionUser?.id) {
+    const { onUserAccountReady } = await import("../lib/onUserAccountReady");
+    onUserAccountReady(sessionUser.id);
+  }
 }
 
 // ─── Email sending helpers (use SendGrid via shared _core/email.ts) ──────────
@@ -222,9 +229,9 @@ export const emailAuthRouter = router({
       const newUser = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
       if (newUser[0]) {
         await ensureUserRole(newUser[0].id);
-        // Auto-add to All Contacts email list
         addToAllContacts(email, fullName, { userId: newUser[0].id, source: "registration" }).catch(() => {});
-
+        const { onNewUserRegistered } = await import("../lib/onUserAccountReady");
+        onNewUserRegistered(newUser[0].id);
       }
 
       // Send verification email
