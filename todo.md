@@ -523,3 +523,6 @@
 - [x] Harden completed digital-download fulfillment so every valid checkout produces one durable purchase entitlement for the intended account and a truthful delivery status.
 - [x] Add focused digital-download account-association, dashboard-access, duplicate-safety, and failed-delivery-status regressions.
 - [ ] Validate the customer’s live Purchases and Downloads views after the authorized entitlement correction; do not send a replacement email unless separately approved.
+- [x] Make learner My Content areas default to a course-card presentation while preserving the existing authorized content set and access actions.
+- [x] Add an accessible learner-controlled card/list view toggle and search across visible My Content items without changing content records or entitlements.
+- [x] Add focused regressions for default card view, view-mode switching, search filtering, responsive behavior, and authorized-content preservation.

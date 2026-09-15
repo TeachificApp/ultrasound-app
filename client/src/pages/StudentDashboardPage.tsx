@@ -20,7 +20,7 @@ import {
   ExternalLink, Download, Play, FileText, Package, AlertCircle, CheckCircle2,
   Clock, XCircle, RefreshCw, Loader2, ChevronRight, ChevronLeft, ClipboardCheck, ShoppingCart, BarChart2, Bell,
   GraduationCap, BookMarked, PenLine, ArrowRight, Video, Layers, Users, Star, Briefcase, MapPin, CalendarDays, Zap,
-  DollarSign, TrendingUp, Filter, CalendarRange,
+  DollarSign, TrendingUp, Filter, CalendarRange, Grid2X2, List, Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -833,6 +833,12 @@ function CommunityProfileSection({ userId }: { userId: number }) {
 
 type ContentSubTab = StudentDashboardContentTab;
 type QuizContentView = "library" | "results";
+type ContentDisplayMode = "cards" | "list";
+
+function itemMatchesContentSearch(item: Record<string, unknown>, fields: string[], normalizedQuery: string): boolean {
+  if (!normalizedQuery) return true;
+  return fields.some((field) => String(item[field] ?? "").toLocaleLowerCase().includes(normalizedQuery));
+}
 
 function parseDashboardTabs(search: string): { initialTab: Tab; initialContentTab?: ContentSubTab; initialQuizView?: QuizContentView } {
   const params = new URLSearchParams(search);
@@ -872,6 +878,8 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
   const { data, isLoading, isError, error, refetch } = trpc.dashboard.getMyContent.useQuery();
   const [contentTab, setContentTab] = useState<ContentSubTab>(initialContentTab ?? "courses");
   const [quizView, setQuizView] = useState<QuizContentView>(initialQuizView ?? "library");
+  const [contentDisplayMode, setContentDisplayMode] = useState<ContentDisplayMode>("cards");
+  const [contentSearch, setContentSearch] = useState("");
   const [autoTabSet, setAutoTabSet] = useState(Boolean(initialContentTab));
   const { data: quizResultsSummary } = trpc.standaloneQuizLearner.getMyQuizResultsSummary.useQuery(
     undefined,
@@ -940,6 +948,56 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
   // Quizzes is always discoverable. Other empty content categories stay hidden
   // on small screens unless selected, keeping the dashboard compact.
   const visibleSubTabs = subTabs.filter(t => t.key === "quizzes" || t.count > 0 || t.key === contentTab);
+  const normalizedContentSearch = contentSearch.trim().toLocaleLowerCase();
+  const contentCollectionClass = contentDisplayMode === "cards"
+    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+    : "flex flex-col gap-3";
+  const noMatchingContent = (icon: React.ElementType) => (
+    <EmptyState
+      icon={icon}
+      title="No matching content"
+      description="Try a different search term or switch to another content area."
+    />
+  );
+  const contentControls = (
+    <div className="flex flex-col gap-3 rounded-xl border border-teal-100 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative min-w-0 flex-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <Input
+          type="search"
+          value={contentSearch}
+          onChange={(event) => setContentSearch(event.target.value)}
+          placeholder={`Search ${subTabs.find((tab) => tab.key === contentTab)?.label.toLocaleLowerCase() ?? "content"}`}
+          aria-label="Search visible content"
+          className="h-10 border-gray-200 pl-9"
+        />
+      </div>
+      <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1" role="group" aria-label="Content display mode">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={contentDisplayMode === "cards"}
+          onClick={() => setContentDisplayMode("cards")}
+          className={`h-8 gap-1.5 px-2.5 ${contentDisplayMode === "cards" ? "bg-white text-[#189aa1] shadow-sm hover:bg-white" : "text-gray-500 hover:text-gray-800"}`}
+        >
+          <Grid2X2 className="h-4 w-4" />
+          <span>Cards</span>
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={contentDisplayMode === "list"}
+          onClick={() => setContentDisplayMode("list")}
+          className={`h-8 gap-1.5 px-2.5 ${contentDisplayMode === "list" ? "bg-white text-[#189aa1] shadow-sm hover:bg-white" : "text-gray-500 hover:text-gray-800"}`}
+        >
+          <List className="h-4 w-4" />
+          <span>List</span>
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -968,7 +1026,8 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
 
       {/* Courses */}
       {contentTab === "courses" && (
-        <div>
+        <div className="space-y-4">
+          {contentControls}
           {(data?.courses.length ?? 0) === 0 ? (
             showLegacyThinkificLink ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center space-y-4">
@@ -991,9 +1050,9 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
             ) : (
               <EmptyState icon={BookOpen} title="No courses yet" description="Enroll in a course to see it here." />
             )
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.courses.map((c, i) => {
+          ) : (data?.courses.filter((c) => itemMatchesContentSearch(c as Record<string, unknown>, ["courseTitle", "courseBrand", "courseSlug"], normalizedContentSearch)).length ?? 0) === 0 ? noMatchingContent(BookOpen) : (
+            <div className={contentCollectionClass}>
+              {data?.courses.filter((c) => itemMatchesContentSearch(c as Record<string, unknown>, ["courseTitle", "courseBrand", "courseSlug"], normalizedContentSearch)).map((c, i) => {
                 const completed = Boolean(c.completedAt) || Number(c.progressPct ?? 0) >= 100;
                 const certificateUrl = (c as { certificateUrl?: string | null }).certificateUrl;
                 const actions = [
@@ -1007,6 +1066,7 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                 <ContentCard
                   key={c.enrollmentId ?? `membership-course-${i}`}
                   thumbnail={c.courseThumbnail}
+                  displayMode={contentDisplayMode}
                   title={c.courseTitle}
                   brand={c.courseBrand}
                   subtitle={(c as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(c.enrolledAt)}`}
@@ -1053,51 +1113,61 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
 
           {quizView === "results" && hasStandaloneSystemQuizResults ? (
             <StudentQuizResultsPanel standaloneOnly />
-          ) : (data?.quizzes.length ?? 0) === 0 ? (
-            <EmptyState icon={ClipboardCheck} title="No quizzes yet" description="Purchase or enroll in a quiz to see it here." />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.quizzes.map((q, i) => (
-                <ContentCard
-                  key={q.enrollmentId ?? `membership-quiz-${i}`}
-                  thumbnail={q.courseThumbnail}
-                  title={q.courseTitle}
-                  brand={q.courseBrand}
-                  subtitle={(q as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(q.enrolledAt)}`}
-                  badge={(q as any).accessSource ? "Membership" : q.completedAt ? "Completed" : "In Progress"}
-                  badgeColor={(q as any).accessSource ? "teal" : q.completedAt ? "emerald" : "blue"}
-                  progressPct={q.progressPct}
-                  completed={!!q.completedAt}
-                  accessSource={(q as any).accessSource ?? null}
-                  expiresAt={(q as any).accessExpiresAt ?? null}
-                  cancelAtPeriodEnd={(q as any).cancelAtPeriodEnd ?? false}
-                  stripePeriodEnd={(q as any).stripePeriodEnd ?? null}
-                  subscriptionCancelledAt={resolveDashboardSubscriptionCancelledAt((q as any).stripeSubscriptionId, (q as any).accessExpiresAt)}
-                  actions={(q as any).contentKind === "standalone_result" ? [
-                    { label: "View Results", icon: ClipboardCheck, href: buildStudentDashboardUrl({ tab: "content", contentTab: "quizzes", quizView: "results" }) },
-                  ] : (q as any).contentKind === "standalone_quiz" && (q as any).courseSlug && (q as any).lessonId ? [
-                    { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player?lesson=${(q as any).lessonId}` },
-                  ] : [
-                    { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
-                  ]}
-                />
-              ))}
-            </div>
+            <>
+              {contentControls}
+              {(data?.quizzes.length ?? 0) === 0 ? (
+                <EmptyState icon={ClipboardCheck} title="No quizzes yet" description="Purchase or enroll in a quiz to see it here." />
+              ) : (data?.quizzes.filter((q) => itemMatchesContentSearch(q as Record<string, unknown>, ["courseTitle", "courseBrand", "courseSlug"], normalizedContentSearch)).length ?? 0) === 0 ? (
+                noMatchingContent(ClipboardCheck)
+              ) : (
+              <div className={contentCollectionClass}>
+                {data?.quizzes.filter((q) => itemMatchesContentSearch(q as Record<string, unknown>, ["courseTitle", "courseBrand", "courseSlug"], normalizedContentSearch)).map((q, i) => (
+                  <ContentCard
+                    key={q.enrollmentId ?? `membership-quiz-${i}`}
+                    thumbnail={q.courseThumbnail}
+                    displayMode={contentDisplayMode}
+                    title={q.courseTitle}
+                    brand={q.courseBrand}
+                    subtitle={(q as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(q.enrolledAt)}`}
+                    badge={(q as any).accessSource ? "Membership" : q.completedAt ? "Completed" : "In Progress"}
+                    badgeColor={(q as any).accessSource ? "teal" : q.completedAt ? "emerald" : "blue"}
+                    progressPct={q.progressPct}
+                    completed={!!q.completedAt}
+                    accessSource={(q as any).accessSource ?? null}
+                    expiresAt={(q as any).accessExpiresAt ?? null}
+                    cancelAtPeriodEnd={(q as any).cancelAtPeriodEnd ?? false}
+                    stripePeriodEnd={(q as any).stripePeriodEnd ?? null}
+                    subscriptionCancelledAt={resolveDashboardSubscriptionCancelledAt((q as any).stripeSubscriptionId, (q as any).accessExpiresAt)}
+                    actions={(q as any).contentKind === "standalone_result" ? [
+                      { label: "View Results", icon: ClipboardCheck, href: buildStudentDashboardUrl({ tab: "content", contentTab: "quizzes", quizView: "results" }) },
+                    ] : (q as any).contentKind === "standalone_quiz" && (q as any).courseSlug && (q as any).lessonId ? [
+                      { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player?lesson=${(q as any).lessonId}` },
+                    ] : [
+                      { label: q.completedAt ? "Retake Quiz" : "Take Quiz", icon: Play, href: `/courses/${q.courseSlug}/player` },
+                    ]}
+                  />
+                ))}
+              </div>
+              )}
+            </>
           )}
         </div>
       )}
 
       {/* Downloads */}
       {contentTab === "downloads" && (
-        <div>
+        <div className="space-y-4">
+          {contentControls}
           {(data?.downloads.length ?? 0) === 0 ? (
             <EmptyState icon={Download} title="No downloads yet" description="Purchase a digital download to see it here." />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(data?.downloads ?? []).map((d: any, i: number) => (
+          ) : (data?.downloads.filter((d: any) => itemMatchesContentSearch(d as Record<string, unknown>, ["courseTitle", "productTitle", "courseBrand", "productSlug", "courseSlug"], normalizedContentSearch)).length ?? 0) === 0 ? noMatchingContent(Download) : (
+            <div className={contentCollectionClass}>
+              {(data?.downloads ?? []).filter((d: any) => itemMatchesContentSearch(d as Record<string, unknown>, ["courseTitle", "productTitle", "courseBrand", "productSlug", "courseSlug"], normalizedContentSearch)).map((d: any, i: number) => (
                 <ContentCard
                   key={d.enrollmentId ?? d.purchaseId ?? `dl-${i}`}
                   thumbnail={d.courseThumbnail ?? d.productThumbnail}
+                  displayMode={contentDisplayMode}
                   title={d.courseTitle ?? d.productTitle}
                   brand={d.courseBrand}
                   subtitle={d.accessSource ? "Included via membership or bundle" : `Purchased ${formatDate(d.enrolledAt ?? d.purchasedAt)}`}
@@ -1129,15 +1199,17 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
 
       {/* Physical Products */}
       {contentTab === "products" && (
-        <div>
+        <div className="space-y-4">
+          {contentControls}
           {(data?.physicalProducts.length ?? 0) === 0 ? (
             <EmptyState icon={Package} title="No product orders yet" description="Purchase a physical product to see your orders here." />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.physicalProducts.map(p => (
+          ) : (data?.physicalProducts.filter((p) => itemMatchesContentSearch(p as Record<string, unknown>, ["productTitle", "productSlug", "fulfillmentStatus"], normalizedContentSearch)).length ?? 0) === 0 ? noMatchingContent(Package) : (
+            <div className={contentCollectionClass}>
+              {data?.physicalProducts.filter((p) => itemMatchesContentSearch(p as Record<string, unknown>, ["productTitle", "productSlug", "fulfillmentStatus"], normalizedContentSearch)).map(p => (
                 <ContentCard
                   key={p.orderId}
                   thumbnail={p.productThumbnail}
+                  displayMode={contentDisplayMode}
                   title={p.productTitle}
                   subtitle={`Ordered ${formatDate(p.orderedAt)} · ${formatCurrency(p.amountPaid, p.currency)}`}
                   badge={p.fulfillmentStatus}
@@ -1155,15 +1227,17 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
 
       {/* Webinars */}
       {contentTab === "webinars" && (
-        <div>
+        <div className="space-y-4">
+          {contentControls}
           {(data?.webinars?.length ?? 0) === 0 ? (
             <EmptyState icon={Video} title="No webinar registrations" description="Register for a webinar to see it here." />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.webinars?.map((w, i) => (
+          ) : (data?.webinars?.filter((w) => itemMatchesContentSearch(w as Record<string, unknown>, ["webinarTitle", "webinarSlug", "webinarStatus"], normalizedContentSearch)).length ?? 0) === 0 ? noMatchingContent(Video) : (
+            <div className={contentCollectionClass}>
+              {data?.webinars?.filter((w) => itemMatchesContentSearch(w as Record<string, unknown>, ["webinarTitle", "webinarSlug", "webinarStatus"], normalizedContentSearch)).map((w, i) => (
                 <ContentCard
                   key={w.registrationId ?? `membership-webinar-${i}`}
                   thumbnail={w.webinarCover}
+                  displayMode={contentDisplayMode}
                   title={w.webinarTitle}
                   subtitle={(w as any).accessSource ? "Included via membership or bundle" : `Registered ${formatDate(w.registeredAt)}${w.scheduledAt ? ` · Scheduled ${formatDate(new Date(w.scheduledAt))}` : ""}`}
                   badge={(w as any).accessSource ? "Membership" : w.attended ? "Attended" : w.webinarStatus === "ended" ? "Replay Available" : "Registered"}
@@ -1180,15 +1254,17 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
       )}
       {/* Workshops */}
       {contentTab === "workshops" && (
-        <div>
+        <div className="space-y-4">
+          {contentControls}
           {((data as any)?.workshops?.length ?? 0) === 0 ? (
             <EmptyState icon={Briefcase} title="No workshop enrollments" description="Register for a workshop to see it here." />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(data as any)?.workshops?.map((w: any) => (
+          ) : ((data as any)?.workshops?.filter((w: any) => itemMatchesContentSearch(w as Record<string, unknown>, ["workshopTitle", "workshopSlug", "instanceTitle", "instanceVenueCity"], normalizedContentSearch)).length ?? 0) === 0 ? noMatchingContent(Briefcase) : (
+            <div className={contentCollectionClass}>
+              {(data as any)?.workshops?.filter((w: any) => itemMatchesContentSearch(w as Record<string, unknown>, ["workshopTitle", "workshopSlug", "instanceTitle", "instanceVenueCity"], normalizedContentSearch)).map((w: any) => (
                 <ContentCard
                   key={w.enrollmentId}
                   thumbnail={w.workshopCover}
+                  displayMode={contentDisplayMode}
                   title={w.workshopTitle}
                   brand={w.workshopBrand}
                   subtitle={[
@@ -1209,15 +1285,17 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
       )}
       {/* Bundles */}
       {contentTab === "bundles" && (
-        <div>
+        <div className="space-y-4">
+          {contentControls}
           {(data?.bundles?.length ?? 0) === 0 ? (
             <EmptyState icon={Layers} title="No bundles purchased" description="Purchase a bundle to see it here." />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.bundles?.map(b => (
+          ) : (data?.bundles?.filter((b) => itemMatchesContentSearch(b as Record<string, unknown>, ["bundleTitle", "bundleSlug"], normalizedContentSearch)).length ?? 0) === 0 ? noMatchingContent(Layers) : (
+            <div className={contentCollectionClass}>
+              {data?.bundles?.filter((b) => itemMatchesContentSearch(b as Record<string, unknown>, ["bundleTitle", "bundleSlug"], normalizedContentSearch)).map(b => (
                 <ContentCard
                   key={b.enrollmentId}
                   thumbnail={b.bundleCover}
+                  displayMode={contentDisplayMode}
                   title={b.bundleTitle}
                   subtitle={`Enrolled ${formatDate(b.enrolledAt)}`}
                   badge="Owned"
@@ -1233,19 +1311,20 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
       )}
       {/* Memberships */}
       {contentTab === "memberships" && (
-        <div>
+        <div className="space-y-4">
+          {contentControls}
           {((data as any)?.memberships?.length ?? 0) === 0 ? (
             <EmptyState icon={Star} title="No memberships" description="You don't have any active memberships yet." />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {(data as any)?.memberships?.map((m: any, i: number) => {
+          ) : ((data as any)?.memberships?.filter((m: any) => itemMatchesContentSearch(m as Record<string, unknown>, ["title", "brand", "status"], normalizedContentSearch)).length ?? 0) === 0 ? noMatchingContent(Star) : (
+            <div className={contentCollectionClass}>
+              {(data as any)?.memberships?.filter((m: any) => itemMatchesContentSearch(m as Record<string, unknown>, ["title", "brand", "status"], normalizedContentSearch)).map((m: any, i: number) => {
                 const isPlan = m.type === "plan";
-                const brandCfg = m.brand ? (BRAND_CONFIG[m.brand] ?? { label: m.brand, color: "#6b7280", bg: "bg-gray-50", border: "border-gray-200" }) : null;
-                const statusColor = m.status === "active" || m.status === "trialing" ? "emerald" : m.status === "cancelled" || m.status === "canceled" || m.status === "expired" ? "red" : "amber";
+                const statusColor: "emerald" | "amber" | "red" = m.status === "active" || m.status === "trialing" ? "emerald" : m.status === "cancelled" || m.status === "canceled" || m.status === "expired" ? "red" : "amber";
                 return (
                   <ContentCard
                     key={`membership-${m.type}-${m.id ?? i}`}
                     thumbnail={m.coverImage ?? null}
+                    displayMode={contentDisplayMode}
                     title={m.title}
                     subtitle={
                       isPlan
@@ -1266,15 +1345,17 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
       )}
       {/* Communities */}
       {contentTab === "communities" && (
-        <div>
+        <div className="space-y-4">
+          {contentControls}
           {(data?.communities?.length ?? 0) === 0 ? (
             <EmptyState icon={Users} title="No community memberships" description="Join a community to see it here." />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data?.communities?.map((c, i) => (
+          ) : (data?.communities.filter((c) => itemMatchesContentSearch(c as Record<string, unknown>, ["communityTitle", "communitySlug", "role"], normalizedContentSearch)).length ?? 0) === 0 ? noMatchingContent(Users) : (
+            <div className={contentCollectionClass}>
+              {data?.communities.filter((c) => itemMatchesContentSearch(c as Record<string, unknown>, ["communityTitle", "communitySlug", "role"], normalizedContentSearch)).map((c, i) => (
                 <ContentCard
                   key={c.memberId ?? `membership-community-${i}`}
                   thumbnail={c.communityCover}
+                  displayMode={contentDisplayMode}
                   title={c.communityTitle}
                   subtitle={(c as any).accessSource ? "Included via membership" : `Joined ${formatDate(c.joinedAt)} · ${c.role}`}
                   badge={(c as any).accessSource ? "Membership" : c.role === "admin" ? "Admin" : c.role === "moderator" ? "Moderator" : "Member"}
@@ -2073,14 +2154,14 @@ function EmptyState({
 }
 
 function ContentCard({
-  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed, accessSource, expiresAt, subscriptionCancelledAt, cancelAtPeriodEnd, stripePeriodEnd,
+  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed, accessSource, expiresAt, subscriptionCancelledAt, cancelAtPeriodEnd, stripePeriodEnd, displayMode = "cards",
 }: {
   thumbnail?: string | null;
   title: string;
   brand?: string | null;
   subtitle: string;
   badge: string;
-  badgeColor: "emerald" | "teal" | "blue" | "amber" | "purple";
+  badgeColor: "emerald" | "teal" | "blue" | "amber" | "purple" | "red";
   trackingInfo?: string;
   progressPct?: number | null;
   completed?: boolean;
@@ -2089,21 +2170,24 @@ function ContentCard({
   subscriptionCancelledAt?: Date | null;
   cancelAtPeriodEnd?: boolean;
   stripePeriodEnd?: Date | null;
+  displayMode?: ContentDisplayMode;
   actions: { label: string; icon: React.ElementType; href: string; secondary?: boolean; external?: boolean }[];
 }) {
-  const colorMap = {
+  const colorMap: Record<"emerald" | "teal" | "blue" | "amber" | "purple" | "red", string> = {
     emerald: "bg-emerald-100 text-emerald-700 border-emerald-200",
     teal:    "bg-teal-100 text-teal-700 border-teal-200",
     blue:    "bg-blue-100 text-blue-700 border-blue-200",
     amber:   "bg-amber-100 text-amber-700 border-amber-200",
     purple:  "bg-purple-100 text-purple-700 border-purple-200",
+    red:     "bg-red-100 text-red-700 border-red-200",
   };
   const pct = Math.min(100, Math.max(0, Number(progressPct ?? 0)));
   const showProgress = progressPct != null;
+  const isList = displayMode === "list";
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col hover:shadow-md hover:border-teal-200 transition-all duration-200">
+    <div className={`bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex hover:shadow-md hover:border-teal-200 transition-all duration-200 ${isList ? "flex-row min-h-32" : "flex-col"}`}>
       {/* Cover image */}
-      <div className="relative h-36 bg-gradient-to-br from-teal-50 to-teal-100 overflow-hidden flex-shrink-0">
+      <div className={`relative bg-gradient-to-br from-teal-50 to-teal-100 overflow-hidden flex-shrink-0 ${isList ? "w-28 sm:w-44" : "h-36"}`}>
         {thumbnail ? (
           <img
             src={thumbnail}
@@ -2129,7 +2213,7 @@ function ContentCard({
         )}
       </div>
       {/* Progress bar */}
-      {showProgress && (
+      {showProgress && !isList && (
         <div className="h-1.5 bg-gray-100 w-full">
           <div
             className={`h-full transition-all duration-500 ${completed ? "bg-emerald-500" : "bg-[#189aa1]"}`}
@@ -2138,7 +2222,7 @@ function ContentCard({
         </div>
       )}
       {/* Body */}
-      <div className="p-4 flex flex-col flex-1">
+      <div className="p-4 flex min-w-0 flex-col flex-1">
         <h4 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2 mb-1">{title}</h4>
         {accessSource && (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#189aa1]/10 text-[#189aa1] border border-[#189aa1]/20 mb-1">
@@ -2151,6 +2235,14 @@ function ContentCard({
           <p className="text-xs font-medium text-[#189aa1] mb-1">
             {completed ? "Completed" : `${pct}% complete`}
           </p>
+        )}
+        {showProgress && isList && (
+          <div className="h-1.5 max-w-md rounded-full bg-gray-100">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${completed ? "bg-emerald-500" : "bg-[#189aa1]"}`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
         )}
         {/* Renews / Cancels on date — shown when Stripe data is available */}
         {stripePeriodEnd && !subscriptionCancelledAt && (
