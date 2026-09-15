@@ -33,6 +33,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { MemberDigitalDownloadPurchaseCard } from "@/components/admin/MemberDigitalDownloadPurchaseCard";
 import { Checkbox } from "@/components/ui/checkbox";
 import Layout from "@/components/Layout";
 import { SdmsCmeUserTab } from "@/components/admin/SdmsCmeUserTab";
@@ -1110,20 +1111,14 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       {contentTab === "downloads" && (
         <div className="space-y-3">
           <SectionHeader title={`Downloads (${data.digitalPurchases?.length ?? 0})`} />
+          <p className="text-xs text-gray-500 -mt-1 mb-2">
+            Resend access emails, raise per-member download limits, and reset per-file download counts.
+          </p>
           {(data.digitalPurchases?.length ?? 0) === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">No digital purchases.</p>
           ) : (
             data.digitalPurchases.map((d: any) => (
-              <div key={d.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between gap-4">
-                <div>
-                  <h4 className="font-semibold text-gray-800 text-sm">{d.productTitle}</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">Purchased {formatDate(d.purchasedAt)}</p>
-                </div>
-                <a href={`/downloads/${d.productSlug}/files`} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200">
-                  <Download className="w-3 h-3" /> Files
-                </a>
-              </div>
+              <MemberDigitalDownloadPurchaseCard key={d.id} purchase={d} />
             ))
           )}
         </div>
