@@ -1432,9 +1432,12 @@ function CertificateConfettiCannons({ active }: { active: boolean }) {
   return <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-[60] h-screen w-screen" />;
 }
 
-function CertificateDialog({ open, onClose, courseTitle, certificateUrl, isLoading }: {
-  open: boolean; onClose: () => void; courseTitle: string; certificateUrl?: string; isLoading?: boolean;
+function CertificateDialog({ open, onClose, courseTitle, courseSlug, certificateUrl, isLoading }: {
+  open: boolean; onClose: () => void; courseTitle: string; courseSlug?: string; certificateUrl?: string; isLoading?: boolean;
 }) {
+  const certificateDownloadHref = courseSlug
+    ? `/api/learner/certificate/${encodeURIComponent(courseSlug)}`
+    : certificateUrl;
   const [waitedLong, setWaitedLong] = useState(false);
 
   useEffect(() => {
@@ -1463,8 +1466,8 @@ function CertificateDialog({ open, onClose, courseTitle, certificateUrl, isLoadi
             <p className="font-semibold text-gray-900 text-lg">Congratulations!</p>
             <p className="text-gray-500 text-sm mt-1">You have completed <strong>{courseTitle}</strong></p>
           </div>
-          {certificateUrl ? (
-            <a href={certificateUrl} target="_blank" rel="noreferrer"
+          {certificateDownloadHref ? (
+            <a href={certificateDownloadHref} target="_blank" rel="noreferrer"
               className="inline-flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-medium px-5 py-2.5 rounded-lg text-sm transition-colors">
               <Download className="w-4 h-4" /> Download Certificate
             </a>
@@ -2534,6 +2537,7 @@ export default function CoursePlayer() {
           open={showCertDialog}
           onClose={() => setShowCertDialog(false)}
           courseTitle={course.title}
+          courseSlug={course.slug}
           certificateUrl={certData?.certificateUrl}
           isLoading={certFetching && !certData?.certificateUrl}
         />

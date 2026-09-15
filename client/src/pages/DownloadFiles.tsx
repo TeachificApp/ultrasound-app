@@ -161,22 +161,26 @@ export default function DownloadFiles() {
       toast.success("Purchase successful! Your files are ready to download.");
     }
   }, [isSuccess]);
-  const [pdfViewerUrl, setPdfViewerUrl] = useState<string | null>(null);
-  const trackDownload = trpc.downloadsLearner.trackDownload.useMutation();
+  const [pdfViewerFileId, setPdfViewerFileId] = useState<number | null>(null);
   const utils = trpc.useUtils();
 
-  const handleDownload = async (file: { id: number; fileName: string; fileUrl: string; downloadStats?: { canDownload: boolean; downloaded: number; remaining: number | null } }) => {
+  const deliveryUrl = (file: { id: number; deliveryUrl?: string; inlineViewUrl?: string }, inline = false) => {
+    const path = inline
+      ? (file.inlineViewUrl ?? `/api/learner/digital-download/${product!.id}/files/${file.id}?inline=1`)
+      : (file.deliveryUrl ?? `/api/learner/digital-download/${product!.id}/files/${file.id}`);
+    const preview = isPreviewMode ? (path.includes("?") ? "&preview=1" : "?preview=1") : "";
+    return `${path}${preview}`;
+  };
+
+  const handleDownload = (file: { id: number; downloadStats?: { canDownload: boolean; downloaded: number; remaining: number | null } }) => {
     if (file.downloadStats && !file.downloadStats.canDownload) {
       toast.error("Download limit reached or access expired.");
       return;
     }
-    try {
-      await trackDownload.mutateAsync({ productId: product!.id, fileId: file.id });
-      await utils.downloadsLearner.getDownloadFiles.invalidate({ productId: product!.id });
-      window.open(file.fileUrl, "_blank", "noopener,noreferrer");
-    } catch (e: any) {
-      toast.error(e.message ?? "Download not allowed");
-    }
+    window.location.href = deliveryUrl(file, false);
+    window.setTimeout(() => {
+      utils.downloadsLearner.getDownloadFiles.invalidate({ productId: product!.id });
+    }, 3000);
   };
 
   if (authLoading || productLoading) {
@@ -337,8 +341,8 @@ export default function DownloadFiles() {
                       <div className="flex items-center gap-2">
                         {(file.mimeType === "application/pdf" || file.fileName?.toLowerCase().endsWith(".pdf")) && (
                           <Button size="sm" variant="outline" className="gap-1 text-teal-600 border-teal-300 hover:bg-teal-50"
-                            onClick={() => setPdfViewerUrl(pdfViewerUrl === file.fileUrl ? null : file.fileUrl)}>
-                            {pdfViewerUrl === file.fileUrl ? "Close" : "View"}
+                            onClick={() => setPdfViewerFileId(pdfViewerFileId === file.id ? null : file.id)}>
+                            {pdfViewerFileId === file.id ? "Close" : "View"}
                           </Button>
                         )}
                         <Button
@@ -353,13 +357,13 @@ export default function DownloadFiles() {
                       </div>
                     </CardContent>
                   </Card>
-                  {pdfViewerUrl === file.fileUrl && (
+                  {pdfViewerFileId === file.id && (
                     <div className="rounded-lg overflow-hidden border border-teal-200 bg-gray-50">
                       <div className="flex items-center justify-between px-3 py-2 bg-teal-50 border-b border-teal-200">
                         <span className="text-xs font-medium text-teal-700">{file.fileName}</span>
-                        <button className="text-xs text-teal-600 hover:text-teal-800" onClick={() => setPdfViewerUrl(null)}>✕ Close</button>
+                        <button className="text-xs text-teal-600 hover:text-teal-800" onClick={() => setPdfViewerFileId(null)}>✕ Close</button>
                       </div>
-                      <iframe src={`${file.fileUrl}#toolbar=1`} className="w-full" style={{ height: "75vh" }} title={file.fileName} />
+                      <iframe src={`${deliveryUrl(file, true)}#toolbar=1`} className="w-full" style={{ height: "75vh" }} title={file.fileName} />
                     </div>
                   )}
                 </div>

@@ -165,7 +165,14 @@ export const downloadsLearnerRouter = router({
 
       const filesWithStats = files.map((f) => {
         const stat = fileStats.find((s) => s.fileId === f.id);
-        return { ...f, downloadStats: stat ?? { downloaded: 0, remaining: null, canDownload: true } };
+        const deliveryPath = `/api/learner/digital-download/${input.productId}/files/${f.id}`;
+        const previewSuffix = isAdminPreview ? "?preview=1" : "";
+        return {
+          ...f,
+          deliveryUrl: `${deliveryPath}${previewSuffix}`,
+          inlineViewUrl: `${deliveryPath}?inline=1${isAdminPreview ? "&preview=1" : ""}`,
+          downloadStats: stat ?? { downloaded: 0, remaining: null, canDownload: true },
+        };
       });
 
       return {
@@ -357,7 +364,7 @@ export const downloadsLearnerRouter = router({
       const {
         loadPurchaseForUser,
         validateDownloadAttempt,
-        logPurchaseActivity,
+        recordDigitalDownloadEvent,
       } = await import("../lib/downloadAccess");
 
       const purchase = await loadPurchaseForUser(db, ctx.user.id, input.productId);
@@ -379,43 +386,21 @@ export const downloadsLearnerRouter = router({
         .where(eq(digitalProductFiles.id, input.fileId))
         .limit(1);
 
-      await db.insert(digitalDownloadEvents).values({
+      await recordDigitalDownloadEvent(db, {
         userId: ctx.user.id,
         productId: input.productId,
         fileId: input.fileId,
         purchaseId: purchase.id,
-        ipAddress: ip.substring(0, 64),
-        userAgent,
-      });
-
-      await db.update(digitalProducts)
-        .set({ downloadCount: sql`download_count + 1` })
-        .where(eq(digitalProducts.id, input.productId));
-
-      await logPurchaseActivity(db, {
-        purchaseId: purchase.id,
-        eventType: "file_downloaded",
-        message: `'${file?.fileName ?? `File #${input.fileId}`}' downloaded by ${ip}`,
+        fileName: file?.fileName,
         ipAddress: ip,
-        fileId: input.fileId,
+        userAgent,
+        productTitle: purchase.productTitle,
       });
 
-      const { logIpAccess } = await import("../jobs/sharingMonitor");
-      logIpAccess({ userId: ctx.user.id, ipAddress: ip, userAgent: userAgent ?? undefined, contentType: "download", contentId: input.productId }).catch(() => {});
-
-      try {
-        const { userActivityLogs } = await import("../../drizzle/schema");
-        await db.insert(userActivityLogs).values({
-          userId: ctx.user.id,
-          eventType: "download",
-          description: `Downloaded ${file?.fileName ?? `file #${input.fileId}`} (${purchase.productTitle})`,
-          ipAddress: ip.substring(0, 64),
-          userAgent,
-          metadata: { productId: input.productId, fileId: input.fileId, purchaseId: purchase.id },
-        });
-      } catch { /* non-blocking */ }
-
-      return { success: true };
+      return {
+        success: true,
+        deliveryUrl: `/api/learner/digital-download/${input.productId}/files/${input.fileId}`,
+      };
     }),
 
   /** Create Stripe checkout session for a bundle */
