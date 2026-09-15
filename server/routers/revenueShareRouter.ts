@@ -27,6 +27,9 @@ import {
   createExpressDashboardLink,
   getStripeAccountStatus,
   retryLedgerEntry,
+  processManualLedgerPayout,
+  canManualProcessLedgerEntry,
+  calculateShareAmountCents,
 } from "../lib/revenueShareEngine";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -309,6 +312,9 @@ export const revenueShareRouter = router({
           status: revenueShareLedger.status,
           errorMessage: revenueShareLedger.errorMessage,
           paidAt: revenueShareLedger.paidAt,
+          processMethod: revenueShareLedger.processMethod,
+          autoProcessedAt: revenueShareLedger.autoProcessedAt,
+          processedByUserId: revenueShareLedger.processedByUserId,
           createdAt: revenueShareLedger.createdAt,
           partnerName: revenueSharePartners.name,
           partnerEmail: revenueSharePartners.email,
@@ -322,42 +328,80 @@ export const revenueShareRouter = router({
       return { entries: rows, total: rows.length };
     }),
 
-  // ── Admin: Retry a failed ledger entry ────────────────────────────────────
-  retryLedgerEntry: protectedProcedure
-    .input(z.object({ id: z.number() }))
-    .mutation(async ({ ctx, input }) => {
+  // ── Admin: Preview manual payout (recalculated share from percentage) ─────
+  previewManualPayout: protectedProcedure
+    .input(z.object({
+      ledgerId: z.number(),
+      sharePercentage: z.number().min(0.01).max(99.99),
+    }))
+    .query(async ({ ctx, input }) => {
       assertAdmin(ctx);
-      return retryLedgerEntry(input.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [entry] = await db.select().from(revenueShareLedger).where(eq(revenueShareLedger.id, input.ledgerId)).limit(1);
+      if (!entry) throw new TRPCError({ code: "NOT_FOUND" });
+      const guard = canManualProcessLedgerEntry(entry);
+      return {
+        allowed: guard.allowed,
+        reason: guard.reason ?? null,
+        grossAmount: entry.grossAmount,
+        sharePercentage: input.sharePercentage,
+        shareAmount: calculateShareAmountCents(entry.grossAmount, input.sharePercentage),
+        currentSharePercentage: parseFloat(String(entry.sharePercentage)),
+        currentShareAmount: entry.shareAmount,
+      };
     }),
 
-  // ── Admin: Process manual payout for pending ledger entries ────────────────
+  // ── Admin: Manual payout for one ledger entry (optional % override) ────────
+  processManualLedgerPayout: protectedProcedure
+    .input(z.object({
+      ledgerId: z.number(),
+      sharePercentage: z.number().min(0.01).max(99.99).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      return processManualLedgerPayout({
+        ledgerEntryId: input.ledgerId,
+        sharePercentage: input.sharePercentage,
+        processedByUserId: ctx.user.id,
+      });
+    }),
+
+  // ── Admin: Process all pending ledger entries for a partner (manual) ─────
   processManualPayout: protectedProcedure
     .input(z.object({ partnerId: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       assertAdmin(ctx);
       const db = await getDb();
-      if (!db) return { processed: 0 };
+      if (!db) return { processed: 0, skipped: 0, errors: [] as string[] };
       const conditions = [eq(revenueShareLedger.status, "pending")];
       if (input.partnerId) conditions.push(eq(revenueShareLedger.partnerId, input.partnerId));
       const pending = await db.select().from(revenueShareLedger).where(and(...conditions));
       let processed = 0;
+      let skipped = 0;
+      const errors: string[] = [];
       for (const entry of pending) {
-        try {
-          await retryLedgerEntry(entry.id);
-          processed++;
-        } catch (e) {
-          console.error(`[RevenueShare] Failed to process ledger entry ${entry.id}:`, e);
+        const guard = canManualProcessLedgerEntry(entry);
+        if (!guard.allowed) {
+          skipped++;
+          continue;
         }
+        const result = await processManualLedgerPayout({
+          ledgerEntryId: entry.id,
+          processedByUserId: ctx.user.id,
+        });
+        if (result.success) processed++;
+        else errors.push(`Entry #${entry.id}: ${result.error ?? "Unknown error"}`);
       }
-      return { processed };
+      return { processed, skipped, errors };
     }),
 
-  // ── Admin: Retry failed transfer ─────────────────────────────────────────
+  // ── Admin: Retry failed transfer (uses current ledger amounts) ─────────────
   retryFailedTransfer: protectedProcedure
     .input(z.object({ ledgerId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       assertAdmin(ctx);
-      return retryLedgerEntry(input.ledgerId);
+      return retryLedgerEntry(input.ledgerId, ctx.user.id);
     }),
 
   // ── Admin: Get summary stats ──────────────────────────────────────────────

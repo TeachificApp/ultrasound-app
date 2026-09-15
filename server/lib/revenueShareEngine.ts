@@ -115,6 +115,48 @@ export interface PaymentTimeRevenueShare {
   sharePercentage: number;
 }
 
+export type RevenueShareProcessMethod = "payment_time" | "stripe_transfer" | "manual";
+
+export function calculateShareAmountCents(grossAmountCents: number, sharePercentage: number): number {
+  return Math.floor((grossAmountCents * sharePercentage) / 100);
+}
+
+/** True when funds were routed automatically (checkout split or post-payment transfer). */
+export function isAutoProcessedLedgerEntry(entry: {
+  status: string;
+  processMethod?: string | null;
+  stripeTransferId?: string | null;
+}): boolean {
+  if (entry.processMethod === "payment_time" || entry.processMethod === "stripe_transfer") return true;
+  // Legacy paid rows predate process_method and were always auto-processed.
+  if (entry.status === "paid" && !entry.processMethod) return true;
+  return false;
+}
+
+export function canManualProcessLedgerEntry(entry: {
+  status: string;
+  processMethod?: string | null;
+  autoProcessedAt?: number | null;
+  stripeTransferId?: string | null;
+}): { allowed: boolean; reason?: string } {
+  if (entry.processMethod === "payment_time") {
+    return { allowed: false, reason: "Payment-time split already routed partner share at checkout" };
+  }
+  if (entry.status === "paid") {
+    if (isAutoProcessedLedgerEntry(entry) || entry.autoProcessedAt) {
+      return { allowed: false, reason: "Already auto-processed — cannot reprocess" };
+    }
+    return { allowed: false, reason: "Already paid" };
+  }
+  if (entry.status === "processing") {
+    return { allowed: false, reason: "Transfer already in progress" };
+  }
+  if (entry.status === "cancelled") {
+    return { allowed: false, reason: "Entry cancelled" };
+  }
+  return { allowed: true };
+}
+
 type AssignmentWithPartner = {
   assignmentId: number;
   partnerId: number;
@@ -351,6 +393,8 @@ export async function recordRevenueShareFromCompletedCheckout(input: {
           currency: (input.session.currency as string) ?? "usd",
           status: "paid",
           paidAt: now,
+          processMethod: "payment_time",
+          autoProcessedAt: now,
           createdAt: now,
           updatedAt: now,
         });
@@ -463,13 +507,16 @@ export async function executeRevenueShareTransfers(ctx: RevenueShareContext): Pr
 
       // Update ledger to "paid"
       if (ledgerId) {
+        const paidAt = Date.now();
         await db
           .update(revenueShareLedger)
           .set({
             stripeTransferId: transfer.id,
             status: "paid",
-            paidAt: Date.now(),
-            updatedAt: Date.now(),
+            paidAt,
+            processMethod: "stripe_transfer",
+            autoProcessedAt: paidAt,
+            updatedAt: paidAt,
           })
           .where(eq(revenueShareLedger.id, ledgerId));
       }
@@ -495,21 +542,27 @@ export async function executeRevenueShareTransfers(ctx: RevenueShareContext): Pr
 }
 
 /**
- * Manually process a single pending/failed ledger entry.
- * Used by the admin "Retry" action.
+ * Admin manual payout for a pending/failed ledger entry.
+ * Optional sharePercentage recalculates shareAmount from gross before transfer.
  */
-export async function retryLedgerEntry(ledgerEntryId: number): Promise<{ success: boolean; error?: string }> {
+export async function processManualLedgerPayout(input: {
+  ledgerEntryId: number;
+  sharePercentage?: number;
+  processedByUserId?: number;
+}): Promise<{ success: boolean; error?: string; shareAmount?: number; sharePercentage?: number }> {
   const db = await getDb();
   if (!db) return { success: false, error: "No database" };
 
   const [entry] = await db
     .select()
     .from(revenueShareLedger)
-    .where(eq(revenueShareLedger.id, ledgerEntryId))
+    .where(eq(revenueShareLedger.id, input.ledgerEntryId))
     .limit(1);
 
   if (!entry) return { success: false, error: "Ledger entry not found" };
-  if (entry.status === "paid") return { success: true }; // Already paid
+
+  const guard = canManualProcessLedgerEntry(entry);
+  if (!guard.allowed) return { success: false, error: guard.reason ?? "Cannot process this entry" };
 
   const [partner] = await db
     .select()
@@ -520,18 +573,42 @@ export async function retryLedgerEntry(ledgerEntryId: number): Promise<{ success
   if (!partner?.stripeAccountId) return { success: false, error: "Partner has no Stripe account" };
   if (partner.onboardingStatus !== "active") return { success: false, error: "Partner onboarding not complete" };
 
+  const sharePercentage = input.sharePercentage ?? parseFloat(String(entry.sharePercentage));
+  if (!Number.isFinite(sharePercentage) || sharePercentage <= 0 || sharePercentage >= 100) {
+    return { success: false, error: "Share percentage must be between 0.01 and 99.99" };
+  }
+
+  const shareAmount = calculateShareAmountCents(entry.grossAmount, sharePercentage);
+  if (shareAmount < 1) return { success: false, error: "Share amount must be at least $0.01" };
+  if (shareAmount >= entry.grossAmount) {
+    return { success: false, error: "Share amount must be less than gross payment" };
+  }
+
   const stripe = getStripeClient();
+  const now = Date.now();
   try {
     await db
       .update(revenueShareLedger)
-      .set({ status: "processing", updatedAt: Date.now() })
-      .where(eq(revenueShareLedger.id, ledgerEntryId));
+      .set({
+        sharePercentage: String(sharePercentage),
+        shareAmount,
+        status: "processing",
+        errorMessage: null,
+        updatedAt: now,
+      })
+      .where(eq(revenueShareLedger.id, input.ledgerEntryId));
 
     const transfer = await stripe.transfers.create({
-      amount: entry.shareAmount,
+      amount: shareAmount,
       currency: entry.currency,
       destination: partner.stripeAccountId,
-      description: `Revenue share retry: ${entry.courseTitle ?? `Course #${entry.courseId}`} — ${entry.sharePercentage}%`,
+      source_transaction: entry.paymentIntentId ?? undefined,
+      description: `Revenue share (manual): ${entry.courseTitle ?? `Course #${entry.courseId}`} — ${sharePercentage}%`,
+      metadata: {
+        ledger_id: String(entry.id),
+        partner_id: String(entry.partnerId),
+        processed_by: input.processedByUserId ? String(input.processedByUserId) : "",
+      },
     });
 
     await db
@@ -539,13 +616,15 @@ export async function retryLedgerEntry(ledgerEntryId: number): Promise<{ success
       .set({
         stripeTransferId: transfer.id,
         status: "paid",
-        paidAt: Date.now(),
+        paidAt: now,
+        processMethod: "manual",
+        processedByUserId: input.processedByUserId ?? null,
         errorMessage: null,
-        updatedAt: Date.now(),
+        updatedAt: now,
       })
-      .where(eq(revenueShareLedger.id, ledgerEntryId));
+      .where(eq(revenueShareLedger.id, input.ledgerEntryId));
 
-    return { success: true };
+    return { success: true, shareAmount, sharePercentage };
   } catch (err: any) {
     await db
       .update(revenueShareLedger)
@@ -554,7 +633,13 @@ export async function retryLedgerEntry(ledgerEntryId: number): Promise<{ success
         errorMessage: err?.message ?? "Unknown error",
         updatedAt: Date.now(),
       })
-      .where(eq(revenueShareLedger.id, ledgerEntryId));
+      .where(eq(revenueShareLedger.id, input.ledgerEntryId));
     return { success: false, error: err?.message };
   }
+}
+
+/** Retry a failed entry using current ledger amounts (no percentage override). */
+export async function retryLedgerEntry(ledgerEntryId: number, processedByUserId?: number): Promise<{ success: boolean; error?: string }> {
+  const result = await processManualLedgerPayout({ ledgerEntryId, processedByUserId });
+  return { success: result.success, error: result.error };
 }
