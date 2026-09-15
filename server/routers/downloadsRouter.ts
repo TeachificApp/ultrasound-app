@@ -165,7 +165,14 @@ export const downloadsLearnerRouter = router({
 
       const filesWithStats = files.map((f) => {
         const stat = fileStats.find((s) => s.fileId === f.id);
-        return { ...f, downloadStats: stat ?? { downloaded: 0, remaining: null, canDownload: true } };
+        const deliveryPath = `/api/learner/digital-download/${input.productId}/files/${f.id}`;
+        const previewSuffix = isAdminPreview ? "?preview=1" : "";
+        return {
+          ...f,
+          deliveryUrl: `${deliveryPath}${previewSuffix}`,
+          inlineViewUrl: `${deliveryPath}?inline=1${isAdminPreview ? "&preview=1" : ""}`,
+          downloadStats: stat ?? { downloaded: 0, remaining: null, canDownload: true },
+        };
       });
 
       return {
@@ -357,7 +364,7 @@ export const downloadsLearnerRouter = router({
       const {
         loadPurchaseForUser,
         validateDownloadAttempt,
-        logPurchaseActivity,
+        recordDigitalDownloadEvent,
       } = await import("../lib/downloadAccess");
 
       const purchase = await loadPurchaseForUser(db, ctx.user.id, input.productId);
@@ -379,43 +386,21 @@ export const downloadsLearnerRouter = router({
         .where(eq(digitalProductFiles.id, input.fileId))
         .limit(1);
 
-      await db.insert(digitalDownloadEvents).values({
+      await recordDigitalDownloadEvent(db, {
         userId: ctx.user.id,
         productId: input.productId,
         fileId: input.fileId,
         purchaseId: purchase.id,
-        ipAddress: ip.substring(0, 64),
-        userAgent,
-      });
-
-      await db.update(digitalProducts)
-        .set({ downloadCount: sql`download_count + 1` })
-        .where(eq(digitalProducts.id, input.productId));
-
-      await logPurchaseActivity(db, {
-        purchaseId: purchase.id,
-        eventType: "file_downloaded",
-        message: `'${file?.fileName ?? `File #${input.fileId}`}' downloaded by ${ip}`,
+        fileName: file?.fileName,
         ipAddress: ip,
-        fileId: input.fileId,
+        userAgent,
+        productTitle: purchase.productTitle,
       });
 
-      const { logIpAccess } = await import("../jobs/sharingMonitor");
-      logIpAccess({ userId: ctx.user.id, ipAddress: ip, userAgent: userAgent ?? undefined, contentType: "download", contentId: input.productId }).catch(() => {});
-
-      try {
-        const { userActivityLogs } = await import("../../drizzle/schema");
-        await db.insert(userActivityLogs).values({
-          userId: ctx.user.id,
-          eventType: "download",
-          description: `Downloaded ${file?.fileName ?? `file #${input.fileId}`} (${purchase.productTitle})`,
-          ipAddress: ip.substring(0, 64),
-          userAgent,
-          metadata: { productId: input.productId, fileId: input.fileId, purchaseId: purchase.id },
-        });
-      } catch { /* non-blocking */ }
-
-      return { success: true };
+      return {
+        success: true,
+        deliveryUrl: `/api/learner/digital-download/${input.productId}/files/${input.fileId}`,
+      };
     }),
 
   /** Create Stripe checkout session for a bundle */
@@ -1336,7 +1321,10 @@ export const downloadsAdminRouter = router({
 
   /** Resend purchase access email */
   resendOrderEmail: protectedProcedure
-    .input(z.object({ purchaseId: z.number() }))
+    .input(z.object({
+      purchaseId: z.number(),
+      fileId: z.number().optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
       const db = await getDb();
@@ -1345,11 +1333,60 @@ export const downloadsAdminRouter = router({
       if (!purchase) throw new TRPCError({ code: "NOT_FOUND" });
       await sendPurchaseConfirmationEmail(purchase.userId, purchase.productId);
       const { logPurchaseActivity } = await import("../lib/downloadAccess");
+      let fileLabel = "";
+      if (input.fileId) {
+        const [file] = await db.select({ fileName: digitalProductFiles.fileName })
+          .from(digitalProductFiles)
+          .where(and(eq(digitalProductFiles.id, input.fileId), eq(digitalProductFiles.productId, purchase.productId)))
+          .limit(1);
+        fileLabel = file?.fileName ? ` (highlight: ${file.fileName})` : "";
+      }
       await logPurchaseActivity(db, {
         purchaseId: input.purchaseId,
         eventType: "email_sent",
-        message: `Download email resent by admin (${ctx.user.email ?? ctx.user.id})`,
+        message: `Download access email resent by admin (${ctx.user.email ?? ctx.user.id})${fileLabel}`,
+        fileId: input.fileId ?? null,
       });
+      return { success: true };
+    }),
+
+  /** Clear per-file download events so the learner can download again */
+  resetFileDownloadCount: protectedProcedure
+    .input(z.object({ purchaseId: z.number(), fileId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [purchase] = await db
+        .select({ id: digitalPurchases.id, userId: digitalPurchases.userId, productId: digitalPurchases.productId })
+        .from(digitalPurchases)
+        .where(eq(digitalPurchases.id, input.purchaseId))
+        .limit(1);
+      if (!purchase) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const [file] = await db
+        .select({ fileName: digitalProductFiles.fileName })
+        .from(digitalProductFiles)
+        .where(and(eq(digitalProductFiles.id, input.fileId), eq(digitalProductFiles.productId, purchase.productId)))
+        .limit(1);
+      if (!file) throw new TRPCError({ code: "NOT_FOUND", message: "File not found for this order" });
+
+      await db
+        .delete(digitalDownloadEvents)
+        .where(and(
+          eq(digitalDownloadEvents.purchaseId, input.purchaseId),
+          eq(digitalDownloadEvents.fileId, input.fileId),
+        ));
+
+      const { logPurchaseActivity } = await import("../lib/downloadAccess");
+      await logPurchaseActivity(db, {
+        purchaseId: input.purchaseId,
+        eventType: "download_reset",
+        message: `Download count reset for '${file.fileName}' by admin (${ctx.user.email ?? ctx.user.id})`,
+        fileId: input.fileId,
+      });
+
       return { success: true };
     }),
 
@@ -2202,8 +2239,8 @@ export async function sendPurchaseConfirmationEmail(userId: number, productId: n
     console.error(`[sendPurchaseConfirmationEmail] Failed to generate auto-login token for user ${userId}:`, tokenErr);
   }
 
-  const fileListHtml = files.map(f => 
-    `<li style="margin:4px 0;"><a href="${f.fileUrl}" style="color:#189aa1;">${f.fileName}</a> (${(f.fileSize / 1024 / 1024).toFixed(1)} MB)</li>`
+  const fileListHtml = files.map(f =>
+    `<li style="margin:4px 0;">${f.fileName} (${(f.fileSize / 1024 / 1024).toFixed(1)} MB)</li>`
   ).join("");
 
   const htmlBody = `<!DOCTYPE html>

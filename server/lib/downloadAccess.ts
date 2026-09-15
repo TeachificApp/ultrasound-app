@@ -201,3 +201,68 @@ export function computeAccessExpiresAt(productDefaultAccessDays: number | null |
   if (!productDefaultAccessDays || productDefaultAccessDays <= 0) return null;
   return new Date(Date.now() + productDefaultAccessDays * 24 * 60 * 60 * 1000);
 }
+
+/** Record a successful file download after bytes were verified available. */
+export async function recordDigitalDownloadEvent(
+  db: MySql2Database<typeof schema>,
+  opts: {
+    userId: number;
+    productId: number;
+    fileId: number;
+    purchaseId: number | null;
+    fileName?: string | null;
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    productTitle?: string | null;
+  },
+): Promise<void> {
+  await db.insert(digitalDownloadEvents).values({
+    userId: opts.userId,
+    productId: opts.productId,
+    fileId: opts.fileId,
+    purchaseId: opts.purchaseId,
+    ipAddress: opts.ipAddress?.substring(0, 64) ?? null,
+    userAgent: opts.userAgent?.substring(0, 500) ?? null,
+  });
+
+  await db.update(digitalProducts)
+    .set({ downloadCount: sql`download_count + 1` })
+    .where(eq(digitalProducts.id, opts.productId));
+
+  if (opts.purchaseId) {
+    await logPurchaseActivity(db, {
+      purchaseId: opts.purchaseId,
+      eventType: "file_downloaded",
+      message: `'${opts.fileName ?? `File #${opts.fileId}`}' downloaded by ${opts.ipAddress ?? "unknown"}`,
+      ipAddress: opts.ipAddress ?? null,
+      fileId: opts.fileId,
+    });
+  }
+
+  try {
+    const { userActivityLogs } = await import("../../drizzle/schema");
+    await db.insert(userActivityLogs).values({
+      userId: opts.userId,
+      eventType: "download",
+      description: `Downloaded ${opts.fileName ?? `file #${opts.fileId}`}${opts.productTitle ? ` (${opts.productTitle})` : ""}`,
+      ipAddress: opts.ipAddress?.substring(0, 64) ?? null,
+      userAgent: opts.userAgent?.substring(0, 500) ?? null,
+      metadata: { productId: opts.productId, fileId: opts.fileId, purchaseId: opts.purchaseId },
+    });
+  } catch {
+    /* non-blocking */
+  }
+
+  try {
+    const { logIpAccess } = await import("../jobs/sharingMonitor");
+    logIpAccess({
+      userId: opts.userId,
+      ipAddress: opts.ipAddress ?? "unknown",
+      userAgent: opts.userAgent ?? undefined,
+      contentType: "download",
+      contentId: opts.productId,
+    }).catch(() => {});
+  } catch {
+    /* non-blocking */
+  }
+}

@@ -299,18 +299,17 @@ function CertificatePreviewLearner({
 
   // Regenerate the PDF on every download so it always uses the user's current name.
   const utils = trpc.useUtils();
+  const certificateDeliveryPath = courseSlug
+    ? `/api/learner/certificate/${encodeURIComponent(courseSlug)}`
+    : null;
+  const certificateInlinePath = certificateDeliveryPath ? `${certificateDeliveryPath}?inline=1` : null;
+
   const refreshMutation = trpc.lmsLearner.refreshCertificate.useMutation({
-    onSuccess: (data) => {
-      // Invalidate the cached certificate so the preview iframe also updates
+    onSuccess: () => {
       utils.lmsLearner.getCourseCertificate.invalidate({ courseSlug: courseSlug ?? "" });
-      // Trigger download of the freshly generated URL
-      const a = document.createElement("a");
-      a.href = data.certificateUrl;
-      a.download = "certificate.pdf";
-      a.target = "_blank";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      if (certificateDeliveryPath) {
+        window.location.href = certificateDeliveryPath;
+      }
     },
     onError: (err) => {
       toast.error("Failed to generate certificate. Please try again.");
@@ -322,7 +321,7 @@ function CertificatePreviewLearner({
     refreshMutation.mutate({ courseSlug });
   }, [courseSlug, refreshMutation]);
 
-  const certUrl = cert.certificateUrl;
+  const certUrl = certificateInlinePath ?? cert.certificateUrl;
 
   return (
     <div
@@ -376,7 +375,7 @@ function CertificatePreviewLearner({
             <><Download size={14} /> Download Certificate</>
           )}
         </Button>
-        <a href={certUrl} target="_blank" rel="noopener noreferrer">
+        <a href={certificateDeliveryPath ?? cert.certificateUrl} target="_blank" rel="noopener noreferrer">
           <Button size="sm" variant="outline" className="gap-2">
             <ExternalLink size={14} /> Open in New Tab
           </Button>

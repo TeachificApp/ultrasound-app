@@ -26,6 +26,7 @@ import { registerUploadAiGenerationSourceRoute } from "../routes/uploadAiGenerat
 import quizImportRouter from "../quizImportRoutes";
 import questionBankExportRouter from "../routes/questionBankExport";
 import { registerUploadDigitalFileRoute } from "../routes/uploadDigitalFile";
+import { registerLearnerProtectedDownloadRoutes } from "../routes/learnerProtectedDownloads";
 import { registerUploadCohortMediaRoute } from "../routes/uploadCohortMedia";
 import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResource";
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
@@ -682,6 +683,7 @@ async function startServer() {
   app.use("/api/quiz/question-bank", questionBankExportRouter);
   // Digital download file upload (multipart, bypasses JSON body limit)
   registerUploadDigitalFileRoute(app);
+  registerLearnerProtectedDownloadRoutes(app);
   // Cohort group discussion media upload (images + videos, admin only)
   registerUploadCohortMediaRoute(app);
   registerUploadCohortResourceRoute(app);

@@ -79,6 +79,10 @@ function OrderDetailDialog({
   const updateMut = trpc.downloadsAdmin.updateOrderAccess.useMutation({
     onSuccess: () => { toast.success("Access updated"); refetch(); },
   });
+  const resetFileMut = trpc.downloadsAdmin.resetFileDownloadCount.useMutation({
+    onSuccess: () => { toast.success("File download count reset"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
 
   const [maxDl, setMaxDl] = useState<string>("");
 
@@ -174,13 +178,31 @@ function OrderDetailDialog({
               </CardHeader>
               <CardContent className="space-y-2 pt-0">
                 {data.files.map((f) => (
-                  <div key={f.fileId} className="flex items-center justify-between text-sm border-b last:border-0 py-2">
-                    <span className="truncate flex-1 font-medium">{f.fileName}</span>
-                    <div className="flex gap-2 shrink-0">
+                  <div key={f.fileId} className="flex flex-wrap items-center justify-between gap-2 text-sm border-b last:border-0 py-2">
+                    <span className="truncate flex-1 font-medium min-w-[120px]">{f.fileName}</span>
+                    <div className="flex flex-wrap gap-2 shrink-0 items-center">
                       <Badge className="bg-blue-600">Downloaded: {f.downloaded}</Badge>
                       <Badge variant="secondary">
                         Remaining: {f.remaining === null ? "∞" : f.remaining}
                       </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={resetFileMut.isPending}
+                        onClick={() => resetFileMut.mutate({ purchaseId: data.id, fileId: f.fileId })}
+                      >
+                        Reset count
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs"
+                        disabled={resendMut.isPending}
+                        onClick={() => resendMut.mutate({ purchaseId: data.id, fileId: f.fileId })}
+                      >
+                        Resend
+                      </Button>
                     </div>
                   </div>
                 ))}

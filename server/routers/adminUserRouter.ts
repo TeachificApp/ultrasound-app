@@ -260,6 +260,9 @@ export const adminUserRouter = router({
       const [digitalPurchaseList] = await db.execute(sql`
         SELECT
           dp.id,
+          dp.product_id AS productId,
+          dp.status,
+          dp.max_downloads_per_file AS maxDownloadsPerFile,
           dp.purchased_at AS purchasedAt,
           dprod.title AS productTitle,
           dprod.slug AS productSlug,
@@ -460,6 +463,9 @@ export const adminUserRouter = router({
         funnelPurchases: isRestrictedManager ? [] : funnelPurchaseList,
         digitalPurchases: (digitalPurchaseList as any[]).map(r => ({
           id: Number(r.id),
+          productId: Number(r.productId),
+          status: String(r.status ?? "open"),
+          maxDownloadsPerFile: r.maxDownloadsPerFile != null ? Number(r.maxDownloadsPerFile) : null,
           purchasedAt: r.purchasedAt,
           productTitle: String(r.productTitle),
           productSlug: String(r.productSlug),
