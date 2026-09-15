@@ -517,3 +517,9 @@
 - [ ] Validate on the deployed learner dashboard that entitled standalone quizzes, LMS quiz courses, learner-only standalone results, and both brand-card images render correctly.
 - [x] Repair the My Dashboard runtime crash caused by an undefined `buildStudentDashboardUrl` reference before validating the learner quiz-result rows.
 - [x] Add focused regression coverage proving the My Content quiz card actions resolve their dashboard URL helper and completed standalone result rows leave loading state.
+- [x] Reconcile the reported digital-download payment with the purchaser, product, webhook, purchase, download-entitlement, and email-delivery records using read-only evidence only.
+- [x] Present the confirmed fulfillment gap and request explicit approval before creating any purchase/download access record or sending any customer access email.
+- [x] Repair the reported customer’s digital-download account association so the confirmed paid purchase appears in her Downloads and Purchases views, without sending email unless separately approved.
+- [x] Harden completed digital-download fulfillment so every valid checkout produces one durable purchase entitlement for the intended account and a truthful delivery status.
+- [x] Add focused digital-download account-association, dashboard-access, duplicate-safety, and failed-delivery-status regressions.
+- [ ] Validate the customer’s live Purchases and Downloads views after the authorized entitlement correction; do not send a replacement email unless separately approved.

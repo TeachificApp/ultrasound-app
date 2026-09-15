@@ -372,7 +372,29 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     return;
   }
 
-  // Check if already purchased (idempotent)
+  const amountTotal = (session.amount_total as number) ?? 0;
+  const paymentIntentId = (session.payment_intent as string) ?? null;
+
+  // A Stripe PaymentIntent is the authoritative idempotency key. Check it before
+  // the broader user/product entitlement so webhook retries cannot create a second
+  // purchase, and a conflicting account association is never reassigned silently.
+  if (paymentIntentId) {
+    const [existingPayment] = await db.select().from(digitalPurchases)
+      .where(eq(digitalPurchases.stripePaymentIntentId, paymentIntentId)).limit(1);
+    if (existingPayment) {
+      if (existingPayment.userId !== userId) {
+        await notifyOwner({
+          title: "⚠️ Digital Download — Payment Account Conflict",
+          content: `Payment ${paymentIntentId} already has a download entitlement for a different account. No reassignment was applied automatically.`,
+        });
+      }
+      console.log(`[Stripe] Digital download payment already reconciled: ${paymentIntentId}`);
+      return;
+    }
+  }
+
+  // Check whether the account already owns the product. This preserves a durable
+  // entitlement while still recording the received duplicate payment for review.
   const [existing] = await db.select().from(digitalPurchases)
     .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, productId))).limit(1);
   if (existing) {
@@ -387,6 +409,18 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       stripePaymentIntentId: (session.payment_intent as string) ?? null,
       message: `Checkout completed but user already owns download product ${productId}`,
     });
+    const deliverySucceeded = await sendPurchaseConfirmationEmail(userId, productId);
+    try {
+      const { logPurchaseActivity } = await import("../lib/downloadAccess");
+      await logPurchaseActivity(db, {
+        purchaseId: existing.id,
+        eventType: deliverySucceeded ? "email_sent" : "email_failed",
+        message: deliverySucceeded
+          ? "Download access email sent after a duplicate checkout."
+          : "Download access email failed after a duplicate checkout.",
+        metadata: JSON.stringify({ paymentIntentId, source: "duplicate_checkout" }),
+      });
+    } catch { /* non-blocking activity log */ }
     await fulfillOrderBumpPurchase(db, meta, {
       userId,
       sessionId: session.id as string,
@@ -394,9 +428,6 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     });
     return;
   }
-
-  const amountTotal = (session.amount_total as number) ?? 0;
-  const paymentIntentId = (session.payment_intent as string) ?? null;
 
   const [productRow] = await db.select({
     maxDownloadsPerFile: digitalProducts.maxDownloadsPerFile,
@@ -472,13 +503,14 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     });
   } catch (_e) { /* non-blocking */ }
   // Send purchase confirmation email with file links
-  await sendPurchaseConfirmationEmail(userId, productId);
+  const deliverySucceeded = await sendPurchaseConfirmationEmail(userId, productId);
   if (newPurchaseId) {
     try {
       await logPurchaseActivity(db, {
         purchaseId: newPurchaseId,
-        eventType: "email_sent",
-        message: "Download email sent",
+        eventType: deliverySucceeded ? "email_sent" : "email_failed",
+        message: deliverySucceeded ? "Download access email sent" : "Download access email failed",
+        metadata: JSON.stringify({ paymentIntentId, source: "checkout_webhook" }),
       });
     } catch { /* non-blocking */ }
   }
