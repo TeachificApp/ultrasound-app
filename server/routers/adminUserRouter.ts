@@ -274,6 +274,68 @@ export const adminUserRouter = router({
         ORDER BY dp.purchased_at DESC
       `);
 
+      // Administrator-only quiz-result history. This deliberately includes every
+      // result model (standalone, lesson quiz, and inline lesson quiz/survey) so
+      // the member profile is a complete administrative record without changing
+      // the learner-facing My Quiz Results eligibility rules.
+      const [standaloneQuizResultList] = await db.execute(sql`
+        SELECT
+          a.id,
+          a.score,
+          a.passed,
+          a.total_questions AS totalQuestions,
+          a.correct_answers AS correctAnswers,
+          a.attempt_number AS attemptNumber,
+          a.completed_at AS submittedAt,
+          q.title AS quizTitle
+        FROM standalone_quiz_attempts a
+        JOIN standalone_quizzes q ON q.id = a.quiz_id
+        WHERE a.user_id = ${input.userId}
+          AND a.completed_at IS NOT NULL
+        ORDER BY a.completed_at DESC
+      `);
+
+      const [lessonQuizResultList] = await db.execute(sql`
+        SELECT
+          a.id,
+          a.course_id AS courseId,
+          a.lesson_id AS lessonId,
+          a.score,
+          a.passed,
+          a.total_questions AS totalQuestions,
+          a.correct_answers AS correctAnswers,
+          a.time_taken_sec AS timeTakenSec,
+          a.created_at AS submittedAt,
+          c.title AS courseTitle,
+          l.title AS lessonTitle
+        FROM lms_quiz_attempts a
+        LEFT JOIN lms_courses c ON c.id = a.course_id
+        LEFT JOIN lms_lessons l ON l.id = a.lesson_id
+        WHERE a.user_id = ${input.userId}
+        ORDER BY a.created_at DESC
+      `);
+
+      const [inlineQuizResultList] = await db.execute(sql`
+        SELECT
+          a.id,
+          a.course_id AS courseId,
+          a.lesson_id AS lessonId,
+          a.quiz_block_id AS quizBlockId,
+          a.score,
+          a.passed,
+          a.submitted_at AS submittedAt,
+          c.title AS courseTitle,
+          l.title AS lessonTitle,
+          COUNT(r.id) AS responseCount
+        FROM lms_inline_quiz_attempts a
+        LEFT JOIN lms_courses c ON c.id = a.course_id
+        LEFT JOIN lms_lessons l ON l.id = a.lesson_id
+        LEFT JOIN lms_inline_quiz_responses r ON r.attempt_id = a.id
+        WHERE a.user_id = ${input.userId}
+        GROUP BY a.id, a.course_id, a.lesson_id, a.quiz_block_id, a.score, a.passed, a.submitted_at, c.title, l.title
+        ORDER BY a.submitted_at DESC
+      `);
+
       // Physical product orders
       const [physicalOrderList] = await db.execute(sql`
         SELECT
@@ -472,6 +534,46 @@ export const adminUserRouter = router({
           productSlug: String(r.productSlug),
           thumbnailUrl: r.thumbnailUrl as string | null,
         })),
+        quizResults: {
+          standalone: (standaloneQuizResultList as any[]).map(r => ({
+            id: Number(r.id),
+            kind: "standalone" as const,
+            quizTitle: String(r.quizTitle ?? "Standalone quiz"),
+            score: r.score != null ? Number(r.score) : null,
+            passed: r.passed == null ? null : Boolean(r.passed),
+            totalQuestions: Number(r.totalQuestions ?? 0),
+            correctAnswers: Number(r.correctAnswers ?? 0),
+            attemptNumber: Number(r.attemptNumber ?? 1),
+            submittedAt: r.submittedAt,
+          })),
+          lesson: (lessonQuizResultList as any[]).map(r => ({
+            id: Number(r.id),
+            kind: "lesson" as const,
+            courseId: Number(r.courseId),
+            lessonId: Number(r.lessonId),
+            courseTitle: String(r.courseTitle ?? "Course"),
+            lessonTitle: String(r.lessonTitle ?? "Lesson"),
+            score: Number(r.score ?? 0),
+            passed: Boolean(r.passed),
+            totalQuestions: Number(r.totalQuestions ?? 0),
+            correctAnswers: Number(r.correctAnswers ?? 0),
+            timeTakenSec: r.timeTakenSec != null ? Number(r.timeTakenSec) : null,
+            submittedAt: r.submittedAt,
+          })),
+          inline: (inlineQuizResultList as any[]).map(r => ({
+            id: Number(r.id),
+            kind: "inline" as const,
+            courseId: Number(r.courseId),
+            lessonId: Number(r.lessonId),
+            quizBlockId: String(r.quizBlockId),
+            courseTitle: String(r.courseTitle ?? "Course"),
+            lessonTitle: String(r.lessonTitle ?? "Lesson"),
+            score: Number(r.score ?? 0),
+            passed: Boolean(r.passed),
+            responseCount: Number(r.responseCount ?? 0),
+            submittedAt: r.submittedAt,
+          })),
+        },
         physicalOrders: (physicalOrderList as any[]).map(r => ({
           id: Number(r.id),
           createdAt: r.createdAt,

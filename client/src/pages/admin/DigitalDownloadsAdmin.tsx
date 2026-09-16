@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
+import { formatCentsAsCurrency } from "@/lib/formatMoney";
 import { Plus, Pencil, Trash2, Copy, Upload, FileIcon, GripVertical, ArrowLeft, ExternalLink, Eye, EyeOff, Image as ImageIcon, Link as LinkIcon, Users, UserPlus, Loader2, Sparkles, LayoutTemplate, BarChart3, ShoppingCart, Settings2, FolderOpen, Workflow, Search, Code2, Save, FileText } from "lucide-react";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
@@ -1194,7 +1195,7 @@ function DownloadStudentsTab({ productId, onGrantAccess }: { productId: number; 
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground">{p.purchasedAt ? new Date(p.purchasedAt).toLocaleDateString() : '—'}</td>
-                  <td className="px-4 py-2.5">{p.amountPaid != null ? `$${(Number(p.amountPaid) / 100).toFixed(2)}` : '—'}</td>
+                  <td className="px-4 py-2.5">{p.amountPaid != null ? formatCentsAsCurrency(p.amountPaid, p.currency ?? "usd") : '—'}</td>
                   <td className="px-4 py-2.5">
                     {p.userId && (
                       <Button size="sm" variant="ghost" className="text-xs text-teal-600 hover:bg-teal-50 h-7" onClick={() => navigate(`/admin/users/${p.userId}`)}>
@@ -1217,14 +1218,15 @@ function DownloadProductAnalytics({ productId, productTitle }: { productId: numb
   const { data, isLoading } = trpc.productAnalytics.getProductPurchasers.useQuery({ productId, productType: "download" });
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading analytics...</div>;
   const purchasers = data?.purchasers ?? [];
-  const totalRevenue = purchasers.reduce((sum: number, p: any) => sum + (Number(p.amountPaid) || 0), 0);
-  const avgOrder = purchasers.length > 0 ? totalRevenue / purchasers.length : 0;
+  const totalRevenue = Number(data?.totalRevenue ?? 0);
+  const paidCount = Number(data?.totalPaid ?? 0);
+  const avgOrder = paidCount > 0 ? totalRevenue / paidCount : 0;
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-4">
-        <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{purchasers.length}</p><p className="text-xs text-muted-foreground mt-1">Total Buyers</p></CardContent></Card>
-        <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">${Number(totalRevenue).toFixed(2)}</p><p className="text-xs text-muted-foreground mt-1">Total Revenue</p></CardContent></Card>
-        <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{purchasers.length > 0 ? `$${(avgOrder / 100).toFixed(2)}` : '—'}</p><p className="text-xs text-muted-foreground mt-1">Avg. Order</p></CardContent></Card>
+        <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{paidCount}</p><p className="text-xs text-muted-foreground mt-1">Paid Buyers</p><p className="mt-1 text-[11px] text-muted-foreground">{purchasers.length} access holder{purchasers.length === 1 ? "" : "s"}</p></CardContent></Card>
+        <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{formatCentsAsCurrency(totalRevenue)}</p><p className="text-xs text-muted-foreground mt-1">Total Revenue</p></CardContent></Card>
+        <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{paidCount > 0 ? formatCentsAsCurrency(avgOrder) : '—'}</p><p className="text-xs text-muted-foreground mt-1">Avg. Order</p></CardContent></Card>
       </div>
       {purchasers.length > 0 && (
         <Card>
@@ -1241,7 +1243,7 @@ function DownloadProductAnalytics({ productId, productTitle }: { productId: numb
                   <tr key={p.transactionId ?? p.userEmail} className="border-t">
                     <td className="px-4 py-2.5"><p className="font-medium">{p.userName || p.userEmail || 'Unknown'}</p><p className="text-xs text-muted-foreground">{p.userEmail}</p></td>
                     <td className="px-4 py-2.5 text-muted-foreground">{p.purchasedAt ? new Date(p.purchasedAt).toLocaleDateString() : '—'}</td>
-                    <td className="px-4 py-2.5">{p.amountPaid != null ? `$${(Number(p.amountPaid) / 100).toFixed(2)}` : '—'}</td>
+                    <td className="px-4 py-2.5">{p.amountPaid != null ? formatCentsAsCurrency(p.amountPaid, p.currency ?? "usd") : '—'}</td>
                   </tr>
                 ))}
               </tbody>

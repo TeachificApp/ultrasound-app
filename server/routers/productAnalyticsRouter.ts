@@ -224,14 +224,18 @@ export const productAnalyticsRouter = router({
         case "download":
           queryStr = sql`
             SELECT dp.id AS transactionId, dp.user_id AS userId,
-              COALESCE(u.name, '') AS userName, COALESCE(u.email, '') AS userEmail,
-              COALESCE(prod.price, 0) AS amountPaid, 'usd' AS currency, 'paid' AS status,
+              COALESCE(NULLIF(u.displayName, ''), NULLIF(u.name, ''), NULLIF(u.email, ''), CONCAT('Member #', dp.user_id)) AS userName,
+              COALESCE(u.email, '') AS userEmail,
+              COALESCE(dp.amount, 0) AS amountPaid, COALESCE(dp.currency, 'usd') AS currency,
+              CASE
+                WHEN COALESCE(dp.amount, 0) > 0 AND dp.status IN ('open', 'expired') THEN 'paid'
+                ELSE dp.status
+              END AS status,
               dp.stripe_payment_intent_id AS stripePaymentIntentId,
               dp.purchased_at AS purchasedAt,
               'download' AS sourceTable
             FROM digital_purchases dp
             LEFT JOIN users u ON dp.user_id = u.id
-            LEFT JOIN digital_products prod ON dp.product_id = prod.id
             WHERE dp.product_id = ${input.productId}
               ${search ? sql`AND (LOWER(u.name) LIKE ${`%${search}%`} OR LOWER(u.email) LIKE ${`%${search}%`})` : sql``}
             ORDER BY dp.purchased_at DESC
@@ -299,7 +303,13 @@ export const productAnalyticsRouter = router({
           countQuery = sql`SELECT COUNT(*) AS total FROM lms_orders WHERE course_id = ${input.productId}`;
           break;
         case "download":
-          countQuery = sql`SELECT COUNT(*) AS total FROM digital_purchases WHERE product_id = ${input.productId}`;
+          countQuery = sql`
+            SELECT
+              COUNT(*) AS total,
+              COALESCE(SUM(CASE WHEN COALESCE(amount, 0) > 0 AND status IN ('open', 'expired') THEN 1 ELSE 0 END), 0) AS totalPaid
+            FROM digital_purchases
+            WHERE product_id = ${input.productId}
+          `;
           break;
         case "physical":
           countQuery = sql`SELECT COUNT(*) AS total FROM physical_product_orders WHERE product_id = ${input.productId}`;
@@ -312,7 +322,10 @@ export const productAnalyticsRouter = router({
           break;
       }
       const countResult = await db.execute(countQuery) as any;
-      const total = Number((Array.isArray(countResult) ? countResult[0] : (countResult as any)[0]?.[0])?.total ?? 0);
+      const countRows = Array.isArray(countResult) ? countResult[0] : (countResult as any)[0] ?? [];
+      const countSummary = Array.isArray(countRows) ? countRows[0] : countRows;
+      const total = Number(countSummary?.total ?? 0);
+      const totalPaid = Number(countSummary?.totalPaid ?? 0);
 
       // Calculate total revenue
       let revenueQuery: any;
@@ -322,6 +335,13 @@ export const productAnalyticsRouter = router({
           break;
         case "funnel":
           revenueQuery = sql`SELECT COALESCE(SUM(amount_paid), 0) AS rev FROM funnel_purchases WHERE source_funnel_id = ${input.productId} AND status = 'paid'`;
+          break;
+        case "download":
+          revenueQuery = sql`
+            SELECT COALESCE(SUM(CASE WHEN COALESCE(amount, 0) > 0 AND status IN ('open', 'expired') THEN amount ELSE 0 END), 0) AS rev
+            FROM digital_purchases
+            WHERE product_id = ${input.productId}
+          `;
           break;
         default:
           revenueQuery = null;
@@ -347,6 +367,7 @@ export const productAnalyticsRouter = router({
           sourceTable: r.sourceTable,
         })),
         total,
+        totalPaid,
         totalRevenue,
       };
     }),

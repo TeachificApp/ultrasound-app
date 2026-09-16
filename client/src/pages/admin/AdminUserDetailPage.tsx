@@ -504,6 +504,57 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
 // ─── Content Tab ──────────────────────────────────────────────────────────────
 type ContentSubTab = "courses" | "cohorts" | "quizzes" | "downloads" | "workshops" | "webinars" | "products" | "bundles" | "memberships" | "communities";
 
+function MemberQuizResults({ results }: { results: any }) {
+  const standalone = results?.standalone ?? [];
+  const lesson = results?.lesson ?? [];
+  const inline = results?.inline ?? [];
+  const allResults = [
+    ...standalone.map((result: any) => ({ ...result, label: "Standalone quiz", detail: result.quizTitle })),
+    ...lesson.map((result: any) => ({ ...result, label: "Lesson quiz", detail: `${result.courseTitle} · ${result.lessonTitle}` })),
+    ...inline.map((result: any) => ({ ...result, label: "Lesson survey / quiz", detail: `${result.courseTitle} · ${result.lessonTitle}` })),
+  ].sort((a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+
+  if (allResults.length === 0) return null;
+
+  return (
+    <section className="space-y-3 border-t border-gray-100 pt-5">
+      <div>
+        <h3 className="text-sm font-semibold text-gray-800">Administrator quiz results</h3>
+        <p className="mt-0.5 text-xs text-gray-500">Standalone, lesson, and survey submissions are visible here only to authorized administrators.</p>
+      </div>
+      <div className="space-y-2">
+        {allResults.map((result: any) => {
+          const isSurvey = result.kind === "inline";
+          return (
+            <div key={`${result.kind}-${result.id}`} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-teal-100 bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700">{result.label}</span>
+                  {isSurvey ? (
+                    <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Submitted</span>
+                  ) : result.passed ? (
+                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Passed</span>
+                  ) : (
+                    <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Completed</span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm font-medium text-gray-800">{result.detail}</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {isSurvey
+                    ? `${result.responseCount ?? 0} response${result.responseCount === 1 ? "" : "s"}`
+                    : `${result.correctAnswers ?? 0}/${result.totalQuestions ?? 0} correct${result.attemptNumber ? ` · Attempt ${result.attemptNumber}` : ""}`}
+                  {result.submittedAt ? ` · ${formatDate(result.submittedAt)}` : ""}
+                </p>
+              </div>
+              {!isSurvey && result.score != null ? <p className="text-lg font-bold text-[#0e4a50]">{Number(result.score).toFixed(1).replace(/\.0$/, "")}%</p> : null}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function ContentTab({ userId, data, refetch }: { userId: number; data: any; refetch: () => void }) {
   const [contentTab, setContentTab] = useState<ContentSubTab>("courses");
   const [enrollOpen, setEnrollOpen] = useState(false);
@@ -620,6 +671,8 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const cohorts   = enrollments.filter((e: any) => e.courseType === 'cohort');
   const quizzes   = enrollments.filter((e: any) => e.isQuiz);
   const downloads = enrollments.filter((e: any) => e.isDownload);
+  const quizResults = data.quizResults ?? { standalone: [], lesson: [], inline: [] };
+  const quizResultCount = (quizResults.standalone?.length ?? 0) + (quizResults.lesson?.length ?? 0) + (quizResults.inline?.length ?? 0);
   const workshopEnrollmentsList = data.workshopEnrollments ?? [];
   const physOrders = data.physicalOrders ?? [];
   const bundleEnrollments = data.bundleEnrollments ?? [];
@@ -631,7 +684,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: courses.length },
     { key: "cohorts",      label: "Cohorts",      icon: Users,          count: cohorts.length },
-    { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: quizzes.length },
+    { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: quizzes.length + quizResultCount },
     { key: "downloads",    label: "Downloads",    icon: Download,       count: downloads.length },
     { key: "workshops",    label: "Workshops",    icon: Calendar,       count: workshopEnrollmentsList.length },
     { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
@@ -953,7 +1006,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       {contentTab === "quizzes" && (
         <div className="space-y-3">
           <SectionHeader
-            title={`Quizzes (${quizzes.length})`}
+            title={`Quizzes & Results (${quizzes.length + quizResultCount})`}
             action={
               <Button size="sm" onClick={() => setEnrollOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
                 <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant Access
@@ -961,7 +1014,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
             }
           />
           {quizzes.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No quiz enrollments.</p>
+            <p className="text-sm text-gray-400 text-center py-8">No standalone quiz enrollments.</p>
           ) : (
             quizzes.map((e: any) => (
               <div key={e.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex gap-4 items-start">
@@ -1104,23 +1157,72 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               </div>
             ))
           )}
+          <MemberQuizResults results={quizResults} />
         </div>
       )}
 
       {/* Downloads */}
       {contentTab === "downloads" && (
         <div className="space-y-3">
-          <SectionHeader title={`Downloads (${data.digitalPurchases?.length ?? 0})`} />
+          <SectionHeader
+            title={`Downloads (${downloads.length + (data.digitalPurchases?.length ?? 0)})`}
+            action={
+              <Button size="sm" onClick={() => setEnrollOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
+                <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant Download / Content Access
+              </Button>
+            }
+          />
           <p className="text-xs text-gray-500 -mt-1 mb-2">
-            Resend access emails, raise per-member download limits, and reset per-file download counts.
+            Manage status, expiry, limits, file activity, and access. Access changes do not send email unless you explicitly use a resend action.
           </p>
-          {(data.digitalPurchases?.length ?? 0) === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No digital purchases.</p>
-          ) : (
-            data.digitalPurchases.map((d: any) => (
-              <MemberDigitalDownloadPurchaseCard key={d.id} purchase={d} />
-            ))
+          {downloads.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">LMS download access</p>
+              {downloads.map((download: any) => (
+                <div key={download.enrollmentId} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-800">{download.courseTitle}</p>
+                    <p className="mt-0.5 text-xs text-gray-500">Granted {formatDate(download.enrolledAt)}</p>
+                    {download.accessExpiresAt ? <p className="mt-0.5 text-xs text-amber-700">Access expires {formatDate(download.accessExpiresAt)}</p> : <p className="mt-0.5 text-xs text-gray-400">No access expiry</p>}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => { setExpiryEditId(download.enrollmentId); setExpiryEditValue(download.accessExpiresAt ? new Date(download.accessExpiresAt).toISOString().slice(0, 10) : ""); }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                    >
+                      <Calendar className="h-3 w-3" /> Edit expiry
+                    </button>
+                    <button
+                      onClick={() => setUnenrollConfirm(download.enrollmentId)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-100"
+                    >
+                      <ShieldOff className="h-3 w-3" /> Remove access
+                    </button>
+                  </div>
+                  {expiryEditId === download.enrollmentId && (
+                    <div className="flex w-full flex-wrap items-center gap-2 rounded-lg bg-gray-50 p-2">
+                      <Input type="date" value={expiryEditValue} onChange={event => setExpiryEditValue(event.target.value)} className="h-8 w-40 text-xs" />
+                      <Button size="sm" disabled={updateExpiry.isPending} onClick={() => updateExpiry.mutate({ enrollmentId: download.enrollmentId, accessExpiresAt: expiryEditValue || null })}>
+                        {updateExpiry.isPending ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null} Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setExpiryEditId(null); setExpiryEditValue(""); }}>Cancel</Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
+          {(data.digitalPurchases?.length ?? 0) > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Digital file access & activity</p>
+              {data.digitalPurchases.map((d: any) => (
+                <MemberDigitalDownloadPurchaseCard key={d.id} purchase={d} />
+              ))}
+            </div>
+          )}
+          {downloads.length === 0 && (data.digitalPurchases?.length ?? 0) === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-8">No digital purchases.</p>
+          ) : null}
         </div>
       )}
 

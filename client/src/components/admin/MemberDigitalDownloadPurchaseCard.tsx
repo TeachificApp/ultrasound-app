@@ -26,11 +26,17 @@ export function MemberDigitalDownloadPurchaseCard({ purchase }: { purchase: Purc
   );
 
   const [maxDl, setMaxDl] = useState("");
+  const [accessStatus, setAccessStatus] = useState<"open" | "expired" | "revoked">("open");
+  const [accessExpiry, setAccessExpiry] = useState("");
 
   useEffect(() => {
     if (data?.maxDownloadsPerFile != null) setMaxDl(String(data.maxDownloadsPerFile));
     else if (data) setMaxDl("");
-  }, [data?.maxDownloadsPerFile, data?.id]);
+    if (data?.status === "expired" || data?.status === "revoked" || data?.status === "open") {
+      setAccessStatus(data.status);
+    }
+    setAccessExpiry(data?.accessExpiresAt ? new Date(data.accessExpiresAt).toISOString().slice(0, 10) : "");
+  }, [data?.maxDownloadsPerFile, data?.id, data?.status, data?.accessExpiresAt]);
 
   const resendMut = trpc.downloadsAdmin.resendOrderEmail.useMutation({
     onSuccess: () => { toast.success("Access email sent"); refetch(); },
@@ -81,6 +87,44 @@ export function MemberDigitalDownloadPurchaseCard({ purchase }: { purchase: Purc
           <p className="text-sm text-gray-400">Could not load order detail.</p>
         ) : (
           <>
+            <div className="grid gap-3 rounded-lg border border-teal-100 bg-teal-50/50 p-3 md:grid-cols-[minmax(140px,1fr)_minmax(150px,1fr)_auto] md:items-end">
+              <div>
+                <Label className="text-xs text-gray-600">Access status</Label>
+                <select
+                  value={accessStatus}
+                  onChange={(event) => setAccessStatus(event.target.value as "open" | "expired" | "revoked")}
+                  className="mt-1 h-8 w-full rounded-md border border-input bg-white px-2 text-sm text-gray-800"
+                >
+                  <option value="open">Open</option>
+                  <option value="expired">Expired</option>
+                  <option value="revoked">Revoked</option>
+                </select>
+              </div>
+              <div>
+                <Label className="text-xs text-gray-600">Access expiry (optional)</Label>
+                <Input
+                  type="date"
+                  value={accessExpiry}
+                  onChange={(event) => setAccessExpiry(event.target.value)}
+                  className="mt-1 h-8"
+                />
+              </div>
+              <Button
+                size="sm"
+                className="bg-teal-700 text-white hover:bg-teal-800"
+                disabled={updateMut.isPending}
+                onClick={() => updateMut.mutate({
+                  purchaseId: purchase.id,
+                  status: accessStatus,
+                  accessExpiresAt: accessExpiry ? new Date(`${accessExpiry}T00:00:00.000Z`).toISOString() : null,
+                })}
+              >
+                {updateMut.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                Save access
+              </Button>
+              <p className="md:col-span-3 text-xs text-gray-500">Changing access does not send email. Use Resend access email only when you intend to contact this student.</p>
+            </div>
+
             <div className="flex flex-wrap gap-2 items-end">
               <div className="min-w-[140px] flex-1 max-w-xs">
                 <Label className="text-xs text-gray-500">Max downloads per file (this member)</Label>
@@ -153,6 +197,25 @@ export function MemberDigitalDownloadPurchaseCard({ purchase }: { purchase: Purc
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+
+            <div className="space-y-2 border-t border-gray-100 pt-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-600">Access activity</p>
+              {data.activity.length === 0 ? (
+                <p className="text-sm text-gray-400">No access activity has been recorded for this download.</p>
+              ) : (
+                <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
+                  {data.activity.map((event) => (
+                    <div key={event.id} className="flex items-start justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs">
+                      <div className="min-w-0">
+                        <p className="font-medium capitalize text-gray-700">{String(event.eventType ?? "activity").replace(/_/g, " ")}</p>
+                        {event.message ? <p className="mt-0.5 text-gray-500">{event.message}</p> : null}
+                      </div>
+                      <time className="shrink-0 text-gray-400">{event.createdAt ? new Date(event.createdAt).toLocaleString() : "—"}</time>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 

@@ -536,3 +536,8 @@
 - [x] Suppress individual membership-item access emails and all automatic-Free-Membership welcome/access emails created as a consequence of another purchase or enrollment; retain one membership-level welcome/access email only for direct membership enrollment.
 - [x] Add focused grant-source, idempotency, email-suppression, direct-membership-delivery, and no-email-sent validation coverage without sending messages or modifying member access records during tests.
 - [x] With explicit approval, add only missing active Free Membership subscriptions and their included access to all current user accounts, using duplicate-safe writes and sending no welcome or item-access email.
+- [x] Add administrator member-profile controls to grant and manage individual download or content access, with duplicate-safe safeguards and no automatic email delivery.
+- [x] Show administrator-visible per-member download access activity, entitlement status, limits, and management controls under the Content → Downloads view.
+- [x] Show administrator-visible standalone, lesson-quiz, and survey result records under the member Content → Quizzes view without exposing those results to other learners.
+- [x] Repair LMS Download Students, Sales, and Analytics views so they identify the correct student and render stored-cent monetary values such as 700 as $7.00 rather than $700.00.
+- [x] Add focused authorization, access-management, quiz-result, student-identity, cents-formatting, and no-email-sent regression coverage for administrator member content management.

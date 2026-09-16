@@ -1871,27 +1871,41 @@ Make ALL content specific and compelling based on the product title and descript
           productId: digitalPurchases.productId,
           amount: digitalPurchases.amount,
           currency: digitalPurchases.currency,
-          status: digitalPurchases.status,
+          status: sql<string>`'paid'`,
           stripePaymentIntentId: digitalPurchases.stripePaymentIntentId,
           purchasedAt: digitalPurchases.purchasedAt,
+          userDisplayName: users.displayName,
           userName: users.name,
           userEmail: users.email,
         })
           .from(digitalPurchases)
           .leftJoin(users, eq(users.id, digitalPurchases.userId))
-          .where(eq(digitalPurchases.productId, input.productId))
+          .where(and(
+            eq(digitalPurchases.productId, input.productId),
+            sql`COALESCE(${digitalPurchases.amount}, 0) > 0`,
+            sql`${digitalPurchases.status} IN ('open', 'expired')`,
+          ))
           .orderBy(desc(digitalPurchases.purchasedAt))
           .limit(input.pageSize)
           .offset(offset),
-        db.select({ count: sql<number>`count(*)`, revenue: sql<number>`COALESCE(SUM(CASE WHEN ${digitalPurchases.status}='open' OR ${digitalPurchases.status}='expired' THEN COALESCE(${digitalPurchases.amount}, 0) ELSE 0 END), 0)` })
+        db.select({
+          count: sql<number>`count(*)`,
+          paidCount: sql<number>`COALESCE(SUM(CASE WHEN COALESCE(${digitalPurchases.amount}, 0) > 0 AND ${digitalPurchases.status} IN ('open', 'expired') THEN 1 ELSE 0 END), 0)`,
+          revenue: sql<number>`COALESCE(SUM(CASE WHEN COALESCE(${digitalPurchases.amount}, 0) > 0 AND ${digitalPurchases.status} IN ('open', 'expired') THEN ${digitalPurchases.amount} ELSE 0 END), 0)`,
+        })
           .from(digitalPurchases)
           .where(eq(digitalPurchases.productId, input.productId)),
       ]);
 
       return {
-        purchases,
-        total: Number(countResult[0]?.count ?? 0),
-        totalRevenue: Number(countResult[0]?.revenue ?? 0),
+        purchases: purchases.map((purchase) => ({
+          ...purchase,
+          amount: Number(purchase.amount ?? 0) / 100,
+          userName: purchase.userDisplayName || purchase.userName || purchase.userEmail || `Member #${purchase.userId}`,
+        })),
+        total: Number(countResult[0]?.paidCount ?? 0),
+        accessCount: Number(countResult[0]?.count ?? 0),
+        totalRevenue: Number(countResult[0]?.revenue ?? 0) / 100,
       };
     }),
 
