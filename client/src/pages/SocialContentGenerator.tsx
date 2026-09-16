@@ -7,9 +7,17 @@
  * Both layouts support dark/light themes, PNG download, and ready-to-copy social posts.
  * Image options: None, Abstract AI background, or Upload custom clinical image.
  */
-import { useRef, useCallback, useState, type ChangeEvent } from "react";
+import { useRef, useCallback, useState, useMemo, useEffect, type ChangeEvent } from "react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
+import { useAdminBrand } from "@/hooks/useAdminBrand";
+import BrandAdminBadge from "@/components/BrandAdminBadge";
+import { CardBrandContext, useCardBrand } from "@/contexts/CardGeneratorBrandContext";
+import {
+  getCardGeneratorBrandConfig,
+  getCategoryHashtags,
+  type CardGeneratorBrandConfig,
+} from "@shared/cardGeneratorBrand";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -157,12 +165,12 @@ type GeneratedItem = {
   imageSource?: "abstract" | "upload";
 };
 
-function buildFullSocialPost(item: GeneratedItem): string {
-  const catTags = CATEGORY_HASHTAGS[item.category] || [];
-  const allHashtags = [...REQUIRED_HASHTAGS, ...catTags].join(" ");
+function buildFullSocialPost(item: GeneratedItem, cfg: CardGeneratorBrandConfig): string {
+  const catTags = getCategoryHashtags(cfg, item.category);
+  const allHashtags = [...cfg.requiredHashtags, ...catTags].join(" ");
   const icon = CONTENT_TYPE_ICONS[item.contentType] || "📸";
   const label = CONTENT_TYPE_LABELS[item.contentType] || item.contentType;
-  return `${icon} ${label} — ${item.category}\n${item.socialCaption}\n🔗 app.allaboutultrasound.com\n${allHashtags}`;
+  return `${icon} ${label} — ${item.category}\n${item.socialCaption}\n🔗 ${cfg.appUrlHost}\n${allHashtags}`;
 }
 
 async function renderCardToPng(el: HTMLElement): Promise<string> {
@@ -185,17 +193,18 @@ function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens 
 
 // ── Branded Header (shared by both layouts) ──────────────────────────────────
 function BrandedHeader({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
+  const { primary: BRAND, displayName, logoUrl, logoRingUrl } = useCardBrand();
   const icon = CONTENT_TYPE_ICONS[item.contentType] || "📸";
   const label = CONTENT_TYPE_LABELS[item.contentType] || item.contentType;
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "36px 48px 24px 48px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden", border: `3px solid ${BRAND}88`, boxShadow: `0 0 20px ${BRAND}44`, flexShrink: 0 }}>
-          <img src={LOGO_RING} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+          <img src={logoRingUrl ?? logoUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
         </div>
         <div>
           <div style={{ color: t.headingColor, fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.1 }}>
-            All About Ultrasound™
+            {displayName}
           </div>
           <div style={{ color: BRAND, fontSize: 13, fontWeight: 700, marginTop: 4, letterSpacing: "1.2px", textTransform: "uppercase" }}>
             {item.category}
@@ -211,23 +220,24 @@ function BrandedHeader({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
 
 // ── Branded Footer (shared by both layouts) ──────────────────────────────────
 function BrandedFooter({ t }: { t: ThemeTokens }) {
+  const { primary: BRAND, appUrlHost, tagline, brand } = useCardBrand();
   return (
     <div style={{ marginTop: "auto" }}>
       {/* Tagline banner */}
       <div style={{ background: t.taglineBg, padding: "16px 48px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
         <span style={{ fontSize: 14, color: t.taglineColor, fontWeight: 400, opacity: 0.7 }}>♡</span>
         <span style={{ fontSize: 16, color: t.taglineColor, fontWeight: 800, letterSpacing: "2px", textTransform: "uppercase" }}>
-          See It. Measure It. Make a Difference.
+          {tagline}
         </span>
         <span style={{ fontSize: 14, color: t.taglineColor, fontWeight: 400, opacity: 0.7 }}>♡</span>
       </div>
       {/* URL bar */}
       <div style={{ background: t.isDark ? "#060e14" : "#d0eced", padding: "10px 48px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ color: BRAND, fontSize: 13, fontWeight: 700, letterSpacing: "0.3px" }}>
-          app.allaboutultrasound.com
+          {appUrlHost}
         </div>
         <div style={{ color: t.mutedColor, fontSize: 11 }}>
-          Follow for daily ultrasound content
+          {brand === "iheartecho" ? "Follow for daily echo content" : "Follow for daily ultrasound content"}
         </div>
       </div>
     </div>
@@ -405,6 +415,7 @@ const PREVIEW_SIZE = 540;
 const SCALE = PREVIEW_SIZE / 1080;
 
 function DownloadableCard({ filename, children, onRef }: { filename: string; children: React.ReactNode; onRef?: (handle: CardHandle) => void }) {
+  const { primary: BRAND, dark: BRAND_DARK } = useCardBrand();
   const ref = useRef<HTMLDivElement>(null);
   const exportPng = useCallback(async (): Promise<string> => {
     if (!ref.current) throw new Error("Card not mounted");
@@ -445,8 +456,10 @@ function DownloadableCard({ filename, children, onRef }: { filename: string; chi
 
 // ── Social Post Panel ────────────────────────────────────────────────────────
 function SocialPostPanel({ item }: { item: GeneratedItem }) {
+  const cfg = useCardBrand();
+  const { primary: BRAND, dark: BRAND_DARK, accent: BRAND_AQUA } = cfg;
   const [copied, setCopied] = useState(false);
-  const post = buildFullSocialPost(item);
+  const post = buildFullSocialPost(item, cfg);
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(post);
@@ -548,11 +561,6 @@ const CONTENT_TYPES = [
   { value: "anatomy_spotlight", label: "🔬 Anatomy Spotlight" },
   { value: "case_teaser", label: "🔍 Case Teaser" },
 ] as const;
-const CATEGORIES = [
-  "Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester",
-  "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular",
-  "MSK", "POCUS", "Physics", "Echocardiography", "General Ultrasound",
-] as const;
 const IMAGE_STYLE_HINTS = [
   "Teal waveform pattern",
   "Geometric mesh",
@@ -564,8 +572,19 @@ const IMAGE_STYLE_HINTS = [
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 export default function SocialContentGenerator() {
+  const adminBrand = useAdminBrand();
+  const brandConfig = useMemo(() => getCardGeneratorBrandConfig(adminBrand), [adminBrand]);
+  const categories = brandConfig.socialCategories;
+  const { primary: BRAND, dark: BRAND_DARK, accent: BRAND_AQUA, zipPrefix } = brandConfig;
+
   const [contentType, setContentType] = useState<string>("meme");
-  const [category, setCategory] = useState<string>("General Ultrasound");
+  const [category, setCategory] = useState<string>(() => categories[0] ?? "General Ultrasound");
+
+  useEffect(() => {
+    if (!categories.includes(category)) {
+      setCategory(categories[0] ?? "General Ultrasound");
+    }
+  }, [categories, category]);
   const [customTopic, setCustomTopic] = useState("");
   const [count, setCount] = useState(2);
   const [cardTheme, setCardTheme] = useState<CardTheme>("light");
@@ -644,7 +663,7 @@ export default function SocialContentGenerator() {
         })
       );
       const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, `ultrasoundassist-social-content-${new Date().toISOString().slice(0, 10)}.zip`);
+      saveAs(blob, `${zipPrefix}-social-content-${new Date().toISOString().slice(0, 10)}.zip`);
       toast.success("ZIP downloaded!");
     } catch (err) {
       console.error("Batch export failed:", err);
@@ -652,11 +671,12 @@ export default function SocialContentGenerator() {
     } finally {
       setBatchLoading(false);
     }
-  }, [items]);
+  }, [items, zipPrefix]);
 
   const t = cardTheme === "dark" ? DARK_THEME : LIGHT_THEME;
 
   return (
+    <CardBrandContext.Provider value={brandConfig}>
     <div className="min-h-screen" style={{ background: "#0a1018" }}>
       {/* Header */}
       <div style={{ background: "#0e1a24", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
@@ -668,6 +688,7 @@ export default function SocialContentGenerator() {
           </Link>
           <Sparkles className="w-4 h-4" style={{ color: BRAND_AQUA }} />
           <h1 className="text-base font-bold text-white">Social Content Generator</h1>
+          <BrandAdminBadge brand={adminBrand} />
           <Badge className="text-[10px] px-1.5 py-0 ml-0.5" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>Admin</Badge>
           <div className="ml-auto flex items-center gap-2">
             {/* Layout toggle */}
@@ -729,7 +750,7 @@ export default function SocialContentGenerator() {
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Category</label>
               <select value={category} onChange={(e) => setCategory(e.target.value)} className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
-                {CATEGORIES.map((c) => (<option key={c} value={c} style={{ background: "#0e1a24" }}>{c}</option>))}
+                {categories.map((c) => (<option key={c} value={c} style={{ background: "#0e1a24" }}>{c}</option>))}
               </select>
             </div>
             {/* Custom Topic */}
@@ -933,5 +954,6 @@ export default function SocialContentGenerator() {
         </div>
       )}
     </div>
+    </CardBrandContext.Provider>
   );
 }

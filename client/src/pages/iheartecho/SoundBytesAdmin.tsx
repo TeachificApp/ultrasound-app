@@ -37,6 +37,8 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAdminBrand } from "@/hooks/useAdminBrand";
+import BrandAdminBadge from "@/components/BrandAdminBadge";
 
 // ── Category config ────────────────────────────────────────────────────────────
 
@@ -89,6 +91,7 @@ const DEFAULT_FORM: FormState = {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function SoundBytesAdmin() {
+  const adminBrand = useAdminBrand();
   const { user } = useAuth();
   // toast is imported from sonner directly
   const utils = trpc.useUtils();
@@ -618,10 +621,17 @@ export default function SoundBytesAdmin() {
                 <Play className="w-4 h-4" style={{ color: "#189aa1" }} />
               </div>
               <div>
-                <h1 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
-                  SoundBytes™ Admin
-                </h1>
-                <p className="text-xs text-gray-400">Manage premium micro-lesson videos</p>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base font-bold text-gray-800" style={{ fontFamily: "Merriweather, serif" }}>
+                    SoundBytes™ Admin
+                  </h1>
+                  <BrandAdminBadge brand={adminBrand} />
+                </div>
+                <p className="text-xs text-gray-400">
+                  {adminBrand === "iheartecho"
+                    ? "Manage iHeartEcho SoundBytes micro-lessons"
+                    : "Manage All About Ultrasound SoundBytes micro-lessons"}
+                </p>
               </div>
             </div>
           </div>

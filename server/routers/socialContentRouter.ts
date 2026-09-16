@@ -17,6 +17,8 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { generateImage } from "../_core/imageGeneration";
 import { getUserRoles } from "../db";
+import { getCardGeneratorBrandConfig } from "../../shared/cardGeneratorBrand";
+import type { Brand } from "../../shared/brands";
 
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   const isOwner = ctx.user.role === "admin";
@@ -38,26 +40,15 @@ const CONTENT_TYPES = [
   "case_teaser",
 ] as const;
 
-const CATEGORIES = [
-  "Abdominal",
-  "Small Parts",
-  "Pelvic/Gyn",
-  "OB 1st Trimester",
-  "OB 2nd/3rd Trimester",
-  "Fetal Echo",
-  "Breast",
-  "Vascular",
-  "MSK",
-  "POCUS",
-  "Physics",
-  "Echocardiography",
-  "General Ultrasound",
-] as const;
-
 type ContentType = (typeof CONTENT_TYPES)[number];
 
-function getSystemPrompt(contentType: ContentType): string {
-  const base = `You are a creative social media content specialist for All About Ultrasound™, a professional education platform for sonographers, physicians, and ultrasound learners. Generate engaging, accurate, and shareable content.`;
+function getSystemPrompt(contentType: ContentType, brand: Brand): string {
+  const cfg = getCardGeneratorBrandConfig(brand);
+  const audience =
+    brand === "iheartecho"
+      ? "echocardiographers, cardiac sonographers, cardiologists, and echo learners"
+      : "sonographers, physicians, and ultrasound learners";
+  const base = `You are a creative social media content specialist for ${cfg.displayName}, a professional education platform for ${audience}. Generate engaging, accurate, and shareable content.`;
 
   const typePrompts: Record<ContentType, string> = {
     meme: `${base}
@@ -89,7 +80,7 @@ Generate a brief clinical scenario that presents an interesting ultrasound findi
   return typePrompts[contentType];
 }
 
-function buildUserPrompt(contentType: ContentType, category: string, customTopic?: string): string {
+function buildUserPrompt(contentType: ContentType, category: string, brand: Brand, customTopic?: string): string {
   const topicContext = customTopic
     ? `Topic focus: ${customTopic}`
     : `Category: ${category}`;
@@ -118,10 +109,12 @@ IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
  */
 function buildAbstractImagePrompt(
   item: { headline: string; category: string; contentType: string },
+  brand: Brand,
   userStyleHint?: string
 ): string {
+  const { primary, accent } = getCardGeneratorBrandConfig(brand);
   if (userStyleHint && userStyleHint.trim()) {
-    return `Abstract decorative background for a medical education social media card. Style: ${userStyleHint.trim()}. Use teal (#189aa1) and aqua (#4ad9e0) color accents on a dark background. NO anatomical imagery, NO ultrasound images, NO organs, NO medical equipment. Only abstract shapes, gradients, waveforms, geometric patterns, or bokeh effects. Clean, modern, professional. No text.`;
+    return `Abstract decorative background for a medical education social media card. Style: ${userStyleHint.trim()}. Use ${primary} and ${accent} color accents on a dark background. NO anatomical imagery, NO ultrasound images, NO organs, NO medical equipment. Only abstract shapes, gradients, waveforms, geometric patterns, or bokeh effects. Clean, modern, professional. No text.`;
   }
 
   // Category-themed abstract styles (no anatomy)
@@ -143,7 +136,17 @@ function buildAbstractImagePrompt(
 
   const style = categoryStyles[item.category] || "abstract teal gradient with geometric patterns on dark background";
 
-  return `Abstract decorative background for a medical education social media card about "${item.headline}". Style: ${style}. Use teal (#189aa1) and aqua (#4ad9e0) color accents. NO anatomical imagery, NO ultrasound images, NO organs, NO medical devices, NO people. Only abstract shapes, gradients, waveforms, geometric patterns, or light effects. Clean, modern, professional. No text, no watermarks.`;
+  return `Abstract decorative background for a medical education social media card about "${item.headline}". Style: ${style}. Use ${primary} and ${accent} color accents. NO anatomical imagery, NO ultrasound images, NO organs, NO medical devices, NO people. Only abstract shapes, gradients, waveforms, geometric patterns, or light effects. Clean, modern, professional. No text, no watermarks.`;
+}
+
+function assertCategoryForBrand(category: string, brand: Brand) {
+  const allowed = getCardGeneratorBrandConfig(brand).socialCategories;
+  if (!allowed.includes(category)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Invalid category for ${brand}. Use: ${allowed.join(", ")}`,
+    });
+  }
 }
 
 export const socialContentRouter = router({
@@ -151,14 +154,16 @@ export const socialContentRouter = router({
     .input(
       z.object({
         contentType: z.enum(CONTENT_TYPES),
-        category: z.enum(CATEGORIES),
+        category: z.string().max(100),
         customTopic: z.string().max(200).optional(),
         count: z.number().min(1).max(5).default(1),
         imageMode: z.enum(["none", "abstract", "upload"]).default("none"),
         imageStyleHint: z.string().max(500).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const brand = ctx.brand as Brand;
+      assertCategoryForBrand(input.category, brand);
       const { contentType, category, customTopic, count, imageMode, imageStyleHint } = input;
 
       const results: Array<{
@@ -176,8 +181,8 @@ export const socialContentRouter = router({
         try {
           const response = await invokeLLM({
             messages: [
-              { role: "system", content: getSystemPrompt(contentType) },
-              { role: "user", content: buildUserPrompt(contentType, category, customTopic) },
+              { role: "system", content: getSystemPrompt(contentType, brand) },
+              { role: "user", content: buildUserPrompt(contentType, category, brand, customTopic) },
             ],
             maxTokens: 2000,
           });
@@ -205,7 +210,7 @@ export const socialContentRouter = router({
           // Generate abstract background if requested
           if (imageMode === "abstract") {
             try {
-              const prompt = buildAbstractImagePrompt(item, imageStyleHint);
+              const prompt = buildAbstractImagePrompt(item, brand, imageStyleHint);
               console.log(`[SocialContent] Generating abstract background for item ${i + 1}`);
               const { url } = await generateImage({ prompt });
               item.imageUrl = url;
@@ -241,9 +246,11 @@ export const socialContentRouter = router({
         contentType: z.string(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const brand = ctx.brand as Brand;
       const prompt = buildAbstractImagePrompt(
         { headline: input.headline, category: input.category, contentType: input.contentType },
+        brand,
         input.styleHint
       );
       console.log(`[SocialContent] Generating standalone abstract image`);
@@ -258,7 +265,8 @@ export const socialContentRouter = router({
     }));
   }),
 
-  getCategories: adminProcedure.query(() => {
-    return CATEGORIES.map((c) => ({ value: c, label: c }));
+  getCategories: adminProcedure.query(({ ctx }) => {
+    const brand = ctx.brand as Brand;
+    return getCardGeneratorBrandConfig(brand).socialCategories.map((c) => ({ value: c, label: c }));
   }),
 });
