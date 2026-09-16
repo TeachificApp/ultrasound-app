@@ -1195,7 +1195,7 @@ function DownloadStudentsTab({ productId, onGrantAccess }: { productId: number; 
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground">{p.purchasedAt ? new Date(p.purchasedAt).toLocaleDateString() : '—'}</td>
-                  <td className="px-4 py-2.5">{p.amountPaid != null ? formatCentsAsCurrency(p.amountPaid, p.currency ?? "usd") : '—'}</td>
+                  <td className="px-4 py-2.5">{p.status === "included" ? <span className="text-xs font-medium text-teal-700">Included access</span> : p.amountPaid != null ? formatCentsAsCurrency(p.amountPaid, p.currency ?? "usd") : '—'}</td>
                   <td className="px-4 py-2.5">
                     {p.userId && (
                       <Button size="sm" variant="ghost" className="text-xs text-teal-600 hover:bg-teal-50 h-7" onClick={() => navigate(`/admin/users/${p.userId}`)}>
@@ -1218,6 +1218,7 @@ function DownloadProductAnalytics({ productId, productTitle }: { productId: numb
   const { data, isLoading } = trpc.productAnalytics.getProductPurchasers.useQuery({ productId, productType: "download" });
   if (isLoading) return <div className="text-center py-8 text-muted-foreground">Loading analytics...</div>;
   const purchasers = data?.purchasers ?? [];
+  const paidPurchasers = purchasers.filter((p: any) => p.status === "paid");
   const totalRevenue = Number(data?.totalRevenue ?? 0);
   const paidCount = Number(data?.totalPaid ?? 0);
   const avgOrder = paidCount > 0 ? totalRevenue / paidCount : 0;
@@ -1228,7 +1229,7 @@ function DownloadProductAnalytics({ productId, productTitle }: { productId: numb
         <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{formatCentsAsCurrency(totalRevenue)}</p><p className="text-xs text-muted-foreground mt-1">Total Revenue</p></CardContent></Card>
         <Card><CardContent className="p-4 text-center"><p className="text-2xl font-bold">{paidCount > 0 ? formatCentsAsCurrency(avgOrder) : '—'}</p><p className="text-xs text-muted-foreground mt-1">Avg. Order</p></CardContent></Card>
       </div>
-      {purchasers.length > 0 && (
+      {paidPurchasers.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-sm">Recent Buyers</CardTitle></CardHeader>
           <CardContent className="p-0">
@@ -1239,7 +1240,7 @@ function DownloadProductAnalytics({ productId, productTitle }: { productId: numb
                 <th className="text-left px-4 py-2.5 font-medium">Amount</th>
               </tr></thead>
               <tbody>
-                {purchasers.slice(0, 10).map((p: any) => (
+                {paidPurchasers.slice(0, 10).map((p: any) => (
                   <tr key={p.transactionId ?? p.userEmail} className="border-t">
                     <td className="px-4 py-2.5"><p className="font-medium">{p.userName || p.userEmail || 'Unknown'}</p><p className="text-xs text-muted-foreground">{p.userEmail}</p></td>
                     <td className="px-4 py-2.5 text-muted-foreground">{p.purchasedAt ? new Date(p.purchasedAt).toLocaleDateString() : '—'}</td>

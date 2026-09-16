@@ -541,3 +541,8 @@
 - [x] Show administrator-visible standalone, lesson-quiz, and survey result records under the member Content → Quizzes view without exposing those results to other learners.
 - [x] Repair LMS Download Students, Sales, and Analytics views so they identify the correct student and render stored-cent monetary values such as 700 as $7.00 rather than $700.00.
 - [x] Add focused authorization, access-management, quiz-result, student-identity, cents-formatting, and no-email-sent regression coverage for administrator member content management.
+- [x] Add administrator-only drill-down views that show a member’s stored response for every question in standalone quizzes, lesson quizzes, and lesson surveys without changing learner attempt or response records.
+- [x] Show all quiz-type course enrollments and their associated access state in the administrator member Content → Quizzes view, in addition to direct standalone quiz access and completed results.
+- [x] Add focused authorization, response-detail accuracy, survey-response, and quiz-course-access regressions without exposing learner responses or content access to unauthorized users.
+- [x] Trace and repair the live LMS Download Students and Analytics query path that still returns unnamed $0.00 access-holder rows instead of paid purchaser identity and confirmed stored-cent revenue; preserve nonfinancial access records separately and send no email.
+- [x] Add a focused deployed-contract regression that distinguishes paid download purchasers from silent/zero-cost access holders and verifies student identity and cents-correct totals in both LMS Download Students and Analytics views.

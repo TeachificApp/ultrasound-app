@@ -17,11 +17,28 @@ describe("administrator member content management", () => {
     expect(router).toContain("quizResults: {");
   });
 
+  it("protects question-by-question responses by member ownership across standalone, lesson, and inline attempts", () => {
+    const router = readProjectFile("server/routers/adminUserRouter.ts");
+
+    expect(router).toContain("getMemberQuizAttemptDetail");
+    expect(router).toContain('kind: z.enum(["standalone", "lesson", "inline"])');
+    expect(router).toContain("FROM standalone_quiz_attempt_answers");
+    expect(router).toContain("FROM lms_quiz_attempt_answers");
+    expect(router).toContain("FROM lms_inline_quiz_responses");
+    expect(router).toContain("AND a.user_id = ${input.userId}");
+    expect(router).toContain("AND a.completed_at IS NOT NULL");
+  });
+
   it("shows protected result records and silent access controls in the administrator member profile", () => {
     const profile = readProjectFile("client/src/pages/admin/AdminUserDetailPage.tsx");
     const downloadCard = readProjectFile("client/src/components/admin/MemberDigitalDownloadPurchaseCard.tsx");
 
     expect(profile).toContain("Administrator quiz results");
+    expect(profile).toContain("View responses");
+    expect(profile).toContain("Question-by-question responses");
+    expect(profile).toContain("parseStoredResponse");
+    expect(profile).toContain("e.isQuiz || e.hasQuizContent");
+    expect(profile).toContain("Course access with lesson quiz");
     expect(profile).toContain("Grant Download / Content Access");
     expect(profile).toContain("Access changes do not send email unless you explicitly use a resend action.");
     expect(downloadCard).toContain("Save access");
@@ -35,11 +52,17 @@ describe("administrator member content management", () => {
     const adminDownloads = readProjectFile("client/src/pages/admin/DigitalDownloadsAdmin.tsx");
 
     expect(analyticsRouter).toContain("COALESCE(dp.amount, 0) AS amountPaid");
+    expect(analyticsRouter).toContain("WHEN COALESCE(dp.amount, 0) = 0 THEN 'included'");
     expect(analyticsRouter).not.toContain("COALESCE(prod.price, 0) AS amountPaid");
     expect(analyticsRouter).toContain("totalPaid");
+    expect(analyticsRouter).toContain("function extractExecuteRows(result: unknown)");
+    expect(analyticsRouter).toContain("const rows = extractExecuteRows(await db.execute(queryStr));");
+    expect(analyticsRouter).toContain("const revRows = extractExecuteRows(await db.execute(revenueQuery));");
     expect(downloadsRouter).toContain("COALESCE(${digitalPurchases.amount}, 0) > 0");
     expect(downloadsRouter).toContain("totalRevenue: Number(countResult[0]?.revenue ?? 0) / 100");
     expect(adminDownloads).toContain("formatCentsAsCurrency(totalRevenue)");
+    expect(adminDownloads).toContain("Included access");
+    expect(adminDownloads).toContain("const paidPurchasers = purchasers.filter");
     expect(adminDownloads).not.toContain("${Number(totalRevenue).toFixed(2)}");
   });
 });

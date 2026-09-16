@@ -189,6 +189,15 @@ export const adminUserRouter = router({
           c.thumbnail_url AS thumbnailUrl,
           c.type AS courseType,
           (c.type = 'quiz') AS isQuiz,
+          (
+            c.type = 'quiz'
+            OR EXISTS (
+              SELECT 1
+              FROM lms_quizzes course_quiz
+              JOIN lms_lessons quiz_lesson ON quiz_lesson.id = course_quiz.lesson_id
+              WHERE quiz_lesson.course_id = c.id
+            )
+          ) AS hasQuizContent,
           (c.type = 'download') AS isDownload,
           (SELECT COUNT(*) FROM lms_video_events WHERE user_id = ${input.userId} AND course_id = c.id AND event_type = 'complete') AS videosCompleted,
           (SELECT COUNT(*) FROM lms_quiz_attempts WHERE user_id = ${input.userId} AND course_id = c.id) AS quizAttempts,
@@ -486,6 +495,7 @@ export const adminUserRouter = router({
           courseSlug: String(r.courseSlug),
           thumbnailUrl: r.thumbnailUrl as string | null,
           isQuiz: String(r.courseType ?? "course") === "quiz",
+          hasQuizContent: Boolean(r.hasQuizContent),
           isDownload: String(r.courseType ?? "course") === "download",
           courseType: String(r.courseType ?? "course"),
           videosCompleted: Number(r.videosCompleted ?? 0),
@@ -654,6 +664,149 @@ export const adminUserRouter = router({
           billingInterval: String(r.billingInterval ?? "one_time"),
           ...(isRestrictedManager ? {} : { price: Number(r.price ?? 0), currency: String(r.currency ?? "usd") }),
           brand: r.brand ? String(r.brand) : null,
+        })),
+      };
+    }),
+
+  /**
+   * Administrator-only question-by-question detail for one selected member
+   * attempt. The attempt must belong to the requested member so a stale or
+   * tampered attempt ID cannot reveal another learner's submitted responses.
+   */
+  getMemberQuizAttemptDetail: protectedProcedure
+    .input(z.object({
+      userId: z.number().int(),
+      attemptId: z.number().int(),
+      kind: z.enum(["standalone", "lesson", "inline"]),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      if (input.kind === "standalone") {
+        const [attemptRows] = await db.execute(sql`
+          SELECT a.id, a.score, a.passed, a.completed_at AS submittedAt,
+            q.title AS title
+          FROM standalone_quiz_attempts a
+          JOIN standalone_quizzes q ON q.id = a.quiz_id
+          WHERE a.id = ${input.attemptId}
+            AND a.user_id = ${input.userId}
+            AND a.completed_at IS NOT NULL
+          LIMIT 1
+        `);
+        const attempt = (attemptRows as any[])[0];
+        if (!attempt) throw new TRPCError({ code: "NOT_FOUND", message: "Quiz attempt not found for this member" });
+
+        const [responseRows] = await db.execute(sql`
+          SELECT aa.id, aa.question_id AS questionId, aa.given_answer AS answerValue,
+            aa.is_correct AS isCorrect, aa.time_spent_seconds AS timeSpentSeconds,
+            qb.question AS questionText, qb.type AS questionType, qb.options AS options,
+            qb.correct_answer AS correctAnswer, qb.correct_answers AS correctAnswers
+          FROM standalone_quiz_attempt_answers aa
+          LEFT JOIN question_bank qb ON qb.id = aa.question_id
+          WHERE aa.attempt_id = ${input.attemptId}
+          ORDER BY aa.id ASC
+        `);
+
+        return {
+          kind: input.kind,
+          title: String(attempt.title ?? "Standalone quiz"),
+          score: attempt.score != null ? Number(attempt.score) : null,
+          passed: attempt.passed == null ? null : Boolean(attempt.passed),
+          submittedAt: attempt.submittedAt,
+          responses: (responseRows as any[]).map((response) => ({
+            id: Number(response.id),
+            questionId: Number(response.questionId),
+            questionText: String(response.questionText ?? `Question #${response.questionId}`),
+            questionType: String(response.questionType ?? "unknown"),
+            options: response.options ?? null,
+            answerValue: response.answerValue ?? null,
+            isCorrect: response.isCorrect == null ? null : Boolean(response.isCorrect),
+            correctAnswer: response.correctAnswer ?? response.correctAnswers ?? null,
+            timeSpentSeconds: response.timeSpentSeconds != null ? Number(response.timeSpentSeconds) : null,
+          })),
+        };
+      }
+
+      if (input.kind === "lesson") {
+        const [attemptRows] = await db.execute(sql`
+          SELECT a.id, a.score, a.passed, a.created_at AS submittedAt,
+            c.title AS courseTitle, l.title AS lessonTitle
+          FROM lms_quiz_attempts a
+          LEFT JOIN lms_courses c ON c.id = a.course_id
+          LEFT JOIN lms_lessons l ON l.id = a.lesson_id
+          WHERE a.id = ${input.attemptId} AND a.user_id = ${input.userId}
+          LIMIT 1
+        `);
+        const attempt = (attemptRows as any[])[0];
+        if (!attempt) throw new TRPCError({ code: "NOT_FOUND", message: "Quiz attempt not found for this member" });
+
+        const [responseRows] = await db.execute(sql`
+          SELECT id, question_id AS questionId, question_text AS questionText,
+            question_type AS questionType, answer_value AS answerValue,
+            is_correct AS isCorrect, correct_answer AS correctAnswer
+          FROM lms_quiz_attempt_answers
+          WHERE attempt_id = ${input.attemptId}
+          ORDER BY id ASC
+        `);
+
+        return {
+          kind: input.kind,
+          title: `${String(attempt.courseTitle ?? "Course")} · ${String(attempt.lessonTitle ?? "Lesson")}`,
+          score: attempt.score != null ? Number(attempt.score) : null,
+          passed: attempt.passed == null ? null : Boolean(attempt.passed),
+          submittedAt: attempt.submittedAt,
+          responses: (responseRows as any[]).map((response) => ({
+            id: Number(response.id),
+            questionId: Number(response.questionId),
+            questionText: String(response.questionText ?? `Question #${response.questionId}`),
+            questionType: String(response.questionType ?? "unknown"),
+            options: null,
+            answerValue: response.answerValue ?? null,
+            isCorrect: response.isCorrect == null ? null : Boolean(response.isCorrect),
+            correctAnswer: response.correctAnswer ?? null,
+            timeSpentSeconds: null,
+          })),
+        };
+      }
+
+      const [attemptRows] = await db.execute(sql`
+        SELECT a.id, a.score, a.passed, a.submitted_at AS submittedAt,
+          c.title AS courseTitle, l.title AS lessonTitle
+        FROM lms_inline_quiz_attempts a
+        LEFT JOIN lms_courses c ON c.id = a.course_id
+        LEFT JOIN lms_lessons l ON l.id = a.lesson_id
+        WHERE a.id = ${input.attemptId} AND a.user_id = ${input.userId}
+        LIMIT 1
+      `);
+      const attempt = (attemptRows as any[])[0];
+      if (!attempt) throw new TRPCError({ code: "NOT_FOUND", message: "Quiz attempt not found for this member" });
+
+      const [responseRows] = await db.execute(sql`
+        SELECT id, question_key AS questionKey, question_text AS questionText,
+          question_type AS questionType, answer_value AS answerValue
+        FROM lms_inline_quiz_responses
+        WHERE attempt_id = ${input.attemptId}
+        ORDER BY id ASC
+      `);
+
+      return {
+        kind: input.kind,
+        title: `${String(attempt.courseTitle ?? "Course")} · ${String(attempt.lessonTitle ?? "Lesson")}`,
+        score: attempt.score != null ? Number(attempt.score) : null,
+        passed: attempt.passed == null ? null : Boolean(attempt.passed),
+        submittedAt: attempt.submittedAt,
+        responses: (responseRows as any[]).map((response) => ({
+          id: Number(response.id),
+          questionId: String(response.questionKey),
+          questionText: String(response.questionText ?? "Question"),
+          questionType: String(response.questionType ?? "unknown"),
+          options: null,
+          answerValue: response.answerValue ?? null,
+          isCorrect: null,
+          correctAnswer: null,
+          timeSpentSeconds: null,
         })),
       };
     }),

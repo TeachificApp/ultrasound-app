@@ -28,6 +28,16 @@ async function assertAdmin(ctx: any) {
   if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
 }
 
+/**
+ * Drizzle's MySQL execute adapter returns either rows or the mysql2
+ * `[rows, fields]` tuple. Product analytics must always expose the actual row
+ * collection—not the tuple's metadata array—as purchaser records.
+ */
+export function extractExecuteRows(result: unknown): any[] {
+  if (Array.isArray(result) && Array.isArray(result[0])) return result[0] as any[];
+  return Array.isArray(result) ? result as any[] : [];
+}
+
 export const productAnalyticsRouter = router({
   /**
    * Get all products across all types with purchase counts
@@ -229,6 +239,7 @@ export const productAnalyticsRouter = router({
               COALESCE(dp.amount, 0) AS amountPaid, COALESCE(dp.currency, 'usd') AS currency,
               CASE
                 WHEN COALESCE(dp.amount, 0) > 0 AND dp.status IN ('open', 'expired') THEN 'paid'
+                WHEN COALESCE(dp.amount, 0) = 0 THEN 'included'
                 ELSE dp.status
               END AS status,
               dp.stripe_payment_intent_id AS stripePaymentIntentId,
@@ -293,8 +304,7 @@ export const productAnalyticsRouter = router({
           break;
       }
 
-      const result = await db.execute(queryStr) as any;
-      const rows = Array.isArray(result) ? result : (result as any)[0] ?? [];
+      const rows = extractExecuteRows(await db.execute(queryStr));
 
       // Get total count
       let countQuery: any;
@@ -321,9 +331,8 @@ export const productAnalyticsRouter = router({
           countQuery = sql`SELECT COUNT(*) AS total FROM funnel_purchases WHERE source_funnel_id = ${input.productId}`;
           break;
       }
-      const countResult = await db.execute(countQuery) as any;
-      const countRows = Array.isArray(countResult) ? countResult[0] : (countResult as any)[0] ?? [];
-      const countSummary = Array.isArray(countRows) ? countRows[0] : countRows;
+      const countRows = extractExecuteRows(await db.execute(countQuery));
+      const countSummary = countRows[0] ?? {};
       const total = Number(countSummary?.total ?? 0);
       const totalPaid = Number(countSummary?.totalPaid ?? 0);
 
@@ -348,8 +357,7 @@ export const productAnalyticsRouter = router({
       }
       let totalRevenue = 0;
       if (revenueQuery) {
-        const revResult = await db.execute(revenueQuery) as any;
-        const revRows = Array.isArray(revResult) ? revResult : (revResult as any)[0] ?? [];
+        const revRows = extractExecuteRows(await db.execute(revenueQuery));
         totalRevenue = Number(revRows[0]?.rev ?? 0);
       }
 

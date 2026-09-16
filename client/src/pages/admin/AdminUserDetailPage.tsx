@@ -7,7 +7,7 @@
  * Actions: enroll, unenroll, grant/revoke membership, cancel sub, refund, issue/remove cert, change role
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRoute, useLocation, useSearch } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -504,7 +504,43 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
 // ─── Content Tab ──────────────────────────────────────────────────────────────
 type ContentSubTab = "courses" | "cohorts" | "quizzes" | "downloads" | "workshops" | "webinars" | "products" | "bundles" | "memberships" | "communities";
 
-function MemberQuizResults({ results }: { results: any }) {
+function parseStoredResponse(value: unknown, options: unknown): string {
+  if (value == null || value === "") return "No response recorded";
+
+  let parsed: unknown = value;
+  try {
+    parsed = typeof value === "string" ? JSON.parse(value) : value;
+  } catch {
+    return String(value);
+  }
+
+  let parsedOptions: unknown[] = [];
+  try {
+    parsedOptions = Array.isArray(options) ? options : (typeof options === "string" ? JSON.parse(options) : []);
+  } catch {
+    parsedOptions = [];
+  }
+
+  const optionLabel = (selection: unknown): string => {
+    if (typeof selection === "number" || (typeof selection === "string" && /^\d+$/.test(selection))) {
+      const candidate = parsedOptions[Number(selection)];
+      if (typeof candidate === "string") return candidate;
+      if (candidate && typeof candidate === "object" && "text" in candidate) return String((candidate as { text?: unknown }).text ?? selection);
+    }
+    if (selection && typeof selection === "object" && "text" in selection) return String((selection as { text?: unknown }).text ?? "");
+    return String(selection ?? "");
+  };
+
+  if (Array.isArray(parsed)) return parsed.map(optionLabel).filter(Boolean).join(", ") || "No response recorded";
+  if (parsed && typeof parsed === "object") {
+    const pairs = Object.entries(parsed as Record<string, unknown>).map(([key, selected]) => `${key}: ${optionLabel(selected)}`);
+    return pairs.join("; ") || "No response recorded";
+  }
+  return optionLabel(parsed) || "No response recorded";
+}
+
+function MemberQuizResults({ userId, results }: { userId: number; results: any }) {
+  const [selectedResult, setSelectedResult] = useState<any | null>(null);
   const standalone = results?.standalone ?? [];
   const lesson = results?.lesson ?? [];
   const inline = results?.inline ?? [];
@@ -516,42 +552,97 @@ function MemberQuizResults({ results }: { results: any }) {
 
   if (allResults.length === 0) return null;
 
+  const detailInput = useMemo(() => selectedResult
+    ? { userId, attemptId: Number(selectedResult.id), kind: selectedResult.kind as "standalone" | "lesson" | "inline" }
+    : { userId, attemptId: 0, kind: "standalone" as const }, [selectedResult, userId]);
+  const attemptDetail = trpc.adminUser.getMemberQuizAttemptDetail.useQuery(detailInput, {
+    enabled: selectedResult !== null,
+  });
+
   return (
-    <section className="space-y-3 border-t border-gray-100 pt-5">
-      <div>
-        <h3 className="text-sm font-semibold text-gray-800">Administrator quiz results</h3>
-        <p className="mt-0.5 text-xs text-gray-500">Standalone, lesson, and survey submissions are visible here only to authorized administrators.</p>
-      </div>
-      <div className="space-y-2">
-        {allResults.map((result: any) => {
-          const isSurvey = result.kind === "inline";
-          return (
-            <div key={`${result.kind}-${result.id}`} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full border border-teal-100 bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700">{result.label}</span>
-                  {isSurvey ? (
-                    <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Submitted</span>
-                  ) : result.passed ? (
-                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Passed</span>
-                  ) : (
-                    <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Completed</span>
-                  )}
+    <>
+      <section className="space-y-3 border-t border-gray-100 pt-5">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">Administrator quiz results</h3>
+          <p className="mt-0.5 text-xs text-gray-500">Standalone, lesson, and survey submissions are visible here only to authorized administrators. Open any result to review the stored response for each question.</p>
+        </div>
+        <div className="space-y-2">
+          {allResults.map((result: any) => {
+            const isSurvey = result.kind === "inline";
+            return (
+              <div key={`${result.kind}-${result.id}`} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-teal-100 bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-700">{result.label}</span>
+                    {isSurvey ? (
+                      <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Submitted</span>
+                    ) : result.passed ? (
+                      <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Passed</span>
+                    ) : (
+                      <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Completed</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm font-medium text-gray-800">{result.detail}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {isSurvey
+                      ? `${result.responseCount ?? 0} response${result.responseCount === 1 ? "" : "s"}`
+                      : `${result.correctAnswers ?? 0}/${result.totalQuestions ?? 0} correct${result.attemptNumber ? ` · Attempt ${result.attemptNumber}` : ""}`}
+                    {result.submittedAt ? ` · ${formatDate(result.submittedAt)}` : ""}
+                  </p>
                 </div>
-                <p className="mt-1 text-sm font-medium text-gray-800">{result.detail}</p>
-                <p className="mt-0.5 text-xs text-gray-500">
-                  {isSurvey
-                    ? `${result.responseCount ?? 0} response${result.responseCount === 1 ? "" : "s"}`
-                    : `${result.correctAnswers ?? 0}/${result.totalQuestions ?? 0} correct${result.attemptNumber ? ` · Attempt ${result.attemptNumber}` : ""}`}
-                  {result.submittedAt ? ` · ${formatDate(result.submittedAt)}` : ""}
-                </p>
+                <div className="flex items-center gap-3">
+                  {!isSurvey && result.score != null ? <p className="text-lg font-bold text-[#0e4a50]">{Number(result.score).toFixed(1).replace(/\.0$/, "")}%</p> : null}
+                  <Button size="sm" variant="outline" onClick={() => setSelectedResult(result)} className="border-teal-200 text-teal-700 hover:bg-teal-50">
+                    <Eye className="mr-1.5 h-3.5 w-3.5" /> View responses
+                  </Button>
+                </div>
               </div>
-              {!isSurvey && result.score != null ? <p className="text-lg font-bold text-[#0e4a50]">{Number(result.score).toFixed(1).replace(/\.0$/, "")}%</p> : null}
+            );
+          })}
+        </div>
+      </section>
+
+      <Dialog open={selectedResult !== null} onOpenChange={(open) => { if (!open) setSelectedResult(null); }}>
+        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Question-by-question responses</DialogTitle>
+            <DialogDescription>{attemptDetail.data?.title ?? selectedResult?.detail ?? "Loading selected attempt…"}</DialogDescription>
+          </DialogHeader>
+          {attemptDetail.isLoading ? (
+            <div className="flex items-center justify-center py-10 text-sm text-gray-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading recorded responses…</div>
+          ) : attemptDetail.error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">Unable to load the recorded responses for this attempt.</div>
+          ) : attemptDetail.data?.responses?.length ? (
+            <div className="space-y-3">
+              {attemptDetail.data.responses.map((response: any, index: number) => (
+                <article key={response.id} className="rounded-xl border border-gray-200 bg-gray-50/60 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <p className="font-medium text-gray-800">{index + 1}. {response.questionText}</p>
+                    {attemptDetail.data?.kind === "inline" ? (
+                      <span className="rounded-full border border-sky-100 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Response recorded</span>
+                    ) : response.isCorrect === true ? (
+                      <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Correct</span>
+                    ) : response.isCorrect === false ? (
+                      <span className="rounded-full border border-red-100 bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">Incorrect</span>
+                    ) : (
+                      <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-gray-600">Response recorded</span>
+                    )}
+                  </div>
+                  <div className="mt-3 rounded-lg border border-teal-100 bg-white px-3 py-2 text-sm text-gray-700">
+                    <span className="font-semibold text-teal-800">Student response: </span>{parseStoredResponse(response.answerValue, response.options)}
+                  </div>
+                  {attemptDetail.data?.kind !== "inline" && response.isCorrect === false && response.correctAnswer ? (
+                    <p className="mt-2 text-xs text-gray-600"><span className="font-semibold">Correct answer: </span>{parseStoredResponse(response.correctAnswer, response.options)}</p>
+                  ) : null}
+                </article>
+              ))}
             </div>
-          );
-        })}
-      </div>
-    </section>
+          ) : (
+            <p className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">No question-by-question response rows were stored for this attempt.</p>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -669,7 +760,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const enrollments = data.enrollments ?? [];
   const courses   = enrollments.filter((e: any) => !e.isQuiz && !e.isDownload && e.courseType !== 'cohort');
   const cohorts   = enrollments.filter((e: any) => e.courseType === 'cohort');
-  const quizzes   = enrollments.filter((e: any) => e.isQuiz);
+  const quizzes   = enrollments.filter((e: any) => e.isQuiz || e.hasQuizContent);
   const downloads = enrollments.filter((e: any) => e.isDownload);
   const quizResults = data.quizResults ?? { standalone: [], lesson: [], inline: [] };
   const quizResultCount = (quizResults.standalone?.length ?? 0) + (quizResults.lesson?.length ?? 0) + (quizResults.inline?.length ?? 0);
@@ -1014,7 +1105,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
             }
           />
           {quizzes.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No standalone quiz enrollments.</p>
+            <p className="text-sm text-gray-400 text-center py-8">No quiz-course access or lesson-quiz course access.</p>
           ) : (
             quizzes.map((e: any) => (
               <div key={e.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex gap-4 items-start">
@@ -1035,6 +1126,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">Enrolled {formatDate(e.enrolledAt)}</p>
+                  <p className="mt-0.5 text-xs font-medium text-teal-700">{e.isQuiz ? "Quiz-course access" : "Course access with lesson quiz"}</p>
                   {e.accessExpiresAt && (() => {
                     const exp = new Date(e.accessExpiresAt);
                     const daysLeft = Math.ceil((exp.getTime() - Date.now()) / 86400000);
@@ -1157,7 +1249,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               </div>
             ))
           )}
-          <MemberQuizResults results={quizResults} />
+          <MemberQuizResults userId={userId} results={quizResults} />
         </div>
       )}
 
