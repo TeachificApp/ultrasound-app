@@ -15,6 +15,7 @@
 import { getDb } from "../db";
 import { ipAccessLogs, sharingAbuseFlags, users } from "../../drizzle/schema";
 import { eq, and, gte, sql, desc, inArray } from "drizzle-orm";
+import { enrichIpAccessLocation } from "../lib/ipLocation";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ export async function logIpAccess(opts: {
       contentType: opts.contentType,
       contentId: opts.contentId || null,
     });
+    void enrichIpAccessLocation(opts.ipAddress);
   } catch (err) {
     console.error("[SharingMonitor] Failed to log IP access:", err);
   }

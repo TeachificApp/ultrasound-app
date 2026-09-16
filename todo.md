@@ -546,3 +546,7 @@
 - [x] Add focused authorization, response-detail accuracy, survey-response, and quiz-course-access regressions without exposing learner responses or content access to unauthorized users.
 - [x] Trace and repair the live LMS Download Students and Analytics query path that still returns unnamed $0.00 access-holder rows instead of paid purchaser identity and confirmed stored-cent revenue; preserve nonfinancial access records separately and send no email.
 - [x] Add a focused deployed-contract regression that distinguishes paid download purchasers from silent/zero-cost access holders and verifies student identity and cents-correct totals in both LMS Download Students and Analytics views.
+- [x] Inventory every brand-specific tool and destination, then ensure each resolves from the current selected All About Ultrasound or iHeartEcho brand rather than defaulting to All About Ultrasound.
+- [x] Add focused cross-brand routing, title, label, and data-context regressions for Challenge Cards and every other brand-specific tool without changing user content or brand access records.
+- [x] Show complete available IP-location fields and provide a protected export of recorded IP access logs for authorized administrators, preserving existing privacy and security boundaries.
+- [x] Add focused authorization, privacy, field-format, and CSV export regressions for IP-access logs without changing existing access, login, or security records.

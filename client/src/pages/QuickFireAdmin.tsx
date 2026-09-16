@@ -100,7 +100,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
-import { perBrandUserPath } from "@/lib/perBrandUrls";
+import { perBrandUserUrl } from "@/lib/perBrandUrls";
 import { detectBrandFromPath, getBrandCategoryConfig, AAUS_QUESTION_CATEGORIES, IHE_QUESTION_CATEGORIES } from "@shared/quickfireCategories";
 
 const TYPE_META = {
@@ -1234,7 +1234,7 @@ export default function QuickFireAdmin() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate(perBrandUserPath("/quickfire", adminBrand))} className="text-gray-400 hover:text-[#189aa1]">
+            <button onClick={() => window.location.assign(perBrandUserUrl("/quickfire", adminBrand))} className="text-gray-400 hover:text-[#189aa1]">
               <ChevronLeft className="w-5 h-5" />
             </button>
             <div>

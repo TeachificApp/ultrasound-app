@@ -3985,6 +3985,18 @@ export const ipAccessLogs = mysqlTable("ip_access_logs", {
   userAgent: text("user_agent"),
   contentType: mysqlEnum("content_type", ["course", "download", "paid_content"]).notNull(),
   contentId: int("content_id"), // course_id, product_id, etc.
+  geoLookupStatus: varchar("geo_lookup_status", { length: 16 }),
+  geoCountry: varchar("geo_country", { length: 96 }),
+  geoRegion: varchar("geo_region", { length: 128 }),
+  geoCity: varchar("geo_city", { length: 128 }),
+  geoPostalCode: varchar("geo_postal_code", { length: 32 }),
+  geoLatitude: decimal("geo_latitude", { precision: 10, scale: 7 }),
+  geoLongitude: decimal("geo_longitude", { precision: 10, scale: 7 }),
+  geoTimezone: varchar("geo_timezone", { length: 128 }),
+  geoIsp: varchar("geo_isp", { length: 255 }),
+  geoOrganization: varchar("geo_organization", { length: 255 }),
+  geoAsn: varchar("geo_asn", { length: 32 }),
+  geoResolvedAt: timestamp("geo_resolved_at"),
   accessedAt: timestamp("accessed_at").defaultNow().notNull(),
 });
 export type IpAccessLog = typeof ipAccessLogs.$inferSelect;

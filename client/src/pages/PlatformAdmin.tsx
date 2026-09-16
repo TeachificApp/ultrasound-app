@@ -1747,10 +1747,10 @@ export default function PlatformAdmin() {
 
   // IHE-only tool cards
   const IHE_ONLY_TOOLS_DEFAULT: ToolCard[] = [
-    { id: "engagement", href: getAdminUrl("/admin/engagement"), icon: BarChart2, label: "Engagement Dashboard", description: "iHeartEcho engagement metrics and analytics", color: "#be185d" },
-    { id: "image-quality", href: "/image-quality-review", icon: Image, label: "Image Quality Review", description: "Review and rate echo image quality submissions", color: "#0891b2" },
-    { id: "diy-accreditation-admin", href: getAdminUrl("/admin/diy-accreditation"), icon: Award, label: "DIY Accreditation Admin", description: "Hub for all DIY Accreditation tools: navigator, forms, org management, lab admin", color: "#0891b2" },
-    { id: "form-builder", href: getAdminUrl("/admin/form-builder"), icon: ClipboardList, label: "DIY Accreditation Forms", description: "Build accreditation review forms for DIY organizations", color: "#0891b2" },
+    { id: "engagement", href: perBrandAdminUrl("/admin/engagement", "iheartecho"), icon: BarChart2, label: "Engagement Dashboard", description: "iHeartEcho engagement metrics and analytics", color: "#be185d" },
+    { id: "image-quality", href: perBrandAdminUrl("/image-quality-review", "iheartecho"), icon: Image, label: "Image Quality Review", description: "Review and rate echo image quality submissions", color: "#0891b2" },
+    { id: "diy-accreditation-admin", href: perBrandAdminUrl("/admin/diy-accreditation", "iheartecho"), icon: Award, label: "DIY Accreditation Admin", description: "Hub for all DIY Accreditation tools: navigator, forms, org management, lab admin", color: "#0891b2" },
+    { id: "form-builder", href: perBrandAdminUrl("/admin/form-builder", "iheartecho"), icon: ClipboardList, label: "DIY Accreditation Forms", description: "Build accreditation review forms for DIY organizations", color: "#0891b2" },
   ];
 
   const [dualToolOrder, setDualToolOrder] = useState<string[]>(() => DUAL_TOOLS_DEFAULT.map(t => t.id));

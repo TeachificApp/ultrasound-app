@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import {
   ChevronLeft, Shield, AlertTriangle, CheckCircle, XCircle, Eye, RefreshCw,
-  Mail, Download, User, Clock, Monitor, ChevronRight, X, Ban, Unlock, Pencil,
+  Mail, Download, User, Clock, Monitor, MapPin, ChevronRight, X, Ban, Unlock, Pencil,
   BookOpen, ChevronDown, ChevronUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,23 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 type FlagStatus = "flagged" | "confirmed" | "dismissed" | "warned" | "all";
+
+function formatIpLocation(record: any): string {
+  const locality = [record.geoCity ?? record.city, record.geoRegion ?? record.region, record.geoCountry ?? record.country]
+    .filter(Boolean)
+    .join(", ");
+  const postal = record.geoPostalCode ?? record.postalCode;
+  return [locality, postal].filter(Boolean).join(" · ") || "Location not resolved";
+}
+
+function formatIpNetwork(record: any): string {
+  const coordinates = (record.geoLatitude ?? record.latitude) != null && (record.geoLongitude ?? record.longitude) != null
+    ? `${record.geoLatitude ?? record.latitude}, ${record.geoLongitude ?? record.longitude}`
+    : null;
+  return [record.geoTimezone ?? record.timezone, record.geoIsp ?? record.isp, record.geoOrganization ?? record.organization, record.geoAsn ?? record.asn, coordinates]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 // ─── Email Preview/Edit Modal ─────────────────────────────────────────────────
 function EmailPreviewModal({
@@ -174,6 +191,13 @@ function StudentDetailPanel({
     { userId, days: 30 },
     { enabled: false }
   );
+  const resolveLocations = trpc.sharingMonitor.resolveUserIpLocations.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Location lookup completed for ${data.resolved + data.unavailable + data.private} IP address${data.attempted === 1 ? "" : "es"}.`);
+      detail.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const sendAlert = trpc.sharingMonitor.sendStudentAlert.useMutation({
     onSuccess: (data) => {
       toast.success(`Alert email sent to ${data.sentTo}`);
@@ -597,16 +621,28 @@ function StudentDetailPanel({
                     <CardTitle className="text-base flex items-center gap-2">
                       <Monitor className="w-4 h-4 text-teal-700" /> IP Address Summary (Last 30 Days)
                     </CardTitle>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 text-xs"
-                      onClick={handleExport}
-                      disabled={exportLogs.isFetching}
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      {exportLogs.isFetching ? "Exporting…" : "Export CSV"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 text-xs"
+                        onClick={() => resolveLocations.mutate({ userId })}
+                        disabled={resolveLocations.isPending}
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        {resolveLocations.isPending ? "Resolving…" : "Resolve missing locations"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 text-xs"
+                        onClick={handleExport}
+                        disabled={exportLogs.isFetching}
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        {exportLogs.isFetching ? "Exporting…" : "Export CSV"}
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -615,12 +651,18 @@ function StudentDetailPanel({
                   ) : (
                     <div className="space-y-1.5">
                       {ipSummary.map((ip: any) => (
-                        <div key={ip.ip} className="flex items-center justify-between bg-gray-50 rounded px-3 py-2 text-sm">
-                          <span className="font-mono text-gray-800">{ip.ip}</span>
-                          <div className="flex gap-4 text-xs text-gray-500">
-                            <span className="font-medium text-gray-700">{ip.count} accesses</span>
-                            <span>First: {new Date(ip.firstSeen).toLocaleDateString()}</span>
-                            <span>Last: {new Date(ip.lastSeen).toLocaleDateString()}</span>
+                        <div key={ip.ip} className="bg-gray-50 rounded px-3 py-2 text-sm">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <span className="font-mono text-gray-800">{ip.ip}</span>
+                              <p className="mt-0.5 flex items-center gap-1 text-xs text-gray-500"><MapPin className="h-3 w-3" /> {formatIpLocation(ip)}</p>
+                              {formatIpNetwork(ip) && <p className="mt-0.5 text-[11px] text-gray-400 break-words">{formatIpNetwork(ip)}</p>}
+                            </div>
+                            <div className="flex shrink-0 gap-4 text-xs text-gray-500">
+                              <span className="font-medium text-gray-700">{ip.count} accesses</span>
+                              <span>First: {new Date(ip.firstSeen).toLocaleDateString()}</span>
+                              <span>Last: {new Date(ip.lastSeen).toLocaleDateString()}</span>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -642,13 +684,17 @@ function StudentDetailPanel({
                   ) : (
                     <div className="max-h-72 overflow-y-auto space-y-1">
                       {logs.map((log: any) => (
-                        <div key={log.id} className="flex items-center gap-3 text-xs bg-gray-50 rounded px-3 py-1.5">
-                          <span className="font-mono text-gray-700 w-32 shrink-0">{log.ipAddress}</span>
-                          <Badge variant="outline" className="text-[10px] shrink-0">{log.contentType}</Badge>
-                          <span className="text-gray-500 shrink-0">{new Date(log.accessedAt).toLocaleString()}</span>
-                          {log.userAgent && (
-                            <span className="text-gray-400 truncate hidden md:block">{log.userAgent.slice(0, 60)}</span>
-                          )}
+                        <div key={log.id} className="text-xs bg-gray-50 rounded px-3 py-1.5">
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-gray-700 w-32 shrink-0">{log.ipAddress}</span>
+                            <Badge variant="outline" className="text-[10px] shrink-0">{log.contentType}</Badge>
+                            <span className="text-gray-500 shrink-0">{new Date(log.accessedAt).toLocaleString()}</span>
+                            {log.userAgent && <span className="text-gray-400 truncate hidden md:block">{log.userAgent.slice(0, 60)}</span>}
+                          </div>
+                          <div className="ml-[140px] mt-1 text-[11px] text-gray-500">
+                            <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {formatIpLocation(log)}</span>
+                            {formatIpNetwork(log) && <span className="ml-2 text-gray-400">{formatIpNetwork(log)}</span>}
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -11,6 +11,7 @@ import { eq, and, gte, desc, sql, inArray, or } from "drizzle-orm";
 import { runSharingMonitor } from "../jobs/sharingMonitor";
 import { sendEmail } from "../_core/email";
 import { getStripeClient } from "../lib/stripeClient";
+import { enrichMissingUserIpLocations } from "../lib/ipLocation";
 
 const SUPPORT_EMAIL = "support@allaboutultrasound.com";
 const SUPPORT_NAME = "All About Ultrasound Support";
@@ -328,6 +329,17 @@ export const sharingMonitorRouter = router({
           count: sql<number>`COUNT(*)`.as("cnt"),
           firstSeen: sql<string>`MIN(${ipAccessLogs.accessedAt})`.as("first_seen"),
           lastSeen: sql<string>`MAX(${ipAccessLogs.accessedAt})`.as("last_seen"),
+          lookupStatus: sql<string>`MAX(${ipAccessLogs.geoLookupStatus})`.as("geo_lookup_status"),
+          country: sql<string>`MAX(${ipAccessLogs.geoCountry})`.as("geo_country"),
+          region: sql<string>`MAX(${ipAccessLogs.geoRegion})`.as("geo_region"),
+          city: sql<string>`MAX(${ipAccessLogs.geoCity})`.as("geo_city"),
+          postalCode: sql<string>`MAX(${ipAccessLogs.geoPostalCode})`.as("geo_postal_code"),
+          latitude: sql<string>`MAX(${ipAccessLogs.geoLatitude})`.as("geo_latitude"),
+          longitude: sql<string>`MAX(${ipAccessLogs.geoLongitude})`.as("geo_longitude"),
+          timezone: sql<string>`MAX(${ipAccessLogs.geoTimezone})`.as("geo_timezone"),
+          isp: sql<string>`MAX(${ipAccessLogs.geoIsp})`.as("geo_isp"),
+          organization: sql<string>`MAX(${ipAccessLogs.geoOrganization})`.as("geo_organization"),
+          asn: sql<string>`MAX(${ipAccessLogs.geoAsn})`.as("geo_asn"),
         })
         .from(ipAccessLogs)
         .where(and(eq(ipAccessLogs.userId, input.userId), gte(ipAccessLogs.accessedAt, since)))
@@ -385,6 +397,14 @@ export const sharingMonitorRouter = router({
       }
 
       return { user: userRow, flags: allFlags, logs, ipSummary, enrollments, enrollmentIpBreakdown };
+    }),
+
+  /** Resolve up to 25 previously unlocated public IPs for one selected user. */
+  resolveUserIpLocations: protectedProcedure
+    .input(z.object({ userId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      assertAdmin(ctx);
+      return enrichMissingUserIpLocations(input.userId, 25);
     }),
 
   /** Send automated alert email to the student and mark flag as warned */
@@ -491,16 +511,33 @@ export const sharingMonitorRouter = router({
         courses.forEach(c => { courseMap[c.id] = c.title; });
       }
 
-      const header = "Timestamp,IP Address,Content Type,Content ID,Content Title,User Agent";
+      const csvCell = (value: unknown) => {
+        const raw = value == null ? "" : String(value);
+        const protectedValue = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+        return `"${protectedValue.replace(/"/g, "'")}"`;
+      };
+      const header = "Timestamp,IP Address,Content Type,Content ID,Content Title,Country,Region,City,Postal Code,Latitude,Longitude,Timezone,ISP,Organization,ASN,Lookup Status,Location Resolved At,User Agent";
       const rows = logs.map(l =>
         [
           new Date(l.accessedAt).toISOString(),
           l.ipAddress,
           l.contentType,
           l.contentId ?? "",
-          `"${(l.contentId && courseMap[l.contentId] ? courseMap[l.contentId] : "").replace(/"/g, "'")}"`,
-          `"${(l.userAgent ?? "").replace(/"/g, "'")}"`,
-        ].join(",")
+          l.contentId && courseMap[l.contentId] ? courseMap[l.contentId] : "",
+          l.geoCountry,
+          l.geoRegion,
+          l.geoCity,
+          l.geoPostalCode,
+          l.geoLatitude,
+          l.geoLongitude,
+          l.geoTimezone,
+          l.geoIsp,
+          l.geoOrganization,
+          l.geoAsn,
+          l.geoLookupStatus,
+          l.geoResolvedAt ? new Date(l.geoResolvedAt).toISOString() : "",
+          l.userAgent,
+        ].map(csvCell).join(",")
       );
 
       const csv = [header, ...rows].join("\n");

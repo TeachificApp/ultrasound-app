@@ -5,7 +5,7 @@
  */
 import { useRef, useCallback, useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -17,13 +17,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { getBrandToolPresentation, resolveToolBrand, type BrandToolPresentation } from "@/lib/brandToolPresentation";
+import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 
 // Brand palette
 const BRAND = "#189aa1";
 const BRAND_DARK = "#0d3d44";
 const BRAND_AQUA = "#4ad9e0";
-const LOGO_URL =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_teal_f0c966ce.png";
 const HERO_URL_DARK =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/daily-challenge-banner-v3_AAUS_ccb55bf0.webp";
 const HERO_URL_LIGHT = HERO_URL_DARK;
@@ -154,19 +154,6 @@ const LIGHT_THEME: ThemeTokens = {
   aPillColor: BRAND_DARK,
 };
 
-// Required hashtags for all posts
-const REQUIRED_HASHTAGS = [
-  "#AllAboutUltrasound",
-  "#UltrasoundAssist",
-  "#Ultrasound",
-  "#DailyChallenge",
-  "#UltrasoundChallenge",
-  "#Sonography",
-  "#MedicalImaging",
-  "#Sonographer",
-  "#UltrasoundEducation",
-];
-
 // Category-specific hashtag map
 const CATEGORY_HASHTAGS: Record<string, string[]> = {
   "Abdominal": ["#AbdominalUltrasound", "#AbdominalImaging", "#GIUltrasound"],
@@ -199,13 +186,14 @@ function buildSocialPost(
   questionText: string,
   answerText: string | null,
   explanationText: string | null,
+  presentation: BrandToolPresentation,
   options?: string[],
 ): string {
   const cleanQ = stripHtml(questionText);
   const cleanA = answerText ? stripHtml(answerText) : null;
   const cleanE = explanationText ? stripHtml(explanationText) : null;
   const categoryTags = getCategoryHashtags(category);
-  const allHashtags = [...REQUIRED_HASHTAGS, ...categoryTags].join(" ");
+  const allHashtags = [...presentation.socialHashtags, ...categoryTags].join(" ");
   const letters = ["A", "B", "C", "D", "E"];
 
   if (type === "question") {
@@ -213,7 +201,7 @@ function buildSocialPost(
       options && options.length > 0
         ? "\n\n" + options.map((o, i) => `${letters[i]}. ${stripHtml(o)}`).join("\n")
         : "";
-    return `🏆Daily Ultrasound Challenge — ${category}
+    return `🏆${presentation.challengeLabel} — ${category}
 
 Can you answer today's question?
 
@@ -221,17 +209,17 @@ Can you answer today's question?
 
 Drop your answer in the comments below! 👇
 
-Get more challenges and take your place on the leaderboard 🏆 at app.allaboutultrasound.com
+Get more challenges and take your place on the leaderboard 🏆 at ${presentation.appHost}
 
 ${allHashtags}`;
   } else {
     const answerLine = cleanA ? `✅ Answer: ${cleanA}` : "";
     const explanationLine = cleanE ? `\n\n💡 ${cleanE}` : "";
-    return `🏆Daily Ultrasound Challenge — ${category} | ANSWER
+    return `🏆${presentation.challengeLabel} — ${category} | ANSWER
 
 ${answerLine}${explanationLine}
 
-Get more challenges and take your place on the leaderboard 🏆 at app.allaboutultrasound.com
+Get more challenges and take your place on the leaderboard 🏆 at ${presentation.appHost}
 
 ${allHashtags}`;
   }
@@ -315,9 +303,9 @@ async function renderCardToPng(el: HTMLElement): Promise<string> {
 
 // ---- shared card shell ------------------------------------------------------
 
-function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens }) {
+function CardShell({ children, t, presentation }: { children: React.ReactNode; t: ThemeTokens; presentation: BrandToolPresentation }) {
   const isLight = t === LIGHT_THEME;
-  const heroUrl = isLight ? HERO_URL_LIGHT : HERO_URL_DARK;
+  const heroUrl = presentation.brand === "aaus" ? (isLight ? HERO_URL_LIGHT : HERO_URL_DARK) : null;
   return (
     <div
       style={{
@@ -334,7 +322,7 @@ function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens 
         style={{
           position: "absolute",
           inset: 0,
-          backgroundImage: `url("${heroUrl}")`,
+          backgroundImage: heroUrl ? `url("${heroUrl}")` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
           opacity: 1,
@@ -397,7 +385,7 @@ function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens 
 
 // ---- card header ------------------------------------------------------------
 
-function CardHeader({ pill, t }: { pill: "QUESTION" | "ANSWER"; t: ThemeTokens }) {
+function CardHeader({ pill, t, presentation }: { pill: "QUESTION" | "ANSWER"; t: ThemeTokens; presentation: BrandToolPresentation }) {
   const pillBg = pill === "QUESTION" ? t.qPillBg : t.aPillBg;
   const pillBorder = pill === "QUESTION" ? t.qPillBorder : t.aPillBorder;
   const pillColor = pill === "QUESTION" ? t.qPillColor : t.aPillColor;
@@ -423,7 +411,7 @@ function CardHeader({ pill, t }: { pill: "QUESTION" | "ANSWER"; t: ThemeTokens }
             flexShrink: 0,
           }}
         >
-          <img src={LOGO_URL} alt="All About Ultrasound" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={presentation.logoUrl} alt={presentation.displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         <div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
@@ -436,7 +424,7 @@ function CardHeader({ pill, t }: { pill: "QUESTION" | "ANSWER"; t: ThemeTokens }
                 lineHeight: 1,
               }}
             >
-              All About Ultrasound™
+              {presentation.displayName}
             </span>
           </div>
           <div
@@ -449,7 +437,7 @@ function CardHeader({ pill, t }: { pill: "QUESTION" | "ANSWER"; t: ThemeTokens }
               textTransform: "uppercase",
             }}
           >
-            Daily Ultrasound Challenge
+            {presentation.challengeLabel}
           </div>
         </div>
       </div>
@@ -488,7 +476,7 @@ function TealDivider({ t }: { t: ThemeTokens }) {
 
 // ---- card footer ------------------------------------------------------------
 
-function CardFooter({ right, t }: { right?: string; t: ThemeTokens }) {
+function CardFooter({ right, t, presentation }: { right?: string; t: ThemeTokens; presentation: BrandToolPresentation }) {
   return (
     <div
       style={{
@@ -501,7 +489,7 @@ function CardFooter({ right, t }: { right?: string; t: ThemeTokens }) {
       }}
     >
       <div style={{ color: t.footerColor, fontSize: 13, fontWeight: 700, opacity: 0.8, letterSpacing: "0.3px" }}>
-        app.allaboutultrasound.com
+        {presentation.appHost}
       </div>
       {right && (
         <div style={{ color: t.footerRight, fontSize: 12 }}>{right}</div>
@@ -518,19 +506,21 @@ function QuestionCard({
   options,
   qid,
   t,
+  presentation,
 }: {
   challengeTitle: string;
   questionText: string;
   options: string[];
   qid: string | null;
   t: ThemeTokens;
+  presentation: BrandToolPresentation;
 }) {
   const letters = ["A", "B", "C", "D", "E"];
   const cleanQ = stripHtml(questionText);
 
   return (
-    <CardShell t={t}>
-      <CardHeader pill="QUESTION" t={t} />
+    <CardShell t={t} presentation={presentation}>
+      <CardHeader pill="QUESTION" t={t} presentation={presentation} />
 
       <div
         style={{
@@ -606,7 +596,7 @@ function QuestionCard({
         </div>
       )}
 
-      <CardFooter t={t} />
+      <CardFooter t={t} presentation={presentation} />
     </CardShell>
   );
 }
@@ -622,6 +612,7 @@ function AnswerCard({
   reviewAnswer,
   qid,
   t,
+  presentation,
 }: {
   challengeTitle: string;
   questionText: string;
@@ -631,6 +622,7 @@ function AnswerCard({
   reviewAnswer: string | null;
   qid: string | null;
   t: ThemeTokens;
+  presentation: BrandToolPresentation;
 }) {
   const letters = ["A", "B", "C", "D", "E"];
   const answerText =
@@ -641,8 +633,8 @@ function AnswerCard({
       : null;
 
   return (
-    <CardShell t={t}>
-      <CardHeader pill="ANSWER" t={t} />
+    <CardShell t={t} presentation={presentation}>
+      <CardHeader pill="ANSWER" t={t} presentation={presentation} />
 
       <div
         style={{
@@ -723,7 +715,7 @@ function AnswerCard({
         </div>
       )}
 
-      <CardFooter right="Follow for daily ultrasound challenges" t={t} />
+      <CardFooter right={`Follow for daily ${presentation.brand === "iheartecho" ? "echocardiography" : "ultrasound"} challenges`} t={t} presentation={presentation} />
     </CardShell>
   );
 }
@@ -831,6 +823,7 @@ function SocialPostPanel({
   answerText,
   explanationText,
   options,
+  presentation,
 }: {
   type: "question" | "answer";
   category: string;
@@ -839,10 +832,11 @@ function SocialPostPanel({
   answerText: string | null;
   explanationText: string | null;
   options?: string[];
+  presentation: BrandToolPresentation;
 }) {
   const [copied, setCopied] = useState(false);
 
-  const post = buildSocialPost(type, category, challengeTitle, questionText, answerText, explanationText, options);
+  const post = buildSocialPost(type, category, challengeTitle, questionText, answerText, explanationText, presentation, options);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -926,12 +920,14 @@ function CategorySection({
   onAnswerRef,
   theme,
   date,
+  presentation,
 }: {
   item: CategoryItem;
   onQuestionRef: (cat: string, h: DownloadableCardHandle) => void;
   onAnswerRef: (cat: string, h: DownloadableCardHandle) => void;
   theme: CardTheme;
   date: string;
+  presentation: BrandToolPresentation;
 }) {
   const t = theme === "dark" ? DARK_THEME : LIGHT_THEME;
   const { category, challenge, questions } = item;
@@ -988,6 +984,7 @@ function CategorySection({
                 options={options}
                 qid={q.qid}
                 t={t}
+                presentation={presentation}
               />
             </DownloadableCard>
           </div>
@@ -1010,6 +1007,7 @@ function CategorySection({
                 reviewAnswer={q.reviewAnswer}
                 qid={q.qid}
                 t={t}
+                presentation={presentation}
               />
             </DownloadableCard>
           </div>
@@ -1029,6 +1027,7 @@ function CategorySection({
               questionText={q.question}
               answerText={answerText}
               explanationText={explanationText}
+              presentation={presentation}
               options={options}
             />
           </div>
@@ -1044,6 +1043,7 @@ function CategorySection({
               questionText={q.question}
               answerText={answerText}
               explanationText={explanationText}
+              presentation={presentation}
               options={options}
             />
           </div>
@@ -1067,6 +1067,11 @@ function formatDateLabel(dateStr: string): string {
 }
 
 export default function ChallengeCardGenerator() {
+  const [location] = useLocation();
+  const presentation = useMemo(
+    () => getBrandToolPresentation(resolveToolBrand(location, window.location.hostname)),
+    [location],
+  );
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [selectedDate, setSelectedDate] = useState<string>(today);
   const isToday = selectedDate === today;
@@ -1122,14 +1127,14 @@ export default function ChallengeCardGenerator() {
         })
       );
       const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, `ultrasoundassist-${type}-${selectedDate}.zip`);
+      saveAs(blob, `${presentation.brand}-${type}-${selectedDate}.zip`);
     } catch (err) {
       console.error("Batch export failed:", err);
       toast.error("Batch export failed. Please try again.");
     } finally {
       setBatchLoading(null);
     }
-  }, [selectedDate]);
+  }, [presentation.brand, selectedDate]);
 
   // Navigation helpers
   const dates = availableDates ?? [today];
@@ -1162,13 +1167,13 @@ export default function ChallengeCardGenerator() {
       {/* Header */}
       <div style={{ background: "#0e1a24", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
         <div className="max-w-screen-2xl mx-auto px-6 py-3 flex items-center gap-2">
-          <Link href="/platform-admin">
+          <Link href={perBrandAdminUrl("/platform-admin", presentation.brand)}>
             <button className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
               <ArrowLeft className="w-4 h-4 text-white/50" />
             </button>
           </Link>
           <ImageIcon className="w-4 h-4" style={{ color: BRAND_AQUA }} />
-          <h1 className="text-base font-bold text-white">Challenge Card Generator</h1>
+          <h1 className="text-base font-bold text-white">{presentation.displayName} Challenge Card Generator</h1>
           <Badge className="text-[10px] px-1.5 py-0 ml-0.5" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>
             Admin
           </Badge>
@@ -1330,6 +1335,7 @@ export default function ChallengeCardGenerator() {
                   item={item}
                   theme={cardTheme}
                   date={selectedDate}
+                  presentation={presentation}
                   onQuestionRef={(cat, h) => { questionRefs.current[cat] = h; }}
                   onAnswerRef={(cat, h) => { answerRefs.current[cat] = h; }}
                 />

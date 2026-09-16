@@ -7,9 +7,9 @@
  * Both layouts support dark/light themes, PNG download, and ready-to-copy social posts.
  * Image options: None, Abstract AI background, or Upload custom clinical image.
  */
-import { useRef, useCallback, useState, type ChangeEvent } from "react";
+import { useRef, useCallback, useState, useMemo, type ChangeEvent } from "react";
 import { trpc } from "@/lib/trpc";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -22,15 +22,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { getBrandToolPresentation, resolveToolBrand, type BrandToolPresentation } from "@/lib/brandToolPresentation";
+import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 
 // ── Brand palette ────────────────────────────────────────────────────────────
 const BRAND = "#189aa1";
 const BRAND_DARK = "#0d3d44";
 const BRAND_AQUA = "#4ad9e0";
-const LOGO_ICON =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_icon_192_teal_f0c966ce.png";
-const LOGO_RING =
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp";
 
 // ── Theme tokens ─────────────────────────────────────────────────────────────
 type CardTheme = "dark" | "light";
@@ -157,12 +155,12 @@ type GeneratedItem = {
   imageSource?: "abstract" | "upload";
 };
 
-function buildFullSocialPost(item: GeneratedItem): string {
+function buildFullSocialPost(item: GeneratedItem, presentation: BrandToolPresentation): string {
   const catTags = CATEGORY_HASHTAGS[item.category] || [];
-  const allHashtags = [...REQUIRED_HASHTAGS, ...catTags].join(" ");
+  const allHashtags = [...presentation.socialHashtags, ...catTags].join(" ");
   const icon = CONTENT_TYPE_ICONS[item.contentType] || "📸";
   const label = CONTENT_TYPE_LABELS[item.contentType] || item.contentType;
-  return `${icon} ${label} — ${item.category}\n${item.socialCaption}\n🔗 app.allaboutultrasound.com\n${allHashtags}`;
+  return `${icon} ${label} — ${item.category}\n${item.socialCaption}\n🔗 ${presentation.appHost}\n${allHashtags}`;
 }
 
 async function renderCardToPng(el: HTMLElement): Promise<string> {
@@ -184,18 +182,18 @@ function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens 
 }
 
 // ── Branded Header (shared by both layouts) ──────────────────────────────────
-function BrandedHeader({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
+function BrandedHeader({ item, t, presentation }: { item: GeneratedItem; t: ThemeTokens; presentation: BrandToolPresentation }) {
   const icon = CONTENT_TYPE_ICONS[item.contentType] || "📸";
   const label = CONTENT_TYPE_LABELS[item.contentType] || item.contentType;
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "36px 48px 24px 48px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
         <div style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden", border: `3px solid ${BRAND}88`, boxShadow: `0 0 20px ${BRAND}44`, flexShrink: 0 }}>
-          <img src={LOGO_RING} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+          <img src={presentation.logoUrl} alt={presentation.displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
         </div>
         <div>
           <div style={{ color: t.headingColor, fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.1 }}>
-            All About Ultrasound™
+            {presentation.displayName}
           </div>
           <div style={{ color: BRAND, fontSize: 13, fontWeight: 700, marginTop: 4, letterSpacing: "1.2px", textTransform: "uppercase" }}>
             {item.category}
@@ -210,7 +208,7 @@ function BrandedHeader({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
 }
 
 // ── Branded Footer (shared by both layouts) ──────────────────────────────────
-function BrandedFooter({ t }: { t: ThemeTokens }) {
+function BrandedFooter({ t, presentation }: { t: ThemeTokens; presentation: BrandToolPresentation }) {
   return (
     <div style={{ marginTop: "auto" }}>
       {/* Tagline banner */}
@@ -224,10 +222,10 @@ function BrandedFooter({ t }: { t: ThemeTokens }) {
       {/* URL bar */}
       <div style={{ background: t.isDark ? "#060e14" : "#d0eced", padding: "10px 48px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ color: BRAND, fontSize: 13, fontWeight: 700, letterSpacing: "0.3px" }}>
-          app.allaboutultrasound.com
+          {presentation.appHost}
         </div>
         <div style={{ color: t.mutedColor, fontSize: 11 }}>
-          Follow for daily ultrasound content
+          Follow for daily {presentation.brand === "iheartecho" ? "echocardiography" : "ultrasound"} content
         </div>
       </div>
     </div>
@@ -235,11 +233,11 @@ function BrandedFooter({ t }: { t: ThemeTokens }) {
 }
 
 // ── Simple Card Layout ───────────────────────────────────────────────────────
-function SimpleContentCard({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
-  const hasImage = !!item.imageUrl;
-  return (
-    <CardShell t={t}>
-      <BrandedHeader item={item} t={t} />
+function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: ThemeTokens; presentation: BrandToolPresentation }) {
+const hasImage = !!item.imageUrl;
+return (
+<CardShell t={t}>
+      <BrandedHeader item={item} t={t} presentation={presentation} />
       {/* Divider */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 48px", marginBottom: 24 }}>
         <div style={{ height: 3, width: 44, borderRadius: 2, background: `linear-gradient(90deg, ${BRAND_AQUA}, ${BRAND})` }} />
@@ -269,13 +267,13 @@ function SimpleContentCard({ item, t }: { item: GeneratedItem; t: ThemeTokens })
           </div>
         )}
       </div>
-      <BrandedFooter t={t} />
+      <BrandedFooter t={t} presentation={presentation} />
     </CardShell>
   );
 }
 
 // ── Infographic Layout ───────────────────────────────────────────────────────
-function InfographicCard({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
+function InfographicCard({ item, t, presentation }: { item: GeneratedItem; t: ThemeTokens; presentation: BrandToolPresentation }) {
   const hasImage = !!item.imageUrl;
   // Split body text into bullet points for the infographic
   const bodyLines = item.body.split(/[.!?]+/).filter((s) => s.trim().length > 5).slice(0, 5);
@@ -288,15 +286,15 @@ function InfographicCard({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
       <div style={{ padding: "36px 48px 0 48px", display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{ width: 80, height: 80, borderRadius: "50%", overflow: "hidden", border: `3px solid ${BRAND}88`, boxShadow: `0 0 24px ${BRAND}44`, flexShrink: 0 }}>
-            <img src={LOGO_RING} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+            <img src={presentation.logoUrl} alt={presentation.displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
           </div>
         </div>
         <div style={{ textAlign: "center", flex: 1 }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: t.mutedColor, letterSpacing: "3px", textTransform: "uppercase" }}>
-            ALL ABOUT
+            {presentation.shortName.toUpperCase()}
           </div>
           <div style={{ fontSize: 48, fontWeight: 900, color: BRAND, letterSpacing: "-1px", lineHeight: 1.1 }}>
-            ULTRASOUND™
+            {presentation.brand === "iheartecho" ? "ECHOCARDIOGRAPHY" : "ULTRASOUND™"}
           </div>
           <div style={{ fontSize: 16, fontWeight: 600, color: t.mutedColor, letterSpacing: "2px", marginTop: 4 }}>
             — on —
@@ -394,7 +392,7 @@ function InfographicCard({ item, t }: { item: GeneratedItem; t: ThemeTokens }) {
       )}
       {/* Spacer */}
       <div style={{ height: 16 }} />
-      <BrandedFooter t={t} />
+      <BrandedFooter t={t} presentation={presentation} />
     </CardShell>
   );
 }
@@ -444,9 +442,9 @@ function DownloadableCard({ filename, children, onRef }: { filename: string; chi
 }
 
 // ── Social Post Panel ────────────────────────────────────────────────────────
-function SocialPostPanel({ item }: { item: GeneratedItem }) {
+function SocialPostPanel({ item, presentation }: { item: GeneratedItem; presentation: BrandToolPresentation }) {
   const [copied, setCopied] = useState(false);
-  const post = buildFullSocialPost(item);
+  const post = buildFullSocialPost(item, presentation);
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(post);
@@ -564,6 +562,11 @@ const IMAGE_STYLE_HINTS = [
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 export default function SocialContentGenerator() {
+  const [location] = useLocation();
+  const presentation = useMemo(
+    () => getBrandToolPresentation(resolveToolBrand(location, window.location.hostname)),
+    [location],
+  );
   const [contentType, setContentType] = useState<string>("meme");
   const [category, setCategory] = useState<string>("General Ultrasound");
   const [customTopic, setCustomTopic] = useState("");
@@ -644,7 +647,7 @@ export default function SocialContentGenerator() {
         })
       );
       const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, `ultrasoundassist-social-content-${new Date().toISOString().slice(0, 10)}.zip`);
+      saveAs(blob, `${presentation.brand}-social-content-${new Date().toISOString().slice(0, 10)}.zip`);
       toast.success("ZIP downloaded!");
     } catch (err) {
       console.error("Batch export failed:", err);
@@ -652,7 +655,7 @@ export default function SocialContentGenerator() {
     } finally {
       setBatchLoading(false);
     }
-  }, [items]);
+  }, [items, presentation.brand]);
 
   const t = cardTheme === "dark" ? DARK_THEME : LIGHT_THEME;
 
@@ -661,13 +664,13 @@ export default function SocialContentGenerator() {
       {/* Header */}
       <div style={{ background: "#0e1a24", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
         <div className="max-w-screen-2xl mx-auto px-6 py-3 flex items-center gap-2">
-          <Link href="/platform-admin">
+          <Link href={perBrandAdminUrl("/platform-admin", presentation.brand)}>
             <button className="p-1.5 rounded-lg hover:bg-white/10 transition-colors">
               <ArrowLeft className="w-4 h-4 text-white/50" />
             </button>
           </Link>
           <Sparkles className="w-4 h-4" style={{ color: BRAND_AQUA }} />
-          <h1 className="text-base font-bold text-white">Social Content Generator</h1>
+          <h1 className="text-base font-bold text-white">{presentation.displayName} Social Content Generator</h1>
           <Badge className="text-[10px] px-1.5 py-0 ml-0.5" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>Admin</Badge>
           <div className="ml-auto flex items-center gap-2">
             {/* Layout toggle */}
@@ -834,9 +837,9 @@ export default function SocialContentGenerator() {
                   onRef={(handle) => { cardRefs.current[idx] = handle; }}
                 >
                   {layoutMode === "infographic" ? (
-                    <InfographicCard item={item} t={t} />
+                    <InfographicCard item={item} t={t} presentation={presentation} />
                   ) : (
-                    <SimpleContentCard item={item} t={t} />
+                    <SimpleContentCard item={item} t={t} presentation={presentation} />
                   )}
                 </DownloadableCard>
                 {/* Actions panel */}
@@ -847,7 +850,7 @@ export default function SocialContentGenerator() {
                       <Share2 className="w-3 h-3" style={{ color: BRAND_AQUA }} />
                       <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Social Post</span>
                     </div>
-                    <SocialPostPanel item={item} />
+                    <SocialPostPanel item={item} presentation={presentation} />
                   </div>
                   {/* Image controls */}
                   <div className="flex flex-col gap-1.5 mt-1">

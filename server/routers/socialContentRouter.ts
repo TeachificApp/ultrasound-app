@@ -56,8 +56,11 @@ const CATEGORIES = [
 
 type ContentType = (typeof CONTENT_TYPES)[number];
 
-function getSystemPrompt(contentType: ContentType): string {
-  const base = `You are a creative social media content specialist for All About Ultrasound™, a professional education platform for sonographers, physicians, and ultrasound learners. Generate engaging, accurate, and shareable content.`;
+function getSystemPrompt(contentType: ContentType, brand: "aaus" | "iheartecho"): string {
+  const brandContext = brand === "iheartecho"
+    ? "iHeartEcho™, a professional echocardiography education platform for sonographers, physicians, and echo learners"
+    : "All About Ultrasound™, a professional ultrasound education platform for sonographers, physicians, and ultrasound learners";
+  const base = `You are a creative social media content specialist for ${brandContext}. Generate engaging, accurate, and shareable content that fits this selected brand.`;
 
   const typePrompts: Record<ContentType, string> = {
     meme: `${base}
@@ -89,15 +92,18 @@ Generate a brief clinical scenario that presents an interesting ultrasound findi
   return typePrompts[contentType];
 }
 
-function buildUserPrompt(contentType: ContentType, category: string, customTopic?: string): string {
+function buildUserPrompt(contentType: ContentType, category: string, customTopic: string | undefined, brand: "aaus" | "iheartecho"): string {
   const topicContext = customTopic
     ? `Topic focus: ${customTopic}`
     : `Category: ${category}`;
+  const audience = brand === "iheartecho"
+    ? "Echocardiographers, cardiac sonographers, cardiologists, echo fellows, and echo students"
+    : "Sonographers, ultrasound technologists, physicians, radiology residents, and ultrasound students";
 
   return `Generate social media content for the following:
 - Content type: ${contentType.replace(/_/g, " ")}
 - ${topicContext}
-- Target audience: Sonographers, ultrasound technologists, physicians, radiology residents, and ultrasound students
+- Target audience: ${audience}
 
 Return your response as a JSON object with exactly these fields:
 {
@@ -158,7 +164,7 @@ export const socialContentRouter = router({
         imageStyleHint: z.string().max(500).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { contentType, category, customTopic, count, imageMode, imageStyleHint } = input;
 
       const results: Array<{
@@ -176,8 +182,8 @@ export const socialContentRouter = router({
         try {
           const response = await invokeLLM({
             messages: [
-              { role: "system", content: getSystemPrompt(contentType) },
-              { role: "user", content: buildUserPrompt(contentType, category, customTopic) },
+              { role: "system", content: getSystemPrompt(contentType, ctx.brand) },
+              { role: "user", content: buildUserPrompt(contentType, category, customTopic, ctx.brand) },
             ],
             maxTokens: 2000,
           });
