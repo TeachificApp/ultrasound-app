@@ -34,6 +34,8 @@ import {
 import { Plus, Eye, EyeOff, ChevronDown, ChevronRight, Search, RefreshCw, Sparkles, Wand2, ImageOff, RotateCcw, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { AiContentSourceFields, EMPTY_AI_CONTENT_SOURCE_STATE, parseTargetWordCount } from "@/components/admin/AiContentSourceFields";
+import { buildAiSourceMutationPayload, hasAiSourceInput } from "@/lib/aiSourceUpload";
 import {
   BlockTemplateLibraryProvider,
   OpenTemplateLibraryButton,
@@ -1119,6 +1121,7 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
   const [aiBlockTone, setAiBlockTone] = useState<"professional" | "enthusiastic" | "educational" | "urgent" | "friendly">("professional");
   const [aiBlockGenerateImage, setAiBlockGenerateImage] = useState(false);
   const [aiBlockIncludeEmoji, setAiBlockIncludeEmoji] = useState(false);
+  const [aiBlockSources, setAiBlockSources] = useState(() => ({ ...EMPTY_AI_CONTENT_SOURCE_STATE }));
   // Replace image state
   const [replaceImageBlockId, setReplaceImageBlockId] = useState<string | null>(null);
   const [replaceImagePrompt, setReplaceImagePrompt] = useState("");
@@ -1563,7 +1566,7 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
         const currentContent = block.type === "button" ? (block.data?.text ?? "") : (block.data?.html ?? "");
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setAiBlockId(null)}>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-5 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-sm flex items-center gap-2">
                   <Wand2 className="w-4 h-4 text-teal-600" />
@@ -1578,7 +1581,7 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
                 </div>
               )}
               <div>
-                <label className="text-xs font-semibold text-gray-700 block mb-1">Instruction <span className="text-red-400">*</span></label>
+                <label className="text-xs font-semibold text-gray-700 block mb-1">Instruction</label>
                 <textarea
                   autoFocus
                   value={aiBlockInstruction}
@@ -1616,11 +1619,24 @@ function EmailBlockEditorInner({ initialBlocks, onChange, _registerInsert }: Ema
                   </label>
                 </div>
               )}
+              <AiContentSourceFields value={aiBlockSources} onChange={setAiBlockSources} showWordCount={block.type !== "button"} />
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setAiBlockId(null)} className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
                 <button
-                  disabled={!aiBlockInstruction.trim() || aiBlockMutation.isPending}
-                  onClick={() => aiBlockMutation.mutate({ blockId: aiBlockId, blockType: block.type as any, currentHtml: currentContent || undefined, instruction: aiBlockInstruction, tone: aiBlockTone, generateBlockImage: aiBlockGenerateImage, includeEmoji: aiBlockIncludeEmoji })}
+                  disabled={!hasAiSourceInput({ prompt: aiBlockInstruction, ...aiBlockSources }) || aiBlockMutation.isPending}
+                  onClick={() => aiBlockMutation.mutate({
+                    blockId: aiBlockId,
+                    blockType: block.type as any,
+                    currentHtml: currentContent || undefined,
+                    instruction: aiBlockInstruction,
+                    tone: aiBlockTone,
+                    generateBlockImage: aiBlockGenerateImage,
+                    includeEmoji: aiBlockIncludeEmoji,
+                    ...buildAiSourceMutationPayload({
+                      ...aiBlockSources,
+                      targetWordCount: parseTargetWordCount(aiBlockSources.targetWordCount) ?? null,
+                    }),
+                  })}
                   className="px-3 py-1.5 text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-semibold disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {aiBlockMutation.isPending ? <><RefreshCw className="w-3 h-3 animate-spin" />Generating...</> : <><Sparkles className="w-3 h-3" />Regenerate</>}

@@ -443,7 +443,7 @@ export const questionBankRouter = router({
         url: z.string().url(),
         mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
         name: z.string().min(1).max(255),
-      })).min(1).max(3).optional(),
+      })).min(1).max(10).optional(),
       sourceUrl: z.string().url().max(2048).optional(),
     }))
     .mutation(async ({ ctx, input }) => {

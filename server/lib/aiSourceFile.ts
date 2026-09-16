@@ -1,3 +1,5 @@
+import { AI_SOURCE_FILE_MAX_COUNT } from "../../shared/aiContentSources";
+
 export const AI_SOURCE_FILE_MIME_TYPES = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
 export const AI_SOURCE_FILE_MAX_BYTES = 50 * 1024 * 1024;
 export type AiSourceFileMimeType = typeof AI_SOURCE_FILE_MIME_TYPES[number];
@@ -34,7 +36,7 @@ export function getAiSourceUploadDecision(user: { role?: string } | null | undef
 }
 
 export function buildAiSourceMessage(instruction: string, sourceInput?: AiSourceFile | AiSourceFile[]) {
-  const sourceFiles = (Array.isArray(sourceInput) ? sourceInput : sourceInput ? [sourceInput] : []).slice(0, 3);
+  const sourceFiles = (Array.isArray(sourceInput) ? sourceInput : sourceInput ? [sourceInput] : []).slice(0, AI_SOURCE_FILE_MAX_COUNT);
   if (sourceFiles.length === 0) return instruction;
   const fileContext = `\n\nUse the attached source file${sourceFiles.length === 1 ? "" : "s"} (${sourceFiles.map(file => `“${file.name}”`).join(", ")}) as the primary factual source. Do not invent details absent from ${sourceFiles.length === 1 ? "it" : "them"}. ${AI_SOURCE_BLIND_WRITING_RULE} ${instruction}`;
   return [

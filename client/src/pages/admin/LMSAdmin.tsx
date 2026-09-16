@@ -646,8 +646,8 @@ export function CreateCourseDialog({ open, onClose, onCreated, defaultType = "co
   };
 
   const uploadAiSourceFiles = async (files: File[]) => {
-    const acceptedFiles = files.slice(0, Math.max(0, 3 - aiSourceFiles.length));
-    if (files.length > acceptedFiles.length) toast.error("You can use up to three source files per generation.");
+    const acceptedFiles = files.slice(0, Math.max(0, 10 - aiSourceFiles.length));
+    if (files.length > acceptedFiles.length) toast.error("You can use up to ten source files per generation.");
     if (acceptedFiles.some(file => file.size > 50 * 1024 * 1024)) { toast.error("Each source file must be 50 MB or smaller."); return; }
     if (acceptedFiles.length === 0) return;
     setAiSourceUploading(true);
@@ -659,7 +659,7 @@ export function CreateCourseDialog({ open, onClose, onCreated, defaultType = "co
         if (!response.ok || !payload.sourceFile) throw new Error(payload.error || `Could not upload ${file.name}`);
         return payload.sourceFile;
       }));
-      setAiSourceFiles(current => [...current, ...uploaded].slice(0, 3));
+      setAiSourceFiles(current => [...current, ...uploaded].slice(0, 10));
       if (!aiTopics.trim() && acceptedFiles[0]) setAiTopics(acceptedFiles[0].name.replace(/\.[^.]+$/, "").replace(/[-_]/g, " "));
       toast.success(`${uploaded.length} source file${uploaded.length === 1 ? "" : "s"} ready`);
     } catch (error: any) {
