@@ -17,7 +17,7 @@
 import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -26,7 +26,7 @@ import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
 import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail, emailWrapper } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
-import { buildPersistentAccessUrl } from "../lib/enrollmentEmail";
+import { buildPersistentAccessUrl, sendBundleAccessEmail } from "../lib/enrollmentEmail";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
 
 // Stripe webhook secret — optional but strongly recommended in production.
@@ -565,9 +565,30 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
         productId: item.productId,
         stripeCheckoutSessionId: session.id as string,
       });
-      // Send email for each product in the bundle
-      await sendPurchaseConfirmationEmail(userId, item.productId);
     }
+  }
+
+  // Direct bundle purchase: one bundle-level message only. The included
+  // downloads are silent grants, so a customer never receives one email per
+  // item from the same bundle purchase.
+  try {
+    const [[bundle], [user]] = await Promise.all([
+      db.select({ title: digitalBundles.title, slug: digitalBundles.slug })
+        .from(digitalBundles).where(eq(digitalBundles.id, bundleId)).limit(1),
+      db.select({ name: users.name, email: users.email })
+        .from(users).where(eq(users.id, userId)).limit(1),
+    ]);
+    if (bundle && user?.email) {
+      const accessToken = await getOrCreateAccessToken(userId);
+      await sendBundleAccessEmail({
+        to: { name: user.name || user.email.split("@")[0], email: user.email },
+        bundleTitle: bundle.title,
+        bundleSlug: bundle.slug,
+        accessToken,
+      });
+    }
+  } catch (emailErr) {
+    console.error(`[Stripe] Bundle access email failed for bundle ${bundleId}:`, emailErr);
   }
 
   await notifyOwner({

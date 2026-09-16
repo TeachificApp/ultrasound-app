@@ -531,3 +531,8 @@
 - [x] Audit stale pending payment records with read-only provider and application evidence, then request explicit authorization before changing any record or payment state.
 - [x] Add focused payment-status, aggregate-total, transaction-count, and stale-pending regressions without changing payment, enrollment, entitlement, or ledger records during validation.
 - [x] Show unresolved or abandoned checkout records only in authorized administrator member transaction history with a clear non-payment label, while excluding them from all spending, revenue, and transaction-count totals and all learner purchase history.
+- [ ] Diagnose the reported deployment failure for checkpoint 03020f68, isolate whether it is application configuration or deployment-platform related, and apply only a validated deployment-safe correction.
+- [x] Automatically grant an idempotent Free Membership when a member receives any qualifying paid course, product, content, bundle, workshop, webinar, or enrollment access, without changing existing direct membership or purchase records.
+- [x] Suppress individual membership-item access emails and all automatic-Free-Membership welcome/access emails created as a consequence of another purchase or enrollment; retain one membership-level welcome/access email only for direct membership enrollment.
+- [x] Add focused grant-source, idempotency, email-suppression, direct-membership-delivery, and no-email-sent validation coverage without sending messages or modifying member access records during tests.
+- [x] With explicit approval, add only missing active Free Membership subscriptions and their included access to all current user accounts, using duplicate-safe writes and sending no welcome or item-access email.

@@ -27,6 +27,7 @@ import { getDb, getOrCreateAccessToken } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { sendEnrollmentEmail, sendQuizAccessEmail } from "../lib/enrollmentEmail";
+import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { addToAllContacts } from "../lib/emailListHelper";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
@@ -1800,6 +1801,7 @@ CRITICAL REQUIREMENTS:
         .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
       if (existingEnrollment) return { enrollmentId: existingEnrollment.id, alreadyEnrolled: true, isNewUser, userId };
       const [result] = await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId }).$returningId();
+      void ensureFreeMembership(userId, { db });
       // Fire enrollment email asynchronously (non-blocking)
       void (async () => {
         try {

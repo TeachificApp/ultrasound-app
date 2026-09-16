@@ -23,6 +23,7 @@ import { invokeLLM } from "../_core/llm";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import { sendDownloadAccessEmail, sendBundleAccessEmail } from "../lib/enrollmentEmail";
+import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import { addToAllContacts } from "../lib/emailListHelper";
 import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
 
@@ -1666,6 +1667,7 @@ export const downloadsAdminRouter = router({
       if (existingPurchase) return { purchaseId: existingPurchase.id, alreadyGranted: true, isNewUser };
       // Grant access
       const [result] = await db.insert(digitalPurchases).values({ userId, productId: input.productId }).$returningId();
+      void ensureFreeMembership(userId, { db });
       // Send email asynchronously
       void (async () => {
         try {
@@ -1732,6 +1734,7 @@ export const downloadsAdminRouter = router({
       if (existingPurchase) return { purchaseId: existingPurchase.id, alreadyGranted: true, isNewUser };
       // Grant access
       const [result] = await db.insert(digitalBundlePurchases).values({ userId, bundleId: input.bundleId }).$returningId();
+      void ensureFreeMembership(userId, { db });
       // Send email asynchronously
       void (async () => {
         try {

@@ -21,9 +21,12 @@ const FREE_MEMBERSHIP_SLUG = "free";
  * Silently enroll a user in the Free Membership plan.
  * Idempotent — safe to call multiple times. Never sends welcome email.
  */
-export async function ensureFreeMembership(userId: number): Promise<void> {
+export async function ensureFreeMembership(
+  userId: number,
+  options: { db?: any } = {},
+): Promise<void> {
   try {
-    const db = await getDb();
+    const db = options.db ?? await getDb();
     if (!db) return;
 
     // Look up the free plan by slug
@@ -40,7 +43,7 @@ export async function ensureFreeMembership(userId: number): Promise<void> {
 
     // Check if subscription already exists (idempotent)
     const [existingSub] = await db
-      .select({ id: membershipSubscriptions.id })
+      .select({ id: membershipSubscriptions.id, status: membershipSubscriptions.status })
       .from(membershipSubscriptions)
       .where(
         and(
@@ -50,35 +53,49 @@ export async function ensureFreeMembership(userId: number): Promise<void> {
       )
       .limit(1);
 
+    let membershipChanged = false;
     if (existingSub) {
-      // Already enrolled — nothing to do
-      return;
+      // A Free Membership is the baseline benefit. Restore an inactive legacy row
+      // without touching any paid-plan subscription or generating email.
+      if (existingSub.status !== "active") {
+        await db.update(membershipSubscriptions).set({
+          status: "active",
+          cancelAtPeriodEnd: false,
+          currentPeriodEnd: null,
+        }).where(eq(membershipSubscriptions.id, existingSub.id));
+        membershipChanged = true;
+      }
+    } else {
+      await db.insert(membershipSubscriptions).values({
+        planId: plan.id,
+        userId,
+        status: "active",
+        stripeSubscriptionId: null,
+        stripeCustomerId: null,
+        currentPeriodEnd: null,
+        cancelAtPeriodEnd: false,
+      });
+      membershipChanged = true;
     }
 
-    // Insert the subscription row
-    await db.insert(membershipSubscriptions).values({
-      planId: plan.id,
-      userId,
-      status: "active",
-      stripeSubscriptionId: null,
-      stripeCustomerId: null,
-      currentPeriodEnd: null,
-    });
-
-    // Grant plan access items (courses, downloads, etc.) — skipEmail is implicit since
-    // we never call sendMembershipWelcomeEmail from here
+    // Always reconcile the configured access items. This is deliberately data-only:
+    // neither this helper nor fulfillMembershipPlanAccess calls an item-access or
+    // membership welcome email helper.
     try {
       const { fulfillMembershipPlanAccess } = await import("./membershipFulfillment");
       await fulfillMembershipPlanAccess(db as any, userId, plan.id, {
         sessionId: null,
         stripeSubscriptionId: null,
         stripeCustomerId: null,
+        source: "membership",
       });
     } catch (fulfillErr) {
       console.error(`[ensureFreeMembership] fulfillMembershipPlanAccess failed for user ${userId}:`, fulfillErr);
     }
 
-    console.log(`[ensureFreeMembership] Enrolled user ${userId} in Free Membership (plan ${plan.id})`);
+    if (membershipChanged) {
+      console.log(`[ensureFreeMembership] Activated Free Membership for user ${userId}`);
+    }
   } catch (err) {
     // Fire-and-forget: log but never throw so callers are not disrupted
     console.error(`[ensureFreeMembership] Error for user ${userId}:`, err);

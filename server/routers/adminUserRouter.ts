@@ -18,6 +18,7 @@ import { getStripeClient } from "../lib/stripeClient";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getDb, getUserRoles } from "../db";
+import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import {
   users,
   lmsEnrollments,
@@ -724,6 +725,7 @@ export const adminUserRouter = router({
           }
         }
 
+        await ensureFreeMembership(input.userId, { db });
         return { enrollmentId: grantId ?? 0, alreadyEnrolled: alreadyGranted, orderId: undefined, stripePaymentIntentId: undefined };
       }
 
@@ -810,6 +812,7 @@ export const adminUserRouter = router({
         await db.update(lmsEnrollments).set({ orderId }).where(eq(lmsEnrollments.id, enrollmentId));
       }
 
+      await ensureFreeMembership(input.userId, { db });
       return { enrollmentId, alreadyEnrolled, orderId, stripePaymentIntentId: resolvedPaymentIntentId };
     }),
 

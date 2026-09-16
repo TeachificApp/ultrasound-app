@@ -22,6 +22,7 @@ import {
   bundleEnrollments,
   bundleItems,
   bundles,
+  communityMembers,
 } from "../../drizzle/schema";
 import { getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
 import { generateAutoLoginToken } from "../routes/autoLogin";
@@ -45,6 +46,8 @@ export type MembershipFulfillmentContext = {
   forceWelcomeEmail?: boolean;
   /** Renew course enrollments (repurchase after expiry) */
   forceRenew?: boolean;
+  /** Attribution for data-only included-access grants; never controls email delivery. */
+  source?: string;
 };
 
 export type MembershipFulfillmentResult = {
@@ -156,6 +159,32 @@ async function grantBrandAccess(
   notes.push(`Brand: ${brandKey} ${tier}`);
 }
 
+async function grantCommunityAccess(
+  db: MySql2Database<typeof schema>,
+  userId: number,
+  communityId: number,
+  notes: string[],
+): Promise<void> {
+  const [existing] = await db
+    .select({ id: communityMembers.id })
+    .from(communityMembers)
+    .where(and(
+      eq(communityMembers.userId, userId),
+      eq(communityMembers.communityId, communityId),
+    ))
+    .limit(1);
+
+  if (!existing) {
+    await db.insert(communityMembers).values({
+      userId,
+      communityId,
+      role: "member",
+      memberStatus: "approved",
+    });
+    notes.push(`Community: ${communityId}`);
+  }
+}
+
 type EnrollOpts = {
   accessExpiresAt?: Date | null;
   stripeSubscriptionId?: string | null;
@@ -246,17 +275,30 @@ async function grantDownload(
   if (!product) return null;
 
   const [existing] = await db
-    .select({ id: digitalPurchases.id })
+    .select({
+      id: digitalPurchases.id,
+      status: digitalPurchases.status,
+      accessExpiresAt: digitalPurchases.accessExpiresAt,
+    })
     .from(digitalPurchases)
-    .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, productId)))
-    .limit(1);
+    .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, productId)));
   if (!existing) {
     await db.insert(digitalPurchases).values({
       userId,
       productId,
       stripeCheckoutSessionId: sessionId,
+      status: "open",
     });
     notes.push(`Download: ${product.title}`);
+  } else if (
+    existing.status !== "open" ||
+    (existing.accessExpiresAt && existing.accessExpiresAt.getTime() <= Date.now())
+  ) {
+    await db.update(digitalPurchases).set({
+      status: "open",
+      accessExpiresAt: null,
+    }).where(eq(digitalPurchases.id, existing.id));
+    notes.push(`Restored download: ${product.title}`);
   }
   return { title: product.title, slug: product.slug };
 }
@@ -323,12 +365,12 @@ export async function fulfillMembershipPlanAccess(
   db: MySql2Database<typeof schema>,
   userId: number,
   planId: number,
-  ctx: Pick<MembershipFulfillmentContext, "sessionId" | "stripeSubscriptionId" | "stripeCustomerId" | "accessExpiresAt" | "forceRenew">,
+  ctx: Pick<MembershipFulfillmentContext, "sessionId" | "stripeSubscriptionId" | "stripeCustomerId" | "accessExpiresAt" | "forceRenew" | "source">,
 ): Promise<string[]> {
   const enrollOpts: EnrollOpts = {
     accessExpiresAt: ctx.accessExpiresAt ?? null,
     stripeSubscriptionId: ctx.stripeSubscriptionId ?? null,
-    source: "stripe",
+    source: ctx.source ?? "stripe",
     forceRenew: ctx.forceRenew,
   };
   const notes: string[] = [];
@@ -363,6 +405,9 @@ export async function fulfillMembershipPlanAccess(
         case "bundle":
           if (item.itemId) await grantBundle(db, userId, item.itemId, ctx.sessionId ?? null, notes, enrollOpts);
           break;
+        case "community":
+          if (item.itemId) await grantCommunityAccess(db, userId, item.itemId, notes);
+          break;
         case "all_courses": {
           const courses = await db
             .select({ id: lmsCourses.id })
@@ -381,7 +426,7 @@ export async function fulfillMembershipPlanAccess(
           break;
         }
         default:
-          if (item.itemId && (item.itemType === "product" || item.itemType === "webinar" || item.itemType === "community")) {
+          if (item.itemId && (item.itemType === "product" || item.itemType === "webinar")) {
             notes.push(`Skipped unsupported access type ${item.itemType} #${item.itemId}`);
           }
           break;

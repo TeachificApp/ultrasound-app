@@ -31,10 +31,12 @@ export async function applyAccessGrantActions(
   } = await import("../../drizzle/schema");
 
   const actions: AccessGrantAction[] = JSON.parse(grantAccessActionsJson);
+  let hasQualifyingAccessGrant = false;
 
   for (const action of actions) {
     const { productType, productId } = action;
     if (!productId) continue;
+    hasQualifyingAccessGrant = true;
 
     if (productType === "course") {
       const [existing] = await db.select({ id: lmsEnrollments.id })
@@ -98,5 +100,10 @@ export async function applyAccessGrantActions(
         await db.insert(webinarRegistrations).values({ userId, webinarId: productId, accessLevel: webinar?.status === "presale" ? "presale" : "full" });
       }
     }
+  }
+
+  if (hasQualifyingAccessGrant) {
+    const { ensureFreeMembership } = await import("./ensureFreeMembership");
+    await ensureFreeMembership(userId, { db });
   }
 }

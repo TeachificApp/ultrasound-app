@@ -38,6 +38,7 @@ import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { buildCmeCertificateFileKey } from "../lib/cmeCertificateFilename";
 import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollmentEmail";
+import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { toCheckoutAmountCents } from "../lib/paymentState";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
@@ -2802,8 +2803,10 @@ export const lmsLearnerRouter = router({
       if (existing) {
         if (existing.enrollmentType === "free_preview") {
           await db.update(lmsEnrollments).set({ enrollmentType: isPresale ? "presale" : "full" }).where(eq(lmsEnrollments.id, existing.id));
+          void ensureFreeMembership(ctx.user.id, { db });
           return { enrollmentId: existing.id, alreadyEnrolled: false };
         }
+        void ensureFreeMembership(ctx.user.id, { db });
         return { enrollmentId: existing.id, alreadyEnrolled: true };
       }
 
@@ -2827,6 +2830,7 @@ export const lmsLearnerRouter = router({
         title: `🎓 Free Course Enrollment`,
         content: `User ${ctx.user.id} (${ctx.user.email}) enrolled in free course: ${course.title} (${input.courseSlug}).`,
       }).catch(() => {});
+      void ensureFreeMembership(ctx.user.id, { db });
       return { enrollmentId: result.id, alreadyEnrolled: false };
     }),
 
@@ -2925,6 +2929,7 @@ export const lmsLearnerRouter = router({
         } else if (existingZero.enrollmentType === "free_preview") {
           await db.update(lmsEnrollments).set({ enrollmentType: isPresale ? "presale" : "full" }).where(eq(lmsEnrollments.id, existingZero.id));
         }
+        void ensureFreeMembership(ctx.user.id, { db });
         return { freeEnrollment: true, courseSlug: course.slug, url: null };
       }
 
@@ -3023,6 +3028,7 @@ export const lmsLearnerRouter = router({
               // fully discounted enrollment has no Stripe payment to reconcile.
               await db.update(lmsOrders).set({ status: "failed" })
                 .where(and(eq(lmsOrders.id, orderResult.id), eq(lmsOrders.status, "pending")));
+              void ensureFreeMembership(ctx.user.id, { db });
               return { freeEnrollment: true, courseSlug: course.slug, url: null };
             }
           }
@@ -3303,6 +3309,7 @@ export const lmsLearnerRouter = router({
         } else if (existingFree.enrollmentType === "free_preview") {
           await db.update(lmsEnrollments).set({ enrollmentType: "full" }).where(eq(lmsEnrollments.id, existingFree.id));
         }
+        void ensureFreeMembership(user.id, { db });
         return { checkoutUrl: null, enrolled: true };
       }
 

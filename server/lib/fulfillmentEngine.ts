@@ -28,6 +28,7 @@ import {
 } from "../../drizzle/schema";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
+import { ensureFreeMembership } from "./ensureFreeMembership";
 
 export type FulfillmentInput = {
   /** Stripe payment intent ID (used for idempotency) */
@@ -395,6 +396,11 @@ export async function executeFulfillment(
   if (hasCriticalFailure) {
     return { success: false, notes, error: errors.join("; ") };
   }
+
+  // A completed course, product, bundle, or membership fulfillment always
+  // establishes the silent Free Membership baseline. The helper is idempotent
+  // and does not call any welcome or item-access email delivery code.
+  await ensureFreeMembership(userId, { db });
 
   return { success: true, notes, error: hasErrors ? errors.join("; ") : undefined };
 }
