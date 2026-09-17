@@ -600,3 +600,4 @@
 - [x] Add a once-per-session in-app final-day alert when fewer than 24 hours remain in a Premium App trial, without notifying non-trial or expired memberships.
 - [x] Add an optional feedback modal before a member cancels an active Premium App trial, schedule the Stripe cancellation only after confirmation, and send the reason/details to the configured Platform Admin notification channel once per newly scheduled trial cancellation.
 - [x] Add focused trial dashboard, final-day alert, cancellation-feedback, no-duplicate-alert, and safe live-trial-status regression coverage without creating or changing subscriptions, payments, memberships, or emails during validation.
+- [x] Replace the Premium trial cancellation feedback dropdown with prominent keyboard-accessible multiple-choice reason cards while retaining the optional comment, selected-reason submission, and Platform Admin notification behavior.

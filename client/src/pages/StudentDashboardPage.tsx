@@ -2086,19 +2086,33 @@ function SubscriptionsTab() {
             <div className="rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-teal-900">
               Your feedback helps the team improve Premium. Sharing a reason is optional.
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="trial-cancellation-reason">What prompted your cancellation?</Label>
-              <select
-                id="trial-cancellation-reason"
-                value={trialCancellationReason}
-                onChange={(event) => setTrialCancellationReason(event.target.value as TrialCancellationReason)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                {TRIAL_CANCELLATION_REASONS.map((reason) => (
-                  <option key={reason.value} value={reason.value}>{reason.label}</option>
-                ))}
-              </select>
-            </div>
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium leading-none">What prompted your cancellation?</legend>
+              <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Trial cancellation reason">
+                {TRIAL_CANCELLATION_REASONS.map((reason) => {
+                  const selected = trialCancellationReason === reason.value;
+                  return (
+                    <label
+                      key={reason.value}
+                      className={`flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 text-sm leading-snug transition-colors ${selected ? "border-[#189aa1] bg-teal-50 text-teal-950 ring-1 ring-[#189aa1]/20" : "border-gray-200 bg-white text-gray-700 hover:border-teal-300 hover:bg-teal-50/40"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="trial-cancellation-reason"
+                        value={reason.value}
+                        checked={selected}
+                        onChange={() => setTrialCancellationReason(reason.value)}
+                        className="sr-only"
+                      />
+                      <span aria-hidden="true" className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${selected ? "border-[#189aa1] bg-[#189aa1]" : "border-gray-300 bg-white"}`}>
+                        {selected ? <CheckCircle2 className="h-3 w-3 text-white" /> : null}
+                      </span>
+                      <span>{reason.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
             <div className="space-y-2">
               <Label htmlFor="trial-cancellation-details">Anything else you would like us to know? <span className="font-normal text-gray-400">(optional)</span></Label>
               <Textarea

@@ -49,6 +49,9 @@ describe("Premium trial dashboard experience", () => {
     expect(dashboard).toContain("Less than 24 hours remain");
     expect(dashboard).toContain("Before you cancel your free trial");
     expect(dashboard).toContain("TRIAL_CANCELLATION_REASONS");
+    expect(dashboard).toContain('type="radio"');
+    expect(dashboard).toContain('role="radiogroup"');
+    expect(dashboard).not.toContain('<select\n                id="trial-cancellation-reason"');
   });
 
   it("alerts Platform Admin only for a newly scheduled active Premium trial cancellation", () => {
