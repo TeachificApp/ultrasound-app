@@ -28,6 +28,7 @@ describe("authorized IP location and export handling", () => {
     expect(router).toContain("const csvCell");
     expect(location).toContain("https://ipwho.is/");
     expect(location).toContain("AbortSignal.timeout(4000)");
+    expect(readProjectFile("server/jobs/sharingMonitor.ts")).toContain("IP location enrichment unavailable");
     expect(view).toContain("Resolve missing locations");
     expect(view).toContain("formatIpLocation");
     expect(view).toContain("Export CSV");

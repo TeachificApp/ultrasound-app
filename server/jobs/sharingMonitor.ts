@@ -48,7 +48,9 @@ export async function logIpAccess(opts: {
       contentType: opts.contentType,
       contentId: opts.contentId || null,
     });
-    void enrichIpAccessLocation(opts.ipAddress);
+    void enrichIpAccessLocation(opts.ipAddress).catch(() => {
+      console.warn("[SharingMonitor] IP location enrichment unavailable");
+    });
   } catch (err) {
     console.error("[SharingMonitor] Failed to log IP access:", err);
   }
