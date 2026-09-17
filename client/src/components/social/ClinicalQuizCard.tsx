@@ -49,6 +49,33 @@ function getTemplate(template: ClinicalQuizCardTemplate) {
   return CLINICAL_QUIZ_CARD_TEMPLATES.find((item) => item.id === template) ?? CLINICAL_QUIZ_CARD_TEMPLATES[0];
 }
 
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function getQuestionFit(question: string, options: string[], hasMedia: boolean) {
+  const optionCharacters = options.reduce((total, option) => total + stripHtml(option).length, 0);
+  const questionSize = clamp(59 - Math.floor(question.length / (hasMedia ? 14 : 19)), hasMedia ? 30 : 32, 59);
+  const optionSize = clamp(29 - Math.floor(optionCharacters / 90), 17, 29);
+  return {
+    questionSize,
+    optionSize,
+    optionGap: optionSize <= 20 ? 10 : 18,
+    optionNumberSize: clamp(optionSize + 2, 19, 31),
+  };
+}
+
+function getAnswerFit(question: string, answer: string | null, explanation: string | null) {
+  const answerLength = answer?.length ?? 0;
+  const explanationLength = explanation ? stripHtml(explanation).length : 0;
+  return {
+    recapSize: clamp(28 - Math.floor(question.length / 52), 16, 28),
+    answerSize: clamp(42 - Math.floor(answerLength / 38), 20, 42),
+    explanationSize: clamp(24 - Math.floor(explanationLength / 180), 14, 24),
+    sectionPadding: explanationLength > 520 ? 18 : 28,
+  };
+}
+
 export interface ClinicalQuizCardProps {
   presentation: BrandToolPresentation;
   template: ClinicalQuizCardTemplate;
@@ -57,6 +84,9 @@ export interface ClinicalQuizCardProps {
   media: ClinicalCardMedia;
   label?: string;
   title?: string;
+  variant?: "question" | "answer";
+  correctAnswer?: string | null;
+  explanation?: string | null;
 }
 
 /** A square social-card layout based on the supplied clinical quiz references. */
@@ -68,12 +98,27 @@ export function ClinicalQuizCard({
   media,
   label = "CLINICAL QUIZ",
   title,
+  variant = "question",
+  correctAnswer,
+  explanation,
 }: ClinicalQuizCardProps) {
+  if (variant === "answer") {
+    return (
+      <ClinicalQuizAnswerCard
+        presentation={presentation}
+        template={template}
+        question={question}
+        correctAnswer={correctAnswer ?? null}
+        explanation={explanation ?? null}
+        title={title}
+      />
+    );
+  }
   const theme = useMemo(() => getTemplate(template), [template]);
   const visibleOptions = options.slice(0, 4).map(stripHtml).filter(Boolean);
   const questionText = stripHtml(question);
   const hasMediaArea = media.kind !== "none";
-  const questionFontSize = questionText.length > 150 ? 42 : questionText.length > 95 ? 50 : 59;
+  const fit = getQuestionFit(questionText, visibleOptions, hasMediaArea);
 
   return (
     <div
@@ -124,7 +169,7 @@ export function ClinicalQuizCard({
       <div
         style={{
           color: theme.text,
-          fontSize: questionFontSize,
+          fontSize: fit.questionSize,
           fontWeight: 800,
           lineHeight: 1.18,
           marginTop: title ? 12 : 24,
@@ -172,14 +217,14 @@ export function ClinicalQuizCard({
           bottom: hasMediaArea ? 112 : undefined,
           display: "grid",
           gridTemplateColumns: visibleOptions.length > 2 ? "1fr 1fr" : "1fr",
-          gap: "18px 68px",
+          gap: `${fit.optionGap}px ${fit.optionGap * 3}px`,
           marginTop: hasMediaArea ? undefined : 22,
         }}
       >
         {visibleOptions.map((option, index) => (
           <div key={`${option}-${index}`} style={{ display: "flex", alignItems: "flex-start", gap: 15, minWidth: 0 }}>
-            <span style={{ color: theme.accent, fontSize: 31, fontWeight: 900, lineHeight: 1.2, flexShrink: 0 }}>{index + 1}.</span>
-            <span style={{ color: theme.text, fontSize: 29, fontWeight: 800, lineHeight: 1.2 }}>{option}</span>
+            <span style={{ color: theme.accent, fontSize: fit.optionNumberSize, fontWeight: 900, lineHeight: 1.2, flexShrink: 0 }}>{index + 1}.</span>
+            <span style={{ color: theme.text, fontSize: fit.optionSize, fontWeight: 800, lineHeight: 1.2 }}>{option}</span>
           </div>
         ))}
       </section>
@@ -199,6 +244,70 @@ export function ClinicalQuizCard({
       >
         {presentation.appHost}
       </footer>
+    </div>
+  );
+}
+
+function ClinicalQuizAnswerCard({
+  presentation,
+  template,
+  question,
+  correctAnswer,
+  explanation,
+  title,
+}: Pick<ClinicalQuizCardProps, "presentation" | "template" | "question" | "correctAnswer" | "explanation" | "title">) {
+  const theme = useMemo(() => getTemplate(template), [template]);
+  const questionText = stripHtml(question);
+  const answerText = correctAnswer ? stripHtml(correctAnswer) : "Answer available in the accompanying explanation.";
+  const fit = getAnswerFit(questionText, answerText, explanation);
+
+  return (
+    <div
+      data-social-quiz-card="true"
+      style={{
+        width: CARD_SIZE,
+        minHeight: CARD_SIZE,
+        position: "relative",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        padding: "62px 76px 48px",
+        fontFamily: "'Segoe UI', Arial, sans-serif",
+        background: theme.background,
+        color: theme.text,
+      }}
+    >
+      <header style={{ display: "flex", alignItems: "center", gap: 26, minHeight: 118 }}>
+        <img
+          src={presentation.logoUrl}
+          alt={presentation.displayName}
+          crossOrigin="anonymous"
+          style={{ width: 116, height: 116, borderRadius: "50%", objectFit: "cover", background: "#ffffff", border: `3px solid ${theme.accent}`, flexShrink: 0 }}
+        />
+        <div>
+          <div style={{ color: theme.text, fontSize: 22, fontWeight: 800, letterSpacing: 2.6, opacity: 0.78 }}>CLINICAL QUIZ ANSWER</div>
+          <div style={{ color: theme.text, fontSize: 30, fontWeight: 800, lineHeight: 1.15, marginTop: 5 }}>{presentation.displayName}</div>
+        </div>
+      </header>
+
+      {title && <div style={{ color: theme.text, fontSize: 20, fontWeight: 700, opacity: 0.72, marginTop: 18, letterSpacing: 0.7 }}>{title}</div>}
+
+      <section style={{ marginTop: title ? 18 : 28, borderLeft: `6px solid ${theme.accent}`, paddingLeft: 22 }}>
+        <div style={{ color: theme.text, fontSize: fit.recapSize, fontWeight: 700, lineHeight: 1.25, opacity: 0.82 }}>{questionText}</div>
+      </section>
+
+      <section style={{ marginTop: 26, border: `4px solid ${theme.accent}`, borderRadius: 18, padding: `${fit.sectionPadding}px 28px`, background: `${theme.accent}1a` }}>
+        <div style={{ color: theme.accent, fontSize: 17, fontWeight: 900, letterSpacing: 2.2 }}>CORRECT ANSWER</div>
+        <div style={{ color: theme.text, fontSize: fit.answerSize, fontWeight: 900, lineHeight: 1.18, marginTop: 12 }}>{answerText}</div>
+      </section>
+
+      {explanation && (
+        <section style={{ marginTop: 22, border: `2px solid ${theme.accent}88`, borderRadius: 16, padding: `${fit.sectionPadding}px 26px`, background: `${theme.accent}0d` }}>
+          <div style={{ color: theme.accent, fontSize: 16, fontWeight: 900, letterSpacing: 2 }}>EXPLANATION</div>
+          <div style={{ color: theme.text, fontSize: fit.explanationSize, fontWeight: 650, lineHeight: 1.38, marginTop: 10 }}>{stripHtml(explanation)}</div>
+        </section>
+      )}
+
+      <footer style={{ position: "absolute", bottom: 42, left: 74, right: 74, textAlign: "center", color: theme.accent, fontSize: 23, fontWeight: 800, letterSpacing: 0.4 }}>{presentation.appHost}</footer>
     </div>
   );
 }

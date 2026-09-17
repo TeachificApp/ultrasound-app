@@ -562,3 +562,7 @@
 - [ ] Verify the new Railway build serves the clinical Challenge Card template selector after the GitHub-main repair is deployed, then close the live deployment-handoff item.
 - [x] Replace the deployed-schema-incompatible member quiz mock-exam query with a schema-safe classification path and restore administrator member profile loading without changing attempts or scores.
 - [ ] After completing the original Challenge Card and member quiz-result repairs, trace and repair Sharing Monitor student-detail selection so flagged user rows open their protected detail panel rather than returning “User not found,” without changing flags, IP logs, user accounts, or access records.
+- [x] Make the active Platform Admin brand selector authoritative for every per-brand tool, ensuring an All About Ultrasound selection never opens, renders, or queries iHeartEcho routes/data and vice versa.
+- [x] Keep Challenge Card question and answer outputs visually matched for every selected clinical template, including background, framing, typography, logo treatment, and selected-brand styling.
+- [x] Derive Challenge Card contextual labels from the actual selected challenge category or content-specific label, never from an unrelated hardcoded specialty label.
+- [x] Dynamically fit Challenge Card question, options, correct answer, and explanation typography and spacing so all content remains visible within the selected matched card template without clipping.

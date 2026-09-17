@@ -37,4 +37,18 @@ describe("selected-brand tool routing", () => {
     expect(platformAdmin).toContain('perBrandAdminUrl("/admin/engagement", "iheartecho")');
     expect(platformAdmin).toContain('perBrandAdminUrl("/image-quality-review", "iheartecho")');
   });
+
+  it("keeps the active selector authoritative and renders paired clinical question-and-answer cards", () => {
+    const platformAdmin = readProjectFile("client/src/pages/PlatformAdmin.tsx");
+    const challengeCards = readProjectFile("client/src/pages/ChallengeCardGenerator.tsx");
+    const clinicalCards = readProjectFile("client/src/components/social/ClinicalQuizCard.tsx");
+
+    expect(platformAdmin).toContain('dualBrand === "iheartecho" && (isIHE || isPlatformAdminOrOwner)');
+    expect(challengeCards).toContain("const contextLabel = q.category?.trim() || category");
+    expect(challengeCards).toContain('variant="answer"');
+    expect(challengeCards).toContain("template={template}");
+    expect(clinicalCards).toContain("function ClinicalQuizAnswerCard");
+    expect(clinicalCards).toContain("function getQuestionFit");
+    expect(clinicalCards).toContain("function getAnswerFit");
+  });
 });

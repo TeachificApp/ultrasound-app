@@ -519,6 +519,10 @@ function QuestionCard({
 }) {
   const letters = ["A", "B", "C", "D", "E"];
   const cleanQ = stripHtml(questionText);
+  const optionCharacters = options.reduce((total, option) => total + stripHtml(option).length, 0);
+  const questionFontSize = Math.max(20, Math.min(options.length > 0 ? 30 : 44, (options.length > 0 ? 34 : 48) - Math.floor(cleanQ.length / 72)));
+  const optionFontSize = Math.max(15, 26 - Math.floor(optionCharacters / 115));
+  const optionPadding = optionFontSize <= 18 ? "9px 14px" : "12px 20px";
 
   return (
     <CardShell t={t} presentation={presentation}>
@@ -543,7 +547,7 @@ function QuestionCard({
       <div
         style={{
           color: t.headingColor,
-          fontSize: options.length > 0 ? 30 : 44,
+          fontSize: questionFontSize,
           fontWeight: 700,
           lineHeight: 1.45,
           marginBottom: options.length > 0 ? 20 : 0,
@@ -567,13 +571,13 @@ function QuestionCard({
                 background: i % 2 === 0 ? t.optionEvenBg : t.optionOddBg,
                 border: `1px solid ${i % 2 === 0 ? t.optionEvenBorder : t.optionOddBorder}`,
                 borderRadius: 12,
-                padding: "12px 20px",
+                padding: optionPadding,
               }}
             >
               <div
                 style={{
-                  width: 44,
-                  height: 44,
+                  width: optionFontSize <= 18 ? 34 : 44,
+                  height: optionFontSize <= 18 ? 34 : 44,
                   borderRadius: 11,
                   flexShrink: 0,
                   background: i % 2 === 0 ? t.bubbleEvenBg : t.bubbleOddBg,
@@ -583,14 +587,14 @@ function QuestionCard({
                   justifyContent: "center",
                   color: i % 2 === 0 ? t.bubbleEvenColor : t.bubbleOddColor,
                   fontWeight: 800,
-                  fontSize: 20,
+                  fontSize: optionFontSize <= 18 ? 16 : 20,
                   marginTop: 2,
                   boxShadow: i % 2 !== 0 ? `0 0 14px ${BRAND}44` : "none",
                 }}
               >
                 {letters[i]}
               </div>
-              <span style={{ color: t.bodyColor, fontSize: 26, fontWeight: 500, lineHeight: 1.4 }}>
+              <span style={{ color: t.bodyColor, fontSize: optionFontSize, fontWeight: 500, lineHeight: 1.32 }}>
                 {stripHtml(opt)}
               </span>
             </div>
@@ -633,6 +637,9 @@ function AnswerCard({
       : reviewAnswer
       ? stripHtml(reviewAnswer)
       : null;
+  const answerFontSize = Math.max(18, 36 - Math.floor((answerText?.length ?? 0) / 44));
+  const explanationFontSize = Math.max(14, 22 - Math.floor((explanation ? stripHtml(explanation).length : 0) / 170));
+  const recapFontSize = Math.max(15, 24 - Math.floor(stripHtml(questionText).length / 80));
 
   return (
     <CardShell t={t} presentation={presentation}>
@@ -662,7 +669,7 @@ function AnswerCard({
           fontFamily: "'Georgia', 'Merriweather', serif",
         }}
       >
-        <RichHtml html={questionText} color={t.recapColor} fontSize={24} lineHeight={1.45} />
+        <RichHtml html={questionText} color={t.recapColor} fontSize={recapFontSize} lineHeight={1.35} />
       </div>
 
       {/* Answer box */}
@@ -692,7 +699,7 @@ function AnswerCard({
           <div style={{ color: BRAND, fontSize: 10, fontWeight: 800, marginBottom: 8, letterSpacing: "2px" }}>
             CORRECT ANSWER
           </div>
-          <div style={{ color: t.answerTextColor, fontSize: 36, fontWeight: 700, lineHeight: 1.35 }}>
+          <div style={{ color: t.answerTextColor, fontSize: answerFontSize, fontWeight: 700, lineHeight: 1.25 }}>
             {answerText}
           </div>
         </div>
@@ -713,7 +720,7 @@ function AnswerCard({
           <div style={{ color: BRAND, fontSize: 10, fontWeight: 800, marginBottom: 10, letterSpacing: "2px" }}>
             EXPLANATION
           </div>
-          <RichHtml html={explanation} color={t.explanationTextColor} fontSize={22} lineHeight={1.6} />
+          <RichHtml html={explanation} color={t.explanationTextColor} fontSize={explanationFontSize} lineHeight={1.38} />
         </div>
       )}
 
@@ -954,6 +961,7 @@ function CategorySection({
       ? stripHtml(q.reviewAnswer)
       : null;
   const explanationText = q.explanation ? stripHtml(q.explanation) : null;
+  const contextLabel = q.category?.trim() || category;
 
   return (
     <div className="rounded-lg border border-white/10 overflow-hidden" style={{ background: "#0e1a24" }}>
@@ -983,9 +991,9 @@ function CategorySection({
               onRef={(h) => onQuestionRef(category, h)}
             >
               {template === "classic" ? (
-                <QuestionCard challengeTitle={challenge.title} questionText={q.question} options={options} qid={q.qid} t={t} presentation={presentation} />
+                <QuestionCard challengeTitle={contextLabel} questionText={q.question} options={options} qid={q.qid} t={t} presentation={presentation} />
               ) : (
-                <ClinicalQuizCard presentation={presentation} template={template} question={q.question} options={options} media={q.imageUrl ? { kind: "image", url: q.imageUrl } : { kind: "none" }} title={challenge.title} />
+                <ClinicalQuizCard presentation={presentation} template={template} question={q.question} options={options} media={q.imageUrl ? { kind: "image", url: q.imageUrl } : { kind: "none" }} title={contextLabel} />
               )}
             </DownloadableCard>
           </div>
@@ -999,17 +1007,31 @@ function CategorySection({
               filename={`${category.replace(/\s+/g, "-")}-${date}-answer.png`}
               onRef={(h) => onAnswerRef(category, h)}
             >
-              <AnswerCard
-                challengeTitle={challenge.title}
-                questionText={q.question}
-                options={options}
-                correctAnswer={q.correctAnswer}
-                explanation={q.explanation}
-                reviewAnswer={q.reviewAnswer}
-                qid={q.qid}
-                t={t}
-                presentation={presentation}
-              />
+              {template === "classic" ? (
+                <AnswerCard
+                  challengeTitle={contextLabel}
+                  questionText={q.question}
+                  options={options}
+                  correctAnswer={q.correctAnswer}
+                  explanation={q.explanation}
+                  reviewAnswer={q.reviewAnswer}
+                  qid={q.qid}
+                  t={t}
+                  presentation={presentation}
+                />
+              ) : (
+                <ClinicalQuizCard
+                  presentation={presentation}
+                  template={template}
+                  variant="answer"
+                  question={q.question}
+                  options={options}
+                  media={{ kind: "none" }}
+                  correctAnswer={answerText}
+                  explanation={q.explanation}
+                  title={contextLabel}
+                />
+              )}
             </DownloadableCard>
           </div>
         </div>

@@ -2100,7 +2100,7 @@ export default function PlatformAdmin() {
 
         {/* ── iHeartEcho Only Tools ─────────────────────────────────── */}
         {/* Show to platform admins on any domain — they manage both brands */}
-        {(isIHE || isPlatformAdminOrOwner) && (
+        {dualBrand === "iheartecho" && (isIHE || isPlatformAdminOrOwner) && (
           <div className="mb-8">
             <div className="mb-3">
               <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">iHeartEcho Only</h2>
