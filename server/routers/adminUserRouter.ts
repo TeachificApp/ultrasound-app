@@ -69,7 +69,8 @@ import { generateAutoLoginToken } from "../routes/autoLogin";
 import { or, like, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
 import { serializeCouponTargeting, validateCouponTargeting } from "../lib/couponTargeting";
-
+import { parseBuilderConfig } from "../lib/quizBuilderConfig";
+import { stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
 type AdminAccessScope = "full" | "manager";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }): Promise<AdminAccessScope> {
@@ -296,7 +297,8 @@ export const adminUserRouter = router({
           a.correct_answers AS correctAnswers,
           a.attempt_number AS attemptNumber,
           a.completed_at AS submittedAt,
-          q.title AS quizTitle
+          q.title AS quizTitle,
+          q.is_mock_exam AS isMockExam
         FROM standalone_quiz_attempts a
         JOIN standalone_quizzes q ON q.id = a.quiz_id
         WHERE a.user_id = ${input.userId}
@@ -545,10 +547,21 @@ export const adminUserRouter = router({
           thumbnailUrl: r.thumbnailUrl as string | null,
         })),
         quizResults: {
-          standalone: (standaloneQuizResultList as any[]).map(r => ({
+          standalone: (standaloneQuizResultList as any[]).filter(r => !Boolean(r.isMockExam)).map(r => ({
             id: Number(r.id),
             kind: "standalone" as const,
             quizTitle: String(r.quizTitle ?? "Standalone quiz"),
+            score: r.score != null ? Number(r.score) : null,
+            passed: r.passed == null ? null : Boolean(r.passed),
+            totalQuestions: Number(r.totalQuestions ?? 0),
+            correctAnswers: Number(r.correctAnswers ?? 0),
+            attemptNumber: Number(r.attemptNumber ?? 1),
+            submittedAt: r.submittedAt,
+          })),
+          mock: (standaloneQuizResultList as any[]).filter(r => Boolean(r.isMockExam)).map(r => ({
+            id: Number(r.id),
+            kind: "standalone" as const,
+            quizTitle: String(r.quizTitle ?? "Mock exam"),
             score: r.score != null ? Number(r.score) : null,
             passed: r.passed == null ? null : Boolean(r.passed),
             totalQuestions: Number(r.totalQuestions ?? 0),
@@ -687,7 +700,7 @@ export const adminUserRouter = router({
       if (input.kind === "standalone") {
         const [attemptRows] = await db.execute(sql`
           SELECT a.id, a.score, a.passed, a.completed_at AS submittedAt,
-            q.title AS title
+            q.title AS title, q.builder_config AS builderConfig
           FROM standalone_quiz_attempts a
           JOIN standalone_quizzes q ON q.id = a.quiz_id
           WHERE a.id = ${input.attemptId}
@@ -697,6 +710,10 @@ export const adminUserRouter = router({
         `);
         const attempt = (attemptRows as any[])[0];
         if (!attempt) throw new TRPCError({ code: "NOT_FOUND", message: "Quiz attempt not found for this member" });
+        const builderConfig = parseBuilderConfig(attempt.builderConfig ? String(attempt.builderConfig) : null);
+        const builderQuestionByAttemptId = new Map(
+          (builderConfig?.questions ?? []).map((question: any) => [stableBuilderQuestionId(String(question.id)), question]),
+        );
 
         const [responseRows] = await db.execute(sql`
           SELECT aa.id, aa.question_id AS questionId, aa.given_answer AS answerValue,
@@ -715,17 +732,23 @@ export const adminUserRouter = router({
           score: attempt.score != null ? Number(attempt.score) : null,
           passed: attempt.passed == null ? null : Boolean(attempt.passed),
           submittedAt: attempt.submittedAt,
-          responses: (responseRows as any[]).map((response) => ({
-            id: Number(response.id),
-            questionId: Number(response.questionId),
-            questionText: String(response.questionText ?? `Question #${response.questionId}`),
-            questionType: String(response.questionType ?? "unknown"),
-            options: response.options ?? null,
-            answerValue: response.answerValue ?? null,
-            isCorrect: response.isCorrect == null ? null : Boolean(response.isCorrect),
-            correctAnswer: response.correctAnswer ?? response.correctAnswers ?? null,
-            timeSpentSeconds: response.timeSpentSeconds != null ? Number(response.timeSpentSeconds) : null,
-          })),
+          responses: (responseRows as any[]).map((response) => {
+            const builderQuestion = builderQuestionByAttemptId.get(Number(response.questionId)) as any;
+            const builderChoices = Array.isArray(builderQuestion?.data?.choices)
+              ? builderQuestion.data.choices.map((choice: any) => ({ id: String(choice.id), text: String(choice.text ?? "") }))
+              : null;
+            return {
+              id: Number(response.id),
+              questionId: Number(response.questionId),
+              questionText: String(response.questionText ?? builderQuestion?.stem ?? `Recorded question ${response.questionId}`),
+              questionType: String(response.questionType ?? builderQuestion?.type ?? "unknown"),
+              options: response.options ?? builderChoices,
+              answerValue: response.answerValue ?? null,
+              isCorrect: response.isCorrect == null ? null : Boolean(response.isCorrect),
+              correctAnswer: response.correctAnswer ?? response.correctAnswers ?? null,
+              timeSpentSeconds: response.timeSpentSeconds != null ? Number(response.timeSpentSeconds) : null,
+            };
+          }),
         };
       }
 
@@ -743,12 +766,17 @@ export const adminUserRouter = router({
         if (!attempt) throw new TRPCError({ code: "NOT_FOUND", message: "Quiz attempt not found for this member" });
 
         const [responseRows] = await db.execute(sql`
-          SELECT id, question_id AS questionId, question_text AS questionText,
-            question_type AS questionType, answer_value AS answerValue,
-            is_correct AS isCorrect, correct_answer AS correctAnswer
-          FROM lms_quiz_attempt_answers
-          WHERE attempt_id = ${input.attemptId}
-          ORDER BY id ASC
+          SELECT a.id, a.question_id AS questionId,
+            COALESCE(a.question_text, lq.question, qb.question) AS questionText,
+            COALESCE(a.question_type, lq.type, qb.type) AS questionType,
+            COALESCE(lq.options, qb.options) AS options,
+            a.answer_value AS answerValue, a.is_correct AS isCorrect,
+            COALESCE(a.correct_answer, lq.correct_answer, qb.correct_answer, qb.correct_answers) AS correctAnswer
+          FROM lms_quiz_attempt_answers a
+          LEFT JOIN lms_quiz_questions lq ON lq.id = a.question_id
+          LEFT JOIN question_bank qb ON qb.id = a.question_id
+          WHERE a.attempt_id = ${input.attemptId}
+          ORDER BY a.id ASC
         `);
 
         return {
@@ -760,9 +788,9 @@ export const adminUserRouter = router({
           responses: (responseRows as any[]).map((response) => ({
             id: Number(response.id),
             questionId: Number(response.questionId),
-            questionText: String(response.questionText ?? `Question #${response.questionId}`),
+            questionText: String(response.questionText ?? `Recorded question ${response.questionId}`),
             questionType: String(response.questionType ?? "unknown"),
-            options: null,
+            options: response.options ?? null,
             answerValue: response.answerValue ?? null,
             isCorrect: response.isCorrect == null ? null : Boolean(response.isCorrect),
             correctAnswer: response.correctAnswer ?? null,

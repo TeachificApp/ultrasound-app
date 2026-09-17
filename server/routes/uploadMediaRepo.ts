@@ -86,6 +86,8 @@ function getR2PublicUrl(): string {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getBrandFromRequest(req: Request): "aaus" | "iheartecho" {
+  const requestedBrand = req.header("X-App-Brand");
+  if (requestedBrand === "aaus" || requestedBrand === "iheartecho") return requestedBrand;
   const origin = (req.headers.origin || req.headers.referer || "") as string;
   try {
     const hostname = new URL(origin).hostname;

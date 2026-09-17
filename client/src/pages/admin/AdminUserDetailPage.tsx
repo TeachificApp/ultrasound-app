@@ -527,6 +527,8 @@ function parseStoredResponse(value: unknown, options: unknown): string {
       if (typeof candidate === "string") return candidate;
       if (candidate && typeof candidate === "object" && "text" in candidate) return String((candidate as { text?: unknown }).text ?? selection);
     }
+    const identifiedOption = parsedOptions.find((candidate) => candidate && typeof candidate === "object" && "id" in candidate && String((candidate as { id?: unknown }).id) === String(selection));
+    if (identifiedOption && typeof identifiedOption === "object" && "text" in identifiedOption) return String((identifiedOption as { text?: unknown }).text ?? selection);
     if (selection && typeof selection === "object" && "text" in selection) return String((selection as { text?: unknown }).text ?? "");
     return String(selection ?? "");
   };
@@ -541,14 +543,19 @@ function parseStoredResponse(value: unknown, options: unknown): string {
 
 function MemberQuizResults({ userId, results }: { userId: number; results: any }) {
   const [selectedResult, setSelectedResult] = useState<any | null>(null);
+  const [resultTab, setResultTab] = useState<"quizzes" | "mocks" | "lesson-surveys">("quizzes");
   const standalone = results?.standalone ?? [];
+  const mocks = results?.mock ?? [];
   const lesson = results?.lesson ?? [];
   const inline = results?.inline ?? [];
-  const allResults = [
-    ...standalone.map((result: any) => ({ ...result, label: "Standalone quiz", detail: result.quizTitle })),
+  const quizResults = standalone.map((result: any) => ({ ...result, label: "Standalone quiz", detail: result.quizTitle }));
+  const mockResults = mocks.map((result: any) => ({ ...result, label: "Mock exam", detail: result.quizTitle }));
+  const lessonSurveyResults = [
     ...lesson.map((result: any) => ({ ...result, label: "Lesson quiz", detail: `${result.courseTitle} · ${result.lessonTitle}` })),
     ...inline.map((result: any) => ({ ...result, label: "Lesson survey / quiz", detail: `${result.courseTitle} · ${result.lessonTitle}` })),
   ].sort((a: any, b: any) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  const allResults = [...quizResults, ...mockResults, ...lessonSurveyResults];
+  const visibleResults = resultTab === "quizzes" ? quizResults : resultTab === "mocks" ? mockResults : lessonSurveyResults;
 
   if (allResults.length === 0) return null;
 
@@ -564,10 +571,21 @@ function MemberQuizResults({ userId, results }: { userId: number; results: any }
       <section className="space-y-3 border-t border-gray-100 pt-5">
         <div>
           <h3 className="text-sm font-semibold text-gray-800">Administrator quiz results</h3>
-          <p className="mt-0.5 text-xs text-gray-500">Standalone, lesson, and survey submissions are visible here only to authorized administrators. Open any result to review the stored response for each question.</p>
+          <p className="mt-0.5 text-xs text-gray-500">Quiz, mock-exam, lesson, and survey submissions are visible here only to authorized administrators. Open any result to review the recorded question and response.</p>
+        </div>
+        <div className="flex flex-wrap gap-2 border-b border-gray-100 pb-3" role="tablist" aria-label="Result type">
+          {([
+            ["quizzes", "Quizzes", quizResults.length],
+            ["mocks", "Mock Exams", mockResults.length],
+            ["lesson-surveys", "Lesson / Survey", lessonSurveyResults.length],
+          ] as const).map(([key, label, count]) => (
+            <Button key={key} size="sm" variant={resultTab === key ? "default" : "outline"} onClick={() => setResultTab(key)} className={resultTab === key ? "bg-[#189aa1] text-white hover:bg-[#157f85]" : "border-gray-200 text-gray-600"}>
+              {label} <span className="ml-1.5 rounded-full bg-black/10 px-1.5 text-[10px]">{count}</span>
+            </Button>
+          ))}
         </div>
         <div className="space-y-2">
-          {allResults.map((result: any) => {
+          {visibleResults.length === 0 ? <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">No {resultTab === "mocks" ? "mock-exam" : resultTab === "lesson-surveys" ? "lesson or survey" : "standalone quiz"} attempts are recorded for this member.</div> : visibleResults.map((result: any) => {
             const isSurvey = result.kind === "inline";
             return (
               <div key={`${result.kind}-${result.id}`} className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50/70 p-3">
@@ -762,8 +780,8 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const cohorts   = enrollments.filter((e: any) => e.courseType === 'cohort');
   const quizzes   = enrollments.filter((e: any) => e.isQuiz || e.hasQuizContent);
   const downloads = enrollments.filter((e: any) => e.isDownload);
-  const quizResults = data.quizResults ?? { standalone: [], lesson: [], inline: [] };
-  const quizResultCount = (quizResults.standalone?.length ?? 0) + (quizResults.lesson?.length ?? 0) + (quizResults.inline?.length ?? 0);
+  const quizResults = data.quizResults ?? { standalone: [], mock: [], lesson: [], inline: [] };
+  const quizResultCount = (quizResults.standalone?.length ?? 0) + (quizResults.mock?.length ?? 0) + (quizResults.lesson?.length ?? 0) + (quizResults.inline?.length ?? 0);
   const workshopEnrollmentsList = data.workshopEnrollments ?? [];
   const physOrders = data.physicalOrders ?? [];
   const bundleEnrollments = data.bundleEnrollments ?? [];

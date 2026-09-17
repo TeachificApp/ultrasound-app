@@ -550,3 +550,11 @@
 - [x] Add focused cross-brand routing, title, label, and data-context regressions for Challenge Cards and every other brand-specific tool without changing user content or brand access records.
 - [x] Show complete available IP-location fields and provide a protected export of recorded IP access logs for authorized administrators, preserving existing privacy and security boundaries.
 - [x] Add focused authorization, privacy, field-format, and CSV export regressions for IP-access logs without changing existing access, login, or security records.
+- [x] Add the supplied clinical image quiz-card visual styles as selectable brand-aware Challenge Card templates, including light, aqua, teal, and dark variants.
+- [x] Build an administrator-only Question Bank social-card generator that saves standalone quiz-question output and prefers existing question-linked media as the clinical image/video source.
+- [x] Allow authorized administrators to choose a Media Repository image/video or upload approved image/video media for a social quiz card, without changing the source Question Bank record.
+- [x] Provide image, video/MP4, and no-media social-card variants with question text and answer options, preserving selected-brand identity and export-ready output.
+- [x] Add focused template, media-precedence, authorization, no-media, video-output, and source-record-preservation regressions for Question Bank social-card generation.
+- [x] Make the Challenge Card templates and Question Bank social-card generator available to all effective Platform Admins, while retaining ordinary-user and unrelated-role denial.
+- [x] Resolve administrator quiz-response drill-downs to actual question wording and selected-answer text rather than internal IDs or stored numeric values.
+- [x] Organize administrator member Content → Quizzes into distinct Quizzes, Mock Exams, and Lesson/Survey result tabs while preserving existing access and attempt records.

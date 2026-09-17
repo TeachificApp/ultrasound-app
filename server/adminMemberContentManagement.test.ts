@@ -27,6 +27,10 @@ describe("administrator member content management", () => {
     expect(router).toContain("FROM lms_inline_quiz_responses");
     expect(router).toContain("AND a.user_id = ${input.userId}");
     expect(router).toContain("AND a.completed_at IS NOT NULL");
+    expect(router).toContain("parseBuilderConfig(attempt.builderConfig");
+    expect(router).toContain("stableBuilderQuestionId(String(question.id))");
+    expect(router).toContain("builderQuestion?.stem");
+    expect(router).toContain("COALESCE(lq.options, qb.options) AS options");
   });
 
   it("shows protected result records and silent access controls in the administrator member profile", () => {
@@ -37,6 +41,10 @@ describe("administrator member content management", () => {
     expect(profile).toContain("View responses");
     expect(profile).toContain("Question-by-question responses");
     expect(profile).toContain("parseStoredResponse");
+    expect(profile).toContain("identifiedOption");
+    expect(profile).toContain('"quizzes" | "mocks" | "lesson-surveys"');
+    expect(profile).toContain("Mock Exams");
+    expect(profile).toContain("Lesson / Survey");
     expect(profile).toContain("e.isQuiz || e.hasQuizContent");
     expect(profile).toContain("Course access with lesson quiz");
     expect(profile).toContain("Grant Download / Content Access");
@@ -44,6 +52,13 @@ describe("administrator member content management", () => {
     expect(downloadCard).toContain("Save access");
     expect(downloadCard).toContain("Access activity");
     expect(downloadCard).toContain("Changing access does not send email.");
+  });
+
+  it("returns mock exam attempts separately from standalone quiz attempts", () => {
+    const router = readProjectFile("server/routers/adminUserRouter.ts");
+
+    expect(router).toContain("q.is_mock_exam AS isMockExam");
+    expect(router).toContain("mock: (standaloneQuizResultList as any[]).filter");
   });
 
   it("uses stored purchase cents for download reporting and excludes zero-cost access grants from paid revenue", () => {

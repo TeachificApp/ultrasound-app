@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { getBrandToolPresentation, resolveToolBrand, type BrandToolPresentation } from "@/lib/brandToolPresentation";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
+import { ClinicalQuizCard, type ClinicalQuizCardTemplate } from "@/components/social/ClinicalQuizCard";
 
 // Brand palette
 const BRAND = "#189aa1";
@@ -30,6 +31,7 @@ const HERO_URL_LIGHT = HERO_URL_DARK;
 
 // ---- Theme tokens -----------------------------------------------------------
 type CardTheme = "dark" | "light";
+type ChallengeCardTemplate = "classic" | ClinicalQuizCardTemplate;
 
 interface ThemeTokens {
   cardBg: string;
@@ -921,6 +923,7 @@ function CategorySection({
   theme,
   date,
   presentation,
+  template,
 }: {
   item: CategoryItem;
   onQuestionRef: (cat: string, h: DownloadableCardHandle) => void;
@@ -928,6 +931,7 @@ function CategorySection({
   theme: CardTheme;
   date: string;
   presentation: BrandToolPresentation;
+  template: ChallengeCardTemplate;
 }) {
   const t = theme === "dark" ? DARK_THEME : LIGHT_THEME;
   const { category, challenge, questions } = item;
@@ -978,14 +982,11 @@ function CategorySection({
               filename={`${category.replace(/\s+/g, "-")}-${date}-question.png`}
               onRef={(h) => onQuestionRef(category, h)}
             >
-              <QuestionCard
-                challengeTitle={challenge.title}
-                questionText={q.question}
-                options={options}
-                qid={q.qid}
-                t={t}
-                presentation={presentation}
-              />
+              {template === "classic" ? (
+                <QuestionCard challengeTitle={challenge.title} questionText={q.question} options={options} qid={q.qid} t={t} presentation={presentation} />
+              ) : (
+                <ClinicalQuizCard presentation={presentation} template={template} question={q.question} options={options} media={q.imageUrl ? { kind: "image", url: q.imageUrl } : { kind: "none" }} title={challenge.title} />
+              )}
             </DownloadableCard>
           </div>
 
@@ -1104,6 +1105,7 @@ export default function ChallengeCardGenerator() {
   const refetch = isToday ? todayQuery.refetch : dateQuery.refetch;
 
   const [cardTheme, setCardTheme] = useState<CardTheme>("dark");
+  const [cardTemplate, setCardTemplate] = useState<ChallengeCardTemplate>("classic");
 
   const questionRefs = useRef<Record<string, DownloadableCardHandle>>({});
   const answerRefs = useRef<Record<string, DownloadableCardHandle>>({});
@@ -1249,6 +1251,13 @@ export default function ChallengeCardGenerator() {
                 ☀️ Light
               </button>
             </div>
+            <select value={cardTemplate} onChange={(event) => setCardTemplate(event.target.value as ChallengeCardTemplate)} className="rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-xs font-semibold text-white outline-none">
+              <option value="classic" className="bg-[#0e1a24]">Classic challenge</option>
+              <option value="clinical-white" className="bg-[#0e1a24]">Clinical White</option>
+              <option value="clinical-aqua" className="bg-[#0e1a24]">Clinical Aqua</option>
+              <option value="clinical-teal" className="bg-[#0e1a24]">Clinical Teal</option>
+              <option value="clinical-dark" className="bg-[#0e1a24]">Clinical Dark</option>
+            </select>
             {hasData && (
               <>
                 <Button
@@ -1336,6 +1345,7 @@ export default function ChallengeCardGenerator() {
                   theme={cardTheme}
                   date={selectedDate}
                   presentation={presentation}
+                  template={cardTemplate}
                   onQuestionRef={(cat, h) => { questionRefs.current[cat] = h; }}
                   onAnswerRef={(cat, h) => { answerRefs.current[cat] = h; }}
                 />
