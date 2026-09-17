@@ -57,8 +57,8 @@ describe("administrator member content management", () => {
   it("returns mock exam attempts separately from standalone quiz attempts", () => {
     const router = readProjectFile("server/routers/adminUserRouter.ts");
 
-    expect(router).toContain("q.is_mock_exam AS isMockExam");
-    expect(router).toContain("mock: (standaloneQuizResultList as any[]).filter");
+    expect(router).toContain("q.type AS quizType");
+    expect(router).toContain('String(r.quizType) === "mock_exam"');
   });
 
   it("uses stored purchase cents for download reporting and excludes zero-cost access grants from paid revenue", () => {

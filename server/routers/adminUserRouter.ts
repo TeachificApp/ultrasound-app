@@ -298,7 +298,7 @@ export const adminUserRouter = router({
           a.attempt_number AS attemptNumber,
           a.completed_at AS submittedAt,
           q.title AS quizTitle,
-          q.is_mock_exam AS isMockExam
+          q.type AS quizType
         FROM standalone_quiz_attempts a
         JOIN standalone_quizzes q ON q.id = a.quiz_id
         WHERE a.user_id = ${input.userId}
@@ -547,7 +547,7 @@ export const adminUserRouter = router({
           thumbnailUrl: r.thumbnailUrl as string | null,
         })),
         quizResults: {
-          standalone: (standaloneQuizResultList as any[]).filter(r => !Boolean(r.isMockExam)).map(r => ({
+          standalone: (standaloneQuizResultList as any[]).filter(r => String(r.quizType) !== "mock_exam").map(r => ({
             id: Number(r.id),
             kind: "standalone" as const,
             quizTitle: String(r.quizTitle ?? "Standalone quiz"),
@@ -558,7 +558,7 @@ export const adminUserRouter = router({
             attemptNumber: Number(r.attemptNumber ?? 1),
             submittedAt: r.submittedAt,
           })),
-          mock: (standaloneQuizResultList as any[]).filter(r => Boolean(r.isMockExam)).map(r => ({
+          mock: (standaloneQuizResultList as any[]).filter(r => String(r.quizType) === "mock_exam").map(r => ({
             id: Number(r.id),
             kind: "standalone" as const,
             quizTitle: String(r.quizTitle ?? "Mock exam"),

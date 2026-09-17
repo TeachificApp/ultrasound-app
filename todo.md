@@ -558,3 +558,7 @@
 - [x] Make the Challenge Card templates and Question Bank social-card generator available to all effective Platform Admins, while retaining ordinary-user and unrelated-role denial.
 - [x] Resolve administrator quiz-response drill-downs to actual question wording and selected-answer text rather than internal IDs or stored numeric values.
 - [x] Organize administrator member Content → Quizzes into distinct Quizzes, Mock Exams, and Lesson/Survey result tabs while preserving existing access and attempt records.
+- [x] Repair Challenge Card source selection so the selected iHeartEcho route retrieves iHeartEcho challenge categories and questions instead of general UltrasoundAssist content.
+- [ ] Verify the new Railway build serves the clinical Challenge Card template selector after the GitHub-main repair is deployed, then close the live deployment-handoff item.
+- [x] Replace the deployed-schema-incompatible member quiz mock-exam query with a schema-safe classification path and restore administrator member profile loading without changing attempts or scores.
+- [ ] After completing the original Challenge Card and member quiz-result repairs, trace and repair Sharing Monitor student-detail selection so flagged user rows open their protected detail panel rather than returning “User not found,” without changing flags, IP logs, user accounts, or access records.
