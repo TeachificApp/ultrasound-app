@@ -17,10 +17,13 @@ function toFutureDate(value: PremiumTrialStatus["trialEnd"], now: number): Date 
 
 /** Stripe's live status and trial end are the only client inputs used for the dashboard trial UI. */
 export function getActivePremiumTrial(
-  subscriptions: Array<PremiumTrialStatus> | null | undefined,
+  subscriptions: Array<PremiumTrialStatus | null | undefined> | null | undefined,
   now = Date.now(),
 ): PremiumTrialCountdown | null {
   for (const subscription of subscriptions ?? []) {
+    // Dashboard membership records can represent a non-Stripe/free or legacy
+    // membership. Those records have no live Stripe subscription payload.
+    if (!subscription) continue;
     if (subscription.status !== "trialing") continue;
     const endsAt = toFutureDate(subscription.trialEnd, now);
     if (!endsAt) continue;

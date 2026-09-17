@@ -29,12 +29,15 @@ describe("Premium trial dashboard experience", () => {
 
   it("calculates a readable countdown and final-day state from only the live trial response", () => {
     const trial = getActivePremiumTrial([
+      null,
+      undefined,
       { status: "active", trialEnd: new Date(now + 10 * 60_000) },
       { status: "trialing", trialEnd: new Date(now + 23 * 60 * 60_000 + 59 * 60_000) },
     ], now);
     expect(trial).toMatchObject({ isFinalDay: true });
     expect(formatPremiumTrialCountdown(trial!.remainingMs)).toBe("23h 59m");
     expect(getActivePremiumTrial([{ status: "trialing", trialEnd: new Date(now - 1) }], now)).toBeNull();
+    expect(getActivePremiumTrial([null, undefined], now)).toBeNull();
   });
 
   it("exposes only a trial expiry timestamp for dashboard membership timing", () => {
