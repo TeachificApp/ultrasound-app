@@ -1729,7 +1729,7 @@ export default function PlatformAdmin() {
     { id: "navigator", basePath: "/admin/navigator", icon: Globe, label: "Navigator Editor", description: "Edit Navigator pathways and content", color: "#7c3aed" },
     { id: "challenge-cards", basePath: "/admin/challenge-cards", icon: GraduationCap, label: "Challenge Card Generator", description: "Generate visual challenge cards for social media", color: "#059669" },
     { id: "social-content", basePath: "/admin/social-content", icon: Image, label: "Social Content Generator", description: "Create branded social media content", color: "#f97316" },
-    { id: "question-bank-social-cards", basePath: "/admin/question-bank-social-cards", icon: Image, label: "Question Bank Social Cards", description: "Create branded clinical image, video, or no-media quiz cards", color: "#0ea5a4" },
+    { id: "question-bank-social-cards", basePath: "/admin/question-bank-social-cards", icon: Image, label: "Quiz Card Generator", description: "Create social-ready Question Bank quiz cards with a linked, uploaded, or Media Repository image/video", color: "#0ea5a4" },
     { id: "soundbytes", basePath: "/admin/soundbytes", icon: Volume2, label: "SoundBytes Admin", description: "Manage SoundBytes audio content and playlists", color: "#7c3aed" },
   ] as const;
 

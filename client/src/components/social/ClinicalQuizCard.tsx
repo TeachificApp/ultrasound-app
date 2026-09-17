@@ -32,6 +32,7 @@ export const CLINICAL_QUIZ_CARD_TEMPLATES: Array<{
 ];
 
 const CARD_SIZE = 1080;
+const OPTION_LETTERS = ["A", "B", "C", "D", "E"];
 export const CLINICAL_MEDIA_FRAME = { x: 112, y: 378, width: 856, height: 430, inset: 12 };
 
 function stripHtml(value: string): string {
@@ -222,8 +223,8 @@ export function ClinicalQuizCard({
         }}
       >
         {visibleOptions.map((option, index) => (
-          <div key={`${option}-${index}`} style={{ display: "flex", alignItems: "flex-start", gap: 15, minWidth: 0 }}>
-            <span style={{ color: theme.accent, fontSize: fit.optionNumberSize, fontWeight: 900, lineHeight: 1.2, flexShrink: 0 }}>{index + 1}.</span>
+          <div key={`${index}-${option}`} style={{ display: "flex", gap: 14, alignItems: "flex-start", minWidth: 0 }}>
+            <span style={{ color: theme.accent, fontSize: fit.optionNumberSize, fontWeight: 900, lineHeight: 1.2, flexShrink: 0 }}>{OPTION_LETTERS[index] ?? `${index + 1}`}</span>
             <span style={{ color: theme.text, fontSize: fit.optionSize, fontWeight: 800, lineHeight: 1.2 }}>{option}</span>
           </div>
         ))}
@@ -270,44 +271,49 @@ function ClinicalQuizAnswerCard({
         position: "relative",
         overflow: "hidden",
         boxSizing: "border-box",
-        padding: "62px 76px 48px",
+        padding: "50px 66px 44px",
         fontFamily: "'Segoe UI', Arial, sans-serif",
         background: theme.background,
         color: theme.text,
       }}
     >
-      <header style={{ display: "flex", alignItems: "center", gap: 26, minHeight: 118 }}>
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, minHeight: 76 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18, minWidth: 0 }}>
         <img
           src={presentation.logoUrl}
           alt={presentation.displayName}
           crossOrigin="anonymous"
-          style={{ width: 116, height: 116, borderRadius: "50%", objectFit: "cover", background: "#ffffff", border: `3px solid ${theme.accent}`, flexShrink: 0 }}
+          style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", background: "#ffffff", border: `2px solid ${theme.accent}`, flexShrink: 0 }}
         />
         <div>
-          <div style={{ color: theme.text, fontSize: 22, fontWeight: 800, letterSpacing: 2.6, opacity: 0.78 }}>CLINICAL QUIZ ANSWER</div>
-          <div style={{ color: theme.text, fontSize: 30, fontWeight: 800, lineHeight: 1.15, marginTop: 5 }}>{presentation.displayName}</div>
+          <div style={{ color: theme.text, fontSize: 23, fontWeight: 900, lineHeight: 1.1 }}>{presentation.displayName}</div>
+          <div style={{ color: theme.text, fontSize: 12, fontWeight: 800, letterSpacing: 1.8, opacity: 0.68, marginTop: 5 }}>DAILY CLINICAL CHALLENGE</div>
         </div>
+        </div>
+        <div style={{ color: theme.accent, border: `2px solid ${theme.accent}`, borderRadius: 999, padding: "8px 18px", fontSize: 14, fontWeight: 900, letterSpacing: 1.4, flexShrink: 0 }}>ANSWER</div>
       </header>
 
-      {title && <div style={{ color: theme.text, fontSize: 20, fontWeight: 700, opacity: 0.72, marginTop: 18, letterSpacing: 0.7 }}>{title}</div>}
+      {title && <div style={{ color: theme.text, fontSize: 15, fontWeight: 800, opacity: 0.7, marginTop: 16, letterSpacing: 0.8, textTransform: "uppercase" }}>{title}</div>}
 
-      <section style={{ marginTop: title ? 18 : 28, borderLeft: `6px solid ${theme.accent}`, paddingLeft: 22 }}>
+      <div style={{ width: 58, height: 4, background: theme.accent, borderRadius: 999, marginTop: title ? 13 : 20 }} />
+
+      <section style={{ marginTop: 16, borderLeft: `5px solid ${theme.accent}`, paddingLeft: 18 }}>
         <div style={{ color: theme.text, fontSize: fit.recapSize, fontWeight: 700, lineHeight: 1.25, opacity: 0.82 }}>{questionText}</div>
       </section>
 
-      <section style={{ marginTop: 26, border: `4px solid ${theme.accent}`, borderRadius: 18, padding: `${fit.sectionPadding}px 28px`, background: `${theme.accent}1a` }}>
-        <div style={{ color: theme.accent, fontSize: 17, fontWeight: 900, letterSpacing: 2.2 }}>CORRECT ANSWER</div>
-        <div style={{ color: theme.text, fontSize: fit.answerSize, fontWeight: 900, lineHeight: 1.18, marginTop: 12 }}>{answerText}</div>
+      <section style={{ marginTop: 22, border: `3px solid ${theme.accent}`, borderRadius: 15, padding: `${fit.sectionPadding}px 24px`, background: `${theme.accent}16` }}>
+        <div style={{ color: theme.accent, fontSize: 14, fontWeight: 900, letterSpacing: 1.8 }}>CORRECT ANSWER</div>
+        <div style={{ color: theme.text, fontSize: fit.answerSize, fontWeight: 900, lineHeight: 1.16, marginTop: 10 }}>{answerText}</div>
       </section>
 
       {explanation && (
-        <section style={{ marginTop: 22, border: `2px solid ${theme.accent}88`, borderRadius: 16, padding: `${fit.sectionPadding}px 26px`, background: `${theme.accent}0d` }}>
-          <div style={{ color: theme.accent, fontSize: 16, fontWeight: 900, letterSpacing: 2 }}>EXPLANATION</div>
-          <div style={{ color: theme.text, fontSize: fit.explanationSize, fontWeight: 650, lineHeight: 1.38, marginTop: 10 }}>{stripHtml(explanation)}</div>
+        <section style={{ marginTop: 17, border: `1px solid ${theme.accent}88`, borderRadius: 13, padding: `${fit.sectionPadding}px 22px`, background: `${theme.accent}0b` }}>
+          <div style={{ color: theme.accent, fontSize: 13, fontWeight: 900, letterSpacing: 1.7 }}>EXPLANATION</div>
+          <div style={{ color: theme.text, fontSize: fit.explanationSize, fontWeight: 650, lineHeight: 1.34, marginTop: 8 }}>{stripHtml(explanation)}</div>
         </section>
       )}
 
-      <footer style={{ position: "absolute", bottom: 42, left: 74, right: 74, textAlign: "center", color: theme.accent, fontSize: 23, fontWeight: 800, letterSpacing: 0.4 }}>{presentation.appHost}</footer>
+      <footer style={{ position: "absolute", bottom: 34, left: 66, right: 66, display: "flex", justifyContent: "space-between", color: theme.accent, fontSize: 13, fontWeight: 800, letterSpacing: 0.4 }}><span>{presentation.appHost}</span><span>Follow for daily clinical challenges</span></footer>
     </div>
   );
 }

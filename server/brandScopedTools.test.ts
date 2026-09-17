@@ -50,5 +50,9 @@ describe("selected-brand tool routing", () => {
     expect(clinicalCards).toContain("function ClinicalQuizAnswerCard");
     expect(clinicalCards).toContain("function getQuestionFit");
     expect(clinicalCards).toContain("function getAnswerFit");
+    expect(clinicalCards).toContain('const OPTION_LETTERS = ["A", "B", "C", "D", "E"]');
+    expect(clinicalCards).toContain("DAILY CLINICAL CHALLENGE");
+    expect(clinicalCards).toContain(">ANSWER<");
+    expect(platformAdmin).toContain('label: "Quiz Card Generator"');
   });
 });

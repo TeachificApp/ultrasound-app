@@ -566,3 +566,5 @@
 - [x] Keep Challenge Card question and answer outputs visually matched for every selected clinical template, including background, framing, typography, logo treatment, and selected-brand styling.
 - [x] Derive Challenge Card contextual labels from the actual selected challenge category or content-specific label, never from an unrelated hardcoded specialty label.
 - [x] Dynamically fit Challenge Card question, options, correct answer, and explanation typography and spacing so all content remains visible within the selected matched card template without clipping.
+- [x] Use A–D option labels on clinical Challenge Cards and align their answer-card hierarchy with the classic answer-card layout while retaining the selected clinical template.
+- [x] Make the all-Platform-Admin Question Bank Social Cards generator clearly discoverable from the approved Platform Admin engagement surface.
