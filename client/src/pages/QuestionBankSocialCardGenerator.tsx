@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Copy, Download, FileImage, FileVideo, Folder, ImageIcon, Loader2, Search, Upload, Video, X } from "lucide-react";
-import { saveAs } from "file-saver";
+import { ArrowLeft, Copy, Download, FileImage, FileVideo, Folder, ImageIcon, Loader2, Search, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -10,11 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import {
   CLINICAL_QUIZ_CARD_TEMPLATES,
   ClinicalQuizCard,
-  exportClinicalVideoCardAsMp4,
-  renderClinicalQuizCardToPng,
   type ClinicalCardMedia,
   type ClinicalQuizCardTemplate,
 } from "@/components/social/ClinicalQuizCard";
+import {
+  DEFAULT_SOCIAL_EXPORT_PLATFORM,
+  exportSocialCard,
+  SocialExportControls,
+  type SocialExportFormat,
+  type SocialExportPlatform,
+} from "@/components/social/SocialCardExport";
 import { getBrandToolPresentation, resolveToolBrand } from "@/lib/brandToolPresentation";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
@@ -47,13 +51,24 @@ function getQuestionMedia(question: any): ClinicalCardMedia {
   return { kind: "none" };
 }
 
-function fileNameFor(question: any, extension: "png" | "mp4") {
+function fileStemFor(question: any, variant: "question" | "answer") {
   const stem = stripHtml(question?.question || "clinical-quiz-card")
     .slice(0, 52)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "") || "clinical-quiz-card";
-  return `${stem}.${extension}`;
+  return `${stem}-${variant}-card`;
+}
+
+function getCorrectAnswer(question: any): string | null {
+  const options = normalizeOptions(question?.options);
+  const raw = question?.correctAnswer;
+  const index = typeof raw === "number" ? raw : /^\d+$/.test(String(raw ?? "")) ? Number(raw) : -1;
+  if (index >= 0 && index < options.length) {
+    return `${OPTION_LETTERS[index] ?? String.fromCharCode(65 + index)}. ${stripHtml(options[index]?.text)}`;
+  }
+  const answer = stripHtml(String(raw ?? ""));
+  return answer || null;
 }
 
 function buildSocialCaption(question: any, presentation: ReturnType<typeof getBrandToolPresentation>, cardLabel?: string) {
@@ -87,11 +102,13 @@ export default function QuestionBankSocialCardGenerator() {
   const [selectedQuestionId, setSelectedQuestionId] = useState<number | null>(null);
   const [template, setTemplate] = useState<ClinicalQuizCardTemplate>("clinical-white");
   const [media, setMedia] = useState<ClinicalCardMedia>({ kind: "none" });
+  const [cardVariant, setCardVariant] = useState<"question" | "answer">("question");
+  const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
+  const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [exporting, setExporting] = useState<"png" | "mp4" | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  const videoBaseCardRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const questionQueryInput = useMemo(() => ({
@@ -112,6 +129,7 @@ export default function QuestionBankSocialCardGenerator() {
   const questionMedia = useMemo(() => selectedQuestion ? getQuestionMedia(selectedQuestion) : { kind: "none" } as ClinicalCardMedia, [selectedQuestion]);
   const mediaAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, page: 1, pageSize: 24 });
   const options = useMemo(() => normalizeOptions(selectedQuestion?.options).map((option) => option.text), [selectedQuestion?.options]);
+  const correctAnswer = useMemo(() => getCorrectAnswer(selectedQuestion), [selectedQuestion]);
   const sourceFolderLabel = useMemo(() => foldersQuery.data?.find((folder: any) => folder.id === selectedQuestion?.folderId)?.name?.trim(), [foldersQuery.data, selectedQuestion?.folderId]);
   const cardLabel = useMemo(() => customCardLabel.trim() || (includeSourceFolderLabel ? sourceFolderLabel : undefined), [customCardLabel, includeSourceFolderLabel, sourceFolderLabel]);
   const caption = useMemo(() => buildSocialCaption(selectedQuestion, presentation, cardLabel), [cardLabel, selectedQuestion, presentation]);
@@ -119,6 +137,7 @@ export default function QuestionBankSocialCardGenerator() {
   const selectQuestion = useCallback((question: any) => {
     setSelectedQuestionId(question.id);
     setMedia(getQuestionMedia(question));
+    setCardVariant("question");
   }, []);
 
   const resetQuestionBrowserPage = useCallback(() => {
@@ -173,32 +192,26 @@ export default function QuestionBankSocialCardGenerator() {
     }
   }, [mediaAssets, presentation.brand]);
 
-  const exportPng = useCallback(async () => {
+  const exportCard = useCallback(async () => {
     if (!cardRef.current || !selectedQuestion) return;
-    setExporting("png");
+    setExporting(exportFormat);
     try {
-      const image = await renderClinicalQuizCardToPng(cardRef.current);
-      const blob = await fetch(image).then((response) => response.blob());
-      saveAs(blob, fileNameFor(selectedQuestion, "png"));
-    } catch {
-      toast.error("PNG export failed. Please try again.");
-    } finally {
-      setExporting(null);
-    }
-  }, [selectedQuestion]);
-
-  const exportMp4 = useCallback(async () => {
-    if (media.kind !== "video" || !videoBaseCardRef.current || !selectedQuestion) return;
-    setExporting("mp4");
-    try {
-      await exportClinicalVideoCardAsMp4({ videoUrl: media.url, baseCardElement: videoBaseCardRef.current, fileName: fileNameFor(selectedQuestion, "mp4") });
-      toast.success("MP4 export is ready.");
+      const filename = await exportSocialCard({
+        cardElement: cardRef.current,
+        platform: exportPlatform,
+        format: exportFormat,
+        filenameStem: fileStemFor(selectedQuestion, cardVariant),
+        motion: cardVariant === "answer"
+          ? { kind: "answer", title: selectedQuestion.question, options, detail: "Review the question", answer: correctAnswer, brandName: presentation.displayName }
+          : { kind: "question", title: selectedQuestion.question, options, brandName: presentation.displayName },
+      });
+      toast.success(`${exportFormat.toUpperCase()} export is ready.`, { description: filename });
     } catch (error: any) {
-      toast.error(error?.message ?? "MP4 export failed. Use a browser-supported MP4 video and try again.");
+      toast.error(error?.message ?? `${exportFormat.toUpperCase()} export failed. Please try again.`);
     } finally {
       setExporting(null);
     }
-  }, [media, selectedQuestion]);
+  }, [cardVariant, correctAnswer, exportFormat, exportPlatform, options, presentation.displayName, selectedQuestion]);
 
   const copyCaption = useCallback(async () => {
     try {
@@ -248,10 +261,10 @@ export default function QuestionBankSocialCardGenerator() {
             <div className="flex min-h-[700px] flex-col items-center justify-center text-center text-white/50"><ImageIcon className="mb-3 h-10 w-10 text-teal-200/60" /><p className="font-semibold text-white/75">Choose a Question Bank question</p><p className="mt-1 max-w-sm text-sm">The generator will prefer its existing clinical image or video. You can override it without changing the source question.</p></div>
           ) : (
             <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold">3. Preview and export</h2><p className="mt-1 text-xs text-white/50">Question, answers, selected card brand, and clinical media are rendered in a 1080 × 1080 social card.</p></div><div className="flex gap-2"><Button size="sm" onClick={exportPng} disabled={exporting !== null} className="gap-1.5 bg-teal-500 text-white hover:bg-teal-400"><Download className="h-3.5 w-3.5" />{exporting === "png" ? "Exporting" : "PNG"}</Button>{media.kind === "video" && <Button size="sm" onClick={exportMp4} disabled={exporting !== null} className="gap-1.5 bg-indigo-500 text-white hover:bg-indigo-400"><Video className="h-3.5 w-3.5" />{exporting === "mp4" ? "Rendering MP4" : "MP4"}</Button>}</div></div>
-              <div className="overflow-auto rounded-lg border border-white/10 bg-black/20 p-4"><div style={{ width: 648, transform: "scale(0.6)", transformOrigin: "top left", height: 648 }}><div ref={cardRef}><ClinicalQuizCard presentation={presentation} template={template} question={selectedQuestion.question} options={options} media={media} title={cardLabel} footerHost={presentation.publicHost} answerContextLabel="CLINICAL QUIZ" answerFooterMessage="Follow for clinical learning" /></div></div></div>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold">3. Preview and export</h2><p className="mt-1 text-xs text-white/50">Export a Question or Answer card at the selected social-platform size as a full PNG or an animated MP4.</p></div><Button size="sm" onClick={exportCard} disabled={exporting !== null} className="gap-1.5 bg-teal-500 text-white hover:bg-teal-400"><Download className="h-3.5 w-3.5" />{exporting ? `Rendering ${exporting.toUpperCase()}` : `Download ${exportFormat.toUpperCase()}`}</Button></div>
+              <div className="mb-3 flex overflow-hidden rounded-lg border border-white/10"><button onClick={() => setCardVariant("question")} className={`flex-1 px-3 py-2 text-xs font-bold ${cardVariant === "question" ? "bg-teal-500 text-white" : "bg-white/[0.03] text-white/55 hover:bg-white/10"}`}>Question card</button><button onClick={() => setCardVariant("answer")} className={`flex-1 px-3 py-2 text-xs font-bold ${cardVariant === "answer" ? "bg-teal-500 text-white" : "bg-white/[0.03] text-white/55 hover:bg-white/10"}`}>Answer card</button></div>
+              <div className="overflow-auto rounded-lg border border-white/10 bg-black/20 p-4"><div style={{ width: 648, transform: "scale(0.6)", transformOrigin: "top left", height: 648 }}><div ref={cardRef}><ClinicalQuizCard presentation={presentation} template={template} variant={cardVariant} question={selectedQuestion.question} options={options} media={cardVariant === "question" ? media : { kind: "none" }} correctAnswer={correctAnswer} explanation={selectedQuestion.explanation} title={cardLabel} footerHost={presentation.publicHost} answerContextLabel="CLINICAL QUIZ" answerFooterMessage="Follow for clinical learning" /></div></div></div>
               <div className="mt-4 rounded-lg border border-white/10 bg-black/15 p-3"><div className="mb-2 flex items-center justify-between"><span className="text-xs font-bold text-teal-100">Social caption</span><Button size="sm" variant="ghost" onClick={copyCaption} className="h-7 gap-1 text-xs text-white/70 hover:bg-white/10 hover:text-white"><Copy className="h-3 w-3" />Copy</Button></div><pre className="max-h-40 overflow-y-auto whitespace-pre-wrap font-sans text-xs leading-relaxed text-white/60">{caption}</pre></div>
-              <div style={{ position: "fixed", left: -12000, top: 0, width: 1080, pointerEvents: "none" }} aria-hidden="true"><div ref={videoBaseCardRef}><ClinicalQuizCard presentation={presentation} template={template} question={selectedQuestion.question} options={options} media={{ kind: "placeholder" }} title={cardLabel} footerHost={presentation.publicHost} answerContextLabel="CLINICAL QUIZ" answerFooterMessage="Follow for clinical learning" /></div></div>
             </>
           )}
         </section>
@@ -259,8 +272,9 @@ export default function QuestionBankSocialCardGenerator() {
         <aside className="space-y-4">
           <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><h2 className="text-sm font-bold">2. Card brand</h2><p className="mt-1 text-xs leading-relaxed text-white/50">The output brand is independent from the selected source question and protected route.</p><div className="mt-3 grid grid-cols-2 gap-2"><Button size="sm" variant="outline" onClick={() => setCardBrand("aaus")} className={`h-auto whitespace-normal border-white/15 p-2 text-left ${cardBrand === "aaus" ? "border-teal-200 bg-teal-300/15 text-teal-100" : "text-white/65 hover:bg-white/10"}`}>All About Ultrasound</Button><Button size="sm" variant="outline" onClick={() => setCardBrand("iheartecho")} className={`h-auto whitespace-normal border-white/15 p-2 text-left ${cardBrand === "iheartecho" ? "border-teal-200 bg-teal-300/15 text-teal-100" : "text-white/65 hover:bg-white/10"}`}>iHeartEcho</Button></div><p className="mt-3 text-[11px] text-teal-100">Card link: {presentation.publicHost}</p></section>
           <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><h2 className="text-sm font-bold">3. Optional card label</h2><p className="mt-1 text-xs leading-relaxed text-white/50">Add the selected question’s source folder or a custom display name. This changes only this exported card and caption.</p><label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-white/75"><input type="checkbox" checked={includeSourceFolderLabel} onChange={(event) => setIncludeSourceFolderLabel(event.target.checked)} disabled={!sourceFolderLabel} className="mt-0.5 accent-teal-400" /><span>Include source folder{sourceFolderLabel ? `: ${sourceFolderLabel}` : " (no folder on this question)"}</span></label><label className="mt-3 block text-[11px] font-bold uppercase tracking-wide text-white/50">Custom display name<Input value={customCardLabel} onChange={(event) => setCustomCardLabel(event.target.value.slice(0, 120))} placeholder="e.g., RPhS Quiz" className="mt-1.5 border-white/10 bg-white/5 text-white placeholder:text-white/35" /></label>{cardLabel && <p className="mt-2 text-[11px] text-teal-100">Output label: {cardLabel}</p>}</section>
-          <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><h2 className="text-sm font-bold">4. Card style</h2><div className="mt-3 grid grid-cols-2 gap-2">{CLINICAL_QUIZ_CARD_TEMPLATES.map((item) => <button key={item.id} onClick={() => setTemplate(item.id)} className={`rounded-lg border p-2 text-left transition-colors ${template === item.id ? "border-teal-200 ring-1 ring-teal-200" : "border-white/10"}`} style={{ background: item.background, color: item.text }}><div className="h-8 rounded" style={{ background: item.accent }} /><span className="mt-2 block text-xs font-bold">{item.label}</span></button>)}</div></section>
-          <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><div className="flex items-center justify-between"><h2 className="text-sm font-bold">5. Clinical media</h2>{media.kind !== "none" && <Button size="sm" variant="ghost" onClick={() => setMedia({ kind: "none" })} className="h-7 gap-1 text-xs text-white/65 hover:bg-white/10 hover:text-white"><X className="h-3 w-3" />No media</Button>}</div><p className="mt-1 text-xs leading-relaxed text-white/50">Existing Question Bank media is selected first. Any override affects this social card only.</p>
+          <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><h2 className="text-sm font-bold">4. Platform export</h2><p className="mt-1 text-xs leading-relaxed text-white/50">Choose each destination’s dimensions. MP4 animates the prompt and answer sequence before revealing the completed card.</p><div className="mt-3"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} compact /></div></section>
+          <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><h2 className="text-sm font-bold">5. Card style</h2><div className="mt-3 grid grid-cols-2 gap-2">{CLINICAL_QUIZ_CARD_TEMPLATES.map((item) => <button key={item.id} onClick={() => setTemplate(item.id)} className={`rounded-lg border p-2 text-left transition-colors ${template === item.id ? "border-teal-200 ring-1 ring-teal-200" : "border-white/10"}`} style={{ background: item.background, color: item.text }}><div className="h-8 rounded" style={{ background: item.accent }} /><span className="mt-2 block text-xs font-bold">{item.label}</span></button>)}</div></section>
+          <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><div className="flex items-center justify-between"><h2 className="text-sm font-bold">6. Clinical media</h2>{media.kind !== "none" && <Button size="sm" variant="ghost" onClick={() => setMedia({ kind: "none" })} className="h-7 gap-1 text-xs text-white/65 hover:bg-white/10 hover:text-white"><X className="h-3 w-3" />No media</Button>}</div><p className="mt-1 text-xs leading-relaxed text-white/50">Existing Question Bank media is selected first. Any override affects this social card only.</p>
             <div className="mt-3 space-y-2">{questionMedia.kind !== "none" && <Button variant="outline" size="sm" onClick={() => setMedia(questionMedia)} className="w-full justify-start gap-2 border-teal-300/30 bg-teal-300/10 text-teal-100 hover:bg-teal-300/20"><FileImage className="h-3.5 w-3.5" />Use Question Bank media</Button>}<Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="w-full justify-start gap-2 border-white/15 text-white/80 hover:bg-white/10"><Upload className="h-3.5 w-3.5" />{uploading ? `Uploading ${uploadProgress}%` : "Upload image or video"}</Button><input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMedia(file); event.currentTarget.value = ""; }} /></div>
             <div className="mt-4 border-t border-white/10 pt-3"><p className="text-[11px] font-bold uppercase tracking-wide text-white/50">Media Repository</p><div className="mt-2 grid grid-cols-2 gap-2">{mediaAssets.data?.assets.filter((asset: any) => asset.mediaType === "image" || asset.mediaType === "video").map((asset: any) => <button key={asset.id} onClick={() => selectRepositoryAsset(asset)} className="overflow-hidden rounded-md border border-white/10 bg-black/20 text-left hover:border-teal-300/60"><div className="flex h-16 items-center justify-center bg-black">{asset.mediaType === "video" ? <FileVideo className="h-5 w-5 text-teal-200" /> : asset.currentVersion?.s3Url ? <img src={asset.currentVersion.s3Url} alt="" className="h-full w-full object-cover" /> : <FileImage className="h-5 w-5 text-teal-200" />}</div><span className="line-clamp-2 block p-1.5 text-[10px] text-white/70">{asset.title}</span></button>)}</div></div>
           </section>

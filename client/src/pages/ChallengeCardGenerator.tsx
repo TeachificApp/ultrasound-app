@@ -20,6 +20,15 @@ import { toast } from "sonner";
 import { getBrandToolPresentation, resolveToolBrand, type BrandToolPresentation } from "@/lib/brandToolPresentation";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 import { ClinicalQuizCard, type ClinicalQuizCardTemplate } from "@/components/social/ClinicalQuizCard";
+import {
+  DEFAULT_SOCIAL_EXPORT_PLATFORM,
+  exportSocialCard,
+  renderSocialCard,
+  SocialExportControls,
+  type CardMotion,
+  type SocialExportFormat,
+  type SocialExportPlatform,
+} from "@/components/social/SocialCardExport";
 
 // Brand palette
 const BRAND = "#189aa1";
@@ -733,6 +742,8 @@ function AnswerCard({
 
 interface DownloadableCardHandle {
   exportPng: () => Promise<string>;
+  exportPlatform: (platform: SocialExportPlatform, format: SocialExportFormat, motion: CardMotion) => Promise<string>;
+  renderPlatform: (platform: SocialExportPlatform, format: SocialExportFormat, motion: CardMotion) => Promise<Blob>;
 }
 
 const PREVIEW_SIZE = 700;
@@ -742,10 +753,16 @@ function DownloadableCard({
   filename,
   children,
   onRef,
+  platform,
+  format,
+  motion,
 }: {
   filename: string;
   children: React.ReactNode;
   onRef?: (handle: DownloadableCardHandle) => void;
+  platform: SocialExportPlatform;
+  format: SocialExportFormat;
+  motion: CardMotion;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -754,28 +771,42 @@ function DownloadableCard({
     return renderCardToPng(ref.current);
   }, []);
 
+  const exportPlatform = useCallback(async (
+    platform: SocialExportPlatform,
+    format: SocialExportFormat,
+    motion: CardMotion,
+  ): Promise<string> => {
+    if (!ref.current) throw new Error("Card not mounted");
+    return exportSocialCard({ cardElement: ref.current, platform, format, filenameStem: filename, motion });
+  }, [filename]);
+
+  const renderPlatform = useCallback(async (
+    platform: SocialExportPlatform,
+    format: SocialExportFormat,
+    motion: CardMotion,
+  ): Promise<Blob> => {
+    if (!ref.current) throw new Error("Card not mounted");
+    return renderSocialCard({ cardElement: ref.current, platform, format, motion });
+  }, []);
+
   const refCallback = useCallback(
     (el: HTMLDivElement | null) => {
       (ref as any).current = el;
       if (el && onRef) {
-        onRef({ exportPng });
+        onRef({ exportPng, exportPlatform, renderPlatform });
       }
     },
-    [exportPng, onRef]
+    [exportPlatform, exportPng, onRef, renderPlatform]
   );
 
   const handleDownload = useCallback(async () => {
     try {
-      const dataUrl = await exportPng();
-      const link = document.createElement("a");
-      link.download = filename;
-      link.href = dataUrl;
-      link.click();
+      await exportPlatform(platform, format, motion);
     } catch (err) {
       console.error("Card export failed:", err);
-      toast.error("Export failed. Please try again.");
+      toast.error(err instanceof Error ? err.message : "Export failed. Please try again.");
     }
-  }, [exportPng, filename]);
+  }, [exportPlatform, format, motion, platform]);
 
   return (
     <div className="flex flex-col">
@@ -816,7 +847,7 @@ function DownloadableCard({
         }}
       >
         <Download className="w-3 h-3" />
-        Download PNG
+        Download {format.toUpperCase()}
       </Button>
     </div>
   );
@@ -931,6 +962,8 @@ function CategorySection({
   date,
   presentation,
   template,
+  exportPlatform,
+  exportFormat,
 }: {
   item: CategoryItem;
   onQuestionRef: (cat: string, h: DownloadableCardHandle) => void;
@@ -939,6 +972,8 @@ function CategorySection({
   date: string;
   presentation: BrandToolPresentation;
   template: ChallengeCardTemplate;
+  exportPlatform: SocialExportPlatform;
+  exportFormat: SocialExportFormat;
 }) {
   const t = theme === "dark" ? DARK_THEME : LIGHT_THEME;
   const { category, challenge, questions } = item;
@@ -962,6 +997,8 @@ function CategorySection({
       : null;
   const explanationText = q.explanation ? stripHtml(q.explanation) : null;
   const contextLabel = q.category?.trim() || category;
+  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName };
+  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName };
 
   return (
     <div className="rounded-lg border border-white/10 overflow-hidden" style={{ background: "#0e1a24" }}>
@@ -989,6 +1026,9 @@ function CategorySection({
             <DownloadableCard
               filename={`${category.replace(/\s+/g, "-")}-${date}-question.png`}
               onRef={(h) => onQuestionRef(category, h)}
+              platform={exportPlatform}
+              format={exportFormat}
+              motion={questionMotion}
             >
               {template === "classic" ? (
                 <QuestionCard challengeTitle={contextLabel} questionText={q.question} options={options} qid={q.qid} t={t} presentation={presentation} />
@@ -1006,6 +1046,9 @@ function CategorySection({
             <DownloadableCard
               filename={`${category.replace(/\s+/g, "-")}-${date}-answer.png`}
               onRef={(h) => onAnswerRef(category, h)}
+              platform={exportPlatform}
+              format={exportFormat}
+              motion={answerMotion}
             >
               {template === "classic" ? (
                 <AnswerCard
@@ -1128,6 +1171,8 @@ export default function ChallengeCardGenerator() {
 
   const [cardTheme, setCardTheme] = useState<CardTheme>("dark");
   const [cardTemplate, setCardTemplate] = useState<ChallengeCardTemplate>("classic");
+  const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
+  const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
 
   const questionRefs = useRef<Record<string, DownloadableCardHandle>>({});
   const answerRefs = useRef<Record<string, DownloadableCardHandle>>({});
@@ -1139,26 +1184,30 @@ export default function ChallengeCardGenerator() {
     const zip = new JSZip();
     const folder = zip.folder(type === "questions" ? "question-cards" : "answer-cards")!;
     try {
-      await Promise.all(
-        Object.entries(refs).map(async ([cat, handle]) => {
-          const dataUrl = await handle.exportPng();
-          const base64 = dataUrl.split(",")[1];
-          folder.file(
-            `${cat.replace(/\s+/g, "-")}-${type === "questions" ? "question" : "answer"}.png`,
-            base64,
-            { base64: true }
-          );
-        })
-      );
+      for (const [cat, handle] of Object.entries(refs)) {
+        const item = data?.find((candidate: any) => candidate.category === cat);
+        const question = item?.questions?.[0];
+        if (!question) continue;
+        const options = parseOptions(question.options);
+        const letters = ["A", "B", "C", "D", "E"];
+        const answer = options.length > 0 && question.correctAnswer != null
+          ? `${letters[question.correctAnswer]}. ${stripHtml(options[question.correctAnswer] ?? "")}`
+          : question.reviewAnswer ? stripHtml(question.reviewAnswer) : null;
+        const motion: CardMotion = type === "questions"
+          ? { kind: "question", title: question.question, options, brandName: presentation.displayName }
+          : { kind: "answer", title: question.question, options, detail: "Review the question", answer, brandName: presentation.displayName };
+        const file = await handle.renderPlatform(exportPlatform, exportFormat, motion);
+        folder.file(`${cat.replace(/\s+/g, "-")}-${type === "questions" ? "question" : "answer"}.${exportFormat}`, await file.arrayBuffer());
+      }
       const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, `${presentation.brand}-${type}-${selectedDate}.zip`);
+      saveAs(blob, `${presentation.brand}-${type}-${exportPlatform}-${exportFormat}-${selectedDate}.zip`);
     } catch (err) {
       console.error("Batch export failed:", err);
       toast.error("Batch export failed. Please try again.");
     } finally {
       setBatchLoading(null);
     }
-  }, [presentation.brand, selectedDate]);
+  }, [data, exportFormat, exportPlatform, presentation.brand, presentation.displayName, selectedDate]);
 
   // Navigation helpers
   const dates = availableDates ?? [today];
@@ -1317,6 +1366,15 @@ export default function ChallengeCardGenerator() {
       </div>
 
       <div className="max-w-screen-2xl mx-auto px-6 py-4">
+        <section className="mb-4 rounded-lg border border-white/10 bg-[#0e1a24] p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-white/80">Platform export</h2>
+              <p className="mt-1 text-[11px] text-white/45">PNG keeps every card fully visible. MP4 animates question and answer cards, then ends on the finished design.</p>
+            </div>
+            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} compact /></div>
+          </div>
+        </section>
         {/* Info bar */}
         <div
           className="rounded-lg p-3 mb-4 text-xs"
@@ -1327,7 +1385,7 @@ export default function ChallengeCardGenerator() {
               ? <>Cards are generated from the <strong className="text-white">next queued challenge</strong> per category.</>
               : <>Showing cards for <strong className="text-white">{selectedDate}</strong> — use ‹ › to browse up to 30 days back.</>
             }{" "}
-            Each card is <strong className="text-white">1080×1080 px</strong> — ideal for Instagram, Facebook, and LinkedIn.
+            Select Facebook, Instagram, LinkedIn, X, Reel, TikTok, YouTube Video, or YouTube Short export sizes above.
             Post the question card first, then the answer card 24 hours later.
             Use <strong className="text-white">All Questions</strong> or <strong className="text-white">All Answers</strong> to download a ZIP of all cards at once.
             Click <strong className="text-white">Copy</strong> on any social post to get a ready-to-paste caption with hashtags.
@@ -1368,6 +1426,8 @@ export default function ChallengeCardGenerator() {
                   date={selectedDate}
                   presentation={presentation}
                   template={cardTemplate}
+                  exportPlatform={exportPlatform}
+                  exportFormat={exportFormat}
                   onQuestionRef={(cat, h) => { questionRefs.current[cat] = h; }}
                   onAnswerRef={(cat, h) => { answerRefs.current[cat] = h; }}
                 />

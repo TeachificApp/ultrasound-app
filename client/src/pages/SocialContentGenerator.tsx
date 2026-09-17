@@ -25,6 +25,15 @@ import { toast } from "sonner";
 import { getBrandToolPresentation, resolveToolBrand, STANDARD_SOCIAL_HASHTAGS, type BrandToolPresentation } from "@/lib/brandToolPresentation";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
+import {
+  DEFAULT_SOCIAL_EXPORT_PLATFORM,
+  exportSocialCard,
+  renderSocialCard,
+  SocialExportControls,
+  type CardMotion,
+  type SocialExportFormat,
+  type SocialExportPlatform,
+} from "@/components/social/SocialCardExport";
 
 // ── Brand palette ────────────────────────────────────────────────────────────
 const BRAND = "#189aa1";
@@ -397,33 +406,63 @@ function InfographicCard({ item, t, presentation }: { item: GeneratedItem; t: Th
 }
 
 // ── Downloadable wrapper ─────────────────────────────────────────────────────
-interface CardHandle { exportPng: () => Promise<string>; }
+interface CardHandle {
+  exportPng: () => Promise<string>;
+  exportPlatform: (platform: SocialExportPlatform, format: SocialExportFormat, motion: CardMotion) => Promise<string>;
+  renderPlatform: (platform: SocialExportPlatform, format: SocialExportFormat, motion: CardMotion) => Promise<Blob>;
+}
 const PREVIEW_SIZE = 540;
 const SCALE = PREVIEW_SIZE / 1080;
 
-function DownloadableCard({ filename, children, onRef }: { filename: string; children: React.ReactNode; onRef?: (handle: CardHandle) => void }) {
+function DownloadableCard({
+  filename,
+  children,
+  onRef,
+  platform,
+  format,
+  motion,
+}: {
+  filename: string;
+  children: React.ReactNode;
+  onRef?: (handle: CardHandle) => void;
+  platform: SocialExportPlatform;
+  format: SocialExportFormat;
+  motion: CardMotion;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const exportPng = useCallback(async (): Promise<string> => {
     if (!ref.current) throw new Error("Card not mounted");
     return renderCardToPng(ref.current);
   }, []);
+  const exportPlatform = useCallback(async (
+    nextPlatform: SocialExportPlatform,
+    nextFormat: SocialExportFormat,
+    nextMotion: CardMotion,
+  ): Promise<string> => {
+    if (!ref.current) throw new Error("Card not mounted");
+    return exportSocialCard({ cardElement: ref.current, platform: nextPlatform, format: nextFormat, filenameStem: filename, motion: nextMotion });
+  }, [filename]);
+  const renderPlatform = useCallback(async (
+    nextPlatform: SocialExportPlatform,
+    nextFormat: SocialExportFormat,
+    nextMotion: CardMotion,
+  ): Promise<Blob> => {
+    if (!ref.current) throw new Error("Card not mounted");
+    return renderSocialCard({ cardElement: ref.current, platform: nextPlatform, format: nextFormat, motion: nextMotion });
+  }, []);
   const refCallback = useCallback((el: HTMLDivElement | null) => {
     (ref as any).current = el;
-    if (el && onRef) onRef({ exportPng });
-  }, [exportPng, onRef]);
+    if (el && onRef) onRef({ exportPng, exportPlatform, renderPlatform });
+  }, [exportPlatform, exportPng, onRef, renderPlatform]);
   const handleDownload = useCallback(async () => {
     try {
-      const dataUrl = await exportPng();
-      const link = document.createElement("a");
-      link.download = filename;
-      link.href = dataUrl;
-      link.click();
-      toast.success("Downloaded!", { description: filename });
+      const savedFile = await exportPlatform(platform, format, motion);
+      toast.success("Downloaded!", { description: savedFile });
     } catch (err) {
       console.error("Card export failed:", err);
-      toast.error("Export failed. Please try again.");
+      toast.error(err instanceof Error ? err.message : "Export failed. Please try again.");
     }
-  }, [exportPng, filename]);
+  }, [exportPlatform, format, motion, platform]);
   return (
     <div className="flex flex-col">
       <div style={{ width: PREVIEW_SIZE, position: "relative", overflow: "hidden", borderRadius: "10px 10px 0 0", border: "1px solid rgba(255,255,255,0.1)", borderBottom: "none", background: "#0a1620", flexShrink: 0 }}>
@@ -434,7 +473,7 @@ function DownloadableCard({ filename, children, onRef }: { filename: string; chi
       </div>
       <Button onClick={handleDownload} size="sm" className="w-full gap-2 text-white font-semibold text-xs rounded-t-none" style={{ background: `linear-gradient(90deg, ${BRAND}, ${BRAND_DARK})`, borderRadius: "0 0 10px 10px" }}>
         <Download className="w-3 h-3" />
-        Download PNG
+        Download {format.toUpperCase()}
       </Button>
     </div>
   );
@@ -570,6 +609,8 @@ export default function SocialContentGenerator() {
   const [cardTheme, setCardTheme] = useState<CardTheme>("light");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("card");
   const [imageMode, setImageMode] = useState<ImageMode>("none");
+  const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
+  const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
   const [imageStyleHint, setImageStyleHint] = useState("");
   const [items, setItems] = useState<GeneratedItem[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
@@ -675,19 +716,22 @@ export default function SocialContentGenerator() {
     if (items.length === 0) return;
     setBatchLoading(true);
     const zip = new JSZip();
-    const folder = zip.folder("social-content-cards")!;
+    const folder = zip.folder(`social-content-${exportPlatform}-${exportFormat}`)!;
     try {
-      await Promise.all(
-        Object.entries(cardRefs.current).map(async ([idx, handle]) => {
-          const dataUrl = await handle.exportPng();
-          const base64 = dataUrl.split(",")[1];
-          const item = items[Number(idx)];
-          const name = `${item.contentType}-${item.category.replace(/[\s/]+/g, "-")}-${Number(idx) + 1}.png`;
-          folder.file(name, base64, { base64: true });
-        })
-      );
+      for (const [idx, handle] of Object.entries(cardRefs.current)) {
+        const item = items[Number(idx)];
+        if (!item) continue;
+        const card = await handle.renderPlatform(exportPlatform, exportFormat, {
+          kind: "social",
+          title: item.headline,
+          detail: item.body,
+          brandName: presentation.displayName,
+        });
+        const name = `${item.contentType}-${item.category.replace(/[\s/]+/g, "-")}-${Number(idx) + 1}.${exportFormat}`;
+        folder.file(name, await card.arrayBuffer());
+      }
       const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, `${presentation.brand}-social-content-${new Date().toISOString().slice(0, 10)}.zip`);
+      saveAs(blob, `${presentation.brand}-social-content-${exportPlatform}-${exportFormat}-${new Date().toISOString().slice(0, 10)}.zip`);
       toast.success("ZIP downloaded!");
     } catch (err) {
       console.error("Batch export failed:", err);
@@ -695,7 +739,7 @@ export default function SocialContentGenerator() {
     } finally {
       setBatchLoading(false);
     }
-  }, [items, presentation.brand]);
+  }, [exportFormat, exportPlatform, items, presentation.brand, presentation.displayName]);
 
   const t = cardTheme === "dark" ? DARK_THEME : LIGHT_THEME;
 
@@ -822,6 +866,14 @@ export default function SocialContentGenerator() {
             </Button>
           </div>
 
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/15 p-3">
+            <div>
+              <div className="text-xs font-bold text-white/80">Platform export</div>
+              <p className="mt-1 text-[11px] text-white/45">MP4 exports animate the headline and clinical insight, then finish on the completed card.</p>
+            </div>
+            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} compact /></div>
+          </div>
+
           {/* Image mode selector */}
           <div className="mt-3 rounded-lg p-3" style={{ background: imageMode !== "none" ? `${BRAND}12` : "rgba(255,255,255,0.02)", border: `1px solid ${imageMode !== "none" ? BRAND + "44" : "rgba(255,255,255,0.06)"}`, transition: "all 0.2s ease" }}>
             <div className="flex items-center gap-3">
@@ -903,6 +955,9 @@ export default function SocialContentGenerator() {
                 <DownloadableCard
                   filename={`${item.contentType}-${item.category.replace(/[\s/]+/g, "-")}-${idx + 1}.png`}
                   onRef={(handle) => { cardRefs.current[idx] = handle; }}
+                  platform={exportPlatform}
+                  format={exportFormat}
+                  motion={{ kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName }}
                 >
                   {layoutMode === "infographic" ? (
                     <InfographicCard item={item} t={t} presentation={presentation} />

@@ -1,0 +1,491 @@
+import { useMemo } from "react";
+import { saveAs } from "file-saver";
+import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from "mediabunny";
+import {
+  DEFAULT_SOCIAL_EXPORT_PLATFORM,
+  getSocialExportPreset,
+  socialExportFilename,
+  SOCIAL_EXPORT_PRESETS,
+  type SocialExportFormat,
+  type SocialExportPlatform,
+} from "@/lib/socialCardExportPresets";
+
+export type CardMotion = {
+  kind: "question" | "answer" | "social";
+  title: string;
+  options?: string[];
+  answer?: string | null;
+  detail?: string | null;
+  brandName?: string;
+  accentColor?: string;
+};
+
+type SocialCardExportOptions = {
+  cardElement: HTMLElement;
+  platform: SocialExportPlatform;
+  format: SocialExportFormat;
+  filenameStem: string;
+  motion: CardMotion;
+};
+
+type RenderedCard = {
+  image: ImageBitmap;
+  width: number;
+  height: number;
+};
+
+const SOURCE_WIDTH = 1080;
+const FRAME_RATE = 12;
+const MOTION_DURATION_SECONDS = 7;
+const FALLBACK_BACKGROUND = "#071318";
+
+function cleanText(value: string | null | undefined): string {
+  return (value ?? "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function easeOutBack(progress: number): number {
+  const x = clamp(progress, 0, 1) - 1;
+  return 1 + 2.70158 * x * x * x + 1.70158 * x * x;
+}
+
+function easeOut(progress: number): number {
+  const x = clamp(progress, 0, 1);
+  return 1 - (1 - x) ** 3;
+}
+
+function drawRoundedRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+  const r = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.arcTo(x + width, y, x + width, y + height, r);
+  context.arcTo(x + width, y + height, x, y + height, r);
+  context.arcTo(x, y + height, x, y, r);
+  context.arcTo(x, y, x + width, y, r);
+  context.closePath();
+}
+
+function wrapCanvasText(context: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number): string[] {
+  const words = cleanText(text).split(" ").filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (context.measureText(candidate).width <= maxWidth || !current) {
+      current = candidate;
+      continue;
+    }
+    lines.push(current);
+    current = word;
+    if (lines.length >= maxLines) break;
+  }
+  if (current && lines.length < maxLines) lines.push(current);
+  if (lines.length === maxLines && words.join(" ").length > lines.join(" ").length) {
+    lines[lines.length - 1] = `${lines[lines.length - 1].replace(/[.…]+$/, "")}…`;
+  }
+  return lines;
+}
+
+function drawWrappedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines: number,
+): number {
+  const lines = wrapCanvasText(context, text, maxWidth, maxLines);
+  lines.forEach((line, index) => context.fillText(line, x, y + index * lineHeight));
+  return lines.length * lineHeight;
+}
+
+async function cardToBitmap(cardElement: HTMLElement): Promise<RenderedCard> {
+  const { toPng } = await import("html-to-image");
+  await document.fonts?.ready;
+  const width = Math.max(1, cardElement.scrollWidth || cardElement.clientWidth || SOURCE_WIDTH);
+  const height = Math.max(1, cardElement.scrollHeight || cardElement.clientHeight || SOURCE_WIDTH);
+  const dataUrl = await toPng(cardElement, {
+    cacheBust: true,
+    pixelRatio: 1,
+    width,
+    height,
+  });
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return { image: await createImageBitmap(blob), width, height };
+}
+
+function getCardPlacement(
+  sourceWidth: number,
+  sourceHeight: number,
+  targetWidth: number,
+  targetHeight: number,
+): { x: number; y: number; width: number; height: number } {
+  const maxWidth = targetWidth * 0.92;
+  const maxHeight = targetHeight * 0.88;
+  const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
+  const width = Math.max(1, Math.round(sourceWidth * scale));
+  const height = Math.max(1, Math.round(sourceHeight * scale));
+  return {
+    x: Math.round((targetWidth - width) / 2),
+    y: Math.round((targetHeight - height) / 2),
+    width,
+    height,
+  };
+}
+
+function drawExportFrame(
+  context: CanvasRenderingContext2D,
+  card: RenderedCard,
+  targetWidth: number,
+  targetHeight: number,
+  overlayAlpha = 0,
+) {
+  const background = context.createLinearGradient(0, 0, targetWidth, targetHeight);
+  background.addColorStop(0, "#06141c");
+  background.addColorStop(0.48, "#0d3d44");
+  background.addColorStop(1, FALLBACK_BACKGROUND);
+  context.fillStyle = background;
+  context.fillRect(0, 0, targetWidth, targetHeight);
+
+  const placement = getCardPlacement(card.width, card.height, targetWidth, targetHeight);
+  context.save();
+  context.shadowColor = "rgba(0,0,0,0.42)";
+  context.shadowBlur = Math.max(18, Math.round(targetWidth * 0.024));
+  context.shadowOffsetY = Math.max(8, Math.round(targetHeight * 0.012));
+  drawRoundedRect(context, placement.x, placement.y, placement.width, placement.height, Math.max(12, Math.round(placement.width * 0.018)));
+  context.clip();
+  context.drawImage(card.image, placement.x, placement.y, placement.width, placement.height);
+  context.restore();
+
+  if (overlayAlpha > 0) {
+    context.fillStyle = `rgba(2, 11, 16, ${clamp(overlayAlpha, 0, 0.92)})`;
+    context.fillRect(0, 0, targetWidth, targetHeight);
+  }
+}
+
+function drawMotionPanel(
+  context: CanvasRenderingContext2D,
+  motion: CardMotion,
+  elapsed: number,
+  targetWidth: number,
+  targetHeight: number,
+) {
+  const accent = motion.accentColor ?? "#4ad9e0";
+  const isVertical = targetHeight / targetWidth > 1.2;
+  const panelWidth = Math.round(targetWidth * (isVertical ? 0.87 : 0.64));
+  const panelX = Math.round((targetWidth - panelWidth) / 2);
+  const panelTop = Math.round(targetHeight * (isVertical ? 0.18 : 0.16));
+  const panelBottom = Math.round(targetHeight * (isVertical ? 0.16 : 0.14));
+  const panelHeight = targetHeight - panelTop - panelBottom;
+  const scaled = targetWidth / 1080;
+  const labelFont = Math.max(15, Math.round(18 * scaled));
+  const titleFont = Math.max(28, Math.round(48 * scaled));
+  const optionFont = Math.max(18, Math.round(25 * scaled));
+  const padding = Math.max(24, Math.round(38 * scaled));
+
+  const panelProgress = easeOut((elapsed - 0.15) / 0.55);
+  context.save();
+  context.globalAlpha = panelProgress;
+  const translatedY = (1 - panelProgress) * Math.round(targetHeight * 0.04);
+  const panelGradient = context.createLinearGradient(panelX, panelTop, panelX + panelWidth, panelTop + panelHeight);
+  panelGradient.addColorStop(0, "rgba(6, 24, 33, 0.97)");
+  panelGradient.addColorStop(1, "rgba(8, 52, 59, 0.95)");
+  context.fillStyle = panelGradient;
+  drawRoundedRect(context, panelX, panelTop + translatedY, panelWidth, panelHeight, Math.max(18, Math.round(28 * scaled)));
+  context.fill();
+  context.strokeStyle = `${accent}bb`;
+  context.lineWidth = Math.max(2, Math.round(3 * scaled));
+  context.stroke();
+  context.restore();
+
+  if (panelProgress < 0.01) return;
+  const x = panelX + padding;
+  const contentWidth = panelWidth - padding * 2;
+  let y = panelTop + translatedY + padding + labelFont;
+
+  context.save();
+  context.globalAlpha = panelProgress;
+  context.fillStyle = accent;
+  context.font = `800 ${labelFont}px "Segoe UI", Arial, sans-serif`;
+  const motionLabel = motion.kind === "answer" ? "ANSWER REVEAL" : motion.kind === "question" ? "CLINICAL QUESTION" : "CLINICAL INSIGHT";
+  context.fillText(motionLabel, x, y);
+  y += labelFont * 1.7;
+
+  const titleProgress = easeOutBack((elapsed - 0.65) / 0.55);
+  if (titleProgress > 0) {
+    context.save();
+    context.globalAlpha = clamp(titleProgress, 0, 1);
+    context.translate(0, (1 - clamp(titleProgress, 0, 1)) * 36 * scaled);
+    context.fillStyle = "#ffffff";
+    context.font = `800 ${titleFont}px "Segoe UI", Arial, sans-serif`;
+    const titleHeight = drawWrappedText(context, motion.title, x, y, contentWidth, titleFont * 1.14, motion.kind === "social" ? 4 : 3);
+    context.restore();
+    y += titleHeight + Math.max(20, Math.round(26 * scaled));
+  }
+
+  if (motion.kind === "question" && motion.options?.length) {
+    motion.options.slice(0, 4).forEach((option, index) => {
+      const start = 1.65 + index * 0.68;
+      const progress = easeOutBack((elapsed - start) / 0.42);
+      if (progress <= 0) return;
+      const itemHeight = Math.max(54, Math.round(62 * scaled));
+      const visibleProgress = clamp(progress, 0, 1);
+      context.save();
+      context.globalAlpha = visibleProgress;
+      context.translate(0, (1 - visibleProgress) * 30 * scaled);
+      context.fillStyle = "rgba(255,255,255,0.085)";
+      drawRoundedRect(context, x, y, contentWidth, itemHeight, Math.max(10, Math.round(12 * scaled)));
+      context.fill();
+      context.strokeStyle = `${accent}99`;
+      context.lineWidth = Math.max(1, Math.round(1.5 * scaled));
+      context.stroke();
+      context.fillStyle = accent;
+      context.font = `900 ${Math.max(17, Math.round(21 * scaled))}px "Segoe UI", Arial, sans-serif`;
+      context.fillText(String.fromCharCode(65 + index), x + Math.round(18 * scaled), y + itemHeight / 2 + Math.round(7 * scaled));
+      context.fillStyle = "#ffffff";
+      context.font = `700 ${optionFont}px "Segoe UI", Arial, sans-serif`;
+      const optionLines = wrapCanvasText(context, option, contentWidth - Math.round(70 * scaled), 2);
+      context.fillText(optionLines[0] ?? "", x + Math.round(54 * scaled), y + itemHeight / 2 + Math.round(7 * scaled));
+      context.restore();
+      y += itemHeight + Math.max(11, Math.round(13 * scaled));
+    });
+  }
+
+  if (motion.kind === "answer") {
+    const answerLetter = motion.answer?.match(/^\s*([A-E])[.)]/i)?.[1]?.toUpperCase() ?? "A";
+    const answerIndex = Math.max(0, answerLetter.charCodeAt(0) - 65);
+    motion.options?.slice(0, 4).forEach((option, index) => {
+      const start = 1.65 + index * 0.36;
+      const progress = easeOutBack((elapsed - start) / 0.34);
+      if (progress <= 0) return;
+      const itemHeight = Math.max(46, Math.round(52 * scaled));
+      const visibleProgress = clamp(progress, 0, 1);
+      const isCorrectChoice = index === answerIndex;
+      context.save();
+      context.globalAlpha = visibleProgress;
+      context.translate(0, (1 - visibleProgress) * 24 * scaled);
+      context.fillStyle = isCorrectChoice ? "rgba(34,197,94,0.18)" : "rgba(255,255,255,0.075)";
+      drawRoundedRect(context, x, y, contentWidth, itemHeight, Math.max(8, Math.round(10 * scaled)));
+      context.fill();
+      context.strokeStyle = isCorrectChoice ? "rgba(74,222,128,0.92)" : `${accent}70`;
+      context.lineWidth = Math.max(1, Math.round(1.5 * scaled));
+      context.stroke();
+      context.fillStyle = isCorrectChoice ? "#86efac" : accent;
+      context.font = `900 ${Math.max(15, Math.round(18 * scaled))}px "Segoe UI", Arial, sans-serif`;
+      context.fillText(String.fromCharCode(65 + index), x + Math.round(17 * scaled), y + itemHeight / 2 + Math.round(6 * scaled));
+      context.fillStyle = "#ffffff";
+      context.font = `700 ${Math.max(16, Math.round(20 * scaled))}px "Segoe UI", Arial, sans-serif`;
+      context.fillText(wrapCanvasText(context, option, contentWidth - Math.round(64 * scaled), 1)[0] ?? "", x + Math.round(49 * scaled), y + itemHeight / 2 + Math.round(6 * scaled));
+      context.restore();
+      y += itemHeight + Math.max(8, Math.round(10 * scaled));
+    });
+
+    const answerProgress = easeOutBack((elapsed - 3.25) / 0.5);
+    if (answerProgress > 0 && motion.answer) {
+      const visibleProgress = clamp(answerProgress, 0, 1);
+      const answerHeight = Math.max(92, Math.round(122 * scaled));
+      context.save();
+      context.globalAlpha = visibleProgress;
+      context.translate(0, (1 - visibleProgress) * 40 * scaled);
+      context.fillStyle = "rgba(34,197,94,0.19)";
+      drawRoundedRect(context, x, y, contentWidth, answerHeight, Math.max(12, Math.round(15 * scaled)));
+      context.fill();
+      context.strokeStyle = "rgba(74,222,128,0.95)";
+      context.lineWidth = Math.max(2, Math.round(3 * scaled));
+      context.stroke();
+      context.fillStyle = "#86efac";
+      context.font = `900 ${labelFont}px "Segoe UI", Arial, sans-serif`;
+      context.fillText("CORRECT ANSWER", x + Math.round(20 * scaled), y + Math.round(27 * scaled));
+      context.fillStyle = "#ffffff";
+      context.font = `800 ${Math.max(optionFont, Math.round(30 * scaled))}px "Segoe UI", Arial, sans-serif`;
+      drawWrappedText(context, motion.answer, x + Math.round(20 * scaled), y + Math.round(65 * scaled), contentWidth - Math.round(40 * scaled), Math.max(optionFont, Math.round(30 * scaled)) * 1.12, 2);
+      context.restore();
+    }
+  }
+
+  if (motion.kind === "social" && motion.detail) {
+    const detailProgress = easeOutBack((elapsed - 1.85) / 0.55);
+    if (detailProgress > 0) {
+      const visibleProgress = clamp(detailProgress, 0, 1);
+      context.save();
+      context.globalAlpha = visibleProgress;
+      context.translate(0, (1 - visibleProgress) * 28 * scaled);
+      context.fillStyle = "rgba(255,255,255,0.08)";
+      drawRoundedRect(context, x, y, contentWidth, Math.max(120, Math.round(152 * scaled)), Math.max(12, Math.round(14 * scaled)));
+      context.fill();
+      context.fillStyle = "rgba(255,255,255,0.88)";
+      context.font = `600 ${optionFont}px "Segoe UI", Arial, sans-serif`;
+      drawWrappedText(context, motion.detail, x + Math.round(20 * scaled), y + Math.round(31 * scaled), contentWidth - Math.round(40 * scaled), optionFont * 1.35, 4);
+      context.restore();
+    }
+  }
+
+  const brandProgress = easeOut((elapsed - 4.8) / 0.4);
+  if (brandProgress > 0) {
+    context.globalAlpha = clamp(brandProgress, 0, 1);
+    context.fillStyle = accent;
+    context.font = `800 ${Math.max(15, Math.round(18 * scaled))}px "Segoe UI", Arial, sans-serif`;
+    const brand = motion.brandName ?? "Clinical education";
+    context.fillText(brand, x, panelTop + panelHeight - padding);
+  }
+  context.restore();
+}
+
+function drawMotionFrame(
+  context: CanvasRenderingContext2D,
+  card: RenderedCard,
+  motion: CardMotion,
+  elapsed: number,
+  targetWidth: number,
+  targetHeight: number,
+) {
+  const revealProgress = clamp((elapsed - 5.9) / 0.65, 0, 1);
+  drawExportFrame(context, card, targetWidth, targetHeight, 0.83 * (1 - revealProgress));
+  if (revealProgress < 1) drawMotionPanel(context, motion, elapsed, targetWidth, targetHeight);
+}
+
+async function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type));
+  if (!blob) throw new Error("The browser could not create the export file.");
+  return blob;
+}
+
+export async function renderSocialCardAsPng(cardElement: HTMLElement, platform: SocialExportPlatform): Promise<Blob> {
+  const preset = getSocialExportPreset(platform);
+  const card = await cardToBitmap(cardElement);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = preset.width;
+    canvas.height = preset.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas exports are not supported in this browser.");
+    drawExportFrame(context, card, preset.width, preset.height);
+    return await canvasToBlob(canvas, "image/png");
+  } finally {
+    card.image.close();
+  }
+}
+
+export async function renderSocialCardAsMp4(
+  cardElement: HTMLElement,
+  platform: SocialExportPlatform,
+  motion: CardMotion,
+): Promise<Blob> {
+  if (!("VideoEncoder" in window)) {
+    throw new Error("MP4 export needs a current Chromium-based browser with hardware video encoding.");
+  }
+  const preset = getSocialExportPreset(platform);
+  const card = await cardToBitmap(cardElement);
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = preset.width;
+    canvas.height = preset.height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas video export is not supported in this browser.");
+
+    const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
+    const source = new CanvasSource(canvas, { codec: "avc", bitrate: new Quality("high") });
+    output.addVideoTrack(source);
+    await output.start();
+    try {
+      const frames = MOTION_DURATION_SECONDS * FRAME_RATE;
+      for (let frame = 0; frame < frames; frame += 1) {
+        const elapsed = frame / FRAME_RATE;
+        drawMotionFrame(context, card, motion, elapsed, preset.width, preset.height);
+        await source.add(elapsed, 1 / FRAME_RATE);
+      }
+      await output.finalize();
+      const buffer = output.target.buffer;
+      if (!buffer) throw new Error("MP4 export did not produce a file.");
+      return new Blob([buffer], { type: "video/mp4" });
+    } catch (error) {
+      await output.cancel().catch(() => undefined);
+      throw error;
+    }
+  } finally {
+    card.image.close();
+  }
+}
+
+export async function renderSocialCard({
+  cardElement,
+  platform,
+  format,
+  motion,
+}: Omit<SocialCardExportOptions, "filenameStem">): Promise<Blob> {
+  return format === "png"
+    ? renderSocialCardAsPng(cardElement, platform)
+    : renderSocialCardAsMp4(cardElement, platform, motion);
+}
+
+export async function exportSocialCard(options: SocialCardExportOptions): Promise<string> {
+  const blob = await renderSocialCard(options);
+  const filename = socialExportFilename(options.filenameStem, options.platform, options.format);
+  saveAs(blob, filename);
+  return filename;
+}
+
+export function SocialExportControls({
+  platform,
+  format,
+  onPlatformChange,
+  onFormatChange,
+  compact = false,
+}: {
+  platform: SocialExportPlatform;
+  format: SocialExportFormat;
+  onPlatformChange: (platform: SocialExportPlatform) => void;
+  onFormatChange: (format: SocialExportFormat) => void;
+  compact?: boolean;
+}) {
+  const activePreset = useMemo(() => getSocialExportPreset(platform), [platform]);
+  return (
+    <div className={`rounded-lg border border-white/15 bg-black/15 ${compact ? "p-2" : "p-3"}`}>
+      <div className={`flex ${compact ? "flex-col gap-1.5" : "flex-wrap items-end gap-3"}`}>
+        <label className="flex min-w-[176px] flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+          Social platform
+          <select
+            value={platform}
+            onChange={(event) => onPlatformChange(event.target.value as SocialExportPlatform)}
+            className="rounded-md border border-white/15 bg-[#0e1a24] px-2.5 py-1.5 text-xs font-semibold normal-case tracking-normal text-white outline-none"
+          >
+            {SOCIAL_EXPORT_PRESETS.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}
+          </select>
+        </label>
+        <div className="flex flex-col gap-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Export format</span>
+          <div className="flex overflow-hidden rounded-md border border-white/15">
+            {(["png", "mp4"] as SocialExportFormat[]).map((value) => (
+              <button
+                type="button"
+                key={value}
+                onClick={() => onFormatChange(value)}
+                className={`px-3 py-1.5 text-xs font-bold uppercase transition-colors ${format === value ? "bg-teal-500 text-white" : "bg-white/[0.03] text-white/55 hover:bg-white/10 hover:text-white"}`}
+                aria-pressed={format === value}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      <p className="mt-2 text-[10px] leading-relaxed text-white/45">
+        {activePreset.description}. PNG keeps the full card visible; MP4 creates a 7-second text-drop sequence and then reveals the finished card.
+      </p>
+    </div>
+  );
+}
+
+export { DEFAULT_SOCIAL_EXPORT_PLATFORM };

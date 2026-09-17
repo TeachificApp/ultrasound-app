@@ -590,3 +590,7 @@
 - [x] Add an optional Quiz Card Generator source-folder label for the selected question’s Question Bank folder on exported cards and captions without changing Question Bank records.
 - [x] Add an optional custom Quiz Card Generator label field for exported cards and captions without changing source questions or folders.
 - [x] Repair SCORM-to-native Question Bank extraction so supported stem, option, and feedback images/videos are imported and attached for new extractions without changing existing Question Bank records.
+- [x] Add shared export presets for Facebook, Instagram, LinkedIn, X, Instagram Reels, Facebook Reels, TikTok, YouTube Video, and YouTube Shorts across Challenge, Social, and Quiz Card Generators.
+- [x] Support platform-sized PNG exports and locally rendered animated MP4 exports for all card generators, preserving the complete card design within every target frame.
+- [x] Animate Question Card prompts and answer choices sequentially, animate Answer Card choice review followed by answer reveal, and animate Social Content headlines and insights before the completed-card reveal.
+- [x] Add focused social-platform export regression coverage and retain the existing Platform Admin authorization and source-record-preservation boundaries.
