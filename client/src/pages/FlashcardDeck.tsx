@@ -10,6 +10,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import Layout from "@/components/Layout";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -310,7 +311,7 @@ export default function FlashcardDeck() {
               You've reviewed <strong>{dailyLimit} flashcards</strong> today — great work!
             </p>
             <p className="text-gray-400 text-sm mb-6">
-              Free members get {dailyLimit} flashcards per day. Come back tomorrow for a fresh set, or upgrade to Premium for unlimited access.
+              Free members get {dailyLimit} flashcards per day. Come back tomorrow for a fresh set, or start Premium with a {PREMIUM_TRIAL_NOTICE.toLowerCase()}.
             </p>
             <div className="bg-gradient-to-br from-[#0e1e2e] to-[#0e4a50] rounded-xl p-5 mb-6 text-left">
               <div className="flex items-center gap-2 mb-2">
@@ -323,7 +324,7 @@ export default function FlashcardDeck() {
             <Link href="/premium">
               <Button className="w-full text-white font-bold mb-3" style={{ background: "#189aa1" }}>
                 <Zap className="w-4 h-4 mr-2" />
-                Upgrade to Premium
+                {PREMIUM_TRIAL_CTA}
               </Button>
             </Link>
             <p className="text-xs text-gray-400">Your daily limit resets at midnight UTC. Come back tomorrow for {dailyLimit} new cards!</p>

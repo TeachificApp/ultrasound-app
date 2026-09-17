@@ -5,6 +5,7 @@
 import { Link } from "wouter";
 import { Zap } from "lucide-react";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
+import { PREMIUM_TRIAL_CTA } from "@/lib/premiumTrial";
 
 const AAUS_BANNER_IMG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/flashcards-banner-final_AAUS_94ef5d55.webp";
 const IHE_BANNER_IMG = "/manus-storage/flashcards-banner-v7_f4e61e43_9139b466.webp";
@@ -68,7 +69,7 @@ export default function FlashcardsBanner({ streak = 0, isPremium = false }: Flas
             {!isPremium && (
               <div className="flex items-center gap-1.5 text-sm text-white/70">
                 <Zap className="w-4 h-4 text-[#4ad9e0]" />
-                <span>10 free cards/day · <Link href="/premium"><span className="text-[#4ad9e0] underline cursor-pointer">Upgrade for unlimited</span></Link></span>
+                <span>10 free cards/day · <Link href="/premium"><span className="text-[#4ad9e0] underline cursor-pointer">{PREMIUM_TRIAL_CTA} for unlimited</span></Link></span>
               </div>
             )}
           </div>

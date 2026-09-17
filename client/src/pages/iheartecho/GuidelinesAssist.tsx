@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { usePremium } from "@/hooks/usePremium";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 import { getLoginUrl } from "@/const";
 import {
   Search, ChevronDown, ChevronRight, ExternalLink,
@@ -959,17 +960,15 @@ function PrintRefCard({ g, isPremium }: { g: Guideline; isPremium: boolean }) {
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-4 leading-relaxed">
-              Printable reference cards are available to <strong>iHeartEcho™ Premium</strong> members. Upgrade to print clean, single-page PDF reference cards for any guideline — perfect for the scanner or study desk.
+              Printable reference cards are available to <strong>iHeartEcho™ Premium</strong> members. {PREMIUM_TRIAL_NOTICE}. Start Premium to print clean, single-page PDF reference cards for any guideline — perfect for the scanner or study desk.
             </p>
             <div className="flex gap-2">
               <a
-                href="https://www.iheartecho.com"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="/premium"
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90"
                 style={{ background: BRAND }}
               >
-                Upgrade to Premium
+                {PREMIUM_TRIAL_CTA}
               </a>
               <button
                 onClick={() => setShowUpgrade(false)}

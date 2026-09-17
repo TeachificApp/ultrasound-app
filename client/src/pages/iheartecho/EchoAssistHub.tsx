@@ -14,6 +14,7 @@ import {
   Cpu, BarChart3, ArrowRight, Droplets, Activity, Wind, Crown, Lock, Shield, Radio, BookOpen, CircuitBoard
 } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 const BRAND = "#189aa1";
 
@@ -638,7 +639,7 @@ export default function EchoAssistHub() {
             <div>
               <h3 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>Premium Feature</h3>
               <p className="text-sm text-gray-500 mt-1">
-                <strong>{upgradeModal.title}</strong> requires a Premium membership.
+                <strong>{upgradeModal.title}</strong> requires a Premium membership. {PREMIUM_TRIAL_NOTICE}.
               </p>
             </div>
             <div className="flex flex-col gap-2">
@@ -647,7 +648,7 @@ export default function EchoAssistHub() {
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm text-white"
                   style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
                 >
-                  <Crown className="w-4 h-4" /> Upgrade to Premium
+                  <Crown className="w-4 h-4" /> {PREMIUM_TRIAL_CTA}
                 </button>
               </Link>
               <button

@@ -594,3 +594,5 @@
 - [x] Support platform-sized PNG exports and locally rendered animated MP4 exports for all card generators, preserving the complete card design within every target frame.
 - [x] Animate Question Card prompts and answer choices sequentially, animate Answer Card choice review followed by answer reveal, and animate Social Content headlines and insights before the completed-card reveal.
 - [x] Add focused social-platform export regression coverage and retain the existing Platform Admin authorization and source-record-preservation boundaries.
+- [x] Add a Stripe-native three-day introductory trial to eligible new single-brand and dual-brand Premium App subscription checkout sessions, without altering existing subscriptions, prices, access records, or payment data.
+- [x] Grant authorized Premium access at the valid Stripe no-payment-required trial checkout event, preserve unpaid-checkout deferral for all other statuses, prevent repeat trials for prior Stripe-managed app memberships, and advertise the trial through shared and direct app upgrade prompts.

@@ -16,6 +16,7 @@
 import { Crown, BookOpen, Flame, FileText, Lock, X } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useCallback } from "react";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 export type UpgradeTriggerType = "post_case" | "streak" | "narrative" | "module_lock";
 
@@ -69,8 +70,8 @@ const TRIGGER_CONFIGS: Record<UpgradeTriggerType, TriggerConfig> = {
     badge: "Premium Feature",
     title: "Upgrade to Access This Module",
     description:
-      "This module is available to Premium members. Upgrade to unlock all EchoNavigator protocols, ScanCoach clinical pearls, EchoAssist™ engines, and more.",
-    primaryLabel: "Upgrade to Premium",
+      `This module is available to Premium members. ${PREMIUM_TRIAL_NOTICE}. Unlock all EchoNavigator protocols, ScanCoach clinical pearls, EchoAssist™ engines, and more.`,
+    primaryLabel: PREMIUM_TRIAL_CTA,
     secondaryLabel: "Back to Dashboard",
     gradient: "linear-gradient(135deg, #b45309, #d97706)",
   },

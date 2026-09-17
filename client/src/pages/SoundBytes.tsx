@@ -13,10 +13,11 @@ import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 import {
   ArrowLeft, Crown, Eye, Lock, Music, Play, Search, Zap, BookOpen,
 } from "lucide-react";
-import { CATEGORY_LABELS, CATEGORY_COLORS, THINKIFIC_LINKS } from "@shared/appConstants";
+import { CATEGORY_LABELS, CATEGORY_COLORS } from "@shared/appConstants";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 
@@ -133,21 +134,19 @@ function SoundByteDetail({
             <p className="text-sm font-semibold text-amber-800">Premium Content</p>
             <p className="text-xs text-amber-700 mt-0.5">
               {isIHE
-                ? "Upgrade to iHeartEcho™ Premium to watch this SoundByte."
-                : "Upgrade to All About Ultrasound™ Premium to watch this SoundByte."}
+                ? `Start iHeartEcho™ Premium with a ${PREMIUM_TRIAL_NOTICE.toLowerCase()} to watch this SoundByte.`
+                : `Start All About Ultrasound™ Premium with a ${PREMIUM_TRIAL_NOTICE.toLowerCase()} to watch this SoundByte.`}
             </p>
           </div>
           <a
-            href={THINKIFIC_LINKS.premiumMonthly}
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/premium"
             className="ml-auto flex-shrink-0"
           >
             <button
               className="px-3 py-1.5 rounded-lg text-xs font-bold text-white whitespace-nowrap"
               style={{ background: "#189aa1" }}
             >
-              Upgrade
+              {PREMIUM_TRIAL_CTA}
             </button>
           </a>
         </div>
@@ -325,13 +324,13 @@ export default function SoundBytes() {
             </p>
             <div className="flex flex-wrap gap-3 items-center">
               {!isPremium && (
-                <a href={THINKIFIC_LINKS.premiumMonthly} target="_blank" rel="noopener noreferrer">
+                <a href="/premium">
                   <button
                     className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90 hover:scale-105"
                     style={{ background: "#189aa1" }}
                   >
                     <Zap className="w-4 h-4" />
-                    Unlock All SoundBytes
+                    {PREMIUM_TRIAL_CTA} — Unlock All SoundBytes
                   </button>
                 </a>
               )}
@@ -403,8 +402,8 @@ export default function SoundBytes() {
                 </h2>
                 <p className="text-white/60 text-sm mb-5 leading-relaxed">
                   {isIHE
-                    ? "Create a free iHeartEcho™ account to access SoundBytes. Free members get the first 3 clips per category. Upgrade to Premium for unlimited access."
-                    : "Create a free All About Ultrasound™ account to access SoundBytes. Free members get the first 3 clips per category. Upgrade to Premium for unlimited access."}
+                    ? `Create a free iHeartEcho™ account to access SoundBytes. Free members get the first 3 clips per category. ${PREMIUM_TRIAL_NOTICE} for unlimited access.`
+                    : `Create a free All About Ultrasound™ account to access SoundBytes. Free members get the first 3 clips per category. ${PREMIUM_TRIAL_NOTICE} for unlimited access.`}
                 </p>
                 <div className="flex flex-col gap-2">
                   <a href={getLoginUrl()} className="block">
@@ -444,21 +443,19 @@ export default function SoundBytes() {
                       <div>
                         <p className="text-white font-semibold text-sm">Unlock All SoundBytes</p>
                         <p className="text-white/60 text-xs">
-                          Free members get 3 clips per category. Premium unlocks everything.
+                          Free members get 3 clips per category. {PREMIUM_TRIAL_NOTICE}.
                         </p>
                       </div>
                     </div>
                     <a
-                      href={THINKIFIC_LINKS.premiumMonthly}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href="/premium"
                       className="flex-shrink-0"
                     >
                       <button
                         className="px-4 py-2 rounded-lg text-xs font-bold text-white whitespace-nowrap"
                         style={{ background: "#189aa1" }}
                       >
-                        Upgrade
+                        {PREMIUM_TRIAL_CTA}
                       </button>
                     </a>
                   </div>

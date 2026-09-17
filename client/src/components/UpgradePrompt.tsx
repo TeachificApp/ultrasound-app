@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Zap, Star, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 const PREMIUM_URL =
   "/premium";
@@ -32,22 +33,22 @@ const VALUE_PROPS = [
   {
     headline: "Unlock Premium Clinical Intelligence",
     body: "Access all 15 specialty navigators, vascular ScanCoaches, and advanced POCUS tools — built for working sonographers.",
-    cta: "Upgrade to Premium →",
+    cta: `${PREMIUM_TRIAL_CTA} →`,
   },
   {
     headline: "Go Deeper with Every Scan",
     body: "Premium unlocks breast, MSK, vascular, and intracranial duplex modules with guideline-driven protocols and reference values.",
-    cta: "Start Premium Today →",
+    cta: `${PREMIUM_TRIAL_CTA} →`,
   },
   {
     headline: "Unlimited Flashcards & Case Library",
     body: "Free members get 10 flashcards/day. Premium gives you unlimited access to flashcards, cases, SoundBytes™, and more.",
-    cta: "Get Unlimited Access →",
+    cta: `${PREMIUM_TRIAL_CTA} →`,
   },
   {
     headline: "The Pocket Reference for Real-Time Scanning",
     body: "UltrasoundAssist™ Premium is your guideline-based companion at the probe — from protocol to pathology, in seconds.",
-    cta: "Upgrade Now →",
+    cta: `${PREMIUM_TRIAL_CTA} →`,
   },
 ];
 
@@ -197,9 +198,7 @@ export default function UpgradePrompt({ eligible }: UpgradePromptProps) {
 
           {/* Pricing hint */}
           <p className="text-xs text-gray-400 mb-4 text-center">
-            From{" "}
-            <span className="font-semibold text-gray-600">$9.97/month</span>
-            {" "}· Cancel anytime
+            <span className="font-semibold text-gray-600">{PREMIUM_TRIAL_NOTICE}</span>
           </p>
 
           {/* CTA */}

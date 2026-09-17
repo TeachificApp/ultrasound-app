@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import {
   THINKIFIC_LEGACY_BILLING_URL,
 } from "@shared/thinkificLegacy";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 const ROLE_CONFIG: Record<string, {
   label: string;
@@ -599,14 +600,14 @@ export default function Profile() {
                       <Award className="w-4 h-4 text-gray-400" />
                     </div>
                     <p className="text-xs text-gray-500 mb-1">No active subscriptions</p>
-                    <p className="text-xs text-gray-400 mb-3">Unlock premium features and DIY accreditation tools.</p>
+                    <p className="text-xs text-gray-400 mb-3">Unlock premium features and DIY accreditation tools. {PREMIUM_TRIAL_NOTICE}.</p>
                     <a
                       href="/premium"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90"
                       style={{ background: "linear-gradient(135deg, #189aa1, #4ad9e0)" }}
                     >
                       <Star className="w-3 h-3" />
-                      Upgrade to Premium
+                      {PREMIUM_TRIAL_CTA}
                     </a>
                   </div>
                 ) : (

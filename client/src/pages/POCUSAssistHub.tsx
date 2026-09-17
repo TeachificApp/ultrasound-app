@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { usePremium } from "@/hooks/usePremium";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 import {
   Shield, Zap, Heart, Wind,
   ArrowRight, Crown, Lock, Stethoscope,
@@ -217,7 +218,7 @@ Advanced, guideline-driven clinical intelligence app designed for sonographers, 
           <div className="flex items-center gap-2 mb-4">
             <Crown className="w-4 h-4 text-amber-500" />
             <h2 className="text-base font-bold text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>
-              Premium — Available with Paid Membership
+              Premium — {PREMIUM_TRIAL_NOTICE}
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -409,7 +410,7 @@ Advanced, guideline-driven clinical intelligence app designed for sonographers, 
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm text-white"
                   style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
                 >
-                  <Crown className="w-4 h-4" /> Upgrade to Premium
+                  <Crown className="w-4 h-4" /> {PREMIUM_TRIAL_CTA}
                 </button>
               </Link>
               <button

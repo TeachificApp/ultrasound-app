@@ -39,6 +39,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
 import MobileAppDashboard from "@/components/MobileAppDashboard";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 import {
   Calculator, ClipboardList, Activity, BookOpen, FileText,
   ArrowRight, Users, Award, Zap, Stethoscope, ExternalLink, MessageCircle, GraduationCap, BookMarked, Crown, Shield, Trophy, Volume2, Layers, CreditCard, BookCheck
@@ -372,14 +373,14 @@ export default function Home() {
                 Unlock Full Clinical Suite
               </h3>
               <p className="text-white/60 text-xs md:text-sm">
-                UEA Navigator, HOCM-Assist™ Navigator, full interpretation engine, 500+ cases, and all premium modules — $9.97/month.
+                UEA Navigator, HOCM-Assist™ Navigator, full interpretation engine, 500+ cases, and all premium modules — {PREMIUM_TRIAL_NOTICE}.
               </p>
             </div>
             <a href="/premium" target="_blank" rel="noopener noreferrer"
               className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90"
               style={{ background: "#189aa1" }}>
               <ExternalLink className="w-4 h-4" />
-              Upgrade
+              {PREMIUM_TRIAL_CTA}
             </a>
           </div>
         ) : (

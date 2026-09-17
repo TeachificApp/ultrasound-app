@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatViewCount, getDisplayViewCount } from "@/lib/caseViewCount";
-import { getThinkificPremiumMonthlyUrl, getThinkificPremiumAnnualUrl } from "@/const";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 import { Lock, Crown } from "lucide-react";
 
 const MODALITY_COLORS: Record<string, string> = {
@@ -126,34 +126,24 @@ export default function CaseDetail() {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-800 mb-2" style={{ fontFamily: "Merriweather, serif" }}>
-                {isFreeLimit ? "Upgrade to Access More Cases" : "Upgrade to Premium for Unlimited Cases"}
+                {isFreeLimit ? "Start a Free Trial for More Cases" : "Start a Free Trial for Unlimited Cases"}
               </h2>
               <p className="text-gray-500 text-sm leading-relaxed">
                 {isFreeLimit
-                  ? `You've reached the free limit of ${limitNum} case. Upgrade to a UltrasoundAssist™ membership to access all 500+ cases with full media, teaching points, and clinical questions.`
-                  : `You've viewed ${limitNum} cases on your current plan. Upgrade to UltrasoundAssist™ Premium for unlimited access to the full Case Library.`
+                  ? `You've reached the free limit of ${limitNum} case. ${PREMIUM_TRIAL_NOTICE} for access to all 500+ cases with full media, teaching points, and clinical questions.`
+                  : `You've viewed ${limitNum} cases on your current plan. ${PREMIUM_TRIAL_NOTICE} for unlimited access to the full Case Library.`
                 }
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 w-full">
-              <a
-                href={getThinkificPremiumMonthlyUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1"
-              >
+              <a href="/premium" className="flex-1">
                 <Button className="w-full gap-2 text-white" style={{ background: "#189aa1" }}>
-                  <Crown className="w-4 h-4" /> Upgrade Monthly
+                  <Crown className="w-4 h-4" /> {PREMIUM_TRIAL_CTA}
                 </Button>
               </a>
-              <a
-                href={getThinkificPremiumAnnualUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1"
-              >
+              <a href="/premium" className="flex-1">
                 <Button variant="outline" className="w-full gap-2 border-[#189aa1] text-[#189aa1]">
-                  <Crown className="w-4 h-4" /> Upgrade Annual
+                  <Crown className="w-4 h-4" /> View Monthly &amp; Annual Plans
                 </Button>
               </a>
             </div>

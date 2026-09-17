@@ -4,6 +4,7 @@
   Explains what's included and links to the upgrade flow.
 */
 import { X, Lock, Check, Zap, Star, ExternalLink } from "lucide-react";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 interface PremiumModalProps {
   featureName: string;
@@ -85,6 +86,7 @@ export default function PremiumModal({ featureName, featureDescription, onClose 
 
           {/* CTA */}
           <div className="space-y-2">
+            <p className="text-center text-xs font-semibold text-[#0e4a50]">{PREMIUM_TRIAL_NOTICE}</p>
             <a
               href="/premium"
               target="_blank"
@@ -93,7 +95,7 @@ export default function PremiumModal({ featureName, featureDescription, onClose 
               style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
             >
               <Zap className="w-4 h-4" />
-              Upgrade to Premium — $9.97/month
+              {PREMIUM_TRIAL_CTA}
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
             <button

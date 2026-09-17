@@ -28,6 +28,7 @@ import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmai
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { buildPersistentAccessUrl, sendBundleAccessEmail } from "../lib/enrollmentEmail";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
+import { hasBrandMembershipTrial, isBrandMembershipTrialCheckout } from "../lib/brandMembershipTrial";
 
 // Stripe webhook secret — optional but strongly recommended in production.
 // Resolve at request time so a rotated secret takes effect without a module reload.
@@ -955,6 +956,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
 
   // ── Grant brand membership ─────────────────────────────────────────────────
   const isLifetime = meta.interval === "lifetime" || !subscriptionId;
+  const isTrial = hasBrandMembershipTrial(meta);
   const membershipTier = isLifetime ? "lifetime" : "premium";
   const [existing] = await db
     .select()
@@ -1036,10 +1038,14 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
         ? buildPersistentAccessUrl(`${baseUrl}/my-dashboard`, accessToken)
         : `${baseUrl}/my-dashboard`;
       const brandLabel = brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
-      const planLabel = isLifetime ? `${brandLabel} Lifetime Premium Membership` : `${brandLabel} Premium Membership`;
+      const planLabel = isLifetime
+        ? `${brandLabel} Lifetime Premium Membership`
+        : isTrial
+          ? `${brandLabel} Premium Membership — 3-Day Free Trial`
+          : `${brandLabel} Premium Membership`;
       const htmlBody = emailWrapper(`
         <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>
-        <p style="margin:0 0 16px;color:#334155;">Hi ${firstName}, your ${planLabel} is now active and ready to use.</p>
+        <p style="margin:0 0 16px;color:#334155;">Hi ${firstName}, your ${planLabel} is now active and ready to use.${isTrial ? " Your paid subscription begins automatically after the 3-day trial unless you cancel before it ends." : ""}</p>
         <div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
           <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Access your membership</p>
           <p style="margin:0 0 8px;font-size:13px;color:#475569;">Click below to access your content \u2014 no password needed:</p>
@@ -1075,7 +1081,11 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
       .limit(1);
     if (!existingPurchase) {
       const brandLabel = brand === "iheartecho" ? "EchoAssist\u2122" : "UltrasoundAssist\u2122";
-      const planLabel = isLifetime ? `${brandLabel} Lifetime Premium Membership` : `${brandLabel} Premium Membership`;
+      const planLabel = isLifetime
+        ? `${brandLabel} Lifetime Premium Membership`
+        : isTrial
+          ? `${brandLabel} Premium Membership — 3-Day Free Trial`
+          : `${brandLabel} Premium Membership`;
       await db.insert(funnelPurchases).values({
         userId: userId || null,
         email: customerEmail || "",
@@ -1175,6 +1185,7 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
 
   // ── Grant both brand memberships ─────────────────────────────────────────────
   const source = isLifetime ? "stripe_dual_lifetime" : "stripe_dual";
+  const isTrial = hasBrandMembershipTrial(meta);
   const brands: ("aaus" | "iheartecho")[] = ["aaus", "iheartecho"];
   for (const brand of brands) {
     const [existing] = await db
@@ -1243,7 +1254,11 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
         purpose: "welcome",
         expiresInLabel: "7 days",
       });
-      const planLabel = isLifetime ? "All Access Dual Lifetime Membership" : "All Access Dual Membership";
+      const planLabel = isLifetime
+        ? "All Access Dual Lifetime Membership"
+        : isTrial
+          ? "All Access Dual Membership — 3-Day Free Trial"
+          : "All Access Dual Membership";
       const accessNote = accessTokenForEmail
         ? `<div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
             <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Access your membership now</p>
@@ -1272,10 +1287,14 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
       const accessUrl = accessToken
         ? buildPersistentAccessUrl(`${baseUrl}/my-dashboard`, accessToken)
         : `${baseUrl}/my-dashboard`;
-      const planLabel = isLifetime ? "All Access Dual Lifetime Membership" : "All Access Dual Membership";
+      const planLabel = isLifetime
+        ? "All Access Dual Lifetime Membership"
+        : isTrial
+          ? "All Access Dual Membership — 3-Day Free Trial"
+          : "All Access Dual Membership";
       const htmlBody = emailWrapper(`
         <h2 style="margin:0 0 12px;font-size:20px;color:#0e4a50;">Your ${planLabel} is active</h2>
-        <p style="margin:0 0 16px;color:#334155;">Hi ${firstName}, your ${planLabel} is now active. You have premium access to both UltrasoundAssist\u2122 and EchoAssist\u2122.</p>
+        <p style="margin:0 0 16px;color:#334155;">Hi ${firstName}, your ${planLabel} is now active. You have premium access to both UltrasoundAssist\u2122 and EchoAssist\u2122.${isTrial ? " Your paid subscription begins automatically after the 3-day trial unless you cancel before it ends." : ""}</p>
         <div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
           <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Access your membership</p>
           <p style="margin:0 0 8px;font-size:13px;color:#475569;">Click below to access your content \u2014 no password needed:</p>
@@ -1309,7 +1328,11 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
       .where(eq(funnelPurchases.stripeCheckoutSessionId, checkoutSessionId))
       .limit(1);
     if (!existingPurchase) {
-      const dualPlanLabel = isLifetime ? "All Access Dual Lifetime Membership" : "All Access Dual Membership";
+      const dualPlanLabel = isLifetime
+        ? "All Access Dual Lifetime Membership"
+        : isTrial
+          ? "All Access Dual Membership — 3-Day Free Trial"
+          : "All Access Dual Membership";
       await db.insert(funnelPurchases).values({
         userId: userId || null,
         email: customerEmail || "",
@@ -2654,7 +2677,13 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       // We MUST NOT grant access yet — store the session and wait for
       // payment_intent.succeeded to confirm the payment before fulfilling.
       const sessionPaymentStatus = (sessionObj.payment_status as string) ?? "";
-      if (sessionPaymentStatus !== "paid") {
+      // Stripe Checkout reports a valid subscription trial as "no_payment_required".
+      // It must receive app access immediately; every other unpaid status remains
+      // deferred until Stripe confirms the payment intent.
+      if (sessionPaymentStatus !== "paid" && !isBrandMembershipTrialCheckout({
+        payment_status: sessionPaymentStatus,
+        metadata: (sessionObj.metadata as Record<string, string>) ?? {},
+      })) {
         const sessionId = (sessionObj.id as string) ?? "";
         const piId = (sessionObj.payment_intent as string) ?? null;
         console.log(`[Stripe] checkout.session.completed with payment_status="${sessionPaymentStatus}" (session=${sessionId}) — deferring fulfillment until payment_intent.succeeded`);

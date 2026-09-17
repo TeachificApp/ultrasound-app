@@ -24,6 +24,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 import { getLoginUrl } from "@/const";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 type AppRole = "user" | "premium_user" | "diy_admin" | "diy_user" | "platform_admin" | "platform_manager" | "accreditation_manager" | "education_manager" | "education_admin" | "education_student" | "platform_owner" | "platform_moderator" | "instructor" | "team_admin" | "affiliate";
 
@@ -169,7 +170,7 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-foreground" style={{ fontFamily: "Merriweather, serif" }}>Premium Feature</h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              This feature requires a <strong>Premium membership</strong>. Upgrade to unlock all clinical protocols, ScanCoach guides, EchoAssist™ engines, and more.
+              This feature requires a <strong>Premium membership</strong>. {PREMIUM_TRIAL_NOTICE}. Unlock all clinical protocols, ScanCoach guides, EchoAssist™ engines, and more.
             </p>
           </div>
           <div className="rounded-xl p-4 text-left space-y-2 border" style={{ borderColor: "#f59e0b30", background: "#f59e0b08" }}>
@@ -187,7 +188,7 @@ export function RoleGuard({ roles, allowAdmin = true, teaserHeight, children }: 
             <Link href="/premium">
               <Button className="w-full font-semibold gap-2" style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)", color: "white" }}>
                 <Crown className="w-4 h-4" />
-                Upgrade to Premium
+                {PREMIUM_TRIAL_CTA}
               </Button>
             </Link>
             <Link href="/">

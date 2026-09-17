@@ -46,11 +46,11 @@ import {
   Link2,
   Crown,
 } from "lucide-react";
-import { getThinkificPremiumMonthlyUrl } from "@/const";
 import { formatDistanceToNow } from "date-fns";
 import { formatViewCount, getDisplayViewCount } from "@/lib/caseViewCount";
 import CaseLibraryBanner from "@/components/CaseLibraryBanner";
 import { isIHeartEchoDomain } from "@/hooks/useSubdomain";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 const MODALITY_COLORS: Record<string, string> = {
   // AAUS modalities
@@ -222,15 +222,15 @@ export default function CaseLibrary() {
                 </p>
                 <p className={`text-xs ${accessStatus.limitReached ? "text-amber-600" : "text-teal-600"}`}>
                   {accessStatus.limitReached
-                    ? "Upgrade to UltrasoundAssist\u2122 Premium for unlimited access to all cases."
-                    : `Upgrade to Premium for unlimited access to all ${total.toLocaleString()} cases.`
+                    ? `Start Premium with a ${PREMIUM_TRIAL_NOTICE.toLowerCase()} for unlimited access to all cases.`
+                    : `Start Premium with a ${PREMIUM_TRIAL_NOTICE.toLowerCase()} for unlimited access to all ${total.toLocaleString()} cases.`
                   }
                 </p>
               </div>
             </div>
-            <a href={getThinkificPremiumMonthlyUrl()} target="_blank" rel="noopener noreferrer">
+            <a href="/premium">
               <Button size="sm" className="gap-1.5 text-white shrink-0" style={{ background: "#189aa1" }}>
-                <Crown className="w-3.5 h-3.5" /> Upgrade to Premium
+                <Crown className="w-3.5 h-3.5" /> {PREMIUM_TRIAL_CTA}
               </Button>
             </a>
           </div>
@@ -587,7 +587,9 @@ export default function CaseLibrary() {
               Sign In to View Cases
             </h2>
             <p className="text-white/60 text-sm mb-5 leading-relaxed">
-              {isIHE ? "Create a free iHeartEcho™ account to access the Echo Case Library. Free members can view cases and submit their own. Upgrade to Premium for the full clinical suite." : "Create a free All About Ultrasound™ account to access the Ultrasound Case Library. Free members can view cases and submit their own. Upgrade to Premium for the full clinical suite."}
+              {isIHE
+                ? `Create a free iHeartEcho™ account to access the Echo Case Library. Free members can view cases and submit their own. ${PREMIUM_TRIAL_NOTICE} for the full clinical suite.`
+                : `Create a free All About Ultrasound™ account to access the Ultrasound Case Library. Free members can view cases and submit their own. ${PREMIUM_TRIAL_NOTICE} for the full clinical suite.`}
             </p>
             <div className="flex flex-col gap-2">
               <a href={getLoginUrl()} className="block">

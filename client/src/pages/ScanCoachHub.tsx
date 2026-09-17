@@ -7,6 +7,7 @@ import { useLocation } from "wouter";
 import Layout from "@/components/Layout";
 import PremiumModal from "@/components/PremiumModal";
 import { usePremium } from "@/hooks/usePremium";
+import { PREMIUM_TRIAL_CTA } from "@/lib/premiumTrial";
 import {
   Scan, Stethoscope, Baby, Heart, Users, Activity,
   Zap, Microscope, Droplets, Wind, Crown, Lock
@@ -109,7 +110,7 @@ export default function ScanCoachHub() {
           <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200">
               <Crown className="w-3 h-3 text-amber-500" />
-              PREMIUM — Requires Premium membership ($9.97/month)
+              PREMIUM — Start with a 3-day free trial
             </div>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
@@ -169,7 +170,7 @@ export default function ScanCoachHub() {
               <a href="/premium" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
                 style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}>
                 <Crown className="w-4 h-4" />
-                Upgrade to Premium — $9.97/month
+                {PREMIUM_TRIAL_CTA}
               </a>
             </div>
           )}

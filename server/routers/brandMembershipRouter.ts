@@ -19,6 +19,7 @@ import { getDb } from "../db";
 import { brandMemberships } from "../../drizzle/schema";
 import { and, eq, desc, inArray } from "drizzle-orm";
 import type { Brand } from "../../shared/brands";
+import { BRAND_PREMIUM_TRIAL_DAYS, hasPriorStripeBrandMembership } from "../lib/brandMembershipTrial";
 
 /**
  * Brand-specific Stripe product configuration.
@@ -133,6 +134,24 @@ function wrapStripeCheckoutError(err: unknown): never {
 
 function isPaidBrandTier(tier: string, status: string): boolean {
   return (tier === "premium" || tier === "lifetime") && status === "active";
+}
+
+/**
+ * The introductory trial is limited to people without a prior Stripe-managed
+ * app Premium membership. Free accounts and non-app purchases do not consume it.
+ */
+async function isEligibleForBrandPremiumTrial(userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const memberships = await db
+    .select({
+      stripeSubscriptionId: brandMemberships.stripeSubscriptionId,
+      stripeCustomerId: brandMemberships.stripeCustomerId,
+      source: brandMemberships.source,
+    })
+    .from(brandMemberships)
+    .where(eq(brandMemberships.userId, userId));
+  return !memberships.some(hasPriorStripeBrandMembership);
 }
 
 async function buildBrandRecurringLineItem(
@@ -262,6 +281,7 @@ export const brandMembershipRouter = router({
       const stripe = getStripeClient();
 
       try {
+        const isTrialEligible = await isEligibleForBrandPremiumTrial(ctx.user.id);
         // Resolve promo code if provided
         let discounts: Array<{ promotion_code: string }> | undefined;
         if (input.promoCode) {
@@ -318,7 +338,13 @@ export const brandMembershipRouter = router({
           line_items: [recurringLineItem],
           subscription_data: {
             description: `${productConfig.name} — ${input.interval === "annual" ? "Annual" : "Monthly"} Subscription — Initial`,
-            metadata: { user_id: ctx.user.id.toString(), brand, type: "brand_membership_upgrade" },
+            ...(isTrialEligible ? { trial_period_days: BRAND_PREMIUM_TRIAL_DAYS } : {}),
+            metadata: {
+              user_id: ctx.user.id.toString(),
+              brand,
+              type: "brand_membership_upgrade",
+              ...(isTrialEligible ? { trial_days: String(BRAND_PREMIUM_TRIAL_DAYS) } : {}),
+            },
           },
           success_url: `${input.origin}/upgrade-success?brand=${brand}&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${input.origin}/premium`,
@@ -330,12 +356,13 @@ export const brandMembershipRouter = router({
             brand,
             type: "brand_membership_upgrade",
             interval: input.interval,
+            ...(isTrialEligible ? { trial_days: String(BRAND_PREMIUM_TRIAL_DAYS) } : {}),
           },
         }, { idempotencyKey: `brand-sub-${ctx.user.id}-${brand}-${input.interval}-${new Date().toISOString().slice(0, 10)}` });
         if (!session.url) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
         }
-        return { checkoutUrl: session.url };
+        return { checkoutUrl: session.url, trialDays: isTrialEligible ? BRAND_PREMIUM_TRIAL_DAYS : 0 };
       } catch (err) {
         wrapStripeCheckoutError(err);
       }
@@ -353,6 +380,7 @@ export const brandMembershipRouter = router({
       const stripe = getStripeClient();
 
       try {
+        const isTrialEligible = await isEligibleForBrandPremiumTrial(ctx.user.id);
         const dualMonthlyLineItem = await buildDualMonthlyLineItem(stripe);
         const session = await stripe.checkout.sessions.create({
           mode: "subscription",
@@ -361,7 +389,12 @@ export const brandMembershipRouter = router({
           line_items: [dualMonthlyLineItem],
           subscription_data: {
             description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Monthly Subscription — Initial`,
-            metadata: { user_id: ctx.user.id.toString(), type: "dual_membership" },
+            ...(isTrialEligible ? { trial_period_days: BRAND_PREMIUM_TRIAL_DAYS } : {}),
+            metadata: {
+              user_id: ctx.user.id.toString(),
+              type: "dual_membership",
+              ...(isTrialEligible ? { trial_days: String(BRAND_PREMIUM_TRIAL_DAYS) } : {}),
+            },
           },
           success_url: `${input.origin}/upgrade-success?dual=1&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${input.origin}/premium`,
@@ -371,12 +404,13 @@ export const brandMembershipRouter = router({
             customer_email: ctx.user.email ?? "",
             customer_name: ctx.user.name ?? "",
             type: "dual_membership",
+            ...(isTrialEligible ? { trial_days: String(BRAND_PREMIUM_TRIAL_DAYS) } : {}),
           },
         }, { idempotencyKey: `dual-monthly-${ctx.user.id}-${new Date().toISOString().slice(0, 10)}` });
         if (!session.url) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
         }
-        return { checkoutUrl: session.url };
+        return { checkoutUrl: session.url, trialDays: isTrialEligible ? BRAND_PREMIUM_TRIAL_DAYS : 0 };
       } catch (err) {
         wrapStripeCheckoutError(err);
       }
@@ -394,6 +428,7 @@ export const brandMembershipRouter = router({
       const stripe = getStripeClient();
 
       try {
+        const isTrialEligible = await isEligibleForBrandPremiumTrial(ctx.user.id);
         const dualAnnualLineItem = await buildDualAnnualLineItem(stripe);
         const session = await stripe.checkout.sessions.create({
           mode: "subscription",
@@ -402,7 +437,12 @@ export const brandMembershipRouter = router({
           line_items: [dualAnnualLineItem],
           subscription_data: {
             description: `${DUAL_MEMBERSHIP_PRODUCT.name} — Annual Subscription — Initial`,
-            metadata: { user_id: ctx.user.id.toString(), type: "dual_membership" },
+            ...(isTrialEligible ? { trial_period_days: BRAND_PREMIUM_TRIAL_DAYS } : {}),
+            metadata: {
+              user_id: ctx.user.id.toString(),
+              type: "dual_membership",
+              ...(isTrialEligible ? { trial_days: String(BRAND_PREMIUM_TRIAL_DAYS) } : {}),
+            },
           },
           success_url: `${input.origin}/upgrade-success?dual=1&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${input.origin}/premium`,
@@ -412,12 +452,13 @@ export const brandMembershipRouter = router({
             customer_email: ctx.user.email ?? "",
             customer_name: ctx.user.name ?? "",
             type: "dual_membership",
+            ...(isTrialEligible ? { trial_days: String(BRAND_PREMIUM_TRIAL_DAYS) } : {}),
           },
         }, { idempotencyKey: `dual-annual-${ctx.user.id}-${new Date().toISOString().slice(0, 10)}` });
         if (!session.url) {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
         }
-        return { checkoutUrl: session.url };
+        return { checkoutUrl: session.url, trialDays: isTrialEligible ? BRAND_PREMIUM_TRIAL_DAYS : 0 };
       } catch (err) {
         wrapStripeCheckoutError(err);
       }

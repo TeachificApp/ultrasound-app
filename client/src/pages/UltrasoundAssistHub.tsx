@@ -12,6 +12,7 @@ import {
   Stethoscope, Brain, Bone, Circle, Zap, Search, Syringe, Calculator
 } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 const specialties = [
   // ── GENERAL ──────────────────────────────────────────────────────────────
@@ -471,7 +472,7 @@ export default function UltrasoundAssistHub() {
               <h3 className="text-lg font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>Premium Feature</h3>
               <p className="text-sm text-gray-500 mt-1">
                 <strong>{upgradeModal.title}</strong>{" "}
-                {upgradeModal.type === "scancoach" ? "ScanCoach™" : "Navigator"} requires a Premium membership.
+                {upgradeModal.type === "scancoach" ? "ScanCoach™" : "Navigator"} requires a Premium membership. {PREMIUM_TRIAL_NOTICE}.
               </p>
             </div>
             <div className="flex flex-col gap-2">
@@ -480,7 +481,7 @@ export default function UltrasoundAssistHub() {
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm text-white"
                   style={{ background: "#189aa1" }}
                 >
-                  <Crown className="w-4 h-4" /> Upgrade to Premium
+                  <Crown className="w-4 h-4" /> {PREMIUM_TRIAL_CTA}
                 </button>
               </Link>
               <button

@@ -5,6 +5,7 @@
   When locked, the children are rendered but blurred behind the overlay.
 */
 import { Lock, Zap, Check, ExternalLink, Star } from "lucide-react";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 interface PremiumLockOverlayProps {
   /** When false, the overlay is shown and content is blurred */
@@ -101,6 +102,7 @@ export default function PremiumLockOverlay({
             </ul>
 
             {/* CTA */}
+            <p className="mb-3 text-center text-xs font-semibold text-[#0e4a50]">{PREMIUM_TRIAL_NOTICE}</p>
             <a
               href="/premium"
               target="_blank"
@@ -109,7 +111,7 @@ export default function PremiumLockOverlay({
               style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
             >
               <Zap className="w-4 h-4" />
-              Upgrade to Premium — All About Ultrasound
+              {PREMIUM_TRIAL_CTA}
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>

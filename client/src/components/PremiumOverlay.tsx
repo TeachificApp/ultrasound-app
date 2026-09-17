@@ -20,6 +20,7 @@ import { Crown, Lock, Sparkles, ArrowRight, Loader2, Zap, Star, Check, LogIn, Cl
 import { Button } from "@/components/ui/button";
 import { usePremium } from "@/hooks/usePremium";
 import { getLoginUrl } from "@/const";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 // ── Timer helpers ─────────────────────────────────────────────────────────────
 const PREVIEW_SECONDS = 35;
@@ -239,7 +240,7 @@ function TimedPreviewOverlay({
               <p className="text-white/60 text-xs leading-relaxed">
                 Your 60-second free preview has ended. Upgrade to{" "}
                 <strong className="text-white/90">All About Ultrasound™ Premium</strong> for{" "}
-                <strong className="text-white/90">$9.97/month</strong>.
+                <strong className="text-white/90">{PREMIUM_TRIAL_NOTICE}</strong>.
               </p>
             </div>
             <div className="bg-white px-6 py-5">
@@ -258,7 +259,7 @@ function TimedPreviewOverlay({
               <div className="flex flex-col gap-2">
                 <a href={upgradeUrl} target="_blank" rel="noopener noreferrer">
                   <Button className="w-full font-bold text-white" style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)" }}>
-                    <Zap className="w-4 h-4 mr-1.5" />Upgrade — $9.97/month
+                    <Zap className="w-4 h-4 mr-1.5" />{PREMIUM_TRIAL_CTA}
                   </Button>
                 </a>
                 {!isLoggedIn && (

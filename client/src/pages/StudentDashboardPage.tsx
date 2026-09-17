@@ -12,6 +12,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { PREMIUM_TRIAL_CTA } from "@/lib/premiumTrial";
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
@@ -1813,7 +1814,7 @@ function SubscriptionsTab() {
                                   className="bg-teal-600 hover:bg-teal-700 text-white"
                                 >
                                   <Zap className="w-3.5 h-3.5 mr-1" />
-                                  Upgrade to Premium
+                                  {PREMIUM_TRIAL_CTA}
                                 </Button>
                               </a>
                             ) : null}

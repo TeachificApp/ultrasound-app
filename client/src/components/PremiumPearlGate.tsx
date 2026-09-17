@@ -45,6 +45,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { getLoginUrl } from "@/const";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -455,7 +456,7 @@ function TimedPreviewGate({
               <p className="text-white/60 text-xs leading-relaxed">
                 Your 60-second free preview has ended. Upgrade to{" "}
                 <strong className="text-white/90">All About Ultrasound™ Premium</strong> for{" "}
-                <strong className="text-white/90">$9.97/month</strong> — every Navigator protocol,
+                <strong className="text-white/90">{PREMIUM_TRIAL_NOTICE}</strong> — every Navigator protocol,
                 ScanCoach guide, calculator engine, and 500+ echo cases.
               </p>
             </div>
@@ -483,7 +484,7 @@ function TimedPreviewGate({
                     style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
                   >
                     <Zap className="w-4 h-4 mr-1.5" />
-                    Upgrade — $9.97/month
+                    {PREMIUM_TRIAL_CTA}
                   </Button>
                 </a>
                 {!isLoggedIn && (
@@ -674,7 +675,7 @@ function UpgradeCard({
         </div>
         <p className="text-white/60 text-xs leading-relaxed">
           Upgrade to All About Ultrasound™ Premium for{" "}
-          <strong className="text-white/90">$9.97/month</strong> — every Navigator protocol,
+                <strong className="text-white/90">{PREMIUM_TRIAL_NOTICE}</strong> — every Navigator protocol,
           ScanCoach guide, calculator engine, and 500+ echo cases.
         </p>
       </div>
@@ -702,7 +703,7 @@ function UpgradeCard({
               style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}
             >
               <Zap className="w-4 h-4 mr-1.5" />
-              Upgrade — $9.97/month
+                    {PREMIUM_TRIAL_CTA}
             </Button>
           </a>
           {!isLoggedIn && (

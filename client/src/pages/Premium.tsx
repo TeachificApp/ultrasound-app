@@ -21,6 +21,7 @@ import { detectBrand } from "@/hooks/useBrand";
 import { toast } from "sonner";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { SUBSCRIPTION_RESUME_LABEL, premiumResumeHref } from "@/lib/accessCta";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_LABEL } from "@/lib/premiumTrial";
 
 // ─── Brand-specific content ───────────────────────────────────────────────────
 
@@ -327,7 +328,7 @@ export default function Premium() {
                   </span>
                 </div>
                 <p className="text-white/60 text-xs mb-3">
-                  {`Get full annual access to ${appName} — $99.97/year.`}
+                  {`Start with a ${PREMIUM_TRIAL_LABEL}, then get full annual access to ${appName} — $99.97/year.`}
                 </p>
                 {user ? (
                   <Button
@@ -337,7 +338,7 @@ export default function Premium() {
                     style={{ background: "#189aa1" }}
                   >
                     <Crown className="w-3.5 h-3.5 mr-1.5" />
-                    Get Annual Access — $99.97/yr
+                    {PREMIUM_TRIAL_CTA} — then $99.97/yr
                     <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
                   </Button>
                 ) : (
@@ -371,8 +372,8 @@ export default function Premium() {
                   ) : status?.isPremium ? (
                     <ResumeBtn />
                   ) : user ? (
-                    <CheckoutBtn
-                      label="Get Monthly"
+                  <CheckoutBtn
+                      label={`${PREMIUM_TRIAL_CTA} — then $9.97/mo`}
                       onPay={() => singleMonthly.mutate({ interval: "monthly", origin: window.location.origin, promoCode: promoCode ?? undefined })}
                       isPending={singleMonthly.isPending}
                       variant="teal"
@@ -397,7 +398,7 @@ export default function Premium() {
                 <div className="text-gray-400 text-xs mb-0.5">per year · renews annually</div>
                 <div className="text-[10px] font-semibold mb-1 text-[#189aa1]">{appName} only</div>
                 <div className="text-[10px] text-gray-400 mb-4">
-                  Full annual access — cancel anytime.
+                  {PREMIUM_TRIAL_LABEL} first, then full annual access — cancel anytime.
                 </div>
                 <div className="mt-auto pt-4">
                   {loading ? (
@@ -408,8 +409,8 @@ export default function Premium() {
                   ) : status?.isPremium ? (
                     <ResumeBtn />
                   ) : user ? (
-                    <CheckoutBtn
-                      label="Get Annual Access"
+                  <CheckoutBtn
+                      label={`${PREMIUM_TRIAL_CTA} — then $99.97/yr`}
                       onPay={() => singleAnnual.mutate({ interval: "annual", origin: window.location.origin, promoCode: promoCode ?? undefined })}
                       isPending={singleAnnual.isPending}
                       variant="teal"
@@ -439,7 +440,7 @@ export default function Premium() {
                     </div>
                   ) : user ? (
                     <CheckoutBtn
-                      label="Get Both Apps"
+                      label={`${PREMIUM_TRIAL_CTA} — then $12.99/mo`}
                       onPay={() => dualMonthly.mutate({ origin: window.location.origin })}
                       isPending={dualMonthly.isPending}
                       variant="amber"
@@ -468,7 +469,7 @@ export default function Premium() {
                   UltrasoundAssist™ + EchoAssist™
                 </div>
                 <div className="text-[10px] text-white/40 mb-4">
-                  Full annual access to both apps — cancel anytime.
+                  {PREMIUM_TRIAL_LABEL} first, then full annual access to both apps — cancel anytime.
                 </div>
                 <div className="mt-auto pt-4">
                   {loading ? (
@@ -486,7 +487,7 @@ export default function Premium() {
                       {dualAnnual.isPending ? (
                         <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />Processing…</>
                       ) : (
-                        <><Crown className="h-4 w-4 shrink-0" />Get Annual — Both Apps</>
+                        <><Crown className="h-4 w-4 shrink-0" />{PREMIUM_TRIAL_CTA} — Both Apps $147/yr</>
                       )}
                     </Button>
                   ) : (
@@ -504,6 +505,7 @@ export default function Premium() {
             {/* Trust signals */}
             <div className="flex flex-wrap items-center justify-center gap-3 text-white/50 text-[11px] mb-4">
               <span className="flex items-center gap-1"><Shield className="w-3 h-3" /> Secure Stripe checkout</span>
+              <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> {PREMIUM_TRIAL_LABEL} for eligible new Premium members</span>
               <span className="flex items-center gap-1"><Clock  className="w-3 h-3" /> Monthly &amp; annual plans cancel anytime</span>
               <span className="flex items-center gap-1"><Star   className="w-3 h-3" /> Instant access after checkout</span>
             </div>
@@ -695,7 +697,7 @@ export default function Premium() {
                 </span>
               </div>
               <p className="text-gray-500 text-sm mb-4">
-                {`Get full annual access to ${appName} — cancel anytime.`}
+                {`Start with a ${PREMIUM_TRIAL_LABEL}, then get full annual access to ${appName} — cancel anytime.`}
               </p>
               {user ? (
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -706,7 +708,7 @@ export default function Premium() {
                     className="border-[#189aa1] text-[#189aa1] hover:bg-[#189aa1] hover:text-white font-bold px-8 py-3 text-sm rounded-xl"
                   >
                     <Crown className="w-4 h-4 mr-2" />
-                    Monthly — $9.97/mo
+                    {PREMIUM_TRIAL_CTA} — then $9.97/mo
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                   <Button
@@ -716,7 +718,7 @@ export default function Premium() {
                     style={{ background: "#189aa1" }}
                   >
                     <Crown className="w-4 h-4 mr-2" />
-                    Annual Access — $99.97/yr
+                    {PREMIUM_TRIAL_CTA} — then $99.97/yr
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                   <Button
@@ -726,7 +728,7 @@ export default function Premium() {
                     style={{ background: "linear-gradient(90deg, #189aa1, #f59e0b)" }}
                   >
                     <Crown className="w-4 h-4 mr-2" />
-                    Both Apps Annual — $147/yr
+                    {PREMIUM_TRIAL_CTA} — Both Apps $147/yr
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
@@ -740,7 +742,7 @@ export default function Premium() {
               )}
             </div>
             <p className="text-gray-400 text-xs">
-              Secure Stripe checkout · Monthly &amp; annual plans cancel anytime
+              Secure Stripe checkout · {PREMIUM_TRIAL_LABEL} for eligible new Premium members · Monthly &amp; annual plans cancel anytime
             </p>
           </div>
         )}

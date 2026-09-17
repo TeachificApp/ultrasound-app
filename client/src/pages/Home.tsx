@@ -9,8 +9,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import { trpc } from "@/lib/trpc";
-import { getThinkificPremiumMonthlyUrl } from "@/const";
 import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 const HERO_BG = resolveAssetUrl(
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/ultrasound-hero-probe-3bWMAQMJw9YFHoPXwbt8bZ.webp",
@@ -370,18 +370,16 @@ export default function Home() {
                 Unlock Full Clinical Suite
               </h3>
               <p className="text-white/60 text-xs md:text-sm">
-                All 15 specialty navigators, full ScanCoach library, 500+ cases, and all premium modules — $9.97/month or $99.97/year.
+                All 15 specialty navigators, full ScanCoach library, 500+ cases, and all premium modules — {PREMIUM_TRIAL_NOTICE}.
               </p>
             </div>
             <a
-              href={getThinkificPremiumMonthlyUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/premium"
               className="flex-shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm text-white transition-all hover:opacity-90"
               style={{ background: "#189aa1" }}
             >
               <ExternalLink className="w-4 h-4" />
-              Upgrade
+              {PREMIUM_TRIAL_CTA}
             </a>
           </div>
         ) : (

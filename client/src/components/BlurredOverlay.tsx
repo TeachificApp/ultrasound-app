@@ -13,6 +13,7 @@
 import { getLoginUrl } from "@/const";
 import { Crown, Lock, LogIn, Layers } from "lucide-react";
 import { Link } from "wouter";
+import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
 
 type OverlayType = "login" | "premium" | "diy";
 
@@ -53,10 +54,10 @@ const CONFIGS: Record<
   premium: {
     icon: <Crown className="w-8 h-8 text-white" />,
     badge: "Premium Feature",
-    title: "Upgrade to Premium",
+    title: "Start Your Premium Free Trial",
     description:
-      "This feature requires a Premium membership. Unlock all EchoNavigator protocols, ScanCoach guides, EchoAssist™ engines, unlimited flashcards, and more.",
-    primaryLabel: "Upgrade to Premium",
+      `This feature requires a Premium membership. ${PREMIUM_TRIAL_NOTICE}. Unlock all EchoNavigator protocols, ScanCoach guides, EchoAssist™ engines, unlimited flashcards, and more.`,
+    primaryLabel: PREMIUM_TRIAL_CTA,
     primaryHref: "/premium",
     secondaryLabel: "Back to Dashboard",
     secondaryHref: "/",
