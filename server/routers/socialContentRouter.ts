@@ -112,11 +112,11 @@ Return your response as a JSON object with exactly these fields:
   "headline": "Short, punchy headline for the graphic card (max 10 words)",
   "body": "The main content text for the graphic card (max 80 words for memes, max 120 words for educational content)",
   "subtext": "Optional supporting text or source/guideline reference (max 30 words, or empty string)",
-  "socialCaption": "Ready-to-post social media caption with emojis and call-to-action (max 200 words, do NOT include hashtags)",
+  "socialCaption": "Ready-to-post social media caption with an optional restrained professional emoji and call-to-action (max 200 words, do NOT include hashtags)",
   "category": "${category}"
 }
 
-IMPORTANT: Return ONLY the JSON object, no markdown formatting or code blocks.`;
+IMPORTANT: Use no more than two professional, relevant emojis in socialCaption. Never place emojis in clinical facts, question wording, options, answers, or explanations. Return ONLY the JSON object, no markdown formatting or code blocks.`;
 }
 
 /**

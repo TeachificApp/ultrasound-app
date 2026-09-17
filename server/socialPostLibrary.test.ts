@@ -50,4 +50,17 @@ describe("shared Social Post Library", () => {
     expect(client).not.toContain("googleImageSearch");
     expect(client).not.toContain("customsearch.googleapis.com");
   });
+
+  it("uses the shared baseline hashtags and public marketing host for every generated Social Post caption", () => {
+    const client = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
+    const presentation = readProjectFile("client/src/lib/brandToolPresentation.ts");
+    const router = readProjectFile("server/routers/socialContentRouter.ts");
+
+    for (const hashtag of ["#AllAboutUltrasound", "#iHeartEcho", "#Ultrasound", "#Sonographer", "#Sonography", "#UltrasoundEducation"]) {
+      expect(presentation).toContain(hashtag);
+    }
+    expect(client).toContain("STANDARD_SOCIAL_HASHTAGS");
+    expect(client).toContain("presentation.publicHost");
+    expect(router).toContain("Use no more than two professional, relevant emojis");
+  });
 });

@@ -8,6 +8,8 @@ export type BrandToolPresentation = {
   tagline: string;
   appUrl: string;
   appHost: string;
+  publicUrl: string;
+  publicHost: string;
   logoUrl: string;
   primaryColor: string;
   darkColor: string;
@@ -15,6 +17,16 @@ export type BrandToolPresentation = {
   challengeLabel: string;
   socialHashtags: string[];
 };
+
+/** Baseline tags required on every Social Post and Quiz Card Generator caption. */
+export const STANDARD_SOCIAL_HASHTAGS = [
+  "#AllAboutUltrasound",
+  "#iHeartEcho",
+  "#Ultrasound",
+  "#Sonographer",
+  "#Sonography",
+  "#UltrasoundEducation",
+] as const;
 
 export function resolveToolBrand(pathname: string, hostname: string): Brand {
   return detectBrandFromPath(pathname) ?? detectBrandFromHostname(hostname);
@@ -30,13 +42,13 @@ export function getBrandToolPresentation(brand: Brand): BrandToolPresentation {
     tagline: config.tagline,
     appUrl: config.appUrl,
     appHost: new URL(config.appUrl).hostname,
+    publicUrl: config.websiteUrl,
+    publicHost: new URL(config.websiteUrl).hostname,
     logoUrl: config.logoUrl,
     primaryColor: config.primaryColor,
     darkColor: config.darkColor,
     accentColor: config.accentColor,
     challengeLabel: isIHeartEcho ? "Daily Echocardiography Challenge" : "Daily Ultrasound Challenge",
-    socialHashtags: isIHeartEcho
-      ? ["#iHeartEcho", "#Echocardiography", "#CardiacUltrasound", "#EchoEducation", "#DailyChallenge"]
-      : ["#AllAboutUltrasound", "#UltrasoundAssist", "#Ultrasound", "#DailyChallenge", "#Sonography"],
+    socialHashtags: [...STANDARD_SOCIAL_HASHTAGS],
   };
 }

@@ -138,6 +138,7 @@ export const questionBankRouter = router({
       presetCategory: z.string().optional(),
       type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"]).optional(),
       types: z.array(z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"])).min(1).optional(),
+      mediaKind: z.enum(["image", "video"]).optional(),
       folderId: z.number().int().nullable().optional(),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(25),
@@ -151,6 +152,20 @@ export const questionBankRouter = router({
       if (input.search) conditions.push(like(questionBank.question, `%${input.search}%`));
       if (input.type) conditions.push(eq(questionBank.type, input.type));
       if (input.types) conditions.push(inArray(questionBank.type, input.types));
+      if (input.mediaKind === "image") {
+        conditions.push(or(
+          sql`${questionBank.questionImageUrl} IS NOT NULL AND ${questionBank.questionImageUrl} <> ''`,
+          sql`${questionBank.feedbackImageUrl} IS NOT NULL AND ${questionBank.feedbackImageUrl} <> ''`,
+          sql`${questionBank.options} LIKE '%\"imageUrl\"%'`,
+        ));
+      }
+      if (input.mediaKind === "video") {
+        conditions.push(or(
+          sql`${questionBank.questionVideoUrl} IS NOT NULL AND ${questionBank.questionVideoUrl} <> ''`,
+          sql`${questionBank.feedbackVideoUrl} IS NOT NULL AND ${questionBank.feedbackVideoUrl} <> ''`,
+          sql`${questionBank.options} LIKE '%\"videoUrl\"%'`,
+        ));
+      }
       if (input.folderId !== undefined) {
         if (input.folderId === null) {
           conditions.push(sql`${questionBank.folderId} IS NULL`);

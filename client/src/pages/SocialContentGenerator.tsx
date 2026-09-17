@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { getBrandToolPresentation, resolveToolBrand, type BrandToolPresentation } from "@/lib/brandToolPresentation";
+import { getBrandToolPresentation, resolveToolBrand, STANDARD_SOCIAL_HASHTAGS, type BrandToolPresentation } from "@/lib/brandToolPresentation";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
 
@@ -115,10 +115,6 @@ const LIGHT_THEME: ThemeTokens = {
 };
 
 // ── Hashtags ─────────────────────────────────────────────────────────────────
-const REQUIRED_HASHTAGS = [
-  "#AllAboutUltrasound", "#UltrasoundAssist", "#Sonography",
-  "#Ultrasound", "#MedicalImaging", "#Sonographer", "#UltrasoundEducation",
-];
 const CATEGORY_HASHTAGS: Record<string, string[]> = {
   "Abdominal": ["#AbdominalUltrasound", "#AbdominalImaging"],
   "Small Parts": ["#ThyroidUltrasound", "#SmallPartsUltrasound"],
@@ -160,10 +156,10 @@ type GeneratedItem = {
 
 function buildFullSocialPost(item: GeneratedItem, presentation: BrandToolPresentation): string {
   const catTags = CATEGORY_HASHTAGS[item.category] || [];
-  const allHashtags = [...presentation.socialHashtags, ...catTags].join(" ");
+  const allHashtags = [...new Set([...STANDARD_SOCIAL_HASHTAGS, ...catTags])].join(" ");
   const icon = CONTENT_TYPE_ICONS[item.contentType] || "📸";
   const label = CONTENT_TYPE_LABELS[item.contentType] || item.contentType;
-  return `${icon} ${label} — ${item.category}\n${item.socialCaption}\n🔗 ${presentation.appHost}\n${allHashtags}`;
+  return `${icon} ${label} — ${item.category}\n${item.socialCaption}\n🔗 ${presentation.publicHost}\n${allHashtags}`;
 }
 
 async function renderCardToPng(el: HTMLElement): Promise<string> {
@@ -225,7 +221,7 @@ function BrandedFooter({ t, presentation }: { t: ThemeTokens; presentation: Bran
       {/* URL bar */}
       <div style={{ background: t.isDark ? "#060e14" : "#d0eced", padding: "10px 48px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ color: BRAND, fontSize: 13, fontWeight: 700, letterSpacing: "0.3px" }}>
-          {presentation.appHost}
+          {presentation.publicHost}
         </div>
         <div style={{ color: t.mutedColor, fontSize: 11 }}>
           Follow for daily {presentation.brand === "iheartecho" ? "echocardiography" : "ultrasound"} content

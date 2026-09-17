@@ -580,3 +580,12 @@
 - [x] Render Question Bank Social Card answer options with the Challenge Classic individual-row layout, A–D markers, and matched readable spacing across selected brands.
 - [x] Remove internal question-type labels such as MCQ from public Question Bank Social Card output, using only meaningful contextual labels when available.
 - [x] Ensure a temporary Social Post Library archive-write error cannot mask an otherwise successful generated post.
+- [x] Transform Quiz Card Generator into a dual-brand Platform Admin tool that searches all Question Bank questions, shows folders, and filters by text, tags, and attached image or video media.
+- [x] Add a creator-selected All About Ultrasound or iHeartEcho card brand to the dual-brand Quiz Card Generator without changing the source Question Bank record.
+- [x] Use www.allaboutultrasound.com and www.iheartecho.com as public URLs in Quiz and Social Generator output while retaining app URLs for Challenge Cards.
+- [x] Add #AllAboutUltrasound #iHeartEcho #Ultrasound #Sonographer #Sonography #UltrasoundEducation to every generated Social Post and Quiz Card caption.
+- [x] Add a restrained professional emoji treatment to both Social Post and Quiz Card captions without inserting emojis into clinical questions, options, answers, or explanations.
+- [x] Add focused dual-brand Question Bank filtering, creator-brand selection, public-link, and standardized-hashtag regressions without changing Question Bank records.
+- [x] Remove “daily” language from Quiz Card Generator captions and card output while retaining Challenge Card daily-challenge wording.
+- [x] Add an optional Quiz Card Generator source-folder label for the selected question’s Question Bank folder on exported cards and captions without changing Question Bank records.
+- [x] Add an optional custom Quiz Card Generator label field for exported cards and captions without changing source questions or folders.

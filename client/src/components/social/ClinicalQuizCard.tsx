@@ -85,6 +85,9 @@ export interface ClinicalQuizCardProps {
   media: ClinicalCardMedia;
   label?: string;
   title?: string;
+  footerHost?: string;
+  answerContextLabel?: string;
+  answerFooterMessage?: string;
   variant?: "question" | "answer";
   correctAnswer?: string | null;
   explanation?: string | null;
@@ -99,6 +102,9 @@ export function ClinicalQuizCard({
   media,
   label = "CLINICAL QUIZ",
   title,
+  footerHost,
+  answerContextLabel,
+  answerFooterMessage,
   variant = "question",
   correctAnswer,
   explanation,
@@ -112,6 +118,9 @@ export function ClinicalQuizCard({
         correctAnswer={correctAnswer ?? null}
         explanation={explanation ?? null}
         title={title}
+        footerHost={footerHost}
+        answerContextLabel={answerContextLabel}
+        answerFooterMessage={answerFooterMessage}
       />
     );
   }
@@ -243,7 +252,7 @@ export function ClinicalQuizCard({
           letterSpacing: 0.4,
         }}
       >
-        {presentation.appHost}
+        {footerHost ?? presentation.appHost}
       </footer>
     </div>
   );
@@ -256,7 +265,10 @@ function ClinicalQuizAnswerCard({
   correctAnswer,
   explanation,
   title,
-}: Pick<ClinicalQuizCardProps, "presentation" | "template" | "question" | "correctAnswer" | "explanation" | "title">) {
+  footerHost,
+  answerContextLabel = "DAILY CLINICAL CHALLENGE",
+  answerFooterMessage = "Follow for daily clinical challenges",
+}: Pick<ClinicalQuizCardProps, "presentation" | "template" | "question" | "correctAnswer" | "explanation" | "title" | "footerHost" | "answerContextLabel" | "answerFooterMessage">) {
   const theme = useMemo(() => getTemplate(template), [template]);
   const questionText = stripHtml(question);
   const answerText = correctAnswer ? stripHtml(correctAnswer) : "Answer available in the accompanying explanation.";
@@ -287,7 +299,7 @@ function ClinicalQuizAnswerCard({
         />
         <div>
           <div style={{ color: theme.text, fontSize: 23, fontWeight: 900, lineHeight: 1.1 }}>{presentation.displayName}</div>
-          <div style={{ color: theme.text, fontSize: 12, fontWeight: 800, letterSpacing: 1.8, opacity: 0.68, marginTop: 5 }}>DAILY CLINICAL CHALLENGE</div>
+          <div style={{ color: theme.text, fontSize: 12, fontWeight: 800, letterSpacing: 1.8, opacity: 0.68, marginTop: 5 }}>{answerContextLabel}</div>
         </div>
         </div>
         <div style={{ color: theme.accent, border: `2px solid ${theme.accent}`, borderRadius: 999, padding: "8px 18px", fontSize: 14, fontWeight: 900, letterSpacing: 1.4, flexShrink: 0 }}>ANSWER</div>
@@ -313,7 +325,7 @@ function ClinicalQuizAnswerCard({
         </section>
       )}
 
-      <footer style={{ position: "absolute", bottom: 34, left: 66, right: 66, display: "flex", justifyContent: "space-between", color: theme.accent, fontSize: 13, fontWeight: 800, letterSpacing: 0.4 }}><span>{presentation.appHost}</span><span>Follow for daily clinical challenges</span></footer>
+      <footer style={{ position: "absolute", bottom: 34, left: 66, right: 66, display: "flex", justifyContent: "space-between", color: theme.accent, fontSize: 13, fontWeight: 800, letterSpacing: 0.4 }}><span>{footerHost ?? presentation.appHost}</span><span>{answerFooterMessage}</span></footer>
     </div>
   );
 }
