@@ -62,8 +62,8 @@ export async function commitScormImportToQuestionBank(
   let mediaMap: Map<string, string>;
   try {
     mediaMap = source.extractedPrefix
-      ? await uploadISpringMediaFromExtractedPrefix(source.extractedPrefix, mediaRefs)
-      : await uploadISpringMediaFromZip(source.zipEntries, mediaRefs);
+      ? await uploadISpringMediaFromExtractedPrefix(source.extractedPrefix, mediaRefs, source.mediaBasePath)
+      : await uploadISpringMediaFromZip(source.zipEntries, mediaRefs, source.mediaBasePath);
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown media storage error";
     // Do not log source package content, storage keys, URLs, or user/session data.

@@ -98,4 +98,29 @@ describe("uploadISpringMediaFromZip", () => {
     expect(result.get("storage://images/img-fetal.png")).toContain("img-fetal.jpg");
     expect(storagePut).toHaveBeenCalledWith(expect.stringMatching(/img-fetal\.jpg$/), image, "image/jpeg");
   });
+
+  it("resolves image and video paths relative to a nested SCORM launch directory", async () => {
+    const rootImage = Buffer.from([0x52, 0x4f, 0x4f, 0x54]);
+    const rootVideo = Buffer.from([0x52, 0x4f, 0x4f, 0x54, 0x56]);
+    const image = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+    const video = Buffer.from([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70]);
+    downloadStorageObject.mockImplementation(async (key: string) => {
+      if (key === "scorm/source/data/images/question.png") return rootImage;
+      if (key === "scorm/source/data/video/choice.mp4") return rootVideo;
+      if (key === "scorm/source/course/data/images/question.png") return image;
+      if (key === "scorm/source/course/data/video/choice.mp4") return video;
+      throw new Error("not found");
+    });
+
+    const result = await uploadISpringMediaFromExtractedPrefix(
+      "scorm/source",
+      ["data/images/question.png", "data/video/choice.mp4"],
+      "course",
+    );
+
+    expect(result.get("data/images/question.png")).toContain("question.png");
+    expect(result.get("data/video/choice.mp4")).toContain("choice.mp4");
+    expect(storagePut).toHaveBeenCalledWith(expect.stringMatching(/question\.png$/), image, "image/png");
+    expect(storagePut).toHaveBeenCalledWith(expect.stringMatching(/choice\.mp4$/), video, "video/mp4");
+  });
 });

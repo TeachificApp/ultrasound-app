@@ -30,6 +30,7 @@ export interface ScormImportSource {
   parsed: ParsedQuiz;
   zipEntries: ZipEntryLike[];
   extractedPrefix?: string;
+  mediaBasePath?: string;
 }
 
 type MediaVersionRow = {
@@ -109,7 +110,13 @@ async function parseFromExtractedPrefix(version: MediaVersionRow): Promise<Scorm
     throw new TRPCError({ code: "BAD_REQUEST", message: `Not a valid iSpring quiz: ${e.message}` });
   }
 
-  return { parsed, zipEntries: [], extractedPrefix: prefix };
+  const mediaBasePath = path.posix.dirname(launchFile.replace(/\\/g, "/"));
+  return {
+    parsed,
+    zipEntries: [],
+    extractedPrefix: prefix,
+    mediaBasePath: mediaBasePath === "." ? "" : mediaBasePath,
+  };
 }
 
 /** Parse quiz + image source for question bank import. */

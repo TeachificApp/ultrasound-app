@@ -15,6 +15,7 @@ describe("SCORM Question Bank media contract", () => {
     expect(commitSource).toContain("parsed.allImageRefs");
     expect(commitSource).toContain("uploadISpringMediaFromZip");
     expect(commitSource).toContain("uploadISpringMediaFromExtractedPrefix");
+    expect(commitSource).toContain("source.mediaBasePath");
     expect(commitSource).toContain("richTextFromISpringContent");
     expect(commitSource).toContain("questionImageUrl");
     expect(commitSource).toContain("questionVideoUrl");

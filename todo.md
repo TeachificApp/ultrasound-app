@@ -589,3 +589,4 @@
 - [x] Remove “daily” language from Quiz Card Generator captions and card output while retaining Challenge Card daily-challenge wording.
 - [x] Add an optional Quiz Card Generator source-folder label for the selected question’s Question Bank folder on exported cards and captions without changing Question Bank records.
 - [x] Add an optional custom Quiz Card Generator label field for exported cards and captions without changing source questions or folders.
+- [x] Repair SCORM-to-native Question Bank extraction so supported stem, option, and feedback images/videos are imported and attached for new extractions without changing existing Question Bank records.

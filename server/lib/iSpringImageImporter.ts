@@ -36,27 +36,46 @@ function findZipEntry(entries: ZipEntryLike[], relativePath: string): ZipEntryLi
   });
 }
 
-function mediaPathCandidates(ref: string): string[] {
+function joinPackagePath(basePath: string, relativePath: string): string {
+  const segments: string[] = [];
+  for (const segment of `${basePath}/${relativePath}`.split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      segments.pop();
+      continue;
+    }
+    segments.push(segment);
+  }
+  return segments.join("/");
+}
+
+function mediaPathCandidates(ref: string, mediaBasePath = ""): string[] {
   const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
   const rootCandidates = [
     `data/${withoutScheme}`,
     withoutScheme,
     `data/storage/${withoutScheme}`,
   ];
+  const basePath = normalizeZipPath(mediaBasePath).replace(/\/+$/, "");
+  const isPackageRootReference = /^\/+/.test(ref);
+  const withPackageRelativeCandidates = (candidates: string[]) => [
+    ...(basePath && !isPackageRootReference ? candidates.map((candidate) => joinPackagePath(basePath, candidate)) : []),
+    ...candidates,
+  ];
   const extensionMatch = /\.[a-z0-9]+$/i.exec(withoutScheme);
-  if (!extensionMatch) return rootCandidates;
+  if (!extensionMatch) return [...new Set(withPackageRelativeCandidates(rootCandidates))];
   const extensions = isVideoPath(withoutScheme)
     ? ["mp4", "m4v", "webm", "mov", "wmv", "avi", "m3u8"]
     : ["jpg", "jpeg", "png", "gif", "webp", "svg"];
   const stem = withoutScheme.slice(0, -extensionMatch[0].length);
-  return [...new Set([
+  return [...new Set(withPackageRelativeCandidates([
     ...rootCandidates,
     ...extensions.flatMap((extension) => [
       `data/${stem}.${extension}`,
       `${stem}.${extension}`,
       `data/storage/${stem}.${extension}`,
     ]),
-  ])];
+  ]))];
 }
 
 function mimeFromPath(filePath: string): string {
@@ -100,10 +119,11 @@ async function mapWithConcurrency<T>(
 async function uploadSingleMediaRef(
   entries: ZipEntryLike[],
   ref: string,
+  mediaBasePath = "",
 ): Promise<[string, string] | null> {
   const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
   let entry: ZipEntryLike | undefined;
-  for (const candidate of mediaPathCandidates(ref)) {
+  for (const candidate of mediaPathCandidates(ref, mediaBasePath)) {
     entry = findZipEntry(entries, candidate);
     if (entry) break;
   }
@@ -121,11 +141,12 @@ async function uploadSingleMediaRef(
 async function uploadSingleMediaRefFromPrefix(
   prefix: string,
   ref: string,
+  mediaBasePath = "",
 ): Promise<[string, string] | null> {
   const withoutScheme = normalizeZipPath(ref.replace(/^storage:\/\//, ""));
   let buf: Buffer | null = null;
   let resolvedKey: string | null = null;
-  for (const candidate of mediaPathCandidates(ref)) {
+  for (const candidate of mediaPathCandidates(ref, mediaBasePath)) {
     const key = `${prefix}/${candidate}`.replace(/\/+/g, "/");
     try {
       buf = await downloadStorageObject(key);
@@ -149,13 +170,14 @@ async function uploadSingleMediaRefFromPrefix(
 export async function uploadISpringMediaFromZip(
   entries: ZipEntryLike[],
   mediaRefs: string[],
+  mediaBasePath = "",
   concurrency = DEFAULT_MEDIA_UPLOAD_CONCURRENCY,
 ): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
   const uniqueRefs = [...new Set(mediaRefs)];
 
   await mapWithConcurrency(uniqueRefs, concurrency, async (ref) => {
-    const uploaded = await uploadSingleMediaRef(entries, ref);
+    const uploaded = await uploadSingleMediaRef(entries, ref, mediaBasePath);
     if (uploaded) urlMap.set(uploaded[0], uploaded[1]);
   });
 
@@ -173,13 +195,14 @@ export function rewriteStorageRefs(text: string, urlMap: Map<string, string>): s
 export async function uploadISpringMediaFromExtractedPrefix(
   prefix: string,
   mediaRefs: string[],
+  mediaBasePath = "",
   concurrency = DEFAULT_MEDIA_UPLOAD_CONCURRENCY,
 ): Promise<Map<string, string>> {
   const urlMap = new Map<string, string>();
   const uniqueRefs = [...new Set(mediaRefs)];
 
   await mapWithConcurrency(uniqueRefs, concurrency, async (ref) => {
-    const uploaded = await uploadSingleMediaRefFromPrefix(prefix, ref);
+    const uploaded = await uploadSingleMediaRefFromPrefix(prefix, ref, mediaBasePath);
     if (uploaded) urlMap.set(uploaded[0], uploaded[1]);
   });
 
