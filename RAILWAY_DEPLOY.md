@@ -17,9 +17,14 @@ Both domains point to the same Railway service. The app detects which subdomain 
 
 Railway auto-detects configuration from these files:
 
-- `railway.toml` — Build/deploy settings, health checks, restart policy
-- `railway.json` — Service configuration (alternative format)
+- `railway.toml` — The single source for this service's build/deploy settings and restart policy.
 - `nixpacks.toml` — Nixpacks builder config (Node.js 22, pnpm)
+
+> Do not add a `railway.json` alongside `railway.toml`. Railway merges
+> configuration-as-code settings into a deployment, and duplicate deployment
+> configuration sources can prevent the Railway API from accepting service
+> settings. Health-check configuration is intentionally managed in Railway's
+> service settings, where the exact path must be `/api/health`.
 
 ```
 Build: pnpm install && pnpm build

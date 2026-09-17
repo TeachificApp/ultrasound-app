@@ -605,3 +605,4 @@
 - [x] Restore iHeartEcho POCUS Cardiac, eFAST, RUSH, and Lung Navigator URL aliases so established navigator links no longer fall through to a 404 page.
 - [x] Prevent anonymous visitors from receiving interactive Premium content previews, while retaining timed previews only for authenticated free members and improving SoundBytes sign-in gating with visible but non-interactive blurred library cards.
 - [x] Repair the student dashboard subscription view so legacy, free, or otherwise non-Stripe membership records cannot crash the Premium trial countdown lookup when their live Stripe payload is absent.
+- [x] Repair the Railway pre-build `healthcheckPath` validation failure by removing duplicate config-as-code sources and the invalid code-level health-check overrides; retain the live unauthenticated `/api/health` endpoint and manage its setting only in Railway service configuration.
