@@ -596,3 +596,7 @@
 - [x] Add focused social-platform export regression coverage and retain the existing Platform Admin authorization and source-record-preservation boundaries.
 - [x] Add a Stripe-native three-day introductory trial to eligible new single-brand and dual-brand Premium App subscription checkout sessions, without altering existing subscriptions, prices, access records, or payment data.
 - [x] Grant authorized Premium access at the valid Stripe no-payment-required trial checkout event, preserve unpaid-checkout deferral for all other statuses, prevent repeat trials for prior Stripe-managed app memberships, and advertise the trial through shared and direct app upgrade prompts.
+- [x] Add a prominent dashboard-top countdown banner for active Premium App trials using only Stripe’s live trial status and expiry timestamp, with a continuously refreshed remaining-time display.
+- [x] Add a once-per-session in-app final-day alert when fewer than 24 hours remain in a Premium App trial, without notifying non-trial or expired memberships.
+- [x] Add an optional feedback modal before a member cancels an active Premium App trial, schedule the Stripe cancellation only after confirmation, and send the reason/details to the configured Platform Admin notification channel once per newly scheduled trial cancellation.
+- [x] Add focused trial dashboard, final-day alert, cancellation-feedback, no-duplicate-alert, and safe live-trial-status regression coverage without creating or changing subscriptions, payments, memberships, or emails during validation.

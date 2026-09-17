@@ -59,6 +59,8 @@ import {
 } from "../../shared/thinkificLegacy";
 import { restoreMissingCourseCertificate } from "./lmsHelpers";
 import { isEnrollmentCompleted } from "../lib/enrollmentAccess";
+import { isActiveBrandPremiumTrialSubscription } from "../lib/brandMembershipTrial";
+import { notifyOwner } from "../_core/notification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -839,6 +841,7 @@ export const dashboardRouter = router({
         let stripeData: {
           status: string;
           currentPeriodEnd: Date | null;
+          trialEnd: Date | null;
           cancelAtPeriodEnd: boolean;
           interval: string | null;
           amount: number | null;
@@ -852,6 +855,7 @@ export const dashboardRouter = router({
             stripeData = {
               status: sub.status,
               currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
+              trialEnd: sub.trial_end ? new Date(sub.trial_end * 1000) : null,
               cancelAtPeriodEnd: sub.cancel_at_period_end,
               interval: item?.price?.recurring?.interval ?? null,
               amount: item?.price?.unit_amount ?? null,
@@ -1141,6 +1145,18 @@ export const dashboardRouter = router({
   cancelSubscription: protectedProcedure
     .input(z.object({
       membershipId: z.number().int().positive(),
+      trialFeedback: z.object({
+        reason: z.enum([
+          "not_selected",
+          "too_expensive",
+          "not_enough_time",
+          "missing_features",
+          "technical_issue",
+          "found_an_alternative",
+          "other",
+        ]),
+        details: z.string().trim().max(2_000).optional(),
+      }).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -1161,12 +1177,57 @@ export const dashboardRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "This subscription cannot be cancelled here. Please contact support." });
       }
 
-      // Cancel at period end (not immediately)
-      await getStripeClient().subscriptions.update(membership.stripeSubscriptionId, {
+      const stripe = getStripeClient();
+      const liveSubscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId) as any;
+      const trialEnd = liveSubscription.trial_end
+        ? new Date(liveSubscription.trial_end * 1000)
+        : null;
+      const isTrialCancellation = isActiveBrandPremiumTrialSubscription({
+        status: liveSubscription.status,
+        trialEnd,
+      });
+      const wasAlreadyScheduledForCancellation = liveSubscription.cancel_at_period_end === true;
+      const isNewTrialCancellation = isTrialCancellation && !wasAlreadyScheduledForCancellation;
+
+      // Cancel at the current trial or billing period end (not immediately).
+      await stripe.subscriptions.update(membership.stripeSubscriptionId, {
         cancel_at_period_end: true,
       });
 
-      return { success: true, message: "Your subscription will be cancelled at the end of the current billing period." };
+      if (isNewTrialCancellation) {
+        const reasonLabels: Record<NonNullable<typeof input.trialFeedback>["reason"], string> = {
+          not_selected: "No reason selected",
+          too_expensive: "Too expensive",
+          not_enough_time: "Not enough time to use it",
+          missing_features: "Missing features or content",
+          technical_issue: "Technical issue",
+          found_an_alternative: "Found an alternative",
+          other: "Other",
+        };
+        const feedback = input.trialFeedback;
+        const endLabel = trialEnd?.toISOString() ?? "Unknown trial end";
+        notifyOwner({
+          title: "Premium trial cancellation feedback",
+          content: [
+            "A member cancelled a Premium App subscription during the three-day trial.",
+            `Member: ${ctx.user.name?.trim() || "Member"} (${ctx.user.email || `User #${ctx.user.id}`})`,
+            `Brand: ${membership.brand}`,
+            `Trial ends: ${endLabel}`,
+            `Reason: ${reasonLabels[feedback?.reason ?? "not_selected"]}`,
+            feedback?.details?.trim() ? `Feedback: ${feedback.details.trim()}` : "Feedback: None provided",
+          ].join("\n"),
+        }).catch(() => {});
+      }
+
+      return {
+        success: true,
+        trialCancelled: isTrialCancellation,
+        message: isNewTrialCancellation
+          ? "Your free trial will end at its scheduled time. Your feedback has been shared with the team."
+          : isTrialCancellation
+          ? "Your free trial is already set to end at its scheduled time. You will not be charged."
+          : "Your subscription will be cancelled at the end of the current billing period.",
+      };
     }),
 
   // ── Reactivate Subscription ───────────────────────────────────────────────────

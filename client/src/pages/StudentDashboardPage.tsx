@@ -13,6 +13,13 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { PREMIUM_TRIAL_CTA } from "@/lib/premiumTrial";
+import {
+  formatPremiumTrialCountdown,
+  formatPremiumTrialEnd,
+  getActivePremiumTrial,
+  TRIAL_CANCELLATION_REASONS,
+  type TrialCancellationReason,
+} from "@/lib/premiumTrialCountdown";
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
@@ -115,6 +122,78 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.color}`}>
       {cfg.label}
     </span>
+  );
+}
+
+function PremiumTrialCountdownBanner() {
+  const { data, isLoading } = trpc.dashboard.getMySubscriptions.useQuery();
+  const [now, setNow] = useState(() => Date.now());
+  const [finalDayAlertOpen, setFinalDayAlertOpen] = useState(false);
+  const trial = getActivePremiumTrial(data?.memberships.map((membership: any) => membership.stripe), now);
+
+  useEffect(() => {
+    if (!trial) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, [trial?.endsAt.getTime()]);
+
+  useEffect(() => {
+    if (!trial?.isFinalDay) return;
+    const storageKey = `premium-trial-final-day-alert:${trial.endsAt.getTime()}`;
+    if (window.sessionStorage.getItem(storageKey) === "shown") return;
+    window.sessionStorage.setItem(storageKey, "shown");
+    setFinalDayAlertOpen(true);
+  }, [trial?.isFinalDay, trial?.endsAt.getTime()]);
+
+  if (isLoading || !trial) return null;
+
+  return (
+    <>
+      <section
+        aria-label="Premium free trial countdown"
+        className={`mb-5 overflow-hidden rounded-2xl border shadow-sm ${trial.isFinalDay ? "border-amber-300 bg-amber-50" : "border-teal-300 bg-gradient-to-r from-[#0e4a50] via-[#147a80] to-[#189aa1]"}`}
+      >
+        <div className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex items-start gap-3">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${trial.isFinalDay ? "bg-amber-500 text-white" : "bg-white/15 text-white"}`}>
+              <Clock className="h-5 w-5" />
+            </div>
+            <div>
+              <p className={`text-sm font-bold ${trial.isFinalDay ? "text-amber-950" : "text-white"}`}>
+                {trial.isFinalDay ? "Your Premium free trial ends in less than 24 hours" : "Your Premium free trial is active"}
+              </p>
+              <p className={`mt-0.5 text-xs sm:text-sm ${trial.isFinalDay ? "text-amber-800" : "text-white/85"}`}>
+                {trial.isFinalDay
+                  ? "Keep your full clinical access by continuing your membership before the trial ends."
+                  : "Explore every Premium feature before your membership begins automatically."}
+              </p>
+            </div>
+          </div>
+          <div className={`rounded-xl px-4 py-2 text-center ${trial.isFinalDay ? "bg-white text-amber-900 ring-1 ring-amber-200" : "bg-white text-[#0e4a50]"}`}>
+            <span className="block text-[10px] font-bold uppercase tracking-widest opacity-70">Time remaining</span>
+            <span className="block text-xl font-black tabular-nums">{formatPremiumTrialCountdown(trial.remainingMs)}</span>
+          </div>
+        </div>
+      </section>
+
+      <Dialog open={finalDayAlertOpen} onOpenChange={setFinalDayAlertOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-900">
+              <AlertCircle className="h-5 w-5" /> Less than 24 hours remain
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-sm leading-relaxed text-gray-600">
+              Your three-day Premium trial ends on <strong>{formatPremiumTrialEnd(trial.endsAt)}</strong>. Your selected membership will begin automatically unless you cancel before then.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setFinalDayAlertOpen(false)} className="bg-[#189aa1] text-white hover:bg-[#147a80]">
+              Continue Exploring Premium
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -1658,7 +1737,13 @@ function SubscriptionsTab() {
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.dashboard.getMySubscriptions.useQuery();
   const cancelSub = trpc.dashboard.cancelSubscription.useMutation({
-    onSuccess: (res) => { toast.success(res.message); utils.dashboard.getMySubscriptions.invalidate(); },
+    onSuccess: (res) => {
+      toast.success(res.message);
+      utils.dashboard.getMySubscriptions.invalidate();
+      setTrialCancelTarget(null);
+      setTrialCancellationDetails("");
+      setTrialCancellationReason("not_selected");
+    },
     onError: (e) => toast.error(e.message),
   });
   const reactivateSub = trpc.dashboard.reactivateSubscription.useMutation({
@@ -1684,6 +1769,9 @@ function SubscriptionsTab() {
   const [confirmCancel, setConfirmCancel] = useState<number | null>(null);
   const [confirmCancelCourse, setConfirmCancelCourse] = useState<number | null>(null);
   const [confirmCancelEnrollment, setConfirmCancelEnrollment] = useState<{ enrollmentId: number; courseTitle: string } | null>(null);
+  const [trialCancelTarget, setTrialCancelTarget] = useState<{ membershipId: number; brand: string; endsAt: Date } | null>(null);
+  const [trialCancellationReason, setTrialCancellationReason] = useState<TrialCancellationReason>("not_selected");
+  const [trialCancellationDetails, setTrialCancellationDetails] = useState("");
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -1733,6 +1821,7 @@ function SubscriptionsTab() {
                   {subs.map(sub => {
                     const isThinkific = sub.isThinkific;
                     const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
+                    const activeTrial = getActivePremiumTrial([sub.stripe]);
                     const tierLabel = sub.tier === "premium" ? "Premium" : sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1);
 
                     return (
@@ -1799,12 +1888,18 @@ function SubscriptionsTab() {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => setConfirmCancel(sub.id)}
+                                  onClick={() => {
+                                    if (activeTrial) {
+                                      setTrialCancelTarget({ membershipId: sub.id, brand, endsAt: activeTrial.endsAt });
+                                    } else {
+                                      setConfirmCancel(sub.id);
+                                    }
+                                  }}
                                   disabled={sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled"}
                                   className="text-red-600 border-red-200 hover:bg-red-50"
                                 >
                                   <XCircle className="w-3.5 h-3.5 mr-1" />
-                                  Cancel
+                                  {activeTrial ? "Cancel Trial" : "Cancel"}
                                 </Button>
                               )
                             ) : !sub.stripeSubscriptionId && !isThinkific && sub.tier !== "premium" ? (
@@ -1976,6 +2071,71 @@ function SubscriptionsTab() {
           </div>
         </div>
       )}
+
+      {/* Trial cancellation feedback — displayed only before an active Premium trial is cancelled. */}
+      <Dialog open={trialCancelTarget !== null} onOpenChange={open => !open && setTrialCancelTarget(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Before you cancel your free trial</DialogTitle>
+            <DialogDescription className="pt-2 text-sm leading-relaxed">
+              Your {BRAND_CONFIG[trialCancelTarget?.brand ?? ""]?.label ?? "Premium"} access will remain available until {trialCancelTarget ? formatPremiumTrialEnd(trialCancelTarget.endsAt) : "the end of the trial"}. You will not be charged when the trial ends.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
+            <div className="rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+              Your feedback helps the team improve Premium. Sharing a reason is optional.
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="trial-cancellation-reason">What prompted your cancellation?</Label>
+              <select
+                id="trial-cancellation-reason"
+                value={trialCancellationReason}
+                onChange={(event) => setTrialCancellationReason(event.target.value as TrialCancellationReason)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {TRIAL_CANCELLATION_REASONS.map((reason) => (
+                  <option key={reason.value} value={reason.value}>{reason.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="trial-cancellation-details">Anything else you would like us to know? <span className="font-normal text-gray-400">(optional)</span></Label>
+              <Textarea
+                id="trial-cancellation-details"
+                value={trialCancellationDetails}
+                onChange={(event) => setTrialCancellationDetails(event.target.value.slice(0, 2_000))}
+                maxLength={2_000}
+                rows={4}
+                placeholder="Your feedback goes directly to the Platform Admin team."
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setTrialCancelTarget(null)} disabled={cancelSub.isPending}>
+              Keep My Trial
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!trialCancelTarget) return;
+                cancelSub.mutate({
+                  membershipId: trialCancelTarget.membershipId,
+                  trialFeedback: {
+                    reason: trialCancellationReason,
+                    details: trialCancellationDetails.trim() || undefined,
+                  },
+                });
+              }}
+              disabled={cancelSub.isPending}
+            >
+              {cancelSub.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Cancel Free Trial
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel membership confirmation */}
       <AlertDialog open={confirmCancel !== null} onOpenChange={open => !open && setConfirmCancel(null)}>
@@ -2893,6 +3053,8 @@ export default function StudentDashboardPage() {
         </div>
 
         <div className="max-w-5xl mx-auto px-3 sm:px-8 py-4 sm:py-8">
+          <PremiumTrialCountdownBanner />
+
           {/* Tab Navigation */}
           <div className="relative mb-5 sm:mb-8">
             {/* Left fade + chevron — only on mobile when scrolled right */}

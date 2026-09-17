@@ -32,6 +32,19 @@ export function isBrandMembershipTrialCheckout(session: {
     && hasBrandMembershipTrial(session.metadata);
 }
 
+/**
+ * Stripe is authoritative for a current trial. The dashboard receives only the
+ * expiry timestamp and never subscription metadata or payment information.
+ */
+export function isActiveBrandPremiumTrialSubscription(subscription: {
+  status?: string | null;
+  trialEnd?: Date | string | number | null;
+}, now = Date.now()): boolean {
+  if (subscription.status !== "trialing" || !subscription.trialEnd) return false;
+  const end = new Date(subscription.trialEnd).getTime();
+  return Number.isFinite(end) && end > now;
+}
+
 /** A previous Stripe-managed membership makes another introductory trial ineligible. */
 export function hasPriorStripeBrandMembership(membership: {
   stripeSubscriptionId?: string | null;
