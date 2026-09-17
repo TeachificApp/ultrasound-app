@@ -13,6 +13,7 @@ describe("selected-brand tool routing", () => {
     expect(urls).toContain("withBrandTag(path, brand)");
     expect(urls).toContain("IHEARTECHO_APP_URL");
     expect(urls).toContain("perBrandAdminUrl");
+    expect(urls).toContain('path === "/platform-admin"');
     expect(presentation).toContain("iheartecho");
     expect(presentation).toContain("getBrandDisplayConfig");
     expect(brands).toContain("app.iheartecho.net");
@@ -54,5 +55,15 @@ describe("selected-brand tool routing", () => {
     expect(clinicalCards).toContain("DAILY CLINICAL CHALLENGE");
     expect(clinicalCards).toContain(">ANSWER<");
     expect(platformAdmin).toContain('label: "Quiz Card Generator"');
+  });
+
+  it("registers selected-brand Engagement URLs and carries A–D labels into Question Bank Social Card captions", () => {
+    const app = readProjectFile("client/src/App.tsx");
+    const socialCards = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+
+    expect(app).toContain('{ base: "/admin/engagement", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard> }');
+    expect(socialCards).toContain('const OPTION_LETTERS = ["A", "B", "C", "D"]');
+    expect(socialCards).toContain('`${OPTION_LETTERS[index] ?? String.fromCharCode(65 + index)}. ${stripHtml(option.text)}`');
+    expect(socialCards).toContain('perBrandAdminUrl("/platform-admin", presentation.brand)');
   });
 });

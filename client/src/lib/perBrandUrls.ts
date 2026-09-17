@@ -19,6 +19,15 @@ function perBrandAppUrl(path: string, brand: Brand): string {
 
 /** Brand-specific administrator URL, including the selected application host and route tag. */
 export function perBrandAdminUrl(path: string, brand: Brand): string {
+  // Platform Admin is selected by host. It has no brand-tagged route and must
+  // remain reachable from every brand-specific tool's back navigation.
+  if (path === "/platform-admin") {
+    const host = brand === "iheartecho" ? IHEARTECHO_APP_URL : APP_URL;
+    const isAlreadyOnHost = typeof window !== "undefined" && (
+      brand === "iheartecho" ? isIHeartEchoDomain() : window.location.hostname === "app.allaboutultrasound.com"
+    );
+    return isAlreadyOnHost ? path : `${host}${path}`;
+  }
   return perBrandAppUrl(path, brand);
 }
 

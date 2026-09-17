@@ -594,6 +594,7 @@ function Router() {
           { base: "/admin/challenge-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard> },
           { base: "/admin/social-content", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard> },
           { base: "/admin/question-bank-social-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankSocialCardGenerator /></RoleGuard> },
+          { base: "/admin/engagement", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard> },
           { base: "/admin/scancoach", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard> },
           { base: "/admin/navigator", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard> },
           { base: "/admin/thinkific-webhook", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard> },
@@ -758,6 +759,7 @@ function MembersRouter() {
         { base: "/admin/challenge-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard> },
         { base: "/admin/social-content", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard> },
         { base: "/admin/question-bank-social-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankSocialCardGenerator /></RoleGuard> },
+        { base: "/admin/engagement", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard> },
         { base: "/admin/scancoach", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard> },
         { base: "/admin/navigator", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><NavigatorEditor /></RoleGuard> },
         { base: "/admin/thinkific-webhook", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ThinkificWebhookAdmin /></RoleGuard> },
@@ -1199,6 +1201,7 @@ function IHeartEchoRouter() {
           { base: "/admin/challenge-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard> },
           { base: "/admin/social-content", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SocialContentGenerator /></RoleGuard> },
           { base: "/admin/question-bank-social-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuestionBankSocialCardGenerator /></RoleGuard> },
+          { base: "/admin/engagement", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><EngagementDashboard /></RoleGuard> },
         ])}
         <Route path="/admin/media-repository">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><MediaRepository /></RoleGuard>}</Route>
         <Route path="/admin/form-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><FormBuilderAdmin /></RoleGuard>}</Route>

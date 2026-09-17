@@ -20,6 +20,7 @@ import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
 
 type BankOption = { text: string; imageUrl?: string; videoUrl?: string };
+const OPTION_LETTERS = ["A", "B", "C", "D"];
 
 function stripHtml(value: string | null | undefined): string {
   return (value ?? "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
@@ -61,7 +62,7 @@ function buildSocialCaption(question: any, presentation: ReturnType<typeof getBr
     "",
     stripHtml(question?.question),
     "",
-    ...options.map((option, index) => `${index + 1}. ${stripHtml(option.text)}`),
+    ...options.map((option, index) => `${OPTION_LETTERS[index] ?? String.fromCharCode(65 + index)}. ${stripHtml(option.text)}`),
     "",
     `Explore more clinical learning at ${presentation.appHost}`,
     "",

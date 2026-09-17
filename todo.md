@@ -568,3 +568,6 @@
 - [x] Dynamically fit Challenge Card question, options, correct answer, and explanation typography and spacing so all content remains visible within the selected matched card template without clipping.
 - [x] Use A–D option labels on clinical Challenge Cards and align their answer-card hierarchy with the classic answer-card layout while retaining the selected clinical template.
 - [x] Make the all-Platform-Admin Question Bank Social Cards generator clearly discoverable from the approved Platform Admin engagement surface.
+- [x] Register a valid iHeartEcho Engagement route and ensure selected-brand Engagement links never resolve to a 404 page.
+- [x] Make Question Bank Social Cards return to the selected brand’s valid Platform Admin route rather than an incorrect or unavailable URL.
+- [x] Use A–D option labels consistently in Question Bank Social Cards, Quiz Card Generator outputs, and clinical Challenge Cards.
