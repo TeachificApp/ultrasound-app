@@ -17,13 +17,14 @@ import {
   ArrowLeft, Download, Loader2,
   Sparkles, Package, Share2, Copy, Check, RefreshCw,
   Image as ImageLucide, Upload, LayoutGrid, CreditCard,
-  X,
+  X, LibraryBig,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { getBrandToolPresentation, resolveToolBrand, type BrandToolPresentation } from "@/lib/brandToolPresentation";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
+import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
 
 // ── Brand palette ────────────────────────────────────────────────────────────
 const BRAND = "#189aa1";
@@ -152,7 +153,9 @@ type GeneratedItem = {
   category: string;
   contentType: string;
   imageUrl?: string;
-  imageSource?: "abstract" | "upload";
+  imageSource?: "ai" | "upload" | "media_repository";
+  libraryId?: number;
+  mediaAssetId?: number | null;
 };
 
 function buildFullSocialPost(item: GeneratedItem, presentation: BrandToolPresentation): string {
@@ -483,7 +486,7 @@ function SocialPostPanel({ item, presentation }: { item: GeneratedItem; presenta
 }
 
 // ── Image Upload Helper ──────────────────────────────────────────────────────
-function ImageUploadButton({ onUploaded, disabled }: { onUploaded: (url: string) => void; disabled?: boolean }) {
+function ImageUploadButton({ onUploaded, disabled, brand }: { onUploaded: (uploaded: { url: string; assetId: number }) => void; disabled?: boolean; brand: "aaus" | "iheartecho" }) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -500,23 +503,20 @@ function ImageUploadButton({ onUploaded, disabled }: { onUploaded: (url: string)
     }
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload-social-image", { method: "POST", body: formData, credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Upload failed" }));
-        throw new Error(err.error || "Upload failed");
-      }
-      const { url } = await res.json();
-      onUploaded(url);
-      toast.success("Image uploaded!");
+      const uploaded = await uploadFileToMediaRepository(file, {
+        access: "private",
+        folder: "social-post-library",
+        brand,
+      });
+      onUploaded({ url: uploaded.s3Url, assetId: uploaded.assetId });
+      toast.success("Image uploaded to Media Repository and selected.");
     } catch (err: any) {
       toast.error("Upload failed", { description: err.message });
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
     }
-  }, [onUploaded]);
+  }, [brand, onUploaded]);
 
   return (
     <>
@@ -576,14 +576,19 @@ export default function SocialContentGenerator() {
   const [imageMode, setImageMode] = useState<ImageMode>("none");
   const [imageStyleHint, setImageStyleHint] = useState("");
   const [items, setItems] = useState<GeneratedItem[]>([]);
+  const [showLibrary, setShowLibrary] = useState(false);
   const [batchLoading, setBatchLoading] = useState(false);
   const [regeneratingImageIdx, setRegeneratingImageIdx] = useState<number | null>(null);
   const [perCardImagePrompts, setPerCardImagePrompts] = useState<Record<number, string>>({});
   const cardRefs = useRef<Record<number, CardHandle>>({});
+  const utils = trpc.useUtils();
+  const mediaAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "image", page: 1, pageSize: 12 });
+  const savedPosts = trpc.socialContent.listSavedPosts.useQuery({ limit: 40 });
 
   const generateMutation = trpc.socialContent.generateContent.useMutation({
     onSuccess: (data) => {
       setItems((prev) => [...data.items, ...prev]);
+      void utils.socialContent.listSavedPosts.invalidate();
       toast.success(`Generated ${data.items.length} item${data.items.length > 1 ? "s" : ""}!`);
     },
     onError: (err) => {
@@ -592,6 +597,9 @@ export default function SocialContentGenerator() {
   });
 
   const generateAbstractMutation = trpc.socialContent.generateAbstractImage.useMutation();
+  const updateSavedPostMutation = trpc.socialContent.updateSavedPost.useMutation({
+    onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
+  });
 
   const handleGenerate = () => {
     generateMutation.mutate({
@@ -601,6 +609,8 @@ export default function SocialContentGenerator() {
       count,
       imageMode,
       imageStyleHint: imageMode === "abstract" ? (imageStyleHint.trim() || undefined) : undefined,
+      layoutMode,
+      cardTheme,
     });
   };
 
@@ -613,22 +623,56 @@ export default function SocialContentGenerator() {
         contentType: item.contentType,
         styleHint: styleHint?.trim() || undefined,
       });
-      setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl, imageSource: "abstract" as const } : p)));
+      setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl, imageSource: "ai" as const, mediaAssetId: null } : p)));
+      const saved = items[idx];
+      if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, imageUrl: result.imageUrl, imageSource: "ai", mediaAssetId: null });
       toast.success("Abstract background regenerated!");
     } catch (err: any) {
       toast.error("Image generation failed", { description: err.message });
     } finally {
       setRegeneratingImageIdx(null);
     }
-  }, [generateAbstractMutation]);
+  }, [generateAbstractMutation, items, updateSavedPostMutation]);
 
-  const handleUploadedImage = useCallback((idx: number, url: string) => {
-    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: url, imageSource: "upload" as const } : p)));
-  }, []);
+  const handleUploadedImage = useCallback((idx: number, uploaded: { url: string; assetId: number }) => {
+    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: uploaded.url, imageSource: "upload" as const, mediaAssetId: uploaded.assetId } : p)));
+    const saved = items[idx];
+    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, imageUrl: uploaded.url, imageSource: "upload", mediaAssetId: uploaded.assetId });
+  }, [items, updateSavedPostMutation]);
+
+  const handleRepositoryImage = useCallback((idx: number, asset: any) => {
+    const imageUrl = asset.currentVersion?.s3Url;
+    if (!imageUrl) return;
+    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl, imageSource: "media_repository" as const, mediaAssetId: asset.id } : p)));
+    const saved = items[idx];
+    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, imageUrl, imageSource: "media_repository", mediaAssetId: asset.id });
+    toast.success("Media Repository image selected.");
+  }, [items, updateSavedPostMutation]);
 
   const handleRemoveImage = useCallback((idx: number) => {
     setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: undefined, imageSource: undefined } : p)));
+    const saved = items[idx];
+    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, imageUrl: null, imageSource: null, mediaAssetId: null });
     toast.success("Image removed from card");
+  }, [items, updateSavedPostMutation]);
+
+  const openSavedPost = useCallback((saved: any) => {
+    setItems([{
+      libraryId: saved.id,
+      headline: saved.headline,
+      body: saved.body,
+      subtext: saved.subtext ?? "",
+      socialCaption: saved.socialCaption,
+      category: saved.category,
+      contentType: saved.contentType,
+      imageUrl: saved.imageUrl ?? undefined,
+      imageSource: saved.imageSource ?? undefined,
+      mediaAssetId: saved.mediaAssetId ?? null,
+    }]);
+    setLayoutMode(saved.layoutMode);
+    setCardTheme(saved.cardTheme);
+    setShowLibrary(false);
+    toast.success("Saved post opened. Download it from the card preview.");
   }, []);
 
   const handleBatchDownload = useCallback(async () => {
@@ -713,9 +757,37 @@ export default function SocialContentGenerator() {
                 Download All ({items.length})
               </Button>
             )}
+            <Button onClick={() => setShowLibrary((value) => !value)} size="sm" variant="outline" className="gap-1.5 border-white/15 text-xs text-white/80 hover:bg-white/10">
+              <LibraryBig className="w-3 h-3" /> Post Library
+            </Button>
           </div>
         </div>
       </div>
+
+      {showLibrary && (
+        <div className="max-w-screen-2xl mx-auto px-6 pt-4">
+          <section className="rounded-xl border border-white/10 bg-[#0e1a24] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-white">Shared {presentation.displayName} Post Library</h2>
+                <p className="mt-1 text-xs text-white/45">Generated posts are available to all Platform Admins for reopening and later download.</p>
+              </div>
+              <Badge className="border-0 bg-teal-300/15 text-teal-200">{savedPosts.data?.length ?? 0} saved</Badge>
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {savedPosts.isLoading && <div className="col-span-full py-5 text-center text-xs text-white/45"><Loader2 className="mx-auto mb-1 h-4 w-4 animate-spin" />Loading saved posts</div>}
+              {savedPosts.data?.map((saved: any) => (
+                <article key={saved.id} className="rounded-lg border border-white/10 bg-black/15 p-3">
+                  <div className="line-clamp-2 text-sm font-semibold text-white/85">{saved.headline}</div>
+                  <div className="mt-1 text-[10px] uppercase tracking-wide text-teal-200/70">{saved.category} · {saved.contentType.replace(/_/g, " ")}</div>
+                  <div className="mt-3 flex items-center justify-between"><span className="text-[10px] text-white/40">{new Date(saved.updatedAt).toLocaleDateString()}</span><Button size="sm" onClick={() => openSavedPost(saved)} className="h-7 bg-teal-500 px-2 text-xs text-white hover:bg-teal-400"><Download className="mr-1 h-3 w-3" />Open</Button></div>
+                </article>
+              ))}
+              {!savedPosts.isLoading && savedPosts.data?.length === 0 && <div className="col-span-full rounded-lg border border-dashed border-white/10 py-5 text-center text-xs text-white/45">Generated posts will appear here for every Platform Admin.</div>}
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="max-w-screen-2xl mx-auto px-6 py-4">
@@ -770,7 +842,7 @@ export default function SocialContentGenerator() {
                   }}
                 >
                   {mode === "none" && <><X className="w-3 h-3" /> None</>}
-                  {mode === "abstract" && <><Sparkles className="w-3 h-3" /> Abstract AI</>}
+                  {mode === "abstract" && <><Sparkles className="w-3 h-3" /> AI Generate</>}
                   {mode === "upload" && <><Upload className="w-3 h-3" /> Upload After</>}
                 </button>
               ))}
@@ -875,7 +947,7 @@ export default function SocialContentGenerator() {
                             {regeneratingImageIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                             {perCardImagePrompts[idx]?.trim() ? "Generate from Prompt" : "New Abstract"}
                           </Button>
-                          <ImageUploadButton onUploaded={(url) => handleUploadedImage(idx, url)} disabled={regeneratingImageIdx === idx} />
+                          <ImageUploadButton onUploaded={(uploaded) => handleUploadedImage(idx, uploaded)} brand={presentation.brand} disabled={regeneratingImageIdx === idx} />
                           <Button size="sm" variant="outline" onClick={() => handleRemoveImage(idx)} className="gap-1.5 text-red-400/70 border-red-400/20 hover:bg-red-400/10 text-xs">
                             <X className="w-3 h-3" /> Remove
                           </Button>
@@ -891,7 +963,7 @@ export default function SocialContentGenerator() {
                             {regeneratingImageIdx === idx ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                             {perCardImagePrompts[idx]?.trim() ? "Generate from Prompt" : "Add Abstract"}
                           </Button>
-                          <ImageUploadButton onUploaded={(url) => handleUploadedImage(idx, url)} disabled={regeneratingImageIdx === idx} />
+                          <ImageUploadButton onUploaded={(uploaded) => handleUploadedImage(idx, uploaded)} brand={presentation.brand} disabled={regeneratingImageIdx === idx} />
                         </>
                       )}
                     </div>
@@ -912,6 +984,18 @@ export default function SocialContentGenerator() {
                         </button>
                       ))}
                     </div>
+                    <div className="mt-2 border-t border-white/10 pt-2">
+                      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/45">Media Repository images</div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {mediaAssets.data?.assets.map((asset: any) => (
+                          <button key={asset.id} onClick={() => handleRepositoryImage(idx, asset)} className="overflow-hidden rounded border border-white/10 bg-black/20 text-left hover:border-teal-300/70" title={asset.title}>
+                            {asset.currentVersion?.s3Url ? <img src={asset.currentVersion.s3Url} alt={asset.title} className="h-14 w-full object-cover" /> : <div className="flex h-14 items-center justify-center"><ImageLucide className="h-4 w-4 text-teal-200" /></div>}
+                            <span className="line-clamp-1 block p-1 text-[9px] text-white/60">{asset.title}</span>
+                          </button>
+                        ))}
+                        {!mediaAssets.isLoading && mediaAssets.data?.assets.length === 0 && <div className="col-span-4 text-[10px] text-white/40">No selected-brand repository images yet.</div>}
+                      </div>
+                    </div>
                   </div>
                   {/* Quick regenerate */}
                   <Button
@@ -919,7 +1003,7 @@ export default function SocialContentGenerator() {
                     variant="outline"
                     onClick={() => {
                       generateMutation.mutate(
-                        { contentType: item.contentType as any, category: item.category as any, count: 1, imageMode: item.imageUrl ? "abstract" : "none" },
+                        { contentType: item.contentType as any, category: item.category as any, count: 1, imageMode: item.imageUrl ? "abstract" : "none", layoutMode, cardTheme },
                         { onSuccess: (data) => { if (data.items[0]) { setItems((prev) => prev.map((p, i) => (i === idx ? data.items[0] : p))); toast.success("Regenerated!"); } } }
                       );
                     }}

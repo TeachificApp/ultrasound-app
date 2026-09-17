@@ -16,6 +16,12 @@ import { enrichMissingUserIpLocations } from "../lib/ipLocation";
 const SUPPORT_EMAIL = "support@allaboutultrasound.com";
 const SUPPORT_NAME = "All About Ultrasound Support";
 
+function isMissingIpLocationColumn(error: unknown): boolean {
+  const candidate = error as { message?: string; cause?: { message?: string } };
+  const message = `${candidate?.message ?? ""} ${candidate?.cause?.message ?? ""}`;
+  return /unknown column .*geo_/i.test(message);
+}
+
 /**
  * Cancel all active Stripe subscriptions for a user across all subscription tables.
  * Returns a summary of what was cancelled.
@@ -313,38 +319,73 @@ export const sharingMonitorRouter = router({
         .where(eq(sharingAbuseFlags.userId, input.userId))
         .orderBy(desc(sharingAbuseFlags.createdAt));
 
-      // Recent access logs (last 30 days)
+      // Recent access logs (last 30 days). A Railway service may briefly run
+      // against a database before the additive geo-location migration. Keep
+      // the protected student detail usable in that state rather than treating
+      // a downstream IP-log query failure as a missing account.
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const logs = await db
-        .select()
-        .from(ipAccessLogs)
-        .where(and(eq(ipAccessLogs.userId, input.userId), gte(ipAccessLogs.accessedAt, since)))
-        .orderBy(desc(ipAccessLogs.accessedAt))
-        .limit(300);
+      let logs: any[];
+      let ipSummary: any[];
+      let ipLocationDataAvailable = true;
+      try {
+        logs = await db
+          .select()
+          .from(ipAccessLogs)
+          .where(and(eq(ipAccessLogs.userId, input.userId), gte(ipAccessLogs.accessedAt, since)))
+          .orderBy(desc(ipAccessLogs.accessedAt))
+          .limit(300);
 
-      // IP summary
-      const ipSummary = await db
-        .select({
-          ip: ipAccessLogs.ipAddress,
-          count: sql<number>`COUNT(*)`.as("cnt"),
-          firstSeen: sql<string>`MIN(${ipAccessLogs.accessedAt})`.as("first_seen"),
-          lastSeen: sql<string>`MAX(${ipAccessLogs.accessedAt})`.as("last_seen"),
-          lookupStatus: sql<string>`MAX(${ipAccessLogs.geoLookupStatus})`.as("geo_lookup_status"),
-          country: sql<string>`MAX(${ipAccessLogs.geoCountry})`.as("geo_country"),
-          region: sql<string>`MAX(${ipAccessLogs.geoRegion})`.as("geo_region"),
-          city: sql<string>`MAX(${ipAccessLogs.geoCity})`.as("geo_city"),
-          postalCode: sql<string>`MAX(${ipAccessLogs.geoPostalCode})`.as("geo_postal_code"),
-          latitude: sql<string>`MAX(${ipAccessLogs.geoLatitude})`.as("geo_latitude"),
-          longitude: sql<string>`MAX(${ipAccessLogs.geoLongitude})`.as("geo_longitude"),
-          timezone: sql<string>`MAX(${ipAccessLogs.geoTimezone})`.as("geo_timezone"),
-          isp: sql<string>`MAX(${ipAccessLogs.geoIsp})`.as("geo_isp"),
-          organization: sql<string>`MAX(${ipAccessLogs.geoOrganization})`.as("geo_organization"),
-          asn: sql<string>`MAX(${ipAccessLogs.geoAsn})`.as("geo_asn"),
-        })
-        .from(ipAccessLogs)
-        .where(and(eq(ipAccessLogs.userId, input.userId), gte(ipAccessLogs.accessedAt, since)))
-        .groupBy(ipAccessLogs.ipAddress)
-        .orderBy(desc(sql`COUNT(*)`));
+        ipSummary = await db
+          .select({
+            ip: ipAccessLogs.ipAddress,
+            count: sql<number>`COUNT(*)`.as("cnt"),
+            firstSeen: sql<string>`MIN(${ipAccessLogs.accessedAt})`.as("first_seen"),
+            lastSeen: sql<string>`MAX(${ipAccessLogs.accessedAt})`.as("last_seen"),
+            lookupStatus: sql<string>`MAX(${ipAccessLogs.geoLookupStatus})`.as("geo_lookup_status"),
+            country: sql<string>`MAX(${ipAccessLogs.geoCountry})`.as("geo_country"),
+            region: sql<string>`MAX(${ipAccessLogs.geoRegion})`.as("geo_region"),
+            city: sql<string>`MAX(${ipAccessLogs.geoCity})`.as("geo_city"),
+            postalCode: sql<string>`MAX(${ipAccessLogs.geoPostalCode})`.as("geo_postal_code"),
+            latitude: sql<string>`MAX(${ipAccessLogs.geoLatitude})`.as("geo_latitude"),
+            longitude: sql<string>`MAX(${ipAccessLogs.geoLongitude})`.as("geo_longitude"),
+            timezone: sql<string>`MAX(${ipAccessLogs.geoTimezone})`.as("geo_timezone"),
+            isp: sql<string>`MAX(${ipAccessLogs.geoIsp})`.as("geo_isp"),
+            organization: sql<string>`MAX(${ipAccessLogs.geoOrganization})`.as("geo_organization"),
+            asn: sql<string>`MAX(${ipAccessLogs.geoAsn})`.as("geo_asn"),
+          })
+          .from(ipAccessLogs)
+          .where(and(eq(ipAccessLogs.userId, input.userId), gte(ipAccessLogs.accessedAt, since)))
+          .groupBy(ipAccessLogs.ipAddress)
+          .orderBy(desc(sql`COUNT(*)`));
+      } catch (error) {
+        if (!isMissingIpLocationColumn(error)) throw error;
+        ipLocationDataAvailable = false;
+        logs = await db
+          .select({
+            id: ipAccessLogs.id,
+            userId: ipAccessLogs.userId,
+            ipAddress: ipAccessLogs.ipAddress,
+            contentType: ipAccessLogs.contentType,
+            contentId: ipAccessLogs.contentId,
+            accessedAt: ipAccessLogs.accessedAt,
+            userAgent: ipAccessLogs.userAgent,
+          })
+          .from(ipAccessLogs)
+          .where(and(eq(ipAccessLogs.userId, input.userId), gte(ipAccessLogs.accessedAt, since)))
+          .orderBy(desc(ipAccessLogs.accessedAt))
+          .limit(300);
+        ipSummary = await db
+          .select({
+            ip: ipAccessLogs.ipAddress,
+            count: sql<number>`COUNT(*)`.as("cnt"),
+            firstSeen: sql<string>`MIN(${ipAccessLogs.accessedAt})`.as("first_seen"),
+            lastSeen: sql<string>`MAX(${ipAccessLogs.accessedAt})`.as("last_seen"),
+          })
+          .from(ipAccessLogs)
+          .where(and(eq(ipAccessLogs.userId, input.userId), gte(ipAccessLogs.accessedAt, since)))
+          .groupBy(ipAccessLogs.ipAddress)
+          .orderBy(desc(sql`COUNT(*)`));
+      }
 
       // Enrollments with per-IP access breakdown
       const enrollments = await db
@@ -396,7 +437,7 @@ export const sharingMonitorRouter = router({
           .orderBy(ipAccessLogs.contentId, desc(sql`COUNT(*)`)) as any;
       }
 
-      return { user: userRow, flags: allFlags, logs, ipSummary, enrollments, enrollmentIpBreakdown };
+      return { user: userRow, flags: allFlags, logs, ipSummary, enrollments, enrollmentIpBreakdown, ipLocationDataAvailable };
     }),
 
   /** Resolve up to 25 previously unlocated public IPs for one selected user. */

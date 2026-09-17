@@ -13,16 +13,18 @@
 
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
 import { invokeLLM } from "../_core/llm";
 import { generateImage } from "../_core/imageGeneration";
-import { getUserRoles } from "../db";
+import { getDb, getUserRoles } from "../db";
+import { mediaAssets, socialPostLibrary } from "../../drizzle/schema";
 
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   const isOwner = ctx.user.role === "admin";
   if (isOwner) return next();
   return getUserRoles(ctx.user.id).then((roles) => {
-    if (roles.includes("platform_admin")) return next();
+    if (roles.includes("platform_admin") || roles.includes("platform_owner")) return next();
     throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
   });
 });
@@ -162,10 +164,14 @@ export const socialContentRouter = router({
         count: z.number().min(1).max(5).default(1),
         imageMode: z.enum(["none", "abstract", "upload"]).default("none"),
         imageStyleHint: z.string().max(500).optional(),
+        layoutMode: z.enum(["card", "infographic"]).default("card"),
+        cardTheme: z.enum(["dark", "light"]).default("light"),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      const { contentType, category, customTopic, count, imageMode, imageStyleHint } = input;
+      const { contentType, category, customTopic, count, imageMode, imageStyleHint, layoutMode, cardTheme } = input;
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const results: Array<{
         headline: string;
@@ -175,7 +181,8 @@ export const socialContentRouter = router({
         category: string;
         contentType: string;
         imageUrl?: string;
-        imageSource?: "abstract" | "upload";
+        imageSource?: "ai" | "upload" | "media_repository";
+        libraryId?: number;
       }> = [];
 
       for (let i = 0; i < count; i++) {
@@ -215,13 +222,28 @@ export const socialContentRouter = router({
               console.log(`[SocialContent] Generating abstract background for item ${i + 1}`);
               const { url } = await generateImage({ prompt });
               item.imageUrl = url;
-              item.imageSource = "abstract";
+              item.imageSource = "ai";
               console.log(`[SocialContent] Abstract background generated: ${url}`);
             } catch (imgErr) {
               console.error(`[SocialContent] Abstract image generation failed for item ${i + 1}:`, imgErr);
             }
           }
 
+          const [saved] = await db.insert(socialPostLibrary).values({
+            brand: ctx.brand,
+            headline: item.headline,
+            body: item.body,
+            subtext: item.subtext || null,
+            socialCaption: item.socialCaption,
+            category: item.category,
+            contentType: item.contentType,
+            layoutMode,
+            cardTheme,
+            imageUrl: item.imageUrl ?? null,
+            imageSource: item.imageSource ?? null,
+            createdByUserId: ctx.user.id,
+          });
+          item.libraryId = Number((saved as any).insertId);
           results.push(item);
         } catch (err) {
           console.error(`[SocialContent] Generation ${i + 1} failed:`, err);
@@ -255,6 +277,60 @@ export const socialContentRouter = router({
       console.log(`[SocialContent] Generating standalone abstract image`);
       const { url } = await generateImage({ prompt });
       return { imageUrl: url };
+    }),
+
+  listSavedPosts: adminProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(40) }).default({ limit: 40 }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      return db
+        .select()
+        .from(socialPostLibrary)
+        .where(eq(socialPostLibrary.brand, ctx.brand))
+        .orderBy(desc(socialPostLibrary.updatedAt), desc(socialPostLibrary.id))
+        .limit(input.limit);
+    }),
+
+  updateSavedPost: adminProcedure
+    .input(z.object({
+      id: z.number().int().positive(),
+      layoutMode: z.enum(["card", "infographic"]).optional(),
+      cardTheme: z.enum(["dark", "light"]).optional(),
+      imageUrl: z.string().url().nullable().optional(),
+      imageSource: z.enum(["ai", "upload", "media_repository", "google"]).nullable().optional(),
+      mediaAssetId: z.number().int().positive().nullable().optional(),
+      imageOriginalUrl: z.string().url().nullable().optional(),
+      imageSourcePageUrl: z.string().url().nullable().optional(),
+      imageAttribution: z.string().max(1000).nullable().optional(),
+      imageLicense: z.string().max(255).nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { id, ...changes } = input;
+      if (changes.mediaAssetId) {
+        const [asset] = await db
+          .select({ id: mediaAssets.id })
+          .from(mediaAssets)
+          .where(and(
+            eq(mediaAssets.id, changes.mediaAssetId),
+            eq(mediaAssets.brand, ctx.brand),
+            isNull(mediaAssets.deletedAt),
+          ))
+          .limit(1);
+        if (!asset) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Selected media asset is not available for this brand" });
+        }
+      }
+      const result = await db
+        .update(socialPostLibrary)
+        .set(changes)
+        .where(and(eq(socialPostLibrary.id, id), eq(socialPostLibrary.brand, ctx.brand)));
+      if (Number((result as any).affectedRows ?? 0) === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Saved social post not found for this brand" });
+      }
+      return { success: true };
     }),
 
   getContentTypes: adminProcedure.query(() => {

@@ -2867,6 +2867,42 @@ export const mediaAssets = mysqlTable("mediaAssets", {
 export type MediaAsset = typeof mediaAssets.$inferSelect;
 export type InsertMediaAsset = typeof mediaAssets.$inferInsert;
 
+// ─── Shared Social Post Library ───────────────────────────────────────────────
+
+/**
+ * social_post_library — durable, brand-scoped Social Content Generator outputs.
+ * Posts are shared among authorized Platform Admins. Card rendering remains
+ * client-side so a saved post can be reopened and downloaded without storing
+ * duplicate rendered image bytes in MySQL.
+ */
+export const socialPostLibrary = mysqlTable("social_post_library", {
+  id: int("id").primaryKey().autoincrement(),
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).notNull().default("aaus"),
+  headline: varchar("headline", { length: 512 }).notNull(),
+  body: text("body").notNull(),
+  subtext: text("subtext"),
+  socialCaption: text("socialCaption").notNull(),
+  category: varchar("category", { length: 128 }).notNull(),
+  contentType: varchar("contentType", { length: 64 }).notNull(),
+  layoutMode: mysqlEnum("layoutMode", ["card", "infographic"]).notNull().default("card"),
+  cardTheme: mysqlEnum("cardTheme", ["dark", "light"]).notNull().default("light"),
+  imageUrl: text("imageUrl"),
+  imageSource: mysqlEnum("imageSource", ["ai", "upload", "media_repository", "google"]).default("ai"),
+  mediaAssetId: int("mediaAssetId"),
+  imageOriginalUrl: text("imageOriginalUrl"),
+  imageSourcePageUrl: text("imageSourcePageUrl"),
+  imageAttribution: text("imageAttribution"),
+  imageLicense: varchar("imageLicense", { length: 255 }),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("social_post_library_brand_created_idx").on(table.brand, table.createdAt),
+  index("social_post_library_creator_idx").on(table.createdByUserId),
+]);
+export type SocialPostLibraryItem = typeof socialPostLibrary.$inferSelect;
+export type InsertSocialPostLibraryItem = typeof socialPostLibrary.$inferInsert;
+
 /**
  * media_versions — immutable upload history for each asset.
  * Re-uploading creates a new row; the highest versionNumber is "current".

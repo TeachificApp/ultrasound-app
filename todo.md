@@ -561,7 +561,7 @@
 - [x] Repair Challenge Card source selection so the selected iHeartEcho route retrieves iHeartEcho challenge categories and questions instead of general UltrasoundAssist content.
 - [ ] Verify the new Railway build serves the clinical Challenge Card template selector after the GitHub-main repair is deployed, then close the live deployment-handoff item.
 - [x] Replace the deployed-schema-incompatible member quiz mock-exam query with a schema-safe classification path and restore administrator member profile loading without changing attempts or scores.
-- [ ] After completing the original Challenge Card and member quiz-result repairs, trace and repair Sharing Monitor student-detail selection so flagged user rows open their protected detail panel rather than returning “User not found,” without changing flags, IP logs, user accounts, or access records.
+- [x] After completing the original Challenge Card and member quiz-result repairs, trace and repair Sharing Monitor student-detail selection so flagged user rows open their protected detail panel rather than returning “User not found,” without changing flags, IP logs, user accounts, or access records.
 - [x] Make the active Platform Admin brand selector authoritative for every per-brand tool, ensuring an All About Ultrasound selection never opens, renders, or queries iHeartEcho routes/data and vice versa.
 - [x] Keep Challenge Card question and answer outputs visually matched for every selected clinical template, including background, framing, typography, logo treatment, and selected-brand styling.
 - [x] Derive Challenge Card contextual labels from the actual selected challenge category or content-specific label, never from an unrelated hardcoded specialty label.
@@ -571,3 +571,7 @@
 - [x] Register a valid iHeartEcho Engagement route and ensure selected-brand Engagement links never resolve to a 404 page.
 - [x] Make Question Bank Social Cards return to the selected brand’s valid Platform Admin route rather than an incorrect or unavailable URL.
 - [x] Use A–D option labels consistently in Question Bank Social Cards, Quiz Card Generator outputs, and clinical Challenge Cards.
+- [x] Store generated Social Post Generator outputs in a durable shared library available to all effective Platform Admins, with later download access and selected-brand context.
+- [x] Add authorized Social Post image-source choices for AI generation, device upload, and Media Repository selection, with source metadata and existing role boundaries preserved; Google image search is deferred separately.
+- [x] Add focused Social Post Library persistence, all-Platform-Admin authorization, download, selected-brand, image-source, attribution, and source-record-preservation regressions.
+- [ ] Add Google image search to Social Post Generator after an approved supported provider and its credentials are configured; deferred by user so it does not block the current Social Post Library release.

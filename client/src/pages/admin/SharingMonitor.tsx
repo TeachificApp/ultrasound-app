@@ -341,6 +341,11 @@ function StudentDetailPanel({
 
           {detail.isLoading ? (
             <div className="flex-1 flex items-center justify-center text-gray-500">Loading student data…</div>
+          ) : detail.isError ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 px-8 text-center text-gray-500">
+              <p>Unable to load this student’s access detail right now.</p>
+              <Button variant="outline" size="sm" onClick={() => detail.refetch()}>Try again</Button>
+            </div>
           ) : !user ? (
             <div className="flex-1 flex items-center justify-center text-gray-500">User not found.</div>
           ) : (
