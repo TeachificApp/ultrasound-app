@@ -4179,6 +4179,28 @@ export const brandMemberships = mysqlTable("brandMemberships", {
 export type BrandMembership = typeof brandMemberships.$inferSelect;
 export type InsertBrandMembership = typeof brandMemberships.$inferInsert;
 
+// ─── Premium Trial Cancellation Feedback ─────────────────────────────────────
+// Durable, administrator-only feedback used for aggregate retention reporting.
+// A Stripe subscription can generate one feedback record even when it grants two brands.
+export const premiumTrialCancellationFeedback = mysqlTable("premium_trial_cancellation_feedback", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  membershipId: int("membershipId").notNull(),
+  stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }).notNull(),
+  brand: varchar("brand", { length: 32 }).notNull(),
+  reason: varchar("reason", { length: 64 }).notNull(),
+  details: text("details"),
+  trialEndsAt: timestamp("trialEndsAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("premium_trial_feedback_subscription_unique").on(table.stripeSubscriptionId),
+  index("premium_trial_feedback_reason_created_idx").on(table.reason, table.createdAt),
+  index("premium_trial_feedback_brand_created_idx").on(table.brand, table.createdAt),
+  index("premium_trial_feedback_user_idx").on(table.userId),
+]);
+export type PremiumTrialCancellationFeedback = typeof premiumTrialCancellationFeedback.$inferSelect;
+export type InsertPremiumTrialCancellationFeedback = typeof premiumTrialCancellationFeedback.$inferInsert;
+
 // ─── Leaderboard & Points ─────────────────────────────────────────────────────
 export const userPointsLog = mysqlTable("userPointsLog", {
   id: int("id").autoincrement().primaryKey(),

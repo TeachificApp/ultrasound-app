@@ -61,4 +61,21 @@ describe("Premium trial dashboard experience", () => {
     expect(dashboardRouter).toContain("const isNewTrialCancellation = isTrialCancellation && !wasAlreadyScheduledForCancellation");
     expect(dashboardRouter).toContain("notifyOwner({");
   });
+
+  it("retains structured trial feedback and exposes admin-only cancellation-reason insights", () => {
+    const schema = read("../drizzle/schema.ts");
+    const migration = read("../drizzle/0068_premium_trial_cancellation_feedback.sql");
+    const dashboardRouter = read("routers/dashboardRouter.ts");
+    const notificationsRouter = read("routers/adminNotificationsRouter.ts");
+    const notificationsPage = read("../client/src/pages/admin/AdminNotifications.tsx");
+
+    expect(schema).toContain('premiumTrialCancellationFeedback = mysqlTable("premium_trial_cancellation_feedback"');
+    expect(migration).toContain('UNIQUE KEY `premium_trial_feedback_subscription_unique`');
+    expect(dashboardRouter).toContain("db.insert(premiumTrialCancellationFeedback).values");
+    expect(notificationsRouter).toContain("trialCancellationInsights: protectedProcedure.query");
+    expect(notificationsRouter).toContain("requireAdmin(ctx.user.role, ctx.user.roles ?? [])");
+    expect(notificationsRouter).toContain("groupBy(premiumTrialCancellationFeedback.reason)");
+    expect(notificationsPage).toContain("Premium Trial Cancellation Insights");
+    expect(notificationsPage).toContain("<BarChart data={trialReasonData} layout=\"vertical\"");
+  });
 });

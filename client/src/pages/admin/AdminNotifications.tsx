@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Bell, BellOff, CheckCheck, Trash2, RefreshCw, Filter } from "lucide-react";
+import { Bell, BellOff, CheckCheck, Trash2, RefreshCw, Filter, MessageSquareText, PieChart as PieChartIcon } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const SOURCE_LABELS: Record<string, string> = {
   system: "System",
@@ -45,6 +46,23 @@ const SOURCE_COLORS: Record<string, string> = {
   community: "bg-pink-100 text-pink-800",
 };
 
+const TRIAL_CANCELLATION_REASON_LABELS: Record<string, string> = {
+  not_selected: "No reason selected",
+  too_expensive: "Too expensive",
+  not_enough_time: "Not enough time",
+  missing_features: "Missing features or content",
+  technical_issue: "Technical issue",
+  found_an_alternative: "Found an alternative",
+  other: "Other",
+};
+
+const TRIAL_CANCELLATION_COLORS = ["#0f766e", "#0891b2", "#0d9488", "#14b8a6", "#0284c7", "#64748b", "#94a3b8"];
+
+function formatReason(reason: string) {
+  return TRIAL_CANCELLATION_REASON_LABELS[reason]
+    ?? reason.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 export default function AdminNotifications() {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -62,6 +80,10 @@ export default function AdminNotifications() {
   );
 
   const { data: sources } = trpc.adminNotifications.sources.useQuery();
+  const { data: trialInsights, isLoading: isLoadingTrialInsights } =
+    trpc.adminNotifications.trialCancellationInsights.useQuery(undefined, {
+      refetchInterval: 30_000,
+    });
 
   const utils = trpc.useUtils();
 
@@ -91,6 +113,14 @@ export default function AdminNotifications() {
   const total = data?.total ?? 0;
   const unreadCount = data?.unread ?? 0;
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const trialReasonData = useMemo(
+    () => (trialInsights?.reasons ?? []).map((item, index) => ({
+      label: formatReason(item.reason),
+      responses: item.count,
+      color: TRIAL_CANCELLATION_COLORS[index % TRIAL_CANCELLATION_COLORS.length],
+    })),
+    [trialInsights?.reasons],
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -144,6 +174,69 @@ export default function AdminNotifications() {
           </Button>
         </div>
       </div>
+
+      {/* Premium Trial Cancellation Insights */}
+      <Card className="mb-6 border border-teal-100 shadow-sm overflow-hidden">
+        <CardHeader className="pb-3 bg-gradient-to-r from-teal-50 via-cyan-50 to-white">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-teal-600 text-white flex items-center justify-center shadow-sm">
+                <PieChartIcon className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <CardTitle className="text-base text-gray-900">Premium Trial Cancellation Insights</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Aggregate feedback from three-day Premium App trial cancellations.</p>
+              </div>
+            </div>
+            {trialInsights?.latestAt && (
+              <span className="text-xs text-muted-foreground rounded-full bg-white/90 border border-teal-100 px-2.5 py-1">
+                Latest response {timeAgo(trialInsights.latestAt)}
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="pt-5">
+          {isLoadingTrialInsights ? (
+            <div className="h-56 rounded-lg bg-muted/60 animate-pulse" aria-label="Loading trial cancellation insights" />
+          ) : trialReasonData.length === 0 ? (
+            <div className="min-h-48 flex flex-col items-center justify-center text-center px-4">
+              <MessageSquareText className="h-9 w-9 text-teal-200 mb-3" />
+              <p className="font-semibold text-sm text-gray-700">No trial-cancellation feedback yet</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md">Reason selections submitted during the three-day trial will be summarized here. Notification cleanup does not remove this reporting data.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_180px] gap-5 items-center">
+              <div className="h-64 min-w-0" aria-label="Bar chart of Premium trial cancellation reasons">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={trialReasonData} layout="vertical" margin={{ top: 4, right: 28, bottom: 4, left: 8 }}>
+                    <CartesianGrid horizontal={false} stroke="#e2e8f0" strokeDasharray="3 3" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fill: "#64748b", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="label" width={132} tick={{ fill: "#475569", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      cursor={{ fill: "rgba(13, 148, 136, 0.08)" }}
+                      contentStyle={{ borderRadius: 10, border: "1px solid #ccfbf1", fontSize: 12 }}
+                      formatter={(value) => [`${value} response${Number(value) === 1 ? "" : "s"}`, "Selections"]}
+                    />
+                    <Bar dataKey="responses" radius={[0, 5, 5, 0]} maxBarSize={26}>
+                      {trialReasonData.map((item) => <Cell key={item.label} fill={item.color} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                <div className="rounded-lg border border-teal-100 bg-teal-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide font-semibold text-teal-700">Responses</p>
+                  <p className="text-2xl font-bold text-teal-950 mt-0.5">{trialInsights?.total ?? 0}</p>
+                </div>
+                <div className="rounded-lg border border-cyan-100 bg-cyan-50 p-3">
+                  <p className="text-[11px] uppercase tracking-wide font-semibold text-cyan-700">With comment</p>
+                  <p className="text-2xl font-bold text-cyan-950 mt-0.5">{trialInsights?.withComment ?? 0}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card className="mb-6">

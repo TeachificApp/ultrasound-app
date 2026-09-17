@@ -601,3 +601,6 @@
 - [x] Add an optional feedback modal before a member cancels an active Premium App trial, schedule the Stripe cancellation only after confirmation, and send the reason/details to the configured Platform Admin notification channel once per newly scheduled trial cancellation.
 - [x] Add focused trial dashboard, final-day alert, cancellation-feedback, no-duplicate-alert, and safe live-trial-status regression coverage without creating or changing subscriptions, payments, memberships, or emails during validation.
 - [x] Replace the Premium trial cancellation feedback dropdown with prominent keyboard-accessible multiple-choice reason cards while retaining the optional comment, selected-reason submission, and Platform Admin notification behavior.
+- [x] Add durable, structured Premium trial cancellation feedback storage and an administrator-only bar chart that aggregates selected reasons without exposing member identities or relying on clearable notification records.
+- [x] Restore iHeartEcho POCUS Cardiac, eFAST, RUSH, and Lung Navigator URL aliases so established navigator links no longer fall through to a 404 page.
+- [x] Prevent anonymous visitors from receiving interactive Premium content previews, while retaining timed previews only for authenticated free members and improving SoundBytes sign-in gating with visible but non-interactive blurred library cards.

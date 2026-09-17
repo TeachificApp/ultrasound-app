@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { usePremium } from "@/hooks/usePremium";
 import { getLoginUrl } from "@/const";
 import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
+import { PremiumPearlGate } from "@/components/PremiumPearlGate";
 
 // ── Timer helpers ─────────────────────────────────────────────────────────────
 const PREVIEW_SECONDS = 35;
@@ -85,9 +86,19 @@ export function PremiumOverlay({ children, featureName, checkoutUrl }: PremiumOv
     );
   }
 
-  // Timed preview gate
+  // Anonymous visitors must sign in before protected content is rendered.
+  // A timed preview is intentionally limited to authenticated free members.
+  if (!isAuthenticated) {
+    return (
+      <PremiumPearlGate type="login" featureName={featureName} teaserHeight={0}>
+        {children}
+      </PremiumPearlGate>
+    );
+  }
+
+  // Authenticated free members receive the brief, non-persistent Premium preview.
   return (
-    <TimedPreviewOverlay featureName={featureName} isLoggedIn={isAuthenticated} checkoutUrl={checkoutUrl}>
+    <TimedPreviewOverlay featureName={featureName} isLoggedIn checkoutUrl={checkoutUrl}>
       {children}
     </TimedPreviewOverlay>
   );

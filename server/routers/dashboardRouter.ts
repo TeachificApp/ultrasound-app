@@ -50,6 +50,7 @@ import {
   lmsSections,
   standaloneQuizAttempts,
   standaloneQuizzes,
+  premiumTrialCancellationFeedback,
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray, sql, or, isNotNull, gte } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
@@ -1206,6 +1207,15 @@ export const dashboardRouter = router({
         };
         const feedback = input.trialFeedback;
         const endLabel = trialEnd?.toISOString() ?? "Unknown trial end";
+        await db.insert(premiumTrialCancellationFeedback).values({
+          userId: ctx.user.id,
+          membershipId: membership.id,
+          stripeSubscriptionId: membership.stripeSubscriptionId,
+          brand: membership.brand,
+          reason: feedback?.reason ?? "not_selected",
+          details: feedback?.details?.trim() || null,
+          trialEndsAt: trialEnd,
+        });
         notifyOwner({
           title: "Premium trial cancellation feedback",
           content: [

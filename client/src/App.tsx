@@ -1147,9 +1147,13 @@ function IHeartEchoRouter() {
         {/* ── POCUS-Assist™ ──────────────────────────────────────────── */}
         <Route path="/pocus-assist-hub" component={POCUSAssistHub} />
         <Route path="/pocus-efast" component={POCUSEfastNavigator} />
+        <Route path="/pocus-efast-navigator" component={POCUSEfastNavigator} />
         <Route path="/pocus-rush">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSRushNavigator /></RoleGuard>}</Route>
+        <Route path="/pocus-rush-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSRushNavigator /></RoleGuard>}</Route>
         <Route path="/pocus-cardiac" component={POCUSCardiacNavigator} />
+        <Route path="/pocus-cardiac-navigator" component={POCUSCardiacNavigator} />
         <Route path="/pocus-lung">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSLungNavigator /></RoleGuard>}</Route>
+        <Route path="/pocus-lung-navigator">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSLungNavigator /></RoleGuard>}</Route>
         <Route path="/pocus-efast-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSEfastScanCoach /></RoleGuard>}</Route>
         <Route path="/pocus-rush-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSRushScanCoach /></RoleGuard>}</Route>
         <Route path="/pocus-cardiac-scan-coach">{() => <RoleGuard roles={["premium_user", "diy_user", "diy_admin"]}><POCUSCardiacScanCoach /></RoleGuard>}</Route>

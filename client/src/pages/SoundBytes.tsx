@@ -358,17 +358,11 @@ export default function SoundBytes() {
           <div className="relative">
             <div
               className="pointer-events-none select-none"
-              style={{ filter: "blur(6px)", opacity: 0.35, maxHeight: "420px", overflow: "hidden" }}
+              style={{ filter: "blur(2.5px)", opacity: 0.64, maxHeight: "420px", overflow: "hidden" }}
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {soundBytesData.slice(0, 6).map((sb) => (
-                  <div key={sb.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-                    <div className="w-full bg-gray-200" style={{ paddingBottom: "56.25%" }} />
-                    <div className="p-3 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-3/4" />
-                      <div className="h-3 bg-gray-100 rounded w-1/2" />
-                    </div>
-                  </div>
+                {soundbytesWithAccess.slice(0, 6).map((sb) => (
+                  <SoundByteCard key={sb.id} sb={{ ...sb, canPlay: false }} onClick={() => {}} />
                 ))}
               </div>
             </div>

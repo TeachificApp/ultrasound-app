@@ -193,7 +193,7 @@ export function PremiumPearlGate({
 
   // ── Timed preview gate (premium type only) ─────────────────────────────────
   // For login/diy gates, skip the timer and show the gate immediately
-  if (type === "premium" && !isLoading) {
+  if (type === "premium" && isLoggedIn && !isLoading) {
     return (
       <TimedPreviewGate
         featureName={featureName}
@@ -206,11 +206,15 @@ export function PremiumPearlGate({
     );
   }
 
+  // Never render a Premium teaser to an anonymous visitor. Authentication is
+  // required before the short Premium preview timer can begin.
+  const renderedGateType: GateType = type === "premium" && !isLoggedIn ? "login" : type;
+
   // ── Non-premium gates (login / diy) or loading state ──────────────────────
   return (
     <div className="relative w-full">
-      {/* Teaser — visible portion fades into blur */}
-      {teaserHeight > 0 ? (
+      {/* Content teasers are available only to authenticated free members. */}
+      {renderedGateType === "premium" && teaserHeight > 0 ? (
         <div
           className="pointer-events-none select-none overflow-hidden"
           style={{
@@ -224,7 +228,7 @@ export function PremiumPearlGate({
         >
           <div style={{ filter: "blur(2px)", opacity: 0.5 }}>{children}</div>
         </div>
-      ) : (
+      ) : renderedGateType === "premium" ? (
         <div
           className="pointer-events-none select-none overflow-hidden"
           style={{ maxHeight: "120px", filter: "blur(4px)", opacity: 0.3 }}
@@ -232,15 +236,15 @@ export function PremiumPearlGate({
         >
           {children}
         </div>
-      )}
+      ) : null}
 
       {/* Upgrade card — anchored below the teaser */}
       <div className="relative z-10 flex justify-center px-4 pb-8 -mt-8">
         {isLoading ? (
           <LoadingCard />
-        ) : type === "login" ? (
+        ) : renderedGateType === "login" ? (
           <LoginCard featureName={featureName} />
-        ) : type === "diy" ? (
+        ) : renderedGateType === "diy" ? (
           <DiyCard featureName={featureName} />
         ) : (
           <UpgradeCard

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { getDb } from "../db";
-import { adminNotifications } from "../../drizzle/schema";
+import { adminNotifications, premiumTrialCancellationFeedback } from "../../drizzle/schema";
 import { desc, eq, and, sql } from "drizzle-orm";
 
 // Helper: verify caller is admin or platform admin
@@ -113,5 +113,37 @@ export const adminNotificationsRouter = router({
       .from(adminNotifications)
       .orderBy(adminNotifications.source);
     return rows.map((r) => r.source);
+  }),
+
+  /** Aggregate administrator-only Premium trial cancellation reasons. */
+  trialCancellationInsights: protectedProcedure.query(async ({ ctx }) => {
+    requireAdmin(ctx.user.role, ctx.user.roles ?? []);
+    const db = await getDb();
+    if (!db) return { total: 0, withComment: 0, latestAt: null, reasons: [] };
+
+    const countExpression = sql<number>`count(*)`;
+    const [summary] = await db
+      .select({
+        total: countExpression,
+        withComment: sql<number>`sum(case when ${premiumTrialCancellationFeedback.details} is not null and trim(${premiumTrialCancellationFeedback.details}) <> '' then 1 else 0 end)`,
+        latestAt: sql<Date | null>`max(${premiumTrialCancellationFeedback.createdAt})`,
+      })
+      .from(premiumTrialCancellationFeedback);
+
+    const reasons = await db
+      .select({
+        reason: premiumTrialCancellationFeedback.reason,
+        count: countExpression,
+      })
+      .from(premiumTrialCancellationFeedback)
+      .groupBy(premiumTrialCancellationFeedback.reason)
+      .orderBy(desc(countExpression), premiumTrialCancellationFeedback.reason);
+
+    return {
+      total: Number(summary?.total ?? 0),
+      withComment: Number(summary?.withComment ?? 0),
+      latestAt: summary?.latestAt ?? null,
+      reasons: reasons.map((row) => ({ reason: row.reason, count: Number(row.count) })),
+    };
   }),
 });
