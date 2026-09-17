@@ -216,15 +216,15 @@ export function ClinicalQuizCard({
           left: hasMediaArea ? 104 : undefined,
           right: hasMediaArea ? 104 : undefined,
           bottom: hasMediaArea ? 112 : undefined,
-          display: "grid",
-          gridTemplateColumns: visibleOptions.length > 2 ? "1fr 1fr" : "1fr",
-          gap: `${fit.optionGap}px ${fit.optionGap * 3}px`,
+          display: "flex",
+          flexDirection: "column",
+          gap: fit.optionGap,
           marginTop: hasMediaArea ? undefined : 22,
         }}
       >
         {visibleOptions.map((option, index) => (
-          <div key={`${index}-${option}`} style={{ display: "flex", gap: 14, alignItems: "flex-start", minWidth: 0 }}>
-            <span style={{ color: theme.accent, fontSize: fit.optionNumberSize, fontWeight: 900, lineHeight: 1.2, flexShrink: 0 }}>{OPTION_LETTERS[index] ?? `${index + 1}`}</span>
+          <div key={`${index}-${option}`} style={{ display: "flex", gap: 16, alignItems: "center", minWidth: 0, border: `2px solid ${theme.accent}66`, borderRadius: 12, padding: `${Math.max(10, fit.optionGap)}px 16px`, background: `${theme.accent}0d` }}>
+            <span style={{ display: "inline-flex", width: Math.max(34, fit.optionNumberSize + 10), height: Math.max(34, fit.optionNumberSize + 10), alignItems: "center", justifyContent: "center", borderRadius: 8, background: theme.accent, color: theme.background, fontSize: fit.optionNumberSize, fontWeight: 900, lineHeight: 1, flexShrink: 0 }}>{OPTION_LETTERS[index] ?? `${index + 1}`}</span>
             <span style={{ color: theme.text, fontSize: fit.optionSize, fontWeight: 800, lineHeight: 1.2 }}>{option}</span>
           </div>
         ))}

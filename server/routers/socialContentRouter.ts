@@ -212,7 +212,8 @@ export const socialContentRouter = router({
             category,
             contentType,
             imageUrl: undefined as string | undefined,
-            imageSource: undefined as "abstract" | "upload" | undefined,
+            imageSource: undefined as "ai" | "upload" | "media_repository" | "google" | undefined,
+            librarySaved: false,
           };
 
           // Generate abstract background if requested
@@ -229,21 +230,31 @@ export const socialContentRouter = router({
             }
           }
 
-          const [saved] = await db.insert(socialPostLibrary).values({
-            brand: ctx.brand,
-            headline: item.headline,
-            body: item.body,
-            subtext: item.subtext || null,
-            socialCaption: item.socialCaption,
-            category: item.category,
-            contentType: item.contentType,
-            layoutMode,
-            cardTheme,
-            imageUrl: item.imageUrl ?? null,
-            imageSource: item.imageSource ?? null,
-            createdByUserId: ctx.user.id,
-          });
-          item.libraryId = Number((saved as any).insertId);
+          try {
+            const libraryValues = {
+              brand: ctx.brand,
+              headline: item.headline,
+              body: item.body,
+              subtext: item.subtext || null,
+              socialCaption: item.socialCaption,
+              category: item.category,
+              contentType: item.contentType,
+              layoutMode,
+              cardTheme,
+              createdByUserId: ctx.user.id,
+              ...(item.imageUrl
+                ? {
+                    imageUrl: item.imageUrl,
+                    imageSource: item.imageSource ?? "ai" as const,
+                  }
+                : {}),
+            };
+            const saved = await db.insert(socialPostLibrary).values(libraryValues).$returningId();
+            item.libraryId = Number(saved[0]?.id);
+            item.librarySaved = true;
+          } catch (archiveError) {
+            console.error("[SocialContent] Generated post could not be archived", archiveError);
+          }
           results.push(item);
         } catch (err) {
           console.error(`[SocialContent] Generation ${i + 1} failed:`, err);

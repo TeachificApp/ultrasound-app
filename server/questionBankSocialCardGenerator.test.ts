@@ -48,4 +48,13 @@ describe("Question Bank social-card generation", () => {
     expect(app).toContain('RoleGuard roles={["platform_admin"]} allowAdmin={true}');
     expect(platformAdmin).toContain('id: "question-bank-social-cards"');
   });
+
+  it("uses public Challenge Classic answer rows without exposing internal MCQ labels", () => {
+    const generator = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+    const card = readProjectFile("client/src/components/social/ClinicalQuizCard.tsx");
+
+    expect(generator).not.toContain("title={selectedQuestion.type.toUpperCase()}");
+    expect(card).toContain('border: `2px solid ${theme.accent}66`');
+    expect(card).toContain('background: theme.accent');
+  });
 });

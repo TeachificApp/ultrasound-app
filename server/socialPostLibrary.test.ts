@@ -26,6 +26,10 @@ describe("shared Social Post Library", () => {
     expect(router).toContain("eq(mediaAssets.brand, ctx.brand)");
     expect(router).toContain('message: "Selected media asset is not available for this brand"');
     expect(router).toContain('roles.includes("platform_admin") || roles.includes("platform_owner")');
+    expect(router).toContain("libraryValues");
+    expect(router).toContain("Generated post could not be archived");
+    expect(router).toContain("item.librarySaved = true");
+    expect(router).toContain(".$returningId()");
   });
 
   it("uses approved Media Repository uploads and selection while retaining AI-generated images", () => {

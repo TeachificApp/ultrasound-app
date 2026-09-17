@@ -575,3 +575,8 @@
 - [x] Add authorized Social Post image-source choices for AI generation, device upload, and Media Repository selection, with source metadata and existing role boundaries preserved; Google image search is deferred separately.
 - [x] Add focused Social Post Library persistence, all-Platform-Admin authorization, download, selected-brand, image-source, attribution, and source-record-preservation regressions.
 - [ ] Add Google image search to Social Post Generator after an approved supported provider and its credentials are configured; deferred by user so it does not block the current Social Post Library release.
+- [ ] Repair the live Social Post Library insert failure that blocks successful Social Content generation, and ensure a temporary archive-write error cannot mask an otherwise successful generated post.
+- [x] Add focused live-schema compatibility and generation-degradation regressions for Social Post Library persistence without creating test posts or media records.
+- [x] Render Question Bank Social Card answer options with the Challenge Classic individual-row layout, A–D markers, and matched readable spacing across selected brands.
+- [x] Remove internal question-type labels such as MCQ from public Question Bank Social Card output, using only meaningful contextual labels when available.
+- [x] Ensure a temporary Social Post Library archive-write error cannot mask an otherwise successful generated post.
