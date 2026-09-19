@@ -1723,6 +1723,7 @@ export default function PlatformAdmin() {
 
   // Per-Brand tool cards — hrefs include `-aaus` / `-ihe` from brand selector above
   const PER_BRAND_TOOLS_META = [
+    { id: "public-site", basePath: "/admin/public-site", icon: Globe, label: "Public Website & Blog", description: "Build and edit the brand website and blog on its own public domain", color: "#0f766e" },
     { id: "cases", basePath: "/admin/cases", icon: ClipboardList, label: "Case Management", description: "Manage clinical case submissions and reviews", color: "#189aa1" },
     { id: "quickfire", basePath: "/admin/quickfire", icon: Zap, label: "Daily Challenge", description: "Manage daily quiz challenges and questions", color: "#f59e0b" },
     { id: "scancoach", basePath: "/admin/scancoach", icon: Scan, label: "ScanCoach Editor", description: "Edit ScanCoach protocols and content", color: "#0891b2" },

@@ -7163,7 +7163,7 @@ export const sdmsCmeSubmissionLogs = mysqlTable("sdmsCmeSubmissionLogs", {
 export type SdmsCmeSubmissionLog = typeof sdmsCmeSubmissionLogs.$inferSelect;
 export type InsertSdmsCmeSubmissionLog = typeof sdmsCmeSubmissionLogs.$inferInsert;
 
-// ─── Marketing Site (staging replica of public website) ─────────────────────
+// ─── Public Marketing Sites (brand-specific public domains) ─────────────────
 
 export const marketingSiteSettings = mysqlTable("marketingSiteSettings", {
   id: int("id").autoincrement().primaryKey(),
@@ -7195,6 +7195,10 @@ export const marketingSitePages = mysqlTable("marketingSitePages", {
   seoTitle: varchar("seoTitle", { length: 255 }),
   seoDescription: text("seoDescription"),
   seoImage: varchar("seoImage", { length: 512 }),
+  blogExcerpt: text("blogExcerpt"),
+  blogAuthor: varchar("blogAuthor", { length: 255 }),
+  blogCategory: varchar("blogCategory", { length: 160 }),
+  blogPublishedAt: timestamp("blogPublishedAt"),
   sourceUrl: varchar("sourceUrl", { length: 1000 }),
   redirectUrl: varchar("redirectUrl", { length: 1000 }),
   isPublished: boolean("isPublished").default(true).notNull(),

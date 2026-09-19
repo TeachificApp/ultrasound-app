@@ -35,6 +35,7 @@ import { registerUploadGenericRoute } from "../routes/uploadGeneric";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
 import { registerFunnelOgMetaRoutes } from "../routes/funnelOgMeta";
 import { registerSitemapRoute } from "../routes/sitemap";
+import { registerMarketingSiteRoutes, registerMarketingSiteOgMeta } from "../routes/marketingSiteRoutes";
 import { registerAutoLoginRoute } from "../routes/autoLogin";
 import { registerGoogleOAuthRoutes, registerGoogleDriveCmeOAuthRoutes } from "../routes/googleOAuth";
 import { appRouter } from "../routers";
@@ -696,6 +697,7 @@ async function startServer() {
   // Cross-domain silent SSO endpoint — must be before tRPC so it's not caught by the SPA catch-all
   registerSsoAutoRoute(app);
   // Sitemap.xml and robots.txt — must be before SPA catch-all
+  registerMarketingSiteRoutes(app);
   registerSitemapRoute(app);
   // Funnel page OG meta injection — must be before SPA catch-all so crawlers get correct meta tags
   registerFunnelOgMetaRoutes(app);
@@ -1074,6 +1076,9 @@ async function startServer() {
   // Handles both /api/media/:slug and /media/:slug (original stored URLs — served directly, no redirect)
   // MUST be registered BEFORE serveStatic so they take priority over the SPA catch-all
   registerMediaServeRoutes(app);
+  // Page-level SEO metadata for the public .net/.com website tenants.
+  // This remains after API and explicit route registration, before the SPA fallback.
+  registerMarketingSiteOgMeta(app);
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);

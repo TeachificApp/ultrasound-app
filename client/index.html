@@ -27,6 +27,12 @@
     <script>
       (function(){
         var h=location.hostname;
+        // The public marketing tenants own their own server-rendered canonical,
+        // Open Graph, and structured-data metadata. Do not replace that with an
+        // app-host canonical merely because an iHeartEcho public hostname contains
+        // the brand word.
+        var isPublicBrandSite=h==='www.allaboutultrasound.net'||h==='allaboutultrasound.net'||h==='www.allaboutultrasound.com'||h==='allaboutultrasound.com'||h==='www.iheartecho.net'||h==='iheartecho.net'||h==='www.iheartecho.com'||h==='iheartecho.com';
+        if(isPublicBrandSite) return;
         var isIHE=h.indexOf('iheartecho')!==-1;
         var isCombo=h.indexOf('learn.')!==-1||h.indexOf('members.')!==-1||h.indexOf('member.')!==-1;
         if(!isIHE&&!isCombo) return;

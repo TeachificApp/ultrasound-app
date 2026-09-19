@@ -194,6 +194,8 @@ import {
 export const appRouter = router({
   system: systemRouter,
   community: communityRouter,
+  marketingSitePublic: marketingSitePublicRouter,
+  marketingSiteAdmin: marketingSiteAdminRouter,
 
   auth: router({
     sessionState: publicProcedure.query(async ({ ctx }) => {

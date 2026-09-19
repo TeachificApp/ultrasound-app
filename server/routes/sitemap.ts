@@ -5,8 +5,9 @@
  */
 import type { Express } from "express";
 import { getDb } from "../db";
-import { lmsCourses, digitalProducts, webinars, bundles, communities, funnelPages } from "../../drizzle/schema";
+import { lmsCourses, digitalProducts, webinars, bundles, communities, funnelPages, marketingSitePages } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
+import { getPublicSiteTenantForHost, isPublicSiteStagingHost, publicSiteOrigin } from "@shared/publicSiteTenants";
 
 const CANONICAL_DOMAIN = process.env.CANONICAL_ROOT_DOMAIN ?? "https://learn.allaboutultrasound.com";
 
@@ -30,6 +31,39 @@ export function registerSitemapRoute(app: Express) {
     try {
       const db = await getDb();
       if (!db) throw new Error("DB unavailable");
+
+      // The review .net hosts remain intentionally noindex and publish no URLs.
+      // At the .com promotion, these exact same tenant rows are served under a
+      // self-canonical, page-complete sitemap without a second content import.
+      const publicSiteTenant = getPublicSiteTenantForHost(req.get("host") ?? "");
+      if (publicSiteTenant) {
+        const entries: string[] = [];
+        if (!isPublicSiteStagingHost(req.get("host") ?? "")) {
+          const origin = publicSiteOrigin(publicSiteTenant, "promotion");
+          const pages = await db.select({
+            path: marketingSitePages.path,
+            updatedAt: marketingSitePages.updatedAt,
+          }).from(marketingSitePages).where(and(
+            eq(marketingSitePages.siteKey, publicSiteTenant.key),
+            eq(marketingSitePages.isPublished, true),
+          ));
+          for (const page of pages) {
+            const lastmod = page.updatedAt ? new Date(page.updatedAt).toISOString().split("T")[0] : undefined;
+            const priority = page.path === "/" ? "1.0" : page.path.startsWith(publicSiteTenant.blogPathPrefix) ? "0.7" : "0.8";
+            entries.push(urlEntry(`${origin}${page.path === "/" ? "/" : page.path}`, priority, "weekly", lastmod));
+          }
+        }
+        const xml = [
+          '<?xml version="1.0" encoding="UTF-8"?>',
+          '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+          ...entries,
+          "</urlset>",
+        ].join("\n");
+        res.setHeader("Content-Type", "application/xml; charset=utf-8");
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        res.send(xml);
+        return;
+      }
       const origin = CANONICAL_DOMAIN.replace(/\/$/, "");
       const entries: string[] = [];
 

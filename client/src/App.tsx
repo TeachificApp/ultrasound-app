@@ -36,6 +36,7 @@ import { deferUntilIdle } from "@/lib/deferUntilIdle";
 import { perBrandAdminRouteElements, perBrandUserRouteElements } from "./routes/perBrandRouteHelpers";
 import { getSitePageDomain } from "@/lib/sitePageDomain";
 import { RESERVED_SITE_SLUGS } from "@shared/sitePagesConstants";
+import { isPublicSiteHost } from "@shared/publicSiteTenants";
 import LegacyStudentDashboardRedirect from "./pages/LegacyStudentDashboardRedirect";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
@@ -124,7 +125,8 @@ const InstancePageEmbed = lazy(() => import("./pages/embed/InstancePageEmbed"));
 const CohortSessionsEmbed = lazy(() => import("./pages/embed/CohortSessionsEmbed"));
 const LessonScheduleEmbed = lazy(() => import("./pages/embed/LessonScheduleEmbed"));
 const PublicMarketingSitePage = lazy(() => import("./pages/PublicMarketingSitePage"));
-const MarketingSiteAdmin = lazy(() => import("./pages/admin/MarketingSiteAdmin"));
+const PublicSiteAdmin = lazy(() => import("./pages/admin/PublicSiteAdmin"));
+const PublicSitePageBuilder = lazy(() => import("./pages/admin/PublicSitePageBuilder"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
@@ -589,6 +591,8 @@ function Router() {
         {/* ── Admin ───────────────────────────────────────────────────────────── */}
         <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><CommunityAdmin /></Suspense></RoleGuard>}</Route>
         {perBrandAdminRouteElements([
+          { base: "/admin/public-site/page/:pageId/edit", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSitePageBuilder /></RoleGuard> },
+          { base: "/admin/public-site", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSiteAdmin /></RoleGuard> },
           { base: "/admin/cases", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard> },
           { base: "/admin/quickfire", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard> },
           { base: "/admin/challenge-cards", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ChallengeCardGenerator /></RoleGuard> },
@@ -1196,6 +1200,8 @@ function IHeartEchoRouter() {
 
         {/* ── Admin ──────────────────────────────────────────────────── */}
         {perBrandAdminRouteElements([
+          { base: "/admin/public-site/page/:pageId/edit", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSitePageBuilder /></RoleGuard> },
+          { base: "/admin/public-site", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSiteAdmin /></RoleGuard> },
           { base: "/admin/cases", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><AdminCaseManagement /></RoleGuard> },
           { base: "/admin/quickfire", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><QuickFireAdmin /></RoleGuard> },
           { base: "/admin/scancoach", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ScanCoachEditor /></RoleGuard> },
@@ -1614,7 +1620,24 @@ function MarketingSiteRouter() {
     <Suspense fallback={pageFallback}>
       <Switch>
         <Route path="/login" component={Login} />
-        <Route path="/admin/marketing-site">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><MarketingSiteAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/marketing-site">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSiteAdmin /></RoleGuard>}</Route>
+        <Route component={PublicMarketingSitePage} />
+      </Switch>
+    </Suspense>
+  );
+}
+
+/** Public brand websites — independently editable CMS tenants on .net now and .com at promotion. */
+function PublicWebsiteRouter() {
+  usePageViewTracker();
+  const pageFallback = (
+    <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+    </div>
+  );
+  return (
+    <Suspense fallback={pageFallback}>
+      <Switch>
         <Route component={PublicMarketingSitePage} />
       </Switch>
     </Suspense>
@@ -1627,6 +1650,7 @@ function App() {
   const onMembersSubdomain = isMembersDomain();
   const onIHeartEchoSubdomain = isIHeartEchoDomain();
   const onAccreditationSubdomain = isAccreditationDomain();
+  const onPublicWebsite = typeof window !== "undefined" && isPublicSiteHost(window.location.hostname);
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
@@ -1637,6 +1661,8 @@ function App() {
           <LegacyPasswordSetupRedirect />
           {onMarketingStaging ? (
             <MarketingSiteRouter />
+          ) : onPublicWebsite ? (
+            <PublicWebsiteRouter />
           ) : onMembersSubdomain ? (
             <><ProfileNameBanner /><MembersRouter /></>
           ) : onLearnSubdomain ? (
