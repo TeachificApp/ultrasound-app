@@ -659,6 +659,27 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         </CC></div>
       );
     }
+    // Public-site imports create lightweight CTA blocks using buttonText and
+    // buttonUrl. Treat these as normal links—not checkout controls—so imported
+    // public pages retain their visible source calls to action.
+    case "cta": {
+      const destination = d.buttonUrl || "#";
+      return (
+        <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#ffffff" }}>
+          <CC style={{ textAlign: d.align ?? "center" }}>
+            {d.headline && <h2 className="text-2xl font-bold text-gray-900 mb-3" dangerouslySetInnerHTML={{ __html: d.headline }} />}
+            {d.subheadline && <p className="text-gray-600 mb-5" dangerouslySetInnerHTML={{ __html: d.subheadline }} />}
+            <a
+              href={destination}
+              className="inline-block px-8 py-3 rounded-lg font-semibold shadow transition-opacity hover:opacity-90"
+              style={{ backgroundColor: d.buttonColor ?? "#179ca3", color: d.buttonTextColor ?? "#ffffff" }}
+            >
+              {d.buttonText ?? "Learn more"}
+            </a>
+          </CC>
+        </div>
+      );
+    }
     case "lead_capture": {
       const lcBtnBg = d.btnBg ?? "#ffffff";
       const lcBtnTxt = d.btnTextColor ?? "#179ca3";

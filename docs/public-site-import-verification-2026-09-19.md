@@ -1,0 +1,9 @@
+# Public Site Import Verification — September 19, 2026
+
+The additive `0069_dual_public_site_editor.sql` migration was applied to the connected application database. Both tenant setting rows and all four blog metadata columns were verified after the migration.
+
+The controlled source import then completed successfully without modifying either source site. The All About Ultrasound tenant (`aaus-net`) contains 178 unique imported records: 119 website pages and 59 blog posts. The iHeartEcho tenant (`iheartecho-net`) contains 73 imported records: 63 website pages and 10 blog posts. Both published root pages were verified in the CMS. The importer recorded 11 legacy member-domain rewrites for All About Ultrasound and one for iHeartEcho, mapping those legacy member URLs to the Learn domain.
+
+A browser check confirmed that the iHeartEcho apex review host renders the imported iHeartEcho homepage and that the All About Ultrasound apex review host returns the imported page content. The browser screenshot for All About Ultrasound was captured while the client-side route was still loading; its extracted content showed the imported homepage. The imported public renderer remains client-side, so initial document titles still use the broader application title while the public content loads; this is a known SEO limitation of the existing client-rendered architecture and is not treated as fully live SEO validation.
+
+The configured `allaboutultrasound.net` and `iheartecho.net` apex hosts currently resolve through Cloudflare. `www.iheartecho.net` redirects to the apex. `www.allaboutultrasound.net` resolves to a Railway hostname but its TLS connection timed out during this verification; this is a live custom-domain/TLS issue, not an import failure. It remains pending before the `www` review URL can be declared live-verified.

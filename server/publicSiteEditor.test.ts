@@ -87,4 +87,13 @@ describe("dual public-site tenant architecture", () => {
     expect(indexHtml).toContain("isPublicBrandSite");
     expect(indexHtml).toContain("www.iheartecho.com");
   });
+
+  it("renders the lightweight CTA blocks produced by the public-site importer", () => {
+    const importer = read("server/routers/pageScraperRouter.ts");
+    const preview = read("client/src/components/BlockPreview.tsx");
+    expect(importer).toContain('type: "cta"');
+    expect(importer).toContain("buttonText: text");
+    expect(preview).toContain('case "cta":');
+    expect(preview).toContain("d.buttonUrl");
+  });
 });
