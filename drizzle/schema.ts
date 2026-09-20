@@ -8578,3 +8578,185 @@ export const testimonialPresets = mysqlTable("testimonial_presets", {
   createdBy: int("created_by"),                     // admin user id
 });
 export type TestimonialPreset = typeof testimonialPresets.$inferSelect;
+
+// ─── Study Groups ─────────────────────────────────────────────────────────────
+// Private learner collaboration spaces. A free group has five total active
+// participants (including its owner). Organization groups are subscription-backed
+// and support an unlimited member roster, organization learning modules, and
+// organization administrator roles.
+
+export const studyGroups = mysqlTable("study_groups", {
+  id: int("id").autoincrement().primaryKey(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: text("description"),
+  tier: mysqlEnum("tier", ["free", "organization"]).notNull().default("free"),
+  organizationName: varchar("organization_name", { length: 200 }),
+  /** Free groups use 5; organization groups use null for unlimited active seats. */
+  seatLimit: int("seat_limit").default(5),
+  status: mysqlEnum("status", ["active", "archived", "canceled"]).notNull().default("active"),
+  meetingProvider: mysqlEnum("meeting_provider", ["zoom", "teams", "other"]),
+  meetingUrl: text("meeting_url"),
+  stripeCustomerId: varchar("stripe_customer_id", { length: 128 }),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 128 }),
+  currentPeriodEnd: timestamp("current_period_end"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  ownerIdx: index("idx_study_groups_owner").on(t.createdByUserId),
+  subscriptionIdx: index("idx_study_groups_subscription").on(t.stripeSubscriptionId),
+}));
+export type StudyGroup = typeof studyGroups.$inferSelect;
+export type InsertStudyGroup = typeof studyGroups.$inferInsert;
+
+export const studyGroupMembers = mysqlTable("study_group_members", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  /** Pending invitees have no user ID until they sign in with the invited email. */
+  userId: int("user_id"),
+  email: varchar("email", { length: 320 }).notNull(),
+  role: mysqlEnum("role", ["owner", "org_admin", "member"]).notNull().default("member"),
+  inviteStatus: mysqlEnum("invite_status", ["active", "pending", "revoked"]).notNull().default("pending"),
+  inviteToken: varchar("invite_token", { length: 128 }),
+  invitedByUserId: int("invited_by_user_id").notNull(),
+  joinedAt: timestamp("joined_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  groupEmailUnique: uniqueIndex("uq_study_group_member_email").on(t.groupId, t.email),
+  inviteTokenUnique: uniqueIndex("uq_study_group_member_invite_token").on(t.inviteToken),
+  groupUserIdx: index("idx_study_group_member_user").on(t.userId),
+  groupStatusIdx: index("idx_study_group_member_status").on(t.groupId, t.inviteStatus),
+}));
+export type StudyGroupMember = typeof studyGroupMembers.$inferSelect;
+export type InsertStudyGroupMember = typeof studyGroupMembers.$inferInsert;
+
+export const studyGroupDocuments = mysqlTable("study_group_documents", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  storageKey: varchar("storage_key", { length: 512 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  mimeType: varchar("mime_type", { length: 128 }).notNull(),
+  fileSize: int("file_size").notNull(),
+  uploadedByUserId: int("uploaded_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  groupCreatedIdx: index("idx_study_group_documents_group_created").on(t.groupId, t.createdAt),
+}));
+export type StudyGroupDocument = typeof studyGroupDocuments.$inferSelect;
+export type InsertStudyGroupDocument = typeof studyGroupDocuments.$inferInsert;
+
+export const studyGroupTasks = mysqlTable("study_group_tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  description: text("description"),
+  assignedToUserId: int("assigned_to_user_id"),
+  dueAt: timestamp("due_at"),
+  status: mysqlEnum("status", ["todo", "in_progress", "done"]).notNull().default("todo"),
+  createdByUserId: int("created_by_user_id").notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  groupStatusIdx: index("idx_study_group_tasks_group_status").on(t.groupId, t.status),
+}));
+export type StudyGroupTask = typeof studyGroupTasks.$inferSelect;
+export type InsertStudyGroupTask = typeof studyGroupTasks.$inferInsert;
+
+export const studyGroupMessages = mysqlTable("study_group_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  userId: int("user_id").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  groupCreatedIdx: index("idx_study_group_messages_group_created").on(t.groupId, t.createdAt),
+}));
+export type StudyGroupMessage = typeof studyGroupMessages.$inferSelect;
+export type InsertStudyGroupMessage = typeof studyGroupMessages.$inferInsert;
+
+export const studyGroupModules = mysqlTable("study_group_modules", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  title: varchar("title", { length: 300 }).notNull(),
+  content: longtext("content"),
+  sortOrder: int("sort_order").notNull().default(0),
+  isPublished: boolean("is_published").notNull().default(true),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  groupOrderIdx: index("idx_study_group_modules_group_order").on(t.groupId, t.sortOrder),
+}));
+export type StudyGroupModule = typeof studyGroupModules.$inferSelect;
+export type InsertStudyGroupModule = typeof studyGroupModules.$inferInsert;
+
+/** Private audit stream for group and organizational activity. */
+export const studyGroupActivity = mysqlTable("study_group_activity", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  actorUserId: int("actor_user_id"),
+  action: varchar("action", { length: 96 }).notNull(),
+  summary: varchar("summary", { length: 512 }).notNull(),
+  entityType: varchar("entity_type", { length: 64 }),
+  entityId: int("entity_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  groupCreatedIdx: index("idx_study_group_activity_group_created").on(t.groupId, t.createdAt),
+}));
+export type StudyGroupActivity = typeof studyGroupActivity.$inferSelect;
+
+/** Paid content acquired by a group administrator at the protected 10% group rate. */
+export const studyGroupContentAccess = mysqlTable("study_group_content_access", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  contentType: mysqlEnum("content_type", ["course", "quiz", "download"]).notNull(),
+  contentId: int("content_id").notNull(),
+  contentTitle: varchar("content_title", { length: 500 }).notNull(),
+  seatLimit: int("seat_limit").notNull(),
+  listPriceCents: int("list_price_cents").notNull(),
+  discountedPriceCents: int("discounted_price_cents").notNull(),
+  status: mysqlEnum("status", ["active", "revoked"]).notNull().default("active"),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 128 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 128 }),
+  /** LMS order created for a course or quiz group purchase; null for downloads. */
+  sourceOrderId: int("source_order_id"),
+  purchasedByUserId: int("purchased_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  groupContentIdx: index("idx_study_group_content_group").on(t.groupId, t.contentType, t.contentId),
+  sessionIdx: index("idx_study_group_content_session").on(t.stripeCheckoutSessionId),
+}));
+export type StudyGroupContentAccess = typeof studyGroupContentAccess.$inferSelect;
+
+/** A group administrator assigns acquired content seats to active group members. */
+export const studyGroupContentAssignments = mysqlTable("study_group_content_assignments", {
+  id: int("id").autoincrement().primaryKey(),
+  contentAccessId: int("content_access_id").notNull(),
+  userId: int("user_id").notNull(),
+  assignedByUserId: int("assigned_by_user_id").notNull(),
+  /** The LMS enrollment or digital purchase created for this assignment, if any. */
+  sourceEntitlementId: int("source_entitlement_id"),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at"),
+}, (t) => ({
+  accessUserUnique: uniqueIndex("uq_study_group_content_assignment").on(t.contentAccessId, t.userId),
+  userIdx: index("idx_study_group_content_assignment_user").on(t.userId),
+}));
+export type StudyGroupContentAssignment = typeof studyGroupContentAssignments.$inferSelect;
+
+/** Platform-admin editable global content blocks rendered within every group workspace. */
+export const studyGroupWorkspaceBlocks = mysqlTable("study_group_workspace_blocks", {
+  id: int("id").autoincrement().primaryKey(),
+  blockKey: varchar("block_key", { length: 100 }).notNull().unique(),
+  blocksJson: longtext("blocks_json").notNull(),
+  updatedByUserId: int("updated_by_user_id").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type StudyGroupWorkspaceBlock = typeof studyGroupWorkspaceBlocks.$inferSelect;

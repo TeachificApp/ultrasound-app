@@ -28,6 +28,7 @@ import questionBankExportRouter from "../routes/questionBankExport";
 import { registerUploadDigitalFileRoute } from "../routes/uploadDigitalFile";
 import { registerLearnerProtectedDownloadRoutes } from "../routes/learnerProtectedDownloads";
 import { registerUploadCohortMediaRoute } from "../routes/uploadCohortMedia";
+import { registerStudyGroupDocumentUploadRoute } from "../routes/uploadStudyGroupDocument";
 import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResource";
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
 import { registerUploadTeachRoute } from "../routes/uploadTeach";
@@ -687,6 +688,7 @@ async function startServer() {
   registerLearnerProtectedDownloadRoutes(app);
   // Cohort group discussion media upload (images + videos, admin only)
   registerUploadCohortMediaRoute(app);
+  registerStudyGroupDocumentUploadRoute(app);
   registerUploadCohortResourceRoute(app);
   // Social content image upload (multipart, admin only)
   registerUploadSocialImageRoute(app);

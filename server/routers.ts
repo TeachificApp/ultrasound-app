@@ -74,6 +74,7 @@ import { quizBankRouter } from "./routers/quizBankRouter";
 import { quizMakerRouter } from "./routers/quizMakerRouter";
 import { teamRouter } from "./routers/teamRouter";
 import { adminNotificationsRouter } from "./routers/adminNotificationsRouter";
+import { studyGroupsRouter } from "./routers/studyGroupsRouter";
 import { sonoTravelersRouter } from "./routers/sonoTravelersRouter";
 import { siteSettingsRouter } from "./routers/siteSettingsRouter";
 import { newsletterRouter } from "./routers/newsletterRouter";
@@ -2853,6 +2854,7 @@ export const appRouter = router({
   quizMaker: quizMakerRouter,
   team: teamRouter,
   adminNotifications: adminNotificationsRouter,
+  studyGroups: studyGroupsRouter,
   sonoTravelers: sonoTravelersRouter,
   siteSettings: siteSettingsRouter,
   newsletter: newsletterRouter,

@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package, Truck, GraduationCap, ArrowRight } from "lucide-react";
+import { BookOpen, Download, HelpCircle, Search, Star, Users, CheckCircle, Package, Truck, GraduationCap, ArrowRight, MessageCircle, Video } from "lucide-react";
 import NewsletterInlineWidget from "@/components/NewsletterInlineWidget";
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -281,8 +281,16 @@ export default function EducationLibrary() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Collection Filter Tabs — Thinkific-style */}
+	  <div className="max-w-6xl mx-auto px-4 py-8">
+	        <Link href="/study-groups" className="mb-7 block">
+	          <div className="group overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-r from-slate-950 via-teal-950 to-teal-700 p-5 text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg sm:p-6">
+	            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+	              <div className="flex gap-4"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/10"><Users className="h-6 w-6 text-teal-100" /></div><div><div className="flex flex-wrap items-center gap-2"><h2 className="text-xl font-bold">Study Groups</h2><Badge className="border border-white/20 bg-white/10 text-teal-100">Free for up to 5</Badge></div><p className="mt-1 max-w-2xl text-sm leading-6 text-teal-100">Create a private learner group, invite by full email, share documents, set tasks, discuss material, and add a Zoom or Microsoft Teams link.</p><div className="mt-3 flex flex-wrap gap-4 text-xs text-teal-100"><span className="flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" />Private discussion</span><span className="flex items-center gap-1"><Video className="h-3.5 w-3.5" />Zoom or Teams</span></div></div></div>
+	              <Button variant="secondary" className="shrink-0 text-teal-800 group-hover:bg-teal-50">Open Study Groups <ArrowRight className="ml-2 h-4 w-4" /></Button>
+	            </div>
+	          </div>
+	        </Link>
+	        {/* Collection Filter Tabs — Thinkific-style */}
         {collections && collections.length > 0 && (
           <div className="mb-6">
             <div className="flex gap-1.5 pb-1 flex-wrap">

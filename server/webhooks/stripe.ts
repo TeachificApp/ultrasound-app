@@ -16,6 +16,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
+import { handleStudyGroupCheckoutCompleted, handleStudyGroupSubscriptionLifecycle } from "../routers/studyGroupsRouter";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
 import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
@@ -2731,6 +2732,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       await handleMembershipCheckoutCompleted(sessionObj);
       await handleDiyCheckoutCompleted(sessionObj);
       await handleTeamCheckoutCompleted(sessionObj);
+      await handleStudyGroupCheckoutCompleted(sessionObj);
       // Fire community workflow rules for any purchase (fire-and-forget)
       try {
         const meta = (sessionObj.metadata as Record<string, string>) ?? {};
@@ -2782,6 +2784,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
               await handleMembershipCheckoutCompleted(storedSession);
               await handleDiyCheckoutCompleted(storedSession);
               await handleTeamCheckoutCompleted(storedSession);
+              await handleStudyGroupCheckoutCompleted(storedSession);
               // Fire community workflow rules
               try {
                 const meta = (storedSession.metadata as Record<string, string>) ?? {};
@@ -2812,6 +2815,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       await handleDiySubscriptionLifecycle(sessionObj, eventType);
       await handleMembershipSubscriptionLifecycle(sessionObj, eventType);
       await handleLmsSubscriptionLifecycle(sessionObj, eventType);
+      await handleStudyGroupSubscriptionLifecycle(sessionObj);
     } else if (eventType === "invoice.paid") {
       await handleInvoicePaid(sessionObj);
     } else if (eventType === "invoice.payment_failed") {

@@ -65,6 +65,10 @@ const Checkout = lazy(() => import("./pages/Checkout"));
 const CheckoutComplete = lazy(() => import("./pages/CheckoutComplete"));
 const WorkshopCheckout = lazy(() => import("./pages/WorkshopCheckout"));
 const EducationLibrary = lazy(() => import("./pages/EducationLibrary"));
+const StudyGroupsPage = lazy(() => import("./pages/StudyGroupsPage"));
+const StudyGroupWorkspace = lazy(() => import("./pages/StudyGroupWorkspace"));
+const StudyGroupInvite = lazy(() => import("./pages/StudyGroupInvite"));
+const StudyGroupsAdmin = lazy(() => import("./pages/admin/StudyGroupsAdmin"));
 const LMSHome = lazy(() => import("./pages/LMSHome"));
 const CollectionDetail = lazy(() => import("./pages/CollectionDetail"));
 const CourseLanding = lazy(() => import("./pages/CourseLanding"));
@@ -945,6 +949,10 @@ function LMSRouter() {
             <Route path="/community/members/:userId" component={CommunityProfile} />
             <Route path="/community/:slug" component={CommunityFeed} />
             <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityAdmin /></RoleGuard>}</Route>
+            <Route path="/admin/study-groups">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><StudyGroupsAdmin /></RoleGuard>}</Route>
+            <Route path="/study-groups/invite" component={StudyGroupInvite} />
+            <Route path="/study-groups/:groupId" component={StudyGroupWorkspace} />
+            <Route path="/study-groups" component={StudyGroupsPage} />
             <Route path="/education-library" component={EducationLibrary} />
             <Route path="/collections/:id" component={CollectionDetail} />
             <Route path="/courses/:slug/overview" component={CourseOverview} />
@@ -1329,7 +1337,7 @@ function IHeartEchoRouter() {
 const RESERVED_FUNNEL_SLUGS = new Set([
   "platform-admin", "login", "register", "logout", "admin", "premium", "profile",
   "enrolled", "upgrade-success", "my-dashboard", "my-quizzes", "my-team", "my-downloads",
-  "education-library", "downloads", "courses", "products", "forms", "community",
+  "education-library", "study-groups", "downloads", "courses", "products", "forms", "community",
   "career-network", "careernetwork", "employer", "accreditation", "lab-admin",
   "diy-member", "diy-register", "magic-link", "verify-email", "forgot-password",
   "reset-password", "unsubscribe", "flashcards", "case-library", "registry-review",
