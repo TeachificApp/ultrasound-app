@@ -26,8 +26,12 @@ describe("dual public-site tenant architecture", () => {
     expect(ihe.currentHost).toBe("www.iheartecho.net");
     expect(ihe.promotionHost).toBe("www.iheartecho.com");
     expect(getPublicSiteTenantForHost("www.iheartecho.net")?.key).toBe("iheartecho-net");
+    expect(getPublicSiteTenantForHost("iheartecho.net")?.key).toBe("iheartecho-net");
     expect(getPublicSiteTenantForHost("www.iheartecho.com")?.key).toBe("iheartecho-net");
+    expect(getPublicSiteTenantForHost("allaboutultrasound.net")?.key).toBe("aaus-net");
+    expect(getPublicSiteTenantForHost("aboutultrasound.net")?.key).toBe("aaus-net");
     expect(isPublicSiteStagingHost("www.allaboutultrasound.net")).toBe(true);
+    expect(isPublicSiteStagingHost("aboutultrasound.net")).toBe(true);
     expect(isPublicSiteStagingHost("www.allaboutultrasound.com")).toBe(false);
     expect(publicSiteOrigin(ihe, "promotion")).toBe("https://www.iheartecho.com");
   });
@@ -64,6 +68,8 @@ describe("dual public-site tenant architecture", () => {
     expect(builder).toContain("Blog metadata");
     expect(renderer).toContain("BlogListing");
     expect(renderer).toContain("promotionOrigin");
+    expect(renderer).toContain("PublicSiteRootFallback");
+    expect(renderer).toContain('pathname === "/"');
   });
 
   it("routes public .net hosts ahead of the app host and provides public sitemap metadata", () => {

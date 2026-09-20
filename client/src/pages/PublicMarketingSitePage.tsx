@@ -94,6 +94,71 @@ function BlogListing({ tenantKey, pathPrefix, accent }: { tenantKey: PublicSiteT
   );
 }
 
+/**
+ * A public domain must not display an application shell or a 404 merely because
+ * its editable CMS copy has not been imported yet. This branded root is a
+ * temporary, useful landing experience; an imported/published homepage always
+ * replaces it automatically.
+ */
+function PublicSiteRootFallback({
+  tenant,
+  nav,
+  accent,
+}: {
+  tenant: NonNullable<ReturnType<typeof getPublicSiteTenant>>;
+  nav: Array<{ label: string; href: string }>;
+  accent: string;
+}) {
+  const isEcho = tenant.brand === "iheartecho";
+  const appUrl = isEcho ? "https://app.iheartecho.com" : "https://app.allaboutultrasound.com";
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <MarketingNav nav={nav} siteName={tenant.siteName} accent={accent} />
+      <main>
+        <section className="bg-[#0e1e2e] text-white">
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-20 sm:py-28">
+            <p className="text-xs sm:text-sm uppercase tracking-[0.22em] font-semibold" style={{ color: accent }}>
+              {isEcho ? "Echocardiography education" : "Ultrasound education"}
+            </p>
+            <h1 className="font-serif text-4xl sm:text-6xl font-bold leading-tight max-w-3xl mt-4">
+              {isEcho ? "Learn echo with confidence." : "Education that moves ultrasound forward."}
+            </h1>
+            <p className="text-lg leading-relaxed text-slate-200 max-w-2xl mt-6">
+              {isEcho
+                ? "Clinical education, CME, registry support, and practical resources for echocardiography professionals."
+                : "Clinical training, CME, registry preparation, and practical resources for ultrasound professionals."}
+            </p>
+            <div className="flex flex-wrap gap-3 mt-8">
+              <a href="https://learn.allaboutultrasound.com" className="inline-flex items-center rounded-lg px-5 py-3 font-semibold text-slate-950" style={{ background: accent }}>
+                Explore learning
+              </a>
+              <a href={appUrl} className="inline-flex items-center rounded-lg border border-white/40 px-5 py-3 font-semibold text-white hover:bg-white/10">
+                Open the clinical app
+              </a>
+            </div>
+          </div>
+        </section>
+        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-14 sm:py-20 grid gap-5 md:grid-cols-3">
+          {[
+            ["CME & courses", "Learn on your schedule with focused clinical education and continuing education."],
+            ["Clinical tools", "Use practical resources built to support scanning, interpretation, and confidence."],
+            ["Professional growth", "Explore registry preparation, workshops, and guidance for the next stage of practice."],
+          ].map(([title, copy]) => (
+            <article key={title} className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm">
+              <div className="h-1 w-12 rounded-full" style={{ background: accent }} />
+              <h2 className="text-xl font-bold text-slate-900 mt-5">{title}</h2>
+              <p className="text-slate-600 leading-relaxed mt-3">{copy}</p>
+            </article>
+          ))}
+        </section>
+      </main>
+      <footer className="bg-[#0e1e2e] text-white/75 text-center text-sm py-10 px-4">
+        <p>© {new Date().getFullYear()} {tenant.siteName}. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+
 export default function PublicMarketingSitePage() {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const tenant = getTenantForBrowser();
@@ -134,6 +199,9 @@ export default function PublicMarketingSitePage() {
   }
 
   if (error || !data?.page) {
+    if (pathname === "/" && tenant) {
+      return <PublicSiteRootFallback tenant={tenant} nav={nav} accent={brand.primaryColor} />;
+    }
     return (
       <div className="min-h-screen bg-slate-50">
         <MarketingNav nav={nav} siteName={settings?.tenant.siteName ?? brand.displayName} accent={brand.accentColor} />

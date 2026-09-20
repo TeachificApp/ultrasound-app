@@ -8,8 +8,12 @@ export type PublicSiteTenant = {
   siteName: string;
   /** Current review/launch hostname. Kept noindex until the .com promotion. */
   currentHost: string;
+  /** Apex and legacy review-domain aliases that resolve to the same tenant. */
+  currentHostAliases: readonly string[];
   /** Final public hostname used at the controlled promotion step. */
   promotionHost: string;
+  /** Apex public-domain aliases retained when the .com host is promoted. */
+  promotionHostAliases: readonly string[];
   /** Existing public source used by the administrator-controlled importer. */
   sourceOrigin: string;
   /** Canonical blog index path retained from the source site. */
@@ -24,7 +28,11 @@ export const PUBLIC_SITE_TENANTS: readonly PublicSiteTenant[] = [
     brand: "aaus",
     siteName: "All About Ultrasound™",
     currentHost: "www.allaboutultrasound.net",
+    // Both the requested apex domain and the currently resolving legacy
+    // short-domain host must enter the public-site router, never the app.
+    currentHostAliases: ["allaboutultrasound.net", "aboutultrasound.net", "www.aboutultrasound.net"],
     promotionHost: "www.allaboutultrasound.com",
+    promotionHostAliases: ["allaboutultrasound.com"],
     sourceOrigin: "https://www.allaboutultrasound.com",
     blogIndexPath: "/making-waves-blog.html",
     blogPathPrefix: "/making-waves-blog/",
@@ -34,7 +42,9 @@ export const PUBLIC_SITE_TENANTS: readonly PublicSiteTenant[] = [
     brand: "iheartecho",
     siteName: "iHeartEcho™",
     currentHost: "www.iheartecho.net",
+    currentHostAliases: ["iheartecho.net"],
     promotionHost: "www.iheartecho.com",
+    promotionHostAliases: ["iheartecho.com"],
     sourceOrigin: "https://www.iheartecho.com",
     blogIndexPath: "/echoblog.html",
     blogPathPrefix: "/echoblog/",
@@ -62,7 +72,10 @@ export function getPublicSiteTenantForBrand(brand: Brand): PublicSiteTenant {
 export function getPublicSiteTenantForHost(hostname: string): PublicSiteTenant | null {
   const host = normalizeHost(hostname);
   return PUBLIC_SITE_TENANTS.find(
-    (tenant) => host === tenant.currentHost || host === tenant.promotionHost,
+    (tenant) => host === tenant.currentHost
+      || host === tenant.promotionHost
+      || tenant.currentHostAliases.includes(host)
+      || tenant.promotionHostAliases.includes(host),
   ) ?? null;
 }
 
@@ -73,7 +86,8 @@ export function isPublicSiteHost(hostname: string): boolean {
 /** .net hosts are intentionally non-indexed until the matching .com promotion. */
 export function isPublicSiteStagingHost(hostname: string): boolean {
   const tenant = getPublicSiteTenantForHost(hostname);
-  return Boolean(tenant && normalizeHost(hostname) === tenant.currentHost);
+  const host = normalizeHost(hostname);
+  return Boolean(tenant && (host === tenant.currentHost || tenant.currentHostAliases.includes(host)));
 }
 
 export function publicSiteOrigin(tenant: PublicSiteTenant, mode: "current" | "promotion" = "current"): string {

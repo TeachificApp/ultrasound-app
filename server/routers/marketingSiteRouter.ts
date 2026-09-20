@@ -86,8 +86,16 @@ export const marketingSitePublicRouter = router({
       const tenant = getPublicSiteTenant(input.tenantKey)!;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const [settings] = await db.select().from(marketingSiteSettings)
-        .where(eq(marketingSiteSettings.siteKey, tenant.key)).limit(1);
+      // The public root remains usable while an administrator is waiting for
+      // the additive CMS migration or the controlled source import. A missing
+      // settings row/table must never make a brand domain fall back to the app.
+      let settings: typeof marketingSiteSettings.$inferSelect | undefined;
+      try {
+        [settings] = await db.select().from(marketingSiteSettings)
+          .where(eq(marketingSiteSettings.siteKey, tenant.key)).limit(1);
+      } catch {
+        settings = undefined;
+      }
       let nav: unknown[] = [];
       let footer: unknown = null;
       try { nav = settings?.navJson ? JSON.parse(settings.navJson) : []; } catch { nav = []; }
@@ -117,13 +125,20 @@ export const marketingSitePublicRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const path = normalizePath(input.path);
-      const [page] = await db.select(publicPageShape).from(marketingSitePages)
-        .where(and(
-          eq(marketingSitePages.siteKey, input.tenantKey),
-          eq(marketingSitePages.path, path),
-          eq(marketingSitePages.isPublished, true),
-        ))
-        .limit(1);
+      let page: typeof marketingSitePages.$inferSelect | undefined;
+      try {
+        [page] = await db.select(publicPageShape).from(marketingSitePages)
+          .where(and(
+            eq(marketingSitePages.siteKey, input.tenantKey),
+            eq(marketingSitePages.path, path),
+            eq(marketingSitePages.isPublished, true),
+          ))
+          .limit(1);
+      } catch {
+        // The client renders the branded root fallback for / and retains a
+        // real 404 for unknown non-root paths until CMS content exists.
+        page = undefined;
+      }
       if (!page) return null;
       if (page.pageType === "redirect" && page.redirectUrl) return { redirectUrl: page.redirectUrl, page: null };
       let blocks: unknown[] = [];
