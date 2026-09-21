@@ -2896,9 +2896,19 @@ export const socialPostLibrary = mysqlTable("social_post_library", {
   createdByUserId: int("createdByUserId").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
+  publishedAt: timestamp("publishedAt"),
+  publishedByUserId: int("publishedByUserId"),
+  flaggedAt: timestamp("flaggedAt"),
+  flaggedByUserId: int("flaggedByUserId"),
+  flagComment: text("flagComment"),
+  flagResolvedAt: timestamp("flagResolvedAt"),
+  deletedAt: timestamp("deletedAt"),
+  deletedByUserId: int("deletedByUserId"),
 }, (table) => [
   index("social_post_library_brand_created_idx").on(table.brand, table.createdAt),
   index("social_post_library_creator_idx").on(table.createdByUserId),
+  index("social_post_library_brand_status_idx").on(table.brand, table.status, table.updatedAt),
 ]);
 export type SocialPostLibraryItem = typeof socialPostLibrary.$inferSelect;
 export type InsertSocialPostLibraryItem = typeof socialPostLibrary.$inferInsert;

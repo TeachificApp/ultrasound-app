@@ -40,7 +40,7 @@ const CONTENT_TYPES = [
   "case_teaser",
 ] as const;
 
-const CATEGORIES = [
+const AAUS_CATEGORIES = [
   "Abdominal",
   "Small Parts",
   "Pelvic/Gyn",
@@ -52,9 +52,18 @@ const CATEGORIES = [
   "MSK",
   "POCUS",
   "Physics",
-  "Echocardiography",
   "General Ultrasound",
 ] as const;
+
+const IHE_CATEGORIES = [
+  "Transthoracic Echo",
+  "Transesophageal Echo",
+  "Intracardiac Echo",
+  "Pediatric/Congenital Echo",
+  "Fetal Echo",
+] as const;
+
+const CATEGORIES = [...AAUS_CATEGORIES, ...IHE_CATEGORIES] as const;
 
 type ContentType = (typeof CONTENT_TYPES)[number];
 
@@ -119,6 +128,14 @@ Return your response as a JSON object with exactly these fields:
 IMPORTANT: Use no more than two professional, relevant emojis in socialCaption. Never place emojis in clinical facts, question wording, options, answers, or explanations. Return ONLY the JSON object, no markdown formatting or code blocks.`;
 }
 
+function getBrandCategories(brand: "aaus" | "iheartecho") {
+  return brand === "iheartecho" ? IHE_CATEGORIES : AAUS_CATEGORIES;
+}
+
+function resolveRequestedBrand(inputBrand: "aaus" | "iheartecho" | undefined, contextBrand: "aaus" | "iheartecho") {
+  return inputBrand ?? contextBrand;
+}
+
 /**
  * Build an ABSTRACT background prompt — no anatomical imagery.
  * Generates decorative, professional backgrounds with medical-themed
@@ -145,7 +162,10 @@ function buildAbstractImagePrompt(
     "MSK": "angular geometric patterns with strong teal accent lines",
     "POCUS": "dynamic abstract waveform burst with teal energy ripples",
     "Physics": "sound wave visualization pattern, abstract frequency lines in teal/aqua",
-    "Echocardiography": "rhythmic pulse wave pattern with teal and aqua gradient, abstract heartbeat lines",
+    "Transthoracic Echo": "rhythmic pulse wave pattern with teal and aqua gradient, abstract heartbeat lines",
+    "Transesophageal Echo": "precise layered waveform lines with deep teal and aqua highlights",
+    "Intracardiac Echo": "dynamic circular pulse field with crisp aqua pathways on deep teal",
+    "Pediatric/Congenital Echo": "gentle heart-rhythm curves and bright aqua motion accents",
     "General Ultrasound": "abstract sound wave ripples with teal gradient on dark background",
   };
 
@@ -160,16 +180,21 @@ export const socialContentRouter = router({
       z.object({
         contentType: z.enum(CONTENT_TYPES),
         category: z.enum(CATEGORIES),
+        brand: z.enum(["aaus", "iheartecho"]).optional(),
         customTopic: z.string().max(200).optional(),
         count: z.number().min(1).max(5).default(1),
         imageMode: z.enum(["none", "abstract", "upload"]).default("none"),
         imageStyleHint: z.string().max(500).optional(),
         layoutMode: z.enum(["card", "infographic"]).default("card"),
-        cardTheme: z.enum(["dark", "light"]).default("light"),
+        cardTheme: z.enum(["dark", "light", "white", "teal", "aqua"]).default("light"),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const { contentType, category, customTopic, count, imageMode, imageStyleHint, layoutMode, cardTheme } = input;
+      const brand = resolveRequestedBrand(input.brand, ctx.brand);
+      if (!getBrandCategories(brand).includes(category as never)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a category available for the selected brand" });
+      }
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
@@ -183,14 +208,16 @@ export const socialContentRouter = router({
         imageUrl?: string;
         imageSource?: "ai" | "upload" | "media_repository";
         libraryId?: number;
+        librarySaved?: boolean;
+        librarySaveError?: boolean;
       }> = [];
 
       for (let i = 0; i < count; i++) {
         try {
           const response = await invokeLLM({
             messages: [
-              { role: "system", content: getSystemPrompt(contentType, ctx.brand) },
-              { role: "user", content: buildUserPrompt(contentType, category, customTopic, ctx.brand) },
+              { role: "system", content: getSystemPrompt(contentType, brand) },
+              { role: "user", content: buildUserPrompt(contentType, category, customTopic, brand) },
             ],
             maxTokens: 2000,
           });
@@ -232,7 +259,7 @@ export const socialContentRouter = router({
 
           try {
             const libraryValues = {
-              brand: ctx.brand,
+              brand,
               headline: item.headline,
               body: item.body,
               subtext: item.subtext || null,
@@ -250,10 +277,17 @@ export const socialContentRouter = router({
                 : {}),
             };
             const saved = await db.insert(socialPostLibrary).values(libraryValues).$returningId();
-            item.libraryId = Number(saved[0]?.id);
+            const libraryId = Number(saved[0]?.id);
+            if (!Number.isInteger(libraryId) || libraryId <= 0) {
+              throw new Error("Library insert did not return a record ID");
+            }
+            item.libraryId = libraryId;
             item.librarySaved = true;
-          } catch (archiveError) {
-            console.error("[SocialContent] Generated post could not be archived", archiveError);
+          } catch {
+            // Creation remains useful to the administrator even if a transient archive write fails.
+            // No database, media, or generated content detail is emitted in the operational log.
+            console.warn("[SocialContent] Shared library save unavailable for generated post");
+            item.librarySaveError = true;
           }
           results.push(item);
         } catch (err) {
@@ -291,14 +325,18 @@ export const socialContentRouter = router({
     }),
 
   listSavedPosts: adminProcedure
-    .input(z.object({ limit: z.number().int().min(1).max(100).default(40) }).default({ limit: 40 }))
+    .input(z.object({
+      brand: z.enum(["aaus", "iheartecho"]).optional(),
+      limit: z.number().int().min(1).max(100).default(40),
+    }).default({ limit: 40 }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const brand = resolveRequestedBrand(input.brand, ctx.brand);
       return db
         .select()
         .from(socialPostLibrary)
-        .where(eq(socialPostLibrary.brand, ctx.brand))
+        .where(and(eq(socialPostLibrary.brand, brand), isNull(socialPostLibrary.deletedAt)))
         .orderBy(desc(socialPostLibrary.updatedAt), desc(socialPostLibrary.id))
         .limit(input.limit);
     }),
@@ -306,8 +344,9 @@ export const socialContentRouter = router({
   updateSavedPost: adminProcedure
     .input(z.object({
       id: z.number().int().positive(),
+      brand: z.enum(["aaus", "iheartecho"]).optional(),
       layoutMode: z.enum(["card", "infographic"]).optional(),
-      cardTheme: z.enum(["dark", "light"]).optional(),
+      cardTheme: z.enum(["dark", "light", "white", "teal", "aqua"]).optional(),
       imageUrl: z.string().url().nullable().optional(),
       imageSource: z.enum(["ai", "upload", "media_repository", "google"]).nullable().optional(),
       mediaAssetId: z.number().int().positive().nullable().optional(),
@@ -319,14 +358,15 @@ export const socialContentRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      const { id, ...changes } = input;
+      const { id, brand: requestedBrand, ...changes } = input;
+      const brand = resolveRequestedBrand(requestedBrand, ctx.brand);
       if (changes.mediaAssetId) {
         const [asset] = await db
           .select({ id: mediaAssets.id })
           .from(mediaAssets)
           .where(and(
             eq(mediaAssets.id, changes.mediaAssetId),
-            eq(mediaAssets.brand, ctx.brand),
+            eq(mediaAssets.brand, brand),
             isNull(mediaAssets.deletedAt),
           ))
           .limit(1);
@@ -337,7 +377,59 @@ export const socialContentRouter = router({
       const result = await db
         .update(socialPostLibrary)
         .set(changes)
-        .where(and(eq(socialPostLibrary.id, id), eq(socialPostLibrary.brand, ctx.brand)));
+        .where(and(eq(socialPostLibrary.id, id), eq(socialPostLibrary.brand, brand), isNull(socialPostLibrary.deletedAt)));
+      if (Number((result as any).affectedRows ?? 0) === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Saved social post not found for this brand" });
+      }
+      return { success: true };
+    }),
+
+  markSavedPostPublished: adminProcedure
+    .input(z.object({ id: z.number().int().positive(), brand: z.enum(["aaus", "iheartecho"]).optional(), published: z.boolean().default(true) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const brand = resolveRequestedBrand(input.brand, ctx.brand);
+      const result = await db
+        .update(socialPostLibrary)
+        .set({
+          status: input.published ? "published" : "draft",
+          publishedAt: input.published ? new Date() : null,
+          publishedByUserId: input.published ? ctx.user.id : null,
+        })
+        .where(and(eq(socialPostLibrary.id, input.id), eq(socialPostLibrary.brand, brand), isNull(socialPostLibrary.deletedAt)));
+      if (Number((result as any).affectedRows ?? 0) === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Saved social post not found for this brand" });
+      }
+      return { success: true };
+    }),
+
+  flagSavedPost: adminProcedure
+    .input(z.object({ id: z.number().int().positive(), brand: z.enum(["aaus", "iheartecho"]).optional(), comment: z.string().trim().min(1).max(1000) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const brand = resolveRequestedBrand(input.brand, ctx.brand);
+      const result = await db
+        .update(socialPostLibrary)
+        .set({ flaggedAt: new Date(), flaggedByUserId: ctx.user.id, flagComment: input.comment, flagResolvedAt: null })
+        .where(and(eq(socialPostLibrary.id, input.id), eq(socialPostLibrary.brand, brand), isNull(socialPostLibrary.deletedAt)));
+      if (Number((result as any).affectedRows ?? 0) === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Saved social post not found for this brand" });
+      }
+      return { success: true };
+    }),
+
+  deleteSavedPost: adminProcedure
+    .input(z.object({ id: z.number().int().positive(), brand: z.enum(["aaus", "iheartecho"]).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const brand = resolveRequestedBrand(input.brand, ctx.brand);
+      const result = await db
+        .update(socialPostLibrary)
+        .set({ status: "archived", deletedAt: new Date(), deletedByUserId: ctx.user.id })
+        .where(and(eq(socialPostLibrary.id, input.id), eq(socialPostLibrary.brand, brand), isNull(socialPostLibrary.deletedAt)));
       if (Number((result as any).affectedRows ?? 0) === 0) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Saved social post not found for this brand" });
       }
@@ -354,4 +446,11 @@ export const socialContentRouter = router({
   getCategories: adminProcedure.query(() => {
     return CATEGORIES.map((c) => ({ value: c, label: c }));
   }),
+
+  getBrandCategories: adminProcedure
+    .input(z.object({ brand: z.enum(["aaus", "iheartecho"]).optional() }).optional())
+    .query(({ ctx, input }) => {
+      const brand = resolveRequestedBrand(input?.brand, ctx.brand);
+      return getBrandCategories(brand).map((c) => ({ value: c, label: c }));
+    }),
 });

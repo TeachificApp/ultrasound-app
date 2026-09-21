@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { saveAs } from "file-saver";
-import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from "mediabunny";
+import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from "mediabunny";
 import {
   DEFAULT_SOCIAL_EXPORT_PLATFORM,
   getSocialExportPreset,
@@ -11,13 +11,16 @@ import {
 } from "@/lib/socialCardExportPresets";
 
 export type CardMotion = {
-  kind: "question" | "answer" | "social";
+  kind: "question" | "answer" | "combined" | "social";
   title: string;
   options?: string[];
   answer?: string | null;
   detail?: string | null;
   brandName?: string;
   accentColor?: string;
+  logoUrl?: string;
+  musicUrl?: string | null;
+  musicTitle?: string | null;
 };
 
 type SocialCardExportOptions = {
@@ -38,6 +41,12 @@ const SOURCE_WIDTH = 1080;
 const FRAME_RATE = 12;
 const MOTION_DURATION_SECONDS = 7;
 const FALLBACK_BACKGROUND = "#071318";
+
+export type SocialMusicOption = {
+  id: number;
+  title: string;
+  url: string;
+};
 
 function cleanText(value: string | null | undefined): string {
   return (value ?? "")
@@ -219,7 +228,7 @@ function drawMotionPanel(
   context.globalAlpha = panelProgress;
   context.fillStyle = accent;
   context.font = `800 ${labelFont}px "Segoe UI", Arial, sans-serif`;
-  const motionLabel = motion.kind === "answer" ? "ANSWER REVEAL" : motion.kind === "question" ? "CLINICAL QUESTION" : "CLINICAL INSIGHT";
+  const motionLabel = motion.kind === "answer" ? "ANSWER REVEAL" : motion.kind === "question" || motion.kind === "combined" ? "CLINICAL QUESTION" : "CLINICAL INSIGHT";
   context.fillText(motionLabel, x, y);
   y += labelFont * 1.7;
 
@@ -235,7 +244,7 @@ function drawMotionPanel(
     y += titleHeight + Math.max(20, Math.round(26 * scaled));
   }
 
-  if (motion.kind === "question" && motion.options?.length) {
+  if ((motion.kind === "question" || motion.kind === "combined") && motion.options?.length) {
     motion.options.slice(0, 4).forEach((option, index) => {
       const start = 1.65 + index * 0.68;
       const progress = easeOutBack((elapsed - start) / 0.42);
@@ -315,6 +324,31 @@ function drawMotionPanel(
     }
   }
 
+  if (motion.kind === "combined" && motion.answer) {
+    const answerProgress = easeOutBack((elapsed - 4.65) / 0.48);
+    if (answerProgress > 0) {
+      const visibleProgress = clamp(answerProgress, 0, 1);
+      const answerHeight = Math.max(92, Math.round(122 * scaled));
+      const answerY = panelTop + panelHeight - padding - answerHeight;
+      context.save();
+      context.globalAlpha = visibleProgress;
+      context.translate(0, (1 - visibleProgress) * 40 * scaled);
+      context.fillStyle = "rgba(34,197,94,0.19)";
+      drawRoundedRect(context, x, answerY, contentWidth, answerHeight, Math.max(12, Math.round(15 * scaled)));
+      context.fill();
+      context.strokeStyle = "rgba(74,222,128,0.95)";
+      context.lineWidth = Math.max(2, Math.round(3 * scaled));
+      context.stroke();
+      context.fillStyle = "#86efac";
+      context.font = `900 ${labelFont}px "Segoe UI", Arial, sans-serif`;
+      context.fillText("CORRECT ANSWER", x + Math.round(20 * scaled), answerY + Math.round(27 * scaled));
+      context.fillStyle = "#ffffff";
+      context.font = `800 ${Math.max(optionFont, Math.round(30 * scaled))}px "Segoe UI", Arial, sans-serif`;
+      drawWrappedText(context, motion.answer, x + Math.round(20 * scaled), answerY + Math.round(65 * scaled), contentWidth - Math.round(40 * scaled), Math.max(optionFont, Math.round(30 * scaled)) * 1.12, 2);
+      context.restore();
+    }
+  }
+
   if (motion.kind === "social" && motion.detail) {
     const detailProgress = easeOutBack((elapsed - 1.85) / 0.55);
     if (detailProgress > 0) {
@@ -350,10 +384,66 @@ function drawMotionFrame(
   elapsed: number,
   targetWidth: number,
   targetHeight: number,
+  logo?: CanvasImageSource | null,
 ) {
-  const revealProgress = clamp((elapsed - 5.9) / 0.65, 0, 1);
-  drawExportFrame(context, card, targetWidth, targetHeight, 0.83 * (1 - revealProgress));
-  if (revealProgress < 1) drawMotionPanel(context, motion, elapsed, targetWidth, targetHeight);
+  const outroProgress = clamp((elapsed - 5.85) / 0.6, 0, 1);
+  drawExportFrame(context, card, targetWidth, targetHeight, 0.86 * (1 - outroProgress));
+  if (outroProgress < 1) {
+    drawMotionPanel(context, motion, elapsed, targetWidth, targetHeight);
+    return;
+  }
+
+  const background = context.createLinearGradient(0, 0, targetWidth, targetHeight);
+  background.addColorStop(0, "#06141c");
+  background.addColorStop(1, "#0b6670");
+  context.fillStyle = background;
+  context.fillRect(0, 0, targetWidth, targetHeight);
+  const scale = targetWidth / 1080;
+  const centerX = targetWidth / 2;
+  const logoSize = Math.min(targetWidth * 0.3, targetHeight * 0.22);
+  if (logo) context.drawImage(logo, centerX - logoSize / 2, targetHeight * 0.3 - logoSize / 2, logoSize, logoSize);
+  context.fillStyle = "#ffffff";
+  context.textAlign = "center";
+  context.font = `800 ${Math.max(28, Math.round(44 * scale))}px "Segoe UI", Arial, sans-serif`;
+  context.fillText(motion.brandName ?? "Clinical education", centerX, targetHeight * 0.58);
+  context.fillStyle = motion.accentColor ?? "#4ad9e0";
+  context.font = `700 ${Math.max(16, Math.round(22 * scale))}px "Segoe UI", Arial, sans-serif`;
+  context.fillText("Follow for clinical learning", centerX, targetHeight * 0.64);
+  context.textAlign = "start";
+}
+
+async function loadMotionLogo(url: string | undefined): Promise<HTMLImageElement | null> {
+  if (!url) return null;
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = url;
+  });
+}
+
+async function addMusicTrack(output: Output, musicUrl: string | null | undefined): Promise<{ source: AudioBufferSource; buffer: AudioBuffer } | null> {
+  if (!musicUrl) return null;
+  try {
+    const response = await fetch(musicUrl, { mode: "cors" });
+    if (!response.ok) return null;
+    const bytes = await response.arrayBuffer();
+    const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextCtor) return null;
+    const audioContext = new AudioContextCtor();
+    const decoded = await audioContext.decodeAudioData(bytes.slice(0));
+    const frames = Math.min(decoded.length, Math.floor(decoded.sampleRate * MOTION_DURATION_SECONDS));
+    const clip = audioContext.createBuffer(decoded.numberOfChannels, frames, decoded.sampleRate);
+    for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) {
+      clip.copyToChannel(decoded.getChannelData(channel).slice(0, frames), channel);
+    }
+    const source = new AudioBufferSource({ codec: "aac", quality: new Quality("medium") });
+    output.addAudioTrack(source);
+    return { source, buffer: clip };
+  } catch {
+    return null;
+  }
 }
 
 async function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
@@ -398,14 +488,19 @@ export async function renderSocialCardAsMp4(
     const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
     const source = new CanvasSource(canvas, { codec: "avc", bitrate: new Quality("high") });
     output.addVideoTrack(source);
+    const [logo, music] = await Promise.all([
+      loadMotionLogo(motion.logoUrl),
+      addMusicTrack(output, motion.musicUrl),
+    ]);
     await output.start();
     try {
       const frames = MOTION_DURATION_SECONDS * FRAME_RATE;
       for (let frame = 0; frame < frames; frame += 1) {
         const elapsed = frame / FRAME_RATE;
-        drawMotionFrame(context, card, motion, elapsed, preset.width, preset.height);
+        drawMotionFrame(context, card, motion, elapsed, preset.width, preset.height, logo);
         await source.add(elapsed, 1 / FRAME_RATE);
       }
+      if (music) await music.source.add(music.buffer);
       await output.finalize();
       const buffer = output.target.buffer;
       if (!buffer) throw new Error("MP4 export did not produce a file.");
@@ -442,12 +537,18 @@ export function SocialExportControls({
   format,
   onPlatformChange,
   onFormatChange,
+  musicOptions = [],
+  musicAssetId,
+  onMusicChange,
   compact = false,
 }: {
   platform: SocialExportPlatform;
   format: SocialExportFormat;
   onPlatformChange: (platform: SocialExportPlatform) => void;
   onFormatChange: (format: SocialExportFormat) => void;
+  musicOptions?: SocialMusicOption[];
+  musicAssetId?: number | null;
+  onMusicChange?: (assetId: number | null) => void;
   compact?: boolean;
 }) {
   const activePreset = useMemo(() => getSocialExportPreset(platform), [platform]);
@@ -480,9 +581,22 @@ export function SocialExportControls({
             ))}
           </div>
         </div>
+        {onMusicChange && (
+          <label className="flex min-w-[176px] flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+            <span className="flex items-center gap-1">Background music <span className="font-normal normal-case text-white/35">MP4 only</span></span>
+            <select
+              value={musicAssetId ?? ""}
+              onChange={(event) => onMusicChange(event.target.value ? Number(event.target.value) : null)}
+              className="rounded-md border border-white/15 bg-[#0e1a24] px-2.5 py-1.5 text-xs font-semibold normal-case tracking-normal text-white outline-none"
+            >
+              <option value="">No music</option>
+              {musicOptions.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
+            </select>
+          </label>
+        )}
       </div>
       <p className="mt-2 text-[10px] leading-relaxed text-white/45">
-        {activePreset.description}. PNG keeps the full card visible; MP4 creates a 7-second text-drop sequence and then reveals the finished card.
+        {activePreset.description}. PNG keeps the full card visible; MP4 creates a 7-second text-drop sequence with a branded outro{musicAssetId ? " and the selected approved track" : ""}.
       </p>
     </div>
   );

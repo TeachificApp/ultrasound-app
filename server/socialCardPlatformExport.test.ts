@@ -30,7 +30,7 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("socialExportFilename");
   });
 
-  it("creates local MP4 motion with progressive text and final-card reveal", () => {
+  it("creates local MP4 motion with progressive text, music, branded outro, and final-card reveal", () => {
     const exporter = readProjectFile("client/src/components/social/SocialCardExport.tsx");
     expect(exporter).toContain("new Mp4OutputFormat()");
     expect(exporter).toContain('codec: "avc"');
@@ -39,6 +39,10 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("CORRECT ANSWER");
     expect(exporter).toContain("drawMotionFrame");
     expect(exporter).toContain("MOTION_DURATION_SECONDS = 7");
+    expect(exporter).toContain("AudioBufferSource");
+    expect(exporter).toContain("motion.musicUrl");
+    expect(exporter).toContain("outroProgress");
+    expect(exporter).toContain('"question" | "answer" | "combined" | "social"');
   });
 
   it("surfaces platform and PNG-or-MP4 choices in every card generator", () => {
@@ -53,6 +57,11 @@ describe("social card platform exports", () => {
     expect(challenge).toContain("renderPlatform(exportPlatform, exportFormat, motion)");
     expect(social).toContain("renderPlatform(exportPlatform, exportFormat");
     expect(quiz).toContain("cardVariant === \"answer\"");
-    expect(quiz).toContain('variant={cardVariant}');
+    expect(quiz).toContain('cardVariant === "combined"');
+    expect(quiz).toContain('variant={cardVariant === "answer" ? "answer" : "question"}');
+    for (const page of [challenge, social, quiz]) {
+      expect(page).toContain("musicAssetId");
+      expect(page).toContain("mediaType: \"audio\"");
+    }
   });
 });

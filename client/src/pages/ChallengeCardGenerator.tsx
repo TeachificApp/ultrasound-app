@@ -27,8 +27,10 @@ import {
   SocialExportControls,
   type CardMotion,
   type SocialExportFormat,
+  type SocialMusicOption,
   type SocialExportPlatform,
 } from "@/components/social/SocialCardExport";
+import { getSocialExportPreset } from "@/lib/socialCardExportPresets";
 
 // Brand palette
 const BRAND = "#189aa1";
@@ -747,7 +749,6 @@ interface DownloadableCardHandle {
 }
 
 const PREVIEW_SIZE = 700;
-const SCALE = PREVIEW_SIZE / 1080;
 
 function DownloadableCard({
   filename,
@@ -765,6 +766,8 @@ function DownloadableCard({
   motion: CardMotion;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const previewPreset = useMemo(() => getSocialExportPreset(platform), [platform]);
+  const previewHeight = Math.round(PREVIEW_SIZE * previewPreset.height / previewPreset.width);
 
   const exportPng = useCallback(async (): Promise<string> => {
     if (!ref.current) throw new Error("Card not mounted");
@@ -813,7 +816,7 @@ function DownloadableCard({
       <div
         style={{
           width: PREVIEW_SIZE,
-          height: PREVIEW_SIZE,
+          height: previewHeight,
           position: "relative",
           overflow: "hidden",
           borderRadius: "10px 10px 0 0",
@@ -830,12 +833,13 @@ function DownloadableCard({
             left: 0,
             width: 1080,
             height: 1080,
-            transform: `scale(${SCALE})`,
+            transform: `scale(${Math.min(PREVIEW_SIZE / 1080, previewHeight / 1080)})`,
             transformOrigin: "top left",
           }}
         >
-          <div ref={refCallback}>{children}</div>
+          <div ref={refCallback} style={{ width: 1080, height: 1080 }}>{children}</div>
         </div>
+        <div className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white/75">{previewPreset.label} · {previewPreset.width}×{previewPreset.height}</div>
       </div>
       <Button
         onClick={handleDownload}
@@ -964,6 +968,8 @@ function CategorySection({
   template,
   exportPlatform,
   exportFormat,
+  musicUrl,
+  musicTitle,
 }: {
   item: CategoryItem;
   onQuestionRef: (cat: string, h: DownloadableCardHandle) => void;
@@ -974,6 +980,8 @@ function CategorySection({
   template: ChallengeCardTemplate;
   exportPlatform: SocialExportPlatform;
   exportFormat: SocialExportFormat;
+  musicUrl?: string | null;
+  musicTitle?: string | null;
 }) {
   const t = theme === "dark" ? DARK_THEME : LIGHT_THEME;
   const { category, challenge, questions } = item;
@@ -997,8 +1005,8 @@ function CategorySection({
       : null;
   const explanationText = q.explanation ? stripHtml(q.explanation) : null;
   const contextLabel = q.category?.trim() || category;
-  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName };
-  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName };
+  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl, musicTitle };
+  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl, musicTitle };
 
   return (
     <div className="rounded-lg border border-white/10 overflow-hidden" style={{ background: "#0e1a24" }}>
@@ -1173,6 +1181,12 @@ export default function ChallengeCardGenerator() {
   const [cardTemplate, setCardTemplate] = useState<ChallengeCardTemplate>("classic");
   const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
   const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
+  const [musicAssetId, setMusicAssetId] = useState<number | null>(null);
+  const musicAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "audio", page: 1, pageSize: 50 });
+  const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
+    .map((asset: any) => ({ id: asset.id, title: asset.title, url: asset.currentVersion?.s3Url }))
+    .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
+  const selectedMusic = useMemo(() => musicOptions.find((asset) => asset.id === musicAssetId) ?? null, [musicAssetId, musicOptions]);
 
   const questionRefs = useRef<Record<string, DownloadableCardHandle>>({});
   const answerRefs = useRef<Record<string, DownloadableCardHandle>>({});
@@ -1194,8 +1208,8 @@ export default function ChallengeCardGenerator() {
           ? `${letters[question.correctAnswer]}. ${stripHtml(options[question.correctAnswer] ?? "")}`
           : question.reviewAnswer ? stripHtml(question.reviewAnswer) : null;
         const motion: CardMotion = type === "questions"
-          ? { kind: "question", title: question.question, options, brandName: presentation.displayName }
-          : { kind: "answer", title: question.question, options, detail: "Review the question", answer, brandName: presentation.displayName };
+          ? { kind: "question", title: question.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl: selectedMusic?.url, musicTitle: selectedMusic?.title }
+          : { kind: "answer", title: question.question, options, detail: "Review the question", answer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl: selectedMusic?.url, musicTitle: selectedMusic?.title };
         const file = await handle.renderPlatform(exportPlatform, exportFormat, motion);
         folder.file(`${cat.replace(/\s+/g, "-")}-${type === "questions" ? "question" : "answer"}.${exportFormat}`, await file.arrayBuffer());
       }
@@ -1207,7 +1221,7 @@ export default function ChallengeCardGenerator() {
     } finally {
       setBatchLoading(null);
     }
-  }, [data, exportFormat, exportPlatform, presentation.brand, presentation.displayName, selectedDate]);
+  }, [data, exportFormat, exportPlatform, presentation.accentColor, presentation.brand, presentation.displayName, presentation.logoUrl, selectedDate, selectedMusic?.title, selectedMusic?.url]);
 
   // Navigation helpers
   const dates = availableDates ?? [today];
@@ -1372,7 +1386,7 @@ export default function ChallengeCardGenerator() {
               <h2 className="text-xs font-bold uppercase tracking-wide text-white/80">Platform export</h2>
               <p className="mt-1 text-[11px] text-white/45">PNG keeps every card fully visible. MP4 animates question and answer cards, then ends on the finished design.</p>
             </div>
-            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} compact /></div>
+            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} musicAssetId={musicAssetId} onMusicChange={setMusicAssetId} compact /></div>
           </div>
         </section>
         {/* Info bar */}
@@ -1428,6 +1442,8 @@ export default function ChallengeCardGenerator() {
                   template={cardTemplate}
                   exportPlatform={exportPlatform}
                   exportFormat={exportFormat}
+                  musicUrl={selectedMusic?.url}
+                  musicTitle={selectedMusic?.title}
                   onQuestionRef={(cat, h) => { questionRefs.current[cat] = h; }}
                   onAnswerRef={(cat, h) => { answerRefs.current[cat] = h; }}
                 />

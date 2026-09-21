@@ -7,7 +7,7 @@
  * Both layouts support dark/light themes, PNG download, and ready-to-copy social posts.
  * Image options: None, Abstract AI background, or Upload custom clinical image.
  */
-import { useRef, useCallback, useState, useMemo, type ChangeEvent } from "react";
+import { useRef, useCallback, useEffect, useState, useMemo, type ChangeEvent } from "react";
 import { trpc } from "@/lib/trpc";
 import { Link, useLocation } from "wouter";
 import { toPng } from "html-to-image";
@@ -17,7 +17,7 @@ import {
   ArrowLeft, Download, Loader2,
   Sparkles, Package, Share2, Copy, Check, RefreshCw,
   Image as ImageLucide, Upload, LayoutGrid, CreditCard,
-  X, LibraryBig,
+  X, LibraryBig, Flag, Trash2, CheckCircle2, Music2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,8 +32,10 @@ import {
   SocialExportControls,
   type CardMotion,
   type SocialExportFormat,
+  type SocialMusicOption,
   type SocialExportPlatform,
 } from "@/components/social/SocialCardExport";
+import { getSocialExportPreset } from "@/lib/socialCardExportPresets";
 
 // ── Brand palette ────────────────────────────────────────────────────────────
 const BRAND = "#189aa1";
@@ -41,7 +43,7 @@ const BRAND_DARK = "#0d3d44";
 const BRAND_AQUA = "#4ad9e0";
 
 // ── Theme tokens ─────────────────────────────────────────────────────────────
-type CardTheme = "dark" | "light";
+type CardTheme = "dark" | "light" | "white" | "teal" | "aqua";
 type LayoutMode = "card" | "infographic";
 type ImageMode = "none" | "abstract" | "upload";
 
@@ -123,6 +125,49 @@ const LIGHT_THEME: ThemeTokens = {
   isDark: false,
 };
 
+const WHITE_THEME: ThemeTokens = {
+  ...LIGHT_THEME,
+  cardBg: "#ffffff",
+  overlayBg: "linear-gradient(160deg, #ffffff 0%, #f4fbfb 55%, #ffffff 100%)",
+  panelBg: "rgba(255,255,255,0.92)",
+  footerBg: "#057e87",
+  taglineBg: "#0d3d44",
+};
+
+const AQUA_THEME: ThemeTokens = {
+  ...LIGHT_THEME,
+  cardBg: "#bdeff1",
+  overlayBg: "linear-gradient(160deg, #dff9fa 0%, #bdeff1 54%, #a8e4e7 100%)",
+  panelBg: "rgba(255,255,255,0.64)",
+  footerBg: "#0d7580",
+  taglineBg: "#057e87",
+};
+
+const TEAL_THEME: ThemeTokens = {
+  ...DARK_THEME,
+  cardBg: "#087e86",
+  overlayBg: "linear-gradient(160deg, #0c9ba2 0%, #087e86 55%, #05535b 100%)",
+  headingColor: "#ffffff",
+  bodyColor: "rgba(255,255,255,0.94)",
+  mutedColor: "rgba(255,255,255,0.72)",
+  panelBg: "rgba(0, 60, 67, 0.26)",
+  panelBorder: "rgba(255,255,255,0.42)",
+  sectionHeaderBg: "#ffffff",
+  sectionHeaderColor: "#057e87",
+  footerBg: "#064d55",
+  taglineBg: "#ffffff",
+  taglineColor: "#057e87",
+  isDark: true,
+};
+
+const CARD_THEMES: Record<CardTheme, ThemeTokens> = {
+  dark: DARK_THEME,
+  light: LIGHT_THEME,
+  white: WHITE_THEME,
+  aqua: AQUA_THEME,
+  teal: TEAL_THEME,
+};
+
 // ── Hashtags ─────────────────────────────────────────────────────────────────
 const CATEGORY_HASHTAGS: Record<string, string[]> = {
   "Abdominal": ["#AbdominalUltrasound", "#AbdominalImaging"],
@@ -160,6 +205,8 @@ type GeneratedItem = {
   imageUrl?: string;
   imageSource?: "ai" | "upload" | "media_repository";
   libraryId?: number;
+  librarySaved?: boolean;
+  librarySaveError?: boolean;
   mediaAssetId?: number | null;
 };
 
@@ -411,8 +458,7 @@ interface CardHandle {
   exportPlatform: (platform: SocialExportPlatform, format: SocialExportFormat, motion: CardMotion) => Promise<string>;
   renderPlatform: (platform: SocialExportPlatform, format: SocialExportFormat, motion: CardMotion) => Promise<Blob>;
 }
-const PREVIEW_SIZE = 540;
-const SCALE = PREVIEW_SIZE / 1080;
+const PREVIEW_SIZE = 560;
 
 function DownloadableCard({
   filename,
@@ -430,6 +476,8 @@ function DownloadableCard({
   motion: CardMotion;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const previewPreset = useMemo(() => getSocialExportPreset(platform), [platform]);
+  const previewHeight = Math.round(PREVIEW_SIZE * previewPreset.height / previewPreset.width);
   const exportPng = useCallback(async (): Promise<string> => {
     if (!ref.current) throw new Error("Card not mounted");
     return renderCardToPng(ref.current);
@@ -465,11 +513,11 @@ function DownloadableCard({
   }, [exportPlatform, format, motion, platform]);
   return (
     <div className="flex flex-col">
-      <div style={{ width: PREVIEW_SIZE, position: "relative", overflow: "hidden", borderRadius: "10px 10px 0 0", border: "1px solid rgba(255,255,255,0.1)", borderBottom: "none", background: "#0a1620", flexShrink: 0 }}>
-        <div style={{ position: "absolute", top: 0, left: 0, width: 1080, transform: `scale(${SCALE})`, transformOrigin: "top left" }}>
-          <div ref={refCallback}>{children}</div>
+      <div style={{ width: PREVIEW_SIZE, height: previewHeight, position: "relative", overflow: "hidden", borderRadius: "10px 10px 0 0", border: "1px solid rgba(255,255,255,0.1)", borderBottom: "none", background: "#0a1620", flexShrink: 0 }}>
+        <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1080, transform: `scale(${Math.min(PREVIEW_SIZE / 1080, previewHeight / 1080)})`, transformOrigin: "top left" }}>
+          <div ref={refCallback} style={{ width: 1080, height: 1080 }}>{children}</div>
         </div>
-        <div style={{ paddingBottom: "100%" }} />
+        <div className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white/75">{previewPreset.label} · {previewPreset.width}×{previewPreset.height}</div>
       </div>
       <Button onClick={handleDownload} size="sm" className="w-full gap-2 text-white font-semibold text-xs rounded-t-none" style={{ background: `linear-gradient(90deg, ${BRAND}, ${BRAND_DARK})`, borderRadius: "0 0 10px 10px" }}>
         <Download className="w-3 h-3" />
@@ -581,10 +629,14 @@ const CONTENT_TYPES = [
   { value: "anatomy_spotlight", label: "🔬 Anatomy Spotlight" },
   { value: "case_teaser", label: "🔍 Case Teaser" },
 ] as const;
-const CATEGORIES = [
+const AAUS_CATEGORIES = [
   "Abdominal", "Small Parts", "Pelvic/Gyn", "OB 1st Trimester",
   "OB 2nd/3rd Trimester", "Fetal Echo", "Breast", "Vascular",
-  "MSK", "POCUS", "Physics", "Echocardiography", "General Ultrasound",
+  "MSK", "POCUS", "Physics", "General Ultrasound",
+] as const;
+const IHE_CATEGORIES = [
+  "Transthoracic Echo", "Transesophageal Echo", "Intracardiac Echo",
+  "Pediatric/Congenital Echo", "Fetal Echo",
 ] as const;
 const IMAGE_STYLE_HINTS = [
   "Teal waveform pattern",
@@ -602,6 +654,10 @@ export default function SocialContentGenerator() {
     () => getBrandToolPresentation(resolveToolBrand(location, window.location.hostname)),
     [location],
   );
+  const brandCategories = useMemo(
+    () => presentation.brand === "iheartecho" ? IHE_CATEGORIES : AAUS_CATEGORIES,
+    [presentation.brand],
+  );
   const [contentType, setContentType] = useState<string>("meme");
   const [category, setCategory] = useState<string>("General Ultrasound");
   const [customTopic, setCustomTopic] = useState("");
@@ -611,22 +667,40 @@ export default function SocialContentGenerator() {
   const [imageMode, setImageMode] = useState<ImageMode>("none");
   const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
   const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
+  const [musicAssetId, setMusicAssetId] = useState<number | null>(null);
   const [imageStyleHint, setImageStyleHint] = useState("");
   const [items, setItems] = useState<GeneratedItem[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
+  const [flagComments, setFlagComments] = useState<Record<number, string>>({});
   const [batchLoading, setBatchLoading] = useState(false);
   const [regeneratingImageIdx, setRegeneratingImageIdx] = useState<number | null>(null);
   const [perCardImagePrompts, setPerCardImagePrompts] = useState<Record<number, string>>({});
   const cardRefs = useRef<Record<number, CardHandle>>({});
   const utils = trpc.useUtils();
   const mediaAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "image", page: 1, pageSize: 12 });
-  const savedPosts = trpc.socialContent.listSavedPosts.useQuery({ limit: 40 });
+  const musicAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "audio", page: 1, pageSize: 50 });
+  const savedPosts = trpc.socialContent.listSavedPosts.useQuery({ brand: presentation.brand, limit: 100 });
+
+  useEffect(() => {
+    setCategory((current) => brandCategories.includes(current as never) ? current : brandCategories[0]);
+  }, [brandCategories]);
+  const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
+    .map((asset: any) => ({ id: asset.id, title: asset.title, url: asset.currentVersion?.s3Url }))
+    .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
+  const selectedMusic = useMemo(() => musicOptions.find((asset) => asset.id === musicAssetId) ?? null, [musicAssetId, musicOptions]);
 
   const generateMutation = trpc.socialContent.generateContent.useMutation({
     onSuccess: (data) => {
       setItems((prev) => [...data.items, ...prev]);
       void utils.socialContent.listSavedPosts.invalidate();
-      toast.success(`Generated ${data.items.length} item${data.items.length > 1 ? "s" : ""}!`);
+      const unsavedCount = data.items.filter((item: GeneratedItem) => item.librarySaveError).length;
+      if (unsavedCount > 0) {
+        toast.warning(`Generated ${data.items.length} item${data.items.length > 1 ? "s" : ""}.`, {
+          description: `${unsavedCount} item${unsavedCount > 1 ? "s could" : " could"} not be saved to the shared Post Library. You can still download the generated card.`,
+        });
+      } else {
+        toast.success(`Generated ${data.items.length} item${data.items.length > 1 ? "s" : ""} and saved them to the Post Library.`);
+      }
     },
     onError: (err) => {
       toast.error("Generation failed", { description: err.message });
@@ -637,11 +711,21 @@ export default function SocialContentGenerator() {
   const updateSavedPostMutation = trpc.socialContent.updateSavedPost.useMutation({
     onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
   });
+  const markPublishedMutation = trpc.socialContent.markSavedPostPublished.useMutation({
+    onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
+  });
+  const flagSavedPostMutation = trpc.socialContent.flagSavedPost.useMutation({
+    onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
+  });
+  const deleteSavedPostMutation = trpc.socialContent.deleteSavedPost.useMutation({
+    onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
+  });
 
   const handleGenerate = () => {
     generateMutation.mutate({
       contentType: contentType as any,
       category: category as any,
+      brand: presentation.brand,
       customTopic: customTopic.trim() || undefined,
       count,
       imageMode,
@@ -662,7 +746,7 @@ export default function SocialContentGenerator() {
       });
       setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl, imageSource: "ai" as const, mediaAssetId: null } : p)));
       const saved = items[idx];
-      if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, imageUrl: result.imageUrl, imageSource: "ai", mediaAssetId: null });
+      if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, brand: presentation.brand, imageUrl: result.imageUrl, imageSource: "ai", mediaAssetId: null });
       toast.success("Abstract background regenerated!");
     } catch (err: any) {
       toast.error("Image generation failed", { description: err.message });
@@ -674,7 +758,7 @@ export default function SocialContentGenerator() {
   const handleUploadedImage = useCallback((idx: number, uploaded: { url: string; assetId: number }) => {
     setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: uploaded.url, imageSource: "upload" as const, mediaAssetId: uploaded.assetId } : p)));
     const saved = items[idx];
-    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, imageUrl: uploaded.url, imageSource: "upload", mediaAssetId: uploaded.assetId });
+    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, brand: presentation.brand, imageUrl: uploaded.url, imageSource: "upload", mediaAssetId: uploaded.assetId });
   }, [items, updateSavedPostMutation]);
 
   const handleRepositoryImage = useCallback((idx: number, asset: any) => {
@@ -682,14 +766,14 @@ export default function SocialContentGenerator() {
     if (!imageUrl) return;
     setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl, imageSource: "media_repository" as const, mediaAssetId: asset.id } : p)));
     const saved = items[idx];
-    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, imageUrl, imageSource: "media_repository", mediaAssetId: asset.id });
+    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, brand: presentation.brand, imageUrl, imageSource: "media_repository", mediaAssetId: asset.id });
     toast.success("Media Repository image selected.");
   }, [items, updateSavedPostMutation]);
 
   const handleRemoveImage = useCallback((idx: number) => {
     setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: undefined, imageSource: undefined } : p)));
     const saved = items[idx];
-    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, imageUrl: null, imageSource: null, mediaAssetId: null });
+    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, brand: presentation.brand, imageUrl: null, imageSource: null, mediaAssetId: null });
     toast.success("Image removed from card");
   }, [items, updateSavedPostMutation]);
 
@@ -726,6 +810,10 @@ export default function SocialContentGenerator() {
           title: item.headline,
           detail: item.body,
           brandName: presentation.displayName,
+          accentColor: presentation.accentColor,
+          logoUrl: presentation.logoUrl,
+          musicUrl: selectedMusic?.url,
+          musicTitle: selectedMusic?.title,
         });
         const name = `${item.contentType}-${item.category.replace(/[\s/]+/g, "-")}-${Number(idx) + 1}.${exportFormat}`;
         folder.file(name, await card.arrayBuffer());
@@ -739,9 +827,9 @@ export default function SocialContentGenerator() {
     } finally {
       setBatchLoading(false);
     }
-  }, [exportFormat, exportPlatform, items, presentation.brand, presentation.displayName]);
+  }, [exportFormat, exportPlatform, items, presentation.accentColor, presentation.brand, presentation.displayName, presentation.logoUrl, selectedMusic?.title, selectedMusic?.url]);
 
-  const t = cardTheme === "dark" ? DARK_THEME : LIGHT_THEME;
+  const t = CARD_THEMES[cardTheme];
 
   return (
     <div className="min-h-screen" style={{ background: "#0a1018" }}>
@@ -774,22 +862,22 @@ export default function SocialContentGenerator() {
                 <LayoutGrid className="w-3 h-3" /> Infographic
               </button>
             </div>
-            {/* Theme toggle */}
             <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${BRAND}44` }}>
-              <button
-                onClick={() => setCardTheme("dark")}
-                className="px-3 py-1.5 text-[11px] font-semibold transition-colors"
-                style={{ background: cardTheme === "dark" ? BRAND_DARK : "transparent", color: cardTheme === "dark" ? BRAND_AQUA : "rgba(255,255,255,0.4)" }}
-              >
-                Dark
-              </button>
-              <button
-                onClick={() => setCardTheme("light")}
-                className="px-3 py-1.5 text-[11px] font-semibold transition-colors"
-                style={{ background: cardTheme === "light" ? "#e8f7f8" : "transparent", color: cardTheme === "light" ? BRAND_DARK : "rgba(255,255,255,0.4)" }}
-              >
-                Light
-              </button>
+              {([
+                ["white", "White", "#ffffff", BRAND_DARK],
+                ["aqua", "Aqua", "#bdeff1", BRAND_DARK],
+                ["teal", "Teal", "#087e86", "#ffffff"],
+                ["dark", "Dark", BRAND_DARK, BRAND_AQUA],
+              ] as const).map(([value, label, background, color]) => (
+                <button
+                  key={value}
+                  onClick={() => setCardTheme(value)}
+                  className="px-2.5 py-1.5 text-[11px] font-semibold transition-colors"
+                  style={{ background: cardTheme === value ? background : "transparent", color: cardTheme === value ? color : "rgba(255,255,255,0.48)" }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
             {items.length > 1 && (
               <Button onClick={handleBatchDownload} disabled={batchLoading} size="sm" className="gap-1.5 text-xs text-white" style={{ background: `linear-gradient(90deg, ${BRAND}, ${BRAND_DARK})` }}>
@@ -818,9 +906,11 @@ export default function SocialContentGenerator() {
               {savedPosts.isLoading && <div className="col-span-full py-5 text-center text-xs text-white/45"><Loader2 className="mx-auto mb-1 h-4 w-4 animate-spin" />Loading saved posts</div>}
               {savedPosts.data?.map((saved: any) => (
                 <article key={saved.id} className="rounded-lg border border-white/10 bg-black/15 p-3">
-                  <div className="line-clamp-2 text-sm font-semibold text-white/85">{saved.headline}</div>
+                  <div className="flex items-start justify-between gap-2"><div className="line-clamp-2 text-sm font-semibold text-white/85">{saved.headline}</div><Badge className={`shrink-0 border-0 text-[9px] ${saved.status === "published" ? "bg-emerald-400/15 text-emerald-200" : "bg-white/10 text-white/55"}`}>{saved.status === "published" ? "Published" : "Draft"}</Badge></div>
                   <div className="mt-1 text-[10px] uppercase tracking-wide text-teal-200/70">{saved.category} · {saved.contentType.replace(/_/g, " ")}</div>
-                  <div className="mt-3 flex items-center justify-between"><span className="text-[10px] text-white/40">{new Date(saved.updatedAt).toLocaleDateString()}</span><Button size="sm" onClick={() => openSavedPost(saved)} className="h-7 bg-teal-500 px-2 text-xs text-white hover:bg-teal-400"><Download className="mr-1 h-3 w-3" />Open</Button></div>
+                  {saved.flagComment && <div className="mt-2 rounded border border-amber-300/25 bg-amber-300/10 p-2 text-[10px] text-amber-100"><span className="font-bold">Flag:</span> {saved.flagComment}</div>}
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5"><Button size="sm" onClick={() => openSavedPost(saved)} className="h-7 bg-teal-500 px-2 text-xs text-white hover:bg-teal-400"><Download className="mr-1 h-3 w-3" />Open</Button><Button size="sm" variant="outline" onClick={() => markPublishedMutation.mutate({ id: saved.id, brand: presentation.brand, published: saved.status !== "published" })} className="h-7 border-white/15 px-2 text-[10px] text-white/75 hover:bg-white/10"><CheckCircle2 className="mr-1 h-3 w-3" />{saved.status === "published" ? "Unpublish" : "Publish"}</Button><Button size="sm" variant="outline" onClick={() => deleteSavedPostMutation.mutate({ id: saved.id, brand: presentation.brand })} className="ml-auto h-7 border-rose-300/25 px-2 text-[10px] text-rose-200 hover:bg-rose-400/10"><Trash2 className="h-3 w-3" /><span className="sr-only">Delete</span></Button></div>
+                  <div className="mt-2 flex gap-1.5"><input value={flagComments[saved.id] ?? ""} onChange={(event) => setFlagComments((current) => ({ ...current, [saved.id]: event.target.value }))} placeholder="Flag comment" className="min-w-0 flex-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white outline-none placeholder:text-white/35" /><Button size="sm" variant="outline" disabled={!flagComments[saved.id]?.trim()} onClick={() => { flagSavedPostMutation.mutate({ id: saved.id, brand: presentation.brand, comment: flagComments[saved.id].trim() }); setFlagComments((current) => ({ ...current, [saved.id]: "" })); }} className="h-7 border-amber-300/25 px-2 text-[10px] text-amber-100 hover:bg-amber-300/10"><Flag className="mr-1 h-3 w-3" />Flag</Button></div>
                 </article>
               ))}
               {!savedPosts.isLoading && savedPosts.data?.length === 0 && <div className="col-span-full rounded-lg border border-dashed border-white/10 py-5 text-center text-xs text-white/45">Generated posts will appear here for every Platform Admin.</div>}
@@ -844,7 +934,7 @@ export default function SocialContentGenerator() {
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Category</label>
               <select value={category} onChange={(e) => setCategory(e.target.value)} className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
-                {CATEGORIES.map((c) => (<option key={c} value={c} style={{ background: "#0e1a24" }}>{c}</option>))}
+                {brandCategories.map((c) => (<option key={c} value={c} style={{ background: "#0e1a24" }}>{c}</option>))}
               </select>
             </div>
             {/* Custom Topic */}
@@ -871,7 +961,7 @@ export default function SocialContentGenerator() {
               <div className="text-xs font-bold text-white/80">Platform export</div>
               <p className="mt-1 text-[11px] text-white/45">MP4 exports animate the headline and clinical insight, then finish on the completed card.</p>
             </div>
-            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} compact /></div>
+            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} musicAssetId={musicAssetId} onMusicChange={setMusicAssetId} compact /></div>
           </div>
 
           {/* Image mode selector */}
@@ -957,7 +1047,7 @@ export default function SocialContentGenerator() {
                   onRef={(handle) => { cardRefs.current[idx] = handle; }}
                   platform={exportPlatform}
                   format={exportFormat}
-                  motion={{ kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName }}
+                  motion={{ kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl: selectedMusic?.url, musicTitle: selectedMusic?.title }}
                 >
                   {layoutMode === "infographic" ? (
                     <InfographicCard item={item} t={t} presentation={presentation} />

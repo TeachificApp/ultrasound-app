@@ -16,20 +16,26 @@ describe("shared Social Post Library", () => {
     expect(migration).toContain("`mediaAssetId` INT NULL");
   });
 
-  it("saves generated posts, scopes the library by selected brand, and validates repository image ownership", () => {
+  it("saves generated posts, shares same-brand records across platform admins, and validates repository image ownership", () => {
     const router = readProjectFile("server/routers/socialContentRouter.ts");
 
     expect(router).toContain("socialPostLibrary");
     expect(router).toContain("listSavedPosts: adminProcedure");
     expect(router).toContain("updateSavedPost: adminProcedure");
-    expect(router).toContain("eq(socialPostLibrary.brand, ctx.brand)");
-    expect(router).toContain("eq(mediaAssets.brand, ctx.brand)");
+    expect(router).toContain("resolveRequestedBrand(input.brand, ctx.brand)");
+    expect(router).toContain("eq(socialPostLibrary.brand, brand)");
+    expect(router).toContain("eq(mediaAssets.brand, brand)");
     expect(router).toContain('message: "Selected media asset is not available for this brand"');
     expect(router).toContain('roles.includes("platform_admin") || roles.includes("platform_owner")');
     expect(router).toContain("libraryValues");
-    expect(router).toContain("Generated post could not be archived");
+    expect(router).toContain("Shared library save unavailable for generated post");
+    expect(router).toContain("item.librarySaveError = true");
     expect(router).toContain("item.librarySaved = true");
     expect(router).toContain(".$returningId()");
+    expect(router).toContain("markSavedPostPublished: adminProcedure");
+    expect(router).toContain("flagSavedPost: adminProcedure");
+    expect(router).toContain("deleteSavedPost: adminProcedure");
+    expect(router).toContain("deletedAt: new Date()");
   });
 
   it("uses approved Media Repository uploads and selection while retaining AI-generated images", () => {

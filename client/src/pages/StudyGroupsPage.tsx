@@ -63,7 +63,7 @@ export default function StudyGroupsPage() {
           <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-2xl">
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Study Groups</h1>
-              <p className="mt-3 text-base leading-7 text-teal-100">A private space to prepare, share resources, set tasks, and meet with other learners. Invite by their full email address—there is no learner directory lookup.</p>
+              <p className="mt-3 text-base leading-7 text-teal-100">Build your learning community: create a private study group to share resources, organize tasks, and meet with fellow learners.</p>
             </div>
             <Button className="bg-white text-teal-800 hover:bg-teal-50" onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" />Create a study group</Button>
           </div>

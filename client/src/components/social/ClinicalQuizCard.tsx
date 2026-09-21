@@ -206,10 +206,10 @@ export function ClinicalQuizCard({
           }}
         >
           {media.kind === "image" && (
-            <img src={media.url} alt="Clinical reference" crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            <img src={media.url} alt="Clinical reference" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
           )}
           {media.kind === "video" && (
-            <video src={media.url} muted controls preload="metadata" crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
+            <video src={media.url} muted controls preload="metadata" playsInline style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center", background: "#000" }} />
           )}
           {media.kind === "placeholder" && (
             <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.64)", fontSize: 22, fontWeight: 700, letterSpacing: 1.2 }}>
