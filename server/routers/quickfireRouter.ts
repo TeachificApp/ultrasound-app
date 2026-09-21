@@ -161,6 +161,13 @@ export const quickfireRouter = router({
       .select({ category: quickfireChallenges.category, questionIds: quickfireChallenges.questionIds })
       .from(quickfireChallenges)
       .where(and(eq(quickfireChallenges.status, "live" as any), eq(quickfireChallenges.brand, ctx.brand)));
+    const liveQuestionIds = Array.from(new Set(liveChallengesNow.flatMap((challenge) => {
+      try { return JSON.parse(challenge.questionIds || "[]") as number[]; } catch { return []; }
+    })));
+    const liveQuestionTypes = new Map((liveQuestionIds.length > 0 ? await db
+      .select({ id: quickfireQuestions.id, type: quickfireQuestions.type })
+      .from(quickfireQuestions)
+      .where(inArray(quickfireQuestions.id, liveQuestionIds)) : []).map((question) => [question.id, question.type]));
     let mapChanged = false;
     // Build a set of keys that have a live challenge
     const liveKeys = new Set<string>();
@@ -170,6 +177,9 @@ export const quickfireRouter = router({
       if (!key) continue;
       liveKeys.add(key);
       const ids: number[] = JSON.parse(lc.questionIds || "[]");
+      // Flashcards belong only to the Flashcards experience. Never let a legacy
+      // quickReview record replace a Daily Challenge MCQ/game question.
+      if (liveQuestionTypes.get(ids[0]) === "quickReview") continue;
       if (ids.length > 0 && questionMap[key] !== ids[0]) {
         questionMap[key] = ids[0];
         mapChanged = true;
@@ -223,10 +233,40 @@ export const quickfireRouter = router({
     }
 
     // Fetch by ID only — isActive was already enforced when the daily set was built
-    const questions = await db
+    let questions = await db
       .select()
       .from(quickfireQuestions)
       .where(inArray(quickfireQuestions.id, allIds));
+
+    // Repair legacy daily-set rows that already reference a quickReview card.
+    // We do this at read time as well as at selection time so the current
+    // challenge becomes usable immediately without changing flashcard records.
+    const legacyFlashcardEntries = Object.entries(questionMap)
+      .filter(([, id]) => id !== null && questions.find((question) => question.id === id)?.type === "quickReview");
+    for (const [key, legacyQuestionId] of legacyFlashcardEntries) {
+      const category = brandCfg.categories.find((candidate) => brandCfg.catKey[candidate] === key);
+      if (!category) continue;
+      const poolLabels = brandCfg.questionPoolLabels[category];
+      const categoryFilter = poolLabels
+        ? (sql`${quickfireQuestions.category} IN (${sql.join(poolLabels.map((value) => sql`${value}`), sql`, `)})` as never)
+        : (eq(quickfireQuestions.category, category) as never);
+      const [replacement] = await db
+        .select()
+        .from(quickfireQuestions)
+        .where(and(
+          eq(quickfireQuestions.isActive, true),
+          or(eq(quickfireQuestions.brand, ctx.brand), inArray(quickfireQuestions.category, CROSS_BRAND_CATEGORIES as string[]))!,
+          sql`${quickfireQuestions.type} != 'quickReview'` as never,
+          categoryFilter,
+        ))
+        .orderBy(desc(quickfireQuestions.updatedAt))
+        .limit(1);
+      if (!replacement) continue;
+      questionMap[key] = replacement.id;
+      questions = questions.filter((question) => question.id !== legacyQuestionId);
+      questions.push(replacement);
+      mapChanged = true;
+    }
 
     const catOrder = brandCfg.defaultOrder;
     const orderedQuestions = catOrder

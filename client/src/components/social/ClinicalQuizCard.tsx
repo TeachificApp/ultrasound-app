@@ -56,13 +56,13 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 function getQuestionFit(question: string, options: string[], hasMedia: boolean) {
   const optionCharacters = options.reduce((total, option) => total + stripHtml(option).length, 0);
-  const questionSize = clamp(59 - Math.floor(question.length / (hasMedia ? 14 : 19)), hasMedia ? 30 : 32, 59);
-  const optionSize = clamp(29 - Math.floor(optionCharacters / 90), 17, 29);
+  const questionSize = clamp(59 - Math.floor(question.length / (hasMedia ? 18 : 19)), hasMedia ? 27 : 32, 59);
+  const optionSize = clamp(29 - Math.floor(optionCharacters / (hasMedia ? 65 : 90)), hasMedia ? 15 : 17, 29);
   return {
     questionSize,
     optionSize,
-    optionGap: optionSize <= 20 ? 10 : 18,
-    optionNumberSize: clamp(optionSize + 2, 19, 31),
+    optionGap: optionSize <= 20 ? (hasMedia ? 7 : 10) : (hasMedia ? 10 : 18),
+    optionNumberSize: clamp(optionSize + 2, hasMedia ? 16 : 19, 31),
   };
 }
 
@@ -139,20 +139,20 @@ export function ClinicalQuizCard({
         position: "relative",
         overflow: "hidden",
         boxSizing: "border-box",
-        padding: "62px 76px 48px",
+        padding: hasMediaArea ? "46px 76px 48px" : "62px 76px 48px",
         fontFamily: "'Segoe UI', Arial, sans-serif",
         background: theme.background,
         color: theme.text,
       }}
     >
-      <header style={{ display: "flex", alignItems: "center", gap: 26, minHeight: 118 }}>
+      <header style={{ display: "flex", alignItems: "center", gap: hasMediaArea ? 20 : 26, minHeight: hasMediaArea ? 88 : 118 }}>
         <img
           src={presentation.logoUrl}
           alt={presentation.displayName}
           crossOrigin="anonymous"
           style={{
-            width: 116,
-            height: 116,
+            width: hasMediaArea ? 86 : 116,
+            height: hasMediaArea ? 86 : 116,
             borderRadius: "50%",
             objectFit: "cover",
             background: "#ffffff",
@@ -161,10 +161,10 @@ export function ClinicalQuizCard({
           }}
         />
         <div>
-          <div style={{ color: theme.text, fontSize: 22, fontWeight: 800, letterSpacing: 2.6, opacity: 0.78 }}>
+          <div style={{ color: theme.text, fontSize: hasMediaArea ? 17 : 22, fontWeight: 800, letterSpacing: hasMediaArea ? 2 : 2.6, opacity: 0.78 }}>
             {label}
           </div>
-          <div style={{ color: theme.text, fontSize: 30, fontWeight: 800, lineHeight: 1.15, marginTop: 5 }}>
+          <div style={{ color: theme.text, fontSize: hasMediaArea ? 25 : 30, fontWeight: 800, lineHeight: 1.15, marginTop: 5 }}>
             {presentation.displayName}
           </div>
         </div>
@@ -182,8 +182,8 @@ export function ClinicalQuizCard({
           fontSize: fit.questionSize,
           fontWeight: 800,
           lineHeight: 1.18,
-          marginTop: title ? 12 : 24,
-          minHeight: hasMediaArea ? 210 : 410,
+          marginTop: title ? 10 : (hasMediaArea ? 16 : 24),
+          minHeight: hasMediaArea ? 0 : 410,
           display: "flex",
           alignItems: hasMediaArea ? "flex-start" : "center",
         }}
@@ -194,13 +194,13 @@ export function ClinicalQuizCard({
       {hasMediaArea && (
         <div
           style={{
-            position: "absolute",
-            left: CLINICAL_MEDIA_FRAME.x,
-            top: CLINICAL_MEDIA_FRAME.y,
-            width: CLINICAL_MEDIA_FRAME.width,
-            height: CLINICAL_MEDIA_FRAME.height,
+            position: "relative",
+            width: "100%",
+            height: 264,
+            marginTop: 16,
+            marginBottom: 14,
             background: "#080808",
-            border: `${CLINICAL_MEDIA_FRAME.inset}px solid ${theme.accent}`,
+            border: `8px solid ${theme.accent}`,
             boxSizing: "border-box",
             overflow: "hidden",
           }}
@@ -221,19 +221,17 @@ export function ClinicalQuizCard({
 
       <section
         style={{
-          position: hasMediaArea ? "absolute" : "relative",
-          left: hasMediaArea ? 104 : undefined,
-          right: hasMediaArea ? 104 : undefined,
-          bottom: hasMediaArea ? 112 : undefined,
+          position: "relative",
           display: "flex",
           flexDirection: "column",
           gap: fit.optionGap,
-          marginTop: hasMediaArea ? undefined : 22,
+          marginTop: hasMediaArea ? 0 : 22,
+          paddingBottom: hasMediaArea ? 54 : 0,
         }}
       >
         {visibleOptions.map((option, index) => (
-          <div key={`${index}-${option}`} style={{ display: "flex", gap: 16, alignItems: "center", minWidth: 0, border: `2px solid ${theme.accent}66`, borderRadius: 12, padding: `${Math.max(10, fit.optionGap)}px 16px`, background: `${theme.accent}0d` }}>
-            <span style={{ display: "inline-flex", width: Math.max(34, fit.optionNumberSize + 10), height: Math.max(34, fit.optionNumberSize + 10), alignItems: "center", justifyContent: "center", borderRadius: 8, background: theme.accent, color: theme.background, fontSize: fit.optionNumberSize, fontWeight: 900, lineHeight: 1, flexShrink: 0 }}>{OPTION_LETTERS[index] ?? `${index + 1}`}</span>
+          <div key={`${index}-${option}`} style={{ display: "flex", gap: hasMediaArea ? 12 : 16, alignItems: "center", minWidth: 0, border: `2px solid ${theme.accent}66`, borderRadius: 12, padding: `${hasMediaArea ? Math.max(7, fit.optionGap) : Math.max(10, fit.optionGap)}px ${hasMediaArea ? 13 : 16}px`, background: `${theme.accent}0d` }}>
+            <span style={{ display: "inline-flex", width: Math.max(hasMediaArea ? 29 : 34, fit.optionNumberSize + (hasMediaArea ? 8 : 10)), height: Math.max(hasMediaArea ? 29 : 34, fit.optionNumberSize + (hasMediaArea ? 8 : 10)), alignItems: "center", justifyContent: "center", borderRadius: 8, background: theme.accent, color: theme.background, fontSize: fit.optionNumberSize, fontWeight: 900, lineHeight: 1, flexShrink: 0 }}>{OPTION_LETTERS[index] ?? `${index + 1}`}</span>
             <span style={{ color: theme.text, fontSize: fit.optionSize, fontWeight: 800, lineHeight: 1.2 }}>{option}</span>
           </div>
         ))}

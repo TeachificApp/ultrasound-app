@@ -984,6 +984,8 @@ function CategorySection({
   musicTitle?: string | null;
 }) {
   const t = theme === "dark" ? DARK_THEME : LIGHT_THEME;
+  const combinedRef = useRef<DownloadableCardHandle | null>(null);
+  const [combinedLoading, setCombinedLoading] = useState(false);
   const { category, challenge, questions } = item;
   const q = questions[0];
 
@@ -1007,6 +1009,21 @@ function CategorySection({
   const contextLabel = q.category?.trim() || category;
   const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl, musicTitle };
   const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl, musicTitle };
+  const combinedMotion: CardMotion = { kind: "combined", title: q.question, options, answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl, musicTitle };
+  const downloadCombined = async () => {
+    if (!combinedRef.current) return;
+    setCombinedLoading(true);
+    try {
+      const file = await combinedRef.current.renderPlatform(exportPlatform, "mp4", combinedMotion);
+      saveAs(file, `${category.replace(/\s+/g, "-")}-${date}-question-answer.mp4`);
+      toast.success("Question + answer MP4 is ready.");
+    } catch (error) {
+      console.error("Combined Challenge Card export failed:", error);
+      toast.error("Question + answer MP4 export failed. Please try again.");
+    } finally {
+      setCombinedLoading(false);
+    }
+  };
 
   return (
     <div className="rounded-lg border border-white/10 overflow-hidden" style={{ background: "#0e1a24" }}>
@@ -1033,7 +1050,7 @@ function CategorySection({
             </div>
             <DownloadableCard
               filename={`${category.replace(/\s+/g, "-")}-${date}-question.png`}
-              onRef={(h) => onQuestionRef(category, h)}
+              onRef={(h) => { combinedRef.current = h; onQuestionRef(category, h); }}
               platform={exportPlatform}
               format={exportFormat}
               motion={questionMotion}
@@ -1085,6 +1102,11 @@ function CategorySection({
               )}
             </DownloadableCard>
           </div>
+        </div>
+        <div className="flex justify-center">
+          <Button size="sm" onClick={() => void downloadCombined()} disabled={combinedLoading} className="gap-1.5 bg-teal-500 text-xs text-white hover:bg-teal-400">
+            {combinedLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Package className="h-3.5 w-3.5" />}Question + answer MP4
+          </Button>
         </div>
 
         {/* Social posts row — side by side below cards */}
@@ -1181,12 +1203,11 @@ export default function ChallengeCardGenerator() {
   const [cardTemplate, setCardTemplate] = useState<ChallengeCardTemplate>("classic");
   const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
   const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
-  const [musicAssetId, setMusicAssetId] = useState<number | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState<SocialMusicOption | null>(null);
   const musicAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "audio", page: 1, pageSize: 50 });
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
-    .map((asset: any) => ({ id: asset.id, title: asset.title, url: asset.currentVersion?.s3Url }))
+    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: asset.currentVersion?.s3Url, source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
-  const selectedMusic = useMemo(() => musicOptions.find((asset) => asset.id === musicAssetId) ?? null, [musicAssetId, musicOptions]);
 
   const questionRefs = useRef<Record<string, DownloadableCardHandle>>({});
   const answerRefs = useRef<Record<string, DownloadableCardHandle>>({});
@@ -1386,7 +1407,7 @@ export default function ChallengeCardGenerator() {
               <h2 className="text-xs font-bold uppercase tracking-wide text-white/80">Platform export</h2>
               <p className="mt-1 text-[11px] text-white/45">PNG keeps every card fully visible. MP4 animates question and answer cards, then ends on the finished design.</p>
             </div>
-            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} musicAssetId={musicAssetId} onMusicChange={setMusicAssetId} compact /></div>
+            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} selectedMusic={selectedMusic} onMusicChange={setSelectedMusic} musicUploadBrand={presentation.brand} compact /></div>
           </div>
         </section>
         {/* Info bar */}

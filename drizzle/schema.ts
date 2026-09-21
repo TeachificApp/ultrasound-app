@@ -2913,6 +2913,44 @@ export const socialPostLibrary = mysqlTable("social_post_library", {
 export type SocialPostLibraryItem = typeof socialPostLibrary.$inferSelect;
 export type InsertSocialPostLibraryItem = typeof socialPostLibrary.$inferInsert;
 
+// ─── Shared Quiz Card Library ─────────────────────────────────────────────────
+
+/**
+ * quiz_card_library — durable Question Bank Quiz Card Generator outputs.
+ * This stores a presentation snapshot, never changes the source Question Bank
+ * question, and is shared only among effective Platform Admins.
+ */
+export const quizCardLibrary = mysqlTable("quiz_card_library", {
+  id: int("id").primaryKey().autoincrement(),
+  brand: mysqlEnum("brand", ["aaus", "iheartecho"]).notNull().default("aaus"),
+  questionBankId: int("questionBankId"),
+  questionSnapshot: json("questionSnapshot").notNull(),
+  cardTemplate: mysqlEnum("cardTemplate", ["clinical-white", "clinical-aqua", "clinical-teal", "clinical-dark"]).notNull().default("clinical-white"),
+  cardVariant: mysqlEnum("cardVariant", ["question", "answer", "combined"]).notNull().default("question"),
+  mediaKind: mysqlEnum("mediaKind", ["image", "video", "none"]).notNull().default("none"),
+  mediaUrl: text("mediaUrl"),
+  sourceFolderLabel: varchar("sourceFolderLabel", { length: 255 }),
+  customCardLabel: varchar("customCardLabel", { length: 120 }),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).notNull().default("draft"),
+  publishedAt: timestamp("publishedAt"),
+  publishedByUserId: int("publishedByUserId"),
+  flaggedAt: timestamp("flaggedAt"),
+  flaggedByUserId: int("flaggedByUserId"),
+  flagComment: text("flagComment"),
+  flagResolvedAt: timestamp("flagResolvedAt"),
+  deletedAt: timestamp("deletedAt"),
+  deletedByUserId: int("deletedByUserId"),
+  createdByUserId: int("createdByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("quiz_card_library_brand_created_idx").on(table.brand, table.createdAt),
+  index("quiz_card_library_creator_idx").on(table.createdByUserId),
+  index("quiz_card_library_brand_status_idx").on(table.brand, table.status, table.updatedAt),
+]);
+export type QuizCardLibraryItem = typeof quizCardLibrary.$inferSelect;
+export type InsertQuizCardLibraryItem = typeof quizCardLibrary.$inferInsert;
+
 /**
  * media_versions — immutable upload history for each asset.
  * Re-uploading creates a new row; the highest versionNumber is "current".
@@ -8611,6 +8649,8 @@ export const studyGroups = mysqlTable("study_groups", {
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 128 }),
   currentPeriodEnd: timestamp("current_period_end"),
+  /** Compatibility only for an already-deployed server revision; do not write new values here. */
+  legacyStripeCurrentPeriodEnd: timestamp("stripe_current_period_end"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 }, (t) => ({

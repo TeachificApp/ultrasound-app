@@ -1,6 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from "mediabunny";
+import { Loader2, Search, Upload } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
 import {
   DEFAULT_SOCIAL_EXPORT_PLATFORM,
   getSocialExportPreset,
@@ -43,9 +46,15 @@ const MOTION_DURATION_SECONDS = 7;
 const FALLBACK_BACKGROUND = "#071318";
 
 export type SocialMusicOption = {
-  id: number;
+  id: string;
   title: string;
   url: string;
+  source: "media_repository" | "openverse";
+  creator?: string;
+  attribution?: string;
+  license?: string;
+  licenseUrl?: string;
+  sourceUrl?: string | null;
 };
 
 function cleanText(value: string | null | undefined): string {
@@ -538,8 +547,9 @@ export function SocialExportControls({
   onPlatformChange,
   onFormatChange,
   musicOptions = [],
-  musicAssetId,
+  selectedMusic,
   onMusicChange,
+  musicUploadBrand,
   compact = false,
 }: {
   platform: SocialExportPlatform;
@@ -547,11 +557,68 @@ export function SocialExportControls({
   onPlatformChange: (platform: SocialExportPlatform) => void;
   onFormatChange: (format: SocialExportFormat) => void;
   musicOptions?: SocialMusicOption[];
-  musicAssetId?: number | null;
-  onMusicChange?: (assetId: number | null) => void;
+  selectedMusic?: SocialMusicOption | null;
+  onMusicChange?: (option: SocialMusicOption | null) => void;
+  musicUploadBrand?: "aaus" | "iheartecho";
   compact?: boolean;
 }) {
   const activePreset = useMemo(() => getSocialExportPreset(platform), [platform]);
+  const [catalogueInput, setCatalogueInput] = useState("");
+  const [catalogueQuery, setCatalogueQuery] = useState("");
+  const [isUploadingMusic, setIsUploadingMusic] = useState(false);
+  const musicInputRef = useRef<HTMLInputElement>(null);
+  const catalogue = trpc.openverseMusic.searchCc0Audio.useQuery(
+    { query: catalogueQuery, limit: 8 },
+    { enabled: catalogueQuery.length >= 2, retry: false, staleTime: 60_000 },
+  );
+  const catalogueOptions = useMemo<SocialMusicOption[]>(() => (catalogue.data?.tracks ?? []).map((track: any) => ({
+    id: `openverse:${track.id}`,
+    title: track.title,
+    url: track.previewUrl,
+    source: "openverse" as const,
+    creator: track.creator,
+    attribution: track.attribution,
+    license: track.license,
+    licenseUrl: track.licenseUrl,
+    sourceUrl: track.sourceUrl,
+  })), [catalogue.data?.tracks]);
+  const combinedMusicOptions = useMemo(() => {
+    const entries = [...musicOptions, ...catalogueOptions];
+    if (selectedMusic && !entries.some((item) => item.id === selectedMusic.id)) entries.push(selectedMusic);
+    return entries;
+  }, [catalogueOptions, musicOptions, selectedMusic]);
+
+  const selectMusic = (value: string) => {
+    if (!value) {
+      onMusicChange?.(null);
+      return;
+    }
+    onMusicChange?.(combinedMusicOptions.find((option) => option.id === value) ?? null);
+  };
+
+  const uploadMusic = async (file: File) => {
+    if (!musicUploadBrand || !file.type.startsWith("audio/")) return;
+    if (file.size > 30 * 1024 * 1024) {
+      throw new Error("Music files must be 30 MB or smaller.");
+    }
+    setIsUploadingMusic(true);
+    try {
+      const uploaded = await uploadFileToMediaRepository(file, {
+        access: "private",
+        folder: "social-card-music",
+        brand: musicUploadBrand,
+      });
+      onMusicChange?.({
+        id: `media:${uploaded.assetId}`,
+        title: file.name.replace(/\.[^.]+$/, ""),
+        url: uploaded.s3Url,
+        source: "media_repository",
+      });
+    } finally {
+      setIsUploadingMusic(false);
+    }
+  };
+
   return (
     <div className={`rounded-lg border border-white/15 bg-black/15 ${compact ? "p-2" : "p-3"}`}>
       <div className={`flex ${compact ? "flex-col gap-1.5" : "flex-wrap items-end gap-3"}`}>
@@ -582,21 +649,52 @@ export function SocialExportControls({
           </div>
         </div>
         {onMusicChange && (
-          <label className="flex min-w-[176px] flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider text-white/50">
-            <span className="flex items-center gap-1">Background music <span className="font-normal normal-case text-white/35">MP4 only</span></span>
-            <select
-              value={musicAssetId ?? ""}
-              onChange={(event) => onMusicChange(event.target.value ? Number(event.target.value) : null)}
-              className="rounded-md border border-white/15 bg-[#0e1a24] px-2.5 py-1.5 text-xs font-semibold normal-case tracking-normal text-white outline-none"
-            >
-              <option value="">No music</option>
-              {musicOptions.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}
-            </select>
-          </label>
+          <div className="min-w-[220px] space-y-1.5">
+            <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider text-white/50">
+              <span className="flex items-center gap-1">Background music <span className="font-normal normal-case text-white/35">MP4 only</span></span>
+              <select
+                value={selectedMusic?.id ?? ""}
+                onChange={(event) => selectMusic(event.target.value)}
+                className="rounded-md border border-white/15 bg-[#0e1a24] px-2.5 py-1.5 text-xs font-semibold normal-case tracking-normal text-white outline-none"
+              >
+                <option value="">No music</option>
+                {musicOptions.length > 0 && <optgroup label="Media Repository">{musicOptions.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}</optgroup>}
+                {catalogueOptions.length > 0 && <optgroup label="Openverse CC0 catalogue">{catalogueOptions.map((option) => <option key={option.id} value={option.id}>{option.title} — {option.creator}</option>)}</optgroup>}
+              </select>
+            </label>
+            <div className="flex gap-1">
+              <input
+                value={catalogueInput}
+                onChange={(event) => setCatalogueInput(event.target.value.slice(0, 80))}
+                onKeyDown={(event) => { if (event.key === "Enter" && catalogueInput.trim().length >= 2) setCatalogueQuery(catalogueInput.trim()); }}
+                placeholder="Search free CC0 music"
+                className="min-w-0 flex-1 rounded-md border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-xs normal-case tracking-normal text-white outline-none placeholder:text-white/35"
+              />
+              <button
+                type="button"
+                disabled={catalogueInput.trim().length < 2 || catalogue.isFetching}
+                onClick={() => setCatalogueQuery(catalogueInput.trim())}
+                className="inline-flex items-center justify-center rounded-md border border-white/15 px-2 text-white/70 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Search the Openverse CC0 music catalogue"
+              >
+                {catalogue.isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+            {musicUploadBrand && <div className="flex items-center gap-2">
+              <input ref={musicInputRef} type="file" accept="audio/mpeg,audio/mp4,audio/aac,audio/x-m4a,audio/wav" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMusic(file).catch((error) => console.error("Music upload failed:", error)); event.currentTarget.value = ""; }} />
+              <button type="button" disabled={isUploadingMusic} onClick={() => musicInputRef.current?.click()} className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] normal-case tracking-normal text-white/70 transition-colors hover:bg-white/10 disabled:opacity-40">
+                {isUploadingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}{isUploadingMusic ? "Uploading…" : "Upload audio"}
+              </button>
+              <span className="text-[10px] normal-case tracking-normal text-white/35">MP3, M4A, AAC, or WAV · up to 30 MB</span>
+            </div>}
+            {catalogue.error && <p className="text-[10px] normal-case tracking-normal text-amber-200">Catalogue search is temporarily unavailable. Media Repository music remains available.</p>}
+            {catalogueOptions.length > 0 && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-white/45">Openverse results are third-party CC0 1.0 previews. Confirm attribution and source before publishing.</p>}
+            {selectedMusic?.source === "openverse" && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-teal-100/80">Selected: {selectedMusic.title} — {selectedMusic.creator} · {selectedMusic.license ?? "CC0 1.0"}</p>}
+          </div>
         )}
       </div>
       <p className="mt-2 text-[10px] leading-relaxed text-white/45">
-        {activePreset.description}. PNG keeps the full card visible; MP4 creates a 7-second text-drop sequence with a branded outro{musicAssetId ? " and the selected approved track" : ""}.
+        {activePreset.description}. PNG keeps the full card visible; MP4 creates a 7-second text-drop sequence with a branded outro{selectedMusic ? " and the selected approved track" : ""}.
       </p>
     </div>
   );

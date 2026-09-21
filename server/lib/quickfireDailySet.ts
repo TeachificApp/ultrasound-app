@@ -8,6 +8,23 @@ function sampleN<T>(arr: T[], n: number): T[] {
   return shuffled.slice(0, n);
 }
 
+async function firstDailyEligibleQuestion(
+  db: NonNullable<Awaited<ReturnType<typeof import("../db").getDb>>>,
+  questionIds: number[],
+) {
+  if (questionIds.length === 0) return null;
+  const [question] = await db
+    .select({ id: quickfireQuestions.id })
+    .from(quickfireQuestions)
+    .where(and(
+      inArray(quickfireQuestions.id, questionIds),
+      eq(quickfireQuestions.isActive, true),
+      sql`${quickfireQuestions.type} != 'quickReview'` as never,
+    ))
+    .limit(1);
+  return question ?? null;
+}
+
 /**
  * Ensure a daily set exists for the given date and brand.
  * Backfills empty categories from the question bank when no queued challenge exists.
@@ -51,8 +68,9 @@ export async function ensureTodaySet(
     const key = catKey[liveC.category];
     if (!key) continue;
     const ids: number[] = JSON.parse(liveC.questionIds || "[]");
-    if (ids.length > 0 && questionMap[key] === null) {
-      questionMap[key] = ids[0];
+    const eligible = await firstDailyEligibleQuestion(db, ids);
+    if (eligible && questionMap[key] === null) {
+      questionMap[key] = eligible.id;
     }
   }
 
@@ -82,8 +100,9 @@ export async function ensureTodaySet(
     );
     if (match) {
       const ids: number[] = JSON.parse(match.questionIds || "[]");
-      if (ids.length > 0) {
-        questionMap[key] = ids[0];
+      const eligible = await firstDailyEligibleQuestion(db, ids);
+      if (eligible) {
+        questionMap[key] = eligible.id;
         usedChallengeIds.push(match.id);
         await db
           .update(quickfireChallenges)
@@ -168,9 +187,10 @@ export async function ensureTodaySet(
       .limit(1);
     if (oldestArchived) {
       const ids: number[] = JSON.parse(oldestArchived.questionIds || "[]");
-      if (ids.length > 0) {
-        questionMap[key] = ids[0];
-        fallbackLiveNeeded.push({ cat, questionId: ids[0] });
+      const eligible = await firstDailyEligibleQuestion(db, ids);
+      if (eligible) {
+        questionMap[key] = eligible.id;
+        fallbackLiveNeeded.push({ cat, questionId: eligible.id });
         console.log(`[ensureTodaySet][${brand}] Recycling archived challenge #${oldestArchived.id} for category "${cat}"`);
       }
     }

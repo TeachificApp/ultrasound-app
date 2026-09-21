@@ -20,6 +20,14 @@ describe("Study Groups", () => {
     expect(read("server/routers/studyGroupsRouter.ts")).toContain("STUDY_GROUP_ORGANIZATION_MONTHLY_CENTS = 9900");
   });
 
+  it("keeps the deployed legacy billing-period column compatible with the current schema", () => {
+    const compatibilityMigration = read("drizzle/0073_study_group_legacy_period_compat.sql");
+    const schema = read("drizzle/schema.ts");
+    expect(compatibilityMigration).toContain("stripe_current_period_end");
+    expect(schema).toContain('legacyStripeCurrentPeriodEnd: timestamp("stripe_current_period_end")');
+    expect(schema).toContain('currentPeriodEnd: timestamp("current_period_end")');
+  });
+
   it("keeps invitations email-address based and supports Zoom and Microsoft Teams meeting links", () => {
     const router = read("server/routers/studyGroupsRouter.ts");
     expect(router).toContain("inviteByEmail");

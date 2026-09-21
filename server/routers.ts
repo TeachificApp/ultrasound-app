@@ -75,6 +75,8 @@ import { quizMakerRouter } from "./routers/quizMakerRouter";
 import { teamRouter } from "./routers/teamRouter";
 import { adminNotificationsRouter } from "./routers/adminNotificationsRouter";
 import { studyGroupsRouter } from "./routers/studyGroupsRouter";
+import { openverseMusicRouter } from "./routers/openverseMusicRouter";
+import { quizCardLibraryRouter } from "./routers/quizCardLibraryRouter";
 import { sonoTravelersRouter } from "./routers/sonoTravelersRouter";
 import { siteSettingsRouter } from "./routers/siteSettingsRouter";
 import { newsletterRouter } from "./routers/newsletterRouter";
@@ -195,6 +197,8 @@ import {
 export const appRouter = router({
   system: systemRouter,
   community: communityRouter,
+  openverseMusic: openverseMusicRouter,
+  quizCardLibrary: quizCardLibraryRouter,
   marketingSitePublic: marketingSitePublicRouter,
   marketingSiteAdmin: marketingSiteAdminRouter,
 

@@ -1,0 +1,30 @@
+-- Shared Quiz Card Library for Platform Admins.
+-- Additive only: source Question Bank and existing Social Post Library records are unchanged.
+CREATE TABLE IF NOT EXISTS `quiz_card_library` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `brand` ENUM('aaus','iheartecho') NOT NULL DEFAULT 'aaus',
+  `questionBankId` INT NULL,
+  `questionSnapshot` JSON NOT NULL,
+  `cardTemplate` ENUM('clinical-white','clinical-aqua','clinical-teal','clinical-dark') NOT NULL DEFAULT 'clinical-white',
+  `cardVariant` ENUM('question','answer','combined') NOT NULL DEFAULT 'question',
+  `mediaKind` ENUM('image','video','none') NOT NULL DEFAULT 'none',
+  `mediaUrl` TEXT NULL,
+  `sourceFolderLabel` VARCHAR(255) NULL,
+  `customCardLabel` VARCHAR(120) NULL,
+  `status` ENUM('draft','published','archived') NOT NULL DEFAULT 'draft',
+  `publishedAt` TIMESTAMP NULL,
+  `publishedByUserId` INT NULL,
+  `flaggedAt` TIMESTAMP NULL,
+  `flaggedByUserId` INT NULL,
+  `flagComment` TEXT NULL,
+  `flagResolvedAt` TIMESTAMP NULL,
+  `deletedAt` TIMESTAMP NULL,
+  `deletedByUserId` INT NULL,
+  `createdByUserId` INT NOT NULL,
+  `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `quiz_card_library_brand_created_idx` (`brand`, `createdAt`),
+  KEY `quiz_card_library_creator_idx` (`createdByUserId`),
+  KEY `quiz_card_library_brand_status_idx` (`brand`, `status`, `updatedAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

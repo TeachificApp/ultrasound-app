@@ -60,8 +60,8 @@ describe("social card platform exports", () => {
     expect(quiz).toContain('cardVariant === "combined"');
     expect(quiz).toContain('variant={cardVariant === "answer" ? "answer" : "question"}');
     for (const page of [challenge, social, quiz]) {
-      expect(page).toContain("musicAssetId");
-      expect(page).toContain("mediaType: \"audio\"");
+      expect(page).toContain("musicUploadBrand");
+      expect(page).toContain("selectedMusic");
     }
   });
 });

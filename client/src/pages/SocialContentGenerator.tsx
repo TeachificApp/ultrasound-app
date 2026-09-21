@@ -667,15 +667,19 @@ export default function SocialContentGenerator() {
   const [imageMode, setImageMode] = useState<ImageMode>("none");
   const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
   const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
-  const [musicAssetId, setMusicAssetId] = useState<number | null>(null);
+  const [mp4Sequence, setMp4Sequence] = useState<"social" | "combined">("social");
+  const [selectedMusic, setSelectedMusic] = useState<SocialMusicOption | null>(null);
   const [imageStyleHint, setImageStyleHint] = useState("");
   const [items, setItems] = useState<GeneratedItem[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [flagComments, setFlagComments] = useState<Record<number, string>>({});
   const [batchLoading, setBatchLoading] = useState(false);
+  const [savedLibraryBatchLoading, setSavedLibraryBatchLoading] = useState(false);
+  const [selectedSavedPostIds, setSelectedSavedPostIds] = useState<number[]>([]);
   const [regeneratingImageIdx, setRegeneratingImageIdx] = useState<number | null>(null);
   const [perCardImagePrompts, setPerCardImagePrompts] = useState<Record<number, string>>({});
   const cardRefs = useRef<Record<number, CardHandle>>({});
+  const savedPostRefs = useRef<Record<number, CardHandle>>({});
   const utils = trpc.useUtils();
   const mediaAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "image", page: 1, pageSize: 12 });
   const musicAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "audio", page: 1, pageSize: 50 });
@@ -685,9 +689,8 @@ export default function SocialContentGenerator() {
     setCategory((current) => brandCategories.includes(current as never) ? current : brandCategories[0]);
   }, [brandCategories]);
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
-    .map((asset: any) => ({ id: asset.id, title: asset.title, url: asset.currentVersion?.s3Url }))
+    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: asset.currentVersion?.s3Url, source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
-  const selectedMusic = useMemo(() => musicOptions.find((asset) => asset.id === musicAssetId) ?? null, [musicAssetId, musicOptions]);
 
   const generateMutation = trpc.socialContent.generateContent.useMutation({
     onSuccess: (data) => {
@@ -796,6 +799,53 @@ export default function SocialContentGenerator() {
     toast.success("Saved post opened. Download it from the card preview.");
   }, []);
 
+  const asGeneratedItem = useCallback((saved: any): GeneratedItem => ({
+    libraryId: saved.id,
+    headline: saved.headline,
+    body: saved.body,
+    subtext: saved.subtext ?? "",
+    socialCaption: saved.socialCaption,
+    category: saved.category,
+    contentType: saved.contentType,
+    imageUrl: saved.imageUrl ?? undefined,
+    imageSource: saved.imageSource ?? undefined,
+    mediaAssetId: saved.mediaAssetId ?? null,
+  }), []);
+
+  const buildExportMotion = useCallback((item: GeneratedItem): CardMotion => mp4Sequence === "combined"
+    ? { kind: "combined", title: item.headline, options: [], answer: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl: selectedMusic?.url, musicTitle: selectedMusic?.title }
+    : { kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl: selectedMusic?.url, musicTitle: selectedMusic?.title },
+  [mp4Sequence, presentation.accentColor, presentation.displayName, presentation.logoUrl, selectedMusic?.title, selectedMusic?.url]);
+
+  const toggleSavedPostSelection = useCallback((id: number) => {
+    setSelectedSavedPostIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  }, []);
+
+  const handleSavedLibraryBulkDownload = useCallback(async () => {
+    const selected = (savedPosts.data ?? []).filter((saved: any) => selectedSavedPostIds.includes(saved.id));
+    if (selected.length === 0) return;
+    setSavedLibraryBatchLoading(true);
+    const zip = new JSZip();
+    const folder = zip.folder(`saved-post-library-${exportPlatform}-${exportFormat}`)!;
+    try {
+      for (const saved of selected) {
+        const handle = savedPostRefs.current[saved.id];
+        if (!handle) throw new Error(`Saved post ${saved.id} is not ready to export.`);
+        const item = asGeneratedItem(saved);
+        const card = await handle.renderPlatform(exportPlatform, exportFormat, buildExportMotion(item));
+        folder.file(`${String(saved.id).padStart(4, "0")}-${item.contentType}-${item.category.replace(/[\s/]+/g, "-")}.${exportFormat}`, await card.arrayBuffer());
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      saveAs(blob, `${presentation.brand}-saved-post-library-${exportPlatform}-${exportFormat}-${new Date().toISOString().slice(0, 10)}.zip`);
+      toast.success(`Downloaded ${selected.length} saved post${selected.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      console.error("Saved post bulk export failed:", error);
+      toast.error("Saved post bulk export failed. Please try again.");
+    } finally {
+      setSavedLibraryBatchLoading(false);
+    }
+  }, [asGeneratedItem, buildExportMotion, exportFormat, exportPlatform, presentation.brand, savedPosts.data, selectedSavedPostIds]);
+
   const handleBatchDownload = useCallback(async () => {
     if (items.length === 0) return;
     setBatchLoading(true);
@@ -805,16 +855,7 @@ export default function SocialContentGenerator() {
       for (const [idx, handle] of Object.entries(cardRefs.current)) {
         const item = items[Number(idx)];
         if (!item) continue;
-        const card = await handle.renderPlatform(exportPlatform, exportFormat, {
-          kind: "social",
-          title: item.headline,
-          detail: item.body,
-          brandName: presentation.displayName,
-          accentColor: presentation.accentColor,
-          logoUrl: presentation.logoUrl,
-          musicUrl: selectedMusic?.url,
-          musicTitle: selectedMusic?.title,
-        });
+        const card = await handle.renderPlatform(exportPlatform, exportFormat, buildExportMotion(item));
         const name = `${item.contentType}-${item.category.replace(/[\s/]+/g, "-")}-${Number(idx) + 1}.${exportFormat}`;
         folder.file(name, await card.arrayBuffer());
       }
@@ -827,7 +868,7 @@ export default function SocialContentGenerator() {
     } finally {
       setBatchLoading(false);
     }
-  }, [exportFormat, exportPlatform, items, presentation.accentColor, presentation.brand, presentation.displayName, presentation.logoUrl, selectedMusic?.title, selectedMusic?.url]);
+  }, [buildExportMotion, exportFormat, exportPlatform, items, presentation.brand]);
 
   const t = CARD_THEMES[cardTheme];
 
@@ -900,13 +941,17 @@ export default function SocialContentGenerator() {
                 <h2 className="text-sm font-bold text-white">Shared {presentation.displayName} Post Library</h2>
                 <p className="mt-1 text-xs text-white/45">Generated posts are available to all Platform Admins for reopening and later download.</p>
               </div>
-              <Badge className="border-0 bg-teal-300/15 text-teal-200">{savedPosts.data?.length ?? 0} saved</Badge>
+              <div className="flex items-center gap-2">
+                <Badge className="border-0 bg-teal-300/15 text-teal-200">{savedPosts.data?.length ?? 0} saved</Badge>
+                <Button size="sm" disabled={selectedSavedPostIds.length === 0 || savedLibraryBatchLoading} onClick={handleSavedLibraryBulkDownload} className="h-8 bg-teal-500 px-2.5 text-xs text-white hover:bg-teal-400"><Package className="mr-1 h-3.5 w-3.5" />{savedLibraryBatchLoading ? "Building ZIP…" : `Download selected (${selectedSavedPostIds.length})`}</Button>
+              </div>
             </div>
+            <p className="mt-2 text-[10px] text-white/40">Bulk export uses the current platform size, file format, and optional music selection.</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               {savedPosts.isLoading && <div className="col-span-full py-5 text-center text-xs text-white/45"><Loader2 className="mx-auto mb-1 h-4 w-4 animate-spin" />Loading saved posts</div>}
               {savedPosts.data?.map((saved: any) => (
                 <article key={saved.id} className="rounded-lg border border-white/10 bg-black/15 p-3">
-                  <div className="flex items-start justify-between gap-2"><div className="line-clamp-2 text-sm font-semibold text-white/85">{saved.headline}</div><Badge className={`shrink-0 border-0 text-[9px] ${saved.status === "published" ? "bg-emerald-400/15 text-emerald-200" : "bg-white/10 text-white/55"}`}>{saved.status === "published" ? "Published" : "Draft"}</Badge></div>
+                  <div className="flex items-start justify-between gap-2"><label className="mt-0.5 flex items-center gap-1.5 text-[10px] text-white/55"><input type="checkbox" checked={selectedSavedPostIds.includes(saved.id)} onChange={() => toggleSavedPostSelection(saved.id)} className="accent-teal-400" /><span className="sr-only">Select {saved.headline} for bulk export</span></label><div className="line-clamp-2 flex-1 text-sm font-semibold text-white/85">{saved.headline}</div><Badge className={`shrink-0 border-0 text-[9px] ${saved.status === "published" ? "bg-emerald-400/15 text-emerald-200" : "bg-white/10 text-white/55"}`}>{saved.status === "published" ? "Published" : "Draft"}</Badge></div>
                   <div className="mt-1 text-[10px] uppercase tracking-wide text-teal-200/70">{saved.category} · {saved.contentType.replace(/_/g, " ")}</div>
                   {saved.flagComment && <div className="mt-2 rounded border border-amber-300/25 bg-amber-300/10 p-2 text-[10px] text-amber-100"><span className="font-bold">Flag:</span> {saved.flagComment}</div>}
                   <div className="mt-3 flex flex-wrap items-center gap-1.5"><Button size="sm" onClick={() => openSavedPost(saved)} className="h-7 bg-teal-500 px-2 text-xs text-white hover:bg-teal-400"><Download className="mr-1 h-3 w-3" />Open</Button><Button size="sm" variant="outline" onClick={() => markPublishedMutation.mutate({ id: saved.id, brand: presentation.brand, published: saved.status !== "published" })} className="h-7 border-white/15 px-2 text-[10px] text-white/75 hover:bg-white/10"><CheckCircle2 className="mr-1 h-3 w-3" />{saved.status === "published" ? "Unpublish" : "Publish"}</Button><Button size="sm" variant="outline" onClick={() => deleteSavedPostMutation.mutate({ id: saved.id, brand: presentation.brand })} className="ml-auto h-7 border-rose-300/25 px-2 text-[10px] text-rose-200 hover:bg-rose-400/10"><Trash2 className="h-3 w-3" /><span className="sr-only">Delete</span></Button></div>
@@ -914,6 +959,13 @@ export default function SocialContentGenerator() {
                 </article>
               ))}
               {!savedPosts.isLoading && savedPosts.data?.length === 0 && <div className="col-span-full rounded-lg border border-dashed border-white/10 py-5 text-center text-xs text-white/45">Generated posts will appear here for every Platform Admin.</div>}
+            </div>
+            <div aria-hidden="true" className="pointer-events-none fixed left-[-12000px] top-0 opacity-0">
+              {savedPosts.data?.map((saved: any) => {
+                const item = asGeneratedItem(saved);
+                const savedTheme = CARD_THEMES[saved.cardTheme as CardTheme] ?? CARD_THEMES.light;
+                return <DownloadableCard key={`saved-export-${saved.id}`} filename={`saved-post-${saved.id}`} onRef={(handle) => { savedPostRefs.current[saved.id] = handle; }} platform={exportPlatform} format={exportFormat} motion={buildExportMotion(item)}>{saved.layoutMode === "infographic" ? <InfographicCard item={item} t={savedTheme} presentation={presentation} /> : <SimpleContentCard item={item} t={savedTheme} presentation={presentation} />}</DownloadableCard>;
+              })}
             </div>
           </section>
         </div>
@@ -961,7 +1013,7 @@ export default function SocialContentGenerator() {
               <div className="text-xs font-bold text-white/80">Platform export</div>
               <p className="mt-1 text-[11px] text-white/45">MP4 exports animate the headline and clinical insight, then finish on the completed card.</p>
             </div>
-            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} musicAssetId={musicAssetId} onMusicChange={setMusicAssetId} compact /></div>
+            <div className="min-w-[300px] space-y-2"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} selectedMusic={selectedMusic} onMusicChange={setSelectedMusic} musicUploadBrand={presentation.brand} compact /><div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/45"><span>MP4 sequence</span><button onClick={() => setMp4Sequence("social")} className={`rounded px-2 py-1 text-[10px] normal-case ${mp4Sequence === "social" ? "bg-teal-400/20 text-teal-100" : "bg-white/5 text-white/50"}`}>Post</button><button onClick={() => setMp4Sequence("combined")} className={`rounded px-2 py-1 text-[10px] normal-case ${mp4Sequence === "combined" ? "bg-teal-400/20 text-teal-100" : "bg-white/5 text-white/50"}`}>Question + answer</button></div></div>
           </div>
 
           {/* Image mode selector */}
@@ -1047,7 +1099,7 @@ export default function SocialContentGenerator() {
                   onRef={(handle) => { cardRefs.current[idx] = handle; }}
                   platform={exportPlatform}
                   format={exportFormat}
-                  motion={{ kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl: selectedMusic?.url, musicTitle: selectedMusic?.title }}
+                  motion={buildExportMotion(item)}
                 >
                   {layoutMode === "infographic" ? (
                     <InfographicCard item={item} t={t} presentation={presentation} />
