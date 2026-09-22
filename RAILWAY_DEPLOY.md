@@ -31,7 +31,16 @@ Build: pnpm install && pnpm build
 Start: pnpm start
 ```
 
-Railway deploys automatically on every push to `main`.
+Railway connects to GitHub `main`, but **`railway.toml` → `[build].watchPatterns`** limits which file changes start a new deployment.
+
+| Change type | Deploy? |
+|-------------|---------|
+| `client/**`, `server/**`, `shared/**`, `drizzle/**`, `package.json`, lockfile, Vite/TS config, `railway.toml`, `nixpacks.toml` | **Yes** |
+| Docs only (`RAILWAY_DEPLOY.md`, `AGENTS.md`, `docs/**`, `todo.md`, …) | **Skipped** (“No changes to watched files”) — expected; production keeps the last successful deploy |
+
+**Docs-only merges (e.g. PR #169) do not need a redeploy.** To ship new runtime code, merge a PR that touches a watched path, or in Railway open the service → **Deployments** → **Redeploy** the latest successful build.
+
+MySQL migrations (`drizzle/*.sql`) are in the watch list for awareness, but **apply SQL on Railway MySQL manually**; a green deploy alone does not run migrations.
 
 ### Manus **Publish** and `healthcheckPath` errors
 

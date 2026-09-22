@@ -1,7 +1,19 @@
 [build]
 builder = "nixpacks"
 buildCommand = "pnpm install && pnpm build"
-watchPatterns = ["client/**", "server/**", "shared/**", "drizzle/**", "package.json", "vite.config.ts", "tsconfig.json"]
+# Only pushes that touch these paths trigger a new Railway build (see RAILWAY_DEPLOY.md).
+watchPatterns = [
+  "client/**",
+  "server/**",
+  "shared/**",
+  "drizzle/**",
+  "package.json",
+  "pnpm-lock.yaml",
+  "vite.config.ts",
+  "tsconfig.json",
+  "railway.toml",
+  "nixpacks.toml",
+]
 
 [deploy]
 startCommand = "pnpm start"
