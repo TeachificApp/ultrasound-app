@@ -38,11 +38,14 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("motion.options?.slice(0, 4).forEach");
     expect(exporter).toContain("CORRECT ANSWER");
     expect(exporter).toContain("drawMotionFrame");
-    expect(exporter).toContain("MOTION_DURATION_SECONDS = 7");
+    expect(exporter).toContain("MOTION_DURATION_SECONDS = 20");
     expect(exporter).toContain("AudioBufferSource");
     expect(exporter).toContain("motion.musicUrl");
     expect(exporter).toContain("outroProgress");
     expect(exporter).toContain('"question" | "answer" | "combined" | "social"');
+    expect(exporter).toContain("OUTRO_HOLD_SECONDS = 10");
+    expect(exporter).toContain("COMBINED_ANSWER_REVEAL_SECONDS = 7.11");
+    expect(exporter).toContain("motion.outroHost");
   });
 
   it("surfaces platform and PNG-or-MP4 choices in every card generator", () => {

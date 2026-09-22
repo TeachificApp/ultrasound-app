@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from "mediabunny";
-import { Loader2, Search, Upload } from "lucide-react";
+import { Headphones, Loader2, Search, Upload } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
 import {
@@ -22,6 +22,8 @@ export type CardMotion = {
   brandName?: string;
   accentColor?: string;
   logoUrl?: string;
+  /** Website shown on the final brand screen; cards choose their approved destination. */
+  outroHost?: string;
   musicUrl?: string | null;
   musicTitle?: string | null;
 };
@@ -42,7 +44,12 @@ type RenderedCard = {
 
 const SOURCE_WIDTH = 1080;
 const FRAME_RATE = 12;
-const MOTION_DURATION_SECONDS = 7;
+const OUTRO_HOLD_SECONDS = 10;
+const MOTION_DURATION_SECONDS = 20;
+const OUTRO_START_SECONDS = MOTION_DURATION_SECONDS - OUTRO_HOLD_SECONDS;
+// The fourth combined-question option completes at 4.11 seconds. The answer
+// deliberately waits three full seconds so viewers can consider every option.
+const COMBINED_ANSWER_REVEAL_SECONDS = 7.11;
 const FALLBACK_BACKGROUND = "#071318";
 
 export type SocialMusicOption = {
@@ -254,87 +261,92 @@ function drawMotionPanel(
   }
 
   if ((motion.kind === "question" || motion.kind === "combined") && motion.options?.length) {
+    const optionTop = y;
+    const itemHeight = Math.max(54, Math.round(62 * scaled));
+    const itemGap = Math.max(11, Math.round(13 * scaled));
     motion.options.slice(0, 4).forEach((option, index) => {
       const start = 1.65 + index * 0.68;
       const progress = easeOutBack((elapsed - start) / 0.42);
       if (progress <= 0) return;
-      const itemHeight = Math.max(54, Math.round(62 * scaled));
+      const itemY = optionTop + index * (itemHeight + itemGap);
       const visibleProgress = clamp(progress, 0, 1);
       context.save();
       context.globalAlpha = visibleProgress;
       context.translate(0, (1 - visibleProgress) * 30 * scaled);
       context.fillStyle = "rgba(255,255,255,0.085)";
-      drawRoundedRect(context, x, y, contentWidth, itemHeight, Math.max(10, Math.round(12 * scaled)));
+      drawRoundedRect(context, x, itemY, contentWidth, itemHeight, Math.max(10, Math.round(12 * scaled)));
       context.fill();
       context.strokeStyle = `${accent}99`;
       context.lineWidth = Math.max(1, Math.round(1.5 * scaled));
       context.stroke();
       context.fillStyle = accent;
       context.font = `900 ${Math.max(17, Math.round(21 * scaled))}px "Segoe UI", Arial, sans-serif`;
-      context.fillText(String.fromCharCode(65 + index), x + Math.round(18 * scaled), y + itemHeight / 2 + Math.round(7 * scaled));
+      context.fillText(String.fromCharCode(65 + index), x + Math.round(18 * scaled), itemY + itemHeight / 2 + Math.round(7 * scaled));
       context.fillStyle = "#ffffff";
       context.font = `700 ${optionFont}px "Segoe UI", Arial, sans-serif`;
       const optionLines = wrapCanvasText(context, option, contentWidth - Math.round(70 * scaled), 2);
-      context.fillText(optionLines[0] ?? "", x + Math.round(54 * scaled), y + itemHeight / 2 + Math.round(7 * scaled));
+      context.fillText(optionLines[0] ?? "", x + Math.round(54 * scaled), itemY + itemHeight / 2 + Math.round(7 * scaled));
       context.restore();
-      y += itemHeight + Math.max(11, Math.round(13 * scaled));
     });
   }
 
   if (motion.kind === "answer") {
     const answerLetter = motion.answer?.match(/^\s*([A-E])[.)]/i)?.[1]?.toUpperCase() ?? "A";
     const answerIndex = Math.max(0, answerLetter.charCodeAt(0) - 65);
+    const optionTop = y;
+    const itemHeight = Math.max(46, Math.round(52 * scaled));
+    const itemGap = Math.max(8, Math.round(10 * scaled));
     motion.options?.slice(0, 4).forEach((option, index) => {
       const start = 1.65 + index * 0.36;
       const progress = easeOutBack((elapsed - start) / 0.34);
       if (progress <= 0) return;
-      const itemHeight = Math.max(46, Math.round(52 * scaled));
+      const itemY = optionTop + index * (itemHeight + itemGap);
       const visibleProgress = clamp(progress, 0, 1);
       const isCorrectChoice = index === answerIndex;
       context.save();
       context.globalAlpha = visibleProgress;
       context.translate(0, (1 - visibleProgress) * 24 * scaled);
       context.fillStyle = isCorrectChoice ? "rgba(34,197,94,0.18)" : "rgba(255,255,255,0.075)";
-      drawRoundedRect(context, x, y, contentWidth, itemHeight, Math.max(8, Math.round(10 * scaled)));
+      drawRoundedRect(context, x, itemY, contentWidth, itemHeight, Math.max(8, Math.round(10 * scaled)));
       context.fill();
       context.strokeStyle = isCorrectChoice ? "rgba(74,222,128,0.92)" : `${accent}70`;
       context.lineWidth = Math.max(1, Math.round(1.5 * scaled));
       context.stroke();
       context.fillStyle = isCorrectChoice ? "#86efac" : accent;
       context.font = `900 ${Math.max(15, Math.round(18 * scaled))}px "Segoe UI", Arial, sans-serif`;
-      context.fillText(String.fromCharCode(65 + index), x + Math.round(17 * scaled), y + itemHeight / 2 + Math.round(6 * scaled));
+      context.fillText(String.fromCharCode(65 + index), x + Math.round(17 * scaled), itemY + itemHeight / 2 + Math.round(6 * scaled));
       context.fillStyle = "#ffffff";
       context.font = `700 ${Math.max(16, Math.round(20 * scaled))}px "Segoe UI", Arial, sans-serif`;
-      context.fillText(wrapCanvasText(context, option, contentWidth - Math.round(64 * scaled), 1)[0] ?? "", x + Math.round(49 * scaled), y + itemHeight / 2 + Math.round(6 * scaled));
+      context.fillText(wrapCanvasText(context, option, contentWidth - Math.round(64 * scaled), 1)[0] ?? "", x + Math.round(49 * scaled), itemY + itemHeight / 2 + Math.round(6 * scaled));
       context.restore();
-      y += itemHeight + Math.max(8, Math.round(10 * scaled));
     });
 
-    const answerProgress = easeOutBack((elapsed - 3.25) / 0.5);
+    const answerProgress = easeOutBack((elapsed - 4.5) / 0.5);
     if (answerProgress > 0 && motion.answer) {
       const visibleProgress = clamp(answerProgress, 0, 1);
       const answerHeight = Math.max(92, Math.round(122 * scaled));
+      const answerY = optionTop + 4 * (itemHeight + itemGap);
       context.save();
       context.globalAlpha = visibleProgress;
       context.translate(0, (1 - visibleProgress) * 40 * scaled);
       context.fillStyle = "rgba(34,197,94,0.19)";
-      drawRoundedRect(context, x, y, contentWidth, answerHeight, Math.max(12, Math.round(15 * scaled)));
+      drawRoundedRect(context, x, answerY, contentWidth, answerHeight, Math.max(12, Math.round(15 * scaled)));
       context.fill();
       context.strokeStyle = "rgba(74,222,128,0.95)";
       context.lineWidth = Math.max(2, Math.round(3 * scaled));
       context.stroke();
       context.fillStyle = "#86efac";
       context.font = `900 ${labelFont}px "Segoe UI", Arial, sans-serif`;
-      context.fillText("CORRECT ANSWER", x + Math.round(20 * scaled), y + Math.round(27 * scaled));
+      context.fillText("CORRECT ANSWER", x + Math.round(20 * scaled), answerY + Math.round(27 * scaled));
       context.fillStyle = "#ffffff";
       context.font = `800 ${Math.max(optionFont, Math.round(30 * scaled))}px "Segoe UI", Arial, sans-serif`;
-      drawWrappedText(context, motion.answer, x + Math.round(20 * scaled), y + Math.round(65 * scaled), contentWidth - Math.round(40 * scaled), Math.max(optionFont, Math.round(30 * scaled)) * 1.12, 2);
+      drawWrappedText(context, motion.answer, x + Math.round(20 * scaled), answerY + Math.round(65 * scaled), contentWidth - Math.round(40 * scaled), Math.max(optionFont, Math.round(30 * scaled)) * 1.12, 2);
       context.restore();
     }
   }
 
   if (motion.kind === "combined" && motion.answer) {
-    const answerProgress = easeOutBack((elapsed - 4.65) / 0.48);
+    const answerProgress = easeOutBack((elapsed - COMBINED_ANSWER_REVEAL_SECONDS) / 0.48);
     if (answerProgress > 0) {
       const visibleProgress = clamp(answerProgress, 0, 1);
       const answerHeight = Math.max(92, Math.round(122 * scaled));
@@ -375,14 +387,6 @@ function drawMotionPanel(
     }
   }
 
-  const brandProgress = easeOut((elapsed - 4.8) / 0.4);
-  if (brandProgress > 0) {
-    context.globalAlpha = clamp(brandProgress, 0, 1);
-    context.fillStyle = accent;
-    context.font = `800 ${Math.max(15, Math.round(18 * scaled))}px "Segoe UI", Arial, sans-serif`;
-    const brand = motion.brandName ?? "Clinical education";
-    context.fillText(brand, x, panelTop + panelHeight - padding);
-  }
   context.restore();
 }
 
@@ -393,9 +397,9 @@ function drawMotionFrame(
   elapsed: number,
   targetWidth: number,
   targetHeight: number,
-  logo?: CanvasImageSource | null,
+  logo?: HTMLImageElement | null,
 ) {
-  const outroProgress = clamp((elapsed - 5.85) / 0.6, 0, 1);
+  const outroProgress = clamp((elapsed - OUTRO_START_SECONDS) / 0.6, 0, 1);
   drawExportFrame(context, card, targetWidth, targetHeight, 0.86 * (1 - outroProgress));
   if (outroProgress < 1) {
     drawMotionPanel(context, motion, elapsed, targetWidth, targetHeight);
@@ -409,15 +413,22 @@ function drawMotionFrame(
   context.fillRect(0, 0, targetWidth, targetHeight);
   const scale = targetWidth / 1080;
   const centerX = targetWidth / 2;
-  const logoSize = Math.min(targetWidth * 0.3, targetHeight * 0.22);
-  if (logo) context.drawImage(logo, centerX - logoSize / 2, targetHeight * 0.3 - logoSize / 2, logoSize, logoSize);
+  const logoSize = Math.min(targetWidth * 0.34, targetHeight * 0.27);
+  if (logo) {
+    const sourceWidth = logo.naturalWidth || logo.width || logoSize;
+    const sourceHeight = logo.naturalHeight || logo.height || logoSize;
+    const aspectRatio = sourceWidth / sourceHeight;
+    const width = aspectRatio >= 1 ? logoSize : logoSize * aspectRatio;
+    const height = aspectRatio >= 1 ? logoSize / aspectRatio : logoSize;
+    context.drawImage(logo, centerX - width / 2, targetHeight * 0.31 - height / 2, width, height);
+  }
   context.fillStyle = "#ffffff";
   context.textAlign = "center";
   context.font = `800 ${Math.max(28, Math.round(44 * scale))}px "Segoe UI", Arial, sans-serif`;
-  context.fillText(motion.brandName ?? "Clinical education", centerX, targetHeight * 0.58);
+  context.fillText(motion.brandName ?? "Clinical education", centerX, targetHeight * 0.59);
   context.fillStyle = motion.accentColor ?? "#4ad9e0";
   context.font = `700 ${Math.max(16, Math.round(22 * scale))}px "Segoe UI", Arial, sans-serif`;
-  context.fillText("Follow for clinical learning", centerX, targetHeight * 0.64);
+  context.fillText(motion.outroHost ?? "Follow for clinical learning", centerX, targetHeight * 0.65);
   context.textAlign = "start";
 }
 
@@ -567,6 +578,7 @@ export function SocialExportControls({
   const [catalogueQuery, setCatalogueQuery] = useState("");
   const [isUploadingMusic, setIsUploadingMusic] = useState(false);
   const musicInputRef = useRef<HTMLInputElement>(null);
+  const musicPreviewRef = useRef<HTMLAudioElement>(null);
   const catalogue = trpc.openverseMusic.searchCc0Audio.useQuery(
     { query: catalogueQuery, limit: 8 },
     { enabled: catalogueQuery.length >= 2, retry: false, staleTime: 60_000 },
@@ -595,6 +607,13 @@ export function SocialExportControls({
     }
     onMusicChange?.(combinedMusicOptions.find((option) => option.id === value) ?? null);
   };
+
+  useEffect(() => {
+    const preview = musicPreviewRef.current;
+    if (!preview) return;
+    preview.pause();
+    preview.currentTime = 0;
+  }, [selectedMusic?.id]);
 
   const uploadMusic = async (file: File) => {
     if (!musicUploadBrand || !file.type.startsWith("audio/")) return;
@@ -662,6 +681,11 @@ export function SocialExportControls({
                 {catalogueOptions.length > 0 && <optgroup label="Openverse CC0 catalogue">{catalogueOptions.map((option) => <option key={option.id} value={option.id}>{option.title} — {option.creator}</option>)}</optgroup>}
               </select>
             </label>
+            {selectedMusic && <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
+              <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Headphones className="h-3 w-3 text-teal-200" />Sample: {selectedMusic.title}</div>
+              <audio ref={musicPreviewRef} controls preload="metadata" src={selectedMusic.url} className="h-7 w-full max-w-[290px]" aria-label={`Play a sample of ${selectedMusic.title}`} />
+              <p className="mt-1 text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Preview plays in this browser only. The full MP4 uses the selected track when the source permits browser decoding and CORS access.</p>
+            </div>}
             <div className="flex gap-1">
               <input
                 value={catalogueInput}
@@ -694,7 +718,7 @@ export function SocialExportControls({
         )}
       </div>
       <p className="mt-2 text-[10px] leading-relaxed text-white/45">
-        {activePreset.description}. PNG keeps the full card visible; MP4 creates a 7-second text-drop sequence with a branded outro{selectedMusic ? " and the selected approved track" : ""}.
+        {activePreset.description}. PNG keeps the full card visible; MP4 stages the text with readable pacing and ends on a 10-second branded website screen{selectedMusic ? " with the selected approved track" : ""}.
       </p>
     </div>
   );

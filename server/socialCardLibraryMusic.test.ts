@@ -14,6 +14,9 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(exporter).toContain("Upload audio");
     expect(exporter).toContain("uploadFileToMediaRepository");
     expect(exporter).toContain("musicUploadBrand");
+    expect(exporter).toContain("Sample:");
+    expect(exporter).toContain("<audio ref={musicPreviewRef} controls");
+    expect(exporter).toContain("Preview plays in this browser only");
     for (const page of [quiz, social, challenge]) expect(page).toContain("musicUploadBrand={presentation.brand}");
   });
 
@@ -21,8 +24,14 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(quiz).toContain('kind: "combined"');
     expect(social).toContain('mp4Sequence');
     expect(social).toContain('Question + answer');
+    expect(challenge).toContain('kind: "combined"');
     expect(challenge).toContain('downloadCombined');
     expect(challenge).toContain('Question + answer MP4');
+    expect(exporter).toContain("COMBINED_ANSWER_REVEAL_SECONDS = 7.11");
+    expect(exporter).toContain("OUTRO_HOLD_SECONDS = 10");
+    expect(quiz).toContain("outroHost: presentation.publicHost");
+    expect(social).toContain("outroHost: presentation.publicHost");
+    expect(challenge).toContain("outroHost: presentation.appHost");
   });
 
   it("persists shared Quiz Card snapshots with moderation actions", () => {

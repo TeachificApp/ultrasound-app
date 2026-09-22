@@ -1007,9 +1007,9 @@ function CategorySection({
       : null;
   const explanationText = q.explanation ? stripHtml(q.explanation) : null;
   const contextLabel = q.category?.trim() || category;
-  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl, musicTitle };
-  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl, musicTitle };
-  const combinedMotion: CardMotion = { kind: "combined", title: q.question, options, answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl, musicTitle };
+  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.appHost, musicUrl, musicTitle };
+  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.appHost, musicUrl, musicTitle };
+  const combinedMotion: CardMotion = { kind: "combined", title: q.question, options, answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.appHost, musicUrl, musicTitle };
   const downloadCombined = async () => {
     if (!combinedRef.current) return;
     setCombinedLoading(true);
@@ -1405,7 +1405,7 @@ export default function ChallengeCardGenerator() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wide text-white/80">Platform export</h2>
-              <p className="mt-1 text-[11px] text-white/45">PNG keeps every card fully visible. MP4 animates question and answer cards, then ends on the finished design.</p>
+              <p className="mt-1 text-[11px] text-white/45">PNG keeps every card fully visible. MP4 gives combined question-and-answer cards a three-second answer pause, then ends on a 10-second app website screen.</p>
             </div>
             <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} selectedMusic={selectedMusic} onMusicChange={setSelectedMusic} musicUploadBrand={presentation.brand} compact /></div>
           </div>
