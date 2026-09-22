@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from "mediabunny";
-import { Headphones, Loader2, Search, Upload } from "lucide-react";
+import { Headphones, Loader2, Search, Sparkles, Upload } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
+import {
+  AI_MUSIC_DURATION_SECONDS,
+  aiLoopFilename,
+  renderAiMusicLoop,
+  type AiMusicMood,
+  type AiMusicTexture,
+} from "@/lib/aiMusicLoop";
 import {
   DEFAULT_SOCIAL_EXPORT_PLATFORM,
   getSocialExportPreset,
@@ -50,13 +57,17 @@ const OUTRO_START_SECONDS = MOTION_DURATION_SECONDS - OUTRO_HOLD_SECONDS;
 // The fourth combined-question option completes at 4.11 seconds. The answer
 // deliberately waits three full seconds so viewers can consider every option.
 const COMBINED_ANSWER_REVEAL_SECONDS = 7.11;
+// Canvas fillText positions are baselines. Reserve title ascent and a visible
+// gap after the static Clinical Question/Insight label before any staged copy
+// is drawn so the first animated item cannot rise into that heading.
+const STATIC_LABEL_TO_CONTENT_GAP_RATIO = 0.82;
 const FALLBACK_BACKGROUND = "#071318";
 
 export type SocialMusicOption = {
   id: string;
   title: string;
   url: string;
-  source: "media_repository" | "openverse";
+  source: "media_repository" | "openverse" | "ai_generated";
   creator?: string;
   attribution?: string;
   license?: string;
@@ -64,7 +75,24 @@ export type SocialMusicOption = {
   sourceUrl?: string | null;
 };
 
-type MusicSourceMode = "none" | "catalogue" | "upload";
+type MusicSourceMode = "none" | "catalogue" | "upload" | "ai";
+
+const AI_MUSIC_MOODS: Array<{ value: AiMusicMood; label: string }> = [
+  { value: "calm", label: "Calm" },
+  { value: "focused", label: "Focused" },
+  { value: "uplifting", label: "Uplifting" },
+  { value: "confident", label: "Confident" },
+  { value: "cinematic", label: "Cinematic" },
+  { value: "energetic", label: "Energetic" },
+];
+
+const AI_MUSIC_TEXTURES: Array<{ value: AiMusicTexture; label: string }> = [
+  { value: "ambient", label: "Ambient" },
+  { value: "lofi", label: "Lo-fi" },
+  { value: "electronic", label: "Electronic" },
+  { value: "minimal", label: "Minimal" },
+  { value: "pulse", label: "Pulse" },
+];
 
 function cleanText(value: string | null | undefined): string {
   return (value ?? "")
@@ -256,7 +284,7 @@ function drawMotionPanel(
   context.font = `800 ${labelFont}px "Segoe UI", Arial, sans-serif`;
   const motionLabel = motion.kind === "answer" ? "ANSWER REVEAL" : motion.kind === "question" || motion.kind === "combined" ? "CLINICAL QUESTION" : "CLINICAL INSIGHT";
   context.fillText(motionLabel, x, y);
-  y += labelFont * 1.7;
+  y += labelFont + titleFont * STATIC_LABEL_TO_CONTENT_GAP_RATIO;
 
   const titleProgress = easeOutBack((elapsed - 0.65) / 0.55);
   if (titleProgress > 0) {
@@ -588,8 +616,13 @@ export function SocialExportControls({
   const [catalogueInput, setCatalogueInput] = useState("");
   const [catalogueQuery, setCatalogueQuery] = useState("");
   const [isUploadingMusic, setIsUploadingMusic] = useState(false);
+  const [aiMood, setAiMood] = useState<AiMusicMood>("focused");
+  const [aiTexture, setAiTexture] = useState<AiMusicTexture>("ambient");
+  const [aiDirection, setAiDirection] = useState("");
+  const [aiMusicError, setAiMusicError] = useState<string | null>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
   const musicPreviewRef = useRef<HTMLAudioElement>(null);
+  const composeAiLoop = trpc.aiMusic.composeLoop.useMutation();
   const catalogue = trpc.openverseMusic.searchCc0Audio.useQuery(
     { query: catalogueQuery, limit: 8 },
     { enabled: musicMode === "catalogue" && catalogueQuery.length >= 2, retry: false, staleTime: 60_000 },
@@ -612,7 +645,7 @@ export function SocialExportControls({
   };
 
   const chooseTrack = (track: SocialMusicOption) => {
-    setMusicMode(track.source === "openverse" ? "catalogue" : "upload");
+    setMusicMode(track.source === "openverse" ? "catalogue" : track.source === "ai_generated" ? "ai" : "upload");
     onMusicChange?.(track);
   };
 
@@ -625,7 +658,7 @@ export function SocialExportControls({
 
   useEffect(() => {
     if (!selectedMusic) return;
-    setMusicMode(selectedMusic.source === "openverse" ? "catalogue" : "upload");
+    setMusicMode(selectedMusic.source === "openverse" ? "catalogue" : selectedMusic.source === "ai_generated" ? "ai" : "upload");
   }, [selectedMusic?.id, selectedMusic?.source]);
 
   useEffect(() => {
@@ -657,6 +690,42 @@ export function SocialExportControls({
         url: uploaded.s3Url,
         source: "media_repository",
       });
+    } finally {
+      setIsUploadingMusic(false);
+    }
+  };
+
+  const generateAiMusic = async () => {
+    if (!musicUploadBrand) {
+      setAiMusicError("Choose a card brand before generating a music loop.");
+      return;
+    }
+    setAiMusicError(null);
+    try {
+      const composition = await composeAiLoop.mutateAsync({
+        mood: aiMood,
+        texture: aiTexture,
+        direction: aiDirection.trim() || undefined,
+        durationSeconds: AI_MUSIC_DURATION_SECONDS,
+      });
+      const wav = await renderAiMusicLoop(composition.plan, composition.durationSeconds);
+      const file = new File([wav], aiLoopFilename(`ai-${composition.plan.title}`), { type: "audio/wav" });
+      setIsUploadingMusic(true);
+      const uploaded = await uploadFileToMediaRepository(file, {
+        access: "private",
+        folder: "social-card-ai-music",
+        notes: `Original AI-composed ${composition.durationSeconds}-second ${aiMood} ${aiTexture} loop for card-video export.`,
+        brand: musicUploadBrand,
+      });
+      chooseTrack({
+        id: `ai:${uploaded.assetId}`,
+        title: `AI loop · ${composition.plan.title}`,
+        url: uploaded.s3Url,
+        source: "ai_generated",
+      });
+    } catch (error) {
+      console.error("AI music loop generation failed:", error);
+      setAiMusicError(error instanceof Error ? error.message : "AI music generation did not complete. Please try again.");
     } finally {
       setIsUploadingMusic(false);
     }
@@ -702,6 +771,7 @@ export function SocialExportControls({
               >
                 <option value="none">No music</option>
                 <option value="catalogue">Free CC0 search</option>
+                <option value="ai">Generate AI beat / loop</option>
                 <option value="upload">Upload audio</option>
               </select>
             </label>
@@ -717,6 +787,31 @@ export function SocialExportControls({
                 <audio controls preload="metadata" src={option.url} className="mt-1.5 h-7 w-full" aria-label={`Preview ${option.title}`} />
               </div>)}</div>}
               <p className="text-[10px] leading-relaxed normal-case tracking-normal text-white/45">Openverse results are third-party CC0 1.0 previews. Confirm attribution and source before publishing.</p>
+            </div>}
+            {musicMode === "ai" && <div className="space-y-2 rounded-md border border-teal-300/20 bg-teal-300/[0.045] p-2">
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold normal-case tracking-normal text-teal-100"><Sparkles className="h-3 w-3" />Create an original AI beat / loop</div>
+              <p className="text-[10px] leading-relaxed normal-case tracking-normal text-white/55">AI composes a compact instrumental blueprint; this browser synthesizes the {AI_MUSIC_DURATION_SECONDS}-second WAV and saves it privately to the selected brand’s Media Repository for preview and MP4 use.</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <label className="flex flex-col gap-1 text-[9px] font-semibold uppercase tracking-wide text-white/45">Mood
+                  <select value={aiMood} onChange={(event) => setAiMood(event.target.value as AiMusicMood)} disabled={composeAiLoop.isPending || isUploadingMusic} className="rounded border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-[10px] font-semibold normal-case tracking-normal text-white outline-none disabled:opacity-50">
+                    {AI_MUSIC_MOODS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-[9px] font-semibold uppercase tracking-wide text-white/45">Style
+                  <select value={aiTexture} onChange={(event) => setAiTexture(event.target.value as AiMusicTexture)} disabled={composeAiLoop.isPending || isUploadingMusic} className="rounded border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-[10px] font-semibold normal-case tracking-normal text-white outline-none disabled:opacity-50">
+                    {AI_MUSIC_TEXTURES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label className="flex flex-col gap-1 text-[9px] font-semibold uppercase tracking-wide text-white/45">Optional direction
+                <input value={aiDirection} onChange={(event) => setAiDirection(event.target.value.slice(0, 280))} disabled={composeAiLoop.isPending || isUploadingMusic} placeholder="e.g., gentle pulse, airy and non-distracting" className="w-full rounded border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-[10px] font-medium normal-case tracking-normal text-white outline-none placeholder:text-white/35 disabled:opacity-50" />
+              </label>
+              <button type="button" onClick={() => void generateAiMusic()} disabled={composeAiLoop.isPending || isUploadingMusic} className="inline-flex w-full items-center justify-center gap-1.5 rounded border border-teal-200/35 bg-teal-300/15 px-2 py-1.5 text-[10px] font-semibold normal-case tracking-normal text-teal-50 transition-colors hover:bg-teal-300/25 disabled:cursor-not-allowed disabled:opacity-50">
+                {composeAiLoop.isPending || isUploadingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                {composeAiLoop.isPending ? "Composing loop…" : isUploadingMusic ? "Saving loop…" : "Generate AI loop"}
+              </button>
+              {aiMusicError && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-amber-200">{aiMusicError}</p>}
+              <p className="text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Instrumental only. Listen to the browser preview before publishing; the selected loop is added to the MP4 when browser decoding permits.</p>
             </div>}
             {musicMode === "upload" && <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.025] p-2">
               {musicUploadBrand && <div className="flex items-center gap-2"><input ref={musicInputRef} type="file" accept="audio/mpeg,audio/mp4,audio/aac,audio/x-m4a,audio/wav" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMusic(file).catch((error) => console.error("Music upload failed:", error)); event.currentTarget.value = ""; }} /><button type="button" disabled={isUploadingMusic} onClick={() => musicInputRef.current?.click()} className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-white/75 transition-colors hover:bg-white/10 disabled:opacity-40">{isUploadingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}{isUploadingMusic ? "Uploading…" : "Choose audio file"}</button><span className="text-[10px] normal-case tracking-normal text-white/35">MP3, M4A, AAC, or WAV · up to 30 MB</span></div>}

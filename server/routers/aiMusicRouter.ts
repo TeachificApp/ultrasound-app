@@ -1,0 +1,166 @@
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+import { protectedProcedure, router } from "../_core/trpc";
+import { getUserRoles } from "../db";
+import { extractAssistantText, invokeLLM } from "../_core/llm";
+
+const MUSIC_MOODS = [
+  "calm",
+  "focused",
+  "uplifting",
+  "confident",
+  "cinematic",
+  "energetic",
+] as const;
+
+const MUSIC_TEXTURES = ["ambient", "lofi", "electronic", "minimal", "pulse"] as const;
+
+export type AiLoopPlan = {
+  title: string;
+  bpm: number;
+  keyRoot: number;
+  scale: "major" | "minor" | "dorian";
+  mood: (typeof MUSIC_MOODS)[number];
+  texture: (typeof MUSIC_TEXTURES)[number];
+  density: 1 | 2 | 3 | 4 | 5;
+  swing: number;
+  kickPattern: number[];
+  snarePattern: number[];
+  hatPattern: number[];
+  bassPattern: number[];
+  leadPattern: number[];
+};
+
+const platformAdminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  if (ctx.user.role === "admin") return next();
+  const roles = await getUserRoles(ctx.user.id);
+  if (roles.includes("platform_admin") || roles.includes("platform_owner")) return next();
+  throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
+});
+
+const loopInput = z.object({
+  mood: z.enum(MUSIC_MOODS),
+  texture: z.enum(MUSIC_TEXTURES),
+  direction: z.string().trim().max(280).optional(),
+  durationSeconds: z.literal(20).default(20),
+});
+
+const compositionSchema = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    bpm: { type: "integer" },
+    keyRoot: { type: "integer" },
+    scale: { type: "string", enum: ["major", "minor", "dorian"] },
+    density: { type: "integer" },
+    swing: { type: "number" },
+    kickPattern: { type: "array", items: { type: "integer" }, minItems: 16, maxItems: 16 },
+    snarePattern: { type: "array", items: { type: "integer" }, minItems: 16, maxItems: 16 },
+    hatPattern: { type: "array", items: { type: "integer" }, minItems: 16, maxItems: 16 },
+    bassPattern: { type: "array", items: { type: "integer" }, minItems: 16, maxItems: 16 },
+    leadPattern: { type: "array", items: { type: "integer" }, minItems: 16, maxItems: 16 },
+  },
+  required: ["title", "bpm", "keyRoot", "scale", "density", "swing", "kickPattern", "snarePattern", "hatPattern", "bassPattern", "leadPattern"],
+  additionalProperties: false,
+} as const;
+
+const sanitizeBinaryPattern = (value: unknown, fallback: number[]) => Array.isArray(value) && value.length === 16
+  ? value.map((step) => Number(step) > 0 ? 1 : 0)
+  : fallback;
+
+const sanitizePitchPattern = (value: unknown, fallback: number[]) => Array.isArray(value) && value.length === 16
+  ? value.map((step) => Number.isFinite(Number(step)) && Number(step) >= -1 && Number(step) <= 24 ? Math.round(Number(step)) : -1)
+  : fallback;
+
+function defaultPlan(mood: AiLoopPlan["mood"], texture: AiLoopPlan["texture"]): AiLoopPlan {
+  const energetic = mood === "energetic" || mood === "confident";
+  return {
+    title: `${mood} ${texture} clinical loop`,
+    bpm: energetic ? 116 : mood === "calm" ? 82 : 98,
+    keyRoot: mood === "cinematic" ? 2 : 0,
+    scale: mood === "uplifting" ? "major" : mood === "focused" ? "dorian" : "minor",
+    mood,
+    texture,
+    density: energetic ? 4 : 3,
+    swing: texture === "lofi" ? 0.12 : 0.03,
+    kickPattern: energetic ? [1,0,0,0, 1,0,0,0, 1,0,1,0, 0,0,1,0] : [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    snarePattern: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hatPattern: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    bassPattern: [0,-1,0,-1, 7,-1,0,-1, 5,-1,7,-1, 0,-1,5,-1],
+    leadPattern: [-1,-1,7,-1, -1,10,-1,-1, 12,-1,10,-1, -1,7,-1,-1],
+  };
+}
+
+function normalizePlan(value: unknown, mood: AiLoopPlan["mood"], texture: AiLoopPlan["texture"]): AiLoopPlan {
+  const fallback = defaultPlan(mood, texture);
+  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const scale = raw.scale === "major" || raw.scale === "minor" || raw.scale === "dorian" ? raw.scale : fallback.scale;
+  const title = typeof raw.title === "string" && raw.title.trim()
+    ? raw.title.trim().replace(/[^a-z0-9 _-]/gi, "").slice(0, 72)
+    : fallback.title;
+  return {
+    title,
+    bpm: Math.max(64, Math.min(150, Math.round(Number(raw.bpm) || fallback.bpm))),
+    keyRoot: Math.max(0, Math.min(11, Math.round(Number(raw.keyRoot) || fallback.keyRoot))),
+    scale,
+    mood,
+    texture,
+    density: Math.max(1, Math.min(5, Math.round(Number(raw.density) || fallback.density))) as AiLoopPlan["density"],
+    swing: Math.max(0, Math.min(0.22, Number(raw.swing) || fallback.swing)),
+    kickPattern: sanitizeBinaryPattern(raw.kickPattern, fallback.kickPattern),
+    snarePattern: sanitizeBinaryPattern(raw.snarePattern, fallback.snarePattern),
+    hatPattern: sanitizeBinaryPattern(raw.hatPattern, fallback.hatPattern),
+    bassPattern: sanitizePitchPattern(raw.bassPattern, fallback.bassPattern),
+    leadPattern: sanitizePitchPattern(raw.leadPattern, fallback.leadPattern),
+  };
+}
+
+function parseComposition(value: string): unknown {
+  const trimmed = value.trim().replace(/^```json\s*/i, "").replace(/```$/i, "");
+  return JSON.parse(trimmed);
+}
+
+/**
+ * The language model creates a constrained original composition blueprint. The
+ * browser synthesizes this plan locally into a short instrumental WAV loop and
+ * then saves it through the brand-scoped Media Repository workflow. No third-
+ * party track is copied or claimed as licensed catalogue music.
+ */
+export const aiMusicRouter = router({
+  composeLoop: platformAdminProcedure
+    .input(loopInput)
+    .mutation(async ({ input }) => {
+      const userDirection = input.direction ? ` Creator direction: ${input.direction}` : "";
+      const response = await invokeLLM({
+        transport: "auto",
+        maxTokens: 650,
+        outputSchema: { name: "instrumental_loop", schema: compositionSchema, strict: true },
+        messages: [
+          {
+            role: "system",
+            content: "You compose concise, original instrumental loop blueprints for a clinical education social-video export. Do not reference artists, existing songs, copyrighted material, lyrics, vocals, spoken words, or medical claims. Produce a 16-step loop that is supportive beneath on-screen educational text, loopable, and never distracting.",
+          },
+          {
+            role: "user",
+            content: `Create one original 20-second ${input.mood}, ${input.texture} instrumental beat/loop. Use practical tempo and small, balanced patterns. Density is 1 (very sparse) through 5 (busy); use 2–4 for readable card-video backing. keyRoot is chromatic 0–11. Pattern values: drum steps are 0/1; bass and lead steps are -1 for rest or semitone offsets 0–24. ${userDirection}`,
+          },
+        ],
+      });
+
+      let plan: AiLoopPlan;
+      try {
+        plan = normalizePlan(parseComposition(extractAssistantText(response)), input.mood, input.texture);
+      } catch {
+        throw new TRPCError({ code: "BAD_GATEWAY", message: "AI music composition did not return a usable loop. Please try again." });
+      }
+
+      return {
+        provider: "AI composition plan",
+        durationSeconds: input.durationSeconds,
+        plan,
+        notice: "This is an original instrumental loop generated from an AI composition plan and synthesized in the browser. Review it before publishing.",
+      };
+    }),
+});
+
+export { defaultPlan, normalizePlan, MUSIC_MOODS, MUSIC_TEXTURES };
