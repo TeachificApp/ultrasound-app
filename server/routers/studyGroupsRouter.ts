@@ -6,6 +6,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { getDb, getUserById, getUserByEmail, getUserRoles } from "../db";
 import { getStripeClient } from "../lib/stripeClient";
 import { sendEmail } from "../_core/email";
+import { formatMysqlQueryError } from "../lib/mysqlQueryError";
 import {
   digitalProducts,
   digitalPurchases,
@@ -311,26 +312,38 @@ export const studyGroupsRouter = router({
     validateMeeting(input);
     const db = await requireDb();
     const actor = await getActorEmail(ctx.user.id);
-    const inserted = await db.insert(studyGroups).values({
-      createdByUserId: ctx.user.id,
-      name: input.name,
-      description: input.description || null,
-      organizationName: input.organizationName || null,
-      meetingProvider: input.meetingProvider ?? null,
-      meetingUrl: input.meetingUrl ?? null,
-      seatLimit: STUDY_GROUP_FREE_SEAT_LIMIT,
-    }).$returningId();
-    const groupId = inserted[0]?.id;
-    if (!groupId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to create study group." });
-    await db.insert(studyGroupMembers).values({
-      groupId,
-      userId: ctx.user.id,
-      email: actor.email,
-      role: "owner",
-      inviteStatus: "active",
-      invitedByUserId: ctx.user.id,
-      joinedAt: new Date(),
-    });
+    let groupId: number;
+    try {
+      const insertResult = await db.insert(studyGroups).values({
+        createdByUserId: ctx.user.id,
+        name: input.name,
+        description: input.description || null,
+        organizationName: input.organizationName || null,
+        meetingProvider: input.meetingProvider ?? null,
+        meetingUrl: input.meetingUrl ?? null,
+        seatLimit: STUDY_GROUP_FREE_SEAT_LIMIT,
+      });
+      groupId = Number((insertResult as unknown as { insertId: number }).insertId);
+      if (!Number.isInteger(groupId) || groupId <= 0) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to create study group." });
+      }
+      await db.insert(studyGroupMembers).values({
+        groupId,
+        userId: ctx.user.id,
+        email: actor.email,
+        role: "owner",
+        inviteStatus: "active",
+        invitedByUserId: ctx.user.id,
+        joinedAt: new Date(),
+      });
+    } catch (err) {
+      if (err instanceof TRPCError) throw err;
+      console.error("[studyGroups.create]", err);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: formatMysqlQueryError(err, "Could not create study group"),
+      });
+    }
     await recordActivity(db, groupId, ctx.user.id, "group_created", `${displayName(actor.user ?? {})} created the group.`);
     return { groupId };
   }),

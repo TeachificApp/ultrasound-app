@@ -33,6 +33,17 @@ Start: pnpm start
 
 Railway deploys automatically on every push to `main`.
 
+### Study Groups (Learn `/study-groups`)
+
+After deploying Study Groups from `main`, apply these **additive** SQL files on Railway MySQL:
+
+1. `drizzle/0070_study_groups.sql` — all `study_group_*` tables
+2. `drizzle/0073_study_group_legacy_period_compat.sql` — optional `stripe_current_period_end` compat column
+
+Verify read-only: `DATABASE_URL='…' pnpm exec vitest run server/verifyStudyGroupsSchema.integration.test.ts`
+
+A raw toast `Failed query: insert into study_groups…` almost always means **0070 was not applied** while the new app code is already live. Code fix `ebe8eb5d` on `main` removed a duplicate Drizzle billing-period column that also broke inserts when the ORM expected columns the database did not have.
+
 ---
 
 ## Required Environment Variables

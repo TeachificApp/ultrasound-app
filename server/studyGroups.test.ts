@@ -31,6 +31,8 @@ describe("Study Groups", () => {
     expect(schema).not.toContain('timestamp("stripe_current_period_end")');
     expect(schema).toContain('currentPeriodEnd: timestamp("current_period_end")');
     expect(router).toContain("createdByUserId: ctx.user.id");
+    expect(router).toContain("formatMysqlQueryError");
+    expect(read("server/verifyStudyGroupsSchema.integration.test.ts")).toContain("study_groups");
   });
 
   it("keeps invitations email-address based and supports Zoom and Microsoft Teams meeting links", () => {
