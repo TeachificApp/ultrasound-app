@@ -66,6 +66,8 @@ Platform-admin per-brand tools (cases, quickfire, scancoach, navigator, thinkifi
 
 16. **Shopify product linking**: Physical products in Shopify checkout mode can link to a Shopify catalog via the Storefront API. Configure `SHOPIFY_STORE_DOMAIN` + `SHOPIFY_STOREFRONT_ACCESS_TOKEN` (primary), or add a second store with `SHOPIFY_STORE_DOMAIN_2` + `SHOPIFY_STOREFRONT_ACCESS_TOKEN_2`. Private Headless tokens (`shpss_`) are server-side only. Admin: Physical Products → **Import from Shopify** (bulk/single) or per-product Checkout tab linker.
 
+17. **Manus Publish → Railway healthcheck**: Do not reintroduce `railway.json` or `healthcheckPath` in `railway.toml`. Manus deploys via GitHub `main`; duplicate config-as-code causes Railway API `healthcheckPath - Invalid input`. Set health check path **`/api/health`** in the Railway service UI if publish still fails after `main` is current. See `RAILWAY_DEPLOY.md` (Manus Publish section).
+
 ### Stripe membership subscriptions
 
 - Webhook handler delegates to `server/lib/membershipFulfillment.ts` for `checkout.session.completed` with `metadata.type=membership`.
