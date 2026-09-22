@@ -825,9 +825,9 @@ export default function SocialContentGenerator() {
   }), []);
 
   const buildExportMotion = useCallback((item: GeneratedItem): CardMotion => mp4Sequence === "combined"
-    ? { kind: "combined", title: item.headline, options: [], answer: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicTitle: selectedMusic?.title }
-    : { kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicTitle: selectedMusic?.title },
-  [mp4Sequence, presentation.accentColor, presentation.displayName, presentation.logoUrl, presentation.publicHost, selectedMusic?.title, selectedMusic?.url]);
+    ? { kind: "combined", title: item.headline, options: [], answer: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
+    : { kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title },
+  [mp4Sequence, presentation.accentColor, presentation.displayName, presentation.logoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
 
   const toggleSavedPostSelection = useCallback((id: number) => {
     setSelectedSavedPostIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);

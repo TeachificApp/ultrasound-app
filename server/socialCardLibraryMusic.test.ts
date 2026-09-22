@@ -17,7 +17,7 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(exporter).toContain("musicUploadBrand");
     expect(exporter).toContain("Selected:");
     expect(exporter).toContain("<audio ref={musicPreviewRef} controls");
-    expect(exporter).toContain("Preview plays in this browser only");
+    expect(exporter).toContain("Preview plays in this browser.");
     for (const page of [quiz, social, challenge]) expect(page).toContain("musicUploadBrand={presentation.brand}");
   });
 
@@ -38,7 +38,15 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(exporter).toContain("renderAiMusicLoop(composition.plan, composition.durationSeconds)");
     expect(exporter).toContain('folder: "social-card-ai-music"');
     expect(exporter).toContain('source: "ai_generated"');
+    expect(exporter).toContain("localBlob: wav");
     expect(exporter).toContain("Instrumental only.");
+  });
+
+  it("embeds freshly selected generated or uploaded audio from browser bytes instead of silently omitting it", () => {
+    expect(exporter).toContain("musicBlob?: Blob | null");
+    expect(exporter).toMatch(/musicBlob\s*\? await musicBlob\.arrayBuffer\(\)/);
+    expect(exporter).toContain("The selected ${label} could not be embedded in this MP4");
+    for (const page of [quiz, social, challenge]) expect(page).toContain("musicBlob: selectedMusic?.localBlob");
   });
 
   it("renders a layered modern instrumental mix rather than a single oscillator beat", () => {
