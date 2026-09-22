@@ -295,10 +295,12 @@ export const studyGroupsRouter = router({
     const memberships = await db.select().from(studyGroupMembers)
       .where(and(eq(studyGroupMembers.userId, ctx.user.id), eq(studyGroupMembers.inviteStatus, "active")));
     const ids = memberships.map(row => row.groupId);
-    const platformAdmin = await isPlatformAdmin(ctx.user.id, ctx.user.role);
-    const groups = platformAdmin
-      ? await db.select().from(studyGroups).where(eq(studyGroups.status, "active")).orderBy(desc(studyGroups.updatedAt))
-      : ids.length ? await db.select().from(studyGroups).where(inArray(studyGroups.id, ids)).orderBy(desc(studyGroups.updatedAt)) : [];
+    // The learner-facing library is membership-only, including when the signed-in
+    // learner is also a Platform Admin. Safeguarding oversight is deliberately
+    // isolated to the Platform Admin-only adminListGroups procedure.
+    const groups = ids.length
+      ? await db.select().from(studyGroups).where(inArray(studyGroups.id, ids)).orderBy(desc(studyGroups.updatedAt))
+      : [];
     const membershipByGroup = new Map(memberships.map(row => [row.groupId, row]));
     return groups.map(group => ({ ...group, membership: membershipByGroup.get(group.id) ?? null, isOrganizationActive: hasActiveOrganization(group) }));
   }),
@@ -314,27 +316,63 @@ export const studyGroupsRouter = router({
     const actor = await getActorEmail(ctx.user.id);
     let groupId: number;
     try {
-      const insertResult = await db.insert(studyGroups).values({
-        createdByUserId: ctx.user.id,
-        name: input.name,
-        description: input.description || null,
-        organizationName: input.organizationName || null,
-        meetingProvider: input.meetingProvider ?? null,
-        meetingUrl: input.meetingUrl ?? null,
-        seatLimit: STUDY_GROUP_FREE_SEAT_LIMIT,
-      });
-      groupId = Number((insertResult as unknown as { insertId: number }).insertId);
-      if (!Number.isInteger(groupId) || groupId <= 0) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to create study group." });
-      }
-      await db.insert(studyGroupMembers).values({
-        groupId,
-        userId: ctx.user.id,
-        email: actor.email,
-        role: "owner",
-        inviteStatus: "active",
-        invitedByUserId: ctx.user.id,
-        joinedAt: new Date(),
+      groupId = await db.transaction(async (tx) => {
+        // Earlier releases read a MySQL insert result as an object instead of
+        // Drizzle's $returningId() array. If the creator retries the exact same
+        // name, finish only that incomplete private group instead of creating a
+        // duplicate record.
+        const [orphanedGroup] = await tx.select({ id: studyGroups.id })
+          .from(studyGroups)
+          .leftJoin(studyGroupMembers, and(
+            eq(studyGroupMembers.groupId, studyGroups.id),
+            eq(studyGroupMembers.userId, ctx.user.id),
+          ))
+          .where(and(
+            eq(studyGroups.createdByUserId, ctx.user.id),
+            eq(studyGroups.name, input.name),
+            eq(studyGroups.status, "active"),
+            isNull(studyGroupMembers.id),
+          ))
+          .orderBy(desc(studyGroups.id))
+          .limit(1);
+
+        const recoveredGroupId = orphanedGroup?.id;
+        if (recoveredGroupId) {
+          await tx.insert(studyGroupMembers).values({
+            groupId: recoveredGroupId,
+            userId: ctx.user.id,
+            email: actor.email,
+            role: "owner",
+            inviteStatus: "active",
+            invitedByUserId: ctx.user.id,
+            joinedAt: new Date(),
+          });
+          return recoveredGroupId;
+        }
+
+        const inserted = await tx.insert(studyGroups).values({
+          createdByUserId: ctx.user.id,
+          name: input.name,
+          description: input.description || null,
+          organizationName: input.organizationName || null,
+          meetingProvider: input.meetingProvider ?? null,
+          meetingUrl: input.meetingUrl ?? null,
+          seatLimit: STUDY_GROUP_FREE_SEAT_LIMIT,
+        }).$returningId();
+        const createdGroupId = Number(inserted[0]?.id);
+        if (!Number.isInteger(createdGroupId) || createdGroupId <= 0) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to create study group." });
+        }
+        await tx.insert(studyGroupMembers).values({
+          groupId: createdGroupId,
+          userId: ctx.user.id,
+          email: actor.email,
+          role: "owner",
+          inviteStatus: "active",
+          invitedByUserId: ctx.user.id,
+          joinedAt: new Date(),
+        });
+        return createdGroupId;
       });
     } catch (err) {
       if (err instanceof TRPCError) throw err;

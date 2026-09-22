@@ -35,6 +35,23 @@ describe("Study Groups", () => {
     expect(read("server/verifyStudyGroupsSchema.integration.test.ts")).toContain("study_groups");
   });
 
+  it("creates a group with its owner atomically and lists only the signed-in learner's groups", () => {
+    const router = read("server/routers/studyGroupsRouter.ts");
+    const listMine = router.slice(router.indexOf("listMine:"), router.indexOf("create:"));
+    const create = router.slice(router.indexOf("create:"), router.indexOf("getWorkspace:"));
+
+    expect(listMine).toContain("membership-only");
+    expect(listMine).toContain("adminListGroups procedure");
+    expect(listMine).toContain("ids.length");
+    expect(listMine).not.toContain("platformAdmin");
+    expect(create).toContain("await db.transaction");
+    expect(create).toContain("}).$returningId()");
+    expect(create).toContain("eq(studyGroups.createdByUserId, ctx.user.id)");
+    expect(create).toContain("isNull(studyGroupMembers.id)");
+    expect(create).toContain('role: "owner"');
+    expect(create).toContain('inviteStatus: "active"');
+  });
+
   it("keeps invitations email-address based and supports Zoom and Microsoft Teams meeting links", () => {
     const router = read("server/routers/studyGroupsRouter.ts");
     expect(router).toContain("inviteByEmail");
