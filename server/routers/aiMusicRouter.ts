@@ -190,13 +190,17 @@ function parseComposition(value: string): unknown {
 
 function textureDirection(texture: AiLoopPlan["texture"]) {
   switch (texture) {
-    case "rnb": return "smooth contemporary R&B rhythm: warm sub-bass, syncopated drums, restrained chord-like synth movement, and a relaxed late-night groove";
-    case "rap": return "clean modern rap instrumental beat: sparse punchy drums, deep sub-bass, crisp hi-hat movement, and lots of space for on-screen text; no rapping or vocal samples";
-    case "hiphop": return "hip-hop instrumental rhythm: head-nod drums, swung hi-hats, melodic sub-bass, and a compact loopable groove; no rapping or vocal samples";
-    case "pop": return "bright polished pop rhythm: steady four-beat pulse, clear snare backbeat, melodic synth hooks, and an accessible upbeat lift";
-    case "upbeat": return "energetic upbeat instrumental: driving dance-pop pulse, bright percussion, positive major-key movement, and high but controlled energy";
-    case "rock": return "instrumental rock-inspired rhythm: driving live-band style kick and snare, rhythmic guitar-like synth voicing, and confident forward movement; no vocals";
-    default: return `${texture} instrumental rhythm`;
+    case "rnb": return "smooth contemporary R&B rhythm: round sub-bass, syncopated kick and clap, crisp closed/open hats, warm minor seventh-feeling chord movement, and a relaxed late-night groove";
+    case "rap": return "clean current rap instrumental beat: tight low-end kick, deep 808-style sub-bass, sparse snare/clap accents, detailed hi-hat syncopation, and lots of space for on-screen text; no rapping or vocal samples";
+    case "hiphop": return "modern hip-hop instrumental rhythm: head-nod drums, swung hi-hats, deep melodic sub-bass, warm chord pad, and a compact loopable groove; no rapping or vocal samples";
+    case "pop": return "polished modern pop rhythm: a tight four-beat kick, bright snare backbeat, crisp hats, supportive major-key chord pad, and a memorable restrained synth hook";
+    case "upbeat": return "energetic modern dance-pop instrumental: driving pulse, bright percussion, clean sub-bass, positive major-key chord movement, and high but controlled energy";
+    case "rock": return "modern instrumental rock-inspired rhythm: punchy live-band style kick and snare, warm driven bass, rhythmic guitar-like synth voicing, and confident forward movement; no vocals";
+    case "electronic": return "modern electronic instrumental: punchy sidechain-feeling kick and sub-bass, bright sequenced hats, a clean synth chord bed, and a compact melodic hook";
+    case "pulse": return "modern pulse-driven instrumental: clean kick and bass lock, precise hats, dark-to-bright synthesizer movement, and a focused clinical-tech energy";
+    case "lofi": return "modern lo-fi instrumental: dusty but clean hip-hop drum pocket, warm bass, lightly swung hats, soft chord pad, and a compact relaxed hook";
+    case "ambient": return "modern ambient instrumental: wide warm pads, subtle low pulse, soft filtered texture, spacious chord movement, and minimal non-distracting percussion";
+    case "minimal": return "modern minimal instrumental: clean tight kick, concise bass motif, sparse hats, restrained warm chord texture, and generous breathing room";
   }
 }
 
@@ -218,11 +222,11 @@ export const aiMusicRouter = router({
         messages: [
           {
             role: "system",
-            content: "You compose concise, original instrumental loop blueprints for a clinical education social-video export. Instrumental only, no vocals, rap, spoken words, samples, artist references, existing songs, copyrighted material, lyrics, or medical claims. Produce a 16-step loop that is supportive beneath on-screen educational text, loopable, and never distracting.",
+            content: "You compose concise, original instrumental loop blueprints for a clinical education social-video export. Instrumental only: no vocals, rapping, spoken words, samples, artist references, existing songs, copyrighted material, lyrics, or medical claims. Produce a contemporary 16-step arrangement with a purposeful drum pocket, sub-bass, harmonic depth, and a restrained lead contour. It must loop cleanly, remain supportive beneath on-screen educational text, have no sudden drops, and never be distracting.",
           },
           {
             role: "user",
-            content: `Instrumental only, no vocals. Create one original 20-second ${input.mood} loop with this style: ${textureDirection(input.texture)}. Use practical tempo and small, balanced patterns. Density is 1 (very sparse) through 5 (busy); use 2–4 for readable card-video backing. keyRoot is chromatic 0–11. Pattern values: drum steps are 0/1; bass and lead steps are -1 for rest or semitone offsets 0–24. ${userDirection}`,
+            content: `Instrumental only, no vocals or spoken/rapped content. Create one original 20-second ${input.mood} loop with this style: ${textureDirection(input.texture)}. Aim for a clean contemporary studio mix: layered kick/snare or clap/hat rhythm, controlled sub-bass, a harmonic chord contour, and a concise lead motif. Use practical tempo and small, balanced patterns. Density is 1 (very sparse) through 5 (busy); use 2–4 for readable card-video backing. keyRoot is chromatic 0–11. Pattern values: drum steps are 0/1; bass and lead steps are -1 for rest or semitone offsets 0–24. ${userDirection}`,
           },
         ],
       });

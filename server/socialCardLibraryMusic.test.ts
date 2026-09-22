@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const root = new URL("..", import.meta.url).pathname;
 const exporter = readFileSync(`${root}/client/src/components/social/SocialCardExport.tsx`, "utf8");
+const loopSynthesizer = readFileSync(`${root}/client/src/lib/aiMusicLoop.ts`, "utf8");
 const quiz = readFileSync(`${root}/client/src/pages/QuestionBankSocialCardGenerator.tsx`, "utf8");
 const social = readFileSync(`${root}/client/src/pages/SocialContentGenerator.tsx`, "utf8");
 const challenge = readFileSync(`${root}/client/src/pages/ChallengeCardGenerator.tsx`, "utf8");
@@ -38,6 +39,14 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(exporter).toContain('folder: "social-card-ai-music"');
     expect(exporter).toContain('source: "ai_generated"');
     expect(exporter).toContain("Instrumental only.");
+  });
+
+  it("renders a layered modern instrumental mix rather than a single oscillator beat", () => {
+    for (const layer of ["addModernKick", "addModernSnare", "addModernHat", "addLayeredBass", "addModernLead", "addPadChord", "createImpulseResponse", "createDrive"]) {
+      expect(loopSynthesizer).toContain(layer);
+    }
+    expect(loopSynthesizer).toContain("createDynamicsCompressor");
+    expect(loopSynthesizer).toContain("chordProgression");
   });
 
   it("supports question-and-answer MP4 sequences across every card generator", () => {
