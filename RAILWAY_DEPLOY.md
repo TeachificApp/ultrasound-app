@@ -31,7 +31,27 @@ Build: pnpm install && pnpm build
 Start: pnpm start
 ```
 
-Railway deploys automatically on every push to `main`.
+Railway connects to GitHub `main`, but **`railway.toml` → `[build].watchPatterns`** limits which file changes start a new deployment.
+
+| Change type | Deploy? |
+|-------------|---------|
+| `client/**`, `server/**`, `shared/**`, `drizzle/**`, `package.json`, lockfile, Vite/TS config, `railway.toml`, `nixpacks.toml` | **Yes** |
+| Docs only (`RAILWAY_DEPLOY.md`, `AGENTS.md`, `docs/**`, `todo.md`, …) | **Skipped** (“No changes to watched files”) — expected; production keeps the last successful deploy |
+
+**Docs-only merges (e.g. PR #169) do not need a redeploy.** To ship new runtime code, merge a PR that touches a watched path, or in Railway open the service → **Deployments** → **Redeploy** the latest successful build.
+
+MySQL migrations (`drizzle/*.sql`) are in the watch list for awareness, but **apply SQL on Railway MySQL manually**; a green deploy alone does not run migrations.
+
+### Study Groups (Learn `/study-groups`)
+
+After deploying Study Groups from `main`, apply these **additive** SQL files on Railway MySQL:
+
+1. `drizzle/0070_study_groups.sql` — all `study_group_*` tables
+2. `drizzle/0073_study_group_legacy_period_compat.sql` — optional `stripe_current_period_end` compat column
+
+Verify read-only: `DATABASE_URL='…' pnpm exec vitest run server/verifyStudyGroupsSchema.integration.test.ts`
+
+A raw toast `Failed query: insert into study_groups…` almost always means **0070 was not applied** while the new app code is already live. Code fix `ebe8eb5d` on `main` removed a duplicate Drizzle billing-period column that also broke inserts when the ORM expected columns the database did not have.
 
 ### Manus **Publish** and `healthcheckPath` errors
 
