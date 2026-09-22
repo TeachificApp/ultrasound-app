@@ -208,9 +208,8 @@ async function startServer() {
   app.get("/api/debug/db-status", async (_req, res) => {
     const { getDb } = await import("../db");
     const hasDbUrl = !!process.env.DATABASE_URL;
-    const dbUrlPrefix = process.env.DATABASE_URL?.substring(0, 30) || "NOT SET";
     const db = await getDb();
-    res.json({ hasDbUrl, dbUrlPrefix, dbConnected: !!db });
+    res.json({ hasDbUrl, dbConnected: !!db });
   });
   // Temporary debug endpoint to diagnose email provider configuration
   app.get("/api/debug/email-status", async (_req, res) => {

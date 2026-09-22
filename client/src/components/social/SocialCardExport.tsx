@@ -32,6 +32,8 @@ export type CardMotion = {
   /** Website shown on the final brand screen; cards choose their approved destination. */
   outroHost?: string;
   musicUrl?: string | null;
+  /** Browser-local audio retained for a newly generated/uploaded track. */
+  musicBlob?: Blob | null;
   musicTitle?: string | null;
 };
 
@@ -73,6 +75,8 @@ export type SocialMusicOption = {
   license?: string;
   licenseUrl?: string;
   sourceUrl?: string | null;
+  /** Retains freshly generated audio for reliable same-browser MP4 encoding. */
+  localBlob?: Blob;
 };
 
 type MusicSourceMode = "none" | "catalogue" | "upload" | "ai";
@@ -487,14 +491,22 @@ async function loadMotionLogo(url: string | undefined): Promise<HTMLImageElement
   });
 }
 
-async function addMusicTrack(output: Output, musicUrl: string | null | undefined): Promise<{ source: AudioBufferSource; buffer: AudioBuffer } | null> {
-  if (!musicUrl) return null;
+async function addMusicTrack(
+  output: Output,
+  musicUrl: string | null | undefined,
+  musicBlob?: Blob | null,
+): Promise<{ source: AudioBufferSource; buffer: AudioBuffer } | null> {
+  if (!musicUrl && !musicBlob) return null;
   try {
-    const response = await fetch(musicUrl, { mode: "cors" });
-    if (!response.ok) return null;
-    const bytes = await response.arrayBuffer();
+    const bytes = musicBlob
+      ? await musicBlob.arrayBuffer()
+      : await (async () => {
+        const response = await fetch(musicUrl!, { mode: "cors" });
+        if (!response.ok) throw new Error(`Audio source returned ${response.status}.`);
+        return response.arrayBuffer();
+      })();
     const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextCtor) return null;
+    if (!AudioContextCtor) throw new Error("This browser cannot decode audio for MP4 export.");
     const audioContext = new AudioContextCtor();
     const decoded = await audioContext.decodeAudioData(bytes.slice(0));
     const frames = Math.min(decoded.length, Math.floor(decoded.sampleRate * MOTION_DURATION_SECONDS));
@@ -502,12 +514,18 @@ async function addMusicTrack(output: Output, musicUrl: string | null | undefined
     for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) {
       clip.copyToChannel(decoded.getChannelData(channel).slice(0, frames), channel);
     }
+    await audioContext.close?.();
     const source = new AudioBufferSource({ codec: "aac", quality: new Quality("medium") });
     output.addAudioTrack(source);
     return { source, buffer: clip };
-  } catch {
-    return null;
+  } catch (error) {
+    const label = motionMusicLabel(musicUrl);
+    throw new Error(`The selected ${label} could not be embedded in this MP4. Try generating the AI loop again, or choose an audio file that this browser can decode.`);
   }
+}
+
+function motionMusicLabel(musicUrl: string | null | undefined) {
+  return musicUrl?.includes("openverse") ? "CC0 track" : "music track";
 }
 
 async function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
@@ -554,7 +572,7 @@ export async function renderSocialCardAsMp4(
     output.addVideoTrack(source);
     const [logo, music] = await Promise.all([
       loadMotionLogo(motion.logoUrl),
-      addMusicTrack(output, motion.musicUrl),
+      addMusicTrack(output, motion.musicUrl, motion.musicBlob),
     ]);
     await output.start();
     try {
@@ -695,6 +713,7 @@ export function SocialExportControls({
         title: file.name.replace(/\.[^.]+$/, ""),
         url: uploaded.s3Url,
         source: "media_repository",
+        localBlob: file,
       });
     } finally {
       setIsUploadingMusic(false);
@@ -728,6 +747,7 @@ export function SocialExportControls({
         title: `AI loop · ${composition.plan.title}`,
         url: uploaded.s3Url,
         source: "ai_generated",
+        localBlob: wav,
       });
     } catch (error) {
       console.error("AI music loop generation failed:", error);
@@ -817,13 +837,13 @@ export function SocialExportControls({
                 {composeAiLoop.isPending ? "Composing loop…" : isUploadingMusic ? "Saving loop…" : "Generate AI loop"}
               </button>
               {aiMusicError && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-amber-200">{aiMusicError}</p>}
-              <p className="text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Instrumental only. Listen to the browser preview before publishing; the selected loop is added to the MP4 when browser decoding permits.</p>
+              <p className="text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Instrumental only. Listen to the browser preview before publishing; this newly generated loop is embedded directly in the MP4 from this browser.</p>
             </div>}
             {musicMode === "upload" && <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.025] p-2">
               {musicUploadBrand && <div className="flex items-center gap-2"><input ref={musicInputRef} type="file" accept="audio/mpeg,audio/mp4,audio/aac,audio/x-m4a,audio/wav" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMusic(file).catch((error) => console.error("Music upload failed:", error)); event.currentTarget.value = ""; }} /><button type="button" disabled={isUploadingMusic} onClick={() => musicInputRef.current?.click()} className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-white/75 transition-colors hover:bg-white/10 disabled:opacity-40">{isUploadingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}{isUploadingMusic ? "Uploading…" : "Choose audio file"}</button><span className="text-[10px] normal-case tracking-normal text-white/35">MP3, M4A, AAC, or WAV · up to 30 MB</span></div>}
               {musicOptions.length > 0 && <div className="space-y-1.5"><p className="text-[10px] font-semibold normal-case tracking-normal text-white/55">Available Media Repository music</p>{musicOptions.map((option) => <div key={option.id} className={`rounded-md border p-2 ${selectedMusic?.id === option.id ? "border-teal-300/60 bg-teal-300/10" : "border-white/10 bg-black/10"}`}><div className="flex items-center justify-between gap-2"><p className="min-w-0 truncate text-[11px] font-semibold normal-case tracking-normal text-white">{option.title}</p><button type="button" onClick={() => chooseTrack(option)} className="shrink-0 rounded border border-teal-300/30 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-teal-100 hover:bg-teal-300/15">{selectedMusic?.id === option.id ? "Selected" : "Use track"}</button></div><audio controls preload="metadata" src={option.url} className="mt-1.5 h-7 w-full" aria-label={`Preview ${option.title}`} /></div>)}</div>}
             </div>}
-            {selectedMusic && <div className="rounded-md border border-white/10 bg-white/[0.035] p-2"><div className="mb-1 flex items-center gap-1 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Headphones className="h-3 w-3 text-teal-200" />Selected: {selectedMusic.title}</div><audio ref={musicPreviewRef} controls preload="metadata" src={selectedMusic.url} className="h-7 w-full max-w-[290px]" aria-label={`Play a sample of ${selectedMusic.title}`} /><p className="mt-1 text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Preview plays in this browser only. The full MP4 uses the selected track when the source permits browser decoding and CORS access.</p></div>}
+            {selectedMusic && <div className="rounded-md border border-white/10 bg-white/[0.035] p-2"><div className="mb-1 flex items-center gap-1 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Headphones className="h-3 w-3 text-teal-200" />Selected: {selectedMusic.title}</div><audio ref={musicPreviewRef} controls preload="metadata" src={selectedMusic.url} className="h-7 w-full max-w-[290px]" aria-label={`Play a sample of ${selectedMusic.title}`} /><p className="mt-1 text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Preview plays in this browser. Freshly generated or uploaded audio is embedded directly in the MP4; other selected tracks must permit browser decoding and CORS access.</p></div>}
             {selectedMusic?.source === "openverse" && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-teal-100/80">Selected: {selectedMusic.title} — {selectedMusic.creator} · {selectedMusic.license ?? "CC0 1.0"}</p>}
           </div>
         )}

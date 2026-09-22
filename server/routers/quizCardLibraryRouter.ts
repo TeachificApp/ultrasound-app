@@ -47,7 +47,7 @@ export const quizCardLibraryRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const [result] = await db.insert(quizCardLibrary).values({
+      const inserted = await db.insert(quizCardLibrary).values({
         brand: input.brand,
         questionBankId: input.questionBankId ?? null,
         questionSnapshot: input.questionSnapshot,
@@ -59,7 +59,27 @@ export const quizCardLibraryRouter = router({
         customCardLabel: input.customCardLabel || null,
         createdByUserId: ctx.user.id,
       }).$returningId();
-      return { id: result.id };
+      const id = Number(inserted[0]?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Quiz Card Library save did not return a record ID. Please try again.",
+        });
+      }
+
+      const [saved] = await db
+        .select({ id: quizCardLibrary.id })
+        .from(quizCardLibrary)
+        .where(eq(quizCardLibrary.id, id))
+        .limit(1);
+      if (!saved) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Quiz Card Library save could not be verified. Please try again.",
+        });
+      }
+
+      return { id: saved.id };
     }),
 
   publish: platformAdminProcedure

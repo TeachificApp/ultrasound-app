@@ -9,6 +9,7 @@ const social = readFileSync(`${root}/client/src/pages/SocialContentGenerator.tsx
 const challenge = readFileSync(`${root}/client/src/pages/ChallengeCardGenerator.tsx`, "utf8");
 const router = readFileSync(`${root}/server/routers/quizCardLibraryRouter.ts`, "utf8");
 const migration = readFileSync(`${root}/drizzle/0072_quiz_card_library.sql`, "utf8");
+const serverEntry = readFileSync(`${root}/server/_core/index.ts`, "utf8");
 
 describe("card music, combined exports, and Quiz Card Library", () => {
   it("offers direct audio upload in the shared exporter for each brand", () => {
@@ -17,7 +18,7 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(exporter).toContain("musicUploadBrand");
     expect(exporter).toContain("Selected:");
     expect(exporter).toContain("<audio ref={musicPreviewRef} controls");
-    expect(exporter).toContain("Preview plays in this browser only");
+    expect(exporter).toContain("Preview plays in this browser.");
     for (const page of [quiz, social, challenge]) expect(page).toContain("musicUploadBrand={presentation.brand}");
   });
 
@@ -38,7 +39,15 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(exporter).toContain("renderAiMusicLoop(composition.plan, composition.durationSeconds)");
     expect(exporter).toContain('folder: "social-card-ai-music"');
     expect(exporter).toContain('source: "ai_generated"');
+    expect(exporter).toContain("localBlob: wav");
     expect(exporter).toContain("Instrumental only.");
+  });
+
+  it("embeds freshly selected generated or uploaded audio from browser bytes instead of silently omitting it", () => {
+    expect(exporter).toContain("musicBlob?: Blob | null");
+    expect(exporter).toMatch(/musicBlob\s*\? await musicBlob\.arrayBuffer\(\)/);
+    expect(exporter).toContain("The selected ${label} could not be embedded in this MP4");
+    for (const page of [quiz, social, challenge]) expect(page).toContain("musicBlob: selectedMusic?.localBlob");
   });
 
   it("renders a layered modern instrumental mix rather than a single oscillator beat", () => {
@@ -67,7 +76,17 @@ describe("card music, combined exports, and Quiz Card Library", () => {
   it("persists shared Quiz Card snapshots with moderation actions", () => {
     expect(migration).toContain("quiz_card_library");
     for (const action of ["save", "publish", "flag", "resolveFlag", "delete"]) expect(router).toContain(`${action}: platformAdminProcedure`);
+    expect(router).toContain("Quiz Card Library save did not return a record ID");
+    expect(router).toContain("Quiz Card Library save could not be verified");
+    expect(router).toContain(".where(eq(quizCardLibrary.id, id))");
     expect(quiz).toContain("Shared Quiz Card Library");
     expect(quiz).toContain("Save to library");
+    expect(quiz).toContain("Saved and verified in the shared Quiz Card Library.");
+    expect(quiz).toContain("Quiz Card Library could not load:");
+  });
+
+  it("does not disclose any database URL fragment from the production status probe", () => {
+    expect(serverEntry).toContain('app.get("/api/debug/db-status"');
+    expect(serverEntry).not.toContain("dbUrlPrefix");
   });
 });
