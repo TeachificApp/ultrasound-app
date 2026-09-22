@@ -64,6 +64,8 @@ export type SocialMusicOption = {
   sourceUrl?: string | null;
 };
 
+type MusicSourceMode = "none" | "catalogue" | "upload";
+
 function cleanText(value: string | null | undefined): string {
   return (value ?? "")
     .replace(/<[^>]*>/g, "")
@@ -574,6 +576,7 @@ export function SocialExportControls({
   compact?: boolean;
 }) {
   const activePreset = useMemo(() => getSocialExportPreset(platform), [platform]);
+  const [musicMode, setMusicMode] = useState<MusicSourceMode>(() => selectedMusic?.source === "openverse" ? "catalogue" : selectedMusic ? "upload" : "none");
   const [catalogueInput, setCatalogueInput] = useState("");
   const [catalogueQuery, setCatalogueQuery] = useState("");
   const [isUploadingMusic, setIsUploadingMusic] = useState(false);
@@ -581,7 +584,7 @@ export function SocialExportControls({
   const musicPreviewRef = useRef<HTMLAudioElement>(null);
   const catalogue = trpc.openverseMusic.searchCc0Audio.useQuery(
     { query: catalogueQuery, limit: 8 },
-    { enabled: catalogueQuery.length >= 2, retry: false, staleTime: 60_000 },
+    { enabled: musicMode === "catalogue" && catalogueQuery.length >= 2, retry: false, staleTime: 60_000 },
   );
   const catalogueOptions = useMemo<SocialMusicOption[]>(() => (catalogue.data?.tracks ?? []).map((track: any) => ({
     id: `openverse:${track.id}`,
@@ -594,18 +597,15 @@ export function SocialExportControls({
     licenseUrl: track.licenseUrl,
     sourceUrl: track.sourceUrl,
   })), [catalogue.data?.tracks]);
-  const combinedMusicOptions = useMemo(() => {
-    const entries = [...musicOptions, ...catalogueOptions];
-    if (selectedMusic && !entries.some((item) => item.id === selectedMusic.id)) entries.push(selectedMusic);
-    return entries;
-  }, [catalogueOptions, musicOptions, selectedMusic]);
 
-  const selectMusic = (value: string) => {
-    if (!value) {
-      onMusicChange?.(null);
-      return;
-    }
-    onMusicChange?.(combinedMusicOptions.find((option) => option.id === value) ?? null);
+  const chooseMusicMode = (nextMode: MusicSourceMode) => {
+    setMusicMode(nextMode);
+    if (nextMode === "none" || selectedMusic) onMusicChange?.(null);
+  };
+
+  const chooseTrack = (track: SocialMusicOption) => {
+    setMusicMode(track.source === "openverse" ? "catalogue" : "upload");
+    onMusicChange?.(track);
   };
 
   useEffect(() => {
@@ -614,6 +614,22 @@ export function SocialExportControls({
     preview.pause();
     preview.currentTime = 0;
   }, [selectedMusic?.id]);
+
+  useEffect(() => {
+    if (!selectedMusic) return;
+    setMusicMode(selectedMusic.source === "openverse" ? "catalogue" : "upload");
+  }, [selectedMusic?.id, selectedMusic?.source]);
+
+  useEffect(() => {
+    if (musicMode !== "catalogue") return;
+    const query = catalogueInput.trim();
+    if (query.length < 2) {
+      setCatalogueQuery("");
+      return;
+    }
+    const delay = window.setTimeout(() => setCatalogueQuery(query), 300);
+    return () => window.clearTimeout(delay);
+  }, [catalogueInput, musicMode]);
 
   const uploadMusic = async (file: File) => {
     if (!musicUploadBrand || !file.type.startsWith("audio/")) return;
@@ -627,7 +643,7 @@ export function SocialExportControls({
         folder: "social-card-music",
         brand: musicUploadBrand,
       });
-      onMusicChange?.({
+      chooseTrack({
         id: `media:${uploaded.assetId}`,
         title: file.name.replace(/\.[^.]+$/, ""),
         url: uploaded.s3Url,
@@ -672,47 +688,33 @@ export function SocialExportControls({
             <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider text-white/50">
               <span className="flex items-center gap-1">Background music <span className="font-normal normal-case text-white/35">MP4 only</span></span>
               <select
-                value={selectedMusic?.id ?? ""}
-                onChange={(event) => selectMusic(event.target.value)}
+                value={musicMode}
+                onChange={(event) => chooseMusicMode(event.target.value as MusicSourceMode)}
                 className="rounded-md border border-white/15 bg-[#0e1a24] px-2.5 py-1.5 text-xs font-semibold normal-case tracking-normal text-white outline-none"
               >
-                <option value="">No music</option>
-                {musicOptions.length > 0 && <optgroup label="Media Repository">{musicOptions.map((option) => <option key={option.id} value={option.id}>{option.title}</option>)}</optgroup>}
-                {catalogueOptions.length > 0 && <optgroup label="Openverse CC0 catalogue">{catalogueOptions.map((option) => <option key={option.id} value={option.id}>{option.title} — {option.creator}</option>)}</optgroup>}
+                <option value="none">No music</option>
+                <option value="catalogue">Free CC0 search</option>
+                <option value="upload">Upload audio</option>
               </select>
             </label>
-            {selectedMusic && <div className="rounded-md border border-white/10 bg-white/[0.035] p-2">
-              <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Headphones className="h-3 w-3 text-teal-200" />Sample: {selectedMusic.title}</div>
-              <audio ref={musicPreviewRef} controls preload="metadata" src={selectedMusic.url} className="h-7 w-full max-w-[290px]" aria-label={`Play a sample of ${selectedMusic.title}`} />
-              <p className="mt-1 text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Preview plays in this browser only. The full MP4 uses the selected track when the source permits browser decoding and CORS access.</p>
+            {musicMode === "catalogue" && <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.025] p-2">
+              <label className="flex items-center gap-1.5 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Search className="h-3 w-3 text-teal-200" />Search free CC0 music</label>
+              <input value={catalogueInput} onChange={(event) => setCatalogueInput(event.target.value.slice(0, 80))} placeholder="Try ambient, piano, upbeat…" className="w-full rounded-md border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-xs normal-case tracking-normal text-white outline-none placeholder:text-white/35" />
+              {catalogueInput.trim().length < 2 && <p className="text-[10px] normal-case tracking-normal text-white/40">Type at least two characters to search the CC0 catalogue.</p>}
+              {catalogue.isFetching && <p className="inline-flex items-center gap-1 text-[10px] normal-case tracking-normal text-white/55"><Loader2 className="h-3 w-3 animate-spin" />Searching free CC0 tracks…</p>}
+              {catalogue.error && <p className="text-[10px] normal-case tracking-normal text-amber-200">The CC0 catalogue is temporarily unavailable. Try again or choose Upload audio.</p>}
+              {!catalogue.isFetching && catalogueQuery.length >= 2 && !catalogue.error && catalogueOptions.length === 0 && <p className="text-[10px] normal-case tracking-normal text-white/40">No compatible non-mature CC0 previews were found. Try a broader search.</p>}
+              {catalogueOptions.length > 0 && <div className="max-h-56 space-y-1.5 overflow-y-auto pr-0.5">{catalogueOptions.map((option) => <div key={option.id} className={`rounded-md border p-2 ${selectedMusic?.id === option.id ? "border-teal-300/60 bg-teal-300/10" : "border-white/10 bg-black/10"}`}>
+                <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate text-[11px] font-semibold normal-case tracking-normal text-white">{option.title}</p><p className="truncate text-[10px] normal-case tracking-normal text-white/45">{option.creator} · CC0 1.0</p></div><button type="button" onClick={() => chooseTrack(option)} className="shrink-0 rounded border border-teal-300/30 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-teal-100 hover:bg-teal-300/15">{selectedMusic?.id === option.id ? "Selected" : "Use track"}</button></div>
+                <audio controls preload="metadata" src={option.url} className="mt-1.5 h-7 w-full" aria-label={`Preview ${option.title}`} />
+              </div>)}</div>}
+              <p className="text-[10px] leading-relaxed normal-case tracking-normal text-white/45">Openverse results are third-party CC0 1.0 previews. Confirm attribution and source before publishing.</p>
             </div>}
-            <div className="flex gap-1">
-              <input
-                value={catalogueInput}
-                onChange={(event) => setCatalogueInput(event.target.value.slice(0, 80))}
-                onKeyDown={(event) => { if (event.key === "Enter" && catalogueInput.trim().length >= 2) setCatalogueQuery(catalogueInput.trim()); }}
-                placeholder="Search free CC0 music"
-                className="min-w-0 flex-1 rounded-md border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-xs normal-case tracking-normal text-white outline-none placeholder:text-white/35"
-              />
-              <button
-                type="button"
-                disabled={catalogueInput.trim().length < 2 || catalogue.isFetching}
-                onClick={() => setCatalogueQuery(catalogueInput.trim())}
-                className="inline-flex items-center justify-center rounded-md border border-white/15 px-2 text-white/70 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Search the Openverse CC0 music catalogue"
-              >
-                {catalogue.isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
-              </button>
-            </div>
-            {musicUploadBrand && <div className="flex items-center gap-2">
-              <input ref={musicInputRef} type="file" accept="audio/mpeg,audio/mp4,audio/aac,audio/x-m4a,audio/wav" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMusic(file).catch((error) => console.error("Music upload failed:", error)); event.currentTarget.value = ""; }} />
-              <button type="button" disabled={isUploadingMusic} onClick={() => musicInputRef.current?.click()} className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] normal-case tracking-normal text-white/70 transition-colors hover:bg-white/10 disabled:opacity-40">
-                {isUploadingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}{isUploadingMusic ? "Uploading…" : "Upload audio"}
-              </button>
-              <span className="text-[10px] normal-case tracking-normal text-white/35">MP3, M4A, AAC, or WAV · up to 30 MB</span>
+            {musicMode === "upload" && <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.025] p-2">
+              {musicUploadBrand && <div className="flex items-center gap-2"><input ref={musicInputRef} type="file" accept="audio/mpeg,audio/mp4,audio/aac,audio/x-m4a,audio/wav" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMusic(file).catch((error) => console.error("Music upload failed:", error)); event.currentTarget.value = ""; }} /><button type="button" disabled={isUploadingMusic} onClick={() => musicInputRef.current?.click()} className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-white/75 transition-colors hover:bg-white/10 disabled:opacity-40">{isUploadingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}{isUploadingMusic ? "Uploading…" : "Choose audio file"}</button><span className="text-[10px] normal-case tracking-normal text-white/35">MP3, M4A, AAC, or WAV · up to 30 MB</span></div>}
+              {musicOptions.length > 0 && <div className="space-y-1.5"><p className="text-[10px] font-semibold normal-case tracking-normal text-white/55">Available Media Repository music</p>{musicOptions.map((option) => <div key={option.id} className={`rounded-md border p-2 ${selectedMusic?.id === option.id ? "border-teal-300/60 bg-teal-300/10" : "border-white/10 bg-black/10"}`}><div className="flex items-center justify-between gap-2"><p className="min-w-0 truncate text-[11px] font-semibold normal-case tracking-normal text-white">{option.title}</p><button type="button" onClick={() => chooseTrack(option)} className="shrink-0 rounded border border-teal-300/30 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-teal-100 hover:bg-teal-300/15">{selectedMusic?.id === option.id ? "Selected" : "Use track"}</button></div><audio controls preload="metadata" src={option.url} className="mt-1.5 h-7 w-full" aria-label={`Preview ${option.title}`} /></div>)}</div>}
             </div>}
-            {catalogue.error && <p className="text-[10px] normal-case tracking-normal text-amber-200">Catalogue search is temporarily unavailable. Media Repository music remains available.</p>}
-            {catalogueOptions.length > 0 && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-white/45">Openverse results are third-party CC0 1.0 previews. Confirm attribution and source before publishing.</p>}
+            {selectedMusic && <div className="rounded-md border border-white/10 bg-white/[0.035] p-2"><div className="mb-1 flex items-center gap-1 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Headphones className="h-3 w-3 text-teal-200" />Selected: {selectedMusic.title}</div><audio ref={musicPreviewRef} controls preload="metadata" src={selectedMusic.url} className="h-7 w-full max-w-[290px]" aria-label={`Play a sample of ${selectedMusic.title}`} /><p className="mt-1 text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Preview plays in this browser only. The full MP4 uses the selected track when the source permits browser decoding and CORS access.</p></div>}
             {selectedMusic?.source === "openverse" && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-teal-100/80">Selected: {selectedMusic.title} — {selectedMusic.creator} · {selectedMusic.license ?? "CC0 1.0"}</p>}
           </div>
         )}

@@ -14,10 +14,21 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(exporter).toContain("Upload audio");
     expect(exporter).toContain("uploadFileToMediaRepository");
     expect(exporter).toContain("musicUploadBrand");
-    expect(exporter).toContain("Sample:");
+    expect(exporter).toContain("Selected:");
     expect(exporter).toContain("<audio ref={musicPreviewRef} controls");
     expect(exporter).toContain("Preview plays in this browser only");
     for (const page of [quiz, social, challenge]) expect(page).toContain("musicUploadBrand={presentation.brand}");
+  });
+
+  it("uses explicit no-music, CC0-search, and upload modes with previewable catalogue results", () => {
+    expect(exporter).toContain('type MusicSourceMode = "none" | "catalogue" | "upload"');
+    expect(exporter).toContain('<option value="none">No music</option>');
+    expect(exporter).toContain('<option value="catalogue">Free CC0 search</option>');
+    expect(exporter).toContain('<option value="upload">Upload audio</option>');
+    expect(exporter).toContain('musicMode === "catalogue"');
+    expect(exporter).toContain('setTimeout(() => setCatalogueQuery(query), 300)');
+    expect(exporter).toContain('Use track');
+    expect(exporter).toContain('aria-label={`Preview ${option.title}`}');
   });
 
   it("supports question-and-answer MP4 sequences across every card generator", () => {
