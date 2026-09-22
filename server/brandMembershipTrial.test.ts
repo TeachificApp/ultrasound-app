@@ -48,6 +48,15 @@ describe("brand Premium introductory trial rules", () => {
     expect(router).toContain("isEligibleForBrandPremiumTrial");
   });
 
+  it("defaults an unspecified single-app trial checkout to the annual plan while retaining monthly selection", () => {
+    const router = read("routers/brandMembershipRouter.ts");
+    const premiumPage = read("../client/src/pages/Premium.tsx");
+    expect(router).toContain('z.enum(["monthly", "annual"]).default("annual")');
+    expect(premiumPage).toContain("Default Trial Plan");
+    expect(premiumPage.indexOf('interval: "annual"')).toBeLessThan(premiumPage.indexOf('interval: "monthly"'));
+    expect(premiumPage).toContain('interval: "monthly"');
+  });
+
   it("does not defer a valid app trial while retaining the non-paid checkout safeguard", () => {
     const webhook = read("webhooks/stripe.ts");
     expect(webhook).toContain("isBrandMembershipTrialCheckout");

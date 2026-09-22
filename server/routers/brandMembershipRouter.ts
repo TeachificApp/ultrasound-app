@@ -267,7 +267,9 @@ export const brandMembershipRouter = router({
    */
   createCheckout: protectedProcedure
     .input(z.object({
-      interval: z.enum(["monthly", "annual"]).default("monthly"),
+      // The annual plan is the default trial destination. Monthly remains an
+      // explicit, available choice in the Premium plan selector.
+      interval: z.enum(["monthly", "annual"]).default("annual"),
       origin: z.string().url(),
       promoCode: z.string().optional(),
     }))
