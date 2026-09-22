@@ -1,6 +1,8 @@
 [build]
 builder = "nixpacks"
 buildCommand = "pnpm install && pnpm build"
+# Deployment trigger: rebuild the reconciled Study Group repair revision after the
+# GitHub merge was skipped as having no watched-file delta on September 22, 2026.
 # Only pushes that touch these paths trigger a new Railway build (see RAILWAY_DEPLOY.md).
 watchPatterns = [
   "client/**",
