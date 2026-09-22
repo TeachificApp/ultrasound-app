@@ -10,7 +10,7 @@ The Railway MySQL target has the migrated user foundation and the Railway-only a
 
 | Service area | Current implementation | Railway cutover requirement | Completion criterion |
 |---|---|---|---|
-| Web application and API | Node/Express, React, tRPC, Vite build; `railway.toml` and `railway.json` already exist | Deploy the current repository as a Railway service using `pnpm build` and `pnpm start` | Railway health check at `/api/health` is green and serving the built client/API |
+| Web application and API | Node/Express, React, tRPC, Vite build; `railway.toml` only (do not add `railway.json`) | Deploy the current repository as a Railway service using `pnpm build` and `pnpm start` | Railway health check at `/api/health` is green and serving the built client/API |
 | Primary database | Manus source plus Railway MySQL target | Use Railway MySQL as the only runtime `DATABASE_URL` | Runtime has no connection to the Manus database; parity reconciliation is recorded |
 | Authentication | Existing password/magic-link logic; managed OAuth fallbacks remain in the core SDK | Use local signed sessions plus Railway MySQL user records; remove managed OAuth fallback from production path | Password reset, magic-link issue/consume, sign-out, and protected routes work without `OAUTH_SERVER_URL` or `VITE_APP_ID` |
 | Password migration | Source password hashes intentionally excluded | Require independent password setup/reset after a verified Railway magic-link sign-in | No source password hash is copied; password-login succeeds after reset |
