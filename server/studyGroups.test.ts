@@ -23,9 +23,14 @@ describe("Study Groups", () => {
   it("keeps the deployed legacy billing-period column compatible with the current schema", () => {
     const compatibilityMigration = read("drizzle/0073_study_group_legacy_period_compat.sql");
     const schema = read("drizzle/schema.ts");
+    const router = read("server/routers/studyGroupsRouter.ts");
     expect(compatibilityMigration).toContain("stripe_current_period_end");
-    expect(schema).toContain('legacyStripeCurrentPeriodEnd: timestamp("stripe_current_period_end")');
+    // The old deployed revision used this extra column. Current application
+    // inserts intentionally omit it, so a current release works whether or not
+    // a connected database has already received the additive compatibility SQL.
+    expect(schema).not.toContain('timestamp("stripe_current_period_end")');
     expect(schema).toContain('currentPeriodEnd: timestamp("current_period_end")');
+    expect(router).toContain("createdByUserId: ctx.user.id");
   });
 
   it("keeps invitations email-address based and supports Zoom and Microsoft Teams meeting links", () => {

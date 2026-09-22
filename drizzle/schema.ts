@@ -8649,8 +8649,6 @@ export const studyGroups = mysqlTable("study_groups", {
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
   stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 128 }),
   currentPeriodEnd: timestamp("current_period_end"),
-  /** Compatibility only for an already-deployed server revision; do not write new values here. */
-  legacyStripeCurrentPeriodEnd: timestamp("stripe_current_period_end"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 }, (t) => ({
