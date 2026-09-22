@@ -9,6 +9,7 @@ const social = readFileSync(`${root}/client/src/pages/SocialContentGenerator.tsx
 const challenge = readFileSync(`${root}/client/src/pages/ChallengeCardGenerator.tsx`, "utf8");
 const router = readFileSync(`${root}/server/routers/quizCardLibraryRouter.ts`, "utf8");
 const migration = readFileSync(`${root}/drizzle/0072_quiz_card_library.sql`, "utf8");
+const serverEntry = readFileSync(`${root}/server/_core/index.ts`, "utf8");
 
 describe("card music, combined exports, and Quiz Card Library", () => {
   it("offers direct audio upload in the shared exporter for each brand", () => {
@@ -75,7 +76,17 @@ describe("card music, combined exports, and Quiz Card Library", () => {
   it("persists shared Quiz Card snapshots with moderation actions", () => {
     expect(migration).toContain("quiz_card_library");
     for (const action of ["save", "publish", "flag", "resolveFlag", "delete"]) expect(router).toContain(`${action}: platformAdminProcedure`);
+    expect(router).toContain("Quiz Card Library save did not return a record ID");
+    expect(router).toContain("Quiz Card Library save could not be verified");
+    expect(router).toContain(".where(eq(quizCardLibrary.id, id))");
     expect(quiz).toContain("Shared Quiz Card Library");
     expect(quiz).toContain("Save to library");
+    expect(quiz).toContain("Saved and verified in the shared Quiz Card Library.");
+    expect(quiz).toContain("Quiz Card Library could not load:");
+  });
+
+  it("does not disclose any database URL fragment from the production status probe", () => {
+    expect(serverEntry).toContain('app.get("/api/debug/db-status"');
+    expect(serverEntry).not.toContain("dbUrlPrefix");
   });
 });
