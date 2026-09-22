@@ -10,6 +10,7 @@ import {
   Output,
 } from "mediabunny";
 import type { BrandToolPresentation } from "@/lib/brandToolPresentation";
+import { useSocialCardFrame } from "@/components/social/SocialCardFrame";
 
 export type ClinicalQuizCardTemplate = "clinical-white" | "clinical-aqua" | "clinical-teal" | "clinical-dark";
 export type ClinicalCardMedia =
@@ -109,6 +110,7 @@ export function ClinicalQuizCard({
   correctAnswer,
   explanation,
 }: ClinicalQuizCardProps) {
+  const frame = useSocialCardFrame();
   if (variant === "answer") {
     return (
       <ClinicalQuizAnswerCard
@@ -129,49 +131,52 @@ export function ClinicalQuizCard({
   const questionText = stripHtml(question);
   const hasMediaArea = media.kind !== "none";
   const fit = getQuestionFit(questionText, visibleOptions, hasMediaArea);
+  const density = frame.contentScale;
+  const px = (value: number) => Math.max(1, Math.round(value * density));
 
   return (
     <div
       data-social-quiz-card="true"
       style={{
-        width: CARD_SIZE,
-        minHeight: CARD_SIZE,
+        width: frame.width,
+        height: frame.height,
+        minHeight: frame.height,
         position: "relative",
         overflow: "hidden",
         boxSizing: "border-box",
-        padding: hasMediaArea ? "46px 76px 48px" : "62px 76px 48px",
+        padding: hasMediaArea ? `${px(46)}px ${px(76)}px ${px(48)}px` : `${px(62)}px ${px(76)}px ${px(48)}px`,
         fontFamily: "'Segoe UI', Arial, sans-serif",
         background: theme.background,
         color: theme.text,
       }}
     >
-      <header style={{ display: "flex", alignItems: "center", gap: hasMediaArea ? 20 : 26, minHeight: hasMediaArea ? 88 : 118 }}>
+      <header style={{ display: "flex", alignItems: "center", gap: px(hasMediaArea ? 20 : 26), minHeight: px(hasMediaArea ? 88 : 118) }}>
         <img
           src={presentation.logoUrl}
           alt={presentation.displayName}
           crossOrigin="anonymous"
           style={{
-            width: hasMediaArea ? 86 : 116,
-            height: hasMediaArea ? 86 : 116,
-            borderRadius: "50%",
+            width: px(hasMediaArea ? 86 : 116),
+            height: px(hasMediaArea ? 86 : 116),
+            borderRadius: px(58),
             objectFit: "cover",
             background: "#ffffff",
-            border: `3px solid ${theme.accent}`,
+            border: `${px(3)}px solid ${theme.accent}`,
             flexShrink: 0,
           }}
         />
         <div>
-          <div style={{ color: theme.text, fontSize: hasMediaArea ? 17 : 22, fontWeight: 800, letterSpacing: hasMediaArea ? 2 : 2.6, opacity: 0.78 }}>
+          <div style={{ color: theme.text, fontSize: px(hasMediaArea ? 17 : 22), fontWeight: 800, letterSpacing: px(hasMediaArea ? 2 : 2.6), opacity: 0.78 }}>
             {label}
           </div>
-          <div style={{ color: theme.text, fontSize: hasMediaArea ? 25 : 30, fontWeight: 800, lineHeight: 1.15, marginTop: 5 }}>
+          <div style={{ color: theme.text, fontSize: px(hasMediaArea ? 25 : 30), fontWeight: 800, lineHeight: 1.15, marginTop: px(5) }}>
             {presentation.displayName}
           </div>
         </div>
       </header>
 
       {title && (
-        <div style={{ color: theme.text, fontSize: 20, fontWeight: 700, opacity: 0.72, marginTop: 18, letterSpacing: 0.7 }}>
+        <div style={{ color: theme.text, fontSize: px(20), fontWeight: 700, opacity: 0.72, marginTop: px(18), letterSpacing: px(0.7) }}>
           {title}
         </div>
       )}
@@ -179,11 +184,11 @@ export function ClinicalQuizCard({
       <div
         style={{
           color: theme.text,
-          fontSize: fit.questionSize,
+          fontSize: px(fit.questionSize),
           fontWeight: 800,
           lineHeight: 1.18,
-          marginTop: title ? 10 : (hasMediaArea ? 16 : 24),
-          minHeight: hasMediaArea ? 0 : 410,
+          marginTop: px(title ? 10 : (hasMediaArea ? 16 : 24)),
+          minHeight: hasMediaArea ? 0 : px(frame.layout === "vertical" ? 490 : frame.layout === "portrait" ? 450 : 410),
           display: "flex",
           alignItems: hasMediaArea ? "flex-start" : "center",
         }}
@@ -196,11 +201,11 @@ export function ClinicalQuizCard({
           style={{
             position: "relative",
             width: "100%",
-            height: 264,
-            marginTop: 16,
-            marginBottom: 14,
+            height: px(frame.layout === "vertical" ? 340 : frame.layout === "portrait" ? 302 : 264),
+            marginTop: px(16),
+            marginBottom: px(14),
             background: "#080808",
-            border: `8px solid ${theme.accent}`,
+            border: `${px(8)}px solid ${theme.accent}`,
             boxSizing: "border-box",
             overflow: "hidden",
           }}
@@ -224,15 +229,15 @@ export function ClinicalQuizCard({
           position: "relative",
           display: "flex",
           flexDirection: "column",
-          gap: fit.optionGap,
-          marginTop: hasMediaArea ? 0 : 22,
-          paddingBottom: hasMediaArea ? 54 : 0,
+          gap: px(fit.optionGap),
+          marginTop: hasMediaArea ? 0 : px(22),
+          paddingBottom: hasMediaArea ? px(54) : 0,
         }}
       >
         {visibleOptions.map((option, index) => (
-          <div key={`${index}-${option}`} style={{ display: "flex", gap: hasMediaArea ? 12 : 16, alignItems: "center", minWidth: 0, border: `2px solid ${theme.accent}66`, borderRadius: 12, padding: `${hasMediaArea ? Math.max(7, fit.optionGap) : Math.max(10, fit.optionGap)}px ${hasMediaArea ? 13 : 16}px`, background: `${theme.accent}0d` }}>
-            <span style={{ display: "inline-flex", width: Math.max(hasMediaArea ? 29 : 34, fit.optionNumberSize + (hasMediaArea ? 8 : 10)), height: Math.max(hasMediaArea ? 29 : 34, fit.optionNumberSize + (hasMediaArea ? 8 : 10)), alignItems: "center", justifyContent: "center", borderRadius: 8, background: theme.accent, color: theme.background, fontSize: fit.optionNumberSize, fontWeight: 900, lineHeight: 1, flexShrink: 0 }}>{OPTION_LETTERS[index] ?? `${index + 1}`}</span>
-            <span style={{ color: theme.text, fontSize: fit.optionSize, fontWeight: 800, lineHeight: 1.2 }}>{option}</span>
+          <div key={`${index}-${option}`} style={{ display: "flex", gap: px(hasMediaArea ? 12 : 16), alignItems: "center", minWidth: 0, border: `${px(2)}px solid ${theme.accent}66`, borderRadius: px(12), padding: `${px(hasMediaArea ? Math.max(7, fit.optionGap) : Math.max(10, fit.optionGap))}px ${px(hasMediaArea ? 13 : 16)}px`, background: `${theme.accent}0d` }}>
+            <span style={{ display: "inline-flex", width: px(Math.max(hasMediaArea ? 29 : 34, fit.optionNumberSize + (hasMediaArea ? 8 : 10))), height: px(Math.max(hasMediaArea ? 29 : 34, fit.optionNumberSize + (hasMediaArea ? 8 : 10))), alignItems: "center", justifyContent: "center", borderRadius: px(8), background: theme.accent, color: theme.background, fontSize: px(fit.optionNumberSize), fontWeight: 900, lineHeight: 1, flexShrink: 0 }}>{OPTION_LETTERS[index] ?? `${index + 1}`}</span>
+            <span style={{ color: theme.text, fontSize: px(fit.optionSize), fontWeight: 800, lineHeight: 1.2 }}>{option}</span>
           </div>
         ))}
       </section>
@@ -240,12 +245,12 @@ export function ClinicalQuizCard({
       <footer
         style={{
           position: "absolute",
-          bottom: 42,
-          left: 74,
-          right: 74,
+          bottom: px(42),
+          left: px(74),
+          right: px(74),
           textAlign: "center",
           color: theme.accent,
-          fontSize: 23,
+          fontSize: px(23),
           fontWeight: 800,
           letterSpacing: 0.4,
         }}
@@ -268,62 +273,66 @@ function ClinicalQuizAnswerCard({
   answerFooterMessage = "Follow for daily clinical challenges",
 }: Pick<ClinicalQuizCardProps, "presentation" | "template" | "question" | "correctAnswer" | "explanation" | "title" | "footerHost" | "answerContextLabel" | "answerFooterMessage">) {
   const theme = useMemo(() => getTemplate(template), [template]);
+  const frame = useSocialCardFrame();
   const questionText = stripHtml(question);
   const answerText = correctAnswer ? stripHtml(correctAnswer) : "Answer available in the accompanying explanation.";
   const fit = getAnswerFit(questionText, answerText, explanation);
+  const density = frame.contentScale;
+  const px = (value: number) => Math.max(1, Math.round(value * density));
 
   return (
     <div
       data-social-quiz-card="true"
       style={{
-        width: CARD_SIZE,
-        minHeight: CARD_SIZE,
+        width: frame.width,
+        height: frame.height,
+        minHeight: frame.height,
         position: "relative",
         overflow: "hidden",
         boxSizing: "border-box",
-        padding: "50px 66px 44px",
+        padding: `${px(50)}px ${px(66)}px ${px(44)}px`,
         fontFamily: "'Segoe UI', Arial, sans-serif",
         background: theme.background,
         color: theme.text,
       }}
     >
-      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, minHeight: 76 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 18, minWidth: 0 }}>
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: px(20), minHeight: px(76) }}>
+        <div style={{ display: "flex", alignItems: "center", gap: px(18), minWidth: 0 }}>
         <img
           src={presentation.logoUrl}
           alt={presentation.displayName}
           crossOrigin="anonymous"
-          style={{ width: 64, height: 64, borderRadius: "50%", objectFit: "cover", background: "#ffffff", border: `2px solid ${theme.accent}`, flexShrink: 0 }}
+          style={{ width: px(64), height: px(64), borderRadius: "50%", objectFit: "cover", background: "#ffffff", border: `${px(2)}px solid ${theme.accent}`, flexShrink: 0 }}
         />
         <div>
-          <div style={{ color: theme.text, fontSize: 23, fontWeight: 900, lineHeight: 1.1 }}>{presentation.displayName}</div>
-          <div style={{ color: theme.text, fontSize: 12, fontWeight: 800, letterSpacing: 1.8, opacity: 0.68, marginTop: 5 }}>{answerContextLabel}</div>
+          <div style={{ color: theme.text, fontSize: px(23), fontWeight: 900, lineHeight: 1.1 }}>{presentation.displayName}</div>
+          <div style={{ color: theme.text, fontSize: px(12), fontWeight: 800, letterSpacing: px(1.8), opacity: 0.68, marginTop: px(5) }}>{answerContextLabel}</div>
         </div>
         </div>
-        <div style={{ color: theme.accent, border: `2px solid ${theme.accent}`, borderRadius: 999, padding: "8px 18px", fontSize: 14, fontWeight: 900, letterSpacing: 1.4, flexShrink: 0 }}>ANSWER</div>
+        <div style={{ color: theme.accent, border: `${px(2)}px solid ${theme.accent}`, borderRadius: 999, padding: `${px(8)}px ${px(18)}px`, fontSize: px(14), fontWeight: 900, letterSpacing: px(1.4), flexShrink: 0 }}>ANSWER</div>
       </header>
 
-      {title && <div style={{ color: theme.text, fontSize: 15, fontWeight: 800, opacity: 0.7, marginTop: 16, letterSpacing: 0.8, textTransform: "uppercase" }}>{title}</div>}
+      {title && <div style={{ color: theme.text, fontSize: px(15), fontWeight: 800, opacity: 0.7, marginTop: px(16), letterSpacing: px(0.8), textTransform: "uppercase" }}>{title}</div>}
 
-      <div style={{ width: 58, height: 4, background: theme.accent, borderRadius: 999, marginTop: title ? 13 : 20 }} />
+      <div style={{ width: px(58), height: px(4), background: theme.accent, borderRadius: 999, marginTop: px(title ? 13 : 20) }} />
 
-      <section style={{ marginTop: 16, borderLeft: `5px solid ${theme.accent}`, paddingLeft: 18 }}>
-        <div style={{ color: theme.text, fontSize: fit.recapSize, fontWeight: 700, lineHeight: 1.25, opacity: 0.82 }}>{questionText}</div>
+      <section style={{ marginTop: px(16), borderLeft: `${px(5)}px solid ${theme.accent}`, paddingLeft: px(18) }}>
+        <div style={{ color: theme.text, fontSize: px(fit.recapSize), fontWeight: 700, lineHeight: 1.25, opacity: 0.82 }}>{questionText}</div>
       </section>
 
-      <section style={{ marginTop: 22, border: `3px solid ${theme.accent}`, borderRadius: 15, padding: `${fit.sectionPadding}px 24px`, background: `${theme.accent}16` }}>
-        <div style={{ color: theme.accent, fontSize: 14, fontWeight: 900, letterSpacing: 1.8 }}>CORRECT ANSWER</div>
-        <div style={{ color: theme.text, fontSize: fit.answerSize, fontWeight: 900, lineHeight: 1.16, marginTop: 10 }}>{answerText}</div>
+      <section style={{ marginTop: px(22), border: `${px(3)}px solid ${theme.accent}`, borderRadius: px(15), padding: `${px(fit.sectionPadding)}px ${px(24)}px`, background: `${theme.accent}16` }}>
+        <div style={{ color: theme.accent, fontSize: px(14), fontWeight: 900, letterSpacing: px(1.8) }}>CORRECT ANSWER</div>
+        <div style={{ color: theme.text, fontSize: px(fit.answerSize), fontWeight: 900, lineHeight: 1.16, marginTop: px(10) }}>{answerText}</div>
       </section>
 
       {explanation && (
-        <section style={{ marginTop: 17, border: `1px solid ${theme.accent}88`, borderRadius: 13, padding: `${fit.sectionPadding}px 22px`, background: `${theme.accent}0b` }}>
-          <div style={{ color: theme.accent, fontSize: 13, fontWeight: 900, letterSpacing: 1.7 }}>EXPLANATION</div>
-          <div style={{ color: theme.text, fontSize: fit.explanationSize, fontWeight: 650, lineHeight: 1.34, marginTop: 8 }}>{stripHtml(explanation)}</div>
+        <section style={{ marginTop: px(17), border: `${px(1)}px solid ${theme.accent}88`, borderRadius: px(13), padding: `${px(fit.sectionPadding)}px ${px(22)}px`, background: `${theme.accent}0b` }}>
+          <div style={{ color: theme.accent, fontSize: px(13), fontWeight: 900, letterSpacing: px(1.7) }}>EXPLANATION</div>
+          <div style={{ color: theme.text, fontSize: px(fit.explanationSize), fontWeight: 650, lineHeight: 1.34, marginTop: px(8) }}>{stripHtml(explanation)}</div>
         </section>
       )}
 
-      <footer style={{ position: "absolute", bottom: 34, left: 66, right: 66, display: "flex", justifyContent: "space-between", color: theme.accent, fontSize: 13, fontWeight: 800, letterSpacing: 0.4 }}><span>{footerHost ?? presentation.appHost}</span><span>{answerFooterMessage}</span></footer>
+      <footer style={{ position: "absolute", bottom: px(34), left: px(66), right: px(66), display: "flex", justifyContent: "space-between", color: theme.accent, fontSize: px(13), fontWeight: 800, letterSpacing: px(0.4) }}><span>{footerHost ?? presentation.appHost}</span><span>{answerFooterMessage}</span></footer>
     </div>
   );
 }

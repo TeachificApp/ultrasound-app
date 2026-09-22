@@ -5,26 +5,48 @@ const readProjectFile = (relativePath: string) =>
   readFileSync(new URL(`../${relativePath}`, import.meta.url), "utf8");
 
 describe("social card platform exports", () => {
-  it("defines requested feed, reel, short, and video export dimensions", () => {
+  it("defines the requested exact feed, story, preview, cover, and video dimensions", () => {
     const presets = readProjectFile("client/src/lib/socialCardExportPresets.ts");
     expect(presets).toContain('id: "facebook_feed"');
+    expect(presets).toContain('width: 1080, height: 1350');
+    expect(presets).toContain('id: "facebook_feed_square"');
+    expect(presets).toContain('id: "facebook_feed_horizontal"');
+    expect(presets).toContain('width: 1200, height: 630');
+    expect(presets).toContain('id: "facebook_story_reel"');
+    expect(presets).toContain('id: "facebook_cover"');
+    expect(presets).toContain('width: 851, height: 315');
     expect(presets).toContain('id: "instagram_feed"');
+    expect(presets).toContain('id: "instagram_feed_square"');
+    expect(presets).toContain('id: "instagram_feed_horizontal"');
+    expect(presets).toContain('width: 1080, height: 566');
+    expect(presets).toContain('id: "instagram_story_reel"');
     expect(presets).toContain('id: "linkedin_post"');
+    expect(presets).toContain('id: "linkedin_feed_horizontal"');
+    expect(presets).toContain('width: 1200, height: 627');
+    expect(presets).toContain('id: "linkedin_profile_cover"');
+    expect(presets).toContain('width: 1584, height: 396');
     expect(presets).toContain('id: "x_post"');
+    expect(presets).toContain('id: "x_link_preview"');
     expect(presets).toContain('id: "instagram_reel"');
     expect(presets).toContain('id: "facebook_reel"');
     expect(presets).toContain('id: "tiktok"');
+    expect(presets).toContain('id: "tiktok_profile"');
+    expect(presets).toContain('width: 200, height: 200');
     expect(presets).toContain('id: "youtube_video"');
     expect(presets).toContain('id: "youtube_short"');
-    expect(presets).toContain('width: 1080, height: 1920');
-    expect(presets).toContain('width: 1920, height: 1080');
-    expect(presets).toContain('width: 1200, height: 1500');
+    expect(presets).toContain('id: "youtube_thumbnail"');
+    expect(presets).toContain('width: 1280, height: 720');
+    expect(presets).toContain('id: "youtube_banner"');
+    expect(presets).toContain('width: 2560, height: 1440');
+    expect(presets).toContain('getSocialCardFrame');
   });
 
-  it("preserves the complete card inside target frames for PNG outputs", () => {
+  it("renders reflowed cards directly into exact target frames for PNG outputs", () => {
     const exporter = readProjectFile("client/src/components/social/SocialCardExport.tsx");
     expect(exporter).toContain("getCardPlacement");
     expect(exporter).toContain("Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight)");
+    expect(exporter).toContain("Math.abs(sourceRatio - targetRatio) < 0.002");
+    expect(exporter).toContain("cardElement.clientWidth || cardElement.scrollWidth");
     expect(exporter).toContain("renderSocialCardAsPng");
     expect(exporter).toContain('canvasToBlob(canvas, "image/png")');
     expect(exporter).toContain("socialExportFilename");
@@ -66,5 +88,8 @@ describe("social card platform exports", () => {
       expect(page).toContain("musicUploadBrand");
       expect(page).toContain("selectedMusic");
     }
+    expect(challenge).toContain("SocialCardFrameProvider");
+    expect(social).toContain("SocialCardFrameProvider");
+    expect(quiz).toContain("SocialCardFrameProvider");
   });
 });

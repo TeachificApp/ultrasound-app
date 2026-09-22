@@ -36,6 +36,7 @@ import {
   type SocialExportPlatform,
 } from "@/components/social/SocialCardExport";
 import { getSocialExportPreset } from "@/lib/socialCardExportPresets";
+import { SocialCardFrameProvider, useSocialCardFrame } from "@/components/social/SocialCardFrame";
 
 // ── Brand palette ────────────────────────────────────────────────────────────
 const BRAND = "#189aa1";
@@ -219,17 +220,19 @@ function buildFullSocialPost(item: GeneratedItem, presentation: BrandToolPresent
 }
 
 async function renderCardToPng(el: HTMLElement): Promise<string> {
-  const actualHeight = el.scrollHeight || 1080;
-  return toPng(el, { cacheBust: true, pixelRatio: 1, width: 1080, height: actualHeight });
+  const actualWidth = el.clientWidth || el.scrollWidth || 1080;
+  const actualHeight = el.clientHeight || el.scrollHeight || 1080;
+  return toPng(el, { cacheBust: true, pixelRatio: 1, width: actualWidth, height: actualHeight });
 }
 
 // ── Card Shell ───────────────────────────────────────────────────────────────
 function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens }) {
+  const frame = useSocialCardFrame();
   return (
-    <div style={{ width: 1080, minHeight: 1080, position: "relative", fontFamily: "'Segoe UI', 'Open Sans', sans-serif", boxSizing: "border-box", background: t.cardBg }}>
+    <div style={{ width: frame.width, height: frame.height, minHeight: frame.height, position: "relative", overflow: "hidden", fontFamily: "'Segoe UI', 'Open Sans', sans-serif", boxSizing: "border-box", background: t.cardBg }}>
       <div style={{ position: "absolute", inset: 0, background: t.overlayBg }} />
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 6, background: t.accentBar }} />
-      <div style={{ position: "relative", width: "100%", minHeight: 1080, display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
+      <div style={{ position: "relative", width: "100%", minHeight: "100%", height: "100%", display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
         {children}
       </div>
     </div>
@@ -238,24 +241,26 @@ function CardShell({ children, t }: { children: React.ReactNode; t: ThemeTokens 
 
 // ── Branded Header (shared by both layouts) ──────────────────────────────────
 function BrandedHeader({ item, t, presentation }: { item: GeneratedItem; t: ThemeTokens; presentation: BrandToolPresentation }) {
+  const frame = useSocialCardFrame();
+  const px = (value: number) => Math.max(1, Math.round(value * frame.contentScale));
   const icon = CONTENT_TYPE_ICONS[item.contentType] || "📸";
   const label = CONTENT_TYPE_LABELS[item.contentType] || item.contentType;
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "36px 48px 24px 48px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        <div style={{ width: 64, height: 64, borderRadius: "50%", overflow: "hidden", border: `3px solid ${BRAND}88`, boxShadow: `0 0 20px ${BRAND}44`, flexShrink: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: `${px(36)}px ${px(48)}px ${px(24)}px` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: px(16) }}>
+        <div style={{ width: px(64), height: px(64), borderRadius: "50%", overflow: "hidden", border: `${px(3)}px solid ${BRAND}88`, boxShadow: `0 0 ${px(20)}px ${BRAND}44`, flexShrink: 0 }}>
           <img src={presentation.logoUrl} alt={presentation.displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
         </div>
         <div>
-          <div style={{ color: t.headingColor, fontSize: 26, fontWeight: 800, letterSpacing: "-0.5px", lineHeight: 1.1 }}>
+          <div style={{ color: t.headingColor, fontSize: px(26), fontWeight: 800, letterSpacing: `${-px(0.5)}px`, lineHeight: 1.1 }}>
             {presentation.displayName}
           </div>
-          <div style={{ color: BRAND, fontSize: 13, fontWeight: 700, marginTop: 4, letterSpacing: "1.2px", textTransform: "uppercase" }}>
+          <div style={{ color: BRAND, fontSize: px(13), fontWeight: 700, marginTop: px(4), letterSpacing: `${px(1.2)}px`, textTransform: "uppercase" }}>
             {item.category}
           </div>
         </div>
       </div>
-      <div style={{ background: t.pillBg, border: `2px solid ${t.pillBorder}`, borderRadius: 28, padding: "8px 20px", color: t.pillColor, fontSize: 13, fontWeight: 800, letterSpacing: "1.5px", textTransform: "uppercase" }}>
+      <div style={{ background: t.pillBg, border: `${px(2)}px solid ${t.pillBorder}`, borderRadius: px(28), padding: `${px(8)}px ${px(20)}px`, color: t.pillColor, fontSize: px(13), fontWeight: 800, letterSpacing: `${px(1.5)}px`, textTransform: "uppercase" }}>
         {icon} {label}
       </div>
     </div>
@@ -264,22 +269,24 @@ function BrandedHeader({ item, t, presentation }: { item: GeneratedItem; t: Them
 
 // ── Branded Footer (shared by both layouts) ──────────────────────────────────
 function BrandedFooter({ t, presentation }: { t: ThemeTokens; presentation: BrandToolPresentation }) {
+  const frame = useSocialCardFrame();
+  const px = (value: number) => Math.max(1, Math.round(value * frame.contentScale));
   return (
     <div style={{ marginTop: "auto" }}>
       {/* Tagline banner */}
-      <div style={{ background: t.taglineBg, padding: "16px 48px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
-        <span style={{ fontSize: 14, color: t.taglineColor, fontWeight: 400, opacity: 0.7 }}>♡</span>
-        <span style={{ fontSize: 16, color: t.taglineColor, fontWeight: 800, letterSpacing: "2px", textTransform: "uppercase" }}>
+      <div style={{ background: t.taglineBg, padding: `${px(16)}px ${px(48)}px`, display: "flex", alignItems: "center", justifyContent: "center", gap: px(12) }}>
+        <span style={{ fontSize: px(14), color: t.taglineColor, fontWeight: 400, opacity: 0.7 }}>♡</span>
+        <span style={{ fontSize: px(16), color: t.taglineColor, fontWeight: 800, letterSpacing: `${px(2)}px`, textTransform: "uppercase" }}>
           See It. Measure It. Make a Difference.
         </span>
-        <span style={{ fontSize: 14, color: t.taglineColor, fontWeight: 400, opacity: 0.7 }}>♡</span>
+        <span style={{ fontSize: px(14), color: t.taglineColor, fontWeight: 400, opacity: 0.7 }}>♡</span>
       </div>
       {/* URL bar */}
-      <div style={{ background: t.isDark ? "#060e14" : "#d0eced", padding: "10px 48px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ color: BRAND, fontSize: 13, fontWeight: 700, letterSpacing: "0.3px" }}>
+      <div style={{ background: t.isDark ? "#060e14" : "#d0eced", padding: `${px(10)}px ${px(48)}px`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ color: BRAND, fontSize: px(13), fontWeight: 700, letterSpacing: `${px(0.3)}px` }}>
           {presentation.publicHost}
         </div>
-        <div style={{ color: t.mutedColor, fontSize: 11 }}>
+        <div style={{ color: t.mutedColor, fontSize: px(11) }}>
           Follow for daily {presentation.brand === "iheartecho" ? "echocardiography" : "ultrasound"} content
         </div>
       </div>
@@ -289,7 +296,10 @@ function BrandedFooter({ t, presentation }: { t: ThemeTokens; presentation: Bran
 
 // ── Simple Card Layout ───────────────────────────────────────────────────────
 function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: ThemeTokens; presentation: BrandToolPresentation }) {
-const hasImage = !!item.imageUrl;
+  const frame = useSocialCardFrame();
+  const px = (value: number) => Math.max(1, Math.round(value * frame.contentScale));
+  const hasImage = !!item.imageUrl;
+  const imageHeight = frame.layout === "wide" ? px(150) : frame.layout === "landscape" ? px(245) : frame.layout === "vertical" ? px(430) : px(360);
 return (
 <CardShell t={t}>
       <BrandedHeader item={item} t={t} presentation={presentation} />
@@ -301,22 +311,22 @@ return (
       </div>
       {/* Image area */}
       {hasImage && (
-        <div style={{ margin: "0 48px 24px 48px", height: 360, borderRadius: 16, overflow: "hidden", border: `2px solid ${BRAND}44`, boxShadow: `0 4px 24px rgba(0,0,0,0.25)`, position: "relative" }}>
+        <div style={{ margin: `0 ${px(48)}px ${px(24)}px`, height: imageHeight, borderRadius: px(16), overflow: "hidden", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, position: "relative" }}>
           <img src={item.imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, background: t.isDark ? "linear-gradient(transparent, rgba(10,22,32,0.6))" : "linear-gradient(transparent, rgba(234,246,247,0.6))" }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: px(60), background: t.isDark ? "linear-gradient(transparent, rgba(10,22,32,0.6))" : "linear-gradient(transparent, rgba(234,246,247,0.6))" }} />
         </div>
       )}
       {/* Content area */}
-      <div style={{ padding: "0 48px", flex: "1 1 auto", display: "flex", flexDirection: "column" }}>
-        <div style={{ color: t.headingColor, fontSize: hasImage ? 42 : 50, fontWeight: 800, lineHeight: 1.2, marginBottom: hasImage ? 16 : 24, fontFamily: "'Georgia', 'Merriweather', serif" }}>
+      <div style={{ padding: `0 ${px(48)}px`, flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <div style={{ color: t.headingColor, fontSize: px(hasImage ? 42 : 50), fontWeight: 800, lineHeight: 1.2, marginBottom: px(hasImage ? 16 : 24), fontFamily: "'Georgia', 'Merriweather', serif" }}>
           {item.headline}
         </div>
-        <div style={{ color: t.bodyColor, fontSize: hasImage ? 26 : 30, fontWeight: 400, lineHeight: 1.55, marginBottom: item.subtext ? 24 : 0, flex: "1 1 auto" }}>
+        <div style={{ color: t.bodyColor, fontSize: px(hasImage ? 26 : 30), fontWeight: 400, lineHeight: 1.55, marginBottom: px(item.subtext ? 24 : 0), flex: "1 1 auto", overflow: "hidden" }}>
           {item.body}
         </div>
         {item.subtext && (
-          <div style={{ background: t.subtextBg, border: `1px solid ${t.subtextBorder}`, borderRadius: 12, padding: "14px 20px", marginBottom: 24 }}>
-            <div style={{ color: t.subtextColor, fontSize: 19, fontWeight: 500, lineHeight: 1.5, fontStyle: "italic" }}>
+          <div style={{ background: t.subtextBg, border: `${px(1)}px solid ${t.subtextBorder}`, borderRadius: px(12), padding: `${px(14)}px ${px(20)}px`, marginBottom: px(24) }}>
+            <div style={{ color: t.subtextColor, fontSize: px(19), fontWeight: 500, lineHeight: 1.5, fontStyle: "italic" }}>
               {item.subtext}
             </div>
           </div>
@@ -477,7 +487,9 @@ function DownloadableCard({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const previewPreset = useMemo(() => getSocialExportPreset(platform), [platform]);
-  const previewHeight = Math.round(PREVIEW_SIZE * previewPreset.height / previewPreset.width);
+  const previewScale = Math.min(PREVIEW_SIZE / previewPreset.width, 760 / previewPreset.height);
+  const previewWidth = Math.round(previewPreset.width * previewScale);
+  const previewHeight = Math.round(previewPreset.height * previewScale);
   const exportPng = useCallback(async (): Promise<string> => {
     if (!ref.current) throw new Error("Card not mounted");
     return renderCardToPng(ref.current);
@@ -513,9 +525,9 @@ function DownloadableCard({
   }, [exportPlatform, format, motion, platform]);
   return (
     <div className="flex flex-col">
-      <div style={{ width: PREVIEW_SIZE, height: previewHeight, position: "relative", overflow: "hidden", borderRadius: "10px 10px 0 0", border: "1px solid rgba(255,255,255,0.1)", borderBottom: "none", background: "#0a1620", flexShrink: 0 }}>
-        <div style={{ position: "absolute", top: 0, left: 0, width: 1080, height: 1080, transform: `scale(${Math.min(PREVIEW_SIZE / 1080, previewHeight / 1080)})`, transformOrigin: "top left" }}>
-          <div ref={refCallback} style={{ width: 1080, height: 1080 }}>{children}</div>
+      <div style={{ width: previewWidth, height: previewHeight, position: "relative", overflow: "hidden", borderRadius: "10px 10px 0 0", border: "1px solid rgba(255,255,255,0.1)", borderBottom: "none", background: "#0a1620", flexShrink: 0 }}>
+        <div style={{ position: "absolute", top: 0, left: 0, width: previewPreset.width, height: previewPreset.height, transform: `scale(${previewScale})`, transformOrigin: "top left" }}>
+          <div ref={refCallback} style={{ width: previewPreset.width, height: previewPreset.height }}><SocialCardFrameProvider platform={platform}>{children}</SocialCardFrameProvider></div>
         </div>
         <div className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white/75">{previewPreset.label} · {previewPreset.width}×{previewPreset.height}</div>
       </div>

@@ -31,6 +31,7 @@ import {
   type SocialExportPlatform,
 } from "@/components/social/SocialCardExport";
 import { getSocialExportPreset } from "@/lib/socialCardExportPresets";
+import { SocialCardFrameProvider, useSocialCardFrame } from "@/components/social/SocialCardFrame";
 
 // Brand palette
 const BRAND = "#189aa1";
@@ -304,12 +305,13 @@ function parseOptions(raw: string | null): string[] {
 }
 
 async function renderCardToPng(el: HTMLElement): Promise<string> {
-  // Measure the actual rendered height so nothing is clipped
-  const actualHeight = el.scrollHeight || 1080;
+  // The selected platform wrapper owns the real output frame.
+  const actualWidth = el.clientWidth || el.scrollWidth || 1080;
+  const actualHeight = el.clientHeight || el.scrollHeight || 1080;
   return toPng(el, {
     cacheBust: true,
     pixelRatio: 1,
-    width: 1080,
+    width: actualWidth,
     height: actualHeight,
   });
 }
@@ -317,14 +319,18 @@ async function renderCardToPng(el: HTMLElement): Promise<string> {
 // ---- shared card shell ------------------------------------------------------
 
 function CardShell({ children, t, presentation }: { children: React.ReactNode; t: ThemeTokens; presentation: BrandToolPresentation }) {
+  const frame = useSocialCardFrame();
+  const px = (value: number) => Math.max(1, Math.round(value * frame.contentScale));
   const isLight = t === LIGHT_THEME;
   const heroUrl = presentation.brand === "aaus" ? (isLight ? HERO_URL_LIGHT : HERO_URL_DARK) : null;
   return (
     <div
       style={{
-        width: 1080,
-        minHeight: 1080,
+        width: frame.width,
+        height: frame.height,
+        minHeight: frame.height,
         position: "relative",
+        overflow: "hidden",
         fontFamily: "'Segoe UI', 'Open Sans', sans-serif",
         boxSizing: "border-box",
         background: t.cardBg,
@@ -383,10 +389,11 @@ function CardShell({ children, t, presentation }: { children: React.ReactNode; t
         style={{
           position: "relative",
           width: "100%",
-          minHeight: 1080,
+          minHeight: "100%",
+          height: "100%",
           display: "flex",
           flexDirection: "column",
-          padding: "52px 64px 44px 68px",
+          padding: `${px(52)}px ${px(64)}px ${px(44)}px ${px(68)}px`,
           boxSizing: "border-box",
         }}
       >
@@ -399,6 +406,8 @@ function CardShell({ children, t, presentation }: { children: React.ReactNode; t
 // ---- card header ------------------------------------------------------------
 
 function CardHeader({ pill, t, presentation }: { pill: "QUESTION" | "ANSWER"; t: ThemeTokens; presentation: BrandToolPresentation }) {
+  const frame = useSocialCardFrame();
+  const px = (value: number) => Math.max(1, Math.round(value * frame.contentScale));
   const pillBg = pill === "QUESTION" ? t.qPillBg : t.aPillBg;
   const pillBorder = pill === "QUESTION" ? t.qPillBorder : t.aPillBorder;
   const pillColor = pill === "QUESTION" ? t.qPillColor : t.aPillColor;
@@ -408,18 +417,18 @@ function CardHeader({ pill, t, presentation }: { pill: "QUESTION" | "ANSWER"; t:
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: 28,
+        marginBottom: px(28),
       }}
     >
       {/* Logo + wordmark */}
-      <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: px(18) }}>
         <div
           style={{
-            width: 72,
-            height: 72,
-            borderRadius: 18,
+            width: px(72),
+            height: px(72),
+            borderRadius: px(18),
             overflow: "hidden",
-            border: `2.5px solid ${BRAND}88`,
+            border: `${px(2.5)}px solid ${BRAND}88`,
             boxShadow: `0 0 24px ${BRAND}55`,
             flexShrink: 0,
           }}
@@ -427,13 +436,13 @@ function CardHeader({ pill, t, presentation }: { pill: "QUESTION" | "ANSWER"; t:
           <img src={presentation.logoUrl} alt={presentation.displayName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         <div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 7 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: px(7) }}>
             <span
               style={{
                 color: t.headingColor,
-                fontSize: 28,
+                fontSize: px(28),
                 fontWeight: 800,
-                letterSpacing: "-0.5px",
+                letterSpacing: `${-px(0.5)}px`,
                 lineHeight: 1,
               }}
             >
@@ -443,10 +452,10 @@ function CardHeader({ pill, t, presentation }: { pill: "QUESTION" | "ANSWER"; t:
           <div
             style={{
               color: BRAND,
-              fontSize: 13,
+              fontSize: px(13),
               fontWeight: 600,
-              marginTop: 4,
-              letterSpacing: "0.8px",
+              marginTop: px(4),
+              letterSpacing: `${px(0.8)}px`,
               textTransform: "uppercase",
             }}
           >
@@ -459,13 +468,13 @@ function CardHeader({ pill, t, presentation }: { pill: "QUESTION" | "ANSWER"; t:
       <div
         style={{
           background: pillBg,
-          border: `1.5px solid ${pillBorder}`,
-          borderRadius: 28,
-          padding: "9px 22px",
+          border: `${px(1.5)}px solid ${pillBorder}`,
+          borderRadius: px(28),
+          padding: `${px(9)}px ${px(22)}px`,
           color: pillColor,
-          fontSize: 13,
+          fontSize: px(13),
           fontWeight: 800,
-          letterSpacing: "2px",
+          letterSpacing: `${px(2)}px`,
           boxShadow: `0 0 18px ${pillBorder}44`,
         }}
       >
@@ -529,6 +538,9 @@ function QuestionCard({
   presentation: BrandToolPresentation;
 }) {
   const letters = ["A", "B", "C", "D", "E"];
+  const frame = useSocialCardFrame();
+  const density = frame.contentScale;
+  const px = (value: number) => Math.max(1, Math.round(value * density));
   const cleanQ = stripHtml(questionText);
   const optionCharacters = options.reduce((total, option) => total + stripHtml(option).length, 0);
   const questionFontSize = Math.max(20, Math.min(options.length > 0 ? 30 : 44, (options.length > 0 ? 34 : 48) - Math.floor(cleanQ.length / 72)));
@@ -558,7 +570,7 @@ function QuestionCard({
       <div
         style={{
           color: t.headingColor,
-          fontSize: questionFontSize,
+          fontSize: px(questionFontSize),
           fontWeight: 700,
           lineHeight: 1.45,
           marginBottom: options.length > 0 ? 20 : 0,
@@ -571,7 +583,7 @@ function QuestionCard({
 
       {/* Options */}
       {options.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: px(10), marginBottom: px(8) }}>
           {options.map((opt, i) => (
             <div
               key={i}
@@ -605,7 +617,7 @@ function QuestionCard({
               >
                 {letters[i]}
               </div>
-              <span style={{ color: t.bodyColor, fontSize: optionFontSize, fontWeight: 500, lineHeight: 1.32 }}>
+              <span style={{ color: t.bodyColor, fontSize: px(optionFontSize), fontWeight: 500, lineHeight: 1.32 }}>
                 {stripHtml(opt)}
               </span>
             </div>
@@ -767,7 +779,9 @@ function DownloadableCard({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const previewPreset = useMemo(() => getSocialExportPreset(platform), [platform]);
-  const previewHeight = Math.round(PREVIEW_SIZE * previewPreset.height / previewPreset.width);
+  const previewScale = Math.min(PREVIEW_SIZE / previewPreset.width, 760 / previewPreset.height);
+  const previewWidth = Math.round(previewPreset.width * previewScale);
+  const previewHeight = Math.round(previewPreset.height * previewScale);
 
   const exportPng = useCallback(async (): Promise<string> => {
     if (!ref.current) throw new Error("Card not mounted");
@@ -815,7 +829,7 @@ function DownloadableCard({
     <div className="flex flex-col">
       <div
         style={{
-          width: PREVIEW_SIZE,
+          width: previewWidth,
           height: previewHeight,
           position: "relative",
           overflow: "hidden",
@@ -831,13 +845,15 @@ function DownloadableCard({
             position: "absolute",
             top: 0,
             left: 0,
-            width: 1080,
-            height: 1080,
-            transform: `scale(${Math.min(PREVIEW_SIZE / 1080, previewHeight / 1080)})`,
+            width: previewPreset.width,
+            height: previewPreset.height,
+            transform: `scale(${previewScale})`,
             transformOrigin: "top left",
           }}
         >
-          <div ref={refCallback} style={{ width: 1080, height: 1080 }}>{children}</div>
+          <div ref={refCallback} style={{ width: previewPreset.width, height: previewPreset.height }}>
+            <SocialCardFrameProvider platform={platform}>{children}</SocialCardFrameProvider>
+          </div>
         </div>
         <div className="absolute bottom-2 right-2 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white/75">{previewPreset.label} · {previewPreset.width}×{previewPreset.height}</div>
       </div>

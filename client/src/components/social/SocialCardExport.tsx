@@ -140,8 +140,11 @@ function drawWrappedText(
 async function cardToBitmap(cardElement: HTMLElement): Promise<RenderedCard> {
   const { toPng } = await import("html-to-image");
   await document.fonts?.ready;
-  const width = Math.max(1, cardElement.scrollWidth || cardElement.clientWidth || SOURCE_WIDTH);
-  const height = Math.max(1, cardElement.scrollHeight || cardElement.clientHeight || SOURCE_WIDTH);
+  // The frame wrapper has the selected platform dimensions. Prefer its client
+  // box rather than a descendant's overflow so the rasterized card has the
+  // exact reflowed social ratio rather than an old square content size.
+  const width = Math.max(1, cardElement.clientWidth || cardElement.scrollWidth || SOURCE_WIDTH);
+  const height = Math.max(1, cardElement.clientHeight || cardElement.scrollHeight || SOURCE_WIDTH);
   const dataUrl = await toPng(cardElement, {
     cacheBust: true,
     pixelRatio: 1,
@@ -159,6 +162,11 @@ function getCardPlacement(
   targetWidth: number,
   targetHeight: number,
 ): { x: number; y: number; width: number; height: number } {
+  const sourceRatio = sourceWidth / sourceHeight;
+  const targetRatio = targetWidth / targetHeight;
+  if (Math.abs(sourceRatio - targetRatio) < 0.002) {
+    return { x: 0, y: 0, width: targetWidth, height: targetHeight };
+  }
   const maxWidth = targetWidth * 0.92;
   const maxHeight = targetHeight * 0.88;
   const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
