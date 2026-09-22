@@ -92,6 +92,12 @@ const AI_MUSIC_TEXTURES: Array<{ value: AiMusicTexture; label: string }> = [
   { value: "electronic", label: "Electronic" },
   { value: "minimal", label: "Minimal" },
   { value: "pulse", label: "Pulse" },
+  { value: "rnb", label: "R&B rhythm" },
+  { value: "rap", label: "Rap beat" },
+  { value: "hiphop", label: "Hip-hop" },
+  { value: "pop", label: "Pop" },
+  { value: "upbeat", label: "Upbeat" },
+  { value: "rock", label: "Rock" },
 ];
 
 function cleanText(value: string | null | undefined): string {
@@ -790,7 +796,7 @@ export function SocialExportControls({
             </div>}
             {musicMode === "ai" && <div className="space-y-2 rounded-md border border-teal-300/20 bg-teal-300/[0.045] p-2">
               <div className="flex items-center gap-1.5 text-[10px] font-semibold normal-case tracking-normal text-teal-100"><Sparkles className="h-3 w-3" />Create an original AI beat / loop</div>
-              <p className="text-[10px] leading-relaxed normal-case tracking-normal text-white/55">AI composes a compact instrumental blueprint; this browser synthesizes the {AI_MUSIC_DURATION_SECONDS}-second WAV and saves it privately to the selected brand’s Media Repository for preview and MP4 use.</p>
+              <p className="text-[10px] leading-relaxed normal-case tracking-normal text-white/55">AI composes a compact instrumental blueprint; choose ambient, R&B, rap, hip-hop, pop, upbeat, rock, or another rhythm style. This browser synthesizes the {AI_MUSIC_DURATION_SECONDS}-second WAV and saves it privately to the selected brand’s Media Repository for preview and MP4 use.</p>
               <div className="grid grid-cols-2 gap-1.5">
                 <label className="flex flex-col gap-1 text-[9px] font-semibold uppercase tracking-wide text-white/45">Mood
                   <select value={aiMood} onChange={(event) => setAiMood(event.target.value as AiMusicMood)} disabled={composeAiLoop.isPending || isUploadingMusic} className="rounded border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-[10px] font-semibold normal-case tracking-normal text-white outline-none disabled:opacity-50">

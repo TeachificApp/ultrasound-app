@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultPlan, normalizePlan } from "./routers/aiMusicRouter";
+import { defaultPlan, MUSIC_TEXTURES, normalizePlan, textureDirection } from "./routers/aiMusicRouter";
 
 describe("AI music loop composition safety", () => {
   it("creates a bounded original instrumental plan when a model response is absent", () => {
@@ -39,5 +39,17 @@ describe("AI music loop composition safety", () => {
     expect(plan.kickPattern.every((step) => step === 1)).toBe(true);
     expect(plan.bassPattern.every((step) => step === -1)).toBe(true);
     expect(plan.leadPattern.every((step) => step === -1)).toBe(true);
+  });
+
+  it("offers original instrumental R&B, rap, hip-hop, pop, upbeat, and rock rhythm profiles", () => {
+    expect(MUSIC_TEXTURES).toEqual(expect.arrayContaining(["rnb", "rap", "hiphop", "pop", "upbeat", "rock"]));
+    for (const texture of ["rnb", "rap", "hiphop", "pop", "upbeat", "rock"] as const) {
+      const plan = defaultPlan("confident", texture);
+      expect(plan.texture).toBe(texture);
+      expect(plan.kickPattern).toHaveLength(16);
+      expect(plan.bassPattern.some((step) => step >= 0)).toBe(true);
+    }
+    expect(textureDirection("rap")).toContain("no rapping");
+    expect(textureDirection("rock")).toContain("no vocals");
   });
 });

@@ -1,5 +1,5 @@
 export type AiMusicMood = "calm" | "focused" | "uplifting" | "confident" | "cinematic" | "energetic";
-export type AiMusicTexture = "ambient" | "lofi" | "electronic" | "minimal" | "pulse";
+export type AiMusicTexture = "ambient" | "lofi" | "electronic" | "minimal" | "pulse" | "rnb" | "rap" | "hiphop" | "pop" | "upbeat" | "rock";
 
 export type AiLoopPlan = {
   title: string;
@@ -107,6 +107,26 @@ function scaleOffset(scale: AiLoopPlan["scale"], scaleDegreeOffset: number) {
   return values[scaleDegreeOffset % values.length] + octaves * 12;
 }
 
+function textureVoicing(texture: AiMusicTexture) {
+  switch (texture) {
+    case "rnb":
+      return { bassType: "sine" as OscillatorType, bassCutoff: 380, leadType: "triangle" as OscillatorType, leadCutoff: 1_250, bassGain: 1.08, leadGain: 0.92 };
+    case "rap":
+    case "hiphop":
+      return { bassType: "sine" as OscillatorType, bassCutoff: 240, leadType: "triangle" as OscillatorType, leadCutoff: 900, bassGain: 1.25, leadGain: 0.72 };
+    case "pop":
+    case "upbeat":
+      return { bassType: "triangle" as OscillatorType, bassCutoff: 520, leadType: "sawtooth" as OscillatorType, leadCutoff: 2_600, bassGain: 0.95, leadGain: 1.12 };
+    case "rock":
+      return { bassType: "sawtooth" as OscillatorType, bassCutoff: 760, leadType: "square" as OscillatorType, leadCutoff: 2_100, bassGain: 0.93, leadGain: 1.02 };
+    case "electronic":
+    case "pulse":
+      return { bassType: "sine" as OscillatorType, bassCutoff: 360, leadType: "sawtooth" as OscillatorType, leadCutoff: 2_200, bassGain: 1, leadGain: 1 };
+    default:
+      return { bassType: "sine" as OscillatorType, bassCutoff: 280, leadType: "triangle" as OscillatorType, leadCutoff: 1_000, bassGain: 1, leadGain: 1 };
+  }
+}
+
 function writeWav(buffer: AudioBuffer): Blob {
   const channels = Math.min(2, buffer.numberOfChannels);
   const length = buffer.length;
@@ -167,7 +187,7 @@ export async function renderAiMusicLoop(plan: AiLoopPlan, durationSeconds = LOOP
   const stepDuration = 60 / plan.bpm / 4;
   const patternSteps = 16;
   const noise = createNoiseBuffer(context, 0.22);
-  const textureLead = plan.texture === "electronic" || plan.texture === "pulse" ? "sawtooth" : "triangle";
+  const voicing = textureVoicing(plan.texture);
   const bassLevel = 0.10 + plan.density * 0.016;
   const leadLevel = plan.texture === "minimal" ? 0.045 : 0.055 + plan.density * 0.012;
 
@@ -181,9 +201,9 @@ export async function renderAiMusicLoop(plan: AiLoopPlan, durationSeconds = LOOP
       if (plan.snarePattern[step]) addNoiseHit(context, master, noise, at, Math.min(0.17, stepDuration * 0.78), 900, 0.10 * accent);
       if (plan.hatPattern[step] && plan.density >= 2) addNoiseHit(context, master, noise, at, Math.min(0.065, stepDuration * 0.5), 5_000, 0.030 * accent);
       const bassOffset = plan.bassPattern[step] ?? -1;
-      if (bassOffset >= 0) addNote(context, master, at, stepDuration * 0.82, frequencyForMidi(rootMidi - 12 + bassOffset), "sine", bassLevel * accent, 280);
+      if (bassOffset >= 0) addNote(context, master, at, stepDuration * 0.82, frequencyForMidi(rootMidi - 12 + bassOffset), voicing.bassType, bassLevel * voicing.bassGain * accent, voicing.bassCutoff);
       const leadOffset = plan.leadPattern[step] ?? -1;
-      if (leadOffset >= 0 && plan.density >= 2) addNote(context, master, at, stepDuration * 0.65, frequencyForMidi(rootMidi + scaleOffset(plan.scale, leadOffset % 14) + 12), textureLead, leadLevel * accent, plan.texture === "ambient" ? 1_000 : 2_200);
+      if (leadOffset >= 0 && plan.density >= 2) addNote(context, master, at, stepDuration * 0.65, frequencyForMidi(rootMidi + scaleOffset(plan.scale, leadOffset % 14) + 12), voicing.leadType, leadLevel * voicing.leadGain * accent, voicing.leadCutoff);
     }
     if (plan.texture === "ambient" && cycle % 2 === 0) {
       addNote(context, ambience, cycleAt, Math.min(3.4, duration - cycleAt), frequencyForMidi(rootMidi + 7), "sine", 0.06, 700);

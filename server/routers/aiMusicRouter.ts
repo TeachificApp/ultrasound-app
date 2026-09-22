@@ -13,7 +13,19 @@ const MUSIC_MOODS = [
   "energetic",
 ] as const;
 
-const MUSIC_TEXTURES = ["ambient", "lofi", "electronic", "minimal", "pulse"] as const;
+const MUSIC_TEXTURES = [
+  "ambient",
+  "lofi",
+  "electronic",
+  "minimal",
+  "pulse",
+  "rnb",
+  "rap",
+  "hiphop",
+  "pop",
+  "upbeat",
+  "rock",
+] as const;
 
 export type AiLoopPlan = {
   title: string;
@@ -74,6 +86,62 @@ const sanitizePitchPattern = (value: unknown, fallback: number[]) => Array.isArr
 
 function defaultPlan(mood: AiLoopPlan["mood"], texture: AiLoopPlan["texture"]): AiLoopPlan {
   const energetic = mood === "energetic" || mood === "confident";
+  const makePlan = (values: Omit<AiLoopPlan, "title" | "mood" | "texture">): AiLoopPlan => ({
+    title: `${mood} ${texture} clinical loop`,
+    mood,
+    texture,
+    ...values,
+  });
+
+  if (texture === "rnb") return makePlan({
+    bpm: 88, keyRoot: 1, scale: "minor", density: 3, swing: 0.1,
+    kickPattern: [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
+    snarePattern: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hatPattern: [1,0,1,0, 1,1,0,0, 1,0,1,0, 1,1,0,0],
+    bassPattern: [0,-1,-1,0, -1,-1,7,-1, 5,-1,-1,5, 0,-1,7,-1],
+    leadPattern: [-1,-1,7,-1, -1,10,-1,-1, 12,-1,10,-1, -1,7,-1,-1],
+  });
+  if (texture === "rap") return makePlan({
+    bpm: 76, keyRoot: 0, scale: "minor", density: 3, swing: 0.02,
+    kickPattern: [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,1,0,0],
+    snarePattern: [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    hatPattern: [1,0,1,1, 1,0,1,0, 1,1,1,0, 1,0,1,1],
+    bassPattern: [0,-1,-1,-1, 0,-1,7,-1, 0,-1,-1,-1, 5,-1,0,-1],
+    leadPattern: [-1,-1,-1,-1, 7,-1,-1,-1, -1,-1,10,-1, -1,-1,-1,-1],
+  });
+  if (texture === "hiphop") return makePlan({
+    bpm: 92, keyRoot: 3, scale: "minor", density: 3, swing: 0.11,
+    kickPattern: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
+    snarePattern: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hatPattern: [1,0,1,0, 1,0,1,1, 1,0,1,0, 1,0,1,1],
+    bassPattern: [0,-1,0,-1, 7,-1,-1,-1, 5,-1,0,-1, 7,-1,5,-1],
+    leadPattern: [-1,7,-1,-1, -1,-1,10,-1, 12,-1,-1,10, -1,-1,7,-1],
+  });
+  if (texture === "pop") return makePlan({
+    bpm: 112, keyRoot: 0, scale: "major", density: 4, swing: 0.02,
+    kickPattern: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+    snarePattern: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hatPattern: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    bassPattern: [0,-1,0,-1, 5,-1,5,-1, 7,-1,7,-1, 5,-1,0,-1],
+    leadPattern: [7,-1,9,-1, 12,-1,9,-1, 7,-1,9,-1, 14,-1,12,-1],
+  });
+  if (texture === "upbeat") return makePlan({
+    bpm: 124, keyRoot: 0, scale: "major", density: 4, swing: 0.01,
+    kickPattern: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+    snarePattern: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hatPattern: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    bassPattern: [0,-1,0,-1, 5,-1,5,-1, 7,-1,7,-1, 5,-1,0,-1],
+    leadPattern: [7,-1,9,-1, 12,-1,9,-1, 7,-1,9,-1, 14,-1,12,-1],
+  });
+  if (texture === "rock") return makePlan({
+    bpm: 108, keyRoot: 2, scale: "major", density: 4, swing: 0.015,
+    kickPattern: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,1,0],
+    snarePattern: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hatPattern: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    bassPattern: [0,-1,0,-1, 5,-1,5,-1, 7,-1,7,-1, 5,-1,0,-1],
+    leadPattern: [7,-1,7,-1, 12,-1,9,-1, 7,-1,9,-1, 14,-1,12,-1],
+  });
+
   return {
     title: `${mood} ${texture} clinical loop`,
     bpm: energetic ? 116 : mood === "calm" ? 82 : 98,
@@ -120,6 +188,18 @@ function parseComposition(value: string): unknown {
   return JSON.parse(trimmed);
 }
 
+function textureDirection(texture: AiLoopPlan["texture"]) {
+  switch (texture) {
+    case "rnb": return "smooth contemporary R&B rhythm: warm sub-bass, syncopated drums, restrained chord-like synth movement, and a relaxed late-night groove";
+    case "rap": return "clean modern rap instrumental beat: sparse punchy drums, deep sub-bass, crisp hi-hat movement, and lots of space for on-screen text; no rapping or vocal samples";
+    case "hiphop": return "hip-hop instrumental rhythm: head-nod drums, swung hi-hats, melodic sub-bass, and a compact loopable groove; no rapping or vocal samples";
+    case "pop": return "bright polished pop rhythm: steady four-beat pulse, clear snare backbeat, melodic synth hooks, and an accessible upbeat lift";
+    case "upbeat": return "energetic upbeat instrumental: driving dance-pop pulse, bright percussion, positive major-key movement, and high but controlled energy";
+    case "rock": return "instrumental rock-inspired rhythm: driving live-band style kick and snare, rhythmic guitar-like synth voicing, and confident forward movement; no vocals";
+    default: return `${texture} instrumental rhythm`;
+  }
+}
+
 /**
  * The language model creates a constrained original composition blueprint. The
  * browser synthesizes this plan locally into a short instrumental WAV loop and
@@ -138,11 +218,11 @@ export const aiMusicRouter = router({
         messages: [
           {
             role: "system",
-            content: "You compose concise, original instrumental loop blueprints for a clinical education social-video export. Do not reference artists, existing songs, copyrighted material, lyrics, vocals, spoken words, or medical claims. Produce a 16-step loop that is supportive beneath on-screen educational text, loopable, and never distracting.",
+            content: "You compose concise, original instrumental loop blueprints for a clinical education social-video export. Instrumental only, no vocals, rap, spoken words, samples, artist references, existing songs, copyrighted material, lyrics, or medical claims. Produce a 16-step loop that is supportive beneath on-screen educational text, loopable, and never distracting.",
           },
           {
             role: "user",
-            content: `Create one original 20-second ${input.mood}, ${input.texture} instrumental beat/loop. Use practical tempo and small, balanced patterns. Density is 1 (very sparse) through 5 (busy); use 2–4 for readable card-video backing. keyRoot is chromatic 0–11. Pattern values: drum steps are 0/1; bass and lead steps are -1 for rest or semitone offsets 0–24. ${userDirection}`,
+            content: `Instrumental only, no vocals. Create one original 20-second ${input.mood} loop with this style: ${textureDirection(input.texture)}. Use practical tempo and small, balanced patterns. Density is 1 (very sparse) through 5 (busy); use 2–4 for readable card-video backing. keyRoot is chromatic 0–11. Pattern values: drum steps are 0/1; bass and lead steps are -1 for rest or semitone offsets 0–24. ${userDirection}`,
           },
         ],
       });
@@ -163,4 +243,4 @@ export const aiMusicRouter = router({
     }),
 });
 
-export { defaultPlan, normalizePlan, MUSIC_MOODS, MUSIC_TEXTURES };
+export { defaultPlan, normalizePlan, MUSIC_MOODS, MUSIC_TEXTURES, textureDirection };
