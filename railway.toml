@@ -1,7 +1,18 @@
 [build]
 builder = "nixpacks"
 buildCommand = "pnpm install && pnpm build"
-watchPatterns = ["client/**", "server/**", "shared/**", "drizzle/**", "package.json", "vite.config.ts", "tsconfig.json"]
+watchPatterns = [
+  "client/**",
+  "server/**",
+  "shared/**",
+  "drizzle/**",
+  "package.json",
+  "pnpm-lock.yaml",
+  "vite.config.ts",
+  "tsconfig.json",
+  "railway.toml",
+  "nixpacks.toml",
+]
 
 [deploy]
 startCommand = "pnpm start"

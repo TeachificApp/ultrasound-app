@@ -22,5 +22,7 @@ describe("Railway local authentication configuration", () => {
     await expect(access(new URL("../railway.json", import.meta.url))).rejects.toThrow();
     expect(railwaySource).not.toContain("healthcheckPath");
     expect(railwaySource).not.toContain("healthcheckTimeout");
+    expect(railwaySource).toContain("railway.toml");
+    expect(railwaySource).toContain("nixpacks.toml");
   });
 });
