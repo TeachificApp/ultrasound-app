@@ -355,39 +355,10 @@ export default function Premium() {
             {/* ── Pricing Cards ─────────────────────────────────────────────── */}
             <div className="grid w-full grid-cols-1 gap-4 text-left sm:grid-cols-2 xl:grid-cols-4 mb-6">
 
-              {/* 1. Monthly — single app */}
-              <div className="flex min-h-[292px] flex-col rounded-2xl bg-white px-5 py-6 shadow-lg">
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Monthly</div>
-                <div className="text-3xl sm:text-4xl font-black text-[#189aa1] mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
-                  $9.97
-                </div>
-                <div className="text-gray-400 text-xs mb-1">per month · cancel anytime</div>
-                <div className="text-[10px] text-gray-400 mb-4">{appName} only</div>
-                <div className="mt-auto pt-4">
-                  {loading ? (
-                    <div className="flex items-center justify-center gap-2 text-gray-400 text-xs py-2">
-                      <div className="w-3 h-3 border-2 border-[#189aa1] border-t-transparent rounded-full animate-spin" />
-                      Checking…
-                    </div>
-                  ) : status?.isPremium ? (
-                    <ResumeBtn />
-                  ) : user ? (
-                  <CheckoutBtn
-                      label={`${PREMIUM_TRIAL_CTA} — then $9.97/mo`}
-                      onPay={() => singleMonthly.mutate({ interval: "monthly", origin: window.location.origin, promoCode: promoCode ?? undefined })}
-                      isPending={singleMonthly.isPending}
-                      variant="teal"
-                    />
-                  ) : (
-                    <SignInBtn />
-                  )}
-                </div>
-              </div>
-
-              {/* 2. Annual — single app */}
+              {/* 1. Annual — single app default */}
               <div className="relative flex min-h-[292px] flex-col rounded-2xl border-2 border-[#189aa1] bg-white px-5 py-6 shadow-2xl">
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-[#189aa1] text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
-                  <Crown className="w-3 h-3" /> Best Value
+                  <Crown className="w-3 h-3" /> Default Trial Plan
                 </div>
                 <div className="text-[10px] font-bold uppercase tracking-wider mb-1 text-[#189aa1]">
                   Annual Access
@@ -398,7 +369,7 @@ export default function Premium() {
                 <div className="text-gray-400 text-xs mb-0.5">per year · renews annually</div>
                 <div className="text-[10px] font-semibold mb-1 text-[#189aa1]">{appName} only</div>
                 <div className="text-[10px] text-gray-400 mb-4">
-                  {PREMIUM_TRIAL_LABEL} first, then full annual access — cancel anytime.
+                  Default free-trial choice. {PREMIUM_TRIAL_LABEL} first, then full annual access — cancel anytime.
                 </div>
                 <div className="mt-auto pt-4">
                   {loading ? (
@@ -413,6 +384,35 @@ export default function Premium() {
                       label={`${PREMIUM_TRIAL_CTA} — then $99.97/yr`}
                       onPay={() => singleAnnual.mutate({ interval: "annual", origin: window.location.origin, promoCode: promoCode ?? undefined })}
                       isPending={singleAnnual.isPending}
+                      variant="teal"
+                    />
+                  ) : (
+                    <SignInBtn />
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Monthly — single app alternate */}
+              <div className="flex min-h-[292px] flex-col rounded-2xl bg-white px-5 py-6 shadow-lg">
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Monthly</div>
+                <div className="text-3xl sm:text-4xl font-black text-[#189aa1] mb-0.5" style={{ fontFamily: "Merriweather, serif" }}>
+                  $9.97
+                </div>
+                <div className="text-gray-400 text-xs mb-1">per month · cancel anytime</div>
+                <div className="text-[10px] text-gray-400 mb-4">{appName} only · available if preferred</div>
+                <div className="mt-auto pt-4">
+                  {loading ? (
+                    <div className="flex items-center justify-center gap-2 text-gray-400 text-xs py-2">
+                      <div className="w-3 h-3 border-2 border-[#189aa1] border-t-transparent rounded-full animate-spin" />
+                      Checking…
+                    </div>
+                  ) : status?.isPremium ? (
+                    <ResumeBtn />
+                  ) : user ? (
+                  <CheckoutBtn
+                      label={`${PREMIUM_TRIAL_CTA} — then $9.97/mo`}
+                      onPay={() => singleMonthly.mutate({ interval: "monthly", origin: window.location.origin, promoCode: promoCode ?? undefined })}
+                      isPending={singleMonthly.isPending}
                       variant="teal"
                     />
                   ) : (

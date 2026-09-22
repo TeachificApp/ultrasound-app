@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
 import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from "mediabunny";
-import { Headphones, Loader2, Search, Upload } from "lucide-react";
+import { Headphones, Loader2, Search, Sparkles, Upload } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
+import {
+  AI_MUSIC_DURATION_SECONDS,
+  aiLoopFilename,
+  renderAiMusicLoop,
+  type AiMusicMood,
+  type AiMusicTexture,
+} from "@/lib/aiMusicLoop";
 import {
   DEFAULT_SOCIAL_EXPORT_PLATFORM,
   getSocialExportPreset,
@@ -25,6 +32,8 @@ export type CardMotion = {
   /** Website shown on the final brand screen; cards choose their approved destination. */
   outroHost?: string;
   musicUrl?: string | null;
+  /** Browser-local audio retained for a newly generated/uploaded track. */
+  musicBlob?: Blob | null;
   musicTitle?: string | null;
 };
 
@@ -50,21 +59,50 @@ const OUTRO_START_SECONDS = MOTION_DURATION_SECONDS - OUTRO_HOLD_SECONDS;
 // The fourth combined-question option completes at 4.11 seconds. The answer
 // deliberately waits three full seconds so viewers can consider every option.
 const COMBINED_ANSWER_REVEAL_SECONDS = 7.11;
+// Canvas fillText positions are baselines. Reserve title ascent and a visible
+// gap after the static Clinical Question/Insight label before any staged copy
+// is drawn so the first animated item cannot rise into that heading.
+const STATIC_LABEL_TO_CONTENT_GAP_RATIO = 0.82;
 const FALLBACK_BACKGROUND = "#071318";
 
 export type SocialMusicOption = {
   id: string;
   title: string;
   url: string;
-  source: "media_repository" | "openverse";
+  source: "media_repository" | "openverse" | "ai_generated";
   creator?: string;
   attribution?: string;
   license?: string;
   licenseUrl?: string;
   sourceUrl?: string | null;
+  /** Retains freshly generated audio for reliable same-browser MP4 encoding. */
+  localBlob?: Blob;
 };
 
-type MusicSourceMode = "none" | "catalogue" | "upload";
+type MusicSourceMode = "none" | "catalogue" | "upload" | "ai";
+
+const AI_MUSIC_MOODS: Array<{ value: AiMusicMood; label: string }> = [
+  { value: "calm", label: "Calm" },
+  { value: "focused", label: "Focused" },
+  { value: "uplifting", label: "Uplifting" },
+  { value: "confident", label: "Confident" },
+  { value: "cinematic", label: "Cinematic" },
+  { value: "energetic", label: "Energetic" },
+];
+
+const AI_MUSIC_TEXTURES: Array<{ value: AiMusicTexture; label: string }> = [
+  { value: "ambient", label: "Ambient" },
+  { value: "lofi", label: "Lo-fi" },
+  { value: "electronic", label: "Electronic" },
+  { value: "minimal", label: "Minimal" },
+  { value: "pulse", label: "Pulse" },
+  { value: "rnb", label: "R&B rhythm" },
+  { value: "rap", label: "Rap beat" },
+  { value: "hiphop", label: "Hip-hop" },
+  { value: "pop", label: "Pop" },
+  { value: "upbeat", label: "Upbeat" },
+  { value: "rock", label: "Rock" },
+];
 
 function cleanText(value: string | null | undefined): string {
   return (value ?? "")
@@ -256,7 +294,7 @@ function drawMotionPanel(
   context.font = `800 ${labelFont}px "Segoe UI", Arial, sans-serif`;
   const motionLabel = motion.kind === "answer" ? "ANSWER REVEAL" : motion.kind === "question" || motion.kind === "combined" ? "CLINICAL QUESTION" : "CLINICAL INSIGHT";
   context.fillText(motionLabel, x, y);
-  y += labelFont * 1.7;
+  y += labelFont + titleFont * STATIC_LABEL_TO_CONTENT_GAP_RATIO;
 
   const titleProgress = easeOutBack((elapsed - 0.65) / 0.55);
   if (titleProgress > 0) {
@@ -453,14 +491,22 @@ async function loadMotionLogo(url: string | undefined): Promise<HTMLImageElement
   });
 }
 
-async function addMusicTrack(output: Output, musicUrl: string | null | undefined): Promise<{ source: AudioBufferSource; buffer: AudioBuffer } | null> {
-  if (!musicUrl) return null;
+async function addMusicTrack(
+  output: Output,
+  musicUrl: string | null | undefined,
+  musicBlob?: Blob | null,
+): Promise<{ source: AudioBufferSource; buffer: AudioBuffer } | null> {
+  if (!musicUrl && !musicBlob) return null;
   try {
-    const response = await fetch(musicUrl, { mode: "cors" });
-    if (!response.ok) return null;
-    const bytes = await response.arrayBuffer();
+    const bytes = musicBlob
+      ? await musicBlob.arrayBuffer()
+      : await (async () => {
+        const response = await fetch(musicUrl!, { mode: "cors" });
+        if (!response.ok) throw new Error(`Audio source returned ${response.status}.`);
+        return response.arrayBuffer();
+      })();
     const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextCtor) return null;
+    if (!AudioContextCtor) throw new Error("This browser cannot decode audio for MP4 export.");
     const audioContext = new AudioContextCtor();
     const decoded = await audioContext.decodeAudioData(bytes.slice(0));
     const frames = Math.min(decoded.length, Math.floor(decoded.sampleRate * MOTION_DURATION_SECONDS));
@@ -468,12 +514,18 @@ async function addMusicTrack(output: Output, musicUrl: string | null | undefined
     for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) {
       clip.copyToChannel(decoded.getChannelData(channel).slice(0, frames), channel);
     }
+    await audioContext.close?.();
     const source = new AudioBufferSource({ codec: "aac", quality: new Quality("medium") });
     output.addAudioTrack(source);
     return { source, buffer: clip };
-  } catch {
-    return null;
+  } catch (error) {
+    const label = motionMusicLabel(musicUrl);
+    throw new Error(`The selected ${label} could not be embedded in this MP4. Try generating the AI loop again, or choose an audio file that this browser can decode.`);
   }
+}
+
+function motionMusicLabel(musicUrl: string | null | undefined) {
+  return musicUrl?.includes("openverse") ? "CC0 track" : "music track";
 }
 
 async function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
@@ -520,7 +572,7 @@ export async function renderSocialCardAsMp4(
     output.addVideoTrack(source);
     const [logo, music] = await Promise.all([
       loadMotionLogo(motion.logoUrl),
-      addMusicTrack(output, motion.musicUrl),
+      addMusicTrack(output, motion.musicUrl, motion.musicBlob),
     ]);
     await output.start();
     try {
@@ -588,8 +640,13 @@ export function SocialExportControls({
   const [catalogueInput, setCatalogueInput] = useState("");
   const [catalogueQuery, setCatalogueQuery] = useState("");
   const [isUploadingMusic, setIsUploadingMusic] = useState(false);
+  const [aiMood, setAiMood] = useState<AiMusicMood>("focused");
+  const [aiTexture, setAiTexture] = useState<AiMusicTexture>("ambient");
+  const [aiDirection, setAiDirection] = useState("");
+  const [aiMusicError, setAiMusicError] = useState<string | null>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
   const musicPreviewRef = useRef<HTMLAudioElement>(null);
+  const composeAiLoop = trpc.aiMusic.composeLoop.useMutation();
   const catalogue = trpc.openverseMusic.searchCc0Audio.useQuery(
     { query: catalogueQuery, limit: 8 },
     { enabled: musicMode === "catalogue" && catalogueQuery.length >= 2, retry: false, staleTime: 60_000 },
@@ -612,7 +669,7 @@ export function SocialExportControls({
   };
 
   const chooseTrack = (track: SocialMusicOption) => {
-    setMusicMode(track.source === "openverse" ? "catalogue" : "upload");
+    setMusicMode(track.source === "openverse" ? "catalogue" : track.source === "ai_generated" ? "ai" : "upload");
     onMusicChange?.(track);
   };
 
@@ -625,7 +682,7 @@ export function SocialExportControls({
 
   useEffect(() => {
     if (!selectedMusic) return;
-    setMusicMode(selectedMusic.source === "openverse" ? "catalogue" : "upload");
+    setMusicMode(selectedMusic.source === "openverse" ? "catalogue" : selectedMusic.source === "ai_generated" ? "ai" : "upload");
   }, [selectedMusic?.id, selectedMusic?.source]);
 
   useEffect(() => {
@@ -656,7 +713,45 @@ export function SocialExportControls({
         title: file.name.replace(/\.[^.]+$/, ""),
         url: uploaded.s3Url,
         source: "media_repository",
+        localBlob: file,
       });
+    } finally {
+      setIsUploadingMusic(false);
+    }
+  };
+
+  const generateAiMusic = async () => {
+    if (!musicUploadBrand) {
+      setAiMusicError("Choose a card brand before generating a music loop.");
+      return;
+    }
+    setAiMusicError(null);
+    try {
+      const composition = await composeAiLoop.mutateAsync({
+        mood: aiMood,
+        texture: aiTexture,
+        direction: aiDirection.trim() || undefined,
+        durationSeconds: AI_MUSIC_DURATION_SECONDS,
+      });
+      const wav = await renderAiMusicLoop(composition.plan, composition.durationSeconds);
+      const file = new File([wav], aiLoopFilename(`ai-${composition.plan.title}`), { type: "audio/wav" });
+      setIsUploadingMusic(true);
+      const uploaded = await uploadFileToMediaRepository(file, {
+        access: "private",
+        folder: "social-card-ai-music",
+        notes: `Original AI-composed ${composition.durationSeconds}-second ${aiMood} ${aiTexture} loop for card-video export.`,
+        brand: musicUploadBrand,
+      });
+      chooseTrack({
+        id: `ai:${uploaded.assetId}`,
+        title: `AI loop · ${composition.plan.title}`,
+        url: uploaded.s3Url,
+        source: "ai_generated",
+        localBlob: wav,
+      });
+    } catch (error) {
+      console.error("AI music loop generation failed:", error);
+      setAiMusicError(error instanceof Error ? error.message : "AI music generation did not complete. Please try again.");
     } finally {
       setIsUploadingMusic(false);
     }
@@ -702,6 +797,7 @@ export function SocialExportControls({
               >
                 <option value="none">No music</option>
                 <option value="catalogue">Free CC0 search</option>
+                <option value="ai">Generate AI beat / loop</option>
                 <option value="upload">Upload audio</option>
               </select>
             </label>
@@ -718,11 +814,36 @@ export function SocialExportControls({
               </div>)}</div>}
               <p className="text-[10px] leading-relaxed normal-case tracking-normal text-white/45">Openverse results are third-party CC0 1.0 previews. Confirm attribution and source before publishing.</p>
             </div>}
+            {musicMode === "ai" && <div className="space-y-2 rounded-md border border-teal-300/20 bg-teal-300/[0.045] p-2">
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold normal-case tracking-normal text-teal-100"><Sparkles className="h-3 w-3" />Create an original AI beat / loop</div>
+              <p className="text-[10px] leading-relaxed normal-case tracking-normal text-white/55">AI composes a compact instrumental blueprint; choose ambient, R&B, rap, hip-hop, pop, upbeat, rock, or another rhythm style. This browser synthesizes the {AI_MUSIC_DURATION_SECONDS}-second WAV and saves it privately to the selected brand’s Media Repository for preview and MP4 use.</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                <label className="flex flex-col gap-1 text-[9px] font-semibold uppercase tracking-wide text-white/45">Mood
+                  <select value={aiMood} onChange={(event) => setAiMood(event.target.value as AiMusicMood)} disabled={composeAiLoop.isPending || isUploadingMusic} className="rounded border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-[10px] font-semibold normal-case tracking-normal text-white outline-none disabled:opacity-50">
+                    {AI_MUSIC_MOODS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-[9px] font-semibold uppercase tracking-wide text-white/45">Style
+                  <select value={aiTexture} onChange={(event) => setAiTexture(event.target.value as AiMusicTexture)} disabled={composeAiLoop.isPending || isUploadingMusic} className="rounded border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-[10px] font-semibold normal-case tracking-normal text-white outline-none disabled:opacity-50">
+                    {AI_MUSIC_TEXTURES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label className="flex flex-col gap-1 text-[9px] font-semibold uppercase tracking-wide text-white/45">Optional direction
+                <input value={aiDirection} onChange={(event) => setAiDirection(event.target.value.slice(0, 280))} disabled={composeAiLoop.isPending || isUploadingMusic} placeholder="e.g., gentle pulse, airy and non-distracting" className="w-full rounded border border-white/15 bg-[#0e1a24] px-2 py-1.5 text-[10px] font-medium normal-case tracking-normal text-white outline-none placeholder:text-white/35 disabled:opacity-50" />
+              </label>
+              <button type="button" onClick={() => void generateAiMusic()} disabled={composeAiLoop.isPending || isUploadingMusic} className="inline-flex w-full items-center justify-center gap-1.5 rounded border border-teal-200/35 bg-teal-300/15 px-2 py-1.5 text-[10px] font-semibold normal-case tracking-normal text-teal-50 transition-colors hover:bg-teal-300/25 disabled:cursor-not-allowed disabled:opacity-50">
+                {composeAiLoop.isPending || isUploadingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                {composeAiLoop.isPending ? "Composing loop…" : isUploadingMusic ? "Saving loop…" : "Generate AI loop"}
+              </button>
+              {aiMusicError && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-amber-200">{aiMusicError}</p>}
+              <p className="text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Instrumental only. Listen to the browser preview before publishing; this newly generated loop is embedded directly in the MP4 from this browser.</p>
+            </div>}
             {musicMode === "upload" && <div className="space-y-2 rounded-md border border-white/10 bg-white/[0.025] p-2">
               {musicUploadBrand && <div className="flex items-center gap-2"><input ref={musicInputRef} type="file" accept="audio/mpeg,audio/mp4,audio/aac,audio/x-m4a,audio/wav" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMusic(file).catch((error) => console.error("Music upload failed:", error)); event.currentTarget.value = ""; }} /><button type="button" disabled={isUploadingMusic} onClick={() => musicInputRef.current?.click()} className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-white/75 transition-colors hover:bg-white/10 disabled:opacity-40">{isUploadingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}{isUploadingMusic ? "Uploading…" : "Choose audio file"}</button><span className="text-[10px] normal-case tracking-normal text-white/35">MP3, M4A, AAC, or WAV · up to 30 MB</span></div>}
               {musicOptions.length > 0 && <div className="space-y-1.5"><p className="text-[10px] font-semibold normal-case tracking-normal text-white/55">Available Media Repository music</p>{musicOptions.map((option) => <div key={option.id} className={`rounded-md border p-2 ${selectedMusic?.id === option.id ? "border-teal-300/60 bg-teal-300/10" : "border-white/10 bg-black/10"}`}><div className="flex items-center justify-between gap-2"><p className="min-w-0 truncate text-[11px] font-semibold normal-case tracking-normal text-white">{option.title}</p><button type="button" onClick={() => chooseTrack(option)} className="shrink-0 rounded border border-teal-300/30 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-teal-100 hover:bg-teal-300/15">{selectedMusic?.id === option.id ? "Selected" : "Use track"}</button></div><audio controls preload="metadata" src={option.url} className="mt-1.5 h-7 w-full" aria-label={`Preview ${option.title}`} /></div>)}</div>}
             </div>}
-            {selectedMusic && <div className="rounded-md border border-white/10 bg-white/[0.035] p-2"><div className="mb-1 flex items-center gap-1 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Headphones className="h-3 w-3 text-teal-200" />Selected: {selectedMusic.title}</div><audio ref={musicPreviewRef} controls preload="metadata" src={selectedMusic.url} className="h-7 w-full max-w-[290px]" aria-label={`Play a sample of ${selectedMusic.title}`} /><p className="mt-1 text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Preview plays in this browser only. The full MP4 uses the selected track when the source permits browser decoding and CORS access.</p></div>}
+            {selectedMusic && <div className="rounded-md border border-white/10 bg-white/[0.035] p-2"><div className="mb-1 flex items-center gap-1 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Headphones className="h-3 w-3 text-teal-200" />Selected: {selectedMusic.title}</div><audio ref={musicPreviewRef} controls preload="metadata" src={selectedMusic.url} className="h-7 w-full max-w-[290px]" aria-label={`Play a sample of ${selectedMusic.title}`} /><p className="mt-1 text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Preview plays in this browser. Freshly generated or uploaded audio is embedded directly in the MP4; other selected tracks must permit browser decoding and CORS access.</p></div>}
             {selectedMusic?.source === "openverse" && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-teal-100/80">Selected: {selectedMusic.title} — {selectedMusic.creator} · {selectedMusic.license ?? "CC0 1.0"}</p>}
           </div>
         )}

@@ -31,7 +31,16 @@ Build: pnpm install && pnpm build
 Start: pnpm start
 ```
 
-Railway deploys automatically on every push to `main`.
+Railway connects to GitHub `main`, but **`railway.toml` → `[build].watchPatterns`** limits which file changes start a new deployment.
+
+| Change type | Deploy? |
+|-------------|---------|
+| `client/**`, `server/**`, `shared/**`, `drizzle/**`, `package.json`, lockfile, Vite/TS config, `railway.toml`, `nixpacks.toml` | **Yes** |
+| Docs only (`RAILWAY_DEPLOY.md`, `AGENTS.md`, `docs/**`, `todo.md`, …) | **Skipped** (“No changes to watched files”) — expected; production keeps the last successful deploy |
+
+**Docs-only merges (e.g. PR #169) do not need a redeploy.** To ship new runtime code, merge a PR that touches a watched path, or in Railway open the service → **Deployments** → **Redeploy** the latest successful build.
+
+MySQL migrations (`drizzle/*.sql`) are in the watch list for awareness, but **apply SQL on Railway MySQL manually**; a green deploy alone does not run migrations.
 
 ### Study Groups (Learn `/study-groups`)
 
@@ -43,6 +52,28 @@ After deploying Study Groups from `main`, apply these **additive** SQL files on 
 Verify read-only: `DATABASE_URL='…' pnpm exec vitest run server/verifyStudyGroupsSchema.integration.test.ts`
 
 A raw toast `Failed query: insert into study_groups…` almost always means **0070 was not applied** while the new app code is already live. Code fix `ebe8eb5d` on `main` removed a duplicate Drizzle billing-period column that also broke inserts when the ORM expected columns the database did not have.
+
+### Manus **Publish** and `healthcheckPath` errors
+
+If Manus reports:
+
+`deployment failed: set railway healthcheck: railway api errors: Error in healthcheckPath - Invalid input`
+
+**Cause:** Railway rejected a health-check path while merging config-as-code with saved service settings. This repo previously had **both** `railway.json` and `railway.toml` defining deploy settings (including `healthcheckPath`), which triggered the API error during Manus-driven deploys.
+
+**Correct repo state (on `main` since commit `6618fa4d`):**
+
+- Only `railway.toml` defines build/start/restart policy — **no** `railway.json`.
+- **No** `healthcheckPath` or `healthcheckTimeout` in `railway.toml` (managed in Railway UI instead).
+- The app exposes an unauthenticated probe at **`GET /api/health`** (returns HTTP 200 JSON).
+
+**After GitHub `main` is updated, fix Railway once in the dashboard** (Manus cannot always clear a bad saved path via API):
+
+1. Open the Ultrasound-App service in [Railway](https://railway.app).
+2. **Settings → Deploy → Health Check Path** — set exactly `/api/health` (leading slash, no query string), or temporarily clear/disable health check, save, then set `/api/health` again.
+3. Redeploy from Manus **Publish** or push to `main`.
+
+Verify: `curl -sS https://app.allaboutultrasound.com/api/health` should return `{"ok":true,...}` with HTTP 200.
 
 ---
 

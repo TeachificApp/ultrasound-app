@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const root = new URL("..", import.meta.url).pathname;
 const exporter = readFileSync(`${root}/client/src/components/social/SocialCardExport.tsx`, "utf8");
+const loopSynthesizer = readFileSync(`${root}/client/src/lib/aiMusicLoop.ts`, "utf8");
 const quiz = readFileSync(`${root}/client/src/pages/QuestionBankSocialCardGenerator.tsx`, "utf8");
 const social = readFileSync(`${root}/client/src/pages/SocialContentGenerator.tsx`, "utf8");
 const challenge = readFileSync(`${root}/client/src/pages/ChallengeCardGenerator.tsx`, "utf8");
@@ -16,19 +17,44 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(exporter).toContain("musicUploadBrand");
     expect(exporter).toContain("Selected:");
     expect(exporter).toContain("<audio ref={musicPreviewRef} controls");
-    expect(exporter).toContain("Preview plays in this browser only");
+    expect(exporter).toContain("Preview plays in this browser.");
     for (const page of [quiz, social, challenge]) expect(page).toContain("musicUploadBrand={presentation.brand}");
   });
 
   it("uses explicit no-music, CC0-search, and upload modes with previewable catalogue results", () => {
-    expect(exporter).toContain('type MusicSourceMode = "none" | "catalogue" | "upload"');
+    expect(exporter).toContain('type MusicSourceMode = "none" | "catalogue" | "upload" | "ai"');
     expect(exporter).toContain('<option value="none">No music</option>');
     expect(exporter).toContain('<option value="catalogue">Free CC0 search</option>');
+    expect(exporter).toContain('<option value="ai">Generate AI beat / loop</option>');
     expect(exporter).toContain('<option value="upload">Upload audio</option>');
     expect(exporter).toContain('musicMode === "catalogue"');
     expect(exporter).toContain('setTimeout(() => setCatalogueQuery(query), 300)');
     expect(exporter).toContain('Use track');
     expect(exporter).toContain('aria-label={`Preview ${option.title}`}');
+  });
+
+  it("composes and saves an original AI music loop through the shared control", () => {
+    expect(exporter).toContain("trpc.aiMusic.composeLoop.useMutation()");
+    expect(exporter).toContain("renderAiMusicLoop(composition.plan, composition.durationSeconds)");
+    expect(exporter).toContain('folder: "social-card-ai-music"');
+    expect(exporter).toContain('source: "ai_generated"');
+    expect(exporter).toContain("localBlob: wav");
+    expect(exporter).toContain("Instrumental only.");
+  });
+
+  it("embeds freshly selected generated or uploaded audio from browser bytes instead of silently omitting it", () => {
+    expect(exporter).toContain("musicBlob?: Blob | null");
+    expect(exporter).toMatch(/musicBlob\s*\? await musicBlob\.arrayBuffer\(\)/);
+    expect(exporter).toContain("The selected ${label} could not be embedded in this MP4");
+    for (const page of [quiz, social, challenge]) expect(page).toContain("musicBlob: selectedMusic?.localBlob");
+  });
+
+  it("renders a layered modern instrumental mix rather than a single oscillator beat", () => {
+    for (const layer of ["addModernKick", "addModernSnare", "addModernHat", "addLayeredBass", "addModernLead", "addPadChord", "createImpulseResponse", "createDrive"]) {
+      expect(loopSynthesizer).toContain(layer);
+    }
+    expect(loopSynthesizer).toContain("createDynamicsCompressor");
+    expect(loopSynthesizer).toContain("chordProgression");
   });
 
   it("supports question-and-answer MP4 sequences across every card generator", () => {
@@ -40,6 +66,7 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(challenge).toContain('Question + answer MP4');
     expect(exporter).toContain("COMBINED_ANSWER_REVEAL_SECONDS = 7.11");
     expect(exporter).toContain("OUTRO_HOLD_SECONDS = 10");
+    expect(exporter).toContain("STATIC_LABEL_TO_CONTENT_GAP_RATIO");
     expect(quiz).toContain("outroHost: presentation.publicHost");
     expect(social).toContain("outroHost: presentation.publicHost");
     expect(challenge).toContain("outroHost: presentation.appHost");

@@ -76,6 +76,7 @@ import { teamRouter } from "./routers/teamRouter";
 import { adminNotificationsRouter } from "./routers/adminNotificationsRouter";
 import { studyGroupsRouter } from "./routers/studyGroupsRouter";
 import { openverseMusicRouter } from "./routers/openverseMusicRouter";
+import { aiMusicRouter } from "./routers/aiMusicRouter";
 import { quizCardLibraryRouter } from "./routers/quizCardLibraryRouter";
 import { sonoTravelersRouter } from "./routers/sonoTravelersRouter";
 import { siteSettingsRouter } from "./routers/siteSettingsRouter";
@@ -198,6 +199,7 @@ export const appRouter = router({
   system: systemRouter,
   community: communityRouter,
   openverseMusic: openverseMusicRouter,
+  aiMusic: aiMusicRouter,
   quizCardLibrary: quizCardLibraryRouter,
   marketingSitePublic: marketingSitePublicRouter,
   marketingSiteAdmin: marketingSiteAdminRouter,
