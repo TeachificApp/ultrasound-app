@@ -80,6 +80,40 @@ const questionInput = z.object({
       presetCategory: z.string().optional(),
 });
 
+const QUESTION_MEDIA_TAGS = {
+  image: { name: "Media: Image", color: "#24abbc" },
+  video: { name: "Media: Video", color: "#0e6b70" },
+} as const;
+
+/** Preserve selected tags while ensuring direct editor media remains discoverable. */
+async function ensureQuestionMediaTags(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, questionId: number) {
+  const [question] = await db.select({
+    questionImageUrl: questionBank.questionImageUrl,
+    questionVideoUrl: questionBank.questionVideoUrl,
+    feedbackImageUrl: questionBank.feedbackImageUrl,
+    feedbackVideoUrl: questionBank.feedbackVideoUrl,
+    flashcardBackImageUrl: questionBank.flashcardBackImageUrl,
+    options: questionBank.options,
+  }).from(questionBank).where(eq(questionBank.id, questionId)).limit(1);
+  if (!question) return;
+  let options: Array<{ imageUrl?: string; videoUrl?: string }> = [];
+  try { options = question.options ? JSON.parse(question.options) : []; } catch { options = []; }
+  const wantsImage = Boolean(question.questionImageUrl || question.feedbackImageUrl || question.flashcardBackImageUrl || options.some(option => option.imageUrl));
+  const wantsVideo = Boolean(question.questionVideoUrl || question.feedbackVideoUrl || options.some(option => option.videoUrl));
+  const requested = [wantsImage ? QUESTION_MEDIA_TAGS.image : null, wantsVideo ? QUESTION_MEDIA_TAGS.video : null].filter(Boolean) as Array<typeof QUESTION_MEDIA_TAGS.image>;
+  if (!requested.length) return;
+  let tags = await db.select({ id: questionBankTags.id, name: questionBankTags.name }).from(questionBankTags).where(inArray(questionBankTags.name, requested.map(tag => tag.name)));
+  const present = new Set(tags.map(tag => tag.name));
+  for (const tag of requested.filter(tag => !present.has(tag.name))) {
+    await db.insert(questionBankTags).values(tag);
+  }
+  tags = await db.select({ id: questionBankTags.id, name: questionBankTags.name }).from(questionBankTags).where(inArray(questionBankTags.name, requested.map(tag => tag.name)));
+  const existingMappings = await db.select({ tagId: questionBankTagMap.tagId }).from(questionBankTagMap).where(eq(questionBankTagMap.questionId, questionId));
+  const existingTagIds = new Set(existingMappings.map(mapping => mapping.tagId));
+  const missingTagIds = tags.filter(tag => !existingTagIds.has(tag.id)).map(tag => ({ questionId, tagId: tag.id }));
+  if (missingTagIds.length) await db.insert(questionBankTagMap).values(missingTagIds);
+}
+
 export const questionBankRouter = router({
   // ─── Tags ──────────────────────────────────────────────────────────────────
 
@@ -287,6 +321,7 @@ export const questionBankRouter = router({
       if (tagIds && tagIds.length > 0) {
         await db.insert(questionBankTagMap).values(tagIds.map(tagId => ({ questionId: result.id, tagId })));
       }
+      await ensureQuestionMediaTags(db, result.id);
       return { id: result.id };
     }),
 
@@ -335,6 +370,7 @@ export const questionBankRouter = router({
           await db.insert(questionBankTagMap).values(tagIds.map(tagId => ({ questionId: id, tagId })));
         }
       }
+      await ensureQuestionMediaTags(db, id);
       return { success: true };
     }),
 

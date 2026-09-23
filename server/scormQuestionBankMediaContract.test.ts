@@ -46,6 +46,15 @@ describe("SCORM Question Bank media contract", () => {
     expect(commitSource).toContain("feedbackImageUrls[0] ?? (questionVideoUrl ? questionImageUrls[0] ?? null : null)");
   });
 
+  it("adds durable media tags whenever imported question, feedback, or answer media is present", () => {
+    expect(commitSource).toContain('const MEDIA_IMAGE_TAG = "Media: Image"');
+    expect(commitSource).toContain('const MEDIA_VIDEO_TAG = "Media: Video"');
+    expect(commitSource).toContain("ensureMediaTagIds");
+    expect(commitSource).toContain("ensureQuestionTagMappings");
+    expect(commitSource).toContain("options.some((option) => option.imageUrl)");
+    expect(commitSource).toContain("options.some((option) => option.videoUrl)");
+  });
+
   it("halts before Question Bank writes when SCORM media preparation fails", () => {
     expect(commitSource).toContain("SCORM media could not be prepared, so no Question Bank records were saved.");
     expect(commitSource).toContain("[QuestionBank] SCORM media preparation failed:");

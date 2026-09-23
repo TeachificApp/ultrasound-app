@@ -71,6 +71,19 @@ describe("Question Bank social-card generation", () => {
     expect(router).toContain('input.mediaKind === "video"');
   });
 
+  it("makes large folder libraries and tag sets easy to scan and filter before applying Question Bank filters", () => {
+    const page = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+
+    expect(page).toContain("flattenFolderBrowserEntries");
+    expect(page).toContain("const [folderSearch, setFolderSearch]");
+    expect(page).toContain("Find a folder");
+    expect(page).toContain("max-h-64");
+    expect(page).toContain("const [tagSearch, setTagSearch]");
+    expect(page).toContain("Search tags");
+    expect(page).toContain("visibleTags");
+    expect(page).toContain("Clear {tagIds.length}");
+  });
+
   it("selects card identity independently and uses a public non-daily Quiz Card destination and caption", () => {
     const page = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
     const card = readProjectFile("client/src/components/social/ClinicalQuizCard.tsx");

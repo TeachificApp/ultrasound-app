@@ -199,4 +199,34 @@ describe("Study Groups", () => {
     expect(workspace).toContain("Group content access");
     expect(admin).toContain("Workspace content blocks");
   });
+
+  it("gives platform admins a management dashboard and gives group members a private safety-report path", () => {
+    const migration = read("drizzle/0077_study_group_content_reports.sql");
+    const schema = read("drizzle/schema.ts");
+    const router = read("server/routers/studyGroupsRouter.ts");
+    const workspace = read("client/src/pages/StudyGroupWorkspace.tsx");
+    const admin = read("client/src/pages/admin/StudyGroupsAdmin.tsx");
+
+    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `study_group_content_reports`");
+    expect(schema).toContain('mysqlTable("study_group_content_reports"');
+    expect(router).toContain("reportContent");
+    expect(router).toContain("notifyOwner");
+    expect(router).toContain("adminDeleteContent");
+    expect(router).toContain("adminResolveContentReport");
+    expect(router).toContain("adminDeleteGroup");
+    expect(workspace).toContain("Report inappropriate group content");
+    expect(workspace).toContain("Platform Admin has been notified for review");
+    expect(admin).toContain("Reported content");
+    expect(admin).toContain("Invite member");
+    expect(admin).toContain("Delete this Study Group");
+  });
+
+  it("opens a clear pricing comparison from the public Study Groups landing page", () => {
+    const listing = read("client/src/pages/StudyGroupsPage.tsx");
+    expect(listing).toContain("setGroupOptionsOpen(true)");
+    expect(listing).toContain("Choose the right way to learn together");
+    expect(listing).toContain("$49");
+    expect(listing).toContain("$99");
+    expect(listing).toContain("eligible course, quiz, and content purchases receive a 10% group discount");
+  });
 });

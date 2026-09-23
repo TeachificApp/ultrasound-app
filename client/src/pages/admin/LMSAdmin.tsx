@@ -11999,6 +11999,8 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
   const [explanation, setExplanation] = useState(question?.explanation ?? "");
   const [qImageUrl, setQImageUrl] = useState(question?.questionImageUrl ?? "");
   const [qVideoUrl, setQVideoUrl] = useState(question?.questionVideoUrl ?? "");
+  const [feedbackImageUrl, setFeedbackImageUrl] = useState(question?.feedbackImageUrl ?? "");
+  const [feedbackVideoUrl, setFeedbackVideoUrl] = useState(question?.feedbackVideoUrl ?? "");
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>(question?.tags?.map((t: any) => t.id) ?? []);
   const [isPreset, setIsPreset] = useState<boolean>(question?.isPreset ?? false);
   const [presetCategory, setPresetCategory] = useState<string>(question?.presetCategory ?? "");
@@ -12023,6 +12025,8 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
       explanation: explanation.trim() || undefined,
       questionImageUrl: qImageUrl.trim() || undefined,
       questionVideoUrl: qVideoUrl.trim() || undefined,
+      feedbackImageUrl: feedbackImageUrl.trim() || undefined,
+      feedbackVideoUrl: feedbackVideoUrl.trim() || undefined,
       tagIds: selectedTagIds,
       isPreset,
       presetCategory: presetCategory.trim() || undefined,
@@ -12131,6 +12135,21 @@ function QuestionBankEditDialog({ question, tags, onClose, onSaved }: {
           <div>
             <Label className="text-sm font-medium text-gray-700 mb-1 block">Explanation (optional)</Label>
             <textarea value={explanation} onChange={e => setExplanation(e.target.value)} rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Explain the correct answer..." />
+          </div>
+
+          <div className="rounded-lg border border-teal-100 bg-teal-50/60 p-3">
+            <Label className="text-sm font-medium text-teal-900 mb-1 block">Feedback media (optional)</Label>
+            <p className="mb-3 text-xs text-teal-700">Shown after the learner checks an answer. Add a direct image or video URL, or use the Media editor for imported SCORM media.</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="text-xs text-gray-500 mb-1 block">Feedback Image URL</Label>
+                <Input value={feedbackImageUrl} onChange={e => setFeedbackImageUrl(e.target.value)} placeholder="https://..." className="h-8 text-sm bg-white" />
+              </div>
+              <div>
+                <Label className="text-xs text-gray-500 mb-1 block">Feedback Video URL</Label>
+                <Input value={feedbackVideoUrl} onChange={e => setFeedbackVideoUrl(e.target.value)} placeholder="https://..." className="h-8 text-sm bg-white" />
+              </div>
+            </div>
           </div>
 
           {/* Tags */}

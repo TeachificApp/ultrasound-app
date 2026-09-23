@@ -32,6 +32,8 @@ const OPTION_LETTERS = ["A", "B", "C", "D"];
 
 type QuestionCardMediaKind = "question-image" | "question-video" | "option-image" | "option-video";
 
+type FolderBrowserEntry = { id: number; name: string; parentId?: number | null; questionCount?: number; depth: number };
+
 function stripHtml(value: string | null | undefined): string {
   return (value ?? "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -82,6 +84,28 @@ function getCorrectAnswer(question: any): string | null {
   return answer || null;
 }
 
+function flattenFolderBrowserEntries(folders: any[]): FolderBrowserEntry[] {
+  const children = new Map<number | null, any[]>();
+  for (const folder of folders) {
+    const parentId = folder.parentId ?? null;
+    children.set(parentId, [...(children.get(parentId) ?? []), folder]);
+  }
+  for (const siblingSet of children.values()) siblingSet.sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0) || String(a.name).localeCompare(String(b.name)));
+  const result: FolderBrowserEntry[] = [];
+  const visited = new Set<number>();
+  const visit = (parentId: number | null, depth: number) => {
+    for (const folder of children.get(parentId) ?? []) {
+      if (visited.has(folder.id)) continue;
+      visited.add(folder.id);
+      result.push({ ...folder, depth });
+      visit(folder.id, depth + 1);
+    }
+  };
+  visit(null, 0);
+  for (const folder of folders) if (!visited.has(folder.id)) { visited.add(folder.id); result.push({ ...folder, depth: 0 }); visit(folder.id, 1); }
+  return result;
+}
+
 function buildSocialCaption(question: any, presentation: ReturnType<typeof getBrandToolPresentation>, cardLabel?: string) {
   const options = normalizeOptions(question?.options).slice(0, 4);
   return [
@@ -106,6 +130,8 @@ export default function QuestionBankSocialCardGenerator() {
   const [search, setSearch] = useState("");
   const [folderId, setFolderId] = useState<number | undefined>();
   const [tagIds, setTagIds] = useState<number[]>([]);
+  const [folderSearch, setFolderSearch] = useState("");
+  const [tagSearch, setTagSearch] = useState("");
   const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
   const [page, setPage] = useState(1);
   const [includeSourceFolderLabel, setIncludeSourceFolderLabel] = useState(false);
@@ -142,6 +168,15 @@ export default function QuestionBankSocialCardGenerator() {
   const questionsQuery = trpc.questionBank.listQuestions.useQuery(questionQueryInput);
   const foldersQuery = trpc.questionBank.listFolders.useQuery();
   const tagsQuery = trpc.questionBank.listTags.useQuery();
+  const folderBrowserEntries = useMemo(() => flattenFolderBrowserEntries(foldersQuery.data ?? []), [foldersQuery.data]);
+  const visibleFolderEntries = useMemo(() => {
+    const needle = folderSearch.trim().toLowerCase();
+    return needle ? folderBrowserEntries.filter((folder) => folder.name.toLowerCase().includes(needle)) : folderBrowserEntries;
+  }, [folderBrowserEntries, folderSearch]);
+  const visibleTags = useMemo(() => {
+    const needle = tagSearch.trim().toLowerCase();
+    return (tagsQuery.data ?? []).filter((tag: any) => tagIds.includes(tag.id) || !needle || tag.name.toLowerCase().includes(needle));
+  }, [tagIds, tagSearch, tagsQuery.data]);
   const selectedQuestion = useMemo(
     () => questionsQuery.data?.questions.find((question: any) => question.id === selectedQuestionId) ?? null,
     [questionsQuery.data?.questions, selectedQuestionId],
@@ -327,8 +362,8 @@ export default function QuestionBankSocialCardGenerator() {
           <h2 className="text-sm font-bold">1. Browse all Question Bank questions</h2>
           <p className="mt-1 text-[11px] leading-relaxed text-white/45">Questions with images or video in their answer choices stay available in native quizzes, but are excluded here because Quiz Cards use accessible A–D text answer rows.</p>
           <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-white/40" /><Input value={search} onChange={(event) => { setSearch(event.target.value); resetQuestionBrowserPage(); }} placeholder="Search all Question Bank questions" className="border-white/10 bg-white/5 pl-9 text-white placeholder:text-white/35" /></div>
-          <div className="mt-3 rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-white/50"><Folder className="h-3.5 w-3.5" />Folders</div><div className="max-h-28 space-y-1 overflow-y-auto pr-1"><button onClick={() => changeFolder(undefined)} className={`w-full rounded px-2 py-1.5 text-left text-xs ${folderId === undefined ? "bg-teal-300/15 text-teal-100" : "text-white/65 hover:bg-white/5"}`}>All folders</button>{foldersQuery.data?.map((folder: any) => <button key={folder.id} onClick={() => changeFolder(folder.id)} className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs ${folderId === folder.id ? "bg-teal-300/15 text-teal-100" : "text-white/65 hover:bg-white/5"}`} style={{ paddingLeft: `${8 + (folder.parentId ? 12 : 0)}px` }}><span className="truncate">{folder.name}</span><span className="ml-2 text-[10px] text-white/35">{folder.questionCount}</span></button>)}</div></div>
-          <div className="mt-3"><p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-white/50">Tags · match all selected</p><div className="flex max-h-20 flex-wrap gap-1 overflow-y-auto pr-1">{tagsQuery.data?.map((tag: any) => <button key={tag.id} onClick={() => toggleTag(tag.id)} className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${tagIds.includes(tag.id) ? "border-teal-200 bg-teal-300/15 text-teal-100" : "border-white/10 text-white/55 hover:border-white/30"}`}>{tag.name}</button>)}</div></div>
+          <div className="mt-3 rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="mb-2 flex items-center justify-between gap-2"><div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-white/50"><Folder className="h-3.5 w-3.5" />Folders</div><span className="text-[10px] text-white/35">{visibleFolderEntries.length} shown</span></div><div className="relative"><Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-white/35" /><Input value={folderSearch} onChange={(event) => setFolderSearch(event.target.value)} placeholder="Find a folder" aria-label="Find a Question Bank folder" className="h-8 border-white/10 bg-white/5 pl-8 text-xs text-white placeholder:text-white/30" /></div>{folderId !== undefined && <button onClick={() => changeFolder(undefined)} className="mt-2 text-[10px] font-semibold text-teal-200 hover:text-teal-100">Clear selected folder</button>}<div className="mt-2 max-h-64 space-y-1 overflow-y-auto rounded-md border border-white/5 bg-black/10 p-1 pr-1.5"><button onClick={() => changeFolder(undefined)} className={`flex w-full items-center rounded px-2 py-2 text-left text-xs font-semibold ${folderId === undefined ? "bg-teal-300/15 text-teal-100" : "text-white/75 hover:bg-white/5"}`}><span>All folders</span></button>{visibleFolderEntries.map((folder) => <button key={folder.id} onClick={() => changeFolder(folder.id)} className={`flex w-full items-center justify-between rounded py-2 pr-2 text-left text-xs ${folderId === folder.id ? "bg-teal-300/15 text-teal-100" : "text-white/65 hover:bg-white/5"}`} style={{ paddingLeft: `${8 + Math.min(folder.depth, 4) * 14}px` }} title={folder.name}><span className="min-w-0 truncate"><span className="mr-1.5 text-white/30">{folder.depth ? "↳" : "•"}</span>{folder.name}</span><span className="ml-2 shrink-0 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/45">{folder.questionCount}</span></button>)}{visibleFolderEntries.length === 0 && <p className="px-2 py-3 text-xs text-white/40">No folders match “{folderSearch}”.</p>}</div></div>
+          <div className="mt-3 rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="mb-2 flex items-center justify-between gap-2"><p className="text-[11px] font-bold uppercase tracking-wide text-white/50">Tags · match all selected</p>{tagIds.length > 0 && <button onClick={() => { setTagIds([]); resetQuestionBrowserPage(); }} className="text-[10px] font-semibold text-teal-200 hover:text-teal-100">Clear {tagIds.length}</button>}</div><div className="relative"><Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-white/35" /><Input value={tagSearch} onChange={(event) => setTagSearch(event.target.value)} placeholder="Search tags" aria-label="Search Question Bank tags" className="h-8 border-white/10 bg-white/5 pl-8 text-xs text-white placeholder:text-white/30" /></div><div className="mt-2 flex max-h-36 flex-wrap content-start gap-1 overflow-y-auto rounded-md border border-white/5 bg-black/10 p-2 pr-1.5">{visibleTags.map((tag: any) => <button key={tag.id} onClick={() => toggleTag(tag.id)} className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${tagIds.includes(tag.id) ? "border-teal-200 bg-teal-300/15 text-teal-100" : "border-white/10 text-white/55 hover:border-white/30"}`}>{tag.name}</button>)}{visibleTags.length === 0 && <p className="px-1 py-2 text-xs text-white/40">No tags match “{tagSearch}”.</p>}</div></div>
           <div className="mt-3"><p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-white/50">Linked media</p><div className="grid grid-cols-3 gap-1">{(["all", "image", "video"] as MediaFilter[]).map((value) => <button key={value} onClick={() => changeMediaFilter(value)} className={`rounded border px-1.5 py-1.5 text-[10px] font-bold capitalize ${mediaFilter === value ? "border-teal-200 bg-teal-300/15 text-teal-100" : "border-white/10 text-white/55 hover:border-white/30"}`}>{value === "all" ? "Any" : value}</button>)}</div></div>
           <div className="mt-3 text-[11px] text-white/45">{questionsQuery.data ? `${questionsQuery.data.total} matching question${questionsQuery.data.total === 1 ? "" : "s"}` : "Loading filters…"}</div>
           <div className="mt-3 max-h-[68vh] space-y-2 overflow-y-auto pr-1">

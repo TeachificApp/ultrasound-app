@@ -15,6 +15,7 @@ import {
   studyGroupActivity,
   studyGroupContentAccess,
   studyGroupContentAssignments,
+  studyGroupContentReports,
   studyGroupDocuments,
   studyGroupMembers,
   studyGroupMessages,
@@ -718,6 +719,38 @@ export const studyGroupsRouter = router({
     return { ok: true };
   }),
 
+  reportContent: protectedProcedure.input(groupIdSchema.extend({
+    contentType: z.enum(["document", "message", "task", "module"]),
+    contentId: z.number().int().positive(),
+    reason: z.string().trim().min(3).max(120),
+    details: z.string().trim().max(2000).optional(),
+  })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const access = await requireGroupAccess(db, input.groupId, ctx.user.id, ctx.user.role);
+    const contentExists = input.contentType === "document"
+      ? await db.select({ id: studyGroupDocuments.id }).from(studyGroupDocuments).where(and(eq(studyGroupDocuments.id, input.contentId), eq(studyGroupDocuments.groupId, input.groupId))).limit(1)
+      : input.contentType === "message"
+        ? await db.select({ id: studyGroupMessages.id }).from(studyGroupMessages).where(and(eq(studyGroupMessages.id, input.contentId), eq(studyGroupMessages.groupId, input.groupId))).limit(1)
+        : input.contentType === "task"
+          ? await db.select({ id: studyGroupTasks.id }).from(studyGroupTasks).where(and(eq(studyGroupTasks.id, input.contentId), eq(studyGroupTasks.groupId, input.groupId))).limit(1)
+          : await db.select({ id: studyGroupModules.id }).from(studyGroupModules).where(and(eq(studyGroupModules.id, input.contentId), eq(studyGroupModules.groupId, input.groupId))).limit(1);
+    if (!contentExists[0]) throw new TRPCError({ code: "NOT_FOUND", message: "That group item is no longer available to report." });
+    const inserted = await db.insert(studyGroupContentReports).values({
+      groupId: input.groupId,
+      reporterUserId: ctx.user.id,
+      contentType: input.contentType,
+      contentId: input.contentId,
+      reason: input.reason,
+      details: input.details || null,
+    }).$returningId();
+    await recordActivity(db, input.groupId, ctx.user.id, "content_reported", `A ${input.contentType} was reported for Platform Admin review.`, "content_report", inserted[0]?.id);
+    void (await import("../_core/notification")).notifyOwner({
+      title: "Study Group content reported",
+      content: `A learner reported ${input.contentType} #${input.contentId} in the private Study Group “${access.group.name}”. Review it in Study Groups oversight.`,
+    }).catch(() => {});
+    return { id: inserted[0]?.id ?? null };
+  }),
+
   createModule: protectedProcedure.input(groupIdSchema.extend({ title: z.string().trim().min(1).max(300), content: z.string().max(100_000).optional(), sortOrder: z.number().int().min(0).default(0) })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     const access = await requireGroupAccess(db, input.groupId, ctx.user.id, ctx.user.role, { manage: true });
@@ -913,17 +946,95 @@ export const studyGroupsRouter = router({
     await requirePlatformAdmin(ctx.user.id, ctx.user.role);
     const groups = await db.select().from(studyGroups).orderBy(desc(studyGroups.updatedAt));
     const groupIds = groups.map(group => group.id);
-    const [members, documents, activity] = groupIds.length ? await Promise.all([
-      db.select().from(studyGroupMembers).where(inArray(studyGroupMembers.groupId, groupIds)),
+    const [members, documents, activity, contentAccesses, reports] = groupIds.length ? await Promise.all([
+      db.select({ membership: studyGroupMembers, name: users.name, displayName: users.displayName })
+        .from(studyGroupMembers).leftJoin(users, eq(users.id, studyGroupMembers.userId))
+        .where(inArray(studyGroupMembers.groupId, groupIds)),
       db.select().from(studyGroupDocuments).where(inArray(studyGroupDocuments.groupId, groupIds)),
       db.select().from(studyGroupActivity).where(inArray(studyGroupActivity.groupId, groupIds)).orderBy(desc(studyGroupActivity.createdAt)).limit(500),
-    ]) : [[], [], []] as const;
+      db.select().from(studyGroupContentAccess).where(inArray(studyGroupContentAccess.groupId, groupIds)).orderBy(desc(studyGroupContentAccess.createdAt)),
+      db.select({ report: studyGroupContentReports, reporterName: users.name, reporterDisplayName: users.displayName })
+        .from(studyGroupContentReports).leftJoin(users, eq(users.id, studyGroupContentReports.reporterUserId))
+        .where(inArray(studyGroupContentReports.groupId, groupIds)).orderBy(desc(studyGroupContentReports.createdAt)).limit(500),
+    ]) : [[], [], [], [], []] as const;
     return groups.map(group => ({
       ...group,
-      activeMembers: members.filter(member => member.groupId === group.id && member.inviteStatus === "active").length,
+      members: members.filter(member => member.membership.groupId === group.id).map(member => ({
+        ...member.membership,
+        displayName: member.displayName || member.name || member.membership.email,
+      })),
+      activeMembers: members.filter(member => member.membership.groupId === group.id && member.membership.inviteStatus === "active").length,
       documents: documents.filter(document => document.groupId === group.id),
+      contentAccesses: contentAccesses.filter(access => access.groupId === group.id),
+      reports: reports.filter(item => item.report.groupId === group.id).map(item => ({
+        ...item.report,
+        reporterName: item.reporterDisplayName || item.reporterName || "Group member",
+      })),
       recentActivity: activity.filter(item => item.groupId === group.id).slice(0, 10),
     }));
+  }),
+
+  adminDeleteContent: protectedProcedure.input(groupIdSchema.extend({
+    contentType: z.enum(["document", "message", "task", "module"]),
+    contentId: z.number().int().positive(),
+  })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await requirePlatformAdmin(ctx.user.id, ctx.user.role);
+    const deletion = input.contentType === "document"
+      ? db.delete(studyGroupDocuments).where(and(eq(studyGroupDocuments.id, input.contentId), eq(studyGroupDocuments.groupId, input.groupId)))
+      : input.contentType === "message"
+        ? db.delete(studyGroupMessages).where(and(eq(studyGroupMessages.id, input.contentId), eq(studyGroupMessages.groupId, input.groupId)))
+        : input.contentType === "task"
+          ? db.delete(studyGroupTasks).where(and(eq(studyGroupTasks.id, input.contentId), eq(studyGroupTasks.groupId, input.groupId)))
+          : db.delete(studyGroupModules).where(and(eq(studyGroupModules.id, input.contentId), eq(studyGroupModules.groupId, input.groupId)));
+    await deletion;
+    await recordActivity(db, input.groupId, ctx.user.id, "platform_admin_content_removed", `Platform Admin removed a ${input.contentType}.`, input.contentType, input.contentId);
+    return { ok: true };
+  }),
+
+  adminResolveContentReport: protectedProcedure.input(z.object({
+    reportId: z.number().int().positive(),
+    status: z.enum(["reviewing", "resolved", "dismissed"]),
+    resolutionNote: z.string().trim().max(2000).optional(),
+  })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await requirePlatformAdmin(ctx.user.id, ctx.user.role);
+    const [report] = await db.select().from(studyGroupContentReports).where(eq(studyGroupContentReports.id, input.reportId)).limit(1);
+    if (!report) throw new TRPCError({ code: "NOT_FOUND", message: "Content report not found." });
+    await db.update(studyGroupContentReports).set({
+      status: input.status,
+      resolutionNote: input.resolutionNote || null,
+      reviewedByUserId: ctx.user.id,
+      reviewedAt: new Date(),
+    }).where(eq(studyGroupContentReports.id, report.id));
+    await recordActivity(db, report.groupId, ctx.user.id, "content_report_reviewed", `Platform Admin marked a content report as ${input.status}.`, "content_report", report.id);
+    return { ok: true };
+  }),
+
+  adminDeleteGroup: protectedProcedure.input(z.object({ groupId: z.number().int().positive(), confirmName: z.string().trim().min(2).max(200) })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await requirePlatformAdmin(ctx.user.id, ctx.user.role);
+    const group = await getGroupOrThrow(db, input.groupId);
+    if (group.name !== input.confirmName) throw new TRPCError({ code: "BAD_REQUEST", message: "Enter the exact group name to confirm deletion." });
+    if (group.stripeSubscriptionId && group.status === "active") {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Cancel or archive the active Organization subscription before permanently deleting this group." });
+    }
+    await db.transaction(async tx => {
+      const accesses = await tx.select({ id: studyGroupContentAccess.id }).from(studyGroupContentAccess).where(eq(studyGroupContentAccess.groupId, group.id));
+      const accessIds = accesses.map(access => access.id);
+      if (accessIds.length) await tx.delete(studyGroupContentAssignments).where(inArray(studyGroupContentAssignments.contentAccessId, accessIds));
+      await tx.delete(studyGroupContentReports).where(eq(studyGroupContentReports.groupId, group.id));
+      await tx.delete(studyGroupDocuments).where(eq(studyGroupDocuments.groupId, group.id));
+      await tx.delete(studyGroupMessages).where(eq(studyGroupMessages.groupId, group.id));
+      await tx.delete(studyGroupTasks).where(eq(studyGroupTasks.groupId, group.id));
+      await tx.delete(studyGroupModules).where(eq(studyGroupModules.groupId, group.id));
+      await tx.delete(studyGroupContentAccess).where(eq(studyGroupContentAccess.groupId, group.id));
+      await tx.delete(studyGroupShareLinks).where(eq(studyGroupShareLinks.groupId, group.id));
+      await tx.delete(studyGroupMembers).where(eq(studyGroupMembers.groupId, group.id));
+      await tx.delete(studyGroupActivity).where(eq(studyGroupActivity.groupId, group.id));
+      await tx.delete(studyGroups).where(eq(studyGroups.id, group.id));
+    });
+    return { ok: true };
   }),
 });
 

@@ -8765,6 +8765,28 @@ export const studyGroupModules = mysqlTable("study_group_modules", {
 export type StudyGroupModule = typeof studyGroupModules.$inferSelect;
 export type InsertStudyGroupModule = typeof studyGroupModules.$inferInsert;
 
+/** A learner-facing safeguarding queue for inappropriate private-group content. */
+export const studyGroupContentReports = mysqlTable("study_group_content_reports", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  reporterUserId: int("reporter_user_id").notNull(),
+  contentType: mysqlEnum("content_type", ["document", "message", "task", "module"]).notNull(),
+  contentId: int("content_id").notNull(),
+  reason: varchar("reason", { length: 120 }).notNull(),
+  details: text("details"),
+  status: mysqlEnum("status", ["open", "reviewing", "resolved", "dismissed"]).notNull().default("open"),
+  reviewedByUserId: int("reviewed_by_user_id"),
+  reviewedAt: timestamp("reviewed_at"),
+  resolutionNote: text("resolution_note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  groupStatusIdx: index("idx_study_group_content_reports_group_status").on(t.groupId, t.status),
+  statusCreatedIdx: index("idx_study_group_content_reports_status_created").on(t.status, t.createdAt),
+}));
+export type StudyGroupContentReport = typeof studyGroupContentReports.$inferSelect;
+export type InsertStudyGroupContentReport = typeof studyGroupContentReports.$inferInsert;
+
 /** Private audit stream for group and organizational activity. */
 export const studyGroupActivity = mysqlTable("study_group_activity", {
   id: int("id").autoincrement().primaryKey(),

@@ -25,6 +25,7 @@ export default function StudyGroupsPage() {
   const [provider, setProvider] = useState<"zoom" | "teams" | "other" | "">("");
   const [meetingUrl, setMeetingUrl] = useState("");
   const [accessSignupIntent, setAccessSignupIntent] = useState<"organization" | "group_learning" | null>(null);
+  const [groupOptionsOpen, setGroupOptionsOpen] = useState(false);
   const createGroup = trpc.studyGroups.create.useMutation({
     onSuccess: ({ groupId }) => {
       toast.success("Study group created");
@@ -59,7 +60,7 @@ export default function StudyGroupsPage() {
               <Badge className="border border-white/35 bg-white/10 text-teal-50">Education Library · Learn together</Badge>
               <h1 className="mt-5 text-4xl font-bold tracking-tight sm:text-5xl">Make study time count.</h1>
               <p className="mt-5 max-w-xl text-lg leading-8 text-teal-50">Turn individual preparation into shared momentum. Bring the people who help you stay accountable, build confidence, and reach the next milestone together.</p>
-              <div className="mt-8 flex flex-wrap gap-3"><Button size="lg" className="bg-white text-teal-900 hover:bg-teal-50" onClick={() => navigate("/login?returnTo=/study-groups")}>Create your Study Group</Button><Button size="lg" variant="outline" className="border-white/60 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => navigate("/login?returnTo=/study-groups")}>See group options</Button></div>
+              <div className="mt-8 flex flex-wrap gap-3"><Button size="lg" className="bg-white text-teal-900 hover:bg-teal-50" onClick={() => navigate("/login?returnTo=/study-groups")}>Create your Study Group</Button><Button size="lg" variant="outline" className="border-white/60 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => setGroupOptionsOpen(true)}>See group options</Button></div>
               <p className="mt-4 text-sm text-teal-50">Already a learner? Sign in to continue with your Study Groups.</p>
             </div>
             <Card className="border-white/30 bg-white/95 text-slate-900 shadow-2xl"><CardHeader><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100"><Users className="h-6 w-6 text-teal-700" /></div><CardTitle className="mt-3">Your goals deserve a team</CardTitle><CardDescription>One focused place for the learners who want more from every study session.</CardDescription></CardHeader><CardContent className="grid gap-3 text-sm text-slate-600"><div className="rounded-lg bg-teal-50 p-3"><strong className="block text-teal-900">Show up stronger</strong>Create the rhythm that turns “someday” into steady progress.</div><div className="rounded-lg bg-slate-50 p-3"><strong className="block text-slate-900">Learn with purpose</strong>Keep the right people close to each goal, course, and milestone.</div><div className="rounded-lg bg-teal-50 p-3"><strong className="block text-teal-900">Grow what matters</strong>Give a learning community the energy and structure to go further.</div></CardContent></Card>
@@ -73,6 +74,19 @@ export default function StudyGroupsPage() {
             <Card className="border-teal-100 bg-white"><CardHeader><BookOpen className="h-6 w-6 text-teal-600" /><CardTitle className="mt-3">Share the finish line</CardTitle><CardDescription>Group Learning Access for shared goals.</CardDescription></CardHeader><CardContent className="space-y-4 text-sm text-slate-600"><p>Give your team a clearer path to the course, quiz, and resource experiences that move learning forward together.</p><Button className="w-full bg-teal-600 hover:bg-teal-700" onClick={() => navigate("/login?returnTo=/study-groups")}>Explore Group Learning</Button></CardContent></Card>
           </div>
         </main>
+        <Dialog open={groupOptionsOpen} onOpenChange={setGroupOptionsOpen}>
+          <DialogContent className="max-w-4xl border-teal-100 bg-[#fbffff] p-0 overflow-hidden">
+            <div className="border-b border-teal-100 bg-gradient-to-r from-teal-700 to-cyan-600 px-6 py-6 text-white">
+              <DialogHeader><DialogTitle className="text-xl text-white">Choose the right way to learn together</DialogTitle><DialogDescription className="mt-1 text-teal-50">Start free with your closest study partners or expand the experience for a larger learning community.</DialogDescription></DialogHeader>
+            </div>
+            <div className="grid gap-4 p-6 md:grid-cols-3">
+              <section className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm"><Users className="h-6 w-6 text-teal-600" /><h3 className="mt-3 font-bold text-slate-900">Free Study Group</h3><p className="mt-1 text-2xl font-bold text-teal-800">$0</p><p className="mt-3 text-sm leading-6 text-slate-600">A private shared home for up to five active or invited learners.</p><ul className="mt-4 space-y-2 text-sm text-slate-600"><li>• Invite study partners by email</li><li>• Share documents, tasks, and discussion</li><li>• Add Zoom or Teams links</li></ul><Button variant="outline" className="mt-5 w-full border-teal-300 text-teal-800 hover:bg-teal-50" onClick={() => navigate("/login?returnTo=/study-groups")}>Start free</Button></section>
+              <section className="rounded-xl border-2 border-teal-400 bg-white p-4 shadow-sm"><Crown className="h-6 w-6 text-teal-600" /><h3 className="mt-3 font-bold text-slate-900">Organization Access</h3><p className="mt-1 text-2xl font-bold text-teal-800">$49<span className="text-sm font-medium text-slate-500">/month</span></p><p className="mt-3 text-sm leading-6 text-slate-600">For one organization group with up to 20 active or invited members.</p><ul className="mt-4 space-y-2 text-sm text-slate-600"><li>• One organization group</li><li>• Up to 20 members</li><li>• Organization admins manage seats and activity</li></ul><Button className="mt-5 w-full bg-teal-700 hover:bg-teal-800" onClick={() => navigate("/login?returnTo=/study-groups")}>Choose $49 access</Button></section>
+              <section className="rounded-xl border border-teal-100 bg-white p-4 shadow-sm"><Building2 className="h-6 w-6 text-teal-600" /><h3 className="mt-3 font-bold text-slate-900">Organization Unlimited</h3><p className="mt-1 text-2xl font-bold text-teal-800">$99<span className="text-sm font-medium text-slate-500">/month</span></p><p className="mt-3 text-sm leading-6 text-slate-600">For up to three organization groups with unlimited members.</p><ul className="mt-4 space-y-2 text-sm text-slate-600"><li>• Up to 3 organization groups</li><li>• Unlimited members</li><li>• Additional groups remain free groups</li></ul><Button className="mt-5 w-full bg-teal-600 hover:bg-teal-700" onClick={() => navigate("/login?returnTo=/study-groups")}>Choose $99 access</Button></section>
+            </div>
+            <div className="border-t border-teal-100 bg-teal-50 px-6 py-4 text-sm text-teal-900"><strong>Group Learning Access:</strong> eligible course, quiz, and content purchases receive a 10% group discount once at least three members have actively joined.</div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }

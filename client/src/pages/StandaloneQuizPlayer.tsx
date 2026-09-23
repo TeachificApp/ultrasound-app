@@ -742,7 +742,7 @@ export default function StandaloneQuizPlayer() {
                 </div>
               )}
               {q.explanation && (
-                <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-sm text-blue-800">
+                <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
                   <strong className="block mb-1">Explanation</strong>
                   {q.explanation}
                 </div>
