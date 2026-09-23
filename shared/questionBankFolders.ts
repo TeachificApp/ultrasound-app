@@ -5,6 +5,10 @@ export type QuestionBankFolderLike = {
   sortOrder?: number | null;
 };
 
+export type QuestionBankFolderWithQuizLogo = QuestionBankFolderLike & {
+  quizLogoUrl?: string | null;
+};
+
 export type FlatQuestionBankFolder<T extends QuestionBankFolderLike> = T & { depth: number };
 
 /** Depth-first folder list for nested UI selects and managers. */
@@ -86,6 +90,31 @@ export function buildQuestionBankFolderChildrenMap<T extends QuestionBankFolderL
 
 export function questionBankRootFolderIds<T extends QuestionBankFolderLike>(folders: T[]) {
   return buildQuestionBankFolderChildrenMap(folders).get(null)?.map((folder) => folder.id) ?? [];
+}
+
+/**
+ * Resolves the nearest configured logo starting at a question's own folder and
+ * walking up through its parent folders. A malformed/cyclic folder hierarchy
+ * simply returns no inherited logo rather than looping.
+ */
+export function resolveInheritedQuestionBankFolderQuizLogo<T extends QuestionBankFolderWithQuizLogo>(
+  folders: T[],
+  folderId: number | null | undefined,
+): string | null {
+  if (!folderId) return null;
+  const byId = new Map(folders.map((folder) => [folder.id, folder]));
+  const visited = new Set<number>();
+  let currentId: number | null | undefined = folderId;
+
+  while (currentId != null && !visited.has(currentId)) {
+    visited.add(currentId);
+    const folder = byId.get(currentId);
+    if (!folder) return null;
+    const logoUrl = folder.quizLogoUrl?.trim();
+    if (logoUrl) return logoUrl;
+    currentId = folder.parentId;
+  }
+  return null;
 }
 
 /** SCORM import only applies manually selected tags — never group names. */

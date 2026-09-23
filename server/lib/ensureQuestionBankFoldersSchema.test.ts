@@ -10,19 +10,21 @@ describe("ensureQuestionBankFoldersSchema", () => {
   });
 
   it("skips when sort_order already exists", async () => {
-    execute.mockResolvedValueOnce([[{ COLUMN_NAME: "sort_order" }], []]);
+    execute.mockResolvedValueOnce([[{ COLUMN_NAME: "sort_order" }, { COLUMN_NAME: "quiz_logo_url" }], []]);
     const result = await ensureQuestionBankFoldersSchema(db);
-    expect(result).toEqual({ applied: false, hadSortOrder: true });
+    expect(result).toEqual({ applied: false, hadSortOrder: true, hadQuizLogoUrl: true });
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("adds sort_order when missing", async () => {
     execute
       .mockResolvedValueOnce([[{ COLUMN_NAME: "name" }], []])
+      .mockResolvedValueOnce([[], []])
       .mockResolvedValueOnce([[], []]);
     const result = await ensureQuestionBankFoldersSchema(db);
     expect(result.applied).toBe(true);
-    expect(execute).toHaveBeenCalledTimes(2);
+    expect(result.hadQuizLogoUrl).toBe(false);
+    expect(execute).toHaveBeenCalledTimes(3);
   });
 
   it("returns unavailable when db is null", async () => {

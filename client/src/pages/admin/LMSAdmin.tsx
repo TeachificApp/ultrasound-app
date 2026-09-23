@@ -11199,6 +11199,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const [exportLoading, setExportLoading] = useState(false);
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
   const [editingFolderName, setEditingFolderName] = useState("");
+  const [folderQuizLogoUrl, setFolderQuizLogoUrl] = useState("");
   const [newFolderParentId, setNewFolderParentId] = useState<number | null>(null);
   const [bulkFolderValue, setBulkFolderValue] = useState("");
   const [bulkNewFolderName, setBulkNewFolderName] = useState("");
@@ -11264,6 +11265,10 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const { data: foldersData, refetch: refetchFolders, error: foldersError } = trpc.questionBank.listFolders.useQuery();
   const folders = foldersData ?? [];
   const folderTree = useMemo(() => flattenQuestionBankFolderTree(folders), [folders]);
+  const selectedFolder = selectedFolderId == null ? null : folders.find((folder: any) => folder.id === selectedFolderId) ?? null;
+  useEffect(() => {
+    setFolderQuizLogoUrl(selectedFolder?.quizLogoUrl ?? "");
+  }, [selectedFolder?.id, selectedFolder?.quizLogoUrl]);
   const createFolder = trpc.questionBank.createFolder.useMutation({
     onSuccess: () => {
       refetchFolders();
@@ -11485,6 +11490,23 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
               />
             )}
           </div>
+          {selectedFolder && (
+            <div className={cn("space-y-2 rounded-lg border p-3", standalone ? "border-teal-200 bg-white" : "border-purple-200 bg-white")}>
+              <div className="flex items-start gap-2">
+                <ImageIcon className={cn("mt-0.5 h-4 w-4 shrink-0", standalone ? "text-teal-700" : "text-purple-700")} />
+                <div>
+                  <p className="text-xs font-semibold text-slate-800">Native quiz folder logo</p>
+                  <p className="mt-0.5 text-[11px] leading-4 text-slate-500">This logo appears on native Question Bank quiz questions in this folder and its subfolders. Quiz Builder design branding takes precedence.</p>
+                </div>
+              </div>
+              <Input value={folderQuizLogoUrl} onChange={(event) => setFolderQuizLogoUrl(event.target.value)} placeholder="https://…/organization-logo.png" className="h-8 bg-white text-xs" />
+              {folderQuizLogoUrl.trim() && <img src={folderQuizLogoUrl} alt="Folder quiz logo preview" className="max-h-12 max-w-full object-contain object-left" onError={(event) => { event.currentTarget.style.display = "none"; }} />}
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="h-8 flex-1 text-xs" disabled={updateFolder.isPending || !selectedFolder.quizLogoUrl} onClick={() => updateFolder.mutate({ id: selectedFolder.id, quizLogoUrl: null })}>Remove logo</Button>
+                <Button size="sm" className={cn("h-8 flex-1 text-xs text-white", standalone ? "bg-teal-600 hover:bg-teal-700" : "bg-purple-600 hover:bg-purple-700")} disabled={updateFolder.isPending} onClick={() => updateFolder.mutate({ id: selectedFolder.id, quizLogoUrl: folderQuizLogoUrl.trim() || null })}>{updateFolder.isPending ? "Saving…" : "Save logo"}</Button>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label className="text-xs font-medium text-purple-700">Parent folder <span className="text-gray-400 font-normal">(optional)</span></Label>
             <select value={newFolderParentId ?? ""} onChange={e => setNewFolderParentId(e.target.value ? Number(e.target.value) : null)} className="w-full h-9 rounded-md border border-purple-200 bg-white px-3 text-sm">

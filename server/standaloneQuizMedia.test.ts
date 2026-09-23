@@ -27,4 +27,21 @@ describe("protected native quiz media", () => {
     expect(player).toContain("onContextMenu={preventMediaContextMenu}");
     expect(standalonePlayer).toContain("standalone-quiz-media");
   });
+
+  it("uses inherited Question Bank folder branding for native questions while retaining Quiz Builder override behavior", () => {
+    const router = source("server/routers/standaloneQuizRouter.ts");
+    const admin = source("client/src/pages/admin/LMSAdmin.tsx");
+    const schema = source("drizzle/schema.ts");
+    const migration = source("drizzle/0079_question_bank_folder_quiz_logo.sql");
+
+    expect(router).toContain("resolveInheritedQuestionBankFolderQuizLogo");
+    expect(router).toContain("folderQuizLogoUrl");
+    expect(standalonePlayer).toContain("folderQuizLogoUrl");
+    expect(standalonePlayer).toContain("if (isBuilderMode &&");
+    expect(standalonePlayer).toContain("Clinical question");
+    expect(schema).toContain('quizLogoUrl: text("quiz_logo_url")');
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `quiz_logo_url`");
+    expect(admin).toContain("Native quiz folder logo");
+    expect(admin).toContain("Quiz Builder design branding takes precedence.");
+  });
 });

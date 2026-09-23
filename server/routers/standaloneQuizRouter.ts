@@ -34,6 +34,7 @@ import { questionBankIdFromBuilderId } from "../lib/visualBuilderQuestionBankSyn
 import { buildStandaloneLearnerOptions, orderQuestionOptions } from "../lib/questionOptionOrder";
 import { filterVisibleDependentQuestions } from "../../shared/quizQuestionDependency";
 import { normalizeQuizAccountFieldKeys, resolveQuizAccountFields } from "../../shared/quizAccountFields";
+import { resolveInheritedQuestionBankFolderQuizLogo } from "../../shared/questionBankFolders";
 import { canOpenStandaloneQuiz, requiresEmbeddedLearnerAccess } from "../lib/standaloneQuizPreviewAccess";
 import {
   isStandaloneQuizStaff,
@@ -431,6 +432,17 @@ export const standaloneQuizLearnerRouter = router({
         quizQs = shuffle(quizQs).slice(0, quiz.questionsPerAttempt);
       }
 
+      // Native Question Bank quizzes inherit the nearest parent-folder logo. The
+      // visual Quiz Builder path intentionally stays governed by its own branding.
+      const folderRows = quizQs.some((row) => row.qb.folderId != null)
+        ? await db.select({
+            id: questionBankFolders.id,
+            name: questionBankFolders.name,
+            parentId: questionBankFolders.parentId,
+            quizLogoUrl: questionBankFolders.quizLogoUrl,
+          }).from(questionBankFolders)
+        : [];
+
       const totalPoints = quizQs.reduce((s, q) => s + q.points, 0);
 
       // Create attempt record
@@ -463,6 +475,7 @@ export const standaloneQuizLearnerRouter = router({
           options,
           questionImageUrl: q.qb.questionImageUrl,
           questionVideoUrl: q.qb.questionVideoUrl,
+          folderQuizLogoUrl: resolveInheritedQuestionBankFolderQuizLogo(folderRows, q.qb.folderId),
           hotspotMarkers: q.qb.hotspotMarkers,
           matchingPairs: q.qb.matchingPairs,
           // Only send correct answer in quiz mode (not mock_exam)

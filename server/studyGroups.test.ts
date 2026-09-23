@@ -132,6 +132,8 @@ describe("Study Groups", () => {
     expect(workspace).toContain('plan: "unlimited"');
     expect(listing).toContain("Organization Access from $49/month");
     expect(listing).toContain("Choose Organization Access");
+    expect(listing).toContain("Build and manage your own group modules and learning content");
+    expect(listing).toContain("Build and manage your organization’s own group learning content");
   });
 
   it("limits Organization coverage to one $49 group or three $99 groups", () => {

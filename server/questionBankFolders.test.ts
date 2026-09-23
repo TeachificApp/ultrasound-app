@@ -3,6 +3,7 @@ import {
   collectDescendantFolderIds,
   flattenQuestionBankFolderTree,
   questionBankFolderOptionLabel,
+  resolveInheritedQuestionBankFolderQuizLogo,
   scormImportQuestionTagIds,
 } from "../shared/questionBankFolders";
 import { readFileSync } from "node:fs";
@@ -47,6 +48,17 @@ describe("questionBankFolders helpers", () => {
       { id: 4, name: "Other", parentId: null },
     ];
     expect(collectDescendantFolderIds(folders, 1)).toEqual([1, 2, 3]);
+  });
+
+  it("inherits the closest configured native-quiz logo from a Question Bank parent folder", () => {
+    const folders = [
+      { id: 1, name: "All About Ultrasound", parentId: null, quizLogoUrl: "https://cdn.example/aaus.png" },
+      { id: 2, name: "Vascular", parentId: 1, quizLogoUrl: null },
+      { id: 3, name: "Access", parentId: 2, quizLogoUrl: "https://cdn.example/access.png" },
+    ];
+    expect(resolveInheritedQuestionBankFolderQuizLogo(folders, 2)).toBe("https://cdn.example/aaus.png");
+    expect(resolveInheritedQuestionBankFolderQuizLogo(folders, 3)).toBe("https://cdn.example/access.png");
+    expect(resolveInheritedQuestionBankFolderQuizLogo(folders, null)).toBeNull();
   });
 
   it("filters Question Bank questions when an administrator opens a folder", () => {

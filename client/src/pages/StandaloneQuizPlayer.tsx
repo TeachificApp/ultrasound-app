@@ -461,6 +461,10 @@ export default function StandaloneQuizPlayer() {
   const givenAnswer = answers[q.questionBankId];
   const isRevealed = revealed[q.questionBankId];
   const isQuizMode = quizData?.type === "quiz";
+  const folderQuizLogoUrl = typeof q.folderQuizLogoUrl === "string" && q.folderQuizLogoUrl.trim()
+    ? q.folderQuizLogoUrl
+    : null;
+  const hasQuestionMedia = Boolean(q.questionImageUrl || q.questionVideoUrl);
 
   // Determine correctness for quiz mode
   let correctIdx: number | null = null;
@@ -615,10 +619,10 @@ export default function StandaloneQuizPlayer() {
   }
 
   return (
-    <div className={isEmbedWidget ? "bg-teal-50/30" : "min-h-screen bg-[radial-gradient(circle_at_top,_#dff6f7_0%,_#f8fcfc_34%,_#f8fafc_100%)]"}>
+    <div className={isEmbedWidget ? "bg-teal-50/30" : "min-h-screen bg-[radial-gradient(circle_at_86%_0%,_#d8f9fb_0%,_#effdfd_30%,_#f7fbfc_65%)]"}>
       {/* Top bar */}
       <div className={`${isEmbedWidget ? "" : "sticky top-0 z-10"} border-b border-teal-100 bg-white/95 px-4 py-3 backdrop-blur`}>
-        <div className="max-w-3xl mx-auto flex items-center gap-4">
+        <div className="max-w-6xl mx-auto flex items-center gap-4">
           <div className="flex-1">
             <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
               <span>{currentIdx + 1} / {activeQuestions.length}</span>
@@ -643,7 +647,7 @@ export default function StandaloneQuizPlayer() {
       </div>
 
       {/* Question */}
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
         {accountFields.length > 0 && (
           <section aria-label="Prefilled account information" className="mb-4 rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-sm">
             <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">Your account information</p>
@@ -652,104 +656,62 @@ export default function StandaloneQuizPlayer() {
             </dl>
           </section>
         )}
-        <div className="relative overflow-hidden rounded-2xl border border-teal-200 bg-white p-6 shadow-[0_18px_50px_rgba(14,107,112,0.12)] mb-4">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-700 via-teal-500 to-cyan-300" />
-          <div className="mb-4 flex items-center gap-2 pt-1 text-xs font-bold uppercase tracking-[0.16em] text-teal-700">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 text-teal-700"><BookOpen className="h-3.5 w-3.5" /></span>
-            Clinical question
+        <div className="relative overflow-hidden rounded-xl border border-teal-200 bg-white shadow-[0_18px_50px_rgba(14,107,112,0.16)] mb-4">
+          <div className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-teal-600 via-cyan-400 to-sky-400" />
+          <div className={`grid gap-8 p-6 pt-9 lg:p-9 lg:pt-11 ${hasQuestionMedia ? "lg:grid-cols-[minmax(0,1.05fr)_minmax(19rem,.95fr)]" : ""}`}>
+            <div>
+              <div className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-teal-700">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 text-teal-700"><BookOpen className="h-3.5 w-3.5" /></span>
+                Clinical question
+              </div>
+              <p className="mb-7 text-lg font-semibold leading-relaxed text-teal-950">{q.question}</p>
+              {isMockExam && (
+                <button type="button" onClick={() => toggleQuestionFlag(q.questionBankId)} className={`mb-5 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${isFlagged ? "border-amber-300 bg-amber-50 text-amber-800" : "border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-700"}`}>
+                  <Flag className={`h-4 w-4 ${isFlagged ? "fill-current" : ""}`} /> {isFlagged ? "Question flagged for review" : "Flag question for review"}
+                </button>
+              )}
+
+              {/* MCQ / truefalse options */}
+              {(q.type === "mcq" || q.type === "truefalse") && options.length > 0 && (
+                <div className="space-y-2.5">
+                  {options.map((opt, i) => {
+                    const isSelected = givenAnswer === String(i);
+                    const isCorrectOpt = isRevealed && correctIdx === i;
+                    const isWrongOpt = isRevealed && isSelected && correctIdx !== i;
+                    return <OptionButton key={i} label={opt.text} letter={String.fromCharCode(65 + i)} selected={isSelected} correct={isCorrectOpt} incorrect={isWrongOpt} disabled={isQuizMode && !!isRevealed} onClick={() => { if (!(isQuizMode && isRevealed)) recordAnswer(q.questionBankId, String(i)); }} />;
+                  })}
+                </div>
+              )}
+
+              {/* True/false without options array */}
+              {q.type === "truefalse" && options.length === 0 && (
+                <div className="space-y-2.5">
+                  {["True", "False"].map((label, i) => {
+                    const val = i === 0 ? "true" : "false";
+                    const isSelected = givenAnswer === val;
+                    const isCorrectOpt = isRevealed && q.correctAnswer === val;
+                    const isWrongOpt = isRevealed && isSelected && q.correctAnswer !== val;
+                    return <OptionButton key={val} label={label} letter={String.fromCharCode(65 + i)} selected={isSelected} correct={isCorrectOpt} incorrect={isWrongOpt} disabled={isQuizMode && !!isRevealed} onClick={() => { if (!(isQuizMode && isRevealed)) recordAnswer(q.questionBankId, val); }} />;
+                  })}
+                </div>
+              )}
+
+              {isQuizMode && givenAnswer !== undefined && !isRevealed && <Button onClick={() => handleReveal(q.questionBankId)} className="mt-5 bg-teal-700 px-6 hover:bg-teal-800">Check Answer</Button>}
+            </div>
+            {hasQuestionMedia && <aside className="flex min-w-0 items-center justify-center rounded-lg bg-slate-950 p-2 shadow-inner"><StandaloneQuestionMedia questionImageUrl={q.questionImageUrl} questionVideoUrl={q.questionVideoUrl} /></aside>}
           </div>
-          <StandaloneQuestionMedia questionImageUrl={q.questionImageUrl} questionVideoUrl={q.questionVideoUrl} />
-          <p className="mb-6 text-base font-semibold leading-relaxed text-slate-900">{q.question}</p>
-          {isMockExam && (
-            <button type="button" onClick={() => toggleQuestionFlag(q.questionBankId)} className={`mb-5 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${isFlagged ? "border-amber-300 bg-amber-50 text-amber-800" : "border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-700"}`}>
-              <Flag className={`h-4 w-4 ${isFlagged ? "fill-current" : ""}`} /> {isFlagged ? "Question flagged for review" : "Flag question for review"}
-            </button>
-          )}
-
-          {/* MCQ / truefalse options */}
-          {(q.type === "mcq" || q.type === "truefalse") && options.length > 0 && (
-            <div className="space-y-2">
-              {options.map((opt, i) => {
-                const isSelected = givenAnswer === String(i);
-                const isCorrectOpt = isRevealed && correctIdx === i;
-                const isWrongOpt = isRevealed && isSelected && correctIdx !== i;
-                return (
-                  <OptionButton
-                    key={i}
-                    label={opt.text}
-                    letter={String.fromCharCode(65 + i)}
-                    selected={isSelected}
-                    correct={isCorrectOpt}
-                    incorrect={isWrongOpt}
-                    disabled={isQuizMode && !!isRevealed}
-                    onClick={() => {
-                      if (isQuizMode && isRevealed) return;
-                      recordAnswer(q.questionBankId, String(i));
-                    }}
-                  />
-                );
-              })}
-            </div>
-          )}
-
-          {/* True/false without options array */}
-          {q.type === "truefalse" && options.length === 0 && (
-            <div className="space-y-2">
-              {["True", "False"].map((label, i) => {
-                const val = i === 0 ? "true" : "false";
-                const isSelected = givenAnswer === val;
-                const isCorrectOpt = isRevealed && q.correctAnswer === val;
-                const isWrongOpt = isRevealed && isSelected && q.correctAnswer !== val;
-                return (
-                  <OptionButton
-                    key={val}
-                    label={label}
-                    letter={String.fromCharCode(65 + i)}
-                    selected={isSelected}
-                    correct={isCorrectOpt}
-                    incorrect={isWrongOpt}
-                    disabled={isQuizMode && !!isRevealed}
-                    onClick={() => {
-                      if (isQuizMode && isRevealed) return;
-                      recordAnswer(q.questionBankId, val);
-                    }}
-                  />
-                );
-              })}
-            </div>
-          )}
-
-          {/* Quiz mode: reveal button + explanation */}
-          {isQuizMode && givenAnswer !== undefined && !isRevealed && (
-            <Button onClick={() => handleReveal(q.questionBankId)} className="mt-4 bg-teal-600 hover:bg-teal-700">
-              Check Answer
-            </Button>
-          )}
 
           {isQuizMode && isRevealed && (
-            <div className="mt-4">
-              <div className={`flex items-center gap-2 font-medium text-sm mb-2 ${
-                givenAnswer === String(correctIdx) ? "text-green-700" : "text-red-600"
-              }`}>
-                {givenAnswer === String(correctIdx)
-                  ? <><CheckCircle className="w-4 h-4" /> Correct!</>
-                  : <><XCircle className="w-4 h-4" /> Incorrect</>}
+            <div className="border-t border-teal-100 bg-[#f7ffff] px-6 py-5 lg:px-9">
+              <div className={`flex items-center gap-2 font-medium text-sm mb-3 ${givenAnswer === String(correctIdx) ? "text-green-700" : "text-red-600"}`}>
+                {givenAnswer === String(correctIdx) ? <><CheckCircle className="w-4 h-4" /> Correct!</> : <><XCircle className="w-4 h-4" /> Incorrect</>}
               </div>
-              {selectedOptionFeedback && (
-                <div className={`rounded-lg border p-4 text-sm mb-3 ${givenAnswer === String(correctIdx) ? "bg-teal-50 border-teal-100 text-teal-800" : "bg-amber-50 border-amber-100 text-amber-900"}`}>
-                  <strong className="block mb-1">About your answer</strong>
-                  {selectedOptionFeedback}
-                </div>
-              )}
-              {q.explanation && (
-                <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
-                  <strong className="block mb-1">Explanation</strong>
-                  {q.explanation}
-                </div>
-              )}
+              {selectedOptionFeedback && <div className={`rounded-lg border p-4 text-sm mb-3 ${givenAnswer === String(correctIdx) ? "bg-teal-50 border-teal-100 text-teal-800" : "bg-amber-50 border-amber-100 text-amber-900"}`}><strong className="block mb-1">About your answer</strong>{selectedOptionFeedback}</div>}
+              {q.explanation && <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900"><strong className="block mb-1">Explanation</strong>{q.explanation}</div>}
               <StandaloneQuestionMedia feedbackImageUrl={q.feedbackImageUrl} feedbackVideoUrl={q.feedbackVideoUrl} showFeedback />
             </div>
           )}
+          {folderQuizLogoUrl && <footer className="flex items-center justify-between gap-4 border-t border-teal-100 bg-white px-6 py-3 lg:px-9"><img src={folderQuizLogoUrl} alt="Question Bank folder logo" className="max-h-14 max-w-[60%] object-contain object-left" /><span className="text-right text-[10px] leading-4 text-teal-700/70">Authorized learner access only</span></footer>}
         </div>
 
         {/* Navigation */}

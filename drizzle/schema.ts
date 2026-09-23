@@ -5737,6 +5737,8 @@ export const questionBankFolders = mysqlTable("question_bank_folders", {
   description: text("description"),
   parentId: int("parent_id"),
   color: varchar("color", { length: 32 }).default("#179ca3").notNull(),
+  /** Optional parent-folder logo inherited by native Question Bank quiz questions. */
+  quizLogoUrl: text("quiz_logo_url"),
   sortOrder: int("sort_order").default(0).notNull(),
   sharedInSonoQuiz: boolean("shared_in_sono_quiz").default(false).notNull(),
   createdByAdminId: int("created_by_admin_id"),

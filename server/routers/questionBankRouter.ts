@@ -955,6 +955,7 @@ export const questionBankRouter = router({
       description: z.string().max(500).optional(),
       parentId: z.number().int().nullable().optional(),
       color: z.string().max(32).default("#179ca3"),
+      quizLogoUrl: z.string().url().max(2_048).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
@@ -965,6 +966,7 @@ export const questionBankRouter = router({
         description: input.description ?? null,
         parentId: input.parentId ?? null,
         color: input.color,
+        quizLogoUrl: input.quizLogoUrl ?? null,
         createdByAdminId: ctx.user.id,
       });
       return { id };
@@ -976,6 +978,7 @@ export const questionBankRouter = router({
       name: z.string().min(1).max(200).optional(),
       description: z.string().max(500).optional(),
       color: z.string().max(32).optional(),
+      quizLogoUrl: z.string().url().max(2_048).nullable().optional(),
       parentId: z.number().int().nullable().optional(),
       sharedInSonoQuiz: z.boolean().optional(),
     }))

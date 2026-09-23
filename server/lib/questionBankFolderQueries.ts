@@ -36,6 +36,7 @@ const legacyFolderSelect = {
   description: questionBankFolders.description,
   parentId: questionBankFolders.parentId,
   color: questionBankFolders.color,
+  quizLogoUrl: sql<string | null>`NULL`.as("quiz_logo_url"),
   sortOrder: sql<number>`0`.as("sort_order"),
   sharedInSonoQuiz: questionBankFolders.sharedInSonoQuiz,
   createdByAdminId: questionBankFolders.createdByAdminId,
@@ -74,6 +75,7 @@ export async function insertQuestionBankFolder(
     description?: string | null;
     parentId?: number | null;
     color?: string;
+    quizLogoUrl?: string | null;
     createdByAdminId?: number | null;
   },
 ): Promise<number> {
@@ -88,6 +90,7 @@ export async function insertQuestionBankFolder(
       description: values.description ?? null,
       parentId: values.parentId ?? null,
       color: values.color ?? "#179ca3",
+      quizLogoUrl: values.quizLogoUrl ?? null,
       sortOrder: Number(maxSort ?? -1) + 1,
       createdByAdminId: values.createdByAdminId ?? null,
     }).$returningId();
@@ -99,6 +102,7 @@ export async function insertQuestionBankFolder(
     description: values.description ?? null,
     parentId: values.parentId ?? null,
     color: values.color ?? "#179ca3",
+    quizLogoUrl: values.quizLogoUrl ?? null,
     createdByAdminId: values.createdByAdminId ?? null,
   }).$returningId();
   return result.id;
