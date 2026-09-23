@@ -174,7 +174,14 @@ function PartnersTab() {
     },
     onError: (e) => toast.error(e.message),
   });
-    const dashboardMutation = trpc.revenueShare.getPartnerExpressDashboardLink.useMutation({
+  const refreshStatusesMutation = trpc.revenueShare.refreshAllPartnerStatuses.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Refreshed ${data.refreshed} Stripe status${data.refreshed === 1 ? "" : "es"}; ${data.active} active`);
+      utils.revenueShare.listPartners.invalidate();
+    },
+    onError: (e) => toast.error(`Could not refresh Stripe statuses: ${e.message}`),
+  });
+  const dashboardMutation = trpc.revenueShare.getPartnerExpressDashboardLink.useMutation({
     onSuccess: (data) => {
       if (data?.url) window.open(data.url, "_blank");
     },
@@ -212,9 +219,20 @@ function PartnersTab() {
           <h2 className="text-lg font-semibold">Revenue Share Partners</h2>
           <p className="text-sm text-muted-foreground">Invite instructors, affiliates, or any revenue share partner. They complete Stripe KYC onboarding and receive automatic payouts.</p>
         </div>
-        <Button onClick={() => setShowInvite(true)} className="gap-1.5 bg-[#189aa1] hover:bg-[#147a80]">
-          <Plus className="h-4 w-4" /> Invite Partner
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => refreshStatusesMutation.mutate()}
+            disabled={refreshStatusesMutation.isPending}
+            className="gap-1.5"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshStatusesMutation.isPending ? "animate-spin" : ""}`} />
+            Refresh Stripe Statuses
+          </Button>
+          <Button onClick={() => setShowInvite(true)} className="gap-1.5 bg-[#189aa1] hover:bg-[#147a80]">
+            <Plus className="h-4 w-4" /> Invite Partner
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -688,6 +706,18 @@ function LedgerTab() {
     },
     onError: (e) => toast.error(e.message),
   });
+  const reconcileSalesMutation = trpc.revenueShare.reconcilePaidCourseSales.useMutation({
+    onSuccess: (data) => {
+      toast.success(
+        data.created > 0
+          ? `Added ${data.created} missing paid sale${data.created === 1 ? "" : "s"} as pending payout records`
+          : "No missing paid course-sale payout records found",
+      );
+      utils.revenueShare.getLedger.invalidate();
+      utils.revenueShare.getSummaryStats.invalidate();
+    },
+    onError: (e) => toast.error(`Could not reconcile paid sales: ${e.message}`),
+  });
 
   function openManualDialog(entry: any) {
     setManualEntry(entry);
@@ -713,7 +743,7 @@ function LedgerTab() {
             Track auto-processed payouts and manually process pending shares. Auto-processed entries cannot be reprocessed.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Select value={filterPartnerId} onValueChange={setFilterPartnerId}>
             <SelectTrigger className="w-48"><SelectValue placeholder="All partners" /></SelectTrigger>
             <SelectContent>
@@ -723,6 +753,15 @@ function LedgerTab() {
               ))}
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            onClick={() => reconcileSalesMutation.mutate()}
+            disabled={reconcileSalesMutation.isPending}
+            className="gap-1.5"
+          >
+            <RefreshCw className={`h-4 w-4 ${reconcileSalesMutation.isPending ? "animate-spin" : ""}`} />
+            Reconcile Paid Course Sales
+          </Button>
           <Button
             variant="outline"
             onClick={() => manualPayoutMutation.mutate({ partnerId: filterPartnerId !== "all" ? Number(filterPartnerId) : undefined })}
@@ -758,7 +797,7 @@ function LedgerTab() {
           <CardContent className="py-12 text-center">
             <DollarSign className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
             <p className="font-medium">No transactions yet</p>
-            <p className="text-sm text-muted-foreground mt-1">Payout records will appear here once payments are processed.</p>
+            <p className="text-sm text-muted-foreground mt-1">Payout records appear automatically for new checkout sales. Use “Reconcile Paid Course Sales” to add eligible historical paid sales as pending records only.</p>
           </CardContent>
         </Card>
       ) : (

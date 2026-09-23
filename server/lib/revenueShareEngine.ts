@@ -84,6 +84,39 @@ export async function getStripeAccountStatus(stripeAccountId: string): Promise<{
   };
 }
 
+/**
+ * Convert Stripe Connect capability state into the status shown in the partner
+ * administration screen. A connected account can finish identity details before
+ * Stripe enables payouts, so that state remains restricted rather than active.
+ */
+export function derivePartnerOnboardingStatus(status: {
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+}): "active" | "restricted" | "onboarding" {
+  if (status.payoutsEnabled && status.detailsSubmitted) return "active";
+  if (status.detailsSubmitted) return "restricted";
+  return "onboarding";
+}
+
+/** Refresh the locally displayed status from Stripe without transferring funds. */
+export async function syncRevenueSharePartnerStatus(stripeAccountId: string): Promise<{
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  onboardingStatus: "active" | "restricted" | "onboarding";
+}> {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection unavailable");
+
+  const status = await getStripeAccountStatus(stripeAccountId);
+  const onboardingStatus = derivePartnerOnboardingStatus(status);
+  await db.update(revenueSharePartners)
+    .set({ onboardingStatus, updatedAt: Date.now() })
+    .where(eq(revenueSharePartners.stripeAccountId, stripeAccountId));
+
+  return { ...status, onboardingStatus };
+}
+
 // ─── Revenue Share Calculation ────────────────────────────────────────────────
 
 export interface RevenueShareContext {

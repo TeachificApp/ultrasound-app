@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getPartnerShareDisposition } from "./lib/revenueShareEngine";
+import { derivePartnerOnboardingStatus, getPartnerShareDisposition } from "./lib/revenueShareEngine";
 
 describe("revenue share partner disposition", () => {
   it("holds an assigned share as pending until Stripe onboarding is active", () => {
@@ -21,5 +21,11 @@ describe("revenue share partner disposition", () => {
       canTransfer: false,
       pendingReason: "Partner has no connected Stripe account",
     });
+  });
+
+  it("marks a fully enabled Stripe account active without treating eventually due fields as incomplete onboarding", () => {
+    expect(derivePartnerOnboardingStatus({ detailsSubmitted: true, payoutsEnabled: true })).toBe("active");
+    expect(derivePartnerOnboardingStatus({ detailsSubmitted: true, payoutsEnabled: false })).toBe("restricted");
+    expect(derivePartnerOnboardingStatus({ detailsSubmitted: false, payoutsEnabled: false })).toBe("onboarding");
   });
 });

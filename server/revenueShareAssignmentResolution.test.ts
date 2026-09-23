@@ -38,4 +38,32 @@ describe("revenue share assignment resolution", () => {
       metadata: options.metadata,
     });
   });
+
+  it("keeps the admin reconciliation path ledger-only and idempotent", () => {
+    const routerSource = readFileSync(
+      fileURLToPath(new URL("./routers/revenueShareRouter.ts", import.meta.url)),
+      "utf8",
+    );
+    const start = routerSource.indexOf("reconcilePaidCourseSales");
+    const end = routerSource.indexOf("// ── Admin: List assignments", start);
+    const reconciliationSource = routerSource.slice(start, end);
+    expect(reconciliationSource).toContain("revenueShareLedger");
+    expect(reconciliationSource).toContain("skippedExisting");
+    expect(reconciliationSource).toContain('status: "pending"');
+    expect(reconciliationSource).not.toContain("stripe.transfers.create");
+  });
+
+  it("exposes a refresh control for stored Stripe onboarding statuses", () => {
+    const routerSource = readFileSync(
+      fileURLToPath(new URL("./routers/revenueShareRouter.ts", import.meta.url)),
+      "utf8",
+    );
+    const adminSource = readFileSync(
+      fileURLToPath(new URL("../client/src/pages/admin/RevenueShareAdmin.tsx", import.meta.url)),
+      "utf8",
+    );
+    expect(routerSource).toContain("refreshAllPartnerStatuses");
+    expect(adminSource).toContain("Refresh Stripe Statuses");
+    expect(adminSource).toContain("Reconcile Paid Course Sales");
+  });
 });

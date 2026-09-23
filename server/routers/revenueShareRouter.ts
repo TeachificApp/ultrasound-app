@@ -5,7 +5,7 @@
  *  - Partner: view own earnings portal
  */
 import { z } from "zod";
-import { eq, and, desc, isNull, or, inArray } from "drizzle-orm";
+import { eq, and, desc, isNull, or, inArray, gte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
@@ -14,6 +14,7 @@ import {
   revenueShareAssignments,
   revenueShareLedger,
   lmsCourses,
+  lmsOrders,
   digitalProducts,
   digitalBundles,
   bundles,
@@ -25,7 +26,7 @@ import {
   createStripeConnectAccount,
   createOnboardingLink,
   createExpressDashboardLink,
-  getStripeAccountStatus,
+  syncRevenueSharePartnerStatus,
   retryLedgerEntry,
   processManualLedgerPayout,
   canManualProcessLedgerEntry,
@@ -176,16 +177,141 @@ export const revenueShareRouter = router({
 
       if (!partner?.stripeAccountId) throw new TRPCError({ code: "NOT_FOUND", message: "No Stripe account" });
 
-      const status = await getStripeAccountStatus(partner.stripeAccountId);
-      const newStatus = status.payoutsEnabled && status.detailsSubmitted ? "active"
-        : status.detailsSubmitted ? "restricted"
-        : "onboarding";
+      return syncRevenueSharePartnerStatus(partner.stripeAccountId);
+    }),
 
-      await db.update(revenueSharePartners)
-        .set({ onboardingStatus: newStatus, updatedAt: Date.now() })
-        .where(eq(revenueSharePartners.id, input.partnerId));
+  // ── Admin: Refresh every Stripe Connect onboarding status ─────────────────
+  refreshAllPartnerStatuses: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const partners = await db.select({
+        id: revenueSharePartners.id,
+        name: revenueSharePartners.name,
+        stripeAccountId: revenueSharePartners.stripeAccountId,
+      }).from(revenueSharePartners);
 
-      return { ...status, onboardingStatus: newStatus };
+      const results = await Promise.all(partners.map(async (partner) => {
+        if (!partner.stripeAccountId) {
+          return { partnerId: partner.id, name: partner.name, status: "pending" as const, refreshed: false };
+        }
+        try {
+          const status = await syncRevenueSharePartnerStatus(partner.stripeAccountId);
+          return { partnerId: partner.id, name: partner.name, status: status.onboardingStatus, refreshed: true };
+        } catch (error) {
+          console.error(`[RevenueShare] Failed to refresh Stripe status for partner ${partner.id}:`, error);
+          return { partnerId: partner.id, name: partner.name, status: "unknown" as const, refreshed: false };
+        }
+      }));
+
+      return {
+        refreshed: results.filter((result) => result.refreshed).length,
+        active: results.filter((result) => result.status === "active").length,
+        results,
+      };
+    }),
+
+  // ── Admin: Reconcile historical paid course sales into pending ledger rows ─
+  reconcilePaidCourseSales: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const assignments = await db.select({
+        assignmentId: revenueShareAssignments.id,
+        partnerId: revenueShareAssignments.partnerId,
+        courseId: revenueShareAssignments.courseId,
+        percentage: revenueShareAssignments.percentage,
+        assignmentCreatedAt: revenueShareAssignments.createdAt,
+        courseTitle: lmsCourses.title,
+      })
+        .from(revenueShareAssignments)
+        .leftJoin(lmsCourses, eq(revenueShareAssignments.courseId, lmsCourses.id))
+        .where(and(
+          eq(revenueShareAssignments.active, true),
+          eq(revenueShareAssignments.productType, "lms_course"),
+        ));
+
+      let created = 0;
+      let skippedExisting = 0;
+      let skippedInvalid = 0;
+      const now = Date.now();
+
+      for (const assignment of assignments) {
+        if (!assignment.courseId) {
+          skippedInvalid++;
+          continue;
+        }
+
+        const orders = await db.select({
+          id: lmsOrders.id,
+          amount: lmsOrders.amount,
+          currency: lmsOrders.currency,
+          paymentIntentId: lmsOrders.stripePaymentIntentId,
+          checkoutSessionId: lmsOrders.stripeSessionId,
+          createdAt: lmsOrders.createdAt,
+        })
+          .from(lmsOrders)
+          .where(and(
+            eq(lmsOrders.courseId, assignment.courseId),
+            eq(lmsOrders.status, "paid"),
+            gte(lmsOrders.createdAt, new Date(assignment.assignmentCreatedAt)),
+          ));
+
+        for (const order of orders) {
+          const grossAmount = Math.round(Number(order.amount));
+          if (!Number.isFinite(grossAmount) || grossAmount < 1 || (!order.paymentIntentId && !order.checkoutSessionId)) {
+            skippedInvalid++;
+            continue;
+          }
+
+          const paymentConditions = [
+            order.paymentIntentId ? eq(revenueShareLedger.paymentIntentId, order.paymentIntentId) : null,
+            order.checkoutSessionId ? eq(revenueShareLedger.checkoutSessionId, order.checkoutSessionId) : null,
+          ].filter(Boolean);
+          const [existing] = await db.select({ id: revenueShareLedger.id })
+            .from(revenueShareLedger)
+            .where(and(
+              eq(revenueShareLedger.partnerId, assignment.partnerId),
+              eq(revenueShareLedger.assignmentId, assignment.assignmentId),
+              or(...paymentConditions as [ReturnType<typeof eq>, ...ReturnType<typeof eq>[]]),
+            ))
+            .limit(1);
+          if (existing) {
+            skippedExisting++;
+            continue;
+          }
+
+          const sharePercentage = Number(assignment.percentage);
+          const shareAmount = calculateShareAmountCents(grossAmount, sharePercentage);
+          if (!Number.isFinite(sharePercentage) || shareAmount < 1 || shareAmount >= grossAmount) {
+            skippedInvalid++;
+            continue;
+          }
+
+          await db.insert(revenueShareLedger).values({
+            partnerId: assignment.partnerId,
+            assignmentId: assignment.assignmentId,
+            courseId: assignment.courseId,
+            courseTitle: assignment.courseTitle ?? `Course #${assignment.courseId}`,
+            paymentIntentId: order.paymentIntentId,
+            checkoutSessionId: order.checkoutSessionId,
+            grossAmount,
+            sharePercentage: String(sharePercentage),
+            shareAmount,
+            currency: order.currency ?? "usd",
+            status: "pending",
+            errorMessage: null,
+            createdAt: now,
+            updatedAt: now,
+          });
+          created++;
+        }
+      }
+
+      return { created, skippedExisting, skippedInvalid };
     }),
 
   // ── Admin: List assignments (optionally filtered by course) ───────────────

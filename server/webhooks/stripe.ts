@@ -2810,6 +2810,19 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       }
       // Always run the funnel handler (handles inline funnel form payments)
       await handleFunnelPaymentIntentSucceeded(sessionObj);
+    } else if (eventType === "account.updated") {
+      const accountId = sessionObj.id as string | undefined;
+      if (accountId) {
+        try {
+          const { syncRevenueSharePartnerStatus } = await import("../lib/revenueShareEngine");
+          const status = await syncRevenueSharePartnerStatus(accountId);
+          console.log(`[RevenueShare] Stripe account ${accountId} synchronized as ${status.onboardingStatus}`);
+        } catch (error) {
+          // A platform webhook can include non-partner accounts. Keep that event
+          // non-blocking, as with the other revenue-share fulfillment work.
+          console.warn(`[RevenueShare] Could not synchronize Stripe account ${accountId}:`, error);
+        }
+      }
     } else if (eventType === "customer.subscription.deleted" || eventType === "customer.subscription.updated") {
       await handleBrandSubscriptionLifecycle(sessionObj, eventType);
       await handleDiySubscriptionLifecycle(sessionObj, eventType);
