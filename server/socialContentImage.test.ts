@@ -99,8 +99,11 @@ describe("Social Post image composition", () => {
       "utf8",
     );
 
-    expect(source).toContain("const imageFrameAspectRatio");
-    expect(source).toContain('aspectRatio: imageFrameAspectRatio');
+    expect(source).toContain("const imageMaxWidth");
+    expect(source).toContain("const imageMaxHeight");
+    expect(source).toContain("maxWidth: imageMaxWidth");
+    expect(source).toContain("maxHeight: imageMaxHeight");
+    expect(source).not.toContain("imageFrameAspectRatio");
     expect(source).toContain('objectFit: "contain"');
     expect(source).toContain('background: t.isDark ? "#07131a" : "#d9eff0"');
     expect(source).not.toContain('objectFit: "cover" }} crossOrigin="anonymous" />\n          <div style={{ position: "absolute", bottom: 0');

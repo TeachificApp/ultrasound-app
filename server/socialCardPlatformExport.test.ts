@@ -75,6 +75,10 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("drawLiveCardVideo(context, card, video");
     expect(exporter).toContain("videoDurationSeconds + 6");
     expect(exporter).toContain("waitForMotionFrame");
+    expect(exporter).toContain("zoomQuestionImage?: boolean");
+    expect(exporter).toContain("drawZoomedCardImage");
+    expect(exporter).toContain("imageZoomStartSeconds");
+    expect(exporter).toContain("CLINICAL IMAGE REVIEW");
   });
 
   it("surfaces platform and PNG-or-MP4 choices in every card generator", () => {
@@ -93,6 +97,9 @@ describe("social card platform exports", () => {
     expect(quiz).toContain('cardVariant === "combined"');
     expect(quiz).toContain('variant={cardVariant === "answer" ? "answer" : "question"}');
     expect(quiz).toContain('questionVideoUrl = media.kind === "video"');
+    expect(quiz).toContain("const canZoomQuestionImage");
+    expect(quiz).toContain("Magnify the clinical image in the MP4");
+    expect(quiz).toContain("zoomQuestionImage: canZoomQuestionImage && zoomQuestionImage");
     for (const page of [challenge, social, quiz]) {
       expect(page).toContain("musicUploadBrand");
       expect(page).toContain("selectedMusic");

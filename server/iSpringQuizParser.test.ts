@@ -137,4 +137,49 @@ describe("parseISpringDataBlob", () => {
     expect(fillInTheBlank.flashcardFront).toBe("The normal ejection fraction is ___%.");
     expect(fillInTheBlank.flashcardBack).toBe("55");
   });
+
+  it("keeps each choice image distinct and excludes choice feedback media", () => {
+    const payload = JSON.stringify({
+      d: {
+        T: "Vascular image answers",
+        sl: {
+          g: [{
+            i: "group-1",
+            T: "Image Questions",
+            S: [{
+              i: "option-image-1",
+              tp: "MultipleChoice",
+              D: { h: "<p>Which waveform is monophasic?</p>", d: ["Which waveform is monophasic?"] },
+              C: { chs: [
+                {
+                  t: { h: "<p></p>", d: [] },
+                  ia: { i: "storage://images/choice-a.jpg" },
+                  f: { v: { r: ["storage://images/correct-feedback.jpg"] } },
+                  c: false,
+                },
+                {
+                  t: { h: "<p></p>", d: [] },
+                  ia: { i: "storage://images/choice-b.jpg" },
+                  f: { v: { r: ["storage://images/correct-feedback.jpg"] } },
+                  c: true,
+                },
+              ] },
+            }],
+          }],
+        },
+      },
+    });
+
+    const parsed = parseISpringDataBlob(payload);
+    const question = parsed.groups[0].questions[0];
+    expect(question.answers.map((answer) => answer.imageRef)).toEqual([
+      "storage://images/choice-a.jpg",
+      "storage://images/choice-b.jpg",
+    ]);
+    expect(question.answers.some((answer) => answer.imageRef === "storage://images/correct-feedback.jpg")).toBe(false);
+    expect(parsed.allImageRefs).toEqual(expect.arrayContaining([
+      "storage://images/choice-a.jpg",
+      "storage://images/choice-b.jpg",
+    ]));
+  });
 });

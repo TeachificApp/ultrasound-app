@@ -121,6 +121,7 @@ export default function QuestionBankSocialCardGenerator() {
   const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
   const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
   const [selectedMusic, setSelectedMusic] = useState<SocialMusicOption | null>(null);
+  const [zoomQuestionImage, setZoomQuestionImage] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [exporting, setExporting] = useState<"png" | "mp4" | null>(null);
@@ -132,6 +133,9 @@ export default function QuestionBankSocialCardGenerator() {
     folderId,
     tagIds: tagIds.length > 0 ? tagIds : undefined,
     mediaKind: mediaFilter === "all" ? undefined : mediaFilter,
+    // Quiz Cards render A–D text rows. Keep image/video-answer questions in
+    // native quizzes, where every answer asset can be displayed accurately.
+    excludeAnswerMedia: true,
     page,
     pageSize: 100,
   }), [folderId, mediaFilter, page, search, tagIds]);
@@ -155,6 +159,7 @@ export default function QuestionBankSocialCardGenerator() {
     .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: asset.currentVersion?.s3Url, source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
   const exportPreset = useMemo(() => getSocialExportPreset(exportPlatform), [exportPlatform]);
+  const canZoomQuestionImage = cardVariant === "combined" && exportFormat === "mp4" && media.kind === "image";
   const utils = trpc.useUtils();
   const savedCards = trpc.quizCardLibrary.list.useQuery(libraryBrandFilter === "all" ? undefined : { brand: libraryBrandFilter });
   const saveCardMutation = trpc.quizCardLibrary.save.useMutation({
@@ -262,7 +267,7 @@ export default function QuestionBankSocialCardGenerator() {
         motion: cardVariant === "answer"
           ? { kind: "answer", title: activeQuestion.question, options, detail: "Review the question", answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl }
           : cardVariant === "combined"
-            ? { kind: "combined", title: activeQuestion.question, options, answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl }
+            ? { kind: "combined", title: activeQuestion.question, options, answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl, zoomQuestionImage: canZoomQuestionImage && zoomQuestionImage }
             : { kind: "question", title: activeQuestion.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl },
       });
       toast.success(`${exportFormat.toUpperCase()} export is ready.`, { description: filename });
@@ -271,7 +276,7 @@ export default function QuestionBankSocialCardGenerator() {
     } finally {
       setExporting(null);
     }
-  }, [activeQuestion, cardVariant, correctAnswer, exportFormat, exportPlatform, media, options, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
+  }, [activeQuestion, canZoomQuestionImage, cardVariant, correctAnswer, exportFormat, exportPlatform, media, options, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url, zoomQuestionImage]);
 
   const saveToLibrary = useCallback(() => {
     if (!activeQuestion) return;
@@ -320,6 +325,7 @@ export default function QuestionBankSocialCardGenerator() {
       <main className="mx-auto grid max-w-screen-2xl gap-6 px-6 py-6 xl:grid-cols-[360px_minmax(0,1fr)_330px]">
         <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
           <h2 className="text-sm font-bold">1. Browse all Question Bank questions</h2>
+          <p className="mt-1 text-[11px] leading-relaxed text-white/45">Questions with images or video in their answer choices stay available in native quizzes, but are excluded here because Quiz Cards use accessible A–D text answer rows.</p>
           <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-white/40" /><Input value={search} onChange={(event) => { setSearch(event.target.value); resetQuestionBrowserPage(); }} placeholder="Search all Question Bank questions" className="border-white/10 bg-white/5 pl-9 text-white placeholder:text-white/35" /></div>
           <div className="mt-3 rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-white/50"><Folder className="h-3.5 w-3.5" />Folders</div><div className="max-h-28 space-y-1 overflow-y-auto pr-1"><button onClick={() => changeFolder(undefined)} className={`w-full rounded px-2 py-1.5 text-left text-xs ${folderId === undefined ? "bg-teal-300/15 text-teal-100" : "text-white/65 hover:bg-white/5"}`}>All folders</button>{foldersQuery.data?.map((folder: any) => <button key={folder.id} onClick={() => changeFolder(folder.id)} className={`flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs ${folderId === folder.id ? "bg-teal-300/15 text-teal-100" : "text-white/65 hover:bg-white/5"}`} style={{ paddingLeft: `${8 + (folder.parentId ? 12 : 0)}px` }}><span className="truncate">{folder.name}</span><span className="ml-2 text-[10px] text-white/35">{folder.questionCount}</span></button>)}</div></div>
           <div className="mt-3"><p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-white/50">Tags · match all selected</p><div className="flex max-h-20 flex-wrap gap-1 overflow-y-auto pr-1">{tagsQuery.data?.map((tag: any) => <button key={tag.id} onClick={() => toggleTag(tag.id)} className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${tagIds.includes(tag.id) ? "border-teal-200 bg-teal-300/15 text-teal-100" : "border-white/10 text-white/55 hover:border-white/30"}`}>{tag.name}</button>)}</div></div>
@@ -344,6 +350,7 @@ export default function QuestionBankSocialCardGenerator() {
             <>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold">3. Preview and export</h2><p className="mt-1 text-xs text-white/50">Export a Question or Answer card at the selected social-platform size as a full PNG or an animated MP4.</p></div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={saveToLibrary} disabled={saveCardMutation.isPending} className="gap-1.5 border-white/15 text-white/75 hover:bg-white/10"><LibraryBig className="h-3.5 w-3.5" />Save to library</Button><Button size="sm" onClick={exportCard} disabled={exporting !== null} className="gap-1.5 bg-teal-500 text-white hover:bg-teal-400"><Download className="h-3.5 w-3.5" />{exporting ? `Rendering ${exporting.toUpperCase()}` : `Download ${exportFormat.toUpperCase()}`}</Button></div></div>
               <div className="mb-3 flex overflow-hidden rounded-lg border border-white/10"><button onClick={() => setCardVariant("question")} className={`flex-1 px-3 py-2 text-xs font-bold ${cardVariant === "question" ? "bg-teal-500 text-white" : "bg-white/[0.03] text-white/55 hover:bg-white/10"}`}>Question only</button><button onClick={() => setCardVariant("answer")} className={`flex-1 px-3 py-2 text-xs font-bold ${cardVariant === "answer" ? "bg-teal-500 text-white" : "bg-white/[0.03] text-white/55 hover:bg-white/10"}`}>Answer only</button><button onClick={() => setCardVariant("combined")} className={`flex-1 px-3 py-2 text-xs font-bold ${cardVariant === "combined" ? "bg-teal-500 text-white" : "bg-white/[0.03] text-white/55 hover:bg-white/10"}`}>Question + answer MP4</button></div>
+              {canZoomQuestionImage && <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-lg border border-teal-300/25 bg-teal-300/10 px-3 py-2 text-xs text-teal-50"><input type="checkbox" checked={zoomQuestionImage} onChange={(event) => setZoomQuestionImage(event.target.checked)} className="mt-0.5 accent-teal-400" /><span><strong>Magnify the clinical image in the MP4</strong><br /><span className="text-teal-100/75">The video shows the question, zooms into the full image for review, brings in the answer options, waits three seconds, then reveals the correct answer and brand outro.</span></span></label>}
               <div className="overflow-auto rounded-lg border border-white/10 bg-black/20 p-4"><div style={{ width: Math.round(exportPreset.width * Math.min(1, 640 / exportPreset.width, 760 / exportPreset.height)), height: Math.round(exportPreset.height * Math.min(1, 640 / exportPreset.width, 760 / exportPreset.height)), position: "relative" }}><div style={{ position: "absolute", top: 0, left: 0, width: exportPreset.width, height: exportPreset.height, transform: `scale(${Math.min(1, 640 / exportPreset.width, 760 / exportPreset.height)})`, transformOrigin: "top left" }}><div ref={cardRef} style={{ width: exportPreset.width, height: exportPreset.height }}><SocialCardFrameProvider platform={exportPlatform}><ClinicalQuizCard presentation={presentation} template={template} variant={cardVariant === "answer" ? "answer" : "question"} question={activeQuestion.question} options={options} media={cardVariant === "question" || cardVariant === "combined" ? media : { kind: "none" }} correctAnswer={correctAnswer} explanation={activeQuestion.explanation} title={cardLabel} footerHost={presentation.publicHost} answerContextLabel="CLINICAL QUIZ" answerFooterMessage="Follow for clinical learning" /></SocialCardFrameProvider></div></div></div></div>
               <div className="mt-4 rounded-lg border border-white/10 bg-black/15 p-3"><div className="mb-2 flex items-center justify-between"><span className="text-xs font-bold text-teal-100">Social caption</span><Button size="sm" variant="ghost" onClick={copyCaption} className="h-7 gap-1 text-xs text-white/70 hover:bg-white/10 hover:text-white"><Copy className="h-3 w-3" />Copy</Button></div><pre className="max-h-40 overflow-y-auto whitespace-pre-wrap font-sans text-xs leading-relaxed text-white/60">{caption}</pre></div>
             </>

@@ -305,15 +305,16 @@ function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: 
   const px = (value: number) => Math.max(1, Math.round(value * frame.contentScale));
   const imageUrl = resolveSocialPostImageUrl(item, presentation);
   const hasImage = !!imageUrl;
-  // Keep the complete clinical image visible. Fixed short crop frames were cutting
-  // off ultrasound labels and anatomy in typical 16:9 source images.
-  const imageFrameAspectRatio = frame.layout === "wide"
-    ? "16 / 5"
-    : frame.layout === "landscape"
-      ? "12 / 5"
-      : "16 / 9";
-return (
-<CardShell t={t}>
+  // Do not impose a post-template aspect ratio on source clinical media. Its own
+  // proportions determine the presentation, bounded only by the available card
+  // space, so labels/anatomy at any edge remain visible rather than letterboxed
+  // or cut by a fixed social-card crop frame.
+  const imageGutter = px(48);
+  const imagePadding = px(7);
+  const imageMaxWidth = frame.width - imageGutter * 2;
+  const imageMaxHeight = Math.round(frame.height * (frame.layout === "wide" ? 0.34 : frame.layout === "landscape" ? 0.38 : 0.35));
+	return (
+	<CardShell t={t}>
       <BrandedHeader item={item} t={t} presentation={presentation} />
       {/* Divider */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 48px", marginBottom: 24 }}>
@@ -323,8 +324,8 @@ return (
       </div>
       {/* Image area */}
       {hasImage && (
-        <div style={{ margin: `0 ${px(48)}px ${px(24)}px`, width: "auto", aspectRatio: imageFrameAspectRatio, borderRadius: px(16), overflow: "hidden", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, background: t.isDark ? "#07131a" : "#d9eff0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" />
+        <div style={{ margin: `0 ${imageGutter}px ${px(24)}px`, maxWidth: imageMaxWidth, maxHeight: imageMaxHeight, alignSelf: "center", padding: imagePadding, borderRadius: px(16), overflow: "visible", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, background: t.isDark ? "#07131a" : "#d9eff0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <img src={imageUrl} alt={item.headline} style={{ width: "auto", height: "auto", maxWidth: imageMaxWidth - imagePadding * 2, maxHeight: imageMaxHeight - imagePadding * 2, objectFit: "contain", display: "block" }} crossOrigin="anonymous" />
         </div>
       )}
       {/* Content area */}

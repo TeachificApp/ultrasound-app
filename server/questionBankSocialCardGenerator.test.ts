@@ -53,7 +53,7 @@ describe("Question Bank social-card generation", () => {
     const card = readProjectFile("client/src/components/social/ClinicalQuizCard.tsx");
 
     expect(generator).not.toContain("title={selectedQuestion.type.toUpperCase()}");
-    expect(card).toContain('border: `2px solid ${theme.accent}66`');
+    expect(card).toContain('border: `${px(2)}px solid ${theme.accent}66`');
     expect(card).toContain('background: theme.accent');
   });
 

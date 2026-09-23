@@ -166,10 +166,15 @@ function parseChoices(chs: any[]): ParsedAnswer[] {
   if (!Array.isArray(chs)) return [];
   return chs.map((ch: any) => {
     const { html, text } = getTextFromDBlock(ch.t);
+    // Choice-level feedback (`f`) can contain the correct-answer image for every
+    // response. It belongs to post-answer feedback, not to the answer tile itself.
+    // Preserve the direct choice payload (including iSpring's `ia` image asset)
+    // while deliberately omitting that feedback branch from option-media lookup.
+    const { f: _feedback, ...choicePayload } = ch ?? {};
     const mediaRefs = [...new Set([
       ...extractMediaRefsFromHtml(html),
       ...getDeclaredMediaRefs(ch.t),
-      ...getNestedMediaRefs(ch),
+      ...getNestedMediaRefs(choicePayload),
     ])];
     const imageRef = mediaRefs.find((ref) => !isVideoRef(ref));
     const videoRef = mediaRefs.find(isVideoRef);

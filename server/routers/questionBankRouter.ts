@@ -139,6 +139,8 @@ export const questionBankRouter = router({
       type: z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"]).optional(),
       types: z.array(z.enum(["mcq", "truefalse", "multiselect", "hotspot", "matching", "flashcard"])).min(1).optional(),
       mediaKind: z.enum(["image", "video"]).optional(),
+      /** Quiz Cards use text answer rows, so answer-image/video questions are not compatible. */
+      excludeAnswerMedia: z.boolean().optional(),
       folderId: z.number().int().nullable().optional(),
       page: z.number().int().min(1).default(1),
       pageSize: z.number().int().min(1).max(100).default(25),
@@ -163,8 +165,16 @@ export const questionBankRouter = router({
         conditions.push(or(
           sql`${questionBank.questionVideoUrl} IS NOT NULL AND ${questionBank.questionVideoUrl} <> ''`,
           sql`${questionBank.feedbackVideoUrl} IS NOT NULL AND ${questionBank.feedbackVideoUrl} <> ''`,
-          sql`${questionBank.options} LIKE '%\"videoUrl\"%'`,
+          sql`${questionBank.options} LIKE '%"videoUrl"%'`,
         ));
+      }
+      if (input.excludeAnswerMedia) {
+        conditions.push(sql`(
+          ${questionBank.options} IS NULL OR (
+            ${questionBank.options} NOT LIKE '%"imageUrl"%' AND
+            ${questionBank.options} NOT LIKE '%"videoUrl"%'
+          )
+        )`);
       }
       if (input.folderId !== undefined) {
         if (input.folderId === null) {

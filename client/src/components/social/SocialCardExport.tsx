@@ -39,6 +39,8 @@ export type CardMotion = {
   musicTitle?: string | null;
   /** Same-origin Question Bank video shown in full before a combined answer reveal. */
   questionVideoUrl?: string | null;
+  /** Optional Question Bank image focus stage before combined-card options animate. */
+  zoomQuestionImage?: boolean;
 };
 
 type SocialCardExportOptions = {
@@ -53,7 +55,8 @@ type RenderedCard = {
   image: ImageBitmap;
   width: number;
   height: number;
-  videoFrame?: { x: number; y: number; width: number; height: number };
+  /** Bounds of the visible clinical image or video inside the reflowed card. */
+  mediaFrame?: { x: number; y: number; width: number; height: number };
 };
 
 const SOURCE_WIDTH = 1080;
@@ -74,6 +77,10 @@ type MotionTimeline = {
   contentEndSeconds: number;
   totalSeconds: number;
   videoDurationSeconds: number;
+  imageZoomStartSeconds: number;
+  imageZoomEndSeconds: number;
+  optionStartSeconds: number;
+  answerRevealSeconds: number;
 };
 
 export type SocialMusicOption = {
@@ -205,27 +212,55 @@ async function cardToBitmap(cardElement: HTMLElement): Promise<RenderedCard> {
   const cardBounds = cardElement.getBoundingClientRect();
   const video = cardElement.querySelector("video");
   const videoBounds = video?.getBoundingClientRect();
-  const videoFrame = videoBounds && videoBounds.width > 0 && videoBounds.height > 0
+  const clinicalImage = Array.from(cardElement.querySelectorAll("img")).find((image) => image.alt === "Clinical reference");
+  const imageBounds = clinicalImage?.getBoundingClientRect();
+  const mediaBounds = videoBounds ?? imageBounds;
+  const mediaFrame = mediaBounds && mediaBounds.width > 0 && mediaBounds.height > 0
     ? {
-      x: Math.max(0, videoBounds.left - cardBounds.left),
-      y: Math.max(0, videoBounds.top - cardBounds.top),
-      width: Math.min(width, videoBounds.width),
-      height: Math.min(height, videoBounds.height),
+      x: Math.max(0, mediaBounds.left - cardBounds.left),
+      y: Math.max(0, mediaBounds.top - cardBounds.top),
+      width: Math.min(width, mediaBounds.width),
+      height: Math.min(height, mediaBounds.height),
     }
     : undefined;
-  return { image: await createImageBitmap(blob), width, height, videoFrame };
+  return { image: await createImageBitmap(blob), width, height, mediaFrame };
 }
 
 function motionTimeline(motion: CardMotion, video: HTMLVideoElement | null): MotionTimeline {
   const videoDurationSeconds = motion.kind === "combined" && video && Number.isFinite(video.duration)
     ? clamp(video.duration, 0, 90)
     : 0;
+  const hasImageZoom = motion.kind === "combined" && motion.zoomQuestionImage;
+  const imageZoomStartSeconds = hasImageZoom ? 1.25 : 0;
+  const imageZoomEndSeconds = hasImageZoom ? 4.25 : 0;
+  const optionStartSeconds = videoDurationSeconds > 0
+    ? videoDurationSeconds
+    : imageZoomEndSeconds > 0
+      ? imageZoomEndSeconds + 0.3
+      : 1.65;
+  const answerRevealSeconds = videoDurationSeconds > 0
+    ? videoDurationSeconds + 3
+    : imageZoomEndSeconds > 0
+      // Four staggered options complete 2.46 seconds after their first entrance;
+      // reserve the requested three seconds before revealing the answer.
+      ? optionStartSeconds + 5.46
+      : COMBINED_ANSWER_REVEAL_SECONDS;
   // Hold the completed question/options for three seconds before revealing the answer,
   // and keep the answer visible for at least three seconds before the 10-second outro.
   const contentEndSeconds = videoDurationSeconds > 0
     ? Math.max(OUTRO_START_SECONDS, videoDurationSeconds + 6)
+    : imageZoomEndSeconds > 0
+      ? Math.max(OUTRO_START_SECONDS, answerRevealSeconds + 3)
     : OUTRO_START_SECONDS;
-  return { contentEndSeconds, totalSeconds: contentEndSeconds + OUTRO_HOLD_SECONDS, videoDurationSeconds };
+  return {
+    contentEndSeconds,
+    totalSeconds: contentEndSeconds + OUTRO_HOLD_SECONDS,
+    videoDurationSeconds,
+    imageZoomStartSeconds,
+    imageZoomEndSeconds,
+    optionStartSeconds,
+    answerRevealSeconds,
+  };
 }
 
 function getCardPlacement(
@@ -289,17 +324,62 @@ function drawLiveCardVideo(
   targetWidth: number,
   targetHeight: number,
 ) {
-  if (!card.videoFrame || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+  if (!card.mediaFrame || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
   const placement = getCardPlacement(card.width, card.height, targetWidth, targetHeight);
   const scaleX = placement.width / card.width;
   const scaleY = placement.height / card.height;
   context.drawImage(
     video,
-    placement.x + card.videoFrame.x * scaleX,
-    placement.y + card.videoFrame.y * scaleY,
-    card.videoFrame.width * scaleX,
-    card.videoFrame.height * scaleY,
+    placement.x + card.mediaFrame.x * scaleX,
+    placement.y + card.mediaFrame.y * scaleY,
+    card.mediaFrame.width * scaleX,
+    card.mediaFrame.height * scaleY,
   );
+}
+
+function drawZoomedCardImage(
+  context: CanvasRenderingContext2D,
+  card: RenderedCard,
+  progress: number,
+  targetWidth: number,
+  targetHeight: number,
+) {
+  if (!card.mediaFrame) return;
+  const sourceX = card.mediaFrame.x;
+  const sourceY = card.mediaFrame.y;
+  const sourceWidth = card.mediaFrame.width;
+  const sourceHeight = card.mediaFrame.height;
+  const visibleProgress = easeOut(progress);
+  const zoom = 1 + visibleProgress * 0.3;
+  const targetMaxWidth = targetWidth * 0.88;
+  const targetMaxHeight = targetHeight * 0.66;
+  const scale = Math.min(targetMaxWidth / sourceWidth, targetMaxHeight / sourceHeight) * zoom;
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
+  const drawX = (targetWidth - drawWidth) / 2;
+  const drawY = targetHeight * 0.19 + (1 - visibleProgress) * targetHeight * 0.07;
+
+  context.save();
+  context.fillStyle = "rgba(3, 17, 23, 0.88)";
+  context.fillRect(0, 0, targetWidth, targetHeight);
+  context.shadowColor = "rgba(0,0,0,0.54)";
+  context.shadowBlur = Math.max(18, targetWidth * 0.03);
+  drawRoundedRect(context, drawX, drawY, drawWidth, drawHeight, Math.max(12, targetWidth * 0.018));
+  context.clip();
+  context.drawImage(card.image, sourceX, sourceY, sourceWidth, sourceHeight, drawX, drawY, drawWidth, drawHeight);
+  context.restore();
+
+  context.save();
+  context.strokeStyle = "rgba(74, 217, 224, 0.94)";
+  context.lineWidth = Math.max(2, targetWidth * 0.003);
+  drawRoundedRect(context, drawX, drawY, drawWidth, drawHeight, Math.max(12, targetWidth * 0.018));
+  context.stroke();
+  context.fillStyle = "#d5fbfd";
+  context.textAlign = "center";
+  context.font = `800 ${Math.max(16, Math.round(targetWidth * 0.021))}px "Segoe UI", Arial, sans-serif`;
+  context.fillText("CLINICAL IMAGE REVIEW", targetWidth / 2, Math.max(32, drawY - targetWidth * 0.02));
+  context.textAlign = "start";
+  context.restore();
 }
 
 function drawMotionPanel(
@@ -308,6 +388,7 @@ function drawMotionPanel(
   elapsed: number,
   targetWidth: number,
   targetHeight: number,
+  timeline?: MotionTimeline,
 ) {
   const accent = motion.accentColor ?? "#4ad9e0";
   const isVertical = targetHeight / targetWidth > 1.2;
@@ -367,7 +448,7 @@ function drawMotionPanel(
     const itemHeight = Math.max(54, Math.round(62 * scaled));
     const itemGap = Math.max(11, Math.round(13 * scaled));
     motion.options.slice(0, 4).forEach((option, index) => {
-      const start = 1.65 + index * 0.68;
+      const start = (motion.kind === "combined" ? timeline?.optionStartSeconds ?? 1.65 : 1.65) + index * 0.68;
       const progress = easeOutBack((elapsed - start) / 0.42);
       if (progress <= 0) return;
       const itemY = optionTop + index * (itemHeight + itemGap);
@@ -448,7 +529,7 @@ function drawMotionPanel(
   }
 
   if (motion.kind === "combined" && motion.answer) {
-    const answerProgress = easeOutBack((elapsed - COMBINED_ANSWER_REVEAL_SECONDS) / 0.48);
+    const answerProgress = easeOutBack((elapsed - (timeline?.answerRevealSeconds ?? COMBINED_ANSWER_REVEAL_SECONDS)) / 0.48);
     if (answerProgress > 0) {
       const visibleProgress = clamp(answerProgress, 0, 1);
       const answerHeight = Math.max(92, Math.round(122 * scaled));
@@ -501,7 +582,15 @@ function drawMotionFrame(
   targetHeight: number,
   logo?: HTMLImageElement | null,
   video?: HTMLVideoElement | null,
-  timeline: MotionTimeline = { contentEndSeconds: OUTRO_START_SECONDS, totalSeconds: MOTION_DURATION_SECONDS, videoDurationSeconds: 0 },
+  timeline: MotionTimeline = {
+    contentEndSeconds: OUTRO_START_SECONDS,
+    totalSeconds: MOTION_DURATION_SECONDS,
+    videoDurationSeconds: 0,
+    imageZoomStartSeconds: 0,
+    imageZoomEndSeconds: 0,
+    optionStartSeconds: 1.65,
+    answerRevealSeconds: COMBINED_ANSWER_REVEAL_SECONDS,
+  },
 ) {
   const outroProgress = clamp((elapsed - timeline.contentEndSeconds) / 0.6, 0, 1);
   drawExportFrame(context, card, targetWidth, targetHeight, 0.86 * (1 - outroProgress));
@@ -510,13 +599,26 @@ function drawMotionFrame(
       drawLiveCardVideo(context, card, video, targetWidth, targetHeight);
       return;
     }
+    if (timeline.imageZoomEndSeconds > 0 && elapsed >= timeline.imageZoomStartSeconds && elapsed < timeline.imageZoomEndSeconds) {
+      drawZoomedCardImage(
+        context,
+        card,
+        (elapsed - timeline.imageZoomStartSeconds) / (timeline.imageZoomEndSeconds - timeline.imageZoomStartSeconds),
+        targetWidth,
+        targetHeight,
+      );
+      return;
+    }
     // The static card keeps the question/options visible after the clip. Resume
     // its staging at the completed-option point, then preserve the three-second
     // pause before the answer reveal.
     const panelElapsed = timeline.videoDurationSeconds > 0
       ? elapsed - timeline.videoDurationSeconds + 4.11
       : elapsed;
-    drawMotionPanel(context, motion, panelElapsed, targetWidth, targetHeight);
+    const panelTimeline = timeline.videoDurationSeconds > 0
+      ? { ...timeline, optionStartSeconds: 1.65, answerRevealSeconds: COMBINED_ANSWER_REVEAL_SECONDS }
+      : timeline;
+    drawMotionPanel(context, motion, panelElapsed, targetWidth, targetHeight, panelTimeline);
     return;
   }
 

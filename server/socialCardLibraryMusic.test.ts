@@ -8,6 +8,7 @@ const quiz = readFileSync(`${root}/client/src/pages/QuestionBankSocialCardGenera
 const social = readFileSync(`${root}/client/src/pages/SocialContentGenerator.tsx`, "utf8");
 const challenge = readFileSync(`${root}/client/src/pages/ChallengeCardGenerator.tsx`, "utf8");
 const router = readFileSync(`${root}/server/routers/quizCardLibraryRouter.ts`, "utf8");
+const questionBankRouter = readFileSync(`${root}/server/routers/questionBankRouter.ts`, "utf8");
 const migration = readFileSync(`${root}/drizzle/0072_quiz_card_library.sql`, "utf8");
 const serverEntry = readFileSync(`${root}/server/_core/index.ts`, "utf8");
 
@@ -83,6 +84,14 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(quiz).toContain("Save to library");
     expect(quiz).toContain("Saved and verified in the shared Quiz Card Library.");
     expect(quiz).toContain("Quiz Card Library could not load:");
+  });
+
+  it("keeps answer-image and answer-video questions in native quizzes rather than partial Quiz Card renders", () => {
+    expect(quiz).toContain("excludeAnswerMedia: true");
+    expect(quiz).toContain("Quiz Cards use accessible A–D text answer rows");
+    expect(questionBankRouter).toContain("excludeAnswerMedia: z.boolean().optional()");
+    expect(questionBankRouter).toContain("NOT LIKE '%\"imageUrl\"%'");
+    expect(questionBankRouter).toContain("NOT LIKE '%\"videoUrl\"%'");
   });
 
   it("does not disclose any database URL fragment from the production status probe", () => {
