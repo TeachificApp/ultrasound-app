@@ -109,4 +109,16 @@ describe("Question Bank social-card generation", () => {
     expect(page).toContain("title={cardLabel}");
     expect(page).toContain("This changes only this exported card and caption.");
   });
+
+  it("shows a shared-library prior-use alert without disabling source-question selection", () => {
+    const page = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+    const libraryRouter = readProjectFile("server/routers/quizCardLibraryRouter.ts");
+
+    expect(page).toContain("libraryUsageByQuestionId");
+    expect(page).toContain("Previously used · {libraryUseCount}");
+    expect(page).toContain("this question can still be selected");
+    expect(page).toContain("savedCard.questionBankId ?? savedCard.questionSnapshot?.id");
+    expect(libraryRouter).toContain("isNull(quizCardLibrary.deletedAt)");
+    expect(libraryRouter).not.toContain("createdByUserId, ctx.user.id");
+  });
 });

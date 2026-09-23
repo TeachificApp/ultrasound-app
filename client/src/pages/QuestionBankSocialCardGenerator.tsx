@@ -201,6 +201,17 @@ export default function QuestionBankSocialCardGenerator() {
   }, [exportFormat, hasVideoMedia]);
   const utils = trpc.useUtils();
   const savedCards = trpc.quizCardLibrary.list.useQuery(libraryBrandFilter === "all" ? undefined : { brand: libraryBrandFilter });
+  /** All platform-admin library records are used so duplicate-use awareness is shared, not per-admin. */
+  const libraryUsageByQuestionId = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const savedCard of savedCards.data ?? []) {
+      const sourceQuestionId = Number(savedCard.questionBankId ?? savedCard.questionSnapshot?.id);
+      if (Number.isSafeInteger(sourceQuestionId) && sourceQuestionId > 0) {
+        counts.set(sourceQuestionId, (counts.get(sourceQuestionId) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [savedCards.data]);
   const saveCardMutation = trpc.quizCardLibrary.save.useMutation({
     onSuccess: async (saved) => {
       setShowLibrary(true);
@@ -377,12 +388,13 @@ export default function QuestionBankSocialCardGenerator() {
           <div className="mt-3 text-[11px] text-white/45">{questionsQuery.data ? `${questionsQuery.data.total} matching question${questionsQuery.data.total === 1 ? "" : "s"}` : "Loading filters…"}</div>
           <div className="mt-3 max-h-[68vh] space-y-2 overflow-y-auto pr-1">
             {questionsQuery.isLoading && <div className="py-8 text-center text-sm text-white/45"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading questions</div>}
-            {questionsQuery.data?.questions.map((question: any) => (
-              <button key={question.id} onClick={() => selectQuestion(question)} className={`w-full rounded-lg border p-3 text-left transition-colors ${selectedQuestionId === question.id ? "border-teal-300 bg-teal-300/10" : "border-white/10 bg-black/10 hover:border-white/25"}`}>
+            {questionsQuery.data?.questions.map((question: any) => {
+              const libraryUseCount = libraryUsageByQuestionId.get(question.id) ?? 0;
+              return <button key={question.id} onClick={() => selectQuestion(question)} className={`w-full rounded-lg border p-3 text-left transition-colors ${selectedQuestionId === question.id ? "border-teal-300 bg-teal-300/10" : "border-white/10 bg-black/10 hover:border-white/25"}`}>
                 <div className="line-clamp-3 text-sm font-semibold leading-relaxed text-white/90">{stripHtml(question.question)}</div>
-                <div className="mt-2 flex items-center gap-2 text-[10px] text-white/45"><span>{question.type}</span>{getQuestionMedia(question).kind !== "none" && <span className="flex items-center gap-1 text-teal-200">{getQuestionMedia(question).kind === "video" ? <FileVideo className="h-3 w-3" /> : <FileImage className="h-3 w-3" />} linked {getQuestionMedia(question).kind}</span>}</div>
-              </button>
-            ))}
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-white/45"><span>{question.type}</span>{getQuestionMedia(question).kind !== "none" && <span className="flex items-center gap-1 text-teal-200">{getQuestionMedia(question).kind === "video" ? <FileVideo className="h-3 w-3" /> : <FileImage className="h-3 w-3" />} linked {getQuestionMedia(question).kind}</span>}{libraryUseCount > 0 && <span className="flex items-center gap-1 rounded-full border border-amber-300/30 bg-amber-300/10 px-1.5 py-0.5 font-semibold text-amber-100" aria-label={`Previously saved to the shared Quiz Card Library ${libraryUseCount} ${libraryUseCount === 1 ? "time" : "times"}; this question can still be selected`}><LibraryBig className="h-3 w-3" />Previously used · {libraryUseCount}</span>}</div>
+              </button>;
+            })}
             {questionsQuery.data && questionsQuery.data.total > 0 && <div className="flex items-center justify-between gap-2 pt-2"><Button size="sm" variant="outline" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1} className="border-white/15 text-white/70 hover:bg-white/10">Previous</Button><span className="text-[10px] text-white/45">Page {page} of {totalPages}</span><Button size="sm" variant="outline" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages} className="border-white/15 text-white/70 hover:bg-white/10">Next</Button></div>}
           </div>
         </section>

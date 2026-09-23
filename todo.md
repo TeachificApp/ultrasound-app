@@ -677,3 +677,4 @@
 - [x] Make image/video Question Bank classification visible in the admin list from actual question, feedback, flashcard, and answer-option media, while preserving existing Media tags.
 - [x] Keep all video-backed Social Post, Quiz Card, and Challenge Card selections in MP4-only export mode, hiding static PNG choice and passing the source video into the local MP4 timeline. Social Post upload and Media Repository selection now accepts video as well as images.
 - [x] Apply the platform teal explanation feedback treatment to the Question Bank learner-preview dialog and expand Quiz Card folder entries for readable hierarchy and long folder names.
+- [x] Add a non-blocking shared-library prior-use indicator to the Quiz Card Generator source selector. Every Platform Admin sees the count of saved Quiz Card library records for each Question Bank question, including prior outputs created by other admins; the question remains fully selectable.
