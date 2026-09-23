@@ -31,6 +31,7 @@ function assetUrl(url?: string | null): string {
 }
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { MathContent } from "@/components/MathContent";
+import { resolveScheduledCountdownTarget } from "@shared/platformTime";
 
 /**
  * Wraps an image element with the correct click action based on the CTAActionPicker behavior.
@@ -548,28 +549,8 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
           </div>
         </CC></div>
       );
-    case "countdown": {
-      const mode = d.mode ?? "on_load";
-      const units = mode === "event" ? ["Days", "Hours", "Minutes", "Seconds"] : ["Hours", "Minutes", "Seconds"];
-      const placeholders = mode === "event" ? ["00", "00", "00", "00"] : [String(Math.floor((d.durationMinutes ?? 90) / 60)).padStart(2, "0"), String((d.durationMinutes ?? 90) % 60).padStart(2, "0"), "00"];
-      return (
-        <div className={`px-8 py-10 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`} style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.accentColor ?? "#179ca3") : undefined }}>
-          {d.headline && <h2 className="text-lg font-bold uppercase tracking-wide mb-4" style={{ color: d.accentColor ?? "#179ca3" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
-          <div className="flex justify-center items-center gap-2">
-            {units.map((unit, i) => (
-              <div key={unit} className="flex items-center gap-2">
-                <div className="text-center">
-                  <div className="text-5xl font-black tracking-tight">{placeholders[i]}</div>
-                  <div className="text-xs font-medium mt-1 opacity-70">{unit}</div>
-                </div>
-                {i < units.length - 1 && <span className="text-4xl font-bold opacity-50 -mt-4">:</span>}
-              </div>
-            ))}
-          </div>
-          {mode === "on_load" && <p className="text-xs text-gray-400 mt-3">Timer starts when visitor loads page ({d.durationMinutes ?? 90} min)</p>}
-        </div>
-      );
-    }
+    case "countdown":
+      return <CountdownBlock data={d} />;
     case "alert": {
       const alertStyles: Record<string, string> = { info: "bg-blue-50 border-blue-300 text-blue-800", success: "bg-green-50 border-green-300 text-green-800", warning: "bg-yellow-50 border-yellow-300 text-yellow-800", error: "bg-red-50 border-red-300 text-red-800" };
       return (
@@ -2189,6 +2170,74 @@ function InstructorBlockPreview({ d }: { d: Record<string, any> }) {
 
 // ─── Countdown helpers ────────────────────────────────────────────────────────
 
+function calculateCountdownParts(endTime: number, now = Date.now()) {
+  const totalSeconds = Math.max(0, Math.floor((endTime - now) / 1000));
+  return {
+    days: Math.floor(totalSeconds / 86400),
+    hours: Math.floor((totalSeconds % 86400) / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: totalSeconds % 60,
+  };
+}
+
+function useLiveCountdown(endTime: number) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    setNow(Date.now());
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [endTime]);
+
+  return calculateCountdownParts(endTime, now);
+}
+
+function CountdownBlock({ data: d }: { data: Record<string, any> }) {
+  const durationMinutes = Math.max(1, Number(d.durationMinutes ?? 90));
+  const targetDate = typeof d.targetDate === "string" ? d.targetDate : "";
+  const eventTarget = useMemo(
+    () => (d.mode === "event" || (!d.mode && targetDate)) && targetDate
+      ? resolveScheduledCountdownTarget(targetDate)
+      : null,
+    [d.mode, targetDate],
+  );
+  const isEvent = eventTarget !== null && Number.isFinite(eventTarget);
+  const endTime = useMemo(() => {
+    if (isEvent) return eventTarget;
+
+    const storageKey = `countdown_bp_${durationMinutes}`;
+    if (typeof sessionStorage === "undefined") return Date.now() + durationMinutes * 60 * 1000;
+    const stored = Number(sessionStorage.getItem(storageKey));
+    if (Number.isFinite(stored) && stored > Date.now()) return stored;
+
+    const end = Date.now() + durationMinutes * 60 * 1000;
+    sessionStorage.setItem(storageKey, String(end));
+    return end;
+  }, [isEvent, eventTarget, durationMinutes]);
+  const time = useLiveCountdown(endTime);
+  const units = isEvent
+    ? [["Days", time.days], ["Hours", time.hours], ["Minutes", time.minutes], ["Seconds", time.seconds]] as const
+    : [["Hours", time.hours], ["Minutes", time.minutes], ["Seconds", time.seconds]] as const;
+
+  return (
+    <div className={`px-8 py-10 text-center ${d.showBorder ? "border-2 rounded-2xl mx-4 my-4" : ""}`} style={{ backgroundColor: d.bgColor ?? "#ffffff", color: d.textColor ?? "#0e1e2e", borderColor: d.showBorder ? (d.accentColor ?? "#179ca3") : undefined }}>
+      {d.headline && <h2 className="text-lg font-bold uppercase tracking-wide mb-4" style={{ color: d.accentColor ?? "#179ca3" }} dangerouslySetInnerHTML={{ __html: d.headline }} />}
+      <div className="flex justify-center items-center gap-2">
+        {units.map(([unit, value], i) => (
+          <div key={unit} className="flex items-center gap-2">
+            <div className="text-center">
+              <div className="text-5xl font-black tracking-tight tabular-nums">{String(value).padStart(2, "0")}</div>
+              <div className="text-xs font-medium mt-1 opacity-70">{unit}</div>
+            </div>
+            {i < units.length - 1 && <span className="text-4xl font-bold opacity-50 -mt-4">:</span>}
+          </div>
+        ))}
+      </div>
+      {!isEvent && <p className="text-xs text-gray-400 mt-3">Timer starts when visitor loads page ({durationMinutes} min)</p>}
+    </div>
+  );
+}
+
 function normalizeCountdownV2Mode(mode: string | undefined): "duration" | "target_date" {
   if (mode === "target_date" || mode === "event") return "target_date";
   return "duration";
@@ -2197,8 +2246,8 @@ function normalizeCountdownV2Mode(mode: string | undefined): "duration" | "targe
 function computeCountdownV2EndTime(d: Record<string, any>): number {
   const mode = normalizeCountdownV2Mode(d.mode);
   if (mode === "target_date" && d.targetDate) {
-    const targetMs = new Date(d.targetDate).getTime();
-    if (!Number.isNaN(targetMs) && targetMs > Date.now()) return targetMs;
+    const targetMs = resolveScheduledCountdownTarget(d.targetDate);
+    if (Number.isFinite(targetMs)) return targetMs;
   }
   const h = Math.max(0, Number(d.durationHours ?? 1));
   const m = Math.max(0, Number(d.durationMinutes ?? 30));
@@ -2430,24 +2479,12 @@ function TickerBlockPreview({ d }: { d: Record<string, any> }) {
  * and target-date mode (count down to a specific date/time).
  */
 export function CountdownV2Block({ data: d }: { data: Record<string, any> }) {
-  const [endTime] = useState<number>(() => computeCountdownV2EndTime(d));
-
-  const calcRemaining = () => Math.max(0, endTime - Date.now());
-  const [remaining, setRemaining] = useState(calcRemaining);
-
-  useEffect(() => {
-    if (remaining <= 0) return;
-    const id = setInterval(() => setRemaining(calcRemaining()), 1000);
-    return () => clearInterval(id);
-  }, [endTime]);
-
-  const expired = remaining <= 0;
-
-  const totalSec = Math.floor(remaining / 1000);
-  const days    = Math.floor(totalSec / 86400);
-  const hours   = Math.floor((totalSec % 86400) / 3600);
-  const minutes = Math.floor((totalSec % 3600) / 60);
-  const seconds = totalSec % 60;
+  const endTime = useMemo(
+    () => computeCountdownV2EndTime(d),
+    [d.mode, d.targetDate, d.durationHours, d.durationMinutes],
+  );
+  const { days, hours, minutes, seconds } = useLiveCountdown(endTime);
+  const expired = endTime <= Date.now();
 
   const pad = (n: number) => String(n).padStart(2, "0");
 

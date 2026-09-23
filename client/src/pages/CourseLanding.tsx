@@ -42,7 +42,7 @@ import { handleCtaBtnClick } from "@/lib/ctaUtils";
 export { handleCtaBtnClick };
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
-import { isScheduledDeadlineOpen, scheduledWallTimeToUtc } from "@shared/platformTime";
+import { isScheduledDeadlineOpen, resolveScheduledCountdownTarget, scheduledWallTimeToUtc } from "@shared/platformTime";
 import { shouldRouteWorkshopCtaToCheckout } from "@shared/workshopPricing";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ function CountdownTimer({ mode, durationMinutes, targetDate, textColor }: { mode
   const resolvedMode = mode ?? (targetDate ? "event" : "on_load");
   useEffect(() => {
     if (resolvedMode === "event" && targetDate) {
-      endRef.current = new Date(targetDate).getTime();
+      endRef.current = resolveScheduledCountdownTarget(targetDate);
     } else {
       const storageKey = `countdown_cl_${durationMinutes ?? 90}`;
       const stored = sessionStorage.getItem(storageKey);
