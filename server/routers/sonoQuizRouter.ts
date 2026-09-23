@@ -34,6 +34,8 @@ import {
   standaloneQuizQuestions,
   questionBankFolders,
   questionBank,
+  studyGroupMembers,
+  studyGroups,
 } from "../../drizzle/schema";
 import {
   broadcastLobbyUpdate,
@@ -91,23 +93,47 @@ async function requirePlatformAdmin(userId: number) {
 
 const requireAdmin = requirePlatformAdmin;
 
-async function requireTeachGameAuthor(userId: number) {
+async function requireTeachGameAuthor(userId: number, studyGroupId?: number | null) {
   const db = (await getDb())!;
   const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
-  if (user?.role === "admin") return { isAdmin: true };
+  if (user?.role === "admin") return { isAdmin: true, isOrganizationGroupAuthor: false };
+
+  if (studyGroupId) {
+    const [group] = await db.select().from(studyGroups).where(eq(studyGroups.id, studyGroupId)).limit(1);
+    const [membership] = await db.select({ role: studyGroupMembers.role })
+      .from(studyGroupMembers)
+      .where(and(
+        eq(studyGroupMembers.groupId, studyGroupId),
+        eq(studyGroupMembers.userId, userId),
+        eq(studyGroupMembers.inviteStatus, "active"),
+      ))
+      .limit(1);
+    const isOrganizationAdmin = Boolean(
+      group
+      && group.tier === "organization"
+      && group.status === "active"
+      && membership
+      && (membership.role === "owner" || membership.role === "org_admin"),
+    );
+    if (isOrganizationAdmin) return { isAdmin: false, isOrganizationGroupAuthor: true };
+  }
+
   const teachContext = await getTeachUserContext(userId);
   if (!teachContext.canAccessTeach) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "TEACH educator access required" });
+    throw new TRPCError({ code: "FORBIDDEN", message: "TEACH educator or active Organization Study Group admin access required" });
   }
-  return { isAdmin: false };
+  if (teachContext.isPlatformAdmin || teachContext.isEducationManager) {
+    return { isAdmin: true, isOrganizationGroupAuthor: false };
+  }
+  return { isAdmin: false, isOrganizationGroupAuthor: false };
 }
 
 async function assertTeachGameOwnership(userId: number, quizId: number) {
-  const author = await requireTeachGameAuthor(userId);
   const db = (await getDb())!;
   const [quiz] = await db.select().from(sonoQuizzes).where(eq(sonoQuizzes.id, quizId)).limit(1);
   if (!quiz) throw new TRPCError({ code: "NOT_FOUND", message: "Live game not found" });
-  if (!author.isAdmin && quiz.createdByUserId !== userId) {
+  const author = await requireTeachGameAuthor(userId, quiz.studyGroupId);
+  if (!author.isAdmin && !author.isOrganizationGroupAuthor && quiz.createdByUserId !== userId) {
     throw new TRPCError({ code: "FORBIDDEN", message: "You can only manage your own Teach games" });
   }
   return quiz;
@@ -120,11 +146,19 @@ export const sonoQuizRouter = router({
   // ── Quiz CRUD ──────────────────────────────────────────────────────────────
 
   listQuizzes: protectedProcedure
-    .input(z.object({ status: z.enum(["draft", "published", "archived", "all"]).default("all") }).optional())
+    .input(z.object({
+      status: z.enum(["draft", "published", "archived", "all"]).default("all"),
+      studyGroupId: z.number().int().positive().optional(),
+    }).optional())
     .query(async ({ ctx, input }) => {
-      await requireTeachGameAuthor(ctx.user.id);
+      const author = await requireTeachGameAuthor(ctx.user.id, input?.studyGroupId);
+      if (input?.studyGroupId && !author.isAdmin && !author.isOrganizationGroupAuthor) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Organization Study Group admin role is required." });
+      }
       const db = (await getDb())!;
-      const conditions = [eq(sonoQuizzes.createdByUserId, ctx.user.id)];
+      const conditions = input?.studyGroupId
+        ? [eq(sonoQuizzes.studyGroupId, input.studyGroupId), eq(sonoQuizzes.isTeachGame, true)]
+        : [eq(sonoQuizzes.createdByUserId, ctx.user.id)];
       if (input?.status && input.status !== "all") {
         conditions.push(eq(sonoQuizzes.status, input.status));
       }
@@ -178,12 +212,19 @@ export const sonoQuizRouter = router({
       isTeachGame: z.boolean().default(false),
       ownerContext: z.enum(["platform", "lms_instructor", "educator_assist"]).default("platform"),
       educatorOrgId: z.number().int().nullable().optional(),
+      studyGroupId: z.number().int().positive().optional(),
       importSource: z.enum(["manual", "kahoot_xlsx"]).default("manual"),
     }))
     .mutation(async ({ ctx, input }) => {
-      const author = await requireTeachGameAuthor(ctx.user.id);
+      const author = await requireTeachGameAuthor(ctx.user.id, input.studyGroupId);
       if (!author.isAdmin && !input.isTeachGame) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Educators can create Teach games only" });
+      }
+      if (input.studyGroupId && !author.isAdmin && !author.isOrganizationGroupAuthor) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Organization Study Group admin role is required." });
+      }
+      if (input.studyGroupId && !input.isTeachGame) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Organization Study Group activities must be TEACH games." });
       }
       const db = (await getDb())!;
       const result = await db.insert(sonoQuizzes).values({
@@ -191,6 +232,7 @@ export const sonoQuizRouter = router({
         isTeachGame: input.isTeachGame,
         ownerContext: input.ownerContext,
         educatorOrgId: input.educatorOrgId ?? null,
+        studyGroupId: input.studyGroupId ?? null,
         importSource: input.importSource,
         title: input.title,
         description: input.description,
@@ -212,9 +254,13 @@ export const sonoQuizRouter = router({
       fileData: z.string().min(1),
       ownerContext: z.enum(["lms_instructor", "educator_assist"]).default("lms_instructor"),
       educatorOrgId: z.number().int().nullable().optional(),
+      studyGroupId: z.number().int().positive().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      await requireTeachGameAuthor(ctx.user.id);
+      const author = await requireTeachGameAuthor(ctx.user.id, input.studyGroupId);
+      if (input.studyGroupId && !author.isAdmin && !author.isOrganizationGroupAuthor) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "An active Organization Study Group admin role is required." });
+      }
       if (!/\.xlsx$/i.test(input.fileName)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Upload a .xlsx spreadsheet exported from your authorised Kahoot quiz template." });
       }
@@ -234,6 +280,7 @@ export const sonoQuizRouter = router({
         isTeachGame: true,
         ownerContext: input.ownerContext,
         educatorOrgId: input.educatorOrgId ?? null,
+        studyGroupId: input.studyGroupId ?? null,
         importSource: "kahoot_xlsx",
         title: input.title,
         timeLimitSeconds: 20,
@@ -294,9 +341,7 @@ export const sonoQuizRouter = router({
       await assertTeachGameOwnership(ctx.user.id, input.quizId);
       const db = (await getDb())!;
       const { quizId, ...updates } = input;
-      await db.update(sonoQuizzes).set(updates as any).where(
-        and(eq(sonoQuizzes.id, quizId), eq(sonoQuizzes.createdByUserId, ctx.user.id))
-      );
+      await db.update(sonoQuizzes).set(updates as any).where(eq(sonoQuizzes.id, quizId));
       return { ok: true };
     }),
 
@@ -318,9 +363,7 @@ export const sonoQuizRouter = router({
         });
       }
       await db.delete(sonoQuizQuestions).where(eq(sonoQuizQuestions.quizId, input.quizId));
-      await db.delete(sonoQuizzes).where(
-        and(eq(sonoQuizzes.id, input.quizId), eq(sonoQuizzes.createdByUserId, ctx.user.id))
-      );
+      await db.delete(sonoQuizzes).where(eq(sonoQuizzes.id, input.quizId));
       return { ok: true };
     }),
 

@@ -2672,6 +2672,8 @@ export const sonoQuizzes = mysqlTable("sonoQuizzes", {
   // TEACH ownership scope controls which instructors and educator organisations can manage a game.
   ownerContext: mysqlEnum("ownerContext", ["platform", "lms_instructor", "educator_assist"]).default("platform").notNull(),
   educatorOrgId: int("educatorOrgId"),
+  // Optional Organization Study Group scope for group-authored TEACH games.
+  studyGroupId: int("studyGroupId"),
   // Import provenance supports transparent user-owned Kahoot spreadsheet imports.
   importSource: mysqlEnum("importSource", ["manual", "kahoot_xlsx"]).default("manual").notNull(),
   title: varchar("title", { length: 300 }).notNull(),
@@ -2691,7 +2693,9 @@ export const sonoQuizzes = mysqlTable("sonoQuizzes", {
   status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => ({
+  studyGroupUpdatedIdx: index("idx_sono_quizzes_study_group_updated").on(t.studyGroupId, t.updatedAt),
+}));
 export type SonoQuiz = typeof sonoQuizzes.$inferSelect;
 export type InsertSonoQuiz = typeof sonoQuizzes.$inferInsert;
 

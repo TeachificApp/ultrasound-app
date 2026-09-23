@@ -132,8 +132,8 @@ describe("Study Groups", () => {
     expect(workspace).toContain('plan: "unlimited"');
     expect(listing).toContain("Organization Access from $49/month");
     expect(listing).toContain("Choose Organization Access");
-    expect(listing).toContain("Build and manage your own group modules and learning content");
-    expect(listing).toContain("Build and manage your organization’s own group learning content");
+    expect(listing).toContain("Create modules and TEACH activities within this platform");
+    expect(listing).toContain("learning content within this platform—from group modules to TEACH activities");
   });
 
   it("limits Organization coverage to one $49 group or three $99 groups", () => {
@@ -230,5 +230,23 @@ describe("Study Groups", () => {
     expect(listing).toContain("$49");
     expect(listing).toContain("$99");
     expect(listing).toContain("eligible course, quiz, and content purchases receive a 10% group discount");
+  });
+
+  it("gives Organization Study Group admins their own scoped TEACH activity workspace", () => {
+    const migration = read("drizzle/0080_study_group_teach_games.sql");
+    const schema = read("drizzle/schema.ts");
+    const router = read("server/routers/sonoQuizRouter.ts");
+    const workspace = read("client/src/pages/StudyGroupWorkspace.tsx");
+    const teachGames = read("client/src/pages/teach/TeachGames.tsx");
+
+    expect(migration).toContain("studyGroupId");
+    expect(schema).toContain('studyGroupId: int("studyGroupId")');
+    expect(router).toContain("isOrganizationGroupAuthor");
+    expect(router).toContain("An active Organization Study Group admin role is required.");
+    expect(router).toContain("eq(sonoQuizzes.studyGroupId, input.studyGroupId)");
+    expect(workspace).toContain("Create TEACH activity");
+    expect(workspace).toContain("/teach/games?studyGroupId=${groupId}");
+    expect(teachGames).toContain("groupWorkspace?.group?.isOrganizationActive");
+    expect(teachGames).toContain("Create your first group TEACH activity");
   });
 });
