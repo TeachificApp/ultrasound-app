@@ -3,7 +3,7 @@
  * Generates branded 1080x1080 social media image cards for daily challenges.
  * Adapted from iHeartEcho for UltrasoundAssist™ (All About Ultrasound™)
  */
-import { useRef, useCallback, useState, useMemo } from "react";
+import { useRef, useCallback, useEffect, useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Link, useLocation } from "wouter";
 import { toPng } from "html-to-image";
@@ -964,6 +964,7 @@ type QuestionItem = {
   explanation: string | null;
   reviewAnswer: string | null;
   imageUrl: string | null;
+  videoUrl?: string | null;
   difficulty: string;
   category: string | null;
 };
@@ -1025,9 +1026,10 @@ function CategorySection({
       : null;
   const explanationText = q.explanation ? stripHtml(q.explanation) : null;
   const contextLabel = q.category?.trim() || category;
-  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle };
-  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle };
-  const combinedMotion: CardMotion = { kind: "combined", title: q.question, options, answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle };
+  const questionVideoUrl = q.videoUrl ?? (/\.(mp4|webm|mov)(?:[?#].*)?$/i.test(q.imageUrl ?? "") ? q.imageUrl : null);
+  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle, questionVideoUrl };
+  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle, questionVideoUrl };
+  const combinedMotion: CardMotion = { kind: "combined", title: q.question, options, answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle, questionVideoUrl };
   const downloadCombined = async () => {
     if (!combinedRef.current) return;
     setCombinedLoading(true);
@@ -1076,7 +1078,7 @@ function CategorySection({
               {template === "classic" ? (
                 <QuestionCard challengeTitle={contextLabel} questionText={q.question} options={options} qid={q.qid} t={t} presentation={presentation} />
               ) : (
-                <ClinicalQuizCard presentation={presentation} template={template} question={q.question} options={options} media={q.imageUrl ? { kind: "image", url: q.imageUrl } : { kind: "none" }} title={contextLabel} />
+                <ClinicalQuizCard presentation={presentation} template={template} question={q.question} options={options} media={questionVideoUrl ? { kind: "video", url: questionVideoUrl } : q.imageUrl ? { kind: "image", url: q.imageUrl } : { kind: "none" }} title={contextLabel} />
               )}
             </DownloadableCard>
           </div>
@@ -1226,6 +1228,10 @@ export default function ChallengeCardGenerator() {
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
     .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: asset.currentVersion?.s3Url, source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
+  const hasVideoMedia = useMemo(() => Boolean(data?.some((item: any) => item.questions?.some((question: QuestionItem) => question.videoUrl || /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(question.imageUrl ?? "")))), [data]);
+  useEffect(() => {
+    if (hasVideoMedia && exportFormat !== "mp4") setExportFormat("mp4");
+  }, [exportFormat, hasVideoMedia]);
 
   const questionRefs = useRef<Record<string, DownloadableCardHandle>>({});
   const answerRefs = useRef<Record<string, DownloadableCardHandle>>({});
@@ -1423,9 +1429,9 @@ export default function ChallengeCardGenerator() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xs font-bold uppercase tracking-wide text-white/80">Platform export</h2>
-              <p className="mt-1 text-[11px] text-white/45">PNG keeps every card fully visible. MP4 gives combined question-and-answer cards a three-second answer pause, then ends on a 10-second app website screen.</p>
+              <p className="mt-1 text-[11px] text-white/45">{hasVideoMedia ? "Video source media stays in motion, so these cards export as MP4 only." : "PNG keeps every card fully visible. MP4 gives combined question-and-answer cards a three-second answer pause, then ends on a 10-second app website screen."}</p>
             </div>
-            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} selectedMusic={selectedMusic} onMusicChange={setSelectedMusic} musicUploadBrand={presentation.brand} compact /></div>
+            <div className="min-w-[300px]"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} selectedMusic={selectedMusic} onMusicChange={setSelectedMusic} musicUploadBrand={presentation.brand} forceMp4={hasVideoMedia} compact /></div>
           </div>
         </section>
         {/* Info bar */}

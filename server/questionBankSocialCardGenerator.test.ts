@@ -77,7 +77,8 @@ describe("Question Bank social-card generation", () => {
     expect(page).toContain("flattenFolderBrowserEntries");
     expect(page).toContain("const [folderSearch, setFolderSearch]");
     expect(page).toContain("Find a folder");
-    expect(page).toContain("max-h-64");
+    expect(page).toContain("max-h-[42vh]");
+    expect(page).toContain("break-words");
     expect(page).toContain("const [tagSearch, setTagSearch]");
     expect(page).toContain("Search tags");
     expect(page).toContain("visibleTags");

@@ -11867,13 +11867,21 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {questions.map(q => (
+              {questions.map(q => {
+                const optionMedia = Array.isArray(q.options) ? q.options : [];
+                const hasImageMedia = Boolean(q.questionImageUrl || q.feedbackImageUrl || q.flashcardBackImageUrl || optionMedia.some((option: any) => option?.imageUrl));
+                const hasVideoMedia = Boolean(q.questionVideoUrl || q.feedbackVideoUrl || optionMedia.some((option: any) => option?.videoUrl));
+                return (
                 <tr key={q.id} className={cn("hover:bg-gray-50 transition-colors", selectedIds.has(q.id) && "bg-teal-50")}>
                   <td className="px-3 py-2.5"><input type="checkbox" checked={selectedIds.has(q.id)} onChange={() => toggleSelect(q.id)} className="rounded" /></td>
                   <td className="px-3 py-2.5">
                     <p className="font-medium text-gray-800 line-clamp-2">{stripHtml(q.question)}</p>
                     {q.explanation && <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">Explanation: {stripHtml(q.explanation)}</p>}
                     {q.isPreset && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200 mt-0.5">⭐ Preset{q.presetCategory ? ` · ${q.presetCategory}` : ""}</span>}
+                    {(hasImageMedia || hasVideoMedia) && <div className="mt-1 flex flex-wrap gap-1" aria-label="Question media tags">
+                      {hasImageMedia && <span className="inline-flex items-center rounded-full border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">Media: Image</span>}
+                      {hasVideoMedia && <span className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-800">Media: Video</span>}
+                    </div>}
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={cn("px-2 py-0.5 rounded-full text-xs font-medium", QUESTION_BANK_TYPE_BADGE[q.type] ?? "bg-gray-100 text-gray-700")}>
@@ -11898,7 +11906,8 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

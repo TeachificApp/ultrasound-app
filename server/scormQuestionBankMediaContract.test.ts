@@ -38,6 +38,20 @@ describe("SCORM Question Bank media contract", () => {
     expect(commitSource).toContain("continue;");
   });
 
+  it("supports source-question-scoped reimports with durable SCORM provenance", () => {
+    const schemaSource = fs.readFileSync(path.resolve(process.cwd(), "drizzle/schema.ts"), "utf8");
+    const migrationSource = fs.readFileSync(path.resolve(process.cwd(), "drizzle/0078_question_bank_scorm_source_provenance.sql"), "utf8");
+    expect(routerSource).toContain("questionIds: z.array(z.string()).max(5_000).optional()");
+    expect(commitSource).toContain("questionIds?: string[]");
+    expect(commitSource).toContain("const selectedQuestionIds");
+    expect(commitSource).toContain("One or more selected SCORM question IDs were not found");
+    expect(schemaSource).toContain('scormSourceAssetId: int("scorm_source_asset_id")');
+    expect(schemaSource).toContain('scormSourceQuestionId: varchar("scorm_source_question_id"');
+    expect(migrationSource).toContain("question_bank_scorm_source_idx");
+    expect(commitSource).toContain("scormSourceAssetId: input.mediaAssetId");
+    expect(commitSource).toContain("scormSourceQuestionId: input.mediaAssetId ? q.id : null");
+  });
+
   it("preserves SCORM media source placement and records administrator-selectable candidates", () => {
     expect(commitSource).toContain("buildImportedMediaCandidates");
     expect(commitSource).toContain("source: \"question\"");

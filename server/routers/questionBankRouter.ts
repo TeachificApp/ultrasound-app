@@ -902,6 +902,8 @@ export const questionBankRouter = router({
       /** @deprecated Prefer importStorageKey — base64-encoded .quiz/.zip bytes hit proxy limits */
       bufferBase64: z.string().optional(),
       groupIds: z.array(z.string()).optional(),
+      /** Source question IDs for a safe reimport of only records confirmed missing. */
+      questionIds: z.array(z.string()).max(5_000).optional(),
       extraTagIds: z.array(z.number().int()).optional(),
       folderId: z.number().int().optional(),
       newFolderName: z.string().max(200).optional(),

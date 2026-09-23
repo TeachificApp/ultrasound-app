@@ -19,4 +19,9 @@ describe("QuestionBankQuestionPreviewDialog", () => {
     expect(source).toContain("does not create a learner attempt or record");
     expect(source).toContain("Close preview");
   });
+
+  it("uses teal styling for the explanation panel", () => {
+    expect(source).toContain("border-teal-200 bg-teal-50 p-4 text-sm text-teal-900");
+    expect(source).not.toContain("border-blue-100 bg-blue-50 p-4 text-sm text-blue-800");
+  });
 });

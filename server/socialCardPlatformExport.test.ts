@@ -111,13 +111,26 @@ describe("social card platform exports", () => {
     for (const page of [challenge, social, quiz]) expect(page).toContain("presentation.outroLogoUrl");
   });
 
+  it("forces MP4 output and removes the static choice whenever selected media is video", () => {
+    const exporter = readProjectFile("client/src/components/social/SocialCardExport.tsx");
+    const challenge = readProjectFile("client/src/pages/ChallengeCardGenerator.tsx");
+    const social = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
+    const quiz = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+    expect(exporter).toContain("forceMp4?: boolean");
+    expect(exporter).toContain('forceMp4 ? ["mp4"]');
+    expect(challenge).toContain("forceMp4={hasVideoMedia}");
+    expect(quiz).toContain("forceMp4={hasVideoMedia}");
+    expect(social).toContain("forceMp4={hasVideoItem}");
+    expect(quiz).toContain("Video source media is available as MP4 only.");
+  });
+
   it("keeps Challenge and Quiz clinical media fully visible in placement-aware frames", () => {
     const challenge = readProjectFile("client/src/pages/ChallengeCardGenerator.tsx");
     const quiz = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
     const clinicalCard = readProjectFile("client/src/components/social/ClinicalQuizCard.tsx");
 
     expect(challenge).toContain("<ClinicalQuizCard");
-    expect(challenge).toContain('media={q.imageUrl ? { kind: "image", url: q.imageUrl } : { kind: "none" }}');
+    expect(challenge).toContain('media={questionVideoUrl ? { kind: "video", url: questionVideoUrl }');
     expect(quiz).toContain("<ClinicalQuizCard");
     expect(quiz).toContain('media={cardVariant === "question" || cardVariant === "combined" ? media : { kind: "none" }}');
     expect(clinicalCard).toContain("const mediaFrameAspectRatio");

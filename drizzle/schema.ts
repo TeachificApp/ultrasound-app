@@ -5788,6 +5788,9 @@ export const questionBank = mysqlTable("question_bank", {
   sourceQuestionIndex: int("source_question_index"),
   /** Original app flashcard source; used only for idempotent copy-to-LMS imports. */
   sourceQuickfireQuestionId: int("source_quickfire_question_id"),
+  /** Durable native SCORM identity, used for safe idempotent package reimports. */
+  scormSourceAssetId: int("scorm_source_asset_id"),
+  scormSourceQuestionId: varchar("scorm_source_question_id", { length: 160 }),
   folderId: int("folder_id"), // FK → question_bank_folders.id
   /** Preset library: when true, this question appears in the Preset Questions picker */
   isPreset: boolean("is_preset").default(false).notNull(),

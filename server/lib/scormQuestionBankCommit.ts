@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import {
   questionBank,
@@ -30,6 +30,8 @@ export type ScormImportConfirmInput = {
   importStorageKey?: string;
   bufferBase64?: string;
   groupIds?: string[];
+  /** Optional source-question scope for a safe reimport of only missing records. */
+  questionIds?: string[];
   extraTagIds?: number[];
   folderId?: number;
   newFolderName?: string;
@@ -133,7 +135,22 @@ export async function commitScormImportToQuestionBank(
         : (() => { throw new TRPCError({ code: "BAD_REQUEST", message: "Provide mediaAssetId, importStorageKey, or bufferBase64 for SCORM import" }); })();
 
   const parsed = source.parsed;
-  const mediaRefs = [...new Set([...parsed.allImageRefs, ...parsed.allVideoRefs])];
+  const selectedQuestionIds = input.questionIds?.length ? new Set(input.questionIds) : null;
+  const sourceQuestions = parsed.groups.flatMap((group) => group.questions);
+  if (selectedQuestionIds) {
+    const foundIds = new Set(sourceQuestions.map((question) => question.id));
+    const missingIds = [...selectedQuestionIds].filter((id) => !foundIds.has(id));
+    if (missingIds.length) throw new TRPCError({ code: "BAD_REQUEST", message: "One or more selected SCORM question IDs were not found in this package." });
+  }
+  const mediaRefs = selectedQuestionIds
+    ? [...new Set(sourceQuestions.filter((question) => selectedQuestionIds.has(question.id)).flatMap((question) => [
+      ...question.questionImageRefs,
+      ...question.questionVideoRefs,
+      ...question.feedbackImageRefs,
+      ...question.feedbackVideoRefs,
+      ...question.answers.flatMap((answer) => [answer.imageRef, answer.videoRef].filter((ref): ref is string => Boolean(ref))),
+    ]))]
+    : [...new Set([...parsed.allImageRefs, ...parsed.allVideoRefs])];
   let mediaMap: Map<string, string>;
   try {
     mediaMap = source.extractedPrefix
@@ -160,9 +177,9 @@ export async function commitScormImportToQuestionBank(
     resolvedFolderId = input.folderId;
   }
 
-  const groups = input.groupIds && input.groupIds.length > 0
+  const groups = (input.groupIds && input.groupIds.length > 0
     ? parsed.groups.filter((g) => input.groupIds!.includes(g.id))
-    : parsed.groups;
+    : parsed.groups).map((group) => selectedQuestionIds ? { ...group, questions: group.questions.filter((question) => selectedQuestionIds.has(question.id)) } : group).filter((group) => group.questions.length > 0);
 
   const tagIds = scormImportQuestionTagIds(input.extraTagIds);
   const mediaTagIds = await ensureMediaTagIds(db);
@@ -248,13 +265,18 @@ export async function commitScormImportToQuestionBank(
           flashcardFront: questionBank.flashcardFront,
           flashcardBack: questionBank.flashcardBack,
           correctAnswers: questionBank.correctAnswers,
+          scormSourceAssetId: questionBank.scormSourceAssetId,
+          scormSourceQuestionId: questionBank.scormSourceQuestionId,
         })
         .from(questionBank)
         .where(and(
-          eq(questionBank.question, questionText),
-          eq(questionBank.type, q.type),
-          eq(questionBank.correctAnswer, q.correctAnswer),
           eq(questionBank.folderId, groupFolderId),
+          input.mediaAssetId
+            ? or(
+                and(eq(questionBank.scormSourceAssetId, input.mediaAssetId), eq(questionBank.scormSourceQuestionId, q.id)),
+                and(eq(questionBank.question, questionText), eq(questionBank.type, q.type), eq(questionBank.correctAnswer, q.correctAnswer)),
+              )
+            : and(eq(questionBank.question, questionText), eq(questionBank.type, q.type), eq(questionBank.correctAnswer, q.correctAnswer)),
         ))
         .limit(1);
 
@@ -281,6 +303,8 @@ export async function commitScormImportToQuestionBank(
           flashcardFront: existingQuestion.flashcardFront ?? q.flashcardFront ?? null,
           flashcardBack: existingQuestion.flashcardBack ?? q.flashcardBack ?? null,
           correctAnswers: existingQuestion.correctAnswers ?? q.correctAnswers ?? null,
+          scormSourceAssetId: existingQuestion.scormSourceAssetId ?? input.mediaAssetId ?? null,
+          scormSourceQuestionId: existingQuestion.scormSourceQuestionId ?? (input.mediaAssetId ? q.id : null),
         };
         const mergedOptionsJson = JSON.stringify(mergedOptions);
         const optionsChanged = mergedOptionsJson !== JSON.stringify(existingOptions);
@@ -313,6 +337,8 @@ export async function commitScormImportToQuestionBank(
         flashcardFront: q.flashcardFront ?? null,
         flashcardBack: q.flashcardBack ?? null,
         correctAnswers: q.correctAnswers ?? null,
+        scormSourceAssetId: input.mediaAssetId ?? null,
+        scormSourceQuestionId: input.mediaAssetId ? q.id : null,
         folderId: groupFolderId,
         createdByAdminId: adminUserId,
       }).$returningId();

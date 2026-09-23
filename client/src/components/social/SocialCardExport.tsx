@@ -840,6 +840,7 @@ export function SocialExportControls({
   selectedMusic,
   onMusicChange,
   musicUploadBrand,
+  forceMp4 = false,
   compact = false,
 }: {
   platform: SocialExportPlatform;
@@ -850,6 +851,8 @@ export function SocialExportControls({
   selectedMusic?: SocialMusicOption | null;
   onMusicChange?: (option: SocialMusicOption | null) => void;
   musicUploadBrand?: "aaus" | "iheartecho";
+  /** Video media must keep motion in the exported asset rather than becoming a still image. */
+  forceMp4?: boolean;
   compact?: boolean;
 }) {
   const activePreset = useMemo(() => getSocialExportPreset(platform), [platform]);
@@ -889,6 +892,10 @@ export function SocialExportControls({
     setMusicMode(track.source === "openverse" ? "catalogue" : track.source === "ai_generated" ? "ai" : "upload");
     onMusicChange?.(track);
   };
+
+  useEffect(() => {
+    if (forceMp4 && format !== "mp4") onFormatChange("mp4");
+  }, [forceMp4, format, onFormatChange]);
 
   useEffect(() => {
     const preview = musicPreviewRef.current;
@@ -990,7 +997,7 @@ export function SocialExportControls({
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Export format</span>
           <div className="flex overflow-hidden rounded-md border border-white/15">
-            {(["png", "mp4"] as SocialExportFormat[]).map((value) => (
+            {((forceMp4 ? ["mp4"] : ["png", "mp4"]) as SocialExportFormat[]).map((value) => (
               <button
                 type="button"
                 key={value}

@@ -179,7 +179,7 @@ export function QuestionBankQuestionPreviewDialog({
                     </div>
                   )}
                   {question.explanation && (
-                    <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+                    <div className="rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
                       <strong className="mb-1 block">Explanation</strong>
                       <RichTextDisplay content={question.explanation} className="question-bank-preview-content" />
                     </div>

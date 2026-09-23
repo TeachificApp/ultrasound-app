@@ -207,7 +207,12 @@ type GeneratedItem = {
   imageSource?: "ai" | "upload" | "media_repository";
   libraryId?: number;
   mediaAssetId?: number | null;
+  mediaType?: "image" | "video";
 };
+
+function hasSocialPostVideo(item: GeneratedItem): boolean {
+  return item.mediaType === "video" || /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(item.imageUrl ?? "");
+}
 
 function resolveSocialPostImageUrl(item: GeneratedItem, presentation: BrandToolPresentation): string | undefined {
   if (item.mediaAssetId && (item.imageSource === "upload" || item.imageSource === "media_repository")) {
@@ -305,6 +310,7 @@ function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: 
   const px = (value: number) => Math.max(1, Math.round(value * frame.contentScale));
   const imageUrl = resolveSocialPostImageUrl(item, presentation);
   const hasImage = !!imageUrl;
+  const hasVideo = hasSocialPostVideo(item);
   // Do not impose a post-template aspect ratio on source clinical media. Its own
   // proportions determine the presentation, bounded only by the available card
   // space, so labels/anatomy at any edge remain visible rather than letterboxed
@@ -325,7 +331,7 @@ function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: 
       {/* Image area */}
       {hasImage && (
         <div style={{ margin: `0 ${imageGutter}px ${px(24)}px`, maxWidth: imageMaxWidth, maxHeight: imageMaxHeight, alignSelf: "center", padding: imagePadding, borderRadius: px(16), overflow: "visible", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, background: t.isDark ? "#07131a" : "#d9eff0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          <img src={imageUrl} alt={item.headline} style={{ width: "auto", height: "auto", maxWidth: imageMaxWidth - imagePadding * 2, maxHeight: imageMaxHeight - imagePadding * 2, objectFit: "contain", display: "block" }} crossOrigin="anonymous" />
+          {hasVideo ? <video src={imageUrl} aria-label={item.headline} autoPlay muted loop playsInline controls={false} style={{ width: "auto", height: "auto", maxWidth: imageMaxWidth - imagePadding * 2, maxHeight: imageMaxHeight - imagePadding * 2, objectFit: "contain", display: "block" }} crossOrigin="anonymous" /> : <img src={imageUrl} alt={item.headline} style={{ width: "auto", height: "auto", maxWidth: imageMaxWidth - imagePadding * 2, maxHeight: imageMaxHeight - imagePadding * 2, objectFit: "contain", display: "block" }} crossOrigin="anonymous" />}
         </div>
       )}
       {/* Content area */}
@@ -353,6 +359,7 @@ function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: 
 function InfographicCard({ item, t, presentation }: { item: GeneratedItem; t: ThemeTokens; presentation: BrandToolPresentation }) {
   const imageUrl = resolveSocialPostImageUrl(item, presentation);
   const hasImage = !!imageUrl;
+  const hasVideo = hasSocialPostVideo(item);
   // Split body text into bullet points for the infographic
   const bodyLines = item.body.split(/[.!?]+/).filter((s) => s.trim().length > 5).slice(0, 5);
   const leftLines = bodyLines.slice(0, Math.ceil(bodyLines.length / 2));
@@ -417,7 +424,7 @@ function InfographicCard({ item, t, presentation }: { item: GeneratedItem; t: Th
         <div style={{ flex: 1.2, display: "flex", flexDirection: "column", gap: 12 }}>
           {hasImage ? (
             <div style={{ flex: 1, borderRadius: 12, overflow: "hidden", border: `2px solid ${BRAND}44`, boxShadow: `0 4px 20px rgba(0,0,0,0.2)`, background: t.isDark ? "#07131a" : "#d9eff0", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" />
+              {hasVideo ? <video src={imageUrl} aria-label={item.headline} autoPlay muted loop playsInline controls={false} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" /> : <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" />}
             </div>
           ) : (
             <div style={{ flex: 1, borderRadius: 12, background: `linear-gradient(135deg, ${BRAND}22, ${BRAND_AQUA}11)`, border: `2px solid ${BRAND}33`, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -594,15 +601,15 @@ function SocialPostPanel({ item, presentation }: { item: GeneratedItem; presenta
 }
 
 // ── Image Upload Helper ──────────────────────────────────────────────────────
-function ImageUploadButton({ onUploaded, disabled, brand }: { onUploaded: (uploaded: { url: string; assetId: number }) => void; disabled?: boolean; brand: "aaus" | "iheartecho" }) {
+function ImageUploadButton({ onUploaded, disabled, brand }: { onUploaded: (uploaded: { url: string; assetId: number; mediaType: "image" | "video" }) => void; disabled?: boolean; brand: "aaus" | "iheartecho" }) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Only image files are allowed");
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      toast.error("Select an image or video file.");
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -616,8 +623,9 @@ function ImageUploadButton({ onUploaded, disabled, brand }: { onUploaded: (uploa
         folder: "social-post-library",
         brand,
       });
-      onUploaded({ url: uploaded.s3Url, assetId: uploaded.assetId });
-      toast.success("Image uploaded to Media Repository and selected.");
+      const mediaType = file.type.startsWith("video/") ? "video" : "image";
+      onUploaded({ url: uploaded.s3Url, assetId: uploaded.assetId, mediaType });
+      toast.success(`${mediaType === "video" ? "Video" : "Image"} uploaded to Media Repository and selected.`);
     } catch (err: any) {
       toast.error("Upload failed", { description: err.message });
     } finally {
@@ -628,7 +636,7 @@ function ImageUploadButton({ onUploaded, disabled, brand }: { onUploaded: (uploa
 
   return (
     <>
-      <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+      <input ref={inputRef} type="file" accept="image/*,video/*" onChange={handleFile} className="hidden" />
       <Button
         size="sm"
         variant="outline"
@@ -637,7 +645,7 @@ function ImageUploadButton({ onUploaded, disabled, brand }: { onUploaded: (uploa
         className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs"
       >
         {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
-        {uploading ? "Uploading..." : "Upload Image"}
+        {uploading ? "Uploading..." : "Upload Image or Video"}
       </Button>
     </>
   );
@@ -707,7 +715,7 @@ export default function SocialContentGenerator() {
   const cardRefs = useRef<Record<number, CardHandle>>({});
   const savedPostRefs = useRef<Record<number, CardHandle>>({});
   const utils = trpc.useUtils();
-  const mediaAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "image", page: 1, pageSize: 12 });
+  const mediaAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, page: 1, pageSize: 12 });
   const musicAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "audio", page: 1, pageSize: 50 });
   const savedPosts = trpc.socialContent.listSavedPosts.useQuery({ brand: presentation.brand, limit: 100 });
 
@@ -717,6 +725,11 @@ export default function SocialContentGenerator() {
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
     .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: asset.currentVersion?.s3Url, source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
+  const hasVideoItem = useMemo(() => items.some(hasSocialPostVideo), [items]);
+
+  useEffect(() => {
+    if (hasVideoItem && exportFormat !== "mp4") setExportFormat("mp4");
+  }, [exportFormat, hasVideoItem]);
 
   const generateMutation = trpc.socialContent.generateContent.useMutation({
     onSuccess: (data) => {
@@ -811,7 +824,7 @@ export default function SocialContentGenerator() {
         contentType: item.contentType,
         styleHint: styleHint?.trim() || undefined,
       });
-      setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl, imageSource: "ai" as const, mediaAssetId: null } : p)));
+      setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl, imageSource: "ai" as const, mediaAssetId: null, mediaType: "image" } : p)));
       toast.success("Abstract background regenerated. Save the post when it is ready.");
     } catch (err: any) {
       toast.error("Image generation failed", { description: err.message });
@@ -820,20 +833,21 @@ export default function SocialContentGenerator() {
     }
   }, [generateAbstractMutation]);
 
-  const handleUploadedImage = useCallback((idx: number, uploaded: { url: string; assetId: number }) => {
-    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: uploaded.url, imageSource: "upload" as const, mediaAssetId: uploaded.assetId } : p)));
-    toast.success("Image added. Save the post when it is ready.");
+  const handleUploadedImage = useCallback((idx: number, uploaded: { url: string; assetId: number; mediaType: "image" | "video" }) => {
+    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: uploaded.url, imageSource: "upload" as const, mediaAssetId: uploaded.assetId, mediaType: uploaded.mediaType } : p)));
+    toast.success(`${uploaded.mediaType === "video" ? "Video" : "Image"} added. Save the post when it is ready.`);
   }, []);
 
   const handleRepositoryImage = useCallback((idx: number, asset: any) => {
     const imageUrl = asset.currentVersion?.s3Url;
     if (!imageUrl) return;
-    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl, imageSource: "media_repository" as const, mediaAssetId: asset.id } : p)));
-    toast.success("Media Repository image selected. Save the post when it is ready.");
+    const mediaType = asset.mediaType === "video" || asset.mimeType?.startsWith("video/") ? "video" : "image";
+    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl, imageSource: "media_repository" as const, mediaAssetId: asset.id, mediaType } : p)));
+    toast.success(`Media Repository ${mediaType} selected. Save the post when it is ready.`);
   }, []);
 
   const handleRemoveImage = useCallback((idx: number) => {
-    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: undefined, imageSource: undefined } : p)));
+    setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: undefined, imageSource: undefined, mediaType: undefined } : p)));
     toast.success("Image removed. Save the post when it is ready.");
   }, []);
 
@@ -849,6 +863,7 @@ export default function SocialContentGenerator() {
       imageUrl: saved.imageUrl ?? undefined,
       imageSource: saved.imageSource ?? undefined,
       mediaAssetId: saved.mediaAssetId ?? null,
+      mediaType: /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(saved.imageUrl ?? "") ? "video" : "image",
     }]);
     setLayoutMode(saved.layoutMode);
     setCardTheme(saved.cardTheme);
@@ -867,11 +882,15 @@ export default function SocialContentGenerator() {
     imageUrl: saved.imageUrl ?? undefined,
     imageSource: saved.imageSource ?? undefined,
     mediaAssetId: saved.mediaAssetId ?? null,
+    mediaType: /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(saved.imageUrl ?? "") ? "video" : "image",
   }), []);
 
-  const buildExportMotion = useCallback((item: GeneratedItem): CardMotion => mp4Sequence === "combined"
-    ? { kind: "combined", title: item.headline, options: [], answer: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
-    : { kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title },
+  const buildExportMotion = useCallback((item: GeneratedItem): CardMotion => {
+    const questionVideoUrl = hasSocialPostVideo(item) ? resolveSocialPostImageUrl(item, presentation) ?? item.imageUrl ?? null : null;
+    return mp4Sequence === "combined"
+      ? { kind: "combined", title: item.headline, options: [], answer: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl }
+      : { kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl };
+  },
   [mp4Sequence, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
 
   const toggleSavedPostSelection = useCallback((id: number) => {
@@ -1068,9 +1087,9 @@ export default function SocialContentGenerator() {
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/15 p-3">
             <div>
               <div className="text-xs font-bold text-white/80">Platform export</div>
-              <p className="mt-1 text-[11px] text-white/45">MP4 exports animate the headline and clinical insight, then finish on the completed card.</p>
+              <p className="mt-1 text-[11px] text-white/45">{hasVideoItem ? "Video source media stays in motion, so this collection exports as MP4 only." : "MP4 exports animate the headline and clinical insight, then finish on the completed card."}</p>
             </div>
-            <div className="min-w-[300px] space-y-2"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} selectedMusic={selectedMusic} onMusicChange={setSelectedMusic} musicUploadBrand={presentation.brand} compact /><div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/45"><span>MP4 sequence</span><button onClick={() => setMp4Sequence("social")} className={`rounded px-2 py-1 text-[10px] normal-case ${mp4Sequence === "social" ? "bg-teal-400/20 text-teal-100" : "bg-white/5 text-white/50"}`}>Post</button><button onClick={() => setMp4Sequence("combined")} className={`rounded px-2 py-1 text-[10px] normal-case ${mp4Sequence === "combined" ? "bg-teal-400/20 text-teal-100" : "bg-white/5 text-white/50"}`}>Question + answer</button></div></div>
+            <div className="min-w-[300px] space-y-2"><SocialExportControls platform={exportPlatform} format={exportFormat} onPlatformChange={setExportPlatform} onFormatChange={setExportFormat} musicOptions={musicOptions} selectedMusic={selectedMusic} onMusicChange={setSelectedMusic} musicUploadBrand={presentation.brand} forceMp4={hasVideoItem} compact /><div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/45"><span>MP4 sequence</span><button onClick={() => setMp4Sequence("social")} className={`rounded px-2 py-1 text-[10px] normal-case ${mp4Sequence === "social" ? "bg-teal-400/20 text-teal-100" : "bg-white/5 text-white/50"}`}>Post</button><button onClick={() => setMp4Sequence("combined")} className={`rounded px-2 py-1 text-[10px] normal-case ${mp4Sequence === "combined" ? "bg-teal-400/20 text-teal-100" : "bg-white/5 text-white/50"}`}>Question + answer</button></div></div>
           </div>
 
           {/* Image mode selector */}
@@ -1218,7 +1237,7 @@ export default function SocialContentGenerator() {
                   <div className="flex flex-col gap-1.5 mt-1">
                     <div className="flex items-center gap-1.5">
                       <ImageLucide className="w-3 h-3" style={{ color: BRAND_AQUA }} />
-                      <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Image</span>
+                      <span className="text-[10px] font-semibold text-white/50 uppercase tracking-wider">Clinical media</span>
                     </div>
                     {/* Per-card image prompt input */}
                     <div className="flex gap-1.5 items-center">
@@ -1275,15 +1294,15 @@ export default function SocialContentGenerator() {
                       ))}
                     </div>
                     <div className="mt-2 border-t border-white/10 pt-2">
-                      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/45">Media Repository images</div>
+                      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/45">Media Repository images and videos</div>
                       <div className="grid grid-cols-4 gap-1.5">
                         {mediaAssets.data?.assets.map((asset: any) => (
                           <button key={asset.id} onClick={() => handleRepositoryImage(idx, asset)} className="overflow-hidden rounded border border-white/10 bg-black/20 text-left hover:border-teal-300/70" title={asset.title}>
-                            {asset.currentVersion?.s3Url ? <img src={`/api/social-post-media/${asset.id}?brand=${presentation.brand}`} alt={asset.title} className="h-14 w-full object-cover" /> : <div className="flex h-14 items-center justify-center"><ImageLucide className="h-4 w-4 text-teal-200" /></div>}
+                            {asset.currentVersion?.s3Url ? (asset.mediaType === "video" || asset.mimeType?.startsWith("video/") ? <video src={`/api/social-post-media/${asset.id}?brand=${presentation.brand}`} muted playsInline className="h-14 w-full object-cover" /> : <img src={`/api/social-post-media/${asset.id}?brand=${presentation.brand}`} alt={asset.title} className="h-14 w-full object-cover" />) : <div className="flex h-14 items-center justify-center"><ImageLucide className="h-4 w-4 text-teal-200" /></div>}
                             <span className="line-clamp-1 block p-1 text-[9px] text-white/60">{asset.title}</span>
                           </button>
                         ))}
-                        {!mediaAssets.isLoading && mediaAssets.data?.assets.length === 0 && <div className="col-span-4 text-[10px] text-white/40">No selected-brand repository images yet.</div>}
+                        {!mediaAssets.isLoading && mediaAssets.data?.assets.length === 0 && <div className="col-span-4 text-[10px] text-white/40">No selected-brand repository images or videos yet.</div>}
                       </div>
                     </div>
                   </div>

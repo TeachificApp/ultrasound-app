@@ -12,4 +12,12 @@ describe("Question Bank row preview", () => {
     expect(source).toContain("setEditingQuestion(q)");
     expect(source).toContain("deleteQ.mutate({ id: q.id })");
   });
+
+  it("visibly labels image and video media even while tag maps are refreshed", () => {
+    expect(source).toContain("const hasImageMedia");
+    expect(source).toContain("const hasVideoMedia");
+    expect(source).toContain("Media: Image");
+    expect(source).toContain("Media: Video");
+    expect(source).toContain('aria-label="Question media tags"');
+  });
 });
