@@ -29,6 +29,7 @@ import {
 export const STUDY_GROUP_FREE_SEAT_LIMIT = 5;
 export const STUDY_GROUP_ORGANIZATION_MONTHLY_CENTS = 9900;
 export const STUDY_GROUP_CONTENT_DISCOUNT_PERCENT = 10;
+export const STUDY_GROUP_CONTENT_DISCOUNT_MINIMUM_MEMBERS = 3;
 const GROUP_WORKSPACE_BLOCK_KEY = "group_workspace_top";
 
 const meetingProviderSchema = z.enum(["zoom", "teams", "other"]);
@@ -167,6 +168,20 @@ async function activeSeatCount(db: Awaited<ReturnType<typeof getDb>>, groupId: n
   return Number(row?.count ?? 0);
 }
 
+/** A group discount requires three people who have actually joined, not pending invitations. */
+async function activeMemberCount(db: Awaited<ReturnType<typeof getDb>>, groupId: number) {
+  if (!db) return 0;
+  const [row] = await db.select({ count: sql<number>`COUNT(*)` }).from(studyGroupMembers)
+    .where(and(eq(studyGroupMembers.groupId, groupId), eq(studyGroupMembers.inviteStatus, "active")));
+  return Number(row?.count ?? 0);
+}
+
+function groupContentDiscountPercent(activeMembers: number) {
+  return activeMembers >= STUDY_GROUP_CONTENT_DISCOUNT_MINIMUM_MEMBERS
+    ? STUDY_GROUP_CONTENT_DISCOUNT_PERCENT
+    : 0;
+}
+
 async function recordActivity(
   db: Awaited<ReturnType<typeof getDb>>,
   groupId: number,
@@ -293,6 +308,7 @@ export const studyGroupsRouter = router({
     freeSeatLimit: STUDY_GROUP_FREE_SEAT_LIMIT,
     organizationMonthlyCents: STUDY_GROUP_ORGANIZATION_MONTHLY_CENTS,
     contentDiscountPercent: STUDY_GROUP_CONTENT_DISCOUNT_PERCENT,
+    contentDiscountMinimumMembers: STUDY_GROUP_CONTENT_DISCOUNT_MINIMUM_MEMBERS,
     meetingProviders: ["Zoom", "Microsoft Teams"],
   })),
 
@@ -682,26 +698,42 @@ export const studyGroupsRouter = router({
   listContentCatalog: protectedProcedure.input(groupIdSchema).query(async ({ ctx, input }) => {
     const db = await requireDb();
     await requireGroupAccess(db, input.groupId, ctx.user.id, ctx.user.role, { manage: true });
-    const [courses, downloads] = await Promise.all([
+    const [courses, downloads, activeMembers] = await Promise.all([
       db.select({ id: lmsCourses.id, title: lmsCourses.title, type: lmsCourses.type, price: lmsCourses.price, isFree: lmsCourses.isFree, thumbnailUrl: lmsCourses.thumbnailUrl })
         .from(lmsCourses).where(and(eq(lmsCourses.status, "public"), eq(lmsCourses.showInLibrary, true), eq(lmsCourses.bundleOnly, false), inArray(lmsCourses.type, ["course", "quiz"]))),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, price: digitalProducts.price, isFree: digitalProducts.isFree, thumbnailUrl: digitalProducts.thumbnailUrl })
         .from(digitalProducts).where(and(eq(digitalProducts.status, "published"), eq(digitalProducts.showInLibrary, true), eq(digitalProducts.bundleOnly, false))),
+      activeMemberCount(db, input.groupId),
     ]);
+    const contentDiscountPercent = groupContentDiscountPercent(activeMembers);
+    const toCatalogItem = <T extends { price: string | number | null }>(item: T) => {
+      const listPriceCents = toCents(item.price);
+      return {
+        ...item,
+        listPriceCents,
+        discountedPriceCents: Math.round(listPriceCents * (1 - contentDiscountPercent / 100)),
+        contentDiscountPercent,
+      };
+    };
     return [
-      ...courses.map(item => ({ ...item, contentType: item.type === "quiz" ? "quiz" as const : "course" as const, listPriceCents: toCents(item.price), discountedPriceCents: Math.round(toCents(item.price) * 0.9) })),
-      ...downloads.map(item => ({ ...item, contentType: "download" as const, listPriceCents: toCents(item.price), discountedPriceCents: Math.round(toCents(item.price) * 0.9) })),
+      ...courses.map(item => ({ ...toCatalogItem(item), contentType: item.type === "quiz" ? "quiz" as const : "course" as const })),
+      ...downloads.map(item => ({ ...toCatalogItem(item), contentType: "download" as const })),
     ];
   }),
 
   createContentCheckout: protectedProcedure.input(groupIdSchema.extend({ contentType: z.enum(["course", "quiz", "download"]), contentId: z.number().int().positive(), seatCount: z.number().int().min(1).max(500), origin: z.string().url().max(1024) })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     const access = await requireGroupAccess(db, input.groupId, ctx.user.id, ctx.user.role, { manage: true });
-    const activeMembers = await activeSeatCount(db, input.groupId);
-    if (input.seatCount > activeMembers) throw new TRPCError({ code: "BAD_REQUEST", message: "Buy no more group-content seats than active or invited group participants." });
+    const [activeSeats, activeMembers] = await Promise.all([
+      activeSeatCount(db, input.groupId),
+      activeMemberCount(db, input.groupId),
+    ]);
+    if (input.seatCount > activeSeats) throw new TRPCError({ code: "BAD_REQUEST", message: "Buy no more group-content seats than active or invited group participants." });
     const content = await resolveGroupContent(db, input);
     const listPriceCents = content.listPriceCents * input.seatCount;
-    const discountedPriceCents = Math.round(listPriceCents * (1 - STUDY_GROUP_CONTENT_DISCOUNT_PERCENT / 100));
+    const contentDiscountPercent = groupContentDiscountPercent(activeMembers);
+    const unitPriceCents = Math.round(content.listPriceCents * (1 - contentDiscountPercent / 100));
+    const discountedPriceCents = unitPriceCents * input.seatCount;
     if (content.isFree || discountedPriceCents === 0) {
       const inserted = await db.insert(studyGroupContentAccess).values({ groupId: input.groupId, contentType: input.contentType, contentId: input.contentId, contentTitle: content.title, seatLimit: input.seatCount, listPriceCents, discountedPriceCents, status: "active", purchasedByUserId: ctx.user.id }).$returningId();
       await recordActivity(db, input.groupId, ctx.user.id, "content_added", `Added free group access to ${content.title}.`, "content_access", inserted[0]?.id);
@@ -715,7 +747,11 @@ export const studyGroupsRouter = router({
       client_reference_id: String(ctx.user.id),
       line_items: [{
         quantity: input.seatCount,
-        price_data: { currency: "usd", unit_amount: Math.round(content.listPriceCents * 0.9), product_data: { name: `${content.title} — Study Group access (10% group discount)` } },
+        price_data: {
+          currency: "usd",
+          unit_amount: unitPriceCents,
+          product_data: { name: `${content.title} — Study Group access${contentDiscountPercent ? ` (${contentDiscountPercent}% group discount)` : ""}` },
+        },
       }],
       metadata: {
         checkout_type: "study_group_content",
@@ -727,13 +763,14 @@ export const studyGroupsRouter = router({
         seat_count: String(input.seatCount),
         list_price_cents: String(listPriceCents),
         discounted_price_cents: String(discountedPriceCents),
+        content_discount_percent: String(contentDiscountPercent),
       },
       success_url: `${origin}/study-groups/${input.groupId}?purchase=success`,
       cancel_url: `${origin}/study-groups/${input.groupId}?purchase=canceled`,
       allow_promotion_codes: true,
     });
     if (!session.url) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to start secure checkout." });
-    return { free: false, checkoutUrl: session.url, discountedPriceCents, listPriceCents };
+    return { free: false, checkoutUrl: session.url, discountedPriceCents, listPriceCents, contentDiscountPercent };
   }),
 
   assignContentSeat: protectedProcedure.input(groupIdSchema.extend({ contentAccessId: z.number().int().positive(), userId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {

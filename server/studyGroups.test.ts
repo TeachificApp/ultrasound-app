@@ -95,15 +95,23 @@ describe("Study Groups", () => {
 
   it("protects group content, platform admin oversight, group seats, and the 10 percent discount", () => {
     const router = read("server/routers/studyGroupsRouter.ts");
+    const workspace = read("client/src/pages/StudyGroupWorkspace.tsx");
     expect(router).toContain("requireGroupAccess");
     expect(router).toContain("requirePlatformAdmin");
     expect(router).toContain("STUDY_GROUP_CONTENT_DISCOUNT_PERCENT = 10");
+    expect(router).toContain("STUDY_GROUP_CONTENT_DISCOUNT_MINIMUM_MEMBERS = 3");
+    expect(router).toContain("function activeMemberCount");
+    expect(router).toContain('eq(studyGroupMembers.inviteStatus, "active")');
+    expect(router).toContain("function groupContentDiscountPercent");
+    expect(router).toContain("contentDiscountMinimumMembers");
     expect(router).toContain("createOrganizationCheckout");
     expect(router).toContain("adminListGroups");
     expect(read("server/routes/uploadStudyGroupDocument.ts")).toContain("study-groups/${groupId}/");
     expect(router).toContain("study_group_access_${access.id}");
     expect(router).toContain("members: access.canManage ? members.map");
-    expect(read("client/src/pages/StudyGroupWorkspace.tsx")).toContain("{permissions.canManage && <span");
+    expect(workspace).toContain("{permissions.canManage && <span");
+    expect(workspace).toContain("The 10% group discount unlocks with");
+    expect(workspace).toContain("item.contentDiscountPercent > 0");
   });
 
   it("registers payment lifecycle and secure document upload paths", () => {
