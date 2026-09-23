@@ -8640,7 +8640,7 @@ export const studyGroups = mysqlTable("study_groups", {
   description: text("description"),
   tier: mysqlEnum("tier", ["free", "organization"]).notNull().default("free"),
   organizationName: varchar("organization_name", { length: 200 }),
-  /** Free groups use 5; organization groups use null for unlimited active seats. */
+  /** Free groups use 5; $49 Organization groups use 20; null marks the $99 unlimited plan. */
   seatLimit: int("seat_limit").default(5),
   status: mysqlEnum("status", ["active", "archived", "canceled"]).notNull().default("active"),
   meetingProvider: mysqlEnum("meeting_provider", ["zoom", "teams", "other"]),

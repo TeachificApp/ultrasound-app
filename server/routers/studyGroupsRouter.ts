@@ -27,12 +27,16 @@ import {
 } from "../../drizzle/schema";
 
 export const STUDY_GROUP_FREE_SEAT_LIMIT = 5;
+export const STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_MONTHLY_CENTS = 4900;
+export const STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT = 20;
+/** Retained as the unlimited Organization plan price for backward-compatible imports. */
 export const STUDY_GROUP_ORGANIZATION_MONTHLY_CENTS = 9900;
 export const STUDY_GROUP_CONTENT_DISCOUNT_PERCENT = 10;
 export const STUDY_GROUP_CONTENT_DISCOUNT_MINIMUM_MEMBERS = 3;
 const GROUP_WORKSPACE_BLOCK_KEY = "group_workspace_top";
 
 const meetingProviderSchema = z.enum(["zoom", "teams", "other"]);
+const organizationPlanSchema = z.enum(["up_to_20", "unlimited"]);
 const meetingInputSchema = z.object({
   meetingProvider: meetingProviderSchema.nullable().optional(),
   meetingUrl: z.string().url().max(2048).nullable().optional(),
@@ -161,11 +165,34 @@ function hasActiveOrganization(group: typeof studyGroups.$inferSelect) {
   return group.tier === "organization" && group.status === "active";
 }
 
+function organizationPlanSeatLimit(plan: z.infer<typeof organizationPlanSchema>) {
+  return plan === "up_to_20" ? STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT : null;
+}
+
+function organizationPlanMonthlyCents(plan: z.infer<typeof organizationPlanSchema>) {
+  return plan === "up_to_20"
+    ? STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_MONTHLY_CENTS
+    : STUDY_GROUP_ORGANIZATION_MONTHLY_CENTS;
+}
+
+function activeParticipantSeatLimit(group: typeof studyGroups.$inferSelect) {
+  return hasActiveOrganization(group) ? group.seatLimit : STUDY_GROUP_FREE_SEAT_LIMIT;
+}
+
 async function activeSeatCount(db: Awaited<ReturnType<typeof getDb>>, groupId: number) {
   if (!db) return 0;
   const [row] = await db.select({ count: sql<number>`COUNT(*)` }).from(studyGroupMembers)
     .where(and(eq(studyGroupMembers.groupId, groupId), inArray(studyGroupMembers.inviteStatus, ["active", "pending"])));
   return Number(row?.count ?? 0);
+}
+
+async function requireAvailableParticipantSeat(db: Awaited<ReturnType<typeof getDb>>, group: typeof studyGroups.$inferSelect) {
+  const seatLimit = activeParticipantSeatLimit(group);
+  if (seatLimit === null || await activeSeatCount(db, group.id) < seatLimit) return;
+  const upgradeAdvice = hasActiveOrganization(group)
+    ? "Upgrade to the unlimited Organization plan for more participants."
+    : "Upgrade to Organization access for more participants.";
+  throw new TRPCError({ code: "BAD_REQUEST", message: `This study group has reached its ${seatLimit}-participant limit. ${upgradeAdvice}` });
 }
 
 /** A group discount requires three people who have actually joined, not pending invitations. */
@@ -306,6 +333,8 @@ const groupIdSchema = z.object({ groupId: z.number().int().positive() });
 export const studyGroupsRouter = router({
   pricing: protectedProcedure.query(() => ({
     freeSeatLimit: STUDY_GROUP_FREE_SEAT_LIMIT,
+    organizationUpToTwentyMonthlyCents: STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_MONTHLY_CENTS,
+    organizationUpToTwentySeatLimit: STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT,
     organizationMonthlyCents: STUDY_GROUP_ORGANIZATION_MONTHLY_CENTS,
     contentDiscountPercent: STUDY_GROUP_CONTENT_DISCOUNT_PERCENT,
     contentDiscountMinimumMembers: STUDY_GROUP_CONTENT_DISCOUNT_MINIMUM_MEMBERS,
@@ -535,9 +564,7 @@ export const studyGroupsRouter = router({
     const email = normalizedEmail(input.email);
     const [existing] = await db.select().from(studyGroupMembers)
       .where(and(eq(studyGroupMembers.groupId, input.groupId), eq(studyGroupMembers.email, email))).limit(1);
-    if (!existing && !hasActiveOrganization(access.group) && await activeSeatCount(db, input.groupId) >= STUDY_GROUP_FREE_SEAT_LIMIT) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: `Free study groups support up to ${STUDY_GROUP_FREE_SEAT_LIMIT} participants. Upgrade to Organization for unlimited seats.` });
-    }
+    if (!existing) await requireAvailableParticipantSeat(db, access.group);
     const invitedUser = await getUserByEmail(email);
     if (!invitedUser) {
       throw new TRPCError({ code: "NOT_FOUND", message: "That email does not belong to a platform learner. Ask the learner to create a free account first." });
@@ -600,9 +627,7 @@ export const studyGroupsRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "A group administrator must restore this member before they can rejoin." });
       }
       if (existing?.inviteStatus === "active") return group.id;
-      if (!existing && !hasActiveOrganization(group) && await activeSeatCount(tx, group.id) >= STUDY_GROUP_FREE_SEAT_LIMIT) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: `This free study group already has its ${STUDY_GROUP_FREE_SEAT_LIMIT}-participant limit. Ask a group administrator for help.` });
-      }
+      if (!existing) await requireAvailableParticipantSeat(tx, group);
       if (existing) {
         await tx.update(studyGroupMembers).set({ userId: ctx.user.id, inviteStatus: "active", joinedAt: new Date(), inviteToken: null, revokedAt: null })
           .where(eq(studyGroupMembers.id, existing.id));
@@ -799,20 +824,22 @@ export const studyGroupsRouter = router({
     return { ok: true };
   }),
 
-  createOrganizationCheckout: protectedProcedure.input(groupIdSchema.extend({ origin: z.string().url().max(1024) })).mutation(async ({ ctx, input }) => {
+  createOrganizationCheckout: protectedProcedure.input(groupIdSchema.extend({ plan: organizationPlanSchema, origin: z.string().url().max(1024) })).mutation(async ({ ctx, input }) => {
     const db = await requireDb();
     const access = await requireGroupAccess(db, input.groupId, ctx.user.id, ctx.user.role, { manage: true });
     if (hasActiveOrganization(access.group)) throw new TRPCError({ code: "CONFLICT", message: "This group already has active Organization access." });
     const stripe = getStripeClient();
     const actor = await getActorEmail(ctx.user.id);
     const origin = getSafeStudyGroupOrigin(input.origin);
+    const monthlyCents = organizationPlanMonthlyCents(input.plan);
+    const planLabel = input.plan === "up_to_20" ? `Up to ${STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT} members` : "Unlimited members";
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer_email: actor.email,
       client_reference_id: String(ctx.user.id),
-      line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: STUDY_GROUP_ORGANIZATION_MONTHLY_CENTS, recurring: { interval: "month" }, product_data: { name: "Study Groups Organization" } } }],
-      metadata: { checkout_type: "study_group_organization", user_id: String(ctx.user.id), study_group_id: String(input.groupId) },
-      subscription_data: { metadata: { checkout_type: "study_group_organization", study_group_id: String(input.groupId) } },
+      line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: monthlyCents, recurring: { interval: "month" }, product_data: { name: `Study Groups Organization — ${planLabel}` } } }],
+      metadata: { checkout_type: "study_group_organization", user_id: String(ctx.user.id), study_group_id: String(input.groupId), organization_plan: input.plan },
+      subscription_data: { metadata: { checkout_type: "study_group_organization", study_group_id: String(input.groupId), organization_plan: input.plan } },
       success_url: `${origin}/study-groups/${input.groupId}?organization=success`,
       cancel_url: `${origin}/study-groups/${input.groupId}?organization=canceled`,
       allow_promotion_codes: true,
@@ -867,15 +894,16 @@ export async function handleStudyGroupCheckoutCompleted(session: any) {
   if (!db) throw new Error("Study Groups database unavailable during checkout fulfillment.");
   const group = await getGroupOrThrow(db, groupId);
   if (checkoutType === "study_group_organization") {
+    const organizationPlan = metadata.organization_plan === "up_to_20" ? "up_to_20" : "unlimited";
     await db.update(studyGroups).set({
       tier: "organization",
-      seatLimit: null,
+      seatLimit: organizationPlanSeatLimit(organizationPlan),
       status: "active",
       stripeCustomerId: typeof session.customer === "string" ? session.customer : null,
       stripeSubscriptionId: typeof session.subscription === "string" ? session.subscription : null,
       stripeCheckoutSessionId: session.id ?? null,
     }).where(eq(studyGroups.id, group.id));
-    await recordActivity(db, group.id, buyerId, "organization_activated", "Study Groups Organization access was activated.");
+    await recordActivity(db, group.id, buyerId, "organization_activated", `Study Groups Organization access was activated (${organizationPlan === "up_to_20" ? `up to ${STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT} members` : "unlimited members"}).`);
     return true;
   }
   const contentType = metadata.content_type as "course" | "quiz" | "download" | undefined;

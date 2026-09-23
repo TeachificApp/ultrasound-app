@@ -84,7 +84,7 @@ describe("Study Groups", () => {
     expect(router).toContain("acceptShareLink");
     expect(router).toContain('role: "member"');
     expect(router).toContain("This share link is no longer available.");
-    expect(router).toContain("This free study group already has its");
+    expect(router).toContain("requireAvailableParticipantSeat");
     expect(workspace).toContain("Share member link");
     expect(workspace).toContain("Revoke link");
     expect(workspace).toContain("/study-groups/join?token=");
@@ -112,6 +112,26 @@ describe("Study Groups", () => {
     expect(workspace).toContain("{permissions.canManage && <span");
     expect(workspace).toContain("The 10% group discount unlocks with");
     expect(workspace).toContain("item.contentDiscountPercent > 0");
+  });
+
+  it("offers Organization access for up to 20 members or unlimited members", () => {
+    const router = read("server/routers/studyGroupsRouter.ts");
+    const workspace = read("client/src/pages/StudyGroupWorkspace.tsx");
+    const listing = read("client/src/pages/StudyGroupsPage.tsx");
+
+    expect(router).toContain("STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_MONTHLY_CENTS = 4900");
+    expect(router).toContain("STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT = 20");
+    expect(router).toContain('z.enum(["up_to_20", "unlimited"])');
+    expect(router).toContain("organizationPlanSeatLimit");
+    expect(router).toContain("organizationPlanMonthlyCents");
+    expect(router).toContain("requireAvailableParticipantSeat");
+    expect(router).toContain("organization_plan: input.plan");
+    expect(router).toContain("seatLimit: organizationPlanSeatLimit(organizationPlan)");
+    expect(workspace).toContain("Choose Organization Group Access");
+    expect(workspace).toContain('plan: "up_to_20"');
+    expect(workspace).toContain('plan: "unlimited"');
+    expect(listing).toContain("organizationUpToTwentySeatLimit");
+    expect(listing).toContain("unlimited members");
   });
 
   it("registers payment lifecycle and secure document upload paths", () => {
