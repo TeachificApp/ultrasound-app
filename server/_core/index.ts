@@ -32,6 +32,7 @@ import { registerStudyGroupDocumentUploadRoute } from "../routes/uploadStudyGrou
 import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResource";
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
 import { registerSocialPostMediaRoute } from "../routes/socialPostMedia";
+import { registerStandaloneQuizMediaRoute } from "../routes/standaloneQuizMedia";
 import { registerUploadTeachRoute } from "../routes/uploadTeach";
 import { registerUploadGenericRoute } from "../routes/uploadGeneric";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
@@ -694,6 +695,8 @@ async function startServer() {
   registerUploadSocialImageRoute(app);
   // Same-origin, authenticated image proxy for private Social Post media assets.
   registerSocialPostMediaRoute(app);
+  // Same-origin, attempt-authorized proxy for native standalone quiz question and feedback media.
+  registerStandaloneQuizMediaRoute(app);
   // TEACH chunked file upload (multipart, bypasses tRPC JSON body limit for large PPTX files)
   registerUploadTeachRoute(app);
   // Generic file upload endpoint — used by uploadFile() helper for scan coach media and other uploads

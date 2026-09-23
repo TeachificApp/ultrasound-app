@@ -2885,7 +2885,7 @@ export const socialPostLibrary = mysqlTable("social_post_library", {
   category: varchar("category", { length: 128 }).notNull(),
   contentType: varchar("contentType", { length: 64 }).notNull(),
   layoutMode: mysqlEnum("layoutMode", ["card", "infographic"]).notNull().default("card"),
-  cardTheme: mysqlEnum("cardTheme", ["dark", "light"]).notNull().default("light"),
+  cardTheme: mysqlEnum("cardTheme", ["dark", "light", "white", "teal", "aqua"]).notNull().default("light"),
   imageUrl: text("imageUrl"),
   imageSource: mysqlEnum("imageSource", ["ai", "upload", "media_repository", "google"]).default("ai"),
   mediaAssetId: int("mediaAssetId"),
@@ -5774,6 +5774,8 @@ export const questionBank = mysqlTable("question_bank", {
   /** Feedback media */
   feedbackImageUrl: text("feedback_image_url"),
   feedbackVideoUrl: text("feedback_video_url"),
+  /** Imported SCORM media candidates with source context for administrator reassignment. */
+  mediaCandidates: text("media_candidates"),
   /** Complete non-presentational Visual Builder question payload for linked standalone quizzes. */
   builderQuestionPayload: longtext("builder_question_payload"),
   // Source tracking

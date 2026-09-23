@@ -837,3 +837,25 @@ textarea,
   border-top: 1px solid #e5e7eb;
   margin: 2rem 0;
 }
+
+/* Native Question Bank media stays protected behind an authenticated proxy.
+   These selectors add a teal visual treatment to the browser's native video controls. */
+.native-quiz-video {
+  background: #061a21;
+  border: 2px solid color-mix(in srgb, #189aa1 72%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #4ad9e0 14%, transparent), 0 8px 24px rgba(8, 46, 51, 0.28);
+}
+
+.native-quiz-video::-webkit-media-controls-panel {
+  background: linear-gradient(90deg, #0e6b70, #189aa1);
+}
+
+.native-quiz-video::-webkit-media-controls-play-button,
+.native-quiz-video::-webkit-media-controls-mute-button {
+  filter: brightness(0) invert(1);
+}
+
+.native-quiz-video::-webkit-media-controls-current-time-display,
+.native-quiz-video::-webkit-media-controls-time-remaining-display {
+  color: #ffffff;
+}

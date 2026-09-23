@@ -97,4 +97,20 @@ describe("social card platform exports", () => {
     expect(presentation).toContain('outroLogoShape: isIHeartEcho ? "circle" : undefined');
     for (const page of [challenge, social, quiz]) expect(page).toContain("presentation.outroLogoUrl");
   });
+
+  it("keeps Challenge and Quiz clinical media fully visible in placement-aware frames", () => {
+    const challenge = readProjectFile("client/src/pages/ChallengeCardGenerator.tsx");
+    const quiz = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+    const clinicalCard = readProjectFile("client/src/components/social/ClinicalQuizCard.tsx");
+
+    expect(challenge).toContain("<ClinicalQuizCard");
+    expect(challenge).toContain('media={q.imageUrl ? { kind: "image", url: q.imageUrl } : { kind: "none" }}');
+    expect(quiz).toContain("<ClinicalQuizCard");
+    expect(quiz).toContain('media={cardVariant === "question" || cardVariant === "combined" ? media : { kind: "none" }}');
+    expect(clinicalCard).toContain("const mediaFrameAspectRatio");
+    expect(clinicalCard).toContain('aspectRatio: mediaFrameAspectRatio');
+    expect(clinicalCard).toContain('objectFit: "contain"');
+    expect(clinicalCard).toContain('frame.layout === "portrait"');
+    expect(clinicalCard).toContain('frame.layout === "vertical"');
+  });
 });

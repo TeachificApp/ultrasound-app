@@ -77,19 +77,30 @@ function useTimer(limitSeconds: number | null, onExpire: () => void) {
 
 // ─── Option button ────────────────────────────────────────────────────────────
 function OptionButton({
-  label, selected, correct, incorrect, disabled, onClick,
+  label, letter, selected, correct, incorrect, disabled, onClick,
 }: {
-  label: string; selected: boolean; correct?: boolean; incorrect?: boolean; disabled: boolean; onClick: () => void;
+  label: string; letter: string; selected: boolean; correct?: boolean; incorrect?: boolean; disabled: boolean; onClick: () => void;
 }) {
-  let cls = "w-full text-left px-4 py-3 rounded-lg border text-sm transition-all ";
-  if (correct) cls += "border-green-500 bg-green-50 text-green-800";
-  else if (incorrect) cls += "border-red-400 bg-red-50 text-red-800";
-  else if (selected) cls += "border-teal-500 bg-teal-50 text-teal-800";
-  else cls += "border-gray-200 bg-white hover:border-teal-300 hover:bg-teal-50/40 text-gray-800";
+  let cls = "group flex w-full items-center gap-3 rounded-xl border px-4 py-3.5 text-left text-sm transition-all ";
+  let markerCls = "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition-colors ";
+  if (correct) {
+    cls += "border-green-500 bg-green-50 text-green-800 shadow-sm";
+    markerCls += "border-green-500 bg-green-500 text-white";
+  } else if (incorrect) {
+    cls += "border-red-400 bg-red-50 text-red-800 shadow-sm";
+    markerCls += "border-red-400 bg-red-400 text-white";
+  } else if (selected) {
+    cls += "border-teal-500 bg-teal-50 text-teal-900 shadow-sm";
+    markerCls += "border-teal-600 bg-teal-600 text-white";
+  } else {
+    cls += "border-teal-100 bg-white text-slate-800 hover:border-teal-400 hover:bg-teal-50/70 hover:shadow-sm";
+    markerCls += "border-teal-300 bg-teal-50 text-teal-700 group-hover:border-teal-500 group-hover:bg-teal-500 group-hover:text-white";
+  }
   if (disabled && !correct && !incorrect && !selected) cls += " opacity-60";
   return (
     <button className={cls} onClick={onClick} disabled={disabled}>
-      {label}
+      <span className={markerCls}>{letter}</span>
+      <span className="font-medium leading-relaxed">{label}</span>
     </button>
   );
 }
@@ -102,6 +113,27 @@ function AdminPreviewBanner({ status }: { status: string }) {
       <strong>Admin preview</strong> — This quiz is <span className="capitalize">{status.replace(/_/g, " ")}</span> and is not visible to learners yet.
     </div>
   );
+}
+
+function attemptMediaUrl(
+  attemptId: number,
+  questionBankId: number,
+  kind: "question-image" | "question-video" | "feedback-image" | "feedback-video",
+) {
+  return `/api/standalone-quiz-media/${attemptId}/${questionBankId}/${kind}`;
+}
+
+function protectNativeQuestionMedia(question: any, attemptId: number) {
+  const questionBankId = Number(question?.questionBankId);
+  if (!Number.isSafeInteger(questionBankId) || questionBankId <= 0) return question;
+
+  return {
+    ...question,
+    ...(question.questionImageUrl ? { questionImageUrl: attemptMediaUrl(attemptId, questionBankId, "question-image") } : {}),
+    ...(question.questionVideoUrl ? { questionVideoUrl: attemptMediaUrl(attemptId, questionBankId, "question-video") } : {}),
+    ...(question.feedbackImageUrl ? { feedbackImageUrl: attemptMediaUrl(attemptId, questionBankId, "feedback-image") } : {}),
+    ...(question.feedbackVideoUrl ? { feedbackVideoUrl: attemptMediaUrl(attemptId, questionBankId, "feedback-video") } : {}),
+  };
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -226,7 +258,7 @@ export default function StandaloneQuizPlayer() {
       {
         onSuccess: (res) => {
           setAttemptId(res.attemptId);
-          setQuestions(res.questions);
+          setQuestions(res.questions.map((question: any) => protectNativeQuestionMedia(question, res.attemptId)));
           setQuizData(res.quiz);
           setAccountFields(res.accountFields ?? []);
           setPhase("started");
@@ -583,16 +615,16 @@ export default function StandaloneQuizPlayer() {
   }
 
   return (
-    <div className={isEmbedWidget ? "bg-gray-50" : "min-h-screen bg-gray-50"}>
+    <div className={isEmbedWidget ? "bg-teal-50/30" : "min-h-screen bg-[radial-gradient(circle_at_top,_#dff6f7_0%,_#f8fcfc_34%,_#f8fafc_100%)]"}>
       {/* Top bar */}
-      <div className={`${isEmbedWidget ? "" : "sticky top-0 z-10"} bg-white border-b border-gray-200 px-4 py-3`}>
+      <div className={`${isEmbedWidget ? "" : "sticky top-0 z-10"} border-b border-teal-100 bg-white/95 px-4 py-3 backdrop-blur`}>
         <div className="max-w-3xl mx-auto flex items-center gap-4">
           <div className="flex-1">
             <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
               <span>{currentIdx + 1} / {activeQuestions.length}</span>
               <span>{answeredCount} answered</span>
             </div>
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-2 bg-teal-100 [&>div]:bg-gradient-to-r [&>div]:from-teal-600 [&>div]:to-cyan-400" />
           </div>
           {timerDisplay && (
             <div className={`flex items-center gap-1.5 text-sm font-mono font-medium ${
@@ -620,9 +652,14 @@ export default function StandaloneQuizPlayer() {
             </dl>
           </section>
         )}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-4">
+        <div className="relative overflow-hidden rounded-2xl border border-teal-200 bg-white p-6 shadow-[0_18px_50px_rgba(14,107,112,0.12)] mb-4">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-700 via-teal-500 to-cyan-300" />
+          <div className="mb-4 flex items-center gap-2 pt-1 text-xs font-bold uppercase tracking-[0.16em] text-teal-700">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 text-teal-700"><BookOpen className="h-3.5 w-3.5" /></span>
+            Clinical question
+          </div>
           <StandaloneQuestionMedia questionImageUrl={q.questionImageUrl} questionVideoUrl={q.questionVideoUrl} />
-          <p className="text-gray-900 text-base font-medium leading-relaxed mb-6">{q.question}</p>
+          <p className="mb-6 text-base font-semibold leading-relaxed text-slate-900">{q.question}</p>
           {isMockExam && (
             <button type="button" onClick={() => toggleQuestionFlag(q.questionBankId)} className={`mb-5 inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${isFlagged ? "border-amber-300 bg-amber-50 text-amber-800" : "border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-700"}`}>
               <Flag className={`h-4 w-4 ${isFlagged ? "fill-current" : ""}`} /> {isFlagged ? "Question flagged for review" : "Flag question for review"}
@@ -640,6 +677,7 @@ export default function StandaloneQuizPlayer() {
                   <OptionButton
                     key={i}
                     label={opt.text}
+                    letter={String.fromCharCode(65 + i)}
                     selected={isSelected}
                     correct={isCorrectOpt}
                     incorrect={isWrongOpt}
@@ -666,6 +704,7 @@ export default function StandaloneQuizPlayer() {
                   <OptionButton
                     key={val}
                     label={label}
+                    letter={String.fromCharCode(65 + i)}
                     selected={isSelected}
                     correct={isCorrectOpt}
                     incorrect={isWrongOpt}

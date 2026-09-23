@@ -195,8 +195,6 @@ export const socialContentRouter = router({
       if (!getBrandCategories(brand).includes(category as never)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a category available for the selected brand" });
       }
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const results: Array<{
         headline: string;
@@ -207,9 +205,6 @@ export const socialContentRouter = router({
         contentType: string;
         imageUrl?: string;
         imageSource?: "ai" | "upload" | "media_repository";
-        libraryId?: number;
-        librarySaved?: boolean;
-        librarySaveError?: boolean;
       }> = [];
 
       for (let i = 0; i < count; i++) {
@@ -240,7 +235,6 @@ export const socialContentRouter = router({
             contentType,
             imageUrl: undefined as string | undefined,
             imageSource: undefined as "ai" | "upload" | "media_repository" | "google" | undefined,
-            librarySaved: false,
           };
 
           // Generate abstract background if requested
@@ -257,38 +251,6 @@ export const socialContentRouter = router({
             }
           }
 
-          try {
-            const libraryValues = {
-              brand,
-              headline: item.headline,
-              body: item.body,
-              subtext: item.subtext || null,
-              socialCaption: item.socialCaption,
-              category: item.category,
-              contentType: item.contentType,
-              layoutMode,
-              cardTheme,
-              createdByUserId: ctx.user.id,
-              ...(item.imageUrl
-                ? {
-                    imageUrl: item.imageUrl,
-                    imageSource: item.imageSource ?? "ai" as const,
-                  }
-                : {}),
-            };
-            const saved = await db.insert(socialPostLibrary).values(libraryValues).$returningId();
-            const libraryId = Number(saved[0]?.id);
-            if (!Number.isInteger(libraryId) || libraryId <= 0) {
-              throw new Error("Library insert did not return a record ID");
-            }
-            item.libraryId = libraryId;
-            item.librarySaved = true;
-          } catch {
-            // Creation remains useful to the administrator even if a transient archive write fails.
-            // No database, media, or generated content detail is emitted in the operational log.
-            console.warn("[SocialContent] Shared library save unavailable for generated post");
-            item.librarySaveError = true;
-          }
           results.push(item);
         } catch (err) {
           console.error(`[SocialContent] Generation ${i + 1} failed:`, err);
@@ -339,6 +301,66 @@ export const socialContentRouter = router({
         .where(and(eq(socialPostLibrary.brand, brand), isNull(socialPostLibrary.deletedAt)))
         .orderBy(desc(socialPostLibrary.updatedAt), desc(socialPostLibrary.id))
         .limit(input.limit);
+    }),
+
+  /** Saves a completed administrator-reviewed Social Post to the shared library. */
+  savePostToLibrary: adminProcedure
+    .input(z.object({
+      brand: z.enum(["aaus", "iheartecho"]).optional(),
+      headline: z.string().trim().min(1).max(512),
+      body: z.string().trim().min(1).max(20_000),
+      subtext: z.string().trim().max(5_000).nullable().optional(),
+      socialCaption: z.string().trim().min(1).max(20_000),
+      category: z.enum(CATEGORIES),
+      contentType: z.enum(CONTENT_TYPES),
+      layoutMode: z.enum(["card", "infographic"]),
+      cardTheme: z.enum(["dark", "light", "white", "teal", "aqua"]),
+      imageUrl: z.string().url().nullable().optional(),
+      imageSource: z.enum(["ai", "upload", "media_repository", "google"]).nullable().optional(),
+      mediaAssetId: z.number().int().positive().nullable().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { brand: requestedBrand, ...post } = input;
+      const brand = resolveRequestedBrand(requestedBrand, ctx.brand);
+      if (!getBrandCategories(brand).includes(post.category as never)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a category available for the selected brand" });
+      }
+      if (post.mediaAssetId) {
+        const [asset] = await db
+          .select({ id: mediaAssets.id })
+          .from(mediaAssets)
+          .where(and(
+            eq(mediaAssets.id, post.mediaAssetId),
+            eq(mediaAssets.brand, brand),
+            isNull(mediaAssets.deletedAt),
+          ))
+          .limit(1);
+        if (!asset) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Selected media asset is not available for this brand" });
+        }
+      }
+      const created = await db.insert(socialPostLibrary).values({
+        brand,
+        headline: post.headline,
+        body: post.body,
+        subtext: post.subtext ?? null,
+        socialCaption: post.socialCaption,
+        category: post.category,
+        contentType: post.contentType,
+        layoutMode: post.layoutMode,
+        cardTheme: post.cardTheme,
+        imageUrl: post.imageUrl ?? null,
+        imageSource: post.imageSource ?? null,
+        mediaAssetId: post.mediaAssetId ?? null,
+        createdByUserId: ctx.user.id,
+      }).$returningId();
+      const id = Number(created[0]?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Post Library save did not return a record ID" });
+      }
+      return { id };
     }),
 
   updateSavedPost: adminProcedure

@@ -70,4 +70,17 @@ describe("questionBankFolders helpers", () => {
     expect(ui).toContain("What should happen to questions in these folders?");
     expect(ui).toContain("questionDisposition: folderQuestionDisposition");
   });
+
+  it("keeps folders collapsed initially and supports only sibling-level reordering", () => {
+    const routerSource = readFileSync(resolve(import.meta.dirname, "routers/questionBankRouter.ts"), "utf8");
+    const tree = readFileSync(resolve(import.meta.dirname, "../client/src/components/QuestionBankFolderTree.tsx"), "utf8");
+    const ui = readFileSync(resolve(import.meta.dirname, "../client/src/pages/admin/LMSAdmin.tsx"), "utf8");
+    expect(routerSource).toContain("Folder ordering must include every folder at the same level exactly once");
+    expect(routerSource).toContain("parentId: z.number().int().nullable()");
+    expect(tree).toContain("onMoveFolder");
+    expect(tree).toContain("Move folder up");
+    expect(tree).toContain("Move folder down");
+    expect(ui).toContain("const [expandedFolderIds, setExpandedFolderIds] = useState<Set<number>>(new Set())");
+    expect(ui).not.toContain("questionBankRootFolderIds(folders)");
+  });
 });

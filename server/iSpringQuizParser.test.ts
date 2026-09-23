@@ -81,4 +81,60 @@ describe("parseISpringDataBlob", () => {
     const parsed = parseISpringDataBlob(makeMiniQuizJson());
     expect(parsed.groups[0].questions[0].explanationText).toBe("Correct!");
   });
+
+  it("imports iSpring matching and sequence questions as native matching pairs", () => {
+    const payload = JSON.stringify({
+      d: {
+        T: "Advanced review",
+        sl: {
+          g: [{
+            i: "group-1",
+            T: "Matching",
+            S: [
+              {
+                i: "match-1",
+                tp: "Matching",
+                D: { h: "<p>Match each medication.</p>", d: ["Match each medication."] },
+                C: { m: [
+                  { p: { i: "1", t: { d: ["Losartan"] } }, r: { i: "1", t: { d: ["ARB"] } } },
+                  { p: { i: "2", t: { d: ["Diltiazem"] } }, r: { i: "2", t: { d: ["Calcium-channel blocker"] } } },
+                ] },
+              },
+              {
+                i: "sequence-1",
+                tp: "Sequence",
+                D: { h: "<p>Put the phases in order.</p>", d: ["Put the phases in order."] },
+                C: { chs: [
+                  { i: "0", t: { d: ["Atrial contraction"] } },
+                  { i: "1", t: { d: ["Isovolumetric contraction"] } },
+                ] },
+              },
+              {
+                i: "fill-1",
+                tp: "FillInTheBlank",
+                D: { h: "<p>The normal ejection fraction is ___%.</p>", d: ["The normal ejection fraction is ___%."] },
+                C: { rt: { r: [{ data: { v: ["55"] } }] } },
+              },
+            ],
+          }],
+        },
+      },
+    });
+
+    const parsed = parseISpringDataBlob(payload);
+    const [matching, sequence, fillInTheBlank] = parsed.groups[0].questions;
+    expect(matching.type).toBe("matching");
+    expect(matching.matchingPairs).toEqual([
+      { id: "1", left: "Losartan", right: "ARB" },
+      { id: "2", left: "Diltiazem", right: "Calcium-channel blocker" },
+    ]);
+    expect(sequence.type).toBe("matching");
+    expect(sequence.matchingPairs).toEqual([
+      { id: "0", left: "1", right: "Atrial contraction" },
+      { id: "1", left: "2", right: "Isovolumetric contraction" },
+    ]);
+    expect(fillInTheBlank.type).toBe("flashcard");
+    expect(fillInTheBlank.flashcardFront).toBe("The normal ejection fraction is ___%.");
+    expect(fillInTheBlank.flashcardBack).toBe("55");
+  });
 });

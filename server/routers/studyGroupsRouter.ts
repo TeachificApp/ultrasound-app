@@ -29,8 +29,10 @@ import {
 export const STUDY_GROUP_FREE_SEAT_LIMIT = 5;
 export const STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_MONTHLY_CENTS = 4900;
 export const STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT = 20;
+export const STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_GROUP_LIMIT = 1;
 /** Retained as the unlimited Organization plan price for backward-compatible imports. */
 export const STUDY_GROUP_ORGANIZATION_MONTHLY_CENTS = 9900;
+export const STUDY_GROUP_ORGANIZATION_UNLIMITED_GROUP_LIMIT = 3;
 export const STUDY_GROUP_CONTENT_DISCOUNT_PERCENT = 10;
 export const STUDY_GROUP_CONTENT_DISCOUNT_MINIMUM_MEMBERS = 3;
 const GROUP_WORKSPACE_BLOCK_KEY = "group_workspace_top";
@@ -167,6 +169,10 @@ function hasActiveOrganization(group: typeof studyGroups.$inferSelect) {
 
 function organizationPlanSeatLimit(plan: z.infer<typeof organizationPlanSchema>) {
   return plan === "up_to_20" ? STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT : null;
+}
+
+function organizationPlanGroupLimit(plan: z.infer<typeof organizationPlanSchema>) {
+  return plan === "up_to_20" ? STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_GROUP_LIMIT : STUDY_GROUP_ORGANIZATION_UNLIMITED_GROUP_LIMIT;
 }
 
 function organizationPlanMonthlyCents(plan: z.infer<typeof organizationPlanSchema>) {
@@ -335,7 +341,9 @@ export const studyGroupsRouter = router({
     freeSeatLimit: STUDY_GROUP_FREE_SEAT_LIMIT,
     organizationUpToTwentyMonthlyCents: STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_MONTHLY_CENTS,
     organizationUpToTwentySeatLimit: STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT,
+    organizationUpToTwentyGroupLimit: STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_GROUP_LIMIT,
     organizationMonthlyCents: STUDY_GROUP_ORGANIZATION_MONTHLY_CENTS,
+    organizationUnlimitedGroupLimit: STUDY_GROUP_ORGANIZATION_UNLIMITED_GROUP_LIMIT,
     contentDiscountPercent: STUDY_GROUP_CONTENT_DISCOUNT_PERCENT,
     contentDiscountMinimumMembers: STUDY_GROUP_CONTENT_DISCOUNT_MINIMUM_MEMBERS,
     meetingProviders: ["Zoom", "Microsoft Teams"],
@@ -805,6 +813,13 @@ export const studyGroupsRouter = router({
     if (!contentAccess) throw new TRPCError({ code: "NOT_FOUND", message: "Active group content access not found." });
     const membership = await getMembership(db, input.groupId, input.userId);
     if (!membership) throw new TRPCError({ code: "BAD_REQUEST", message: "Content can be assigned only to an active group member." });
+    if (contentAccess.seatLimit === 1) {
+      const [previousSingleSeatAssignment] = await db.select().from(studyGroupContentAssignments)
+        .where(eq(studyGroupContentAssignments.contentAccessId, contentAccess.id)).limit(1);
+      if (previousSingleSeatAssignment && previousSingleSeatAssignment.userId !== input.userId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A one-person Group Learning Access seat is permanently assigned to its original participant and cannot be transferred." });
+      }
+    }
     const activeAssignments = await db.select({ count: sql<number>`COUNT(*)` }).from(studyGroupContentAssignments).where(and(eq(studyGroupContentAssignments.contentAccessId, contentAccess.id), isNull(studyGroupContentAssignments.revokedAt)));
     const [existing] = await db.select().from(studyGroupContentAssignments).where(and(eq(studyGroupContentAssignments.contentAccessId, contentAccess.id), eq(studyGroupContentAssignments.userId, input.userId), isNull(studyGroupContentAssignments.revokedAt))).limit(1);
     if (!existing && Number(activeAssignments[0]?.count ?? 0) >= contentAccess.seatLimit) throw new TRPCError({ code: "BAD_REQUEST", message: "All purchased content seats are already assigned." });
@@ -819,6 +834,9 @@ export const studyGroupsRouter = router({
     const [contentAccess] = await db.select().from(studyGroupContentAccess).where(and(eq(studyGroupContentAccess.id, input.contentAccessId), eq(studyGroupContentAccess.groupId, input.groupId))).limit(1);
     const [assignment] = await db.select().from(studyGroupContentAssignments).where(and(eq(studyGroupContentAssignments.contentAccessId, input.contentAccessId), eq(studyGroupContentAssignments.userId, input.userId), isNull(studyGroupContentAssignments.revokedAt))).limit(1);
     if (!contentAccess || !assignment) throw new TRPCError({ code: "NOT_FOUND", message: "Active group content assignment not found." });
+    if (contentAccess.seatLimit === 1) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "A one-person Group Learning Access seat is permanently assigned and cannot be removed or transferred." });
+    }
     await revokeGroupContentSeat(db, assignment, contentAccess);
     await recordActivity(db, input.groupId, ctx.user.id, "content_seat_revoked", `Removed group access to ${contentAccess.contentTitle}.`, "content_assignment", assignment.id);
     return { ok: true };
@@ -828,24 +846,50 @@ export const studyGroupsRouter = router({
     const db = await requireDb();
     const access = await requireGroupAccess(db, input.groupId, ctx.user.id, ctx.user.role, { manage: true });
     if (hasActiveOrganization(access.group)) throw new TRPCError({ code: "CONFLICT", message: "This group already has active Organization access." });
+    const activeOrganizationGroups = await db.select().from(studyGroups).where(and(
+      eq(studyGroups.createdByUserId, ctx.user.id),
+      eq(studyGroups.tier, "organization"),
+      eq(studyGroups.status, "active"),
+    ));
+    const requestedSeatLimit = organizationPlanSeatLimit(input.plan);
+    const reusableOrganizationGroup = activeOrganizationGroups.find((group) => group.seatLimit === requestedSeatLimit && group.stripeSubscriptionId);
+    if (reusableOrganizationGroup?.stripeSubscriptionId) {
+      const sharedGroups = activeOrganizationGroups.filter((group) => group.stripeSubscriptionId === reusableOrganizationGroup.stripeSubscriptionId);
+      const groupLimit = organizationPlanGroupLimit(input.plan);
+      if (sharedGroups.length >= groupLimit) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: input.plan === "up_to_20" ? "The $49 Organization plan applies to one group. Additional groups remain free with free-group limits." : "The $99 Organization plan already covers its maximum of three groups. Additional groups remain free with free-group limits." });
+      }
+      await db.update(studyGroups).set({
+        tier: "organization",
+        seatLimit: requestedSeatLimit,
+        status: "active",
+        stripeCustomerId: reusableOrganizationGroup.stripeCustomerId,
+        stripeSubscriptionId: reusableOrganizationGroup.stripeSubscriptionId,
+        stripeCheckoutSessionId: reusableOrganizationGroup.stripeCheckoutSessionId,
+        currentPeriodEnd: reusableOrganizationGroup.currentPeriodEnd,
+      }).where(eq(studyGroups.id, input.groupId));
+      await recordActivity(db, input.groupId, ctx.user.id, "organization_activated", `Applied the existing Organization plan to this group (${sharedGroups.length + 1} of ${groupLimit} covered groups).`);
+      return { checkoutUrl: null, appliedExistingPlan: true, groupLimit };
+    }
     const stripe = getStripeClient();
     const actor = await getActorEmail(ctx.user.id);
     const origin = getSafeStudyGroupOrigin(input.origin);
     const monthlyCents = organizationPlanMonthlyCents(input.plan);
-    const planLabel = input.plan === "up_to_20" ? `Up to ${STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT} members` : "Unlimited members";
+    const groupLimit = organizationPlanGroupLimit(input.plan);
+    const planLabel = input.plan === "up_to_20" ? `Up to ${STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT} members · 1 group` : "Unlimited members · up to 3 groups";
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer_email: actor.email,
       client_reference_id: String(ctx.user.id),
       line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: monthlyCents, recurring: { interval: "month" }, product_data: { name: `Study Groups Organization — ${planLabel}` } } }],
-      metadata: { checkout_type: "study_group_organization", user_id: String(ctx.user.id), study_group_id: String(input.groupId), organization_plan: input.plan },
-      subscription_data: { metadata: { checkout_type: "study_group_organization", study_group_id: String(input.groupId), organization_plan: input.plan } },
+      metadata: { checkout_type: "study_group_organization", user_id: String(ctx.user.id), study_group_id: String(input.groupId), organization_plan: input.plan, organization_group_limit: String(groupLimit) },
+      subscription_data: { metadata: { checkout_type: "study_group_organization", study_group_id: String(input.groupId), organization_plan: input.plan, organization_group_limit: String(groupLimit) } },
       success_url: `${origin}/study-groups/${input.groupId}?organization=success`,
       cancel_url: `${origin}/study-groups/${input.groupId}?organization=canceled`,
       allow_promotion_codes: true,
     });
     if (!session.url) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to start secure checkout." });
-    return { checkoutUrl: session.url };
+    return { checkoutUrl: session.url, appliedExistingPlan: false, groupLimit };
   }),
 
   getWorkspaceBlocks: protectedProcedure.query(async () => {
@@ -903,7 +947,7 @@ export async function handleStudyGroupCheckoutCompleted(session: any) {
       stripeSubscriptionId: typeof session.subscription === "string" ? session.subscription : null,
       stripeCheckoutSessionId: session.id ?? null,
     }).where(eq(studyGroups.id, group.id));
-    await recordActivity(db, group.id, buyerId, "organization_activated", `Study Groups Organization access was activated (${organizationPlan === "up_to_20" ? `up to ${STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT} members` : "unlimited members"}).`);
+    await recordActivity(db, group.id, buyerId, "organization_activated", `Study Groups Organization access was activated (${organizationPlan === "up_to_20" ? `up to ${STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_SEAT_LIMIT} members in 1 group` : "unlimited members in up to 3 groups"}).`);
     return true;
   }
   const contentType = metadata.content_type as "course" | "quiz" | "download" | undefined;
@@ -935,12 +979,12 @@ export async function handleStudyGroupSubscriptionLifecycle(subscription: any) {
   if (!subscriptionId) return false;
   const db = await getDb();
   if (!db) return false;
-  const [group] = await db.select().from(studyGroups).where(eq(studyGroups.stripeSubscriptionId, subscriptionId)).limit(1);
-  if (!group) return false;
+  const groups = await db.select().from(studyGroups).where(eq(studyGroups.stripeSubscriptionId, subscriptionId));
+  if (groups.length === 0) return false;
   const stripeStatus = String(subscription.status ?? "");
   const active = stripeStatus === "active" || stripeStatus === "trialing";
   const currentPeriodEnd = subscription.current_period_end ? new Date(Number(subscription.current_period_end) * 1000) : null;
-  await db.update(studyGroups).set({ status: active ? "active" : "canceled", currentPeriodEnd }).where(eq(studyGroups.id, group.id));
-  await recordActivity(db, group.id, null, "organization_subscription_updated", active ? "Organization subscription is active." : "Organization subscription is no longer active.");
+  await db.update(studyGroups).set({ status: active ? "active" : "canceled", currentPeriodEnd }).where(eq(studyGroups.stripeSubscriptionId, subscriptionId));
+  await Promise.all(groups.map((group) => recordActivity(db, group.id, null, "organization_subscription_updated", active ? "Organization subscription is active." : "Organization subscription is no longer active.")));
   return true;
 }

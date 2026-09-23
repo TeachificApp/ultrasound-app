@@ -133,6 +133,17 @@ export function ClinicalQuizCard({
   const fit = getQuestionFit(questionText, visibleOptions, hasMediaArea);
   const density = frame.contentScale;
   const px = (value: number) => Math.max(1, Math.round(value * density));
+  // Use a placement-aware image box rather than a shallow fixed crop. Clinical
+  // source images remain entirely visible at every social-platform frame.
+  const mediaFrameAspectRatio = frame.layout === "wide"
+    ? "4 / 1"
+    : frame.layout === "landscape"
+      ? "3 / 1"
+      : frame.layout === "square"
+        ? "5 / 2"
+        : frame.layout === "portrait"
+          ? "16 / 7"
+          : "16 / 9";
 
   return (
     <div
@@ -201,7 +212,7 @@ export function ClinicalQuizCard({
           style={{
             position: "relative",
             width: "100%",
-            height: px(frame.layout === "vertical" ? 340 : frame.layout === "portrait" ? 302 : 264),
+            aspectRatio: mediaFrameAspectRatio,
             marginTop: px(16),
             marginBottom: px(14),
             background: "#080808",
@@ -211,10 +222,10 @@ export function ClinicalQuizCard({
           }}
         >
           {media.kind === "image" && (
-            <img src={media.url} alt="Clinical reference" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center" }} />
+            <img src={media.url} alt="Clinical reference" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center", display: "block" }} />
           )}
           {media.kind === "video" && (
-            <video src={media.url} muted controls preload="metadata" playsInline style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center", background: "#000" }} />
+            <video src={media.url} muted controls preload="metadata" playsInline style={{ width: "100%", height: "100%", objectFit: "contain", objectPosition: "center", background: "#000", display: "block" }} />
           )}
           {media.kind === "placeholder" && (
             <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,0.64)", fontSize: 22, fontWeight: 700, letterSpacing: 1.2 }}>

@@ -10,6 +10,12 @@ import { toast } from "sonner";
 import { Image as ImageIcon, Loader2, Plus, Trash2, Upload, Video } from "lucide-react";
 
 type MediaField = "questionImageUrl" | "questionVideoUrl" | "feedbackImageUrl" | "feedbackVideoUrl";
+type ImportedMediaCandidate = {
+  url: string;
+  kind: "image" | "video";
+  source: "question" | "feedback";
+  label: string;
+};
 
 function parseOptions(value: unknown): { text: string; imageUrl?: string; videoUrl?: string; feedback?: string }[] {
   if (Array.isArray(value)) return value.map((option) => typeof option === "string" ? { text: option } : option);
@@ -26,6 +32,25 @@ function parseIndices(value: unknown): number[] {
   if (Array.isArray(value)) return value.map(Number).filter(Number.isFinite);
   if (typeof value !== "string") return [];
   try { return parseIndices(JSON.parse(value)); } catch { return []; }
+}
+
+function parseMediaCandidates(value: unknown, question: any): ImportedMediaCandidate[] {
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+    if (Array.isArray(parsed)) {
+      return parsed.filter((candidate): candidate is ImportedMediaCandidate =>
+        candidate && typeof candidate.url === "string"
+        && (candidate.kind === "image" || candidate.kind === "video")
+        && (candidate.source === "question" || candidate.source === "feedback"),
+      );
+    }
+  } catch { /* use current assignments below */ }
+  return [
+    question.questionImageUrl ? { url: question.questionImageUrl, kind: "image", source: "question", label: "Current question image" } : null,
+    question.questionVideoUrl ? { url: question.questionVideoUrl, kind: "video", source: "question", label: "Current question video" } : null,
+    question.feedbackImageUrl ? { url: question.feedbackImageUrl, kind: "image", source: "feedback", label: "Current feedback image" } : null,
+    question.feedbackVideoUrl ? { url: question.feedbackVideoUrl, kind: "video", source: "feedback", label: "Current feedback video" } : null,
+  ].filter((candidate): candidate is ImportedMediaCandidate => Boolean(candidate));
 }
 
 async function uploadQuestionMedia(file: File): Promise<{ url: string; mediaType: "image" | "video" }> {
@@ -116,6 +141,7 @@ export function QuestionBankMediaEditorDialog({ question, open, onOpenChange, on
       questionVideoUrl: question.questionVideoUrl ?? "",
       feedbackImageUrl: question.feedbackImageUrl ?? "",
       feedbackVideoUrl: question.feedbackVideoUrl ?? "",
+      mediaCandidates: question.mediaCandidates ?? null,
       explanation: question.explanation ?? "",
     });
   }, [question]);
@@ -123,6 +149,14 @@ export function QuestionBankMediaEditorDialog({ question, open, onOpenChange, on
   if (!draft) return null;
   const supportsChoices = ["mcq", "truefalse", "multiselect"].includes(draft.type);
   const isMultiple = draft.type === "multiselect";
+  const mediaCandidates = parseMediaCandidates(draft.mediaCandidates, draft);
+  const assignImportedMedia = (candidate: ImportedMediaCandidate, placement: "question" | "feedback") => {
+    const field: MediaField = placement === "question"
+      ? candidate.kind === "video" ? "questionVideoUrl" : "questionImageUrl"
+      : candidate.kind === "video" ? "feedbackVideoUrl" : "feedbackImageUrl";
+    setDraft({ ...draft, [field]: candidate.url });
+    toast.success(`${candidate.label} assigned to ${placement} media.`);
+  };
 
   const save = () => updateQuestion.mutate({
     id: draft.id,
@@ -135,6 +169,7 @@ export function QuestionBankMediaEditorDialog({ question, open, onOpenChange, on
     questionVideoUrl: draft.questionVideoUrl || null,
     feedbackImageUrl: draft.feedbackImageUrl || null,
     feedbackVideoUrl: draft.feedbackVideoUrl || null,
+    mediaCandidates: draft.mediaCandidates,
   });
 
   return (
@@ -169,6 +204,30 @@ export function QuestionBankMediaEditorDialog({ question, open, onOpenChange, on
             <MediaPicker label="Question Image" field="questionImageUrl" value={draft.questionImageUrl} onChange={(value) => setDraft({ ...draft, questionImageUrl: value })} />
             <MediaPicker label="Question Video" field="questionVideoUrl" value={draft.questionVideoUrl} onChange={(value) => setDraft({ ...draft, questionVideoUrl: value })} />
           </div>
+          {mediaCandidates.length > 1 && (
+            <section className="rounded-lg border border-teal-200 bg-teal-50/40 p-3">
+              <div className="text-xs font-semibold text-teal-900">Imported media choices</div>
+              <p className="mt-1 text-xs text-teal-800/80">SCORM feedback media stays in feedback by default. When a question has multiple images, select the exact image that belongs with the question and the one that appears after feedback.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {mediaCandidates.map((candidate, index) => (
+                  <div key={`${candidate.url}-${index}`} className="rounded border border-teal-100 bg-white p-2">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-700">
+                      {candidate.kind === "video" ? <Video className="h-3.5 w-3.5 text-teal-700" /> : <ImageIcon className="h-3.5 w-3.5 text-teal-700" />}
+                      <span className="truncate">{candidate.label}</span>
+                      <span className="ml-auto rounded bg-teal-50 px-1.5 py-0.5 text-[10px] capitalize text-teal-700">{candidate.source}</span>
+                    </div>
+                    {candidate.kind === "video"
+                      ? <video src={candidate.url} controls className="mb-2 max-h-24 w-full rounded bg-black" />
+                      : <img src={candidate.url} alt={candidate.label} className="mb-2 max-h-24 w-full rounded bg-slate-50 object-contain" />}
+                    <div className="flex gap-1.5">
+                      <Button type="button" size="sm" variant="outline" className="h-7 flex-1 border-teal-200 px-2 text-[10px] text-teal-800" onClick={() => assignImportedMedia(candidate, "question")}>Use in question</Button>
+                      <Button type="button" size="sm" variant="outline" className="h-7 flex-1 border-teal-200 px-2 text-[10px] text-teal-800" onClick={() => assignImportedMedia(candidate, "feedback")}>Use in feedback</Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           <div>
             <Label>Feedback Explanation</Label>
             <Textarea value={draft.explanation} onChange={(event) => setDraft({ ...draft, explanation: event.target.value })} rows={3} placeholder="Shown after a learner checks their answer." className="mt-1" />

@@ -206,8 +206,6 @@ type GeneratedItem = {
   imageUrl?: string;
   imageSource?: "ai" | "upload" | "media_repository";
   libraryId?: number;
-  librarySaved?: boolean;
-  librarySaveError?: boolean;
   mediaAssetId?: number | null;
 };
 
@@ -307,7 +305,13 @@ function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: 
   const px = (value: number) => Math.max(1, Math.round(value * frame.contentScale));
   const imageUrl = resolveSocialPostImageUrl(item, presentation);
   const hasImage = !!imageUrl;
-  const imageHeight = frame.layout === "wide" ? px(150) : frame.layout === "landscape" ? px(245) : frame.layout === "vertical" ? px(430) : px(360);
+  // Keep the complete clinical image visible. Fixed short crop frames were cutting
+  // off ultrasound labels and anatomy in typical 16:9 source images.
+  const imageFrameAspectRatio = frame.layout === "wide"
+    ? "16 / 5"
+    : frame.layout === "landscape"
+      ? "12 / 5"
+      : "16 / 9";
 return (
 <CardShell t={t}>
       <BrandedHeader item={item} t={t} presentation={presentation} />
@@ -319,9 +323,8 @@ return (
       </div>
       {/* Image area */}
       {hasImage && (
-        <div style={{ margin: `0 ${px(48)}px ${px(24)}px`, height: imageHeight, borderRadius: px(16), overflow: "hidden", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, position: "relative" }}>
-          <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: px(60), background: t.isDark ? "linear-gradient(transparent, rgba(10,22,32,0.6))" : "linear-gradient(transparent, rgba(234,246,247,0.6))" }} />
+        <div style={{ margin: `0 ${px(48)}px ${px(24)}px`, width: "auto", aspectRatio: imageFrameAspectRatio, borderRadius: px(16), overflow: "hidden", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, background: t.isDark ? "#07131a" : "#d9eff0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" />
         </div>
       )}
       {/* Content area */}
@@ -412,8 +415,8 @@ function InfographicCard({ item, t, presentation }: { item: GeneratedItem; t: Th
         {/* Center — image or highlight */}
         <div style={{ flex: 1.2, display: "flex", flexDirection: "column", gap: 12 }}>
           {hasImage ? (
-            <div style={{ flex: 1, borderRadius: 12, overflow: "hidden", border: `2px solid ${BRAND}44`, boxShadow: `0 4px 20px rgba(0,0,0,0.2)` }}>
-              <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+            <div style={{ flex: 1, borderRadius: 12, overflow: "hidden", border: `2px solid ${BRAND}44`, boxShadow: `0 4px 20px rgba(0,0,0,0.2)`, background: t.isDark ? "#07131a" : "#d9eff0", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" />
             </div>
           ) : (
             <div style={{ flex: 1, borderRadius: 12, background: `linear-gradient(135deg, ${BRAND}22, ${BRAND_AQUA}11)`, border: `2px solid ${BRAND}33`, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -682,7 +685,7 @@ export default function SocialContentGenerator() {
   const [contentType, setContentType] = useState<string>("meme");
   const [category, setCategory] = useState<string>("General Ultrasound");
   const [customTopic, setCustomTopic] = useState("");
-  const [count, setCount] = useState(2);
+  const [count, setCount] = useState(1);
   const [cardTheme, setCardTheme] = useState<CardTheme>("light");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("card");
   const [imageMode, setImageMode] = useState<ImageMode>("none");
@@ -717,15 +720,9 @@ export default function SocialContentGenerator() {
   const generateMutation = trpc.socialContent.generateContent.useMutation({
     onSuccess: (data) => {
       setItems((prev) => [...data.items, ...prev]);
-      void utils.socialContent.listSavedPosts.invalidate();
-      const unsavedCount = data.items.filter((item: GeneratedItem) => item.librarySaveError).length;
-      if (unsavedCount > 0) {
-        toast.warning(`Generated ${data.items.length} item${data.items.length > 1 ? "s" : ""}.`, {
-          description: `${unsavedCount} item${unsavedCount > 1 ? "s could" : " could"} not be saved to the shared Post Library. You can still download the generated card.`,
-        });
-      } else {
-        toast.success(`Generated ${data.items.length} item${data.items.length > 1 ? "s" : ""} and saved them to the Post Library.`);
-      }
+      toast.success(`Generated ${data.items.length} item${data.items.length > 1 ? "s" : ""}.`, {
+        description: "Review or edit the post, choose an image if needed, then select Save to Post Library when it is ready.",
+      });
     },
     onError: (err) => {
       toast.error("Generation failed", { description: err.message });
@@ -733,6 +730,9 @@ export default function SocialContentGenerator() {
   });
 
   const generateAbstractMutation = trpc.socialContent.generateAbstractImage.useMutation();
+  const savePostToLibraryMutation = trpc.socialContent.savePostToLibrary.useMutation({
+    onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
+  });
   const updateSavedPostMutation = trpc.socialContent.updateSavedPost.useMutation({
     onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
   });
@@ -750,37 +750,42 @@ export default function SocialContentGenerator() {
     setItems((previous) => previous.map((item, itemIndex) => itemIndex === idx ? { ...item, ...changes } : item));
   }, []);
 
-  const savePostTextToLibrary = useCallback(async (idx: number) => {
+  const savePostToLibrary = useCallback(async (idx: number) => {
     const item = items[idx];
-    if (!item?.libraryId) {
-      toast.error("This post is not in the shared Post Library yet", {
-        description: "Generate a saved post or reopen one from the library before saving edits.",
-      });
-      return;
-    }
-    if (!item.headline.trim() || !item.body.trim() || !item.socialCaption.trim()) {
+    if (!item || !item.headline.trim() || !item.body.trim() || !item.socialCaption.trim()) {
       toast.error("Headline, card text, and social caption are required before saving.");
       return;
     }
+    const payload = {
+      brand: presentation.brand,
+      headline: item.headline.trim(),
+      body: item.body.trim(),
+      subtext: item.subtext.trim() || null,
+      socialCaption: item.socialCaption.trim(),
+      category: item.category as any,
+      contentType: item.contentType as any,
+      layoutMode,
+      cardTheme,
+      imageUrl: item.imageUrl ?? null,
+      imageSource: item.imageSource ?? null,
+      mediaAssetId: item.mediaAssetId ?? null,
+    };
     setSavingPostTextIdx(idx);
     try {
-      await updateSavedPostMutation.mutateAsync({
-        id: item.libraryId,
-        brand: presentation.brand,
-        headline: item.headline.trim(),
-        body: item.body.trim(),
-        subtext: item.subtext.trim() || null,
-        socialCaption: item.socialCaption.trim(),
-        category: item.category as any,
-        contentType: item.contentType as any,
-      });
-      toast.success("Post text saved to the shared Post Library.");
+      if (item.libraryId) {
+        await updateSavedPostMutation.mutateAsync({ id: item.libraryId, ...payload });
+        toast.success("Post edits saved to the shared Post Library.");
+      } else {
+        const saved = await savePostToLibraryMutation.mutateAsync(payload);
+        setItems((previous) => previous.map((candidate, itemIndex) => itemIndex === idx ? { ...candidate, libraryId: saved.id } : candidate));
+        toast.success("Post saved to the shared Post Library.");
+      }
     } catch (error: any) {
-      toast.error("Unable to save post text", { description: error?.message ?? "Please try again." });
+      toast.error("Unable to save post to the library", { description: error?.message ?? "Please try again." });
     } finally {
       setSavingPostTextIdx(null);
     }
-  }, [items, presentation.brand, updateSavedPostMutation]);
+  }, [cardTheme, items, layoutMode, presentation.brand, savePostToLibraryMutation, updateSavedPostMutation]);
 
   const handleGenerate = () => {
     generateMutation.mutate({
@@ -806,37 +811,30 @@ export default function SocialContentGenerator() {
         styleHint: styleHint?.trim() || undefined,
       });
       setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: result.imageUrl, imageSource: "ai" as const, mediaAssetId: null } : p)));
-      const saved = items[idx];
-      if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, brand: presentation.brand, imageUrl: result.imageUrl, imageSource: "ai", mediaAssetId: null });
-      toast.success("Abstract background regenerated!");
+      toast.success("Abstract background regenerated. Save the post when it is ready.");
     } catch (err: any) {
       toast.error("Image generation failed", { description: err.message });
     } finally {
       setRegeneratingImageIdx(null);
     }
-  }, [generateAbstractMutation, items, updateSavedPostMutation]);
+  }, [generateAbstractMutation]);
 
   const handleUploadedImage = useCallback((idx: number, uploaded: { url: string; assetId: number }) => {
     setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: uploaded.url, imageSource: "upload" as const, mediaAssetId: uploaded.assetId } : p)));
-    const saved = items[idx];
-    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, brand: presentation.brand, imageUrl: uploaded.url, imageSource: "upload", mediaAssetId: uploaded.assetId });
-  }, [items, updateSavedPostMutation]);
+    toast.success("Image added. Save the post when it is ready.");
+  }, []);
 
   const handleRepositoryImage = useCallback((idx: number, asset: any) => {
     const imageUrl = asset.currentVersion?.s3Url;
     if (!imageUrl) return;
     setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl, imageSource: "media_repository" as const, mediaAssetId: asset.id } : p)));
-    const saved = items[idx];
-    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, brand: presentation.brand, imageUrl, imageSource: "media_repository", mediaAssetId: asset.id });
-    toast.success("Media Repository image selected.");
-  }, [items, updateSavedPostMutation]);
+    toast.success("Media Repository image selected. Save the post when it is ready.");
+  }, []);
 
   const handleRemoveImage = useCallback((idx: number) => {
     setItems((prev) => prev.map((p, i) => (i === idx ? { ...p, imageUrl: undefined, imageSource: undefined } : p)));
-    const saved = items[idx];
-    if (saved?.libraryId) updateSavedPostMutation.mutate({ id: saved.libraryId, brand: presentation.brand, imageUrl: null, imageSource: null, mediaAssetId: null });
-    toast.success("Image removed from card");
-  }, [items, updateSavedPostMutation]);
+    toast.success("Image removed. Save the post when it is ready.");
+  }, []);
 
   const openSavedPost = useCallback((saved: any) => {
     setItems([{
@@ -1180,7 +1178,7 @@ export default function SocialContentGenerator() {
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <div>
                         <div className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Edit post text</div>
-                        <p className="mt-0.5 text-[10px] text-white/35">Changes update the preview immediately and can be saved to the shared library.</p>
+                        <p className="mt-0.5 text-[10px] text-white/35">Changes update the preview only. Select Save once the text and image are ready.</p>
                       </div>
                       {item.libraryId ? <Badge className="border-0 bg-teal-300/15 text-[9px] text-teal-100">Library post</Badge> : <Badge className="border-0 bg-amber-300/15 text-[9px] text-amber-100">Not saved</Badge>}
                     </div>
@@ -1209,9 +1207,9 @@ export default function SocialContentGenerator() {
                           </select>
                         </label>
                       </div>
-                      <Button size="sm" disabled={!item.libraryId || savingPostTextIdx === idx} onClick={() => void savePostTextToLibrary(idx)} className="h-8 w-full bg-teal-500 text-xs text-white hover:bg-teal-400 disabled:opacity-45">
+                      <Button size="sm" disabled={savingPostTextIdx === idx} onClick={() => void savePostToLibrary(idx)} className="h-8 w-full bg-teal-500 text-xs text-white hover:bg-teal-400 disabled:opacity-45">
                         {savingPostTextIdx === idx ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}
-                        {savingPostTextIdx === idx ? "Saving post text…" : "Save text to Post Library"}
+                        {savingPostTextIdx === idx ? "Saving post…" : item.libraryId ? "Save edits to Post Library" : "Save to Post Library"}
                       </Button>
                     </div>
                   </div>

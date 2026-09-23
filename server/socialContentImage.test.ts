@@ -92,6 +92,21 @@ describe("socialContent.generateContent input schema", () => {
   });
 });
 
+describe("Social Post image composition", () => {
+  it("uses placement-aware contain frames so clinical images are never cropped", () => {
+    const source = require("node:fs").readFileSync(
+      new URL("../client/src/pages/SocialContentGenerator.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("const imageFrameAspectRatio");
+    expect(source).toContain('aspectRatio: imageFrameAspectRatio');
+    expect(source).toContain('objectFit: "contain"');
+    expect(source).toContain('background: t.isDark ? "#07131a" : "#d9eff0"');
+    expect(source).not.toContain('objectFit: "cover" }} crossOrigin="anonymous" />\n          <div style={{ position: "absolute", bottom: 0');
+  });
+});
+
 // Test the generateImage input schema
 describe("socialContent.generateImage input schema", () => {
   const { z } = require("zod");

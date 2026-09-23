@@ -14,7 +14,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { cn, stripHtml } from "@/lib/utils";
 import { formatCentsAsCurrency } from "@/lib/formatMoney";
-import { flattenQuestionBankFolderTree, questionBankFolderOptionLabel, questionBankRootFolderIds } from "@shared/questionBankFolders";
+import { flattenQuestionBankFolderTree, questionBankFolderOptionLabel } from "@shared/questionBankFolders";
 import { QUESTION_BANK_TYPES, QUESTION_BANK_TYPE_BADGE, questionBankTypeLabel, type QuestionBankType } from "@shared/questionBankTypes";
 import { QuestionBankFolderTree } from "@/components/QuestionBankFolderTree";
 import { QuestionBankQuestionPreviewDialog } from "@/components/QuestionBankQuestionPreviewDialog";
@@ -11264,10 +11264,6 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const { data: foldersData, refetch: refetchFolders, error: foldersError } = trpc.questionBank.listFolders.useQuery();
   const folders = foldersData ?? [];
   const folderTree = useMemo(() => flattenQuestionBankFolderTree(folders), [folders]);
-  useEffect(() => {
-    if (!folders.length || expandedFolderIds.size > 0) return;
-    setExpandedFolderIds(new Set(questionBankRootFolderIds(folders)));
-  }, [folders, expandedFolderIds.size]);
   const createFolder = trpc.questionBank.createFolder.useMutation({
     onSuccess: () => {
       refetchFolders();
@@ -11281,6 +11277,10 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
   const updateFolder = trpc.questionBank.updateFolder.useMutation({
     onSuccess: () => { refetchFolders(); setEditingFolderId(null); setEditingFolderName(""); toast.success("Folder updated"); },
     onError: (e) => toast.error(e.message || "Could not update folder"),
+  });
+  const reorderFolders = trpc.questionBank.reorderFolders.useMutation({
+    onSuccess: () => { refetchFolders(); toast.success("Folder order saved"); },
+    onError: (e) => toast.error(e.message || "Could not reorder folders"),
   });
   const deleteFolder = trpc.questionBank.deleteFolder.useMutation({
     onSuccess: (data, variables) => {
@@ -11365,6 +11365,17 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
     if (!editingFolderId || !name) return;
     updateFolder.mutate({ id: editingFolderId, name });
   };
+
+  const moveFolder = useCallback((folder: { id: number; parentId?: number | null }, direction: "up" | "down") => {
+    const parentId = folder.parentId ?? null;
+    const siblings = folders.filter((candidate: any) => (candidate.parentId ?? null) === parentId);
+    const currentIndex = siblings.findIndex((candidate: any) => candidate.id === folder.id);
+    const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.length) return;
+    const nextOrder = [...siblings];
+    [nextOrder[currentIndex], nextOrder[nextIndex]] = [nextOrder[nextIndex], nextOrder[currentIndex]];
+    reorderFolders.mutate({ parentId, folderIds: nextOrder.map((candidate: any) => candidate.id) });
+  }, [folders, reorderFolders]);
 
   const selectedQuestionIds = [...selectedIds];
 
@@ -11469,6 +11480,7 @@ export function QuestionBankWorkspace({ standalone = false }: { standalone?: boo
                 onCancelEditFolder={() => { setEditingFolderId(null); setEditingFolderName(""); }}
                 onDeleteFolder={(folder) => requestDeleteFolder(folder)}
                 onAddSubfolder={setNewFolderParentId}
+                onMoveFolder={moveFolder}
                 accent={standalone ? "teal" : "purple"}
               />
             )}

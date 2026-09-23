@@ -49,8 +49,6 @@ function getQuestionMedia(question: any): ClinicalCardMedia {
   if (question.questionImageUrl) return { kind: "image", url: question.questionImageUrl };
   if (optionVideo) return { kind: "video", url: optionVideo };
   if (optionImage) return { kind: "image", url: optionImage };
-  if (question.feedbackVideoUrl) return { kind: "video", url: question.feedbackVideoUrl };
-  if (question.feedbackImageUrl) return { kind: "image", url: question.feedbackImageUrl };
   return { kind: "none" };
 }
 

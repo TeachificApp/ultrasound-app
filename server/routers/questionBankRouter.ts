@@ -299,6 +299,7 @@ export const questionBankRouter = router({
       questionVideoUrl: z.string().nullable().optional(),
       feedbackImageUrl: z.string().nullable().optional(),
       feedbackVideoUrl: z.string().nullable().optional(),
+      mediaCandidates: z.string().nullable().optional(),
       folderId: z.number().int().nullable().optional(),
       isPreset: z.boolean().optional(),
       presetCategory: z.string().max(100).nullable().optional(),
@@ -888,7 +889,16 @@ export const questionBankRouter = router({
         .where(sql`${questionBank.folderId} IS NOT NULL`)
         .groupBy(questionBank.folderId);
       const countMap = Object.fromEntries(counts.map(c => [c.folderId, Number(c.count)]));
-      return folders.map(f => ({ ...f, questionCount: countMap[f.id] ?? 0 }));
+      // A parent import folder normally contains only subfolders. Show its
+      // descendant total so a completed SCORM import is visible at the root.
+      return folders.map((folder) => {
+        const descendantFolderIds = collectDescendantFolderIds(folders, folder.id);
+        const questionCount = descendantFolderIds.reduce(
+          (total, folderId) => total + (countMap[folderId] ?? 0),
+          0,
+        );
+        return { ...folder, questionCount };
+      });
     }),
 
   createFolder: protectedProcedure
@@ -947,11 +957,20 @@ export const questionBankRouter = router({
     }),
 
   reorderFolders: protectedProcedure
-    .input(z.object({ folderIds: z.array(z.number().int()).min(1) }))
+    .input(z.object({
+      folderIds: z.array(z.number().int()).min(1),
+      parentId: z.number().int().nullable(),
+    }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const rows = await db.select({ id: questionBankFolders.id, parentId: questionBankFolders.parentId }).from(questionBankFolders);
+      const siblingIds = rows.filter((folder) => folder.parentId === input.parentId).map((folder) => folder.id);
+      const suppliedIds = new Set(input.folderIds);
+      if (suppliedIds.size !== input.folderIds.length || siblingIds.length !== input.folderIds.length || siblingIds.some((id) => !suppliedIds.has(id))) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Folder ordering must include every folder at the same level exactly once" });
+      }
       await reorderQuestionBankFolders(db, input.folderIds);
       return { ok: true };
     }),

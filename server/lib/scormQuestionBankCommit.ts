@@ -1,9 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import {
   questionBank,
   questionBankFolders,
+  questionBankTags,
   questionBankTagMap,
 } from "../../drizzle/schema";
 import {
@@ -43,6 +44,80 @@ export type ScormImportConfirmResult = {
   totalUpdated: number;
   questionBankIds?: number[];
 };
+
+const MEDIA_IMAGE_TAG = "Media: Image";
+const MEDIA_VIDEO_TAG = "Media: Video";
+
+type ImportedMediaCandidate = {
+  url: string;
+  kind: "image" | "video";
+  source: "question" | "feedback";
+  label: string;
+};
+
+function resolvedMediaUrls(refs: string[], mediaMap: Map<string, string>) {
+  return [...new Set(refs.map((ref) => mediaMap.get(ref)).filter((url): url is string => Boolean(url)))];
+}
+
+function buildImportedMediaCandidates(
+  questionImageUrls: string[],
+  questionVideoUrls: string[],
+  feedbackImageUrls: string[],
+  feedbackVideoUrls: string[],
+): ImportedMediaCandidate[] {
+  return [
+    ...questionImageUrls.map((url, index) => ({ url, kind: "image" as const, source: "question" as const, label: `Question image ${index + 1}` })),
+    ...questionVideoUrls.map((url, index) => ({ url, kind: "video" as const, source: "question" as const, label: `Question video ${index + 1}` })),
+    ...feedbackImageUrls.map((url, index) => ({ url, kind: "image" as const, source: "feedback" as const, label: `Feedback image ${index + 1}` })),
+    ...feedbackVideoUrls.map((url, index) => ({ url, kind: "video" as const, source: "feedback" as const, label: `Feedback video ${index + 1}` })),
+  ];
+}
+
+async function ensureMediaTagIds(db: MySql2Database<any>): Promise<{ image: number; video: number }> {
+  const names = [MEDIA_IMAGE_TAG, MEDIA_VIDEO_TAG];
+  let tags = await db.select({ id: questionBankTags.id, name: questionBankTags.name })
+    .from(questionBankTags)
+    .where(inArray(questionBankTags.name, names));
+
+  const existingNames = new Set(tags.map((tag) => tag.name));
+  for (const [name, color] of [[MEDIA_IMAGE_TAG, "#24abbc"], [MEDIA_VIDEO_TAG, "#0e6b70"]] as const) {
+    if (existingNames.has(name)) continue;
+    try {
+      await db.insert(questionBankTags).values({ name, color }).$returningId();
+    } catch {
+      // A concurrent SCORM import may have created the same globally unique tag.
+    }
+  }
+
+  tags = await db.select({ id: questionBankTags.id, name: questionBankTags.name })
+    .from(questionBankTags)
+    .where(inArray(questionBankTags.name, names));
+  const tagIdByName = new Map(tags.map((tag) => [tag.name, tag.id]));
+  const image = tagIdByName.get(MEDIA_IMAGE_TAG);
+  const video = tagIdByName.get(MEDIA_VIDEO_TAG);
+  if (!image || !video) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Question media tags could not be prepared." });
+  return { image, video };
+}
+
+async function ensureQuestionTagMappings(
+  db: MySql2Database<any>,
+  questionId: number,
+  tagIds: number[],
+) {
+  const uniqueTagIds = [...new Set(tagIds)];
+  if (uniqueTagIds.length === 0) return;
+  const existing = await db.select({ tagId: questionBankTagMap.tagId })
+    .from(questionBankTagMap)
+    .where(and(
+      eq(questionBankTagMap.questionId, questionId),
+      inArray(questionBankTagMap.tagId, uniqueTagIds),
+    ));
+  const existingTagIds = new Set(existing.map((row) => row.tagId));
+  const missingTagIds = uniqueTagIds.filter((tagId) => !existingTagIds.has(tagId));
+  if (missingTagIds.length > 0) {
+    await db.insert(questionBankTagMap).values(missingTagIds.map((tagId) => ({ questionId, tagId })));
+  }
+}
 
 export async function commitScormImportToQuestionBank(
   db: MySql2Database<any>,
@@ -90,6 +165,7 @@ export async function commitScormImportToQuestionBank(
     : parsed.groups;
 
   const tagIds = scormImportQuestionTagIds(input.extraTagIds);
+  const mediaTagIds = await ensureMediaTagIds(db);
   const results: { groupName: string; inserted: number; updated: number }[] = [];
   const questionBankIds: number[] = [];
   const includeQuestionBankIds = input.includeQuestionBankIds !== false;
@@ -134,10 +210,29 @@ export async function commitScormImportToQuestionBank(
         q.explanationHtml,
         (value) => rewriteStorageRefs(value, mediaMap),
       ) || null;
-      const questionImageUrl = q.questionImageRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
-      const questionVideoUrl = q.questionVideoRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
-      const feedbackImageUrl = q.feedbackImageRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
-      const feedbackVideoUrl = q.feedbackVideoRefs.map((ref) => mediaMap.get(ref)).find(Boolean) ?? null;
+      const questionImageUrls = resolvedMediaUrls(q.questionImageRefs, mediaMap);
+      const questionVideoUrls = resolvedMediaUrls(q.questionVideoRefs, mediaMap);
+      const feedbackImageUrls = resolvedMediaUrls(q.feedbackImageRefs, mediaMap);
+      const feedbackVideoUrls = resolvedMediaUrls(q.feedbackVideoRefs, mediaMap);
+      // Source-specific feedback always remains feedback. If a question stem carries
+      // both a video and an image but has no feedback image, favour motion in the
+      // question and show the still after the answer is revealed.
+      const questionVideoUrl = questionVideoUrls[0] ?? null;
+      const feedbackVideoUrl = feedbackVideoUrls[0] ?? null;
+      const feedbackImageUrl = feedbackImageUrls[0] ?? (questionVideoUrl ? questionImageUrls[0] ?? null : null);
+      const questionImageUrl = questionVideoUrl && !feedbackImageUrls[0] ? null : questionImageUrls[0] ?? null;
+      const mediaCandidates = buildImportedMediaCandidates(
+        questionImageUrls,
+        questionVideoUrls,
+        feedbackImageUrls,
+        feedbackVideoUrls,
+      );
+      const mediaCandidatesJson = mediaCandidates.length > 0 ? JSON.stringify(mediaCandidates) : null;
+      const questionTagIds = [
+        ...tagIds,
+        ...(questionImageUrl || feedbackImageUrl || options.some((option) => option.imageUrl) ? [mediaTagIds.image] : []),
+        ...(questionVideoUrl || feedbackVideoUrl || options.some((option) => option.videoUrl) ? [mediaTagIds.video] : []),
+      ];
 
       const [existingQuestion] = await db
         .select({
@@ -147,7 +242,11 @@ export async function commitScormImportToQuestionBank(
           questionVideoUrl: questionBank.questionVideoUrl,
           feedbackImageUrl: questionBank.feedbackImageUrl,
           feedbackVideoUrl: questionBank.feedbackVideoUrl,
+          mediaCandidates: questionBank.mediaCandidates,
           hotspotMarkers: questionBank.hotspotMarkers,
+          matchingPairs: questionBank.matchingPairs,
+          flashcardFront: questionBank.flashcardFront,
+          flashcardBack: questionBank.flashcardBack,
           correctAnswers: questionBank.correctAnswers,
         })
         .from(questionBank)
@@ -176,7 +275,11 @@ export async function commitScormImportToQuestionBank(
           questionVideoUrl: existingQuestion.questionVideoUrl ?? questionVideoUrl,
           feedbackImageUrl: existingQuestion.feedbackImageUrl ?? feedbackImageUrl,
           feedbackVideoUrl: existingQuestion.feedbackVideoUrl ?? feedbackVideoUrl,
+          mediaCandidates: existingQuestion.mediaCandidates ?? mediaCandidatesJson,
           hotspotMarkers: existingQuestion.hotspotMarkers ?? (q.hotspotMarkers ? JSON.stringify(q.hotspotMarkers) : null),
+          matchingPairs: existingQuestion.matchingPairs ?? (q.matchingPairs ? JSON.stringify(q.matchingPairs) : null),
+          flashcardFront: existingQuestion.flashcardFront ?? q.flashcardFront ?? null,
+          flashcardBack: existingQuestion.flashcardBack ?? q.flashcardBack ?? null,
           correctAnswers: existingQuestion.correctAnswers ?? q.correctAnswers ?? null,
         };
         const mergedOptionsJson = JSON.stringify(mergedOptions);
@@ -189,6 +292,7 @@ export async function commitScormImportToQuestionBank(
           }).where(eq(questionBank.id, existingQuestion.id));
           updated++;
         }
+        await ensureQuestionTagMappings(db, existingQuestion.id, questionTagIds);
         if (includeQuestionBankIds) questionBankIds.push(existingQuestion.id);
         continue;
       }
@@ -203,17 +307,17 @@ export async function commitScormImportToQuestionBank(
         questionVideoUrl,
         feedbackImageUrl,
         feedbackVideoUrl,
+        mediaCandidates: mediaCandidatesJson,
         hotspotMarkers: q.hotspotMarkers ? JSON.stringify(q.hotspotMarkers) : null,
+        matchingPairs: q.matchingPairs ? JSON.stringify(q.matchingPairs) : null,
+        flashcardFront: q.flashcardFront ?? null,
+        flashcardBack: q.flashcardBack ?? null,
         correctAnswers: q.correctAnswers ?? null,
         folderId: groupFolderId,
         createdByAdminId: adminUserId,
       }).$returningId();
 
-      if (tagIds.length > 0) {
-        await db.insert(questionBankTagMap).values(
-          tagIds.map((tid) => ({ questionId: result.id, tagId: tid })),
-        );
-      }
+      await ensureQuestionTagMappings(db, result.id, questionTagIds);
 
       if (includeQuestionBankIds) questionBankIds.push(result.id);
       inserted++;

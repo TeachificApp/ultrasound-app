@@ -1,4 +1,4 @@
-import { CheckCircle, ChevronDown, ChevronRight, FolderOpen, Pencil, Plus, X } from "lucide-react";
+import { ArrowDown, ArrowUp, CheckCircle, ChevronDown, ChevronRight, FolderOpen, Pencil, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ type QuestionBankFolderTreeProps = {
   onCancelEditFolder: () => void;
   onDeleteFolder: (folder: QuestionBankFolderRow) => void;
   onAddSubfolder: (parentId: number) => void;
+  onMoveFolder: (folder: QuestionBankFolderRow, direction: "up" | "down") => void;
   accent?: "purple" | "teal";
 };
 
@@ -41,6 +42,8 @@ function FolderTreeNode({
   const children = childrenByParent.get(folder.id) ?? [];
   const isExpanded = props.expandedFolderIds.has(folder.id);
   const isSelected = props.selectedFolderId === folder.id;
+  const siblings = childrenByParent.get(folder.parentId ?? null) ?? [];
+  const siblingIndex = siblings.findIndex((sibling) => sibling.id === folder.id);
   const accentSelected = props.accent === "teal" ? "bg-teal-600 text-white border-teal-600" : "bg-purple-100 border-purple-400";
   const accentIdle = props.accent === "teal" ? "bg-white border-teal-200 hover:bg-teal-50" : "bg-white border-purple-200";
 
@@ -84,6 +87,8 @@ function FolderTreeNode({
           ) : (
             <>
               <button type="button" title="Add subfolder" onClick={() => props.onAddSubfolder(folder.id)} className="rounded p-1 opacity-70 hover:opacity-100"><Plus className="h-3.5 w-3.5" /></button>
+              <button type="button" title="Move folder up" aria-label={`Move ${folder.name} up`} disabled={siblingIndex <= 0} onClick={() => props.onMoveFolder(folder, "up")} className="rounded p-1 opacity-70 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-25"><ArrowUp className="h-3.5 w-3.5" /></button>
+              <button type="button" title="Move folder down" aria-label={`Move ${folder.name} down`} disabled={siblingIndex < 0 || siblingIndex >= siblings.length - 1} onClick={() => props.onMoveFolder(folder, "down")} className="rounded p-1 opacity-70 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-25"><ArrowDown className="h-3.5 w-3.5" /></button>
               <button type="button" title="Rename folder" onClick={() => props.onStartEditFolder(folder)} className="rounded p-1 opacity-70 hover:opacity-100"><Pencil className="h-3.5 w-3.5" /></button>
               <button type="button" title="Delete folder" onClick={() => props.onDeleteFolder(folder)} className="rounded p-1 text-red-500 opacity-70 hover:opacity-100"><X className="h-3.5 w-3.5" /></button>
             </>

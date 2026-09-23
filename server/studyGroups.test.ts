@@ -134,6 +134,36 @@ describe("Study Groups", () => {
     expect(listing).toContain("unlimited members");
   });
 
+  it("limits Organization coverage to one $49 group or three $99 groups", () => {
+    const router = read("server/routers/studyGroupsRouter.ts");
+    const listing = read("client/src/pages/StudyGroupsPage.tsx");
+    const workspace = read("client/src/pages/StudyGroupWorkspace.tsx");
+
+    expect(router).toContain("STUDY_GROUP_ORGANIZATION_UP_TO_TWENTY_GROUP_LIMIT = 1");
+    expect(router).toContain("STUDY_GROUP_ORGANIZATION_UNLIMITED_GROUP_LIMIT = 3");
+    expect(router).toContain("reusableOrganizationGroup");
+    expect(router).toContain("Additional groups remain free with free-group limits");
+    expect(router).toContain("groups.map((group) => recordActivity");
+    expect(listing).toContain("up to three groups with unlimited members");
+    expect(workspace).toContain("Covers up to {organizationUnlimitedGroupLimit} Organization groups");
+  });
+
+  it("provides guided access sign-up and keeps one-person learning seats non-transferable", () => {
+    const router = read("server/routers/studyGroupsRouter.ts");
+    const listing = read("client/src/pages/StudyGroupsPage.tsx");
+    const workspace = read("client/src/pages/StudyGroupWorkspace.tsx");
+
+    expect(listing).toContain("Sign up for Organization access");
+    expect(listing).toContain("Set up Group Learning Access");
+    expect(listing).toContain("add at least three participants later");
+    expect(workspace).toContain("setup === \"organization\"");
+    expect(workspace).toContain("setup === \"group-learning\"");
+    expect(workspace).toContain("permanently assigned to its first participant");
+    expect(router).toContain("previousSingleSeatAssignment");
+    expect(router).toContain("cannot be transferred");
+    expect(router).toContain("cannot be removed or transferred");
+  });
+
   it("registers payment lifecycle and secure document upload paths", () => {
     const webhook = read("server/webhooks/stripe.ts");
     const index = read("server/_core/index.ts");

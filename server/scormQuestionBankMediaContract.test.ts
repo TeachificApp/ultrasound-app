@@ -38,6 +38,14 @@ describe("SCORM Question Bank media contract", () => {
     expect(commitSource).toContain("continue;");
   });
 
+  it("preserves SCORM media source placement and records administrator-selectable candidates", () => {
+    expect(commitSource).toContain("buildImportedMediaCandidates");
+    expect(commitSource).toContain("source: \"question\"");
+    expect(commitSource).toContain("source: \"feedback\"");
+    expect(commitSource).toContain("mediaCandidates: mediaCandidatesJson");
+    expect(commitSource).toContain("feedbackImageUrls[0] ?? (questionVideoUrl ? questionImageUrls[0] ?? null : null)");
+  });
+
   it("halts before Question Bank writes when SCORM media preparation fails", () => {
     expect(commitSource).toContain("SCORM media could not be prepared, so no Question Bank records were saved.");
     expect(commitSource).toContain("[QuestionBank] SCORM media preparation failed:");

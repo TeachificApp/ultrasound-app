@@ -19,7 +19,7 @@ export interface ParsedAnswer {
 export interface ParsedQuestion {
   id: string;
   ispringType: string;
-  type: "mcq" | "truefalse" | "hotspot";
+  type: "mcq" | "truefalse" | "hotspot" | "matching" | "flashcard";
   questionHtml: string;
   questionText: string;
   answers: ParsedAnswer[];
@@ -42,6 +42,9 @@ export interface ParsedQuestion {
     width: number;
     height: number;
   }>;
+  matchingPairs?: Array<{ id: string; left: string; right: string }>;
+  flashcardFront?: string;
+  flashcardBack?: string;
   correctAnswers?: string;
 }
 
@@ -178,6 +181,11 @@ function parseChoices(chs: any[]): ParsedAnswer[] {
       ...(videoRef ? { videoRef } : {}),
     };
   });
+}
+
+function textFromISpringBlock(block: any): string {
+  const { html, text } = getTextFromDBlock(block);
+  return text || stripHtml(html);
 }
 
 function getFeedback(q: any): { html: string; text: string; refs: string[] } {
@@ -338,6 +346,73 @@ function parseQuestion(q: any): ParsedQuestion | null {
       questionVideoRefs: questionRefs.filter(isVideoRef),
       feedbackImageRefs: feedbackRefs.filter((ref) => !isVideoRef(ref)),
       feedbackVideoRefs: feedbackRefs.filter(isVideoRef),
+    };
+  }
+
+  if (tp === "Matching") {
+    const matchingPairs = (Array.isArray(q.C?.m) ? q.C.m : []).map((pair: any, index: number) => ({
+      id: String(pair?.p?.i ?? pair?.r?.i ?? index + 1),
+      left: textFromISpringBlock(pair?.p?.t),
+      right: textFromISpringBlock(pair?.r?.t),
+    })).filter((pair: { left: string; right: string }) => pair.left && pair.right);
+    if (matchingPairs.length === 0) return null;
+    return {
+      id: q.i ?? "",
+      ispringType: tp,
+      type: "matching",
+      questionHtml,
+      questionText,
+      answers: [],
+      correctAnswer: JSON.stringify(matchingPairs).slice(0, 500),
+      explanationHtml: feedback.html,
+      explanationText: feedback.text,
+      matchingPairs,
+      ...withMedia([]),
+    };
+  }
+
+  if (tp === "Sequence") {
+    const matchingPairs = (Array.isArray(q.C?.chs) ? q.C.chs : []).map((choice: any, index: number) => ({
+      id: String(choice?.i ?? index + 1),
+      left: String(index + 1),
+      right: textFromISpringBlock(choice?.t),
+    })).filter((pair: { right: string }) => pair.right);
+    if (matchingPairs.length === 0) return null;
+    return {
+      id: q.i ?? "",
+      ispringType: tp,
+      type: "matching",
+      questionHtml,
+      questionText,
+      answers: [],
+      correctAnswer: JSON.stringify(matchingPairs).slice(0, 500),
+      explanationHtml: feedback.html,
+      explanationText: feedback.text,
+      matchingPairs,
+      ...withMedia([]),
+    };
+  }
+
+  if (tp === "FillInTheBlank") {
+    const acceptedAnswers = (Array.isArray(q.C?.rt?.r) ? q.C.rt.r : [])
+      .flatMap((entry: any) => Array.isArray(entry?.data?.v) ? entry.data.v : [])
+      .map((value: unknown) => String(value).trim())
+      .filter(Boolean);
+    const answer = acceptedAnswers[0];
+    if (!answer) return null;
+    return {
+      id: q.i ?? "",
+      ispringType: tp,
+      type: "flashcard",
+      questionHtml,
+      questionText,
+      answers: [],
+      correctAnswer: answer.slice(0, 500),
+      explanationHtml: feedback.html,
+      explanationText: feedback.text,
+      flashcardFront: questionText,
+      flashcardBack: answer,
+      ...withMedia([]),
     };
   }
 

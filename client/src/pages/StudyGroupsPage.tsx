@@ -24,12 +24,15 @@ export default function StudyGroupsPage() {
   const [description, setDescription] = useState("");
   const [provider, setProvider] = useState<"zoom" | "teams" | "other" | "">("");
   const [meetingUrl, setMeetingUrl] = useState("");
+  const [accessSignupIntent, setAccessSignupIntent] = useState<"organization" | "group_learning" | null>(null);
   const createGroup = trpc.studyGroups.create.useMutation({
     onSuccess: ({ groupId }) => {
       toast.success("Study group created");
       void utils.studyGroups.listMine.invalidate();
       setOpen(false);
-      navigate(`/study-groups/${groupId}`);
+      const setup = accessSignupIntent === "organization" ? "organization" : accessSignupIntent === "group_learning" ? "group-learning" : null;
+      setAccessSignupIntent(null);
+      navigate(`/study-groups/${groupId}${setup ? `?setup=${setup}` : ""}`);
     },
     onError: error => toast.error(error.message),
   });
@@ -41,16 +44,35 @@ export default function StudyGroupsPage() {
     meetingUrl: meetingUrl || null,
   });
 
+  const beginAccessSignup = (intent: "organization" | "group_learning") => {
+    setAccessSignupIntent(intent);
+    setOpen(true);
+  };
+
   if (!user) {
     return (
-      <div className="min-h-[65vh] grid place-items-center bg-slate-50 px-4">
-        <Card className="max-w-lg text-center border-teal-100 shadow-lg">
-          <CardHeader><LockKeyhole className="mx-auto h-10 w-10 text-teal-600" /><CardTitle>Study together on Learn</CardTitle></CardHeader>
-          <CardContent className="space-y-4 text-slate-600">
-            <p>Create a private group, invite other platform learners by full email, and collaborate around your education.</p>
-            <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => navigate("/login")}>Sign in to use Study Groups</Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen overflow-hidden bg-slate-50">
+        <section className="relative isolate overflow-hidden bg-gradient-to-br from-slate-950 via-teal-950 to-teal-700 text-white">
+          <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(circle_at_20%_20%,rgba(94,234,212,.75),transparent_28%),radial-gradient(circle_at_85%_65%,rgba(45,212,191,.55),transparent_30%)]" />
+          <div className="relative mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[1.15fr_.85fr] lg:px-8 lg:py-24">
+            <div className="max-w-2xl">
+              <Badge className="border border-white/20 bg-white/10 text-teal-50">Learn collaboration</Badge>
+              <h1 className="mt-5 text-4xl font-bold tracking-tight sm:text-5xl">Study together. Keep every learner on track.</h1>
+              <p className="mt-5 max-w-xl text-lg leading-8 text-teal-100">Create a private Study Group for focused ultrasound education. Bring learners together with protected discussion, live meeting links, shared documents, tasks, and course access.</p>
+              <div className="mt-8 flex flex-wrap gap-3"><Button size="lg" className="bg-white text-teal-900 hover:bg-teal-50" onClick={() => navigate("/login?returnTo=/study-groups")}>Sign in to create a group</Button><Button size="lg" variant="outline" className="border-white/40 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => navigate("/login?returnTo=/study-groups")}>Explore group access</Button></div>
+              <p className="mt-4 text-sm text-teal-100">Already a learner? Sign in to see only the groups you belong to.</p>
+            </div>
+            <Card className="border-white/20 bg-white/95 text-slate-900 shadow-2xl"><CardHeader><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100"><Users className="h-6 w-6 text-teal-700" /></div><CardTitle className="mt-3">A private learning space</CardTitle><CardDescription>Designed for real study partners—not a public learner directory.</CardDescription></CardHeader><CardContent className="grid gap-3 text-sm text-slate-600"><div className="rounded-lg bg-teal-50 p-3"><strong className="block text-teal-900">Plan together</strong>Tasks, discussion, protected documents, and Zoom or Microsoft Teams links.</div><div className="rounded-lg bg-slate-50 p-3"><strong className="block text-slate-900">Learn together</strong>Assign eligible course, quiz, and download access to active participants.</div><div className="rounded-lg bg-amber-50 p-3"><strong className="block text-amber-900">Grow together</strong>Organization Access adds administrative controls and editable learning modules.</div></CardContent></Card>
+          </div>
+        </section>
+        <main className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="mx-auto mb-9 max-w-2xl text-center"><p className="text-sm font-bold uppercase tracking-[.18em] text-teal-700">Choose your starting point</p><h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">Study Groups that scale with your learners</h2><p className="mt-3 text-slate-600">Start free, build your participant list when you are ready, or add Organization Access for a managed learning environment.</p></div>
+          <div className="grid gap-5 md:grid-cols-3">
+            <Card className="border-teal-100"><CardHeader><Users className="h-6 w-6 text-teal-600" /><CardTitle className="mt-3">Free for up to 5</CardTitle><CardDescription>Private collaboration for a small study team.</CardDescription></CardHeader><CardContent className="space-y-4 text-sm text-slate-600"><p>Invite by exact email, share protected documents, discuss material, and add a live meeting link.</p><Button variant="outline" className="w-full" onClick={() => navigate("/login?returnTo=/study-groups")}>Create a free group</Button></CardContent></Card>
+            <Card className="border-amber-200 shadow-sm"><CardHeader><Crown className="h-6 w-6 text-amber-600" /><CardTitle className="mt-3">Organization Access</CardTitle><CardDescription>$49/month for one group of up to 20 members, or $99/month for up to three groups with unlimited members.</CardDescription></CardHeader><CardContent className="space-y-4 text-sm text-slate-600"><p>Add organization administrators, editable group learning modules, and managed participant seats. Additional groups remain free with free-group limits.</p><Button className="w-full bg-amber-600 hover:bg-amber-700" onClick={() => navigate("/login?returnTo=/study-groups")}>Sign in to choose a plan</Button></CardContent></Card>
+            <Card className="border-indigo-100"><CardHeader><BookOpen className="h-6 w-6 text-indigo-600" /><CardTitle className="mt-3">Group Learning Access</CardTitle><CardDescription>Purchase eligible content seats for your active group.</CardDescription></CardHeader><CardContent className="space-y-4 text-sm text-slate-600"><p>You may create the group first and invite participants later. The 10% group discount activates once three participants have actively joined.</p><Button className="w-full bg-indigo-600 hover:bg-indigo-700" onClick={() => navigate("/login?returnTo=/study-groups")}>Sign in to set up access</Button></CardContent></Card>
+          </div>
+        </main>
       </div>
     );
   }
@@ -73,11 +95,11 @@ export default function StudyGroupsPage() {
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="grid gap-5 md:grid-cols-3">
           <Card className="border-teal-100"><CardHeader className="pb-3"><Users className="h-5 w-5 text-teal-600" /><CardTitle className="text-base">Free for up to {pricing?.freeSeatLimit ?? 5}</CardTitle></CardHeader><CardContent className="text-sm text-slate-600">Create a private group, invite participants by email, share documents, discuss material, set tasks, and add a Zoom or Teams link.</CardContent></Card>
-          <Card className="border-amber-200"><CardHeader className="pb-3"><Crown className="h-5 w-5 text-amber-600" /><CardTitle className="text-base">Organization access</CardTitle></CardHeader><CardContent className="text-sm text-slate-600">Choose up to {pricing?.organizationUpToTwentySeatLimit ?? 20} members for ${((pricing?.organizationUpToTwentyMonthlyCents ?? 4900) / 100).toFixed(2)}/month, or unlimited members for ${((pricing?.organizationMonthlyCents ?? 9900) / 100).toFixed(2)}/month. Both include organization administrators, editable learning modules, and seat management.</CardContent></Card>
-          <Card className="border-indigo-100"><CardHeader className="pb-3"><BookOpen className="h-5 w-5 text-indigo-600" /><CardTitle className="text-base">Group learning access</CardTitle></CardHeader><CardContent className="text-sm text-slate-600">Group and organization admins can purchase eligible course, quiz, and download seats with a 10% group discount once at least three participants have actively joined.</CardContent></Card>
+          <Card className="border-amber-200"><CardHeader className="pb-3"><Crown className="h-5 w-5 text-amber-600" /><CardTitle className="text-base">Organization access</CardTitle></CardHeader><CardContent className="space-y-4 text-sm text-slate-600"><p>Choose one group with up to {pricing?.organizationUpToTwentySeatLimit ?? 20} members for ${((pricing?.organizationUpToTwentyMonthlyCents ?? 4900) / 100).toFixed(2)}/month, or up to three groups with unlimited members for ${((pricing?.organizationMonthlyCents ?? 9900) / 100).toFixed(2)}/month. Both include organization administrators, editable learning modules, and seat management; further groups stay free with free-group limits.</p><Button className="w-full bg-amber-600 hover:bg-amber-700" onClick={() => beginAccessSignup("organization")}><Building2 className="mr-2 h-4 w-4" />Sign up for Organization access</Button></CardContent></Card>
+          <Card className="border-indigo-100"><CardHeader className="pb-3"><BookOpen className="h-5 w-5 text-indigo-600" /><CardTitle className="text-base">Group learning access</CardTitle></CardHeader><CardContent className="space-y-4 text-sm text-slate-600"><p>Group and organization admins can purchase eligible course, quiz, and download seats. Create the group now and add at least three participants later; the 10% group discount activates once three participants have actively joined.</p><Button className="w-full bg-indigo-600 hover:bg-indigo-700" onClick={() => beginAccessSignup("group_learning")}><BookOpen className="mr-2 h-4 w-4" />Set up Group Learning Access</Button></CardContent></Card>
         </div>
 
-        <div className="mt-10 flex items-center justify-between"><div><h2 className="text-xl font-bold text-slate-900">Your study groups</h2><p className="mt-1 text-sm text-slate-500">Only the groups you belong to are shown.</p></div><Button variant="outline" onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" />New group</Button></div>
+        <div className="mt-10 flex items-center justify-between"><div><h2 className="text-xl font-bold text-slate-900">My Study Groups</h2><p className="mt-1 text-sm text-slate-500">Only the groups you belong to are shown.</p></div><Button variant="outline" onClick={() => setOpen(true)}><Plus className="mr-2 h-4 w-4" />New group</Button></div>
         <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {isLoading && Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-44 animate-pulse rounded-xl bg-white border" />)}
           {!isLoading && groups?.map(group => (
@@ -93,9 +115,9 @@ export default function StudyGroupsPage() {
       </main>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg"><DialogHeader><DialogTitle>Create a private study group</DialogTitle><DialogDescription>The creator is the group admin. Free groups include up to five total active or invited participants.</DialogDescription></DialogHeader>
+        <DialogContent className="max-w-lg"><DialogHeader><DialogTitle>{accessSignupIntent === "organization" ? "Create a group for Organization Access" : accessSignupIntent === "group_learning" ? "Create a group for Group Learning Access" : "Create a private study group"}</DialogTitle><DialogDescription>{accessSignupIntent === "organization" ? "Create the private group first, then choose the Organization plan in the next step." : accessSignupIntent === "group_learning" ? "Create the private group first. You can invite the required three participants after it is created; the group discount applies once three participants have actively joined." : "The creator is the group admin. Free groups include up to five total active or invited participants."}</DialogDescription></DialogHeader>
           <div className="space-y-4 py-2"><div className="space-y-2"><Label htmlFor="sg-name">Group name</Label><Input id="sg-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g., RVT Registry Review – Spring" /></div><div className="space-y-2"><Label htmlFor="sg-description">Description <span className="text-slate-400">(optional)</span></Label><Textarea id="sg-description" value={description} onChange={e => setDescription(e.target.value)} placeholder="What is this group preparing for?" /></div><div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label>Live meeting platform <span className="text-slate-400">(optional)</span></Label><Select value={provider} onValueChange={(value: "zoom" | "teams" | "other") => setProvider(value)}><SelectTrigger><SelectValue placeholder="Choose a platform" /></SelectTrigger><SelectContent><SelectItem value="zoom">Zoom</SelectItem><SelectItem value="teams">Microsoft Teams</SelectItem><SelectItem value="other">Other secure link</SelectItem></SelectContent></Select></div><div className="space-y-2"><Label htmlFor="sg-meeting">Meeting link</Label><Input id="sg-meeting" value={meetingUrl} onChange={e => setMeetingUrl(e.target.value)} placeholder="https://…" /></div></div></div>
-          <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button disabled={name.trim().length < 2 || createGroup.isPending} className="bg-teal-600 hover:bg-teal-700" onClick={create}>{createGroup.isPending ? "Creating…" : "Create group"}</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => { setOpen(false); setAccessSignupIntent(null); }}>Cancel</Button><Button disabled={name.trim().length < 2 || createGroup.isPending} className="bg-teal-600 hover:bg-teal-700" onClick={create}>{createGroup.isPending ? "Creating…" : accessSignupIntent ? "Create group and continue" : "Create group"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -198,8 +198,22 @@ function PremiumTrialCountdownBanner() {
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "subscriptions" | "purchases" | "certificates" | "instructor" | "revenue_partner";
-const VALID_TABS: Tab[] = ["profile", "content", "subscriptions", "purchases", "certificates", "instructor", "revenue_partner"];
+type Tab = "profile" | "content" | "groups" | "subscriptions" | "purchases" | "certificates" | "instructor" | "revenue_partner";
+const VALID_TABS: Tab[] = ["profile", "content", "groups", "subscriptions", "purchases", "certificates", "instructor", "revenue_partner"];
+
+function GroupsTab() {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-sm">
+      <div className="bg-gradient-to-r from-teal-950 via-teal-800 to-teal-600 px-6 py-8 text-white sm:px-8">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="max-w-xl"><div className="flex items-center gap-2 text-teal-100"><Users className="h-5 w-5" /><span className="text-sm font-semibold">Learning collaboration</span></div><h2 className="mt-3 text-2xl font-bold">My Study Groups</h2><p className="mt-2 text-sm leading-6 text-teal-50">Open your private group spaces to collaborate with invited learners, manage shared resources, and stay on top of tasks.</p></div>
+          <a href="/study-groups"><Button className="bg-white text-teal-900 hover:bg-teal-50">Open My Study Groups <ChevronRight className="ml-2 h-4 w-4" /></Button></a>
+        </div>
+      </div>
+      <div className="grid gap-4 p-6 sm:grid-cols-3 sm:p-8"><div className="rounded-xl bg-teal-50 p-4"><Users className="h-5 w-5 text-teal-700" /><p className="mt-3 text-sm font-bold text-slate-900">Private by default</p><p className="mt-1 text-xs leading-5 text-slate-600">Only groups you belong to appear in your Study Groups area.</p></div><div className="rounded-xl bg-slate-50 p-4"><BookOpen className="h-5 w-5 text-teal-700" /><p className="mt-3 text-sm font-bold text-slate-900">Shared learning</p><p className="mt-1 text-xs leading-5 text-slate-600">Coordinate documents, tasks, discussion, and approved content access.</p></div><div className="rounded-xl bg-amber-50 p-4"><Video className="h-5 w-5 text-amber-700" /><p className="mt-3 text-sm font-bold text-slate-900">Meet live</p><p className="mt-1 text-xs leading-5 text-slate-600">Keep your Zoom or Microsoft Teams meeting link with the group.</p></div></div>
+    </section>
+  );
+}
 
 // ─── Profile Tab ─────────────────────────────────────────────────────────────
 
@@ -2926,6 +2940,7 @@ export default function StudentDashboardPage() {
 
   const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "content",       label: "My Content",    icon: BookOpen },
+    { key: "groups",        label: "My Groups",     icon: Users },
     { key: "profile",       label: "Profile",       icon: User },
     { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
     { key: "purchases",     label: "Purchases",     icon: ShoppingCart },
@@ -3107,6 +3122,7 @@ export default function StudentDashboardPage() {
           {/* Tab Content */}
           {activeTab === "profile"       && <ProfileTab />}
           {activeTab === "content"       && <MyContentTab initialContentTab={initialContentTab} initialQuizView={initialQuizView} />}
+          {activeTab === "groups"        && <GroupsTab />}
           {activeTab === "subscriptions" && <SubscriptionsTab />}
           {activeTab === "purchases"     && <PurchasesTab />}
           {activeTab === "certificates"  && <CertificatesTab />}
