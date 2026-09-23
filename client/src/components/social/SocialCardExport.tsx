@@ -37,6 +37,8 @@ export type CardMotion = {
   /** Browser-local audio retained for a newly generated/uploaded track. */
   musicBlob?: Blob | null;
   musicTitle?: string | null;
+  /** Same-origin Question Bank video shown in full before a combined answer reveal. */
+  questionVideoUrl?: string | null;
 };
 
 type SocialCardExportOptions = {
@@ -51,6 +53,7 @@ type RenderedCard = {
   image: ImageBitmap;
   width: number;
   height: number;
+  videoFrame?: { x: number; y: number; width: number; height: number };
 };
 
 const SOURCE_WIDTH = 1080;
@@ -66,6 +69,12 @@ const COMBINED_ANSWER_REVEAL_SECONDS = 7.11;
 // is drawn so the first animated item cannot rise into that heading.
 const STATIC_LABEL_TO_CONTENT_GAP_RATIO = 0.82;
 const FALLBACK_BACKGROUND = "#071318";
+
+type MotionTimeline = {
+  contentEndSeconds: number;
+  totalSeconds: number;
+  videoDurationSeconds: number;
+};
 
 export type SocialMusicOption = {
   id: string;
@@ -193,7 +202,30 @@ async function cardToBitmap(cardElement: HTMLElement): Promise<RenderedCard> {
   });
   const response = await fetch(dataUrl);
   const blob = await response.blob();
-  return { image: await createImageBitmap(blob), width, height };
+  const cardBounds = cardElement.getBoundingClientRect();
+  const video = cardElement.querySelector("video");
+  const videoBounds = video?.getBoundingClientRect();
+  const videoFrame = videoBounds && videoBounds.width > 0 && videoBounds.height > 0
+    ? {
+      x: Math.max(0, videoBounds.left - cardBounds.left),
+      y: Math.max(0, videoBounds.top - cardBounds.top),
+      width: Math.min(width, videoBounds.width),
+      height: Math.min(height, videoBounds.height),
+    }
+    : undefined;
+  return { image: await createImageBitmap(blob), width, height, videoFrame };
+}
+
+function motionTimeline(motion: CardMotion, video: HTMLVideoElement | null): MotionTimeline {
+  const videoDurationSeconds = motion.kind === "combined" && video && Number.isFinite(video.duration)
+    ? clamp(video.duration, 0, 90)
+    : 0;
+  // Hold the completed question/options for three seconds before revealing the answer,
+  // and keep the answer visible for at least three seconds before the 10-second outro.
+  const contentEndSeconds = videoDurationSeconds > 0
+    ? Math.max(OUTRO_START_SECONDS, videoDurationSeconds + 6)
+    : OUTRO_START_SECONDS;
+  return { contentEndSeconds, totalSeconds: contentEndSeconds + OUTRO_HOLD_SECONDS, videoDurationSeconds };
 }
 
 function getCardPlacement(
@@ -248,6 +280,26 @@ function drawExportFrame(
     context.fillStyle = `rgba(2, 11, 16, ${clamp(overlayAlpha, 0, 0.92)})`;
     context.fillRect(0, 0, targetWidth, targetHeight);
   }
+}
+
+function drawLiveCardVideo(
+  context: CanvasRenderingContext2D,
+  card: RenderedCard,
+  video: HTMLVideoElement,
+  targetWidth: number,
+  targetHeight: number,
+) {
+  if (!card.videoFrame || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+  const placement = getCardPlacement(card.width, card.height, targetWidth, targetHeight);
+  const scaleX = placement.width / card.width;
+  const scaleY = placement.height / card.height;
+  context.drawImage(
+    video,
+    placement.x + card.videoFrame.x * scaleX,
+    placement.y + card.videoFrame.y * scaleY,
+    card.videoFrame.width * scaleX,
+    card.videoFrame.height * scaleY,
+  );
 }
 
 function drawMotionPanel(
@@ -448,11 +500,23 @@ function drawMotionFrame(
   targetWidth: number,
   targetHeight: number,
   logo?: HTMLImageElement | null,
+  video?: HTMLVideoElement | null,
+  timeline: MotionTimeline = { contentEndSeconds: OUTRO_START_SECONDS, totalSeconds: MOTION_DURATION_SECONDS, videoDurationSeconds: 0 },
 ) {
-  const outroProgress = clamp((elapsed - OUTRO_START_SECONDS) / 0.6, 0, 1);
+  const outroProgress = clamp((elapsed - timeline.contentEndSeconds) / 0.6, 0, 1);
   drawExportFrame(context, card, targetWidth, targetHeight, 0.86 * (1 - outroProgress));
   if (outroProgress < 1) {
-    drawMotionPanel(context, motion, elapsed, targetWidth, targetHeight);
+    if (timeline.videoDurationSeconds > 0 && video && elapsed < timeline.videoDurationSeconds) {
+      drawLiveCardVideo(context, card, video, targetWidth, targetHeight);
+      return;
+    }
+    // The static card keeps the question/options visible after the clip. Resume
+    // its staging at the completed-option point, then preserve the three-second
+    // pause before the answer reveal.
+    const panelElapsed = timeline.videoDurationSeconds > 0
+      ? elapsed - timeline.videoDurationSeconds + 4.11
+      : elapsed;
+    drawMotionPanel(context, motion, panelElapsed, targetWidth, targetHeight);
     return;
   }
 
@@ -508,10 +572,38 @@ async function loadMotionLogo(url: string | undefined): Promise<HTMLImageElement
   });
 }
 
+async function loadMotionVideo(url: string | null | undefined): Promise<HTMLVideoElement | null> {
+  if (!url) return null;
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.preload = "auto";
+    video.muted = true;
+    video.playsInline = true;
+    const timeout = window.setTimeout(() => resolve(null), 15_000);
+    const finish = () => {
+      window.clearTimeout(timeout);
+      resolve(Number.isFinite(video.duration) && video.duration > 0 ? video : null);
+    };
+    video.onloadedmetadata = finish;
+    video.onerror = () => {
+      window.clearTimeout(timeout);
+      resolve(null);
+    };
+    video.src = url;
+    video.load();
+  });
+}
+
+function waitForMotionFrame() {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, Math.round(1000 / FRAME_RATE)));
+}
+
 async function addMusicTrack(
   output: Output,
   musicUrl: string | null | undefined,
   musicBlob?: Blob | null,
+  maxDurationSeconds = MOTION_DURATION_SECONDS,
 ): Promise<{ source: AudioBufferSource; buffer: AudioBuffer } | null> {
   if (!musicUrl && !musicBlob) return null;
   try {
@@ -526,7 +618,7 @@ async function addMusicTrack(
     if (!AudioContextCtor) throw new Error("This browser cannot decode audio for MP4 export.");
     const audioContext = new AudioContextCtor();
     const decoded = await audioContext.decodeAudioData(bytes.slice(0));
-    const frames = Math.min(decoded.length, Math.floor(decoded.sampleRate * MOTION_DURATION_SECONDS));
+    const frames = Math.min(decoded.length, Math.floor(decoded.sampleRate * maxDurationSeconds));
     const clip = audioContext.createBuffer(decoded.numberOfChannels, frames, decoded.sampleRate);
     for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) {
       clip.copyToChannel(decoded.getChannelData(channel).slice(0, frames), channel);
@@ -576,7 +668,10 @@ export async function renderSocialCardAsMp4(
     throw new Error("MP4 export needs a current Chromium-based browser with hardware video encoding.");
   }
   const preset = getSocialExportPreset(platform);
-  const card = await cardToBitmap(cardElement);
+  const [motionVideo, card] = await Promise.all([
+    loadMotionVideo(motion.questionVideoUrl),
+    cardToBitmap(cardElement),
+  ]);
   try {
     const canvas = document.createElement("canvas");
     canvas.width = preset.width;
@@ -587,17 +682,20 @@ export async function renderSocialCardAsMp4(
     const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
     const source = new CanvasSource(canvas, { codec: "avc", bitrate: new Quality("high") });
     output.addVideoTrack(source);
+    const timeline = motionTimeline(motion, motionVideo);
     const [logo, music] = await Promise.all([
       loadMotionLogo(motion.logoUrl),
-      addMusicTrack(output, motion.musicUrl, motion.musicBlob),
+      addMusicTrack(output, motion.musicUrl, motion.musicBlob, timeline.totalSeconds),
     ]);
     await output.start();
     try {
-      const frames = MOTION_DURATION_SECONDS * FRAME_RATE;
+      if (motionVideo) await motionVideo.play().catch(() => undefined);
+      const frames = Math.ceil(timeline.totalSeconds * FRAME_RATE);
       for (let frame = 0; frame < frames; frame += 1) {
         const elapsed = frame / FRAME_RATE;
-        drawMotionFrame(context, card, motion, elapsed, preset.width, preset.height, logo);
+        drawMotionFrame(context, card, motion, elapsed, preset.width, preset.height, logo, motionVideo, timeline);
         await source.add(elapsed, 1 / FRAME_RATE);
+        if (motionVideo && elapsed < timeline.videoDurationSeconds) await waitForMotionFrame();
       }
       if (music) await music.source.add(music.buffer);
       await output.finalize();

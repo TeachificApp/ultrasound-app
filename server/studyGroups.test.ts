@@ -130,8 +130,8 @@ describe("Study Groups", () => {
     expect(workspace).toContain("Choose Organization Group Access");
     expect(workspace).toContain('plan: "up_to_20"');
     expect(workspace).toContain('plan: "unlimited"');
-    expect(listing).toContain("organizationUpToTwentySeatLimit");
-    expect(listing).toContain("unlimited members");
+    expect(listing).toContain("Organization Access from $49/month");
+    expect(listing).toContain("Choose Organization Access");
   });
 
   it("limits Organization coverage to one $49 group or three $99 groups", () => {
@@ -144,7 +144,7 @@ describe("Study Groups", () => {
     expect(router).toContain("reusableOrganizationGroup");
     expect(router).toContain("Additional groups remain free with free-group limits");
     expect(router).toContain("groups.map((group) => recordActivity");
-    expect(listing).toContain("up to three groups with unlimited members");
+    expect(listing).toContain("Organization Access from $49/month");
     expect(workspace).toContain("Covers up to {organizationUnlimitedGroupLimit} Organization groups");
   });
 
@@ -153,9 +153,9 @@ describe("Study Groups", () => {
     const listing = read("client/src/pages/StudyGroupsPage.tsx");
     const workspace = read("client/src/pages/StudyGroupWorkspace.tsx");
 
-    expect(listing).toContain("Sign up for Organization access");
-    expect(listing).toContain("Set up Group Learning Access");
-    expect(listing).toContain("add at least three participants later");
+    expect(listing).toContain("Choose Organization Access");
+    expect(listing).toContain("Explore Group Learning");
+    expect(listing).toContain("You can invite the required three participants after it is created");
     expect(workspace).toContain("setup === \"organization\"");
     expect(workspace).toContain("setup === \"group-learning\"");
     expect(workspace).toContain("permanently assigned to its first participant");

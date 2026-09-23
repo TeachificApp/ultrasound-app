@@ -30,6 +30,8 @@ type BankOption = { text: string; imageUrl?: string; videoUrl?: string };
 type MediaFilter = "all" | "image" | "video";
 const OPTION_LETTERS = ["A", "B", "C", "D"];
 
+type QuestionCardMediaKind = "question-image" | "question-video" | "option-image" | "option-video";
+
 function stripHtml(value: string | null | undefined): string {
   return (value ?? "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -41,14 +43,22 @@ function normalizeOptions(value: unknown): BankOption[] {
     .filter((option) => typeof option?.text === "string" && stripHtml(option.text));
 }
 
+function questionCardMediaUrl(question: any, kind: QuestionCardMediaKind, sourceUrl: string | undefined): string | undefined {
+  if (!sourceUrl) return undefined;
+  const questionId = Number(question?.id);
+  return Number.isSafeInteger(questionId) && questionId > 0
+    ? `/api/question-bank-card-media/${questionId}/${kind}`
+    : sourceUrl;
+}
+
 function getQuestionMedia(question: any): ClinicalCardMedia {
   const options = normalizeOptions(question.options);
   const optionVideo = options.find((option) => option.videoUrl)?.videoUrl;
   const optionImage = options.find((option) => option.imageUrl)?.imageUrl;
-  if (question.questionVideoUrl) return { kind: "video", url: question.questionVideoUrl };
-  if (question.questionImageUrl) return { kind: "image", url: question.questionImageUrl };
-  if (optionVideo) return { kind: "video", url: optionVideo };
-  if (optionImage) return { kind: "image", url: optionImage };
+  if (question.questionVideoUrl) return { kind: "video", url: questionCardMediaUrl(question, "question-video", question.questionVideoUrl)! };
+  if (question.questionImageUrl) return { kind: "image", url: questionCardMediaUrl(question, "question-image", question.questionImageUrl)! };
+  if (optionVideo) return { kind: "video", url: questionCardMediaUrl(question, "option-video", optionVideo)! };
+  if (optionImage) return { kind: "image", url: questionCardMediaUrl(question, "option-image", optionImage)! };
   return { kind: "none" };
 }
 
@@ -208,7 +218,7 @@ export default function QuestionBankSocialCardGenerator() {
   const totalPages = Math.max(1, Math.ceil((questionsQuery.data?.total ?? 0) / 100));
 
   const selectRepositoryAsset = useCallback((asset: any) => {
-    const url = asset.currentVersion?.s3Url;
+    const url = asset.slug ? `/api/media/${asset.slug}` : asset.currentVersion?.s3Url;
     if (!url) return;
     setMedia(asset.mediaType === "video" || asset.mimeType?.startsWith("video/") ? { kind: "video", url } : { kind: "image", url });
   }, []);
@@ -227,8 +237,10 @@ export default function QuestionBankSocialCardGenerator() {
         brand: presentation.brand,
         onProgress: setUploadProgress,
       });
-      setMedia(file.type.startsWith("video/") ? { kind: "video", url: uploaded.s3Url } : { kind: "image", url: uploaded.s3Url });
-      await mediaAssets.refetch();
+      const refreshed = await mediaAssets.refetch();
+      const asset = refreshed.data?.assets.find((item: any) => item.id === uploaded.assetId);
+      const url = asset?.slug ? `/api/media/${asset.slug}` : uploaded.s3Url;
+      setMedia(file.type.startsWith("video/") ? { kind: "video", url } : { kind: "image", url });
       toast.success("Media uploaded to Media Repository and selected for this card.");
     } catch (error: any) {
       toast.error(error?.message ?? "Media upload failed.");
@@ -241,16 +253,17 @@ export default function QuestionBankSocialCardGenerator() {
     if (!cardRef.current || !activeQuestion) return;
     setExporting(exportFormat);
     try {
+      const questionVideoUrl = media.kind === "video" ? media.url : null;
       const filename = await exportSocialCard({
         cardElement: cardRef.current,
         platform: exportPlatform,
         format: exportFormat,
         filenameStem: fileStemFor(activeQuestion, cardVariant),
         motion: cardVariant === "answer"
-          ? { kind: "answer", title: activeQuestion.question, options, detail: "Review the question", answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
+          ? { kind: "answer", title: activeQuestion.question, options, detail: "Review the question", answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl }
           : cardVariant === "combined"
-            ? { kind: "combined", title: activeQuestion.question, options, answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
-            : { kind: "question", title: activeQuestion.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title },
+            ? { kind: "combined", title: activeQuestion.question, options, answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl }
+            : { kind: "question", title: activeQuestion.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl },
       });
       toast.success(`${exportFormat.toUpperCase()} export is ready.`, { description: filename });
     } catch (error: any) {
@@ -258,7 +271,7 @@ export default function QuestionBankSocialCardGenerator() {
     } finally {
       setExporting(null);
     }
-  }, [activeQuestion, cardVariant, correctAnswer, exportFormat, exportPlatform, options, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
+  }, [activeQuestion, cardVariant, correctAnswer, exportFormat, exportPlatform, media, options, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
 
   const saveToLibrary = useCallback(() => {
     if (!activeQuestion) return;

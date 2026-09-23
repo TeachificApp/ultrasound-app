@@ -33,6 +33,7 @@ import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResourc
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
 import { registerSocialPostMediaRoute } from "../routes/socialPostMedia";
 import { registerStandaloneQuizMediaRoute } from "../routes/standaloneQuizMedia";
+import { registerQuestionBankCardMediaRoute } from "../routes/questionBankCardMedia";
 import { registerUploadTeachRoute } from "../routes/uploadTeach";
 import { registerUploadGenericRoute } from "../routes/uploadGeneric";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
@@ -697,6 +698,8 @@ async function startServer() {
   registerSocialPostMediaRoute(app);
   // Same-origin, attempt-authorized proxy for native standalone quiz question and feedback media.
   registerStandaloneQuizMediaRoute(app);
+  // Same-origin, Platform-Admin-only proxy keeps Question Bank card media export-safe.
+  registerQuestionBankCardMediaRoute(app);
   // TEACH chunked file upload (multipart, bypasses tRPC JSON body limit for large PPTX files)
   registerUploadTeachRoute(app);
   // Generic file upload endpoint — used by uploadFile() helper for scan coach media and other uploads
