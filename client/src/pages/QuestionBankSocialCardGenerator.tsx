@@ -249,10 +249,10 @@ export default function QuestionBankSocialCardGenerator() {
         format: exportFormat,
         filenameStem: fileStemFor(activeQuestion, cardVariant),
         motion: cardVariant === "answer"
-          ? { kind: "answer", title: activeQuestion.question, options, detail: "Review the question", answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
+          ? { kind: "answer", title: activeQuestion.question, options, detail: "Review the question", answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
           : cardVariant === "combined"
-            ? { kind: "combined", title: activeQuestion.question, options, answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
-            : { kind: "question", title: activeQuestion.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title },
+            ? { kind: "combined", title: activeQuestion.question, options, answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
+            : { kind: "question", title: activeQuestion.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title },
       });
       toast.success(`${exportFormat.toUpperCase()} export is ready.`, { description: filename });
     } catch (error: any) {
@@ -260,7 +260,7 @@ export default function QuestionBankSocialCardGenerator() {
     } finally {
       setExporting(null);
     }
-  }, [activeQuestion, cardVariant, correctAnswer, exportFormat, exportPlatform, options, presentation.accentColor, presentation.displayName, presentation.logoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
+  }, [activeQuestion, cardVariant, correctAnswer, exportFormat, exportPlatform, options, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
 
   const saveToLibrary = useCallback(() => {
     if (!activeQuestion) return;

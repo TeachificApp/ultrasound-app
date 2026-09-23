@@ -11,6 +11,10 @@ export type BrandToolPresentation = {
   publicUrl: string;
   publicHost: string;
   logoUrl: string;
+  /** Logo source used only for the video outro. */
+  outroLogoUrl: string;
+  /** Optional transparent-looking circular crop for an opaque square app icon. */
+  outroLogoShape?: "circle";
   primaryColor: string;
   darkColor: string;
   accentColor: string;
@@ -45,6 +49,8 @@ export function getBrandToolPresentation(brand: Brand): BrandToolPresentation {
     publicUrl: config.websiteUrl,
     publicHost: new URL(config.websiteUrl).hostname,
     logoUrl: config.logoUrl,
+    outroLogoUrl: config.logoUrl,
+    outroLogoShape: isIHeartEcho ? "circle" : undefined,
     primaryColor: config.primaryColor,
     darkColor: config.darkColor,
     accentColor: config.accentColor,

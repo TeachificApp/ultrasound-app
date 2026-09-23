@@ -68,12 +68,15 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("OUTRO_HOLD_SECONDS = 10");
     expect(exporter).toContain("COMBINED_ANSWER_REVEAL_SECONDS = 7.11");
     expect(exporter).toContain("motion.outroHost");
+    expect(exporter).toContain('motion.logoShape === "circle"');
+    expect(exporter).toContain("context.arc(centerX, logoCenterY, logoSize / 2");
   });
 
   it("surfaces platform and PNG-or-MP4 choices in every card generator", () => {
     const challenge = readProjectFile("client/src/pages/ChallengeCardGenerator.tsx");
     const social = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
     const quiz = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+    const presentation = readProjectFile("client/src/lib/brandToolPresentation.ts");
     for (const page of [challenge, social, quiz]) {
       expect(page).toContain("SocialExportControls");
       expect(page).toContain("DEFAULT_SOCIAL_EXPORT_PLATFORM");
@@ -91,5 +94,7 @@ describe("social card platform exports", () => {
     expect(challenge).toContain("SocialCardFrameProvider");
     expect(social).toContain("SocialCardFrameProvider");
     expect(quiz).toContain("SocialCardFrameProvider");
+    expect(presentation).toContain('outroLogoShape: isIHeartEcho ? "circle" : undefined');
+    for (const page of [challenge, social, quiz]) expect(page).toContain("presentation.outroLogoUrl");
   });
 });

@@ -29,6 +29,8 @@ export type CardMotion = {
   brandName?: string;
   accentColor?: string;
   logoUrl?: string;
+  /** Removes the opaque square surrounding a circular source mark during the outro only. */
+  logoShape?: "circle";
   /** Website shown on the final brand screen; cards choose their approved destination. */
   outroHost?: string;
   musicUrl?: string | null;
@@ -466,9 +468,24 @@ function drawMotionFrame(
     const sourceWidth = logo.naturalWidth || logo.width || logoSize;
     const sourceHeight = logo.naturalHeight || logo.height || logoSize;
     const aspectRatio = sourceWidth / sourceHeight;
-    const width = aspectRatio >= 1 ? logoSize : logoSize * aspectRatio;
-    const height = aspectRatio >= 1 ? logoSize / aspectRatio : logoSize;
-    context.drawImage(logo, centerX - width / 2, targetHeight * 0.31 - height / 2, width, height);
+    const circularMark = motion.logoShape === "circle";
+    // The iHeartEcho source icon has a 74% circular emblem inside an opaque square.
+    // Scale and clip only for the video outro so the square never reaches the canvas.
+    const sourceEmblemRatio = circularMark ? 0.74 : 1;
+    const renderedSize = logoSize / sourceEmblemRatio;
+    const width = aspectRatio >= 1 ? renderedSize : renderedSize * aspectRatio;
+    const height = aspectRatio >= 1 ? renderedSize / aspectRatio : renderedSize;
+    const logoCenterY = targetHeight * 0.31;
+    if (circularMark) {
+      context.save();
+      context.beginPath();
+      context.arc(centerX, logoCenterY, logoSize / 2, 0, Math.PI * 2);
+      context.clip();
+      context.drawImage(logo, centerX - width / 2, logoCenterY - height / 2, width, height);
+      context.restore();
+    } else {
+      context.drawImage(logo, centerX - width / 2, logoCenterY - height / 2, width, height);
+    }
   }
   context.fillStyle = "#ffffff";
   context.textAlign = "center";

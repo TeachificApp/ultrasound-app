@@ -1025,9 +1025,9 @@ function CategorySection({
       : null;
   const explanationText = q.explanation ? stripHtml(q.explanation) : null;
   const contextLabel = q.category?.trim() || category;
-  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle };
-  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle };
-  const combinedMotion: CardMotion = { kind: "combined", title: q.question, options, answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle };
+  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle };
+  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle };
+  const combinedMotion: CardMotion = { kind: "combined", title: q.question, options, answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle };
   const downloadCombined = async () => {
     if (!combinedRef.current) return;
     setCombinedLoading(true);
@@ -1247,8 +1247,8 @@ export default function ChallengeCardGenerator() {
           ? `${letters[question.correctAnswer]}. ${stripHtml(options[question.correctAnswer] ?? "")}`
           : question.reviewAnswer ? stripHtml(question.reviewAnswer) : null;
         const motion: CardMotion = type === "questions"
-          ? { kind: "question", title: question.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
-          : { kind: "answer", title: question.question, options, detail: "Review the question", answer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.logoUrl, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title };
+          ? { kind: "question", title: question.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
+          : { kind: "answer", title: question.question, options, detail: "Review the question", answer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title };
         const file = await handle.renderPlatform(exportPlatform, exportFormat, motion);
         folder.file(`${cat.replace(/\s+/g, "-")}-${type === "questions" ? "question" : "answer"}.${exportFormat}`, await file.arrayBuffer());
       }
@@ -1260,7 +1260,7 @@ export default function ChallengeCardGenerator() {
     } finally {
       setBatchLoading(null);
     }
-  }, [data, exportFormat, exportPlatform, presentation.accentColor, presentation.brand, presentation.displayName, presentation.logoUrl, selectedDate, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
+  }, [data, exportFormat, exportPlatform, presentation.accentColor, presentation.brand, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, selectedDate, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
 
   // Navigation helpers
   const dates = availableDates ?? [today];
