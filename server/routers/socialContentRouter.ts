@@ -345,6 +345,12 @@ export const socialContentRouter = router({
     .input(z.object({
       id: z.number().int().positive(),
       brand: z.enum(["aaus", "iheartecho"]).optional(),
+      headline: z.string().trim().min(1).max(512).optional(),
+      body: z.string().trim().min(1).max(20_000).optional(),
+      subtext: z.string().trim().max(5_000).nullable().optional(),
+      socialCaption: z.string().trim().min(1).max(20_000).optional(),
+      category: z.enum(CATEGORIES).optional(),
+      contentType: z.enum(CONTENT_TYPES).optional(),
       layoutMode: z.enum(["card", "infographic"]).optional(),
       cardTheme: z.enum(["dark", "light", "white", "teal", "aqua"]).optional(),
       imageUrl: z.string().url().nullable().optional(),
@@ -360,6 +366,9 @@ export const socialContentRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { id, brand: requestedBrand, ...changes } = input;
       const brand = resolveRequestedBrand(requestedBrand, ctx.brand);
+      if (changes.category && !getBrandCategories(brand).includes(changes.category as never)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a category available for the selected brand" });
+      }
       if (changes.mediaAssetId) {
         const [asset] = await db
           .select({ id: mediaAssets.id })

@@ -211,6 +211,13 @@ type GeneratedItem = {
   mediaAssetId?: number | null;
 };
 
+function resolveSocialPostImageUrl(item: GeneratedItem, presentation: BrandToolPresentation): string | undefined {
+  if (item.mediaAssetId && (item.imageSource === "upload" || item.imageSource === "media_repository")) {
+    return `/api/social-post-media/${item.mediaAssetId}?brand=${presentation.brand}`;
+  }
+  return item.imageUrl;
+}
+
 function buildFullSocialPost(item: GeneratedItem, presentation: BrandToolPresentation): string {
   const catTags = CATEGORY_HASHTAGS[item.category] || [];
   const allHashtags = [...new Set([...STANDARD_SOCIAL_HASHTAGS, ...catTags])].join(" ");
@@ -298,7 +305,8 @@ function BrandedFooter({ t, presentation }: { t: ThemeTokens; presentation: Bran
 function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: ThemeTokens; presentation: BrandToolPresentation }) {
   const frame = useSocialCardFrame();
   const px = (value: number) => Math.max(1, Math.round(value * frame.contentScale));
-  const hasImage = !!item.imageUrl;
+  const imageUrl = resolveSocialPostImageUrl(item, presentation);
+  const hasImage = !!imageUrl;
   const imageHeight = frame.layout === "wide" ? px(150) : frame.layout === "landscape" ? px(245) : frame.layout === "vertical" ? px(430) : px(360);
 return (
 <CardShell t={t}>
@@ -312,7 +320,7 @@ return (
       {/* Image area */}
       {hasImage && (
         <div style={{ margin: `0 ${px(48)}px ${px(24)}px`, height: imageHeight, borderRadius: px(16), overflow: "hidden", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, position: "relative" }}>
-          <img src={item.imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+          <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: px(60), background: t.isDark ? "linear-gradient(transparent, rgba(10,22,32,0.6))" : "linear-gradient(transparent, rgba(234,246,247,0.6))" }} />
         </div>
       )}
@@ -339,7 +347,8 @@ return (
 
 // ── Infographic Layout ───────────────────────────────────────────────────────
 function InfographicCard({ item, t, presentation }: { item: GeneratedItem; t: ThemeTokens; presentation: BrandToolPresentation }) {
-  const hasImage = !!item.imageUrl;
+  const imageUrl = resolveSocialPostImageUrl(item, presentation);
+  const hasImage = !!imageUrl;
   // Split body text into bullet points for the infographic
   const bodyLines = item.body.split(/[.!?]+/).filter((s) => s.trim().length > 5).slice(0, 5);
   const leftLines = bodyLines.slice(0, Math.ceil(bodyLines.length / 2));
@@ -404,7 +413,7 @@ function InfographicCard({ item, t, presentation }: { item: GeneratedItem; t: Th
         <div style={{ flex: 1.2, display: "flex", flexDirection: "column", gap: 12 }}>
           {hasImage ? (
             <div style={{ flex: 1, borderRadius: 12, overflow: "hidden", border: `2px solid ${BRAND}44`, boxShadow: `0 4px 20px rgba(0,0,0,0.2)` }}>
-              <img src={item.imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
+              <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "cover" }} crossOrigin="anonymous" />
             </div>
           ) : (
             <div style={{ flex: 1, borderRadius: 12, background: `linear-gradient(135deg, ${BRAND}22, ${BRAND_AQUA}11)`, border: `2px solid ${BRAND}33`, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -689,6 +698,7 @@ export default function SocialContentGenerator() {
   const [savedLibraryBatchLoading, setSavedLibraryBatchLoading] = useState(false);
   const [selectedSavedPostIds, setSelectedSavedPostIds] = useState<number[]>([]);
   const [regeneratingImageIdx, setRegeneratingImageIdx] = useState<number | null>(null);
+  const [savingPostTextIdx, setSavingPostTextIdx] = useState<number | null>(null);
   const [perCardImagePrompts, setPerCardImagePrompts] = useState<Record<number, string>>({});
   const cardRefs = useRef<Record<number, CardHandle>>({});
   const savedPostRefs = useRef<Record<number, CardHandle>>({});
@@ -735,6 +745,42 @@ export default function SocialContentGenerator() {
   const deleteSavedPostMutation = trpc.socialContent.deleteSavedPost.useMutation({
     onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
   });
+
+  const updatePostDraft = useCallback((idx: number, changes: Partial<GeneratedItem>) => {
+    setItems((previous) => previous.map((item, itemIndex) => itemIndex === idx ? { ...item, ...changes } : item));
+  }, []);
+
+  const savePostTextToLibrary = useCallback(async (idx: number) => {
+    const item = items[idx];
+    if (!item?.libraryId) {
+      toast.error("This post is not in the shared Post Library yet", {
+        description: "Generate a saved post or reopen one from the library before saving edits.",
+      });
+      return;
+    }
+    if (!item.headline.trim() || !item.body.trim() || !item.socialCaption.trim()) {
+      toast.error("Headline, card text, and social caption are required before saving.");
+      return;
+    }
+    setSavingPostTextIdx(idx);
+    try {
+      await updateSavedPostMutation.mutateAsync({
+        id: item.libraryId,
+        brand: presentation.brand,
+        headline: item.headline.trim(),
+        body: item.body.trim(),
+        subtext: item.subtext.trim() || null,
+        socialCaption: item.socialCaption.trim(),
+        category: item.category as any,
+        contentType: item.contentType as any,
+      });
+      toast.success("Post text saved to the shared Post Library.");
+    } catch (error: any) {
+      toast.error("Unable to save post text", { description: error?.message ?? "Please try again." });
+    } finally {
+      setSavingPostTextIdx(null);
+    }
+  }, [items, presentation.brand, updateSavedPostMutation]);
 
   const handleGenerate = () => {
     generateMutation.mutate({
@@ -1129,6 +1175,46 @@ export default function SocialContentGenerator() {
                     </div>
                     <SocialPostPanel item={item} presentation={presentation} />
                   </div>
+                  {/* Persistent text editor */}
+                  <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Edit post text</div>
+                        <p className="mt-0.5 text-[10px] text-white/35">Changes update the preview immediately and can be saved to the shared library.</p>
+                      </div>
+                      {item.libraryId ? <Badge className="border-0 bg-teal-300/15 text-[9px] text-teal-100">Library post</Badge> : <Badge className="border-0 bg-amber-300/15 text-[9px] text-amber-100">Not saved</Badge>}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/45">Headline
+                        <input value={item.headline} onChange={(event) => updatePostDraft(idx, { headline: event.target.value })} className="mt-1 w-full rounded border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white outline-none placeholder:text-white/25 focus:border-teal-300/60" />
+                      </label>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/45">Card text
+                        <textarea value={item.body} onChange={(event) => updatePostDraft(idx, { body: event.target.value })} rows={4} className="mt-1 w-full resize-y rounded border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs leading-relaxed text-white outline-none placeholder:text-white/25 focus:border-teal-300/60" />
+                      </label>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/45">Reference or supporting text
+                        <textarea value={item.subtext} onChange={(event) => updatePostDraft(idx, { subtext: event.target.value })} rows={2} placeholder="Optional guideline or source reference" className="mt-1 w-full resize-y rounded border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs leading-relaxed text-white outline-none placeholder:text-white/25 focus:border-teal-300/60" />
+                      </label>
+                      <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/45">Social caption
+                        <textarea value={item.socialCaption} onChange={(event) => updatePostDraft(idx, { socialCaption: event.target.value })} rows={4} className="mt-1 w-full resize-y rounded border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs leading-relaxed text-white outline-none placeholder:text-white/25 focus:border-teal-300/60" />
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/45">Category
+                          <select value={item.category} onChange={(event) => updatePostDraft(idx, { category: event.target.value })} className="mt-1 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white outline-none focus:border-teal-300/60">
+                            {brandCategories.map((option) => <option key={option} value={option} className="bg-[#0e1a24]">{option}</option>)}
+                          </select>
+                        </label>
+                        <label className="block text-[10px] font-semibold uppercase tracking-wider text-white/45">Post type
+                          <select value={item.contentType} onChange={(event) => updatePostDraft(idx, { contentType: event.target.value })} className="mt-1 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white outline-none focus:border-teal-300/60">
+                            {CONTENT_TYPES.map((option) => <option key={option.value} value={option.value} className="bg-[#0e1a24]">{option.label}</option>)}
+                          </select>
+                        </label>
+                      </div>
+                      <Button size="sm" disabled={!item.libraryId || savingPostTextIdx === idx} onClick={() => void savePostTextToLibrary(idx)} className="h-8 w-full bg-teal-500 text-xs text-white hover:bg-teal-400 disabled:opacity-45">
+                        {savingPostTextIdx === idx ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}
+                        {savingPostTextIdx === idx ? "Saving post text…" : "Save text to Post Library"}
+                      </Button>
+                    </div>
+                  </div>
                   {/* Image controls */}
                   <div className="flex flex-col gap-1.5 mt-1">
                     <div className="flex items-center gap-1.5">
@@ -1156,7 +1242,7 @@ export default function SocialContentGenerator() {
                           <Button size="sm" variant="outline" onClick={() => handleRemoveImage(idx)} className="gap-1.5 text-red-400/70 border-red-400/20 hover:bg-red-400/10 text-xs">
                             <X className="w-3 h-3" /> Remove
                           </Button>
-                          <a href={item.imageUrl} target="_blank" rel="noopener noreferrer" download>
+                          <a href={resolveSocialPostImageUrl(item, presentation) ?? item.imageUrl} target="_blank" rel="noopener noreferrer" download>
                             <Button size="sm" variant="outline" className="gap-1.5 text-white/50 border-white/15 hover:bg-white/10 text-xs">
                               <Download className="w-3 h-3" /> Image Only
                             </Button>
@@ -1194,7 +1280,7 @@ export default function SocialContentGenerator() {
                       <div className="grid grid-cols-4 gap-1.5">
                         {mediaAssets.data?.assets.map((asset: any) => (
                           <button key={asset.id} onClick={() => handleRepositoryImage(idx, asset)} className="overflow-hidden rounded border border-white/10 bg-black/20 text-left hover:border-teal-300/70" title={asset.title}>
-                            {asset.currentVersion?.s3Url ? <img src={asset.currentVersion.s3Url} alt={asset.title} className="h-14 w-full object-cover" /> : <div className="flex h-14 items-center justify-center"><ImageLucide className="h-4 w-4 text-teal-200" /></div>}
+                            {asset.currentVersion?.s3Url ? <img src={`/api/social-post-media/${asset.id}?brand=${presentation.brand}`} alt={asset.title} className="h-14 w-full object-cover" /> : <div className="flex h-14 items-center justify-center"><ImageLucide className="h-4 w-4 text-teal-200" /></div>}
                             <span className="line-clamp-1 block p-1 text-[9px] text-white/60">{asset.title}</span>
                           </button>
                         ))}

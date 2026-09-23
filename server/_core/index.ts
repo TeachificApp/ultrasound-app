@@ -31,6 +31,7 @@ import { registerUploadCohortMediaRoute } from "../routes/uploadCohortMedia";
 import { registerStudyGroupDocumentUploadRoute } from "../routes/uploadStudyGroupDocument";
 import { registerUploadCohortResourceRoute } from "../routes/uploadCohortResource";
 import { registerUploadSocialImageRoute } from "../routes/uploadSocialImage";
+import { registerSocialPostMediaRoute } from "../routes/socialPostMedia";
 import { registerUploadTeachRoute } from "../routes/uploadTeach";
 import { registerUploadGenericRoute } from "../routes/uploadGeneric";
 import { registerSsoAutoRoute } from "../routes/ssoAuto";
@@ -691,6 +692,8 @@ async function startServer() {
   registerUploadCohortResourceRoute(app);
   // Social content image upload (multipart, admin only)
   registerUploadSocialImageRoute(app);
+  // Same-origin, authenticated image proxy for private Social Post media assets.
+  registerSocialPostMediaRoute(app);
   // TEACH chunked file upload (multipart, bypasses tRPC JSON body limit for large PPTX files)
   registerUploadTeachRoute(app);
   // Generic file upload endpoint — used by uploadFile() helper for scan coach media and other uploads

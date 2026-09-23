@@ -38,6 +38,19 @@ describe("shared Social Post Library", () => {
     expect(router).toContain("deletedAt: new Date()");
   });
 
+  it("persists every editable Social Post text field and keeps category choices brand-safe", () => {
+    const client = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
+    const router = readProjectFile("server/routers/socialContentRouter.ts");
+
+    expect(router).toContain("headline: z.string().trim().min(1).max(512).optional()");
+    expect(router).toContain("body: z.string().trim().min(1).max(20_000).optional()");
+    expect(router).toContain("socialCaption: z.string().trim().min(1).max(20_000).optional()");
+    expect(router).toContain("Choose a category available for the selected brand");
+    expect(client).toContain("Edit post text");
+    expect(client).toContain("Save text to Post Library");
+    expect(client).toContain("savePostTextToLibrary");
+  });
+
   it("uses approved Media Repository uploads and selection while retaining AI-generated images", () => {
     const client = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
 
