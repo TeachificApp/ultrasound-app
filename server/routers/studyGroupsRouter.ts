@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { z } from "zod";
 import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { protectedProcedure, router } from "../_core/trpc";
@@ -19,6 +19,7 @@ import {
   studyGroupMembers,
   studyGroupMessages,
   studyGroupModules,
+  studyGroupShareLinks,
   studyGroups,
   studyGroupTasks,
   studyGroupWorkspaceBlocks,
@@ -70,6 +71,11 @@ function displayName(user: { displayName?: string | null; name?: string | null; 
 
 function createInviteToken() {
   return `${randomUUID().replaceAll("-", "")}${Date.now().toString(36)}`;
+}
+
+/** A 256-bit opaque bearer token; links never grant an administrative role. */
+function createShareLinkToken() {
+  return randomBytes(32).toString("base64url");
 }
 
 function validateMeeting(input: z.infer<typeof meetingInputSchema>) {
@@ -449,6 +455,57 @@ export const studyGroupsRouter = router({
     return { ok: true, isOrganizationActive: hasActiveOrganization(access.group) };
   }),
 
+  getActiveShareLink: protectedProcedure.input(groupIdSchema).query(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await requireGroupAccess(db, input.groupId, ctx.user.id, ctx.user.role, { manage: true });
+    const [shareLink] = await db.select({
+      id: studyGroupShareLinks.id,
+      token: studyGroupShareLinks.token,
+      createdAt: studyGroupShareLinks.createdAt,
+    }).from(studyGroupShareLinks).where(and(
+      eq(studyGroupShareLinks.groupId, input.groupId),
+      isNull(studyGroupShareLinks.revokedAt),
+    )).orderBy(desc(studyGroupShareLinks.createdAt)).limit(1);
+    return shareLink ?? null;
+  }),
+
+  createShareLink: protectedProcedure.input(groupIdSchema).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await requireGroupAccess(db, input.groupId, ctx.user.id, ctx.user.role, { manage: true });
+    const token = createShareLinkToken();
+    const inserted = await db.transaction(async (tx) => {
+      // One current link per group keeps revocation straightforward. Creating a new
+      // link rotates the old bearer token without affecting any current members.
+      await tx.update(studyGroupShareLinks).set({ revokedAt: new Date() }).where(and(
+        eq(studyGroupShareLinks.groupId, input.groupId),
+        isNull(studyGroupShareLinks.revokedAt),
+      ));
+      return tx.insert(studyGroupShareLinks).values({
+        groupId: input.groupId,
+        token,
+        createdByUserId: ctx.user.id,
+      }).$returningId();
+    });
+    const id = inserted[0]?.id ?? 0;
+    if (!id) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to create a share link." });
+    await recordActivity(db, input.groupId, ctx.user.id, "share_link_created", "Created a reusable member invitation link.", "share_link", id);
+    return { id, token };
+  }),
+
+  revokeShareLink: protectedProcedure.input(groupIdSchema.extend({ shareLinkId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    await requireGroupAccess(db, input.groupId, ctx.user.id, ctx.user.role, { manage: true });
+    const [shareLink] = await db.select({ id: studyGroupShareLinks.id }).from(studyGroupShareLinks).where(and(
+      eq(studyGroupShareLinks.id, input.shareLinkId),
+      eq(studyGroupShareLinks.groupId, input.groupId),
+      isNull(studyGroupShareLinks.revokedAt),
+    )).limit(1);
+    if (!shareLink) throw new TRPCError({ code: "NOT_FOUND", message: "This share link is no longer active." });
+    await db.update(studyGroupShareLinks).set({ revokedAt: new Date() }).where(eq(studyGroupShareLinks.id, shareLink.id));
+    await recordActivity(db, input.groupId, ctx.user.id, "share_link_revoked", "Revoked a reusable member invitation link.", "share_link", shareLink.id);
+    return { ok: true };
+  }),
+
   inviteByEmail: protectedProcedure.input(groupIdSchema.extend({
     email: z.string().email().max(320),
     role: z.enum(["member", "org_admin"]).default("member"),
@@ -501,6 +558,53 @@ export const studyGroupsRouter = router({
       .where(eq(studyGroupMembers.id, invite.id));
     await recordActivity(db, invite.groupId, ctx.user.id, "member_joined", `${displayName(actor.user ?? {})} joined the group.`, "member", invite.id);
     return { groupId: invite.groupId };
+  }),
+
+  acceptShareLink: protectedProcedure.input(z.object({ token: z.string().min(32).max(128) })).mutation(async ({ ctx, input }) => {
+    const db = await requireDb();
+    const actor = await getActorEmail(ctx.user.id);
+    const [shareLink] = await db.select().from(studyGroupShareLinks).where(and(
+      eq(studyGroupShareLinks.token, input.token),
+      isNull(studyGroupShareLinks.revokedAt),
+    )).limit(1);
+    if (!shareLink) throw new TRPCError({ code: "NOT_FOUND", message: "This share link is no longer available." });
+
+    const groupId = await db.transaction(async (tx) => {
+      const [group] = await tx.select().from(studyGroups).where(and(
+        eq(studyGroups.id, shareLink.groupId),
+        eq(studyGroups.status, "active"),
+      )).limit(1);
+      if (!group) throw new TRPCError({ code: "NOT_FOUND", message: "This study group is no longer available." });
+
+      const [existing] = await tx.select().from(studyGroupMembers).where(and(
+        eq(studyGroupMembers.groupId, group.id),
+        eq(studyGroupMembers.email, actor.email),
+      )).limit(1);
+      if (existing?.inviteStatus === "revoked") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "A group administrator must restore this member before they can rejoin." });
+      }
+      if (existing?.inviteStatus === "active") return group.id;
+      if (!existing && !hasActiveOrganization(group) && await activeSeatCount(tx, group.id) >= STUDY_GROUP_FREE_SEAT_LIMIT) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `This free study group already has its ${STUDY_GROUP_FREE_SEAT_LIMIT}-participant limit. Ask a group administrator for help.` });
+      }
+      if (existing) {
+        await tx.update(studyGroupMembers).set({ userId: ctx.user.id, inviteStatus: "active", joinedAt: new Date(), inviteToken: null, revokedAt: null })
+          .where(eq(studyGroupMembers.id, existing.id));
+      } else {
+        await tx.insert(studyGroupMembers).values({
+          groupId: group.id,
+          userId: ctx.user.id,
+          email: actor.email,
+          role: "member",
+          inviteStatus: "active",
+          invitedByUserId: shareLink.createdByUserId,
+          joinedAt: new Date(),
+        });
+      }
+      return group.id;
+    });
+    await recordActivity(db, groupId, ctx.user.id, "member_joined_by_link", `${displayName(actor.user ?? {})} joined using a share link.`, "member");
+    return { groupId };
   }),
 
   revokeMember: protectedProcedure.input(groupIdSchema.extend({ memberId: z.number().int().positive() })).mutation(async ({ ctx, input }) => {

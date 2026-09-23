@@ -68,6 +68,7 @@ const EducationLibrary = lazy(() => import("./pages/EducationLibrary"));
 const StudyGroupsPage = lazy(() => import("./pages/StudyGroupsPage"));
 const StudyGroupWorkspace = lazy(() => import("./pages/StudyGroupWorkspace"));
 const StudyGroupInvite = lazy(() => import("./pages/StudyGroupInvite"));
+const StudyGroupShareJoin = lazy(() => import("./pages/StudyGroupShareJoin"));
 const StudyGroupsAdmin = lazy(() => import("./pages/admin/StudyGroupsAdmin"));
 const LMSHome = lazy(() => import("./pages/LMSHome"));
 const CollectionDetail = lazy(() => import("./pages/CollectionDetail"));
@@ -951,6 +952,7 @@ function LMSRouter() {
             <Route path="/admin/community">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CommunityAdmin /></RoleGuard>}</Route>
             <Route path="/admin/study-groups">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><StudyGroupsAdmin /></RoleGuard>}</Route>
             <Route path="/study-groups/invite" component={StudyGroupInvite} />
+            <Route path="/study-groups/join" component={StudyGroupShareJoin} />
             <Route path="/study-groups/:groupId" component={StudyGroupWorkspace} />
             <Route path="/study-groups" component={StudyGroupsPage} />
             <Route path="/education-library" component={EducationLibrary} />

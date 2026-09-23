@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 const REQUIRED_TABLES = [
   "study_groups",
   "study_group_members",
+  "study_group_share_links",
   "study_group_documents",
   "study_group_tasks",
   "study_group_messages",

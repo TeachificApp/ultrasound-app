@@ -8681,6 +8681,25 @@ export const studyGroupMembers = mysqlTable("study_group_members", {
 export type StudyGroupMember = typeof studyGroupMembers.$inferSelect;
 export type InsertStudyGroupMember = typeof studyGroupMembers.$inferInsert;
 
+/**
+ * A revocable, group-admin-managed link. The token is intentionally high entropy
+ * and a valid link always grants ordinary member access only.
+ */
+export const studyGroupShareLinks = mysqlTable("study_group_share_links", {
+  id: int("id").autoincrement().primaryKey(),
+  groupId: int("group_id").notNull(),
+  token: varchar("token", { length: 128 }).notNull(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  tokenUnique: uniqueIndex("uq_study_group_share_link_token").on(t.token),
+  groupActiveIdx: index("idx_study_group_share_link_group_active").on(t.groupId, t.revokedAt),
+}));
+export type StudyGroupShareLink = typeof studyGroupShareLinks.$inferSelect;
+export type InsertStudyGroupShareLink = typeof studyGroupShareLinks.$inferInsert;
+
 export const studyGroupDocuments = mysqlTable("study_group_documents", {
   id: int("id").autoincrement().primaryKey(),
   groupId: int("group_id").notNull(),

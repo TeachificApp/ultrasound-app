@@ -65,6 +65,34 @@ describe("Study Groups", () => {
     expect(router).toContain("Study Group links must use an approved Learn platform address.");
   });
 
+  it("provides revocable share links that can grant only participant access", () => {
+    const migration = read("drizzle/0074_study_group_share_links.sql");
+    const schema = read("drizzle/schema.ts");
+    const router = read("server/routers/studyGroupsRouter.ts");
+    const workspace = read("client/src/pages/StudyGroupWorkspace.tsx");
+    const joinPage = read("client/src/pages/StudyGroupShareJoin.tsx");
+    const app = read("client/src/App.tsx");
+
+    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `study_group_share_links`");
+    expect(migration).toContain("uq_study_group_share_link_token");
+    expect(schema).toContain('mysqlTable("study_group_share_links"');
+    expect(router).toContain("createShareLinkToken");
+    expect(router).toContain("randomBytes(32).toString(\"base64url\")");
+    expect(router).toContain("getActiveShareLink");
+    expect(router).toContain("createShareLink");
+    expect(router).toContain("revokeShareLink");
+    expect(router).toContain("acceptShareLink");
+    expect(router).toContain('role: "member"');
+    expect(router).toContain("This share link is no longer available.");
+    expect(router).toContain("This free study group already has its");
+    expect(workspace).toContain("Share member link");
+    expect(workspace).toContain("Revoke link");
+    expect(workspace).toContain("/study-groups/join?token=");
+    expect(joinPage).toContain("acceptShareLink");
+    expect(joinPage).toContain("This link never grants administrator access.");
+    expect(app).toContain('path="/study-groups/join"');
+  });
+
   it("protects group content, platform admin oversight, group seats, and the 10 percent discount", () => {
     const router = read("server/routers/studyGroupsRouter.ts");
     expect(router).toContain("requireGroupAccess");
