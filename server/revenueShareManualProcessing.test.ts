@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   calculateShareAmountCents,
@@ -29,5 +31,18 @@ describe("revenue share manual processing guards", () => {
     expect(canManualProcessLedgerEntry({ status: "pending", processMethod: null }).allowed).toBe(true);
     expect(canManualProcessLedgerEntry({ status: "failed", processMethod: null }).allowed).toBe(true);
     expect(canManualProcessLedgerEntry({ status: "processing", processMethod: null }).allowed).toBe(false);
+  });
+
+  it("requires a detailed confirmation before individual or batch Stripe transfers", () => {
+    const adminSource = readFileSync(
+      fileURLToPath(new URL("../client/src/pages/admin/RevenueShareAdmin.tsx", import.meta.url)),
+      "utf8",
+    );
+    expect(adminSource).toContain("Review Stripe Transfer");
+    expect(adminSource).toContain("Confirm & Send Stripe Transfer");
+    expect(adminSource).toContain("Confirm pending revenue-share payments");
+    expect(adminSource).toContain("Total Stripe transfers");
+    expect(adminSource).toContain("setPaymentConfirm");
+    expect(adminSource).toContain("setBatchConfirmOpen(true)");
   });
 });

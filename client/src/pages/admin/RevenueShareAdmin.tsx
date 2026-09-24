@@ -23,6 +23,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,6 +39,9 @@ import {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtMoney(cents: number) {
   return "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+}
+function calculateShareAmount(grossAmountCents: number, sharePercentage: number) {
+  return Math.floor((grossAmountCents * sharePercentage) / 100);
 }
 function fmtDate(ts: number | null | undefined) {
   if (!ts) return "—";
@@ -697,6 +704,8 @@ function LedgerTab() {
   const [filterPartnerId, setFilterPartnerId] = useState<string>("all");
   const [manualEntry, setManualEntry] = useState<any | null>(null);
   const [manualPct, setManualPct] = useState("");
+  const [paymentConfirm, setPaymentConfirm] = useState<{ entry: any; sharePercentage: number } | null>(null);
+  const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
   const utils = trpc.useUtils();
 
   const { data: partners = [] } = trpc.revenueShare.listPartners.useQuery();
@@ -716,6 +725,7 @@ function LedgerTab() {
       toast.success(`Paid ${fmtMoney(data.shareAmount ?? 0)} to partner`);
       utils.revenueShare.getLedger.invalidate();
       setManualEntry(null);
+      setPaymentConfirm(null);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -726,6 +736,7 @@ function LedgerTab() {
       if (data?.errors?.length) msg.push(`${data.errors.length} failed`);
       toast.success(msg.join(", "));
       utils.revenueShare.getLedger.invalidate();
+      setBatchConfirmOpen(false);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -756,6 +767,11 @@ function LedgerTab() {
 
   const totalPaid = ledger.filter((r: any) => r.status === "paid").reduce((s: number, r: any) => s + (r.shareAmount ?? 0), 0);
   const totalPending = ledger.filter((r: any) => r.status === "pending" || r.status === "failed").reduce((s: number, r: any) => s + (r.shareAmount ?? 0), 0);
+  const eligibleBatchEntries = ledger.filter((r: any) => r.status === "pending" && canProcessEntry(r));
+  const eligibleBatchAmount = eligibleBatchEntries.reduce((sum: number, r: any) => sum + (r.shareAmount ?? 0), 0);
+  const selectedPartner = filterPartnerId === "all"
+    ? null
+    : (partners as any[]).find((partner: any) => partner.id === Number(filterPartnerId));
 
   return (
     <div className="space-y-4">
@@ -787,8 +803,8 @@ function LedgerTab() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => manualPayoutMutation.mutate({ partnerId: filterPartnerId !== "all" ? Number(filterPartnerId) : undefined })}
-            disabled={manualPayoutMutation.isPending}
+            onClick={() => setBatchConfirmOpen(true)}
+            disabled={manualPayoutMutation.isPending || eligibleBatchEntries.length === 0}
             className="gap-1.5"
           >
             <RefreshCw className={`h-4 w-4 ${manualPayoutMutation.isPending ? "animate-spin" : ""}`} />
@@ -966,16 +982,79 @@ function LedgerTab() {
                 !preview?.allowed ||
                 !Number.isFinite(pctNum)
               }
-              onClick={() => processOneMutation.mutate({
-                ledgerId: manualEntry!.id,
+              onClick={() => setPaymentConfirm({
+                entry: manualEntry!,
                 sharePercentage: pctNum,
               })}
             >
-              {processOneMutation.isPending ? "Processing…" : "Process Payout"}
+              Review Stripe Transfer
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!paymentConfirm} onOpenChange={(open) => { if (!open) setPaymentConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm revenue-share payment</AlertDialogTitle>
+            <AlertDialogDescription>
+              This sends a Stripe Connect transfer. Confirm the payment details below before continuing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {paymentConfirm && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-slate-800 space-y-2">
+              <div className="flex justify-between gap-4"><span className="text-slate-600">Partner</span><span className="font-medium text-right">{paymentConfirm.entry.partnerName}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-slate-600">Course</span><span className="font-medium text-right">{paymentConfirm.entry.courseTitle ?? "—"}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-slate-600">Gross sale</span><span className="font-medium">{fmtMoney(paymentConfirm.entry.grossAmount)}</span></div>
+              <div className="flex justify-between gap-4"><span className="text-slate-600">Share</span><span className="font-medium">{paymentConfirm.sharePercentage.toFixed(2)}%</span></div>
+              <div className="flex justify-between gap-4 border-t border-amber-200 pt-2 text-base"><span className="font-semibold">Stripe transfer</span><span className="font-bold text-[#147a80]">{fmtMoney(calculateShareAmount(paymentConfirm.entry.grossAmount, paymentConfirm.sharePercentage))}</span></div>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">This payment is recorded as a manual payout and cannot be reprocessed from the ledger after Stripe accepts it.</p>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={processOneMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[#147a80] hover:bg-[#0f656a]"
+              disabled={processOneMutation.isPending || !paymentConfirm}
+              onClick={() => paymentConfirm && processOneMutation.mutate({
+                ledgerId: paymentConfirm.entry.id,
+                sharePercentage: paymentConfirm.sharePercentage,
+              })}
+            >
+              {processOneMutation.isPending ? "Sending…" : "Confirm & Send Stripe Transfer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={batchConfirmOpen} onOpenChange={setBatchConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm pending revenue-share payments</AlertDialogTitle>
+            <AlertDialogDescription>
+              This sends a separate Stripe Connect transfer for each eligible pending ledger entry in the current selection.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-slate-800 space-y-2">
+            <div className="flex justify-between gap-4"><span className="text-slate-600">Selection</span><span className="font-medium text-right">{selectedPartner ? selectedPartner.name : "All partners"}</span></div>
+            <div className="flex justify-between gap-4"><span className="text-slate-600">Eligible payouts</span><span className="font-medium">{eligibleBatchEntries.length}</span></div>
+            <div className="flex justify-between gap-4 border-t border-amber-200 pt-2 text-base"><span className="font-semibold">Total Stripe transfers</span><span className="font-bold text-[#147a80]">{fmtMoney(eligibleBatchAmount)}</span></div>
+          </div>
+          <p className="text-xs text-muted-foreground">Entries that Stripe cannot process will remain in the ledger with an error; successful payments cannot be reprocessed.</p>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={manualPayoutMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-[#147a80] hover:bg-[#0f656a]"
+              disabled={manualPayoutMutation.isPending || eligibleBatchEntries.length === 0}
+              onClick={() => manualPayoutMutation.mutate({
+                partnerId: filterPartnerId !== "all" ? Number(filterPartnerId) : undefined,
+              })}
+            >
+              {manualPayoutMutation.isPending ? "Sending…" : `Confirm & Send ${eligibleBatchEntries.length} Payment${eligibleBatchEntries.length === 1 ? "" : "s"}`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
