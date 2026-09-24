@@ -7235,6 +7235,8 @@ export const marketingSiteSettings = mysqlTable("marketingSiteSettings", {
   footerJson: longtext("footerJson"),
   headerBlocks: longtext("headerBlocks"),
   footerBlocks: longtext("footerBlocks"),
+  /** Editable default sidebar for the tenant's blog index and article pages. */
+  blogSidebarBlocks: longtext("blogSidebarBlocks"),
   faviconUrl: varchar("faviconUrl", { length: 512 }),
   globalCss: longtext("globalCss"),
   stagingBannerText: varchar("stagingBannerText", { length: 500 }).default("Staging Preview — Not Live"),
@@ -7258,6 +7260,9 @@ export const marketingSitePages = mysqlTable("marketingSitePages", {
   blogAuthor: varchar("blogAuthor", { length: 255 }),
   blogCategory: varchar("blogCategory", { length: 160 }),
   blogPublishedAt: timestamp("blogPublishedAt"),
+  /** Uses the tenant sidebar by default; article editors may provide a replacement. */
+  blogSidebarMode: mysqlEnum("blogSidebarMode", ["inherit", "override"]).default("inherit").notNull(),
+  blogSidebarBlocks: longtext("blogSidebarBlocks"),
   sourceUrl: varchar("sourceUrl", { length: 1000 }),
   redirectUrl: varchar("redirectUrl", { length: 1000 }),
   isPublished: boolean("isPublished").default(true).notNull(),

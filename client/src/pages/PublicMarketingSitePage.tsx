@@ -60,19 +60,21 @@ function MarketingNav({
 }
 
 function BlogListing({ tenantKey, pathPrefix, accent }: { tenantKey: PublicSiteTenantKey; pathPrefix: string; accent: string }) {
-  const { data, isLoading } = trpc.marketingSitePublic.listBlogPosts.useQuery({ tenantKey, limit: 24, offset: 0 });
+  const { data, isLoading } = trpc.marketingSitePublic.listBlogPosts.useQuery({ tenantKey, limit: 100, offset: 0 });
+  const archive = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("archive") : null;
   if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="animate-spin" style={{ color: accent }} /></div>;
   if (!data?.posts.length) return null;
+  const posts = archive ? data.posts.filter((post) => post.publishedAt && new Date(post.publishedAt).toISOString().slice(0, 7) === archive) : data.posts;
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16 pt-10">
       <div className="flex items-end justify-between gap-4 mb-6">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em]" style={{ color: accent }}>Clinical perspectives</p>
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">Latest articles</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mt-1">{archive ? `Articles from ${new Date(`${archive}-01T12:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}` : "Latest articles"}</h2>
         </div>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {data.posts.map((post) => (
+        {posts.map((post) => (
           <article key={post.id} className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
             {post.image ? <img src={post.image} alt="" className="h-40 w-full object-cover" loading="lazy" /> : <div className="h-2" style={{ background: accent }} />}
             <div className="p-5 flex flex-col flex-1">
@@ -91,6 +93,45 @@ function BlogListing({ tenantKey, pathPrefix, accent }: { tenantKey: PublicSiteT
       </div>
       <p className="sr-only">Articles are published under {pathPrefix}</p>
     </section>
+  );
+}
+
+function BlogSidebar({
+  tenantKey,
+  blogIndexPath,
+  accent,
+  blocks,
+}: {
+  tenantKey: PublicSiteTenantKey;
+  blogIndexPath: string;
+  accent: string;
+  blocks: Block[];
+}) {
+  const { data, isLoading } = trpc.marketingSitePublic.listBlogPosts.useQuery({ tenantKey, limit: 100, offset: 0 });
+  const posts = data?.posts ?? [];
+  const archives = Array.from(new Map(posts.filter((post) => post.publishedAt).map((post) => {
+    const key = new Date(post.publishedAt!).toISOString().slice(0, 7);
+    return [key, new Date(`${key}-01T12:00:00`)];
+  })).entries());
+
+  return (
+    <aside className="space-y-7">
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>Blog archive</p>
+        <div className="mt-3 space-y-2">
+          <a href={blogIndexPath} className="block text-sm font-semibold text-slate-900 hover:underline">All articles</a>
+          {archives.slice(0, 18).map(([key, date]) => <a key={key} href={`${blogIndexPath}?archive=${key}`} className="block text-sm text-slate-600 hover:text-slate-950 hover:underline">{date.toLocaleDateString(undefined, { month: "long", year: "numeric" })}</a>)}
+        </div>
+      </section>
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>Recent posts</p>
+        <div className="mt-3 space-y-3">
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin" style={{ color: accent }} />}
+          {posts.slice(0, 8).map((post) => <a key={post.id} href={post.path} className="block group"><p className="text-sm font-semibold leading-snug text-slate-900 group-hover:underline">{post.title}</p>{post.publishedAt && <p className="mt-1 text-xs text-slate-500">{new Date(post.publishedAt).toLocaleDateString()}</p>}</a>)}
+        </div>
+      </section>
+      {blocks.map((block) => <div key={block.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"><BlockPreview block={block} /></div>)}
+    </aside>
   );
 }
 
@@ -193,6 +234,10 @@ export default function PublicMarketingSitePage() {
   const brand = getBrandDisplayConfig(settings?.tenant?.brand ?? tenant?.brand ?? "aaus");
   const blogIndexPath = settings?.tenant?.blogIndexPath ?? tenant?.blogIndexPath;
   const showBlogListing = Boolean(blogIndexPath && pathname === blogIndexPath);
+  const isBlogSurface = showBlogListing || data?.page?.pageType === "blog_post";
+  const globalBlogSidebarBlocks = (settings?.blogSidebarBlocks ?? []) as Block[];
+  const articleBlogSidebarBlocks = (data?.page?.blogSidebarBlocks ?? []) as Block[];
+  const blogSidebarBlocks = data?.page?.blogSidebarMode === "override" ? articleBlogSidebarBlocks : globalBlogSidebarBlocks;
 
   if (isLoading || settingsLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-slate-50"><Loader2 className="animate-spin" style={{ color: brand.primaryColor }} size={32} /></div>;
@@ -220,9 +265,19 @@ export default function PublicMarketingSitePage() {
       {settings?.globalCss && <style>{settings.globalCss}</style>}
       <MarketingNav nav={nav} siteName={settings?.tenant.siteName ?? brand.displayName} accent={brand.accentColor} />
       <main>
-        {blocks.map((block) => <div key={block.id}><BlockPreview block={block} /></div>)}
-        {blocks.length === 0 && <div className="py-24 text-center text-slate-500">This page is ready for content in the visual editor.</div>}
-        {showBlogListing && <BlogListing tenantKey={tenantKey} pathPrefix={tenant?.blogPathPrefix ?? ""} accent={brand.primaryColor} />}
+        {isBlogSurface ? (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 lg:py-12 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_350px]">
+            <div className="min-w-0">
+              {blocks.map((block) => <div key={block.id}><BlockPreview block={block} /></div>)}
+              {blocks.length === 0 && !showBlogListing && <div className="py-24 text-center text-slate-500">This article is ready for content in the visual editor.</div>}
+              {showBlogListing && <BlogListing tenantKey={tenantKey} pathPrefix={tenant?.blogPathPrefix ?? ""} accent={brand.primaryColor} />}
+            </div>
+            {blogIndexPath && <BlogSidebar tenantKey={tenantKey} blogIndexPath={blogIndexPath} accent={brand.primaryColor} blocks={blogSidebarBlocks} />}
+          </div>
+        ) : <>
+          {blocks.map((block) => <div key={block.id}><BlockPreview block={block} /></div>)}
+          {blocks.length === 0 && <div className="py-24 text-center text-slate-500">This page is ready for content in the visual editor.</div>}
+        </>}
       </main>
       <footer className="bg-[#0e1e2e] text-white/75 text-center text-sm py-10 px-4 mt-12">
         <p>© {new Date().getFullYear()} {settings?.tenant.siteName ?? brand.displayName}. All rights reserved.</p>

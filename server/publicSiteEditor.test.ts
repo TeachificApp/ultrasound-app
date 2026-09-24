@@ -53,6 +53,7 @@ describe("dual public-site tenant architecture", () => {
     const manager = read("client/src/pages/admin/PublicSiteAdmin.tsx");
     const builder = read("client/src/pages/admin/PublicSitePageBuilder.tsx");
     const renderer = read("client/src/pages/PublicMarketingSitePage.tsx");
+    const sidebarEditor = read("client/src/components/public-site/BlogSidebarBlockEditor.tsx");
     expect(migration).toContain("'aaus-net'");
     expect(migration).toContain("'iheartecho-net'");
     expect(migration).toContain("blogPublishedAt");
@@ -66,7 +67,13 @@ describe("dual public-site tenant architecture", () => {
     expect(manager).toContain(".net now → .com later");
     expect(builder).toContain("BlockSettings");
     expect(builder).toContain("Blog metadata");
+    expect(builder).toContain("Article-specific sidebar");
+    expect(manager).toContain("Brand blog sidebar");
+    expect(manager).toContain("BlogSidebarBlockEditor");
+    expect(sidebarEditor).toContain("SortableBlock");
     expect(renderer).toContain("BlogListing");
+    expect(renderer).toContain("BlogSidebar");
+    expect(renderer).toContain("Blog archive");
     expect(renderer).toContain("promotionOrigin");
     expect(renderer).toContain("PublicSiteRootFallback");
     expect(renderer).toContain('pathname === "/"');
@@ -95,5 +102,23 @@ describe("dual public-site tenant architecture", () => {
     expect(importer).toContain("buttonText: text");
     expect(preview).toContain('case "cta":');
     expect(preview).toContain("d.buttonUrl");
+  });
+
+  it("keeps mirrored source assets, blog sidebars, and both configured public tenants durable", () => {
+    const schema = read("drizzle/schema.ts");
+    const migration = read("drizzle/0082_public_site_tenants_and_blog_sidebars.sql");
+    const importer = read("server/lib/marketingSiteImport.ts");
+    const router = read("server/routers/marketingSiteRouter.ts");
+    expect(schema).toContain("blogSidebarBlocks");
+    expect(schema).toContain("blogSidebarMode");
+    expect(migration).toContain("blogExcerpt");
+    expect(migration).toContain("blogSidebarMode");
+    expect(importer).toContain("mirrorSourceAsset");
+    expect(importer).toContain("storagePut");
+    expect(importer).toContain("new URL(seo.seoImage, sourceUrl)");
+    expect(importer).toContain("rewriteBareUrls");
+    expect(importer).toContain('$("*").contents()');
+    expect(router).toContain("saveBlogSidebar");
+    expect(router).toContain("blogSidebarMode");
   });
 });

@@ -15,6 +15,7 @@ import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } 
 import { ArrowLeft, Eye, FileText, Globe2, PenLine, Save, Send, Trash2 } from "lucide-react";
 import { resolveToolBrand } from "@/lib/brandToolPresentation";
 import { getPublicSiteTenantForBrand, type PublicSiteTenantKey } from "@shared/publicSiteTenants";
+import { BlogSidebarBlockEditor } from "@/components/public-site/BlogSidebarBlockEditor";
 
 function adminRoot(brand: "aaus" | "iheartecho") {
   return `/admin/public-site-${brand === "iheartecho" ? "ihe" : "aaus"}`;
@@ -51,6 +52,8 @@ export default function PublicSitePageBuilder() {
   const [blogAuthor, setBlogAuthor] = useState("");
   const [blogCategory, setBlogCategory] = useState("");
   const [blogPublishedAt, setBlogPublishedAt] = useState("");
+  const [blogSidebarMode, setBlogSidebarMode] = useState<"inherit" | "override">("inherit");
+  const [blogSidebarBlocks, setBlogSidebarBlocks] = useState<Block[]>([]);
 
   const { data: page, isLoading } = trpc.marketingSiteAdmin.getPage.useQuery({ id, tenantKey }, { enabled: Number.isFinite(id) });
   const save = trpc.marketingSiteAdmin.savePage.useMutation({
@@ -75,6 +78,8 @@ export default function PublicSitePageBuilder() {
     setBlogAuthor(page.blogAuthor ?? "");
     setBlogCategory(page.blogCategory ?? "");
     setBlogPublishedAt(toDateInput(page.blogPublishedAt));
+    setBlogSidebarMode(page.blogSidebarMode ?? "inherit");
+    try { setBlogSidebarBlocks(page.blogSidebarBlocks ? JSON.parse(page.blogSidebarBlocks) : []); } catch { setBlogSidebarBlocks([]); }
     setLoadedId(page.id);
   }, [page, loadedId]);
 
@@ -95,6 +100,8 @@ export default function PublicSitePageBuilder() {
       blogAuthor: pageType === "blog_post" ? blogAuthor.trim() || null : null,
       blogCategory: pageType === "blog_post" ? blogCategory.trim() || null : null,
       blogPublishedAt: pageType === "blog_post" && blogPublishedAt ? new Date(blogPublishedAt) : null,
+      blogSidebarMode: pageType === "blog_post" ? blogSidebarMode : "inherit",
+      blogSidebarBlocks: pageType === "blog_post" && blogSidebarMode === "override" ? JSON.stringify(blogSidebarBlocks) : null,
       isPublished: publishOverride ?? published,
     });
     if (publishOverride !== undefined) setPublished(publishOverride);
@@ -124,7 +131,7 @@ export default function PublicSitePageBuilder() {
   const isRedirect = pageType === "redirect";
 
   return (
-    <div className="h-screen bg-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-100 flex flex-col">
       <header className="h-16 shrink-0 bg-white border-b px-4 flex items-center justify-between gap-3">
         <div className="min-w-0 flex items-center gap-3"><Button size="sm" variant="ghost" onClick={() => navigate(adminRoot(brand))}><ArrowLeft className="w-4 h-4 mr-1" /> Website</Button><div className="min-w-0"><p className="font-semibold text-sm truncate">{title || "Untitled page"}</p><p className="font-mono text-xs text-slate-500 truncate">{tenant.currentHost}{path}</p></div></div>
         <div className="flex items-center gap-2"><a href={previewUrl} target="_blank" rel="noreferrer"><Button size="sm" variant="outline"><Eye className="w-4 h-4 mr-1" /> Preview</Button></a><Button size="sm" variant="outline" disabled={save.isPending} onClick={() => void savePage()}><Save className="w-4 h-4 mr-1" /> Save</Button><Button size="sm" disabled={save.isPending} onClick={() => void savePage(!published)} className={published ? "bg-amber-600 hover:bg-amber-700" : "bg-teal-600 hover:bg-teal-700"}>{published ? "Unpublish" : <><Send className="w-4 h-4 mr-1" /> Publish</>}</Button></div>
@@ -150,12 +157,13 @@ export default function PublicSitePageBuilder() {
         <aside className="w-[330px] shrink-0 bg-white border-l overflow-y-auto p-4 space-y-4">
           <section><h2 className="font-semibold text-sm">Page details</h2><div className="space-y-2 mt-3"><div><Label className="text-xs">Title</Label><Input value={title} onChange={(event) => setTitle(event.target.value)} /></div><div><Label className="text-xs">URL path</Label><Input value={path} onChange={(event) => setPath(event.target.value)} placeholder="/about" /></div><div><Label className="text-xs">Content type</Label><Select value={pageType} onValueChange={(value) => setPageType(value as typeof pageType)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="page">Website page</SelectItem><SelectItem value="blog_post">Blog post</SelectItem><SelectItem value="redirect">Redirect</SelectItem></SelectContent></Select></div><div className="flex items-center justify-between pt-1"><Label className="text-sm">Published</Label><Switch checked={published} onCheckedChange={setPublished} /></div></div></section>
           {isRedirect && <section className="border-t pt-4"><Label className="text-sm font-semibold">Redirect destination</Label><Input className="mt-2" value={redirectUrl} onChange={(event) => setRedirectUrl(event.target.value)} placeholder="https://…" /></section>}
-          {isBlog && <section className="border-t pt-4"><h2 className="font-semibold text-sm flex items-center gap-2"><PenLine className="w-4 h-4 text-teal-600" /> Blog metadata</h2><div className="space-y-2 mt-3"><div><Label className="text-xs">Excerpt</Label><Textarea rows={3} value={blogExcerpt} onChange={(event) => setBlogExcerpt(event.target.value)} /></div><div><Label className="text-xs">Author</Label><Input value={blogAuthor} onChange={(event) => setBlogAuthor(event.target.value)} /></div><div><Label className="text-xs">Category</Label><Input value={blogCategory} onChange={(event) => setBlogCategory(event.target.value)} /></div><div><Label className="text-xs">Publication date</Label><Input type="datetime-local" value={blogPublishedAt} onChange={(event) => setBlogPublishedAt(event.target.value)} /></div></div></section>}
+          {isBlog && <section className="border-t pt-4"><h2 className="font-semibold text-sm flex items-center gap-2"><PenLine className="w-4 h-4 text-teal-600" /> Blog metadata</h2><div className="space-y-2 mt-3"><div><Label className="text-xs">Excerpt</Label><Textarea rows={3} value={blogExcerpt} onChange={(event) => setBlogExcerpt(event.target.value)} /></div><div><Label className="text-xs">Author</Label><Input value={blogAuthor} onChange={(event) => setBlogAuthor(event.target.value)} /></div><div><Label className="text-xs">Category</Label><Input value={blogCategory} onChange={(event) => setBlogCategory(event.target.value)} /></div><div><Label className="text-xs">Publication date</Label><Input type="datetime-local" value={blogPublishedAt} onChange={(event) => setBlogPublishedAt(event.target.value)} /></div><div><Label className="text-xs">Article sidebar</Label><Select value={blogSidebarMode} onValueChange={(value) => setBlogSidebarMode(value as "inherit" | "override")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="inherit">Use brand blog sidebar</SelectItem><SelectItem value="override">Use this article’s sidebar</SelectItem></SelectContent></Select></div></div></section>}
           <section className="border-t pt-4"><h2 className="font-semibold text-sm">SEO</h2><div className="space-y-2 mt-3"><div><Label className="text-xs">SEO title</Label><Input value={seoTitle} onChange={(event) => setSeoTitle(event.target.value)} /></div><div><Label className="text-xs">Meta description</Label><Textarea rows={3} value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} /></div><div><Label className="text-xs">Open Graph image URL</Label><Input value={seoImage} onChange={(event) => setSeoImage(event.target.value)} /></div></div></section>
           {selectedBlock && <section className="border-t pt-4"><h2 className="font-semibold text-sm">Selected block</h2><div className="mt-3"><BlockSettings block={selectedBlock} onChange={(data) => setBlocks((items) => items.map((block) => block.id === selectedBlock.id ? { ...block, data } : block))} /></div></section>}
           <section className="border-t pt-4"><a href={previewUrl} target="_blank" rel="noreferrer" className="text-xs inline-flex items-center gap-1 text-teal-700"><Globe2 className="w-3.5 h-3.5" /> Open .net preview</a><p className="text-xs text-slate-500 mt-2">This path is retained when the tenant is promoted to {tenant.promotionHost}.</p></section>
         </aside>
       </div>
+      {isBlog && blogSidebarMode === "override" && <div className="border-t bg-slate-50 px-4 py-5"><div className="max-w-6xl mx-auto"><BlogSidebarBlockEditor label="Article-specific sidebar" description="Replace the brand’s normal archive, recent-post, and promotional sidebar blocks only for this article." blocks={blogSidebarBlocks} onChange={setBlogSidebarBlocks} /></div></div>}
     </div>
   );
 }

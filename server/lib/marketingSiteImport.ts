@@ -7,9 +7,11 @@
  * Learn, and each tenant remains independently publishable and editable.
  */
 import * as cheerio from "cheerio";
+import { createHash } from "node:crypto";
 import { eq, and } from "drizzle-orm";
 import { htmlToBlocks, type ScrapedBlock } from "../routers/pageScraperRouter";
 import { marketingSitePages, marketingSiteSettings } from "../../drizzle/schema";
+import { storagePut } from "../storage";
 import {
   getPublicSiteTenant,
   getPublicSiteTenantForHost,
@@ -50,6 +52,9 @@ export interface PublicSiteImportOptions {
   urls?: string[];
   limit?: number;
 }
+
+/** Keeps each source asset to one download/upload across a sitemap import. */
+type ImportAssetCache = Map<string, string>;
 
 /**
  * Verified legacy-course destinations.  Keep this intentionally small and
@@ -153,6 +158,14 @@ export function rewritePublicSiteLink(
     return `https://learn.allaboutultrasound.com${url.pathname}${url.search}${url.hash}`;
   }
 
+  // All legacy Teachable checkout URLs have been retired. Known products above
+  // retain their exact Learn course destination; every other legacy checkout
+  // reaches the current Learn catalog rather than an obsolete payment page.
+  if (host === "allaboutultrasound.teachable.com") {
+    if (counts) counts.legacyMemberLinks += 1;
+    return "https://learn.allaboutultrasound.com";
+  }
+
   if (host === new URL(tenant.sourceOrigin).hostname.toLowerCase().replace(/^www\./, "")) {
     if (counts) counts.sourceLinks += 1;
     return `${url.pathname}${url.search}${url.hash}`;
@@ -169,25 +182,35 @@ export function rewritePublicSiteLink(
   return url.href;
 }
 
-function rewriteValue(value: unknown, tenant: PublicSiteTenant, counts: RewriteCounts): unknown {
+function rewriteBareUrls(value: string, tenant: PublicSiteTenant, counts: RewriteCounts): string {
+  return value.replace(/https?:\/\/[^\s<>"']+/gi, (url) => rewritePublicSiteLink(url, tenant, counts));
+}
+
+function rewriteValue(value: unknown, tenant: PublicSiteTenant, counts: RewriteCounts, fieldName?: string): unknown {
   if (typeof value === "string") {
     // Preserve rich-text and embed HTML while replacing only URL attribute values.
     if (/<[a-z][\s\S]*>/i.test(value)) {
       const $ = cheerio.load(value, { xmlMode: false }, false);
-      $("[href], [src], [poster]").each((_, element) => {
-        for (const attr of ["href", "src", "poster"]) {
-          const original = $(element).attr(attr);
-          if (original) $(element).attr(attr, rewritePublicSiteLink(original, tenant, counts));
+      $("[href]").each((_, element) => {
+        const original = $(element).attr("href");
+        if (original) $(element).attr("href", rewritePublicSiteLink(original, tenant, counts));
+      });
+      $("*").contents().each((_, node: any) => {
+        if (node.type === "text" && typeof node.data === "string") {
+          node.data = rewriteBareUrls(node.data, tenant, counts);
         }
       });
+      // Keep source image/video references intact until mirrorValueAssets has
+      // transferred the owned asset into this tenant's durable storage.
       return $.root().html() ?? value;
     }
+    if (fieldName && /(image|logo|icon|photo|picture|background|poster|thumbnail|avatar|media)/i.test(fieldName)) return value;
     if (/^(https?:\/\/|\/)/i.test(value)) return rewritePublicSiteLink(value, tenant, counts);
-    return value;
+    return rewriteBareUrls(value, tenant, counts);
   }
-  if (Array.isArray(value)) return value.map((item) => rewriteValue(item, tenant, counts));
+  if (Array.isArray(value)) return value.map((item) => rewriteValue(item, tenant, counts, fieldName));
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, rewriteValue(item, tenant, counts)]));
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, rewriteValue(item, tenant, counts, key)]));
   }
   return value;
 }
@@ -198,6 +221,73 @@ function rewriteBlocksForTenant(blocks: ScrapedBlock[], tenant: PublicSiteTenant
     blocks: blocks.map((block) => ({ ...block, data: rewriteValue(block.data, tenant, counts) as Record<string, unknown> })),
     counts,
   };
+}
+
+function isSourceAssetUrl(value: string, tenant: PublicSiteTenant) {
+  try {
+    const sourceHost = new URL(tenant.sourceOrigin).hostname.replace(/^www\./, "");
+    return new URL(value).hostname.replace(/^www\./, "") === sourceHost;
+  } catch {
+    return false;
+  }
+}
+
+function contentTypeExtension(contentType: string, sourceUrl: string) {
+  const extensions: Record<string, string> = {
+    "image/jpeg": ".jpg", "image/png": ".png", "image/gif": ".gif", "image/webp": ".webp",
+    "image/svg+xml": ".svg", "video/mp4": ".mp4", "video/webm": ".webm",
+  };
+  if (extensions[contentType]) return extensions[contentType]!;
+  try { return new URL(sourceUrl).pathname.match(/\.(?:avif|gif|jpe?g|png|svg|webp|mp4|webm)$/i)?.[0]?.toLowerCase() ?? ".bin"; } catch { return ".bin"; }
+}
+
+async function mirrorSourceAsset(url: string, tenant: PublicSiteTenant, cache: ImportAssetCache): Promise<string> {
+  if (!isSourceAssetUrl(url, tenant)) return url;
+  const cached = cache.get(url);
+  if (cached) return cached;
+  try {
+    const response = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(30_000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const contentType = response.headers.get("content-type")?.split(";")[0]?.toLowerCase() || "application/octet-stream";
+    if (!/^(image|video)\//.test(contentType)) throw new Error(`Unsupported asset type ${contentType}`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length === 0 || bytes.length > 40 * 1024 * 1024) throw new Error("Asset exceeds import size limit");
+    const key = `marketing-sites/${tenant.key}/assets/${createHash("sha256").update(url).digest("hex").slice(0, 24)}${contentTypeExtension(contentType, url)}`;
+    const { url: mirroredUrl } = await storagePut(key, bytes, contentType);
+    cache.set(url, mirroredUrl);
+    return mirroredUrl;
+  } catch (error) {
+    console.warn("[PublicSiteImport] Asset mirror failed", { tenant: tenant.key, url, error: error instanceof Error ? error.message : String(error) });
+    return url;
+  }
+}
+
+async function mirrorValueAssets(value: unknown, tenant: PublicSiteTenant, cache: ImportAssetCache, fieldName?: string): Promise<unknown> {
+  if (typeof value === "string") {
+    if (/<[a-z][\s\S]*>/i.test(value)) {
+      const $ = cheerio.load(value, { xmlMode: false }, false);
+      for (const element of $("img[src], source[src], video[poster]").toArray()) {
+        for (const attribute of ["src", "poster"]) {
+          const original = $(element).attr(attribute);
+          if (original) $(element).attr(attribute, await mirrorSourceAsset(original, tenant, cache));
+        }
+      }
+      return $.root().html() ?? value;
+    }
+    return fieldName && /(image|logo|icon|photo|picture|background|poster|thumbnail|avatar|media)/i.test(fieldName)
+      ? mirrorSourceAsset(value, tenant, cache)
+      : value;
+  }
+  if (Array.isArray(value)) return Promise.all(value.map((item) => mirrorValueAssets(item, tenant, cache, fieldName)));
+  if (value && typeof value === "object") {
+    const entries = await Promise.all(Object.entries(value).map(async ([key, item]) => [key, await mirrorValueAssets(item, tenant, cache, key)] as const));
+    return Object.fromEntries(entries);
+  }
+  return value;
+}
+
+async function mirrorBlocksForTenant(blocks: ScrapedBlock[], tenant: PublicSiteTenant, cache: ImportAssetCache) {
+  return Promise.all(blocks.map(async (block) => ({ ...block, data: await mirrorValueAssets(block.data, tenant, cache) as Record<string, unknown> })));
 }
 
 function extractSeo($: cheerio.CheerioAPI) {
@@ -294,7 +384,7 @@ export async function importPublicSitePage(
   db: any,
   tenantKey: PublicSiteTenantKey,
   sourceUrl: string,
-  opts?: { skipExisting?: boolean },
+  opts?: { skipExisting?: boolean; assetCache?: ImportAssetCache },
 ): Promise<ImportPageResult> {
   const tenant = getPublicSiteTenant(tenantKey);
   if (!tenant) throw new Error(`Unknown public-site tenant: ${tenantKey}`);
@@ -317,6 +407,12 @@ export async function importPublicSitePage(
     const title = seo.seoTitle || $("h1").first().text().trim() || path;
     const parsed = htmlToBlocks(html, sourceUrl);
     const rewritten = rewriteBlocksForTenant(parsed, tenant);
+    const assetCache = opts?.assetCache ?? new Map<string, string>();
+    const mirroredBlocks = await mirrorBlocksForTenant(rewritten.blocks, tenant, assetCache);
+    const seoImageUrl = seo.seoImage ? (() => {
+      try { return new URL(seo.seoImage, sourceUrl).href; } catch { return seo.seoImage; }
+    })() : "";
+    const mirroredSeoImage = seoImageUrl ? await mirrorSourceAsset(seoImageUrl, tenant, assetCache) : "";
     const blog = kind === "blog_post" ? extractBlogMetadata($) : {};
 
     const values = {
@@ -324,10 +420,10 @@ export async function importPublicSitePage(
       path,
       title,
       pageType: kind,
-      blocks: JSON.stringify(rewritten.blocks),
+      blocks: JSON.stringify(mirroredBlocks),
       seoTitle: seo.seoTitle || title,
       seoDescription: seo.seoDescription,
-      seoImage: seo.seoImage,
+      seoImage: mirroredSeoImage || seo.seoImage,
       ...blog,
       sourceUrl,
       isPublished: true,
@@ -350,7 +446,7 @@ export async function importPublicSitePage(
     if (existing) await db.update(marketingSitePages).set(values).where(eq(marketingSitePages.id, existing.id));
     else await db.insert(marketingSitePages).values(values);
 
-    return { path, sourceUrl, title, blockCount: rewritten.blocks.length, status: "imported", kind, rewrites: rewritten.counts };
+    return { path, sourceUrl, title, blockCount: mirroredBlocks.length, status: "imported", kind, rewrites: rewritten.counts };
   } catch (error: any) {
     const message = error?.message ?? "Import failed";
     const failedValues = {
@@ -410,8 +506,12 @@ export async function bulkImportPublicSite(
     });
   const batch = options.limit ? selected.slice(0, options.limit) : selected;
   const results: ImportPageResult[] = [];
+  const assetCache: ImportAssetCache = new Map();
   for (const sourceUrl of batch) {
-    const result = await importPublicSitePage(db, tenant.key, sourceUrl, { skipExisting: options.reimportExisting !== true });
+    const result = await importPublicSitePage(db, tenant.key, sourceUrl, {
+      skipExisting: options.reimportExisting !== true,
+      assetCache,
+    });
     results.push(result);
     console.log(`[PublicSiteImport] ${tenant.key} ${result.status} ${result.path}`);
     await new Promise((resolve) => setTimeout(resolve, 250));

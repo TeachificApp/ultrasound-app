@@ -75,6 +75,8 @@ const publicPageShape = {
   blogAuthor: marketingSitePages.blogAuthor,
   blogCategory: marketingSitePages.blogCategory,
   blogPublishedAt: marketingSitePages.blogPublishedAt,
+  blogSidebarMode: marketingSitePages.blogSidebarMode,
+  blogSidebarBlocks: marketingSitePages.blogSidebarBlocks,
   redirectUrl: marketingSitePages.redirectUrl,
   isPublished: marketingSitePages.isPublished,
 };
@@ -98,8 +100,10 @@ export const marketingSitePublicRouter = router({
       }
       let nav: unknown[] = [];
       let footer: unknown = null;
+      let blogSidebarBlocks: unknown[] = [];
       try { nav = settings?.navJson ? JSON.parse(settings.navJson) : []; } catch { nav = []; }
       try { footer = settings?.footerJson ? JSON.parse(settings.footerJson) : null; } catch { footer = null; }
+      try { blogSidebarBlocks = settings?.blogSidebarBlocks ? JSON.parse(settings.blogSidebarBlocks) : []; } catch { blogSidebarBlocks = []; }
       return {
         tenant: {
           key: tenant.key,
@@ -116,6 +120,7 @@ export const marketingSitePublicRouter = router({
         globalCss: settings?.globalCss ?? null,
         nav,
         footer,
+        blogSidebarBlocks,
       };
     }),
 
@@ -300,6 +305,8 @@ export const marketingSiteAdminRouter = router({
       blogAuthor: z.string().max(255).nullable().optional(),
       blogCategory: z.string().max(160).nullable().optional(),
       blogPublishedAt: z.date().nullable().optional(),
+      blogSidebarMode: z.enum(["inherit", "override"]).optional(),
+      blogSidebarBlocks: z.string().max(300_000).nullable().optional(),
       redirectUrl: z.string().max(1000).nullable().optional(),
       isPublished: z.boolean().optional(),
     }))
@@ -312,6 +319,9 @@ export const marketingSiteAdminRouter = router({
       if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
       if (input.blocks !== undefined) {
         try { JSON.parse(input.blocks); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Page blocks must be valid JSON." }); }
+      }
+      if (input.blogSidebarBlocks !== undefined && input.blogSidebarBlocks !== null) {
+        try { JSON.parse(input.blogSidebarBlocks); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Article sidebar blocks must be valid JSON." }); }
       }
       const { id, tenantKey, path, ...rest } = input;
       const updates: Record<string, unknown> = { ...rest, updatedAt: new Date() };
@@ -340,6 +350,19 @@ export const marketingSiteAdminRouter = router({
       try { JSON.parse(input.navJson); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Navigation must be valid JSON." }); }
       await ensurePublicSiteSettings(db, input.tenantKey);
       await db.update(marketingSiteSettings).set({ navJson: input.navJson, updatedAt: new Date() })
+        .where(eq(marketingSiteSettings.siteKey, input.tenantKey));
+      return { ok: true };
+    }),
+
+  saveBlogSidebar: protectedProcedure
+    .input(z.object({ tenantKey: tenantKeySchema, blocks: z.string().max(300_000) }))
+    .mutation(async ({ ctx, input }) => {
+      requirePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      try { JSON.parse(input.blocks); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Blog sidebar blocks must be valid JSON." }); }
+      await ensurePublicSiteSettings(db, input.tenantKey);
+      await db.update(marketingSiteSettings).set({ blogSidebarBlocks: input.blocks, updatedAt: new Date() })
         .where(eq(marketingSiteSettings.siteKey, input.tenantKey));
       return { ok: true };
     }),

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -10,9 +10,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ExternalLink, FilePlus2, Globe2, Loader2, RefreshCw, Rss, Search, Sparkles, Upload } from "lucide-react";
+import { ExternalLink, FilePlus2, Globe2, Loader2, PanelRightOpen, RefreshCw, Rss, Search, Sparkles, Upload } from "lucide-react";
 import { resolveToolBrand } from "@/lib/brandToolPresentation";
 import { getPublicSiteTenantForBrand, type PublicSiteTenantKey } from "@shared/publicSiteTenants";
+import { type Block } from "@/components/BlockPreview";
+import { BlogSidebarBlockEditor } from "@/components/public-site/BlogSidebarBlockEditor";
 
 function adminRoot(brand: "aaus" | "iheartecho") {
   return `/admin/public-site-${brand === "iheartecho" ? "ihe" : "aaus"}`;
@@ -36,6 +38,9 @@ export default function PublicSiteAdmin() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newPath, setNewPath] = useState(tab === "blog" ? tenant.blogPathPrefix : "/");
+  const [blogSidebarOpen, setBlogSidebarOpen] = useState(false);
+  const [blogSidebarBlocks, setBlogSidebarBlocks] = useState<Block[]>([]);
+  const [sidebarHydratedFor, setSidebarHydratedFor] = useState<string | null>(null);
 
   const pageType = tab === "blog" ? "blog" : "page";
   const { data: status, refetch: refetchStatus } = trpc.marketingSiteAdmin.getImportStatus.useQuery({ tenantKey });
@@ -45,6 +50,16 @@ export default function PublicSiteAdmin() {
     search: search || undefined,
     limit: 500,
   });
+  const saveBlogSidebar = trpc.marketingSiteAdmin.saveBlogSidebar.useMutation({
+    onSuccess: () => { toast.success("Brand blog sidebar saved."); setBlogSidebarOpen(false); setSidebarHydratedFor(null); void refetchStatus(); },
+    onError: (error) => toast.error(error.message),
+  });
+
+  useEffect(() => {
+    if (!status || sidebarHydratedFor === tenantKey) return;
+    try { setBlogSidebarBlocks(status.settings?.blogSidebarBlocks ? JSON.parse(status.settings.blogSidebarBlocks) : []); } catch { setBlogSidebarBlocks([]); }
+    setSidebarHydratedFor(tenantKey);
+  }, [status, sidebarHydratedFor, tenantKey]);
 
   const refresh = () => { void refetchStatus(); void refetchPages(); };
   const importOne = trpc.marketingSiteAdmin.importUrl.useMutation({
@@ -141,7 +156,7 @@ export default function PublicSiteAdmin() {
         <Tabs value={tab} onValueChange={(value) => setTab(value as "pages" | "blog")}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <TabsList><TabsTrigger value="pages">Website pages</TabsTrigger><TabsTrigger value="blog" className="gap-2"><Rss className="w-3.5 h-3.5" /> Blog posts</TabsTrigger></TabsList>
-            <div className="flex gap-2"><div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9 w-56" placeholder="Search path" /></div><Button onClick={beginCreate} className="gap-2"><FilePlus2 className="w-4 h-4" /> New {tab === "blog" ? "post" : "page"}</Button></div>
+            <div className="flex flex-wrap gap-2"><div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9 w-56" placeholder="Search path" /></div>{tab === "blog" && <Button variant="outline" onClick={() => setBlogSidebarOpen(true)} className="gap-2"><PanelRightOpen className="w-4 h-4" /> Blog sidebar</Button>}<Button onClick={beginCreate} className="gap-2"><FilePlus2 className="w-4 h-4" /> New {tab === "blog" ? "post" : "page"}</Button></div>
           </div>
         </Tabs>
 
@@ -167,6 +182,13 @@ export default function PublicSiteAdmin() {
           <DialogHeader><DialogTitle>Create {tab === "blog" ? "a blog post" : "a website page"}</DialogTitle><DialogDescription>Drafts are private until published from the visual editor.</DialogDescription></DialogHeader>
           <div className="space-y-3 py-2"><div><Label>Title</Label><Input value={newTitle} onChange={(event) => setNewTitle(event.target.value)} placeholder={tab === "blog" ? "Article title" : "Page title"} /></div><div><Label>Path</Label><Input value={newPath} onChange={(event) => setNewPath(event.target.value)} placeholder={tab === "blog" ? `${tenant.blogPathPrefix}article-slug` : "/about"} /></div></div>
           <DialogFooter><Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button><Button disabled={!newTitle.trim() || !newPath.trim() || createPage.isPending} onClick={() => createPage.mutate({ tenantKey, title: newTitle, path: newPath, pageType: tab === "blog" ? "blog_post" : "page" })}>{createPage.isPending ? "Creating…" : "Create draft"}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={blogSidebarOpen} onOpenChange={setBlogSidebarOpen}>
+        <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
+          <DialogHeader><DialogTitle>Brand blog sidebar</DialogTitle><DialogDescription>This block editor controls promotional content beside the archive and recent-post lists on every {tenant.siteName} blog page. Individual article editors may replace it when needed.</DialogDescription></DialogHeader>
+          <BlogSidebarBlockEditor label="Brand-wide sidebar content" description="Archive and recent-post navigation are always included. Add editable promos, images, calls to action, or other content below them." blocks={blogSidebarBlocks} onChange={setBlogSidebarBlocks} />
+          <DialogFooter><Button variant="outline" onClick={() => setBlogSidebarOpen(false)}>Cancel</Button><Button disabled={saveBlogSidebar.isPending} onClick={() => saveBlogSidebar.mutate({ tenantKey, blocks: JSON.stringify(blogSidebarBlocks) })}>{saveBlogSidebar.isPending ? "Saving…" : "Save sidebar"}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
