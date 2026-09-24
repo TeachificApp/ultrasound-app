@@ -5,7 +5,7 @@
  *  - Partner: view own earnings portal
  */
 import { z } from "zod";
-import { eq, and, desc, isNull, or, inArray, gte } from "drizzle-orm";
+import { eq, and, desc, isNull, or, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
@@ -51,7 +51,34 @@ export const revenueShareRouter = router({
       .select()
       .from(revenueSharePartners)
       .orderBy(desc(revenueSharePartners.createdAt));
-    return partners;
+    if (partners.length === 0) return [];
+
+    const assignments = await db
+      .select({
+        id: revenueShareAssignments.id,
+        partnerId: revenueShareAssignments.partnerId,
+        courseId: revenueShareAssignments.courseId,
+        courseTitle: lmsCourses.title,
+        productType: revenueShareAssignments.productType,
+        percentage: revenueShareAssignments.percentage,
+        active: revenueShareAssignments.active,
+        label: revenueShareAssignments.label,
+      })
+      .from(revenueShareAssignments)
+      .leftJoin(lmsCourses, eq(revenueShareAssignments.courseId, lmsCourses.id))
+      .where(inArray(revenueShareAssignments.partnerId, partners.map((partner) => partner.id)));
+
+    const assignmentsByPartner = new Map<number, typeof assignments>();
+    for (const assignment of assignments) {
+      const existing = assignmentsByPartner.get(assignment.partnerId) ?? [];
+      existing.push(assignment);
+      assignmentsByPartner.set(assignment.partnerId, existing);
+    }
+
+    return partners.map((partner) => ({
+      ...partner,
+      assignedCourses: assignmentsByPartner.get(partner.id) ?? [],
+    }));
   }),
 
   // ── Admin: Create a new partner ───────────────────────────────────────────
@@ -231,7 +258,7 @@ export const revenueShareRouter = router({
         .leftJoin(lmsCourses, eq(revenueShareAssignments.courseId, lmsCourses.id))
         .where(and(
           eq(revenueShareAssignments.active, true),
-          eq(revenueShareAssignments.productType, "lms_course"),
+          inArray(revenueShareAssignments.productType, ["lms_course", "course"]),
         ));
 
       let created = 0;
@@ -257,7 +284,6 @@ export const revenueShareRouter = router({
           .where(and(
             eq(lmsOrders.courseId, assignment.courseId),
             eq(lmsOrders.status, "paid"),
-            gte(lmsOrders.createdAt, new Date(assignment.assignmentCreatedAt)),
           ));
 
         for (const order of orders) {
@@ -336,6 +362,7 @@ export const revenueShareRouter = router({
           partnerEmail: revenueSharePartners.email,
           onboardingStatus: revenueSharePartners.onboardingStatus,
           courseTitle: lmsCourses.title,
+          productTitle: lmsCourses.title,
         })
         .from(revenueShareAssignments)
         .leftJoin(revenueSharePartners, eq(revenueShareAssignments.partnerId, revenueSharePartners.id))
@@ -362,10 +389,11 @@ export const revenueShareRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const now = Date.now();
+      const productType = input.productType === "course" ? "lms_course" : input.productType;
       const [result] = await db.insert(revenueShareAssignments).values({
         partnerId: input.partnerId,
         courseId: input.courseId ?? undefined,
-        productType: input.productType,
+        productType,
         percentage: String(input.percentage),
         label: input.label ?? null,
         active: true,
@@ -423,6 +451,11 @@ export const revenueShareRouter = router({
       const db = await getDb();
       if (!db) return { entries: [], total: 0 };
 
+      const conditions = [];
+      if (input?.partnerId) conditions.push(eq(revenueShareLedger.partnerId, input.partnerId));
+      if (input?.courseId) conditions.push(eq(revenueShareLedger.courseId, input.courseId));
+      if (input?.status) conditions.push(eq(revenueShareLedger.status, input.status));
+
       const rows = await db
         .select({
           id: revenueShareLedger.id,
@@ -447,6 +480,7 @@ export const revenueShareRouter = router({
         })
         .from(revenueShareLedger)
         .leftJoin(revenueSharePartners, eq(revenueShareLedger.partnerId, revenueSharePartners.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(revenueShareLedger.createdAt))
         .limit(input?.limit ?? 100)
         .offset(input?.offset ?? 0);

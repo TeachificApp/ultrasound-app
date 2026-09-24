@@ -62,6 +62,7 @@ function statusBadge(status: string) {
   return <Badge variant={s.variant}>{s.label}</Badge>;
 }
 const PRODUCT_TYPE_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
+  lms_course: { label: "Course", icon: <BookOpen className="h-3.5 w-3.5" /> },
   course: { label: "Course", icon: <BookOpen className="h-3.5 w-3.5" /> },
   bundle: { label: "Bundle", icon: <Layers className="h-3.5 w-3.5" /> },
   download: { label: "Digital Download", icon: <Download className="h-3.5 w-3.5" /> },
@@ -254,6 +255,7 @@ function PartnersTab() {
             <TableHeader>
               <TableRow>
                 <TableHead>Partner</TableHead>
+                <TableHead>Revenue-share courses</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Payout Schedule</TableHead>
                 <TableHead>Stripe Account</TableHead>
@@ -267,6 +269,26 @@ function PartnersTab() {
                   <TableCell>
                     <div className="font-medium">{p.name}</div>
                     <div className="text-xs text-muted-foreground">{p.email}</div>
+                  </TableCell>
+                  <TableCell className="max-w-sm">
+                    {p.assignedCourses?.length ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.assignedCourses.map((assignment: any) => (
+                          <Badge
+                            key={assignment.id}
+                            variant={assignment.active ? "outline" : "secondary"}
+                            className="max-w-full whitespace-normal text-left leading-snug"
+                            title={`${assignment.courseTitle ?? assignment.label ?? "All eligible courses"} — ${assignment.percentage}% ${assignment.active ? "active" : "inactive"}`}
+                          >
+                            <BookOpen className="mr-1 h-3 w-3 shrink-0" />
+                            {assignment.courseTitle ?? assignment.label ?? "All eligible courses"}
+                            <span className="ml-1 text-muted-foreground">({assignment.percentage}%)</span>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No course assignments</span>
+                    )}
                   </TableCell>
                   <TableCell>{statusBadge(p.onboardingStatus)}</TableCell>
                   <TableCell className="capitalize">{p.payoutSchedule}</TableCell>
@@ -520,6 +542,7 @@ function AssignmentsTab() {
     onSuccess: () => {
       toast.success("Revenue share assignment created");
       utils.revenueShare.listAssignments.invalidate();
+      utils.revenueShare.listPartners.invalidate();
       setShowAdd(false);
       setForm({ partnerId: "", productId: "", productType: "course", percentage: "" });
     },
@@ -572,7 +595,7 @@ function AssignmentsTab() {
                       <div className="font-medium">{a.partnerName}</div>
                       <div className="text-xs text-muted-foreground">{a.partnerEmail}</div>
                     </TableCell>
-                    <TableCell className="font-medium">{a.productTitle ?? `ID: ${a.productId}`}</TableCell>
+                    <TableCell className="font-medium">{a.productTitle ?? a.courseTitle ?? a.label ?? (a.courseId ? `Course #${a.courseId}` : "All eligible courses")}</TableCell>
                     <TableCell>
                       <span className="flex items-center gap-1 text-sm text-muted-foreground">
                         {typeInfo.icon} {typeInfo.label}

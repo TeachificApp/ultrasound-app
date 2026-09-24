@@ -50,6 +50,8 @@ describe("revenue share assignment resolution", () => {
     expect(reconciliationSource).toContain("revenueShareLedger");
     expect(reconciliationSource).toContain("skippedExisting");
     expect(reconciliationSource).toContain('status: "pending"');
+    expect(reconciliationSource).toContain('inArray(revenueShareAssignments.productType, ["lms_course", "course"])');
+    expect(reconciliationSource).not.toContain("gte(lmsOrders.createdAt");
     expect(reconciliationSource).not.toContain("stripe.transfers.create");
   });
 
@@ -65,5 +67,20 @@ describe("revenue share assignment resolution", () => {
     expect(routerSource).toContain("refreshAllPartnerStatuses");
     expect(adminSource).toContain("Refresh Stripe Statuses");
     expect(adminSource).toContain("Reconcile Paid Course Sales");
+  });
+
+  it("returns assigned courses on each partner and renders their readable titles", () => {
+    const routerSource = readFileSync(
+      fileURLToPath(new URL("./routers/revenueShareRouter.ts", import.meta.url)),
+      "utf8",
+    );
+    const adminSource = readFileSync(
+      fileURLToPath(new URL("../client/src/pages/admin/RevenueShareAdmin.tsx", import.meta.url)),
+      "utf8",
+    );
+    expect(routerSource).toContain("assignedCourses: assignmentsByPartner.get(partner.id) ?? []");
+    expect(routerSource).toContain("productTitle: lmsCourses.title");
+    expect(adminSource).toContain("Revenue-share courses");
+    expect(adminSource).toContain("a.productTitle ?? a.courseTitle ?? a.label");
   });
 });
