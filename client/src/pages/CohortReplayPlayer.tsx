@@ -321,7 +321,7 @@ export default function CohortReplayPlayer() {
             {error?.message ?? "This recording could not be found or you do not have access."}
           </p>
           <Button asChild variant="outline">
-            <Link href={`/cohort/${courseId}?tab=replays`}>Back to Replays</Link>
+            <Link href={`/cohort/${courseId}?tab=replays`}>Back to Recordings</Link>
           </Button>
         </Card>
       </div>
@@ -334,8 +334,9 @@ export default function CohortReplayPlayer() {
   const accentColor = (data as any).accentColor as string ?? "#0d9488";
 
   // Resolve embed info
-  const resolvedEmbedUrl = (recording as any).resolvedEmbedUrl as string | null;
-  const rawUrl = resolvedEmbedUrl ?? recording.videoUrl ?? "";
+  const playbackUrl = ((recording as any).playbackUrl ?? (recording as any).resolvedEmbedUrl) as string | null;
+  const playbackUnavailableReason = (recording as any).playbackUnavailableReason as string | null;
+  const rawUrl = playbackUrl ?? "";
   const embed = rawUrl ? getEmbedInfo(rawUrl) : null;
   const hasCustomEmbed = !!(recording as any).embedCode;
   const durationSecs = recording.durationSeconds ?? 0;
@@ -352,7 +353,7 @@ export default function CohortReplayPlayer() {
           <Button variant="ghost" size="sm" className="gap-1.5 -ml-2" style={{ color: primaryColor }} asChild>
             <Link href={`/cohort/${courseId}?tab=replays`}>
               <ChevronLeft className="w-4 h-4" />
-              Back to Replays
+              Back to Recordings
             </Link>
           </Button>
           <span className="text-gray-300 text-sm">/</span>
@@ -400,7 +401,12 @@ export default function CohortReplayPlayer() {
             <div className="w-full aspect-video flex items-center justify-center bg-gray-900">
               <div className="text-center">
                 <Film className="w-16 h-16 text-gray-600 mx-auto mb-3" />
-                <p className="text-gray-400">No video available for this recording</p>
+                <p className="text-gray-300 font-medium">This replay is being prepared</p>
+                <p className="text-gray-500 text-sm mt-1 max-w-sm">
+                  {playbackUnavailableReason === "unresolvable_thinkific_video"
+                    ? "The recording source is temporarily unavailable. Please try again shortly."
+                    : "The recording has been listed, but its video has not been posted yet."}
+                </p>
               </div>
             </div>
           )}

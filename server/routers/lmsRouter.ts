@@ -43,6 +43,7 @@ import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { toCheckoutAmountCents } from "../lib/paymentState";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
+import { resolveCohortRecordingPlayback } from "../lib/cohortRecordingPlayback";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
@@ -4423,8 +4424,15 @@ export const lmsLearnerRouter = router({
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      // Verify enrollment (or admin)
-      const isAdmin = ctx.user.role === "admin";
+      const isAdmin = ["admin", "platform_admin", "platform_owner"].includes(ctx.user.role ?? "");
+      const [courseTheme] = await db.select({
+        primaryColor: lmsCourses.primaryColor,
+        accentColor: lmsCourses.accentColor,
+        multiCohortMode: lmsCourses.multiCohortMode,
+      }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!courseTheme) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+
+      // Verify enrollment (or effective Platform Admin).
       if (!isAdmin) {
         const [enrollment] = await db.select({ id: lmsEnrollments.id })
           .from(lmsEnrollments)
@@ -4433,9 +4441,29 @@ export const lmsLearnerRouter = router({
         if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
       }
       const [recording] = await db.select().from(lmsCohortRecordings)
-        .where(and(eq(lmsCohortRecordings.id, input.recordingId), eq(lmsCohortRecordings.courseId, input.courseId)))
+        .where(and(
+          eq(lmsCohortRecordings.id, input.recordingId),
+          eq(lmsCohortRecordings.courseId, input.courseId),
+          ...(isAdmin ? [] : [eq(lmsCohortRecordings.status, "published")]),
+        ))
         .limit(1);
       if (!recording) throw new TRPCError({ code: "NOT_FOUND", message: "Recording not found" });
+
+      // Match the direct replay route to the Recordings tab: a learner may only
+      // view a recording that is shared or assigned to their own cohort group.
+      if (!isAdmin && courseTheme.multiCohortMode && recording.cohortGroupId != null) {
+        const [groupEnrollment] = await db.select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId })
+          .from(lmsCohortGroupEnrollments)
+          .where(and(
+            eq(lmsCohortGroupEnrollments.userId, ctx.user.id),
+            eq(lmsCohortGroupEnrollments.courseId, input.courseId),
+          ))
+          .limit(1);
+        if (!groupEnrollment || groupEnrollment.cohortGroupId !== recording.cohortGroupId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This recording is not assigned to your cohort" });
+        }
+      }
+
       // Get the session info if linked
       let session = null;
       if (recording.sessionId) {
@@ -4446,29 +4474,24 @@ export const lmsLearnerRouter = router({
       const [progress] = await db.select().from(lmsCohortRecordingProgress)
         .where(and(eq(lmsCohortRecordingProgress.userId, ctx.user.id), eq(lmsCohortRecordingProgress.recordingId, input.recordingId)))
         .limit(1);
-      // Fetch course theme colors
-      const [courseTheme] = await db.select({ primaryColor: lmsCourses.primaryColor, accentColor: lmsCourses.accentColor })
-        .from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
       const primaryColor = courseTheme?.primaryColor ?? "#179ca3";
       const accentColor = courseTheme?.accentColor ?? "#0d9488";
-      // Resolve Thinkific proxy URLs to Wistia embed URLs server-side
-      // (Thinkific proxy has x-frame-options: SAMEORIGIN so can't be iframed directly)
-      let resolvedEmbedUrl: string | null = null;
-      if (recording.videoUrl && recording.videoUrl.includes('platform.thinkific.com/videoproxy')) {
-        try {
-          const resp = await fetch(recording.videoUrl, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0' } });
-          const html = await resp.text();
-          const wistiaMatch = html.match(/wistia_async_(\w+)/);
-          if (wistiaMatch) {
-            // Strip '#' from hex color for Wistia playerColor param
-            const wistiaColor = primaryColor.replace(/^#/, '');
-            resolvedEmbedUrl = `https://fast.wistia.net/embed/iframe/${wistiaMatch[1]}?videoFoam=true&autoPlay=false&playerColor=${wistiaColor}`;
-          }
-        } catch (_) {
-          // Ignore resolution errors - fall back to direct URL
-        }
-      }
-      return { recording: { ...recording, resolvedEmbedUrl }, session, progress: progress ?? null, primaryColor, accentColor };
+      const playback = await resolveCohortRecordingPlayback({ videoUrl: recording.videoUrl, primaryColor });
+      return {
+        recording: {
+          ...recording,
+          // Retain the legacy field for older clients while returning a named,
+          // safe playback URL to the current player.
+          resolvedEmbedUrl: playback.playbackUrl,
+          playbackUrl: playback.playbackUrl,
+          playbackSource: playback.source,
+          playbackUnavailableReason: playback.unavailableReason,
+        },
+        session,
+        progress: progress ?? null,
+        primaryColor,
+        accentColor,
+      };
     }),
 
   /** Get recording progress for all recordings in a course for the current user */

@@ -1022,7 +1022,7 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
         {([
           { key: "sessions", label: "Live Sessions", icon: <Video className="w-4 h-4" />, count: upcomingSessions.length },
           { key: "assignments", label: "Assignments", icon: <FileText className="w-4 h-4" />, count: pendingAssignments.length },
-          { key: "replays", label: "Replays", icon: <Film className="w-4 h-4" />, count: recordings.length },
+          { key: "replays", label: "Recordings", icon: <Film className="w-4 h-4" />, count: recordings.length },
           { key: "resources", label: "Resources", icon: <FolderOpen className="w-4 h-4" />, count: resources.length },
           { key: "discussions", label: "Discussions", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>, count: discData?.messages?.length ?? 0 },
         ] as const).map(({ key, label, icon, count }) => (
@@ -1122,7 +1122,7 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
         </div>
       )}
 
-      {/* Replays tab */}
+      {/* Recordings tab */}
       {cohortTab === "replays" && (
         <div className="space-y-4">
           {recordings.length === 0 ? (
@@ -1399,10 +1399,14 @@ function CohortRecordingCard({ recording, courseId }: { recording: any; courseId
   const thumbSrc = useRecordingThumb(recording);
   const isDirectVideo = getRecordingAutoThumb(recording.videoUrl)?.startsWith("__video__") ?? false;
   const directVideoUrl = isDirectVideo ? recording.videoUrl : null;
+  const hasPlayableVideo = Boolean(recording.videoUrl?.trim());
   const [imgErr, setImgErr] = React.useState(false);
-  return (
-    <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
-      <Card className="border border-gray-200 bg-white hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group overflow-hidden">
+  const card = (
+      <Card className={`border bg-white transition-all overflow-hidden ${
+        hasPlayableVideo
+          ? "border-gray-200 hover:border-teal-300 hover:shadow-md cursor-pointer group"
+          : "border-dashed border-amber-300 bg-amber-50/30"
+      }`}>
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
             {/* Thumbnail — 16:9 aspect box */}
@@ -1423,8 +1427,10 @@ function CohortRecordingCard({ recording, courseId }: { recording: any; courseId
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2 flex-wrap">
-                <h3 className="font-semibold text-gray-900 text-sm leading-tight group-hover:text-teal-700 transition-colors">{recording.title}</h3>
-                <Badge className="bg-teal-100 text-teal-700 border-teal-200 text-xs flex-shrink-0">Recording</Badge>
+                <h3 className={`font-semibold text-gray-900 text-sm leading-tight transition-colors ${hasPlayableVideo ? "group-hover:text-teal-700" : ""}`}>{recording.title}</h3>
+                <Badge className={`text-xs flex-shrink-0 ${hasPlayableVideo ? "bg-teal-100 text-teal-700 border-teal-200" : "bg-amber-100 text-amber-800 border-amber-200"}`}>
+                  {hasPlayableVideo ? "Recording" : "Preparing"}
+                </Badge>
               </div>
               {recording.description && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{recording.description}</p>}
               <div className="flex items-center gap-3 mt-1.5 flex-wrap">
@@ -1435,14 +1441,24 @@ function CohortRecordingCard({ recording, courseId }: { recording: any; courseId
                   <p className="flex items-center gap-1 text-xs text-gray-500"><Clock className="w-3 h-3" />{durationMins} min</p>
                 )}
               </div>
-              <p className="mt-2 text-xs text-teal-600 font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                <PlayCircle className="w-3.5 h-3.5" /> Watch Recording
-              </p>
+              {hasPlayableVideo ? (
+                <p className="mt-2 text-xs text-teal-600 font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
+                  <PlayCircle className="w-3.5 h-3.5" /> Watch Recording
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-amber-700 font-medium flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" /> Replay video has not been posted yet
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
-    </Link>
+  );
+  return hasPlayableVideo ? (
+    <Link href={`/cohort/${courseId}/replay/${recording.id}`}>{card}</Link>
+  ) : (
+    <div aria-label={`${recording.title} replay is being prepared`}>{card}</div>
   );
 }
 
