@@ -384,6 +384,15 @@ export async function applyRevenueShareToCheckoutSession(input: {
   return buildPaymentTimeRevenueShareCheckoutOptions(share);
 }
 
+/** Accept either the standard string reference or an expanded Stripe object. */
+export function normalizeStripePaymentIntentId(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string") {
+    return (value as { id: string }).id;
+  }
+  return null;
+}
+
 /** Webhook helper: record payment-time ledger entry or run post-payment transfers. */
 export async function recordRevenueShareFromCompletedCheckout(input: {
   session: Record<string, unknown>;
@@ -402,6 +411,7 @@ export async function recordRevenueShareFromCompletedCheckout(input: {
     const sharePercentage = meta.revenue_share_percentage;
     if (Number.isInteger(partnerId) && Number.isInteger(assignmentId) && Number.isInteger(shareAmount) && shareAmount > 0 && sharePercentage) {
       const sessionId = input.session.id as string;
+      const paymentIntentId = normalizeStripePaymentIntentId(input.session.payment_intent);
       const [existing] = await db.select({ id: revenueShareLedger.id })
         .from(revenueShareLedger)
         .where(and(
@@ -417,7 +427,7 @@ export async function recordRevenueShareFromCompletedCheckout(input: {
           assignmentId,
           courseId: input.courseId,
           courseTitle: input.courseTitle ?? null,
-          paymentIntentId: (input.session.payment_intent as string) ?? null,
+          paymentIntentId,
           checkoutSessionId: sessionId,
           customerEmail: (input.session.customer_email as string) ?? (input.session.customer_details as any)?.email ?? null,
           grossAmount: (input.session.amount_total as number) ?? 0,

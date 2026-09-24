@@ -41,6 +41,7 @@ import { sendEnrollmentEmail, sendEnrollmentEmailForUser } from "../lib/enrollme
 import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { toCheckoutAmountCents } from "../lib/paymentState";
+import { isCachedStripePriceCompatible, shouldInvalidateCourseStripeCache } from "../lib/stripePriceCache";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
 import { resolveCohortRecordingPlayback } from "../lib/cohortRecordingPlayback";
@@ -4587,15 +4588,6 @@ export const lmsLearnerRouter = router({
       // Always use the learn subdomain for Stripe redirects (not the main app domain)
       const learnDomain = "https://learn.allaboutultrasound.com";
 
-      // Return cached payment link if still active
-      const cachedLinkId = (course as any).stripePaymentLinkId as string | null;
-      if (cachedLinkId) {
-        try {
-          const existing = await stripe.paymentLinks.retrieve(cachedLinkId);
-          if (existing.active) return { url: existing.url };
-        } catch { /* fall through */ }
-      }
-
       // Check for first active pricing option first
       const pricingOpts = await db.select().from(lmsPricingOptions)
         .where(eq(lmsPricingOptions.courseId, course.id));
@@ -4605,6 +4597,36 @@ export const lmsLearnerRouter = router({
       const currency = course.currency ?? "usd";
       const price = firstActive?.price ?? course.price;
       let stripePriceId = firstActive?.stripePriceId ?? course.stripePriceId ?? null;
+
+      const priceTerms = {
+        currency,
+        pricingType,
+        price,
+        subscriptionInterval: firstActive?.subscriptionInterval ?? course.subscriptionInterval,
+        installmentAmount: firstActive?.installmentAmount ?? course.installmentAmount,
+        installmentIntervalDays: firstActive?.installmentIntervalDays ?? course.installmentIntervalDays,
+      };
+      if (stripePriceId) {
+        try {
+          const storedPrice = await stripe.prices.retrieve(stripePriceId);
+          if (!isCachedStripePriceCompatible(storedPrice, priceTerms)) stripePriceId = null;
+        } catch { stripePriceId = null; }
+      }
+
+      // A cached link is valid only if the price it was built around remains
+      // compatible with the LMS terms. Prevent an old price from surviving an
+      // admin edit merely because its link is still active in Stripe.
+      const cachedLinkId = (course as any).stripePaymentLinkId as string | null;
+      if (cachedLinkId && stripePriceId) {
+        try {
+          const existing = await stripe.paymentLinks.retrieve(cachedLinkId);
+          const linkItems = await stripe.paymentLinks.listLineItems(cachedLinkId, { limit: 2 });
+          const cachedPriceId = linkItems.data.length === 1
+            ? (typeof linkItems.data[0]?.price === "string" ? linkItems.data[0].price : linkItems.data[0]?.price?.id)
+            : null;
+          if (existing.active && cachedPriceId === stripePriceId) return { url: existing.url };
+        } catch { /* fall through */ }
+      }
 
       if (!stripePriceId) {
         const product = await stripe.products.create({
@@ -4694,6 +4716,24 @@ export const lmsLearnerRouter = router({
             return null; // stale price from a different Stripe account
           }
           throw e; // re-throw unexpected errors
+        }
+      };
+
+      // Stripe Price amounts and recurring terms are immutable. A price can be
+      // present and active yet still be stale after an LMS course is edited.
+      const validateCompatiblePriceId = async (
+        priceId: string | null,
+        terms: Parameters<typeof isCachedStripePriceCompatible>[1],
+      ): Promise<string | null> => {
+        if (!priceId) return null;
+        try {
+          const storedPrice = await stripe.prices.retrieve(priceId);
+          return isCachedStripePriceCompatible(storedPrice, terms) ? priceId : null;
+        } catch (e: any) {
+          if (e?.code === "resource_missing" || e?.statusCode === 404 || (e?.message && e.message.includes("No such price"))) {
+            return null;
+          }
+          throw e;
         }
       };
 
@@ -4799,7 +4839,14 @@ export const lmsLearnerRouter = router({
         subscriptionInterval = opt.subscriptionInterval ?? null;
         productName = `${course.title}${opt.label ? ` — ${opt.label}` : ""}`;
         isSubscription = pricingType === "subscription" || pricingType === "payment_plan";
-        stripePriceId = await validatePriceId(opt.stripePriceId ?? null);
+        stripePriceId = await validateCompatiblePriceId(opt.stripePriceId ?? null, {
+          currency,
+          pricingType,
+          price: displayPrice,
+          subscriptionInterval: opt.subscriptionInterval,
+          installmentAmount: opt.installmentAmount,
+          installmentIntervalDays: opt.installmentIntervalDays,
+        });
 
         if (!stripePriceId) {
           const product = await stripe.products.create({
@@ -4882,7 +4929,14 @@ export const lmsLearnerRouter = router({
       displayPrice = Number(course.price ?? 0);
       subscriptionInterval = course.subscriptionInterval ?? null;
       isSubscription = pricingType === "subscription" || pricingType === "payment_plan";
-      stripePriceId = await validatePriceId(course.stripePriceId ?? null);
+      stripePriceId = await validateCompatiblePriceId(course.stripePriceId ?? null, {
+        currency,
+        pricingType,
+        price: displayPrice,
+        subscriptionInterval: course.subscriptionInterval,
+        installmentAmount: course.installmentAmount,
+        installmentIntervalDays: course.installmentIntervalDays,
+      });
 
       if (!stripePriceId) {
         const product = await stripe.products.create({
@@ -4989,6 +5043,22 @@ export const lmsLearnerRouter = router({
             const result = await reconcileLmsCheckoutFromStripeSession(db as any, session as unknown as Record<string, unknown>);
             if (result.success) {
               console.log(`[CheckoutStatus] LMS fallback fulfilled: user ${result.userId}, course ${result.courseId}`);
+              // The completion page is a recovery path for an unavailable or
+              // delayed webhook. Mirror the webhook's idempotent revenue-share
+              // recorder so a completed payment-time split is never omitted
+              // from the admin ledger simply because fallback fulfilled it.
+              if (result.courseId) {
+                const [course] = await db.select({ title: lmsCourses.title })
+                  .from(lmsCourses)
+                  .where(eq(lmsCourses.id, result.courseId))
+                  .limit(1);
+                const { recordRevenueShareFromCompletedCheckout } = await import("../lib/revenueShareEngine");
+                await recordRevenueShareFromCompletedCheckout({
+                  session: session as unknown as Record<string, unknown>,
+                  courseId: result.courseId,
+                  courseTitle: course?.title ?? null,
+                });
+              }
             }
           } catch (err) {
             console.error("[CheckoutStatus] Fallback fulfillment error:", err);
@@ -5254,6 +5324,12 @@ export const lmsGroupRouter = router({
       const updates: Record<string, any> = {};
       for (const [k, v] of Object.entries(fields)) { if (v !== undefined) updates[k] = v; }
       if (Object.keys(updates).length > 0) {
+        if (shouldInvalidateCourseStripeCache(updates)) {
+          // Stripe Price and Payment Link records are immutable snapshots of
+          // a price configuration, so start a fresh checkout cache after edits.
+          updates.stripePriceId = null;
+          updates.stripePaymentLinkId = null;
+        }
         await db.update(lmsPricingOptions).set(updates).where(eq(lmsPricingOptions.id, id));
       }
       return { success: true };

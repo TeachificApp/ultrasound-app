@@ -11,4 +11,9 @@ describe("payment-time revenue-share split safeguards", () => {
     expect(Math.floor((2997 * 25) / 100)).toBe(749);
     expect(2997 - 749).toBe(2248);
   });
+
+  it("calculates a $6.24 share from the current $24.97 course price", () => {
+    expect(Math.floor((2497 * 25) / 100)).toBe(624);
+    expect(2497 - 624).toBe(1873);
+  });
 });

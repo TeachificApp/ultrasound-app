@@ -30,6 +30,7 @@ import { sendEnrollmentEmail } from "../lib/enrollmentEmail";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import { syncLessonFlashcardBlocksToQuestionBank, syncLessonQuizBlocksToQuestionBank } from "../lib/lessonQuizQuestionBankSync";
+import { shouldInvalidateCourseStripeCache } from "../lib/stripePriceCache";
 import {
   lmsCourses,
   lmsSections,
@@ -486,6 +487,12 @@ export const lmsCourseBuilderRouter = router({
       if (filtered.coverImageUrl && !filtered.thumbnailUrl) filtered.thumbnailUrl = filtered.coverImageUrl;
       if (filtered.thumbnailUrl && !filtered.coverImageUrl) filtered.coverImageUrl = filtered.thumbnailUrl;
       if (Object.keys(filtered).length > 0) {
+        // Stripe Prices and Payment Links are immutable. A changed LMS price or
+        // billing cadence must never continue to use an older cached checkout.
+        if (shouldInvalidateCourseStripeCache(filtered)) {
+          filtered.stripePriceId = null;
+          filtered.stripePaymentLinkId = null;
+        }
         await db.update(lmsCourses).set(filtered).where(eq(lmsCourses.id, id));
       }
 

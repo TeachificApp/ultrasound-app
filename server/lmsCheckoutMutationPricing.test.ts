@@ -33,8 +33,16 @@ function createDb(course: Record<string, unknown>) {
   const query = {
     limit: vi.fn().mockResolvedValue([course]),
   };
+  const revenueShareQuery = {
+    where: vi.fn().mockResolvedValue([]),
+  };
   return {
-    select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => query) })) })),
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => query),
+        leftJoin: vi.fn(() => revenueShareQuery),
+      })),
+    })),
     insert: vi.fn(() => ({ values: vi.fn(() => ({ $returningId: vi.fn().mockResolvedValue([{ id: 701 }]) })) })),
     update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn().mockResolvedValue(undefined) })) })),
   };
