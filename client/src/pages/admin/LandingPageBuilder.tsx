@@ -7603,7 +7603,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
 // ─── Sortable Block Card ──────────────────────────────────────────────────────
 
 // ─── Column Drop Zone ─────────────────────────────────────────────────────────
-function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onMoveToOther, onDeleteChild, onAddBlock, onReorderChild }: {
+function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onMoveToOther, onDeleteChild, onAddBlock, onReorderChild, selectedChildId, onSelectChild }: {
   id: string; blocks: Block[]; activeDragId: UniqueIdentifier | null;
   isTargeted?: boolean;
   onMoveOut: (childBlockId: string) => void;
@@ -7611,6 +7611,8 @@ function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onMov
   onDeleteChild?: (childBlockId: string) => void;
   onAddBlock: (block: Block) => void;
   onReorderChild?: (childBlockId: string, direction: "up" | "down") => void;
+  selectedChildId?: string | null;
+  onSelectChild?: (block: Block) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -7638,6 +7640,8 @@ function ColumnDropZone({ id, blocks, activeDragId, isTargeted, onMoveOut, onMov
                 <ColumnChildBlock
                   key={b.id}
                   block={b}
+                  isSelected={selectedChildId === b.id}
+                  onSelect={onSelectChild ? () => onSelectChild(b) : undefined}
                   onMoveOut={() => onMoveOut(b.id)}
                   onMoveToOther={onMoveToOther ? () => onMoveToOther(b.id) : undefined}
                   onDelete={onDeleteChild ? () => onDeleteChild(b.id) : undefined}
@@ -7760,8 +7764,10 @@ function ColumnBlockPickerDialog({ open, onOpenChange, onAddBlock }: {
 }
 
 // ─── Column Child Block (sortable within a column) ────────────────────────────
-function ColumnChildBlock({ block, onMoveOut, onMoveToOther, onDelete, onMoveUp, onMoveDown, colZoneId }: {
+function ColumnChildBlock({ block, isSelected, onSelect, onMoveOut, onMoveToOther, onDelete, onMoveUp, onMoveDown, colZoneId }: {
   block: Block;
+  isSelected?: boolean;
+  onSelect?: () => void;
   onMoveOut: () => void;
   onMoveToOther?: () => void;
   onDelete?: () => void;
@@ -7772,10 +7778,10 @@ function ColumnChildBlock({ block, onMoveOut, onMoveToOther, onDelete, onMoveUp,
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1, pointerEvents: isDragging ? "none" as const : undefined };
   return (
-    <div ref={setNodeRef} style={style} data-col-zone={colZoneId} className="relative group border border-gray-200 rounded bg-white overflow-hidden">
+    <div ref={setNodeRef} style={style} data-col-zone={colZoneId} onClick={(event) => { if (!(event.target as HTMLElement).closest("[data-drag-handle]")) onSelect?.(); }} className={`relative group border rounded bg-white overflow-hidden ${isSelected ? "border-2 border-teal-500 shadow-sm" : "border-gray-200"}`}>
       {/* Top-left action toolbar */}
       <div className="absolute top-1 left-1 z-10 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        <div {...attributes} {...listeners} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-gray-600 flex items-center justify-center cursor-grab active:cursor-grabbing" title="Drag to reorder"><GripVertical size={11} /></div>
+        <div {...attributes} {...listeners} data-drag-handle="true" className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-gray-600 flex items-center justify-center cursor-grab active:cursor-grabbing" title="Drag to reorder"><GripVertical size={11} /></div>
         {onMoveToOther && (
           <button onClick={e => { e.stopPropagation(); onMoveToOther(); }} className="w-6 h-6 bg-white border border-gray-200 rounded shadow text-gray-400 hover:text-teal-600 flex items-center justify-center" title="Move to other column"><ArrowLeftRight size={11} /></button>
         )}
@@ -7803,7 +7809,7 @@ function ColumnChildBlock({ block, onMoveOut, onMoveToOther, onDelete, onMoveUp,
   );
 }
 
-export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, onMoveUp, onMoveDown, onSaveAsTemplate, coursePrice, courseTitle, activeDragId, activeColumnTarget, onMoveBlockOutOfColumn, onAddBlockToColumn, onMoveChildToOtherColumn, onDeleteChildFromColumn, onReorderChildInColumn }: {
+export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplicate, onMoveUp, onMoveDown, onSaveAsTemplate, coursePrice, courseTitle, activeDragId, activeColumnTarget, onMoveBlockOutOfColumn, onAddBlockToColumn, onMoveChildToOtherColumn, onDeleteChildFromColumn, onReorderChildInColumn, selectedChildId, onSelectChild }: {
   block: Block; isSelected: boolean; onSelect: () => void; onDelete: () => void; onDuplicate: () => void; onMoveUp?: () => void; onMoveDown?: () => void; onSaveAsTemplate?: (block: Block) => void; coursePrice?: number; courseTitle?: string;
   activeDragId?: UniqueIdentifier | null;
   activeColumnTarget?: { blockId: string; side: "left" | "right" } | null;
@@ -7815,6 +7821,9 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
   onDeleteChildFromColumn?: (colBlockId: string, side: "left" | "right", childBlockId: string) => void;
   /** Reorder a child block within its column side */
   onReorderChildInColumn?: (colBlockId: string, side: "left" | "right", childBlockId: string, direction: "up" | "down") => void;
+  /** Optional child selection support for other page builders. */
+  selectedChildId?: string | null;
+  onSelectChild?: (block: Block) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id });
 
@@ -7872,6 +7881,8 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
                   onDeleteChild={onDeleteChildFromColumn ? childId => onDeleteChildFromColumn(block.id, "left", childId) : undefined}
                   onAddBlock={newBlock => onAddBlockToColumn?.(block.id, "left", newBlock)}
                   onReorderChild={onReorderChildInColumn ? (childId, dir) => onReorderChildInColumn(block.id, "left", childId, dir) : undefined}
+                  selectedChildId={selectedChildId}
+                  onSelectChild={onSelectChild}
                 />
               </div>
               <div style={{ flex: 100 - leftRatio, minWidth: 0 }}>
@@ -7886,6 +7897,8 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
                   onDeleteChild={onDeleteChildFromColumn ? childId => onDeleteChildFromColumn(block.id, "right", childId) : undefined}
                   onAddBlock={newBlock => onAddBlockToColumn?.(block.id, "right", newBlock)}
                   onReorderChild={onReorderChildInColumn ? (childId, dir) => onReorderChildInColumn(block.id, "right", childId, dir) : undefined}
+                  selectedChildId={selectedChildId}
+                  onSelectChild={onSelectChild}
                 />
               </div>
             </div>

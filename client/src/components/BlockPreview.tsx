@@ -125,7 +125,7 @@ export const CC = ({ children, className = "", ...rest }: React.HTMLAttributes<H
   <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${className}`.trim()} {...rest}>{children}</div>
 );
 
-export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnroll, onCheckoutPage, onDirectCheckout }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number; onEnroll?: (...args: any[]) => void; onCheckoutPage?: (...args: any[]) => void; onDirectCheckout?: DirectCheckoutHandler }) {
+export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnroll, onCheckoutPage, onDirectCheckout, nestingDepth = 0 }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number; onEnroll?: (...args: any[]) => void; onCheckoutPage?: (...args: any[]) => void; onDirectCheckout?: DirectCheckoutHandler; /** Protect public rendering from malformed recursively nested column data. */ nestingDepth?: number }) {
   const { user } = useAuth();
   const d = block.data ?? {};
   const handleBlockCtaClick = (e: React.MouseEvent<HTMLElement>) =>
@@ -1377,6 +1377,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const rightBlocks: Block[] = d.rightBlocks ?? [];
       const leftRatio = d.leftRatio ?? 50;
       const gap = d.gap ?? 32;
+      if (nestingDepth >= 4) {
+        return <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">This layout has reached the supported nesting depth.</div>;
+      }
       return (
         <div style={{ backgroundColor: d.bgColor ?? "transparent", padding: `${d.paddingY ?? 16}px 0` }}><CC>
           <div className="flex items-start" style={{ gap: `${gap}px` }}>
@@ -1385,7 +1388,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                 <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-gray-400 text-xs">Left column (empty)</div>
               ) : (
                 <div className="space-y-2">
-                  {leftBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} />)}
+                  {leftBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} nestingDepth={nestingDepth + 1} />)}
                 </div>
               )}
             </div>
@@ -1394,7 +1397,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                 <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-gray-400 text-xs">Right column (empty)</div>
               ) : (
                 <div className="space-y-2">
-                  {rightBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} />)}
+                  {rightBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} nestingDepth={nestingDepth + 1} />)}
                 </div>
               )}
             </div>

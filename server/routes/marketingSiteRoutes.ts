@@ -77,6 +77,10 @@ export function registerMarketingSiteOgMeta(app: Express) {
       name: tenant.siteName,
       url: `${publicSiteOrigin(tenant, "promotion")}${pagePath === "/" ? "/" : pagePath}`,
     };
+    let pageNoIndex = false;
+    let pageKeywords = "";
+    let headerCode = "";
+    let footerCode = "";
 
     try {
       const db = await getDb();
@@ -86,10 +90,20 @@ export function registerMarketingSiteOgMeta(app: Express) {
           eq(marketingSitePages.path, pagePath),
           eq(marketingSitePages.isPublished, true),
         )).limit(1);
-        if (page?.seoTitle) title = page.seoTitle;
-        if (page?.seoDescription) description = page.seoDescription;
-        if (page?.seoImage) image = page.seoImage;
-        if (page?.pageType === "blog_post") {
+        // Private pages never leak their authored metadata or custom tags to
+        // crawlers. The client access gate remains the source of their title.
+        if (page && page.visibility === "public") {
+          if (page.seoTitle) title = page.seoTitle;
+          if (page.seoDescription) description = page.seoDescription;
+          if (page.seoImage) image = page.seoImage;
+          pageNoIndex = page.hideFromSearch;
+          pageKeywords = page.seoKeywords ?? "";
+          headerCode = page.headerCode ?? "";
+          footerCode = page.footerCode ?? "";
+        } else if (page) {
+          pageNoIndex = true;
+        }
+        if (page?.pageType === "blog_post" && page.visibility === "public") {
           structuredData = {
             "@context": "https://schema.org",
             "@type": "BlogPosting",
@@ -111,11 +125,12 @@ export function registerMarketingSiteOgMeta(app: Express) {
 
     const requestOrigin = `https://${(req.get("host") ?? tenant.currentHost).split(":")[0]}`;
     const canonical = `${publicSiteOrigin(tenant, "promotion")}${pagePath === "/" ? "" : pagePath}`;
-    const noindex = isPublicSiteStagingHost(req.get("host") ?? "");
+    const noindex = isPublicSiteStagingHost(req.get("host") ?? "") || pageNoIndex;
     const meta = [
       noindex ? '<meta name="robots" content="noindex, nofollow">' : '<meta name="robots" content="index, follow">',
       `<title>${escapeHtml(title)}</title>`,
       `<meta name="description" content="${escapeHtml(description)}" />`,
+      pageKeywords ? `<meta name="keywords" content="${escapeHtml(pageKeywords)}" />` : "",
       `<meta property="og:title" content="${escapeHtml(title)}" />`,
       `<meta property="og:description" content="${escapeHtml(description)}" />`,
       `<meta property="og:url" content="${escapeHtml(`${requestOrigin}${pagePath === "/" ? "" : pagePath}`)}" />`,
@@ -124,7 +139,10 @@ export function registerMarketingSiteOgMeta(app: Express) {
       `<script type="application/ld+json">${JSON.stringify(structuredData).replace(/</g, "\\u003c")}</script>`,
     ].filter(Boolean).join("\n    ");
 
-    html = html.replace(/<title>[^<]*<\/title>/i, "").replace("</head>", `    ${meta}\n  </head>`);
+    html = html
+      .replace(/<title>[^<]*<\/title>/i, "")
+      .replace("</head>", `    ${meta}\n    ${headerCode}\n  </head>`)
+      .replace("</body>", `    ${footerCode}\n  </body>`);
     res.setHeader("Content-Type", "text/html");
     if (noindex) res.setHeader("X-Robots-Tag", "noindex, nofollow");
     res.send(html);

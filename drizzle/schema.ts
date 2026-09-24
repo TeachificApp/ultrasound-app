@@ -7249,13 +7249,25 @@ export type MarketingSiteSetting = typeof marketingSiteSettings.$inferSelect;
 export const marketingSitePages = mysqlTable("marketingSitePages", {
   id: int("id").autoincrement().primaryKey(),
   siteKey: varchar("siteKey", { length: 64 }).notNull().default("aau-staging"),
+  /** Optional parent page for the Weebly-style page tree in the per-brand site editor. */
+  parentId: int("parentId"),
   path: varchar("path", { length: 500 }).notNull(),
   title: varchar("title", { length: 500 }),
   pageType: mysqlEnum("pageType", ["page", "blog_post", "redirect"]).default("page").notNull(),
   blocks: longtext("blocks"),
+  /** Hides the page from generated public navigation while keeping it addressable. */
+  hideInNavigation: boolean("hideInNavigation").default(false).notNull(),
+  /** Per-page access mode modeled after the source site editor. */
+  visibility: mysqlEnum("visibility", ["public", "site_password", "members_or_groups"]).default("public").notNull(),
+  sitePasswordHash: varchar("sitePasswordHash", { length: 128 }),
+  headerType: mysqlEnum("headerType", ["standard", "splash", "no_header"]).default("standard").notNull(),
   seoTitle: varchar("seoTitle", { length: 255 }),
   seoDescription: text("seoDescription"),
+  seoKeywords: text("seoKeywords"),
   seoImage: varchar("seoImage", { length: 512 }),
+  headerCode: longtext("headerCode"),
+  footerCode: longtext("footerCode"),
+  hideFromSearch: boolean("hideFromSearch").default(false).notNull(),
   blogExcerpt: text("blogExcerpt"),
   blogAuthor: varchar("blogAuthor", { length: 255 }),
   blogCategory: varchar("blogCategory", { length: 160 }),
