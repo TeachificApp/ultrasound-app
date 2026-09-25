@@ -37,6 +37,7 @@ import { MemberDigitalDownloadPurchaseCard } from "@/components/admin/MemberDigi
 import { Checkbox } from "@/components/ui/checkbox";
 import Layout from "@/components/Layout";
 import { SdmsCmeUserTab } from "@/components/admin/SdmsCmeUserTab";
+import { formatPlatformDateTimeEt } from "@shared/platformTime";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 const BRAND_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -3210,16 +3211,7 @@ function CertificatesTab({ userId, data, refetch }: { userId: number; data: any;
 }
 
 // ─── Communications Tab ────────────────────────────────────────────────────────
-const toET = (ts: any) => {
-  if (!ts) return "—";
-  try {
-    return new Date(ts).toLocaleString("en-US", {
-      timeZone: "America/New_York",
-      month: "numeric", day: "numeric", year: "numeric",
-      hour: "numeric", minute: "2-digit", hour12: true,
-    }) + " ET";
-  } catch { return String(ts); }
-};
+const toET = (ts: any) => formatPlatformDateTimeEt(ts);
 
 const COMM_TYPE_LABELS: Record<string, string> = {
   magic_link: "Magic Link", welcome: "Welcome", certificate: "Certificate",
