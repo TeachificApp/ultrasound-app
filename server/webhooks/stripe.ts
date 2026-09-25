@@ -30,6 +30,7 @@ import { generateAutoLoginToken } from "../routes/autoLogin";
 import { buildPersistentAccessUrl, sendBundleAccessEmail } from "../lib/enrollmentEmail";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
 import { hasBrandMembershipTrial, isBrandMembershipTrialCheckout } from "../lib/brandMembershipTrial";
+import { grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 
 // Stripe webhook secret — optional but strongly recommended in production.
 // Resolve at request time so a rotated secret takes effect without a module reload.
@@ -777,6 +778,11 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
     status: "active",
     accessLevel: instanceAvailability?.status === "presale" ? "presale" : "full",
     accessGrantedAt: new Date(),
+  });
+  await grantScheduledContentAccess(db, {
+    userId,
+    sourceType: "workshop_instance",
+    sourceId: instanceId,
   });
   // Fetch workshop/instance details for notification and email
   const [workshopRow] = await db

@@ -3,6 +3,8 @@ import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 import { buildWorkshopCheckoutIdempotencyKey, resolveWorkshopCheckoutPrice, workshopDollarsToCents } from "../../shared/workshopPricing";
 import { isScheduledDeadlineOpen, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "../../shared/platformTime";
+import { shiftDateFromStart } from "../../shared/scheduledContentDuplication";
+import { cloneScheduledContentLinks, grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from "drizzle-orm";
@@ -17,6 +19,7 @@ import {
   workshopEnrollments,
   workshopPricingOptions,
   workshopWaitlistEntries,
+  scheduledContentLinks,
   users,
   lmsEnrollments,
   lmsSections,
@@ -518,6 +521,11 @@ export const workshopLearnerRouter = router({
         status: "active",
         accessLevel: instance.status === "presale" ? "presale" : "full",
       });
+      await grantScheduledContentAccess(db, {
+        userId: ctx.user.id,
+        sourceType: "workshop_instance",
+        sourceId: instance.id,
+      });
       await db.update(workshopInstances)
         .set({ enrolledCount: sql`enrolled_count + 1` })
         .where(eq(workshopInstances.id, instance.id));
@@ -599,15 +607,22 @@ export const workshopLearnerRouter = router({
 
       if (priceInCents === 0 || workshop.isFree) {
         // Free enrollment — only if user is logged in
-        if (userId) await db.insert(workshopEnrollments).values({
-          workshopId: workshop.id,
-          instanceId: instance.id,
-          userId,
-          amountPaid: 0,
-          currency: workshop.currency,
-          status: "active",
-          accessLevel: instance.status === "presale" ? "presale" : "full",
-        });
+        if (userId) {
+          await db.insert(workshopEnrollments).values({
+            workshopId: workshop.id,
+            instanceId: instance.id,
+            userId,
+            amountPaid: 0,
+            currency: workshop.currency,
+            status: "active",
+            accessLevel: instance.status === "presale" ? "presale" : "full",
+          });
+          await grantScheduledContentAccess(db, {
+            userId,
+            sourceType: "workshop_instance",
+            sourceId: instance.id,
+          });
+        }
         if (userId) await db
           .update(workshopInstances)
           .set({ enrolledCount: sql`enrolled_count + 1` })
@@ -757,6 +772,11 @@ export const workshopLearnerRouter = router({
           currency: session.currency ?? "usd",
           status: "active",
           accessLevel: instanceAvailability?.status === "presale" ? "presale" : "full",
+        });
+        await grantScheduledContentAccess(db, {
+          userId,
+          sourceType: "workshop_instance",
+          sourceId: instanceId,
         });
         // Increment enrolled count
         await db
@@ -1128,6 +1148,80 @@ export const workshopAdminRouter = router({
       return { success: true };
     }),
 
+  /** Duplicate a scheduled workshop run, its instance resources, and linked access items. */
+  duplicateInstance: protectedProcedure
+    .input(z.object({
+      sourceInstanceId: z.number().int().positive(),
+      title: z.string().min(1).max(255),
+      newStartDate: z.string().min(1),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [source] = await db.select().from(workshopInstances)
+        .where(eq(workshopInstances.id, input.sourceInstanceId)).limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop instance not found." });
+      const newStartDate = parseScheduledTimestamp(input.newStartDate, source.timezone ?? PLATFORM_TIMEZONE, "start");
+      const [created] = await db.insert(workshopInstances).values({
+        workshopId: source.workshopId,
+        title: input.title.trim(),
+        description: source.description,
+        startDate: newStartDate,
+        endDate: shiftDateFromStart(source.endDate, source.startDate, newStartDate),
+        timezone: source.timezone,
+        durationMinutes: source.durationMinutes,
+        locationType: source.locationType,
+        venueName: source.venueName,
+        venueAddress: source.venueAddress,
+        venueCity: source.venueCity,
+        venueState: source.venueState,
+        venueCountry: source.venueCountry,
+        meetingUrl: source.meetingUrl,
+        capacity: source.capacity,
+        price: source.price,
+        compareAtPrice: source.compareAtPrice,
+        availableForPurchase: false,
+        salesCloseDate: shiftDateFromStart(source.salesCloseDate, source.startDate, newStartDate),
+        salesOpenDate: shiftDateFromStart(source.salesOpenDate, source.startDate, newStartDate),
+        enrollmentCloseDate: shiftDateFromStart(source.enrollmentCloseDate, source.startDate, newStartDate),
+        status: "draft",
+        enrolledCount: 0,
+        instanceContent: source.instanceContent,
+        landingBlocks: source.landingBlocks,
+        presaleWelcomeHeading: source.presaleWelcomeHeading,
+        presaleWelcomeBody: source.presaleWelcomeBody,
+        presaleWelcomeMediaUrl: source.presaleWelcomeMediaUrl,
+        presaleWelcomeCtaLabel: source.presaleWelcomeCtaLabel,
+        presaleWelcomeCtaUrl: source.presaleWelcomeCtaUrl,
+      }).$returningId();
+      const resources = await db.select().from(workshopResources)
+        .where(eq(workshopResources.instanceId, source.id));
+      for (const resource of resources) {
+        await db.insert(workshopResources).values({
+          workshopId: source.workshopId,
+          instanceId: created.id,
+          title: resource.title,
+          description: resource.description,
+          cardImageUrl: resource.cardImageUrl,
+          actionType: resource.actionType,
+          linkUrl: resource.linkUrl,
+          fileUrl: resource.fileUrl,
+          fileKey: resource.fileKey,
+          fileName: resource.fileName,
+          status: resource.status,
+          position: resource.position,
+        });
+      }
+      const linked = await cloneScheduledContentLinks(db, {
+        sourceType: "workshop_instance",
+        sourceId: source.id,
+        destinationId: created.id,
+        createdByUserId: ctx.user.id,
+      });
+      return { id: created.id, copied: { resources: resources.length, linkedItems: linked.copied } };
+    }),
+
   /** Delete a workshop instance */
   deleteInstance: protectedProcedure
     .input(z.object({ id: z.number() }))
@@ -1136,6 +1230,10 @@ export const workshopAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(workshopEnrollments).where(eq(workshopEnrollments.instanceId, input.id));
       await db.delete(workshopResources).where(eq(workshopResources.instanceId, input.id));
+      await db.delete(scheduledContentLinks).where(and(
+        eq(scheduledContentLinks.sourceType, "workshop_instance"),
+        eq(scheduledContentLinks.sourceId, input.id),
+      ));
       await db.delete(workshopInstances).where(eq(workshopInstances.id, input.id));
       return { success: true };
     }),
@@ -1369,6 +1467,11 @@ export const workshopAdminRouter = router({
         await db.update(workshopInstances)
           .set({ enrolledCount: sql`enrolled_count + 1` })
           .where(eq(workshopInstances.id, input.instanceId));
+        await grantScheduledContentAccess(db, {
+          userId: input.userId,
+          sourceType: "workshop_instance",
+          sourceId: input.instanceId,
+        });
         return { success: true, alreadyAssigned: false };
       }
 
@@ -1380,6 +1483,11 @@ export const workshopAdminRouter = router({
         currency: "usd",
         status: "active",
         accessLevel: instance.status === "presale" ? "presale" : "full",
+      });
+      await grantScheduledContentAccess(db, {
+        userId: input.userId,
+        sourceType: "workshop_instance",
+        sourceId: input.instanceId,
       });
       await db.update(workshopInstances)
         .set({ enrolledCount: sql`enrolled_count + 1` })
@@ -1421,6 +1529,11 @@ export const workshopAdminRouter = router({
         currency: "usd",
         status: "active",
         accessLevel: instance?.status === "presale" ? "presale" : "full",
+      });
+      await grantScheduledContentAccess(db, {
+        userId: input.userId,
+        sourceType: "workshop_instance",
+        sourceId: input.instanceId,
       });
       await db
         .update(workshopInstances)
@@ -1675,6 +1788,11 @@ export const workshopAdminRouter = router({
           .limit(1);
         if (!existing) {
           await db.insert(workshopEnrollments).values({ userId, workshopId: input.workshopId, instanceId: instance.id, status: "active", accessLevel: instance.status === "presale" ? "presale" : "full" });
+          await grantScheduledContentAccess(db, {
+            userId,
+            sourceType: "workshop_instance",
+            sourceId: instance.id,
+          });
         }
         await sendEmail({
           to: { name: entry.name, email: entry.email },
@@ -1691,6 +1809,11 @@ export const workshopAdminRouter = router({
             .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.workshopId, input.workshopId))).limit(1);
           if (!existing) {
             await db.insert(workshopEnrollments).values({ userId, workshopId: input.workshopId, instanceId: instance.id, status: "active", accessLevel: instance.status === "presale" ? "presale" : "full" });
+            await grantScheduledContentAccess(db, {
+              userId,
+              sourceType: "workshop_instance",
+              sourceId: instance.id,
+            });
           }
           await sendEmail({
             to: { name: entry.name, email: entry.email },

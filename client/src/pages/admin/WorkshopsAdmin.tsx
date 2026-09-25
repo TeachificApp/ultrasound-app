@@ -32,6 +32,7 @@ import { CSS } from "@dnd-kit/utilities";
 import RichTextEditor from "@/components/RichTextEditor";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
+import { ScheduledContentLinksPanel } from "@/components/admin/ScheduledContentLinksPanel";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import { formatWorkshopDollars } from "../../../../shared/workshopPricing";
@@ -534,6 +535,9 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
   const [instPresaleWelcomeMediaUrl, setInstPresaleWelcomeMediaUrl] = useState("");
   const [instPresaleWelcomeCtaLabel, setInstPresaleWelcomeCtaLabel] = useState("");
   const [instPresaleWelcomeCtaUrl, setInstPresaleWelcomeCtaUrl] = useState("");
+  const [duplicateInstanceDialog, setDuplicateInstanceDialog] = useState<any>(null);
+  const [duplicateInstanceTitle, setDuplicateInstanceTitle] = useState("");
+  const [duplicateInstanceStartDate, setDuplicateInstanceStartDate] = useState("");
 
   // Resource dialog state
   const [resourceDialogOpen, setResourceDialogOpen] = useState(false);
@@ -609,6 +613,15 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
   const deleteInstanceMutation = trpc.workshopAdmin.deleteInstance.useMutation({
     onSuccess: () => { utils.workshopAdmin.getById.invalidate({ id: workshopId }); toast.success("Instance deleted"); },
     onError: (e) => toast.error(e.message),
+  });
+
+  const duplicateInstanceMutation = trpc.workshopAdmin.duplicateInstance.useMutation({
+    onSuccess: (result) => {
+      utils.workshopAdmin.getById.invalidate({ id: workshopId });
+      setDuplicateInstanceDialog(null);
+      toast.success(`Instance duplicated with ${result.copied.resources} resource(s) and ${result.copied.linkedItems} linked item(s).`);
+    },
+    onError: (error) => toast.error(error.message),
   });
 
   const createResourceMutation = trpc.workshopAdmin.createResource.useMutation({
@@ -1096,6 +1109,13 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
                           onClick={() => window.open(`/admin/workshops/${workshopId}/instances/${inst.id}/page-builder`, "_blank")}>
                           Edit Page
                         </Button>
+                        <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => {
+                          setDuplicateInstanceTitle(`${inst.title} Copy`);
+                          setDuplicateInstanceStartDate("");
+                          setDuplicateInstanceDialog(inst);
+                        }}>
+                          <Copy className="mr-1 h-3.5 w-3.5" /> Duplicate
+                        </Button>
                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEditInstance(inst)}>
                           <Edit2 className="w-3.5 h-3.5" />
                         </Button>
@@ -1115,6 +1135,9 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
                     </div>
                 </CardContent>
               </Card>
+              <div className="px-1">
+                <ScheduledContentLinksPanel sourceType="workshop_instance" sourceId={inst.id} />
+              </div>
               {selectedInstanceIdForStudents === inst.id && (
                 <WorkshopInstanceStudentsPanel
                   workshopId={workshopId}
@@ -1454,6 +1477,36 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
           <WorkshopRevenueShareEditor workshopId={workshopId} />
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!duplicateInstanceDialog} onOpenChange={(open) => { if (!open) setDuplicateInstanceDialog(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Duplicate workshop instance</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm leading-6 text-slate-600">The copied instance remains a draft and is not put on sale automatically. It retains its page content, instance-specific resources, and linked access items. Dates preserve their offset from the selected new start date; participants and enrollments are not copied.</p>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-xs">New instance title</Label>
+              <Input className="mt-1" value={duplicateInstanceTitle} onChange={(event) => setDuplicateInstanceTitle(event.target.value)} />
+            </div>
+            <div>
+              <Label className="text-xs">New start date</Label>
+              <Input className="mt-1" type="datetime-local" value={duplicateInstanceStartDate} onChange={(event) => setDuplicateInstanceStartDate(event.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDuplicateInstanceDialog(null)}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" disabled={!duplicateInstanceTitle.trim() || !duplicateInstanceStartDate || duplicateInstanceMutation.isPending}
+              onClick={() => duplicateInstanceDialog && duplicateInstanceMutation.mutate({
+                sourceInstanceId: duplicateInstanceDialog.id,
+                title: duplicateInstanceTitle.trim(),
+                newStartDate: duplicateInstanceStartDate,
+              })}>
+              {duplicateInstanceMutation.isPending ? "Duplicating…" : "Duplicate instance"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Instance Dialog ── */}
       <Dialog open={instanceDialogOpen} onOpenChange={setInstanceDialogOpen}>

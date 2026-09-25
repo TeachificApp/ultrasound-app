@@ -1252,6 +1252,14 @@ async function startServer() {
         return ensureMarketingSitePageControlsSchema(db);
       })
       .catch((err) => console.error("[Startup] ensureMarketingSitePageControlsSchema error:", err));
+    // Ensure additive scheduled cohort/workshop content links exist before
+    // assignment and checkout fulfillment can grant the configured access.
+    getDb()
+      .then(async (db) => {
+        const { ensureScheduledContentLinksSchema } = await import("../lib/ensureScheduledContentLinksSchema");
+        return ensureScheduledContentLinksSchema(db);
+      })
+      .catch((err) => console.error("[Startup] ensureScheduledContentLinksSchema error:", err));
     // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
       console.log("[Startup] Durable SCORM queue enabled — pending packages will not be skipped");

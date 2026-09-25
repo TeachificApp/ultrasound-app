@@ -81,6 +81,7 @@ import { quizCardLibraryRouter } from "./routers/quizCardLibraryRouter";
 import { sonoTravelersRouter } from "./routers/sonoTravelersRouter";
 import { siteSettingsRouter } from "./routers/siteSettingsRouter";
 import { newsletterRouter } from "./routers/newsletterRouter";
+import { scheduledContentAdminRouter } from "./routers/scheduledContentAdminRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -203,6 +204,7 @@ export const appRouter = router({
   quizCardLibrary: quizCardLibraryRouter,
   marketingSitePublic: marketingSitePublicRouter,
   marketingSiteAdmin: marketingSiteAdminRouter,
+  scheduledContentAdmin: scheduledContentAdminRouter,
 
   auth: router({
     sessionState: publicProcedure.query(async ({ ctx }) => {

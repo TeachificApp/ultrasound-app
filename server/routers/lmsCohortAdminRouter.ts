@@ -82,6 +82,7 @@ import {
   mediaUploadResponses,
   lmsCohortGroups,
   lmsCohortGroupEnrollments,
+  scheduledContentLinks,
   lmsCohortMessages,
   lmsCohortStaff,
   postingAliases,
@@ -89,6 +90,8 @@ import {
 } from "../../drizzle/schema";
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 import { parseScheduledTimestamp, PLATFORM_TIMEZONE } from "../../shared/platformTime";
+import { shiftDateFromStart } from "../../shared/scheduledContentDuplication";
+import { cloneScheduledContentLinks, grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 import { assertAdmin, generateSlug, uniqueSlug, recalcProgress, issueCertificateIfEnabled } from "./lmsHelpers";
@@ -1075,6 +1078,163 @@ export const lmsCohortAdminRouter = router({
       return { success: true };
     }),
 
+  /** Duplicate one scheduled cohort run without copying learners or submissions. */
+  duplicateCohortGroup: protectedProcedure
+    .input(z.object({
+      sourceGroupId: z.number().int().positive(),
+      name: z.string().min(1).max(255),
+      newStartDate: z.string().min(1),
+      includeRecordings: z.boolean().default(false),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [source] = await db.select().from(lmsCohortGroups)
+        .where(eq(lmsCohortGroups.id, input.sourceGroupId)).limit(1);
+      if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "Cohort group not found." });
+      const newStartDate = parseScheduledTimestamp(input.newStartDate, PLATFORM_TIMEZONE, "start");
+      const [lastGroup] = await db.select({ sortOrder: lmsCohortGroups.sortOrder })
+        .from(lmsCohortGroups).where(eq(lmsCohortGroups.courseId, source.courseId))
+        .orderBy(desc(lmsCohortGroups.sortOrder)).limit(1);
+      const sourceDate = source.startDate;
+      const [created] = await db.insert(lmsCohortGroups).values({
+        courseId: source.courseId,
+        name: input.name.trim(),
+        slug: `${generateSlug(input.name)}-${Date.now().toString(36)}`.slice(0, 255),
+        description: source.description,
+        startDate: newStartDate,
+        endDate: shiftDateFromStart(source.endDate, sourceDate, newStartDate),
+        enrollmentCloseDate: shiftDateFromStart(source.enrollmentCloseDate, sourceDate, newStartDate),
+        maxStudents: source.maxStudents,
+        location: source.location,
+        durationHours: source.durationHours,
+        status: "draft",
+        pageBlocks: source.pageBlocks,
+        landingBlocks: source.landingBlocks,
+        isFeaturedOnLanding: false,
+        sortOrder: (lastGroup?.sortOrder ?? -1) + 1,
+        accessDurationDays: source.accessDurationDays,
+        waitlistEnabled: source.waitlistEnabled,
+        waitlistHeading: source.waitlistHeading,
+        waitlistBody: source.waitlistBody,
+        waitlistCtaLabel: source.waitlistCtaLabel,
+        waitlistCtaUrl: source.waitlistCtaUrl,
+        waitlistRedirectUrl: source.waitlistRedirectUrl,
+        waitlistSuccessMessage: source.waitlistSuccessMessage,
+        presaleWelcomeHeading: source.presaleWelcomeHeading,
+        presaleWelcomeBody: source.presaleWelcomeBody,
+        presaleWelcomeMediaUrl: source.presaleWelcomeMediaUrl,
+        presaleWelcomeCtaLabel: source.presaleWelcomeCtaLabel,
+        presaleWelcomeCtaUrl: source.presaleWelcomeCtaUrl,
+      }).$returningId();
+
+      const sessions = await db.select().from(lmsCohortSessions).where(and(
+        eq(lmsCohortSessions.courseId, source.courseId),
+        eq(lmsCohortSessions.cohortGroupId, source.id),
+        isNull(lmsCohortSessions.parentSessionId),
+      ));
+      const sessionIdMap = new Map<number, number>();
+      for (const session of sessions) {
+        const [copy] = await db.insert(lmsCohortSessions).values({
+          courseId: session.courseId,
+          cohortGroupId: created.id,
+          title: session.title,
+          description: session.description,
+          sessionDate: shiftDateFromStart(session.sessionDate, sourceDate, newStartDate) ?? newStartDate,
+          durationMinutes: session.durationMinutes,
+          meetingUrl: session.meetingUrl,
+          recordingUrl: session.recordingUrl,
+          status: session.status,
+          timezone: session.timezone,
+          recurrenceRule: session.recurrenceRule,
+          recurrenceDaysOfWeek: session.recurrenceDaysOfWeek,
+          recurrenceInterval: session.recurrenceInterval,
+          recurrenceEndDate: shiftDateFromStart(session.recurrenceEndDate, sourceDate, newStartDate),
+          recurrenceOccurrenceCount: session.recurrenceOccurrenceCount,
+          parentSessionId: null,
+        }).$returningId();
+        sessionIdMap.set(session.id, copy.id);
+      }
+
+      const assignments = await db.select().from(lmsCohortAssignments).where(and(
+        eq(lmsCohortAssignments.courseId, source.courseId),
+        eq(lmsCohortAssignments.cohortGroupId, source.id),
+      ));
+      for (const assignment of assignments) {
+        await db.insert(lmsCohortAssignments).values({
+          courseId: assignment.courseId,
+          cohortGroupId: created.id,
+          title: assignment.title,
+          description: assignment.description,
+          contentBlocks: assignment.contentBlocks,
+          dueDate: shiftDateFromStart(assignment.dueDate, sourceDate, newStartDate),
+          maxPoints: assignment.maxPoints,
+          submissionType: assignment.submissionType,
+          status: assignment.status,
+          position: assignment.position,
+        });
+      }
+
+      const resources = await db.select().from(lmsCohortResources).where(and(
+        eq(lmsCohortResources.courseId, source.courseId),
+        eq(lmsCohortResources.cohortGroupId, source.id),
+      ));
+      for (const resource of resources) {
+        await db.insert(lmsCohortResources).values({
+          courseId: resource.courseId,
+          cohortGroupId: created.id,
+          title: resource.title,
+          description: resource.description,
+          cardImageUrl: resource.cardImageUrl,
+          actionType: resource.actionType,
+          linkUrl: resource.linkUrl,
+          downloadSource: resource.downloadSource,
+          fileUrl: resource.fileUrl,
+          fileKey: resource.fileKey,
+          fileName: resource.fileName,
+          mediaAssetId: resource.mediaAssetId,
+          downloadProductId: resource.downloadProductId,
+          status: resource.status,
+          position: resource.position,
+        });
+      }
+
+      let recordingsCopied = 0;
+      if (input.includeRecordings) {
+        const recordings = await db.select().from(lmsCohortRecordings).where(and(
+          eq(lmsCohortRecordings.courseId, source.courseId),
+          eq(lmsCohortRecordings.cohortGroupId, source.id),
+        ));
+        for (const recording of recordings) {
+          await db.insert(lmsCohortRecordings).values({
+            courseId: recording.courseId,
+            cohortGroupId: created.id,
+            sessionId: recording.sessionId ? sessionIdMap.get(recording.sessionId) ?? null : null,
+            title: recording.title,
+            description: recording.description,
+            videoUrl: recording.videoUrl,
+            thumbnailUrl: recording.thumbnailUrl,
+            durationSeconds: recording.durationSeconds,
+            status: recording.status,
+            showControls: recording.showControls,
+            position: recording.position,
+          });
+          recordingsCopied++;
+        }
+      }
+      const linked = await cloneScheduledContentLinks(db, {
+        sourceType: "cohort_group",
+        sourceId: source.id,
+        destinationId: created.id,
+        createdByUserId: ctx.user.id,
+      });
+      return {
+        id: created.id,
+        copied: { sessions: sessions.length, assignments: assignments.length, resources: resources.length, recordings: recordingsCopied, linkedItems: linked.copied },
+      };
+    }),
+
   /** Delete a cohort group */
   deleteCohortGroup: protectedProcedure
     .input(z.object({ id: z.number() }))
@@ -1083,6 +1243,10 @@ export const lmsCohortAdminRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       await db.delete(lmsCohortGroupEnrollments).where(eq(lmsCohortGroupEnrollments.cohortGroupId, input.id));
+      await db.delete(scheduledContentLinks).where(and(
+        eq(scheduledContentLinks.sourceType, "cohort_group"),
+        eq(scheduledContentLinks.sourceId, input.id),
+      ));
       await db.delete(lmsCohortGroups).where(eq(lmsCohortGroups.id, input.id));
       return { success: true };
     }),
@@ -1169,6 +1333,11 @@ export const lmsCohortAdminRouter = router({
         userId: input.userId,
         courseId: input.courseId,
       });
+      await grantScheduledContentAccess(db, {
+        userId: input.userId,
+        sourceType: "cohort_group",
+        sourceId: input.cohortGroupId,
+      });
       // Auto-send welcome email when assigning to cohort group (fire-and-forget)
       if (input.sendWelcomeEmail !== false) {
         (async () => {
@@ -1235,6 +1404,11 @@ export const lmsCohortAdminRouter = router({
         enrollmentId: enrollment?.id ?? 0,
         userId: input.userId,
         courseId: input.courseId,
+      });
+      await grantScheduledContentAccess(db, {
+        userId: input.userId,
+        sourceType: "cohort_group",
+        sourceId: input.toGroupId,
       });
       return { success: true };
     }),
@@ -1564,6 +1738,11 @@ export const lmsCohortAdminRouter = router({
           enrollmentId: enrollment?.id ?? 0,
           userId,
           courseId: input.courseId,
+        });
+        await grantScheduledContentAccess(db, {
+          userId,
+          sourceType: "cohort_group",
+          sourceId: input.cohortGroupId,
         });
         assigned++;
       }

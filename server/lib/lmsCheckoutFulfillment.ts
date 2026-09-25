@@ -20,6 +20,7 @@ import { getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
 import { sendEnrollmentEmail, sendQuizAccessEmail } from "./enrollmentEmail";
 import { notifyOwner } from "../_core/notification";
 import { isEnrollmentAccessActive } from "./enrollmentAccess";
+import { grantScheduledContentAccess } from "./scheduledContentLinks";
 
 export type LmsCheckoutFulfillmentResult = {
   success: boolean;
@@ -707,6 +708,11 @@ export async function reconcileLmsCheckoutFromStripeSession(
               enrollmentId: enrollment.id,
               userId,
               courseId,
+            });
+            await grantScheduledContentAccess(db, {
+              userId,
+              sourceType: "cohort_group",
+              sourceId: cohortGroupId,
             });
             if (featuredGroup.status === "presale") {
               await db.update(lmsEnrollments)

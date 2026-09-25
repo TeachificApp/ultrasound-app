@@ -6279,6 +6279,27 @@ export const lmsCohortGroupEnrollments = mysqlTable("lms_cohort_group_enrollment
 export type LmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferSelect;
 export type InsertLmsCohortGroupEnrollment = typeof lmsCohortGroupEnrollments.$inferInsert;
 
+// ─── Scheduled Cohort / Workshop Content Links ───────────────────────────────
+// An access link belongs to one scheduled run, not to its parent course or
+// workshop.  It grants an enrolled learner the selected item without changing
+// any existing purchase record or access that learner may already hold.
+export const scheduledContentLinks = mysqlTable("scheduled_content_links", {
+  id: int("id").autoincrement().primaryKey(),
+  sourceType: mysqlEnum("source_type", ["cohort_group", "workshop_instance"]).notNull(),
+  sourceId: int("source_id").notNull(),
+  targetType: mysqlEnum("target_type", ["course", "download", "webinar", "workshop_instance"]).notNull(),
+  targetId: int("target_id").notNull(),
+  // Optional duration for the linked entitlement. Null keeps the target's
+  // normal lifetime/access policy intact.
+  accessDurationDays: int("access_duration_days"),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type ScheduledContentLink = typeof scheduledContentLinks.$inferSelect;
+export type InsertScheduledContentLink = typeof scheduledContentLinks.$inferInsert;
+
 // ─── Draft Notify Entries ("Notify Me When Open" for draft products) ───────────
 export const draftNotifyEntries = mysqlTable("draft_notify_entries", {
   id: int("id").autoincrement().primaryKey(),

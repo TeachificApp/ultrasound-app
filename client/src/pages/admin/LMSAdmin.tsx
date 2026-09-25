@@ -82,6 +82,7 @@ import { UnassignedStudentsAssignPanel } from "@/components/cohort/UnassignedStu
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import { CourseWaitlistTab } from "@/components/CourseWaitlistTab";
 import { ContentEmbedTab } from "@/components/admin/ContentEmbedTab";
+import { ScheduledContentLinksPanel } from "@/components/admin/ScheduledContentLinksPanel";
 import TeachAdminPanel from "@/pages/admin/TeachAdminPanel";
 import { QuizQuestionGroups } from "@/components/QuizQuestionGroups";
 import { AiSourceFileReview } from "@/components/admin/AiSourceFileReview";
@@ -12390,6 +12391,18 @@ function CohortTab({ courseId }: { courseId: number }) {
     onError: (e) => toast.error(e.message),
   });
   const [groupDialog, setGroupDialog] = useState<{ open: boolean; group?: any }>({ open: false });
+  const [duplicateGroupDialog, setDuplicateGroupDialog] = useState<{ group: any } | null>(null);
+  const [duplicateGroupName, setDuplicateGroupName] = useState("");
+  const [duplicateGroupStartDate, setDuplicateGroupStartDate] = useState("");
+  const [duplicateGroupRecordings, setDuplicateGroupRecordings] = useState(false);
+  const duplicateCohortGroup = trpc.lmsAdmin.duplicateCohortGroup.useMutation({
+    onSuccess: (result) => {
+      refetchGroups();
+      setDuplicateGroupDialog(null);
+      toast.success(`Group duplicated with ${result.copied.sessions} session(s), ${result.copied.assignments} assignment(s), ${result.copied.resources} resource(s), and ${result.copied.linkedItems} linked item(s).`);
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "waitlist" | "presale" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false, accessDurationDays: "", presaleWelcomeHeading: "", presaleWelcomeBody: "", presaleWelcomeMediaUrl: "", presaleWelcomeCtaLabel: "", presaleWelcomeCtaUrl: "" });
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupEnrollDialogOpen, setGroupEnrollDialogOpen] = useState(false);
@@ -13665,13 +13678,23 @@ function CohortTab({ courseId }: { courseId: number }) {
                         onClick={() => window.open(`/admin/lms/${courseId}/cohorts/${group.id}/page-builder`, "_blank")}>
                         Edit Page
                       </Button>
+                      <Button size="sm" variant="outline" className="text-xs" onClick={() => {
+                        setDuplicateGroupName(`${group.name} Copy`);
+                        setDuplicateGroupStartDate("");
+                        setDuplicateGroupRecordings(false);
+                        setDuplicateGroupDialog({ group });
+                      }}>
+                        <Copy className="mr-1 h-3.5 w-3.5" /> Duplicate
+                      </Button>
                       <Button size="sm" variant="outline" onClick={() => { setSelectedGroupId(selectedGroupId === group.id ? null : group.id); }} className="text-xs">
                         {selectedGroupId === group.id ? "Hide Students" : "Manage Students"}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => openGroupDialog(group)} className="text-xs">Edit</Button>
                       <Button size="sm" variant="outline" onClick={() => { if (confirm(`Delete group "${group.name}"? This will unassign all students.`)) deleteCohortGroup.mutate({ id: group.id }); }} className="text-xs text-red-600 border-red-200 hover:bg-red-50">Delete</Button>
                     </div>
-                  </div>
+                    </div>
+
+                    <ScheduledContentLinksPanel sourceType="cohort_group" sourceId={group.id} />
 
                   {/* Student management panel */}
                   {selectedGroupId === group.id && (
@@ -13919,6 +13942,43 @@ function CohortTab({ courseId }: { courseId: number }) {
               </div>
             </div>
           )}
+
+          <Dialog open={!!duplicateGroupDialog} onOpenChange={(open) => { if (!open) setDuplicateGroupDialog(null); }}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Duplicate cohort group</DialogTitle>
+                <DialogDescription>
+                  The new run starts as a draft. Sessions, assignments, due dates, resources, page content, and linked access items retain their timing relative to the new start date. Learners, submissions, and enrollment records are never copied.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <div>
+                  <Label className="text-xs">New group name</Label>
+                  <Input className="mt-1" value={duplicateGroupName} onChange={(event) => setDuplicateGroupName(event.target.value)} />
+                </div>
+                <div>
+                  <Label className="text-xs">New start date</Label>
+                  <Input className="mt-1" type="date" value={duplicateGroupStartDate} onChange={(event) => setDuplicateGroupStartDate(event.target.value)} />
+                </div>
+                <label className="flex items-start gap-3 rounded-lg border border-teal-100 bg-teal-50/50 p-3 text-sm text-slate-700">
+                  <input type="checkbox" className="mt-0.5 accent-teal-600" checked={duplicateGroupRecordings} onChange={(event) => setDuplicateGroupRecordings(event.target.checked)} />
+                  <span><strong>Include recordings</strong><br /><span className="text-xs text-slate-500">Keep the source recording links on the new group. Leave off for a new live run without prior recordings.</span></span>
+                </label>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDuplicateGroupDialog(null)}>Cancel</Button>
+                <Button className="bg-teal-600 hover:bg-teal-700" disabled={!duplicateGroupName.trim() || !duplicateGroupStartDate || duplicateCohortGroup.isPending}
+                  onClick={() => duplicateGroupDialog && duplicateCohortGroup.mutate({
+                    sourceGroupId: duplicateGroupDialog.group.id,
+                    name: duplicateGroupName.trim(),
+                    newStartDate: duplicateGroupStartDate,
+                    includeRecordings: duplicateGroupRecordings,
+                  })}>
+                  {duplicateCohortGroup.isPending ? "Duplicating…" : "Duplicate group"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* Group create/edit dialog */}
           {groupDialog.open && (
