@@ -109,6 +109,8 @@ describe("dual public-site tenant architecture", () => {
     const migration = read("drizzle/0082_public_site_tenants_and_blog_sidebars.sql");
     const importer = read("server/lib/marketingSiteImport.ts");
     const router = read("server/routers/marketingSiteRouter.ts");
+    const schemaAssurance = read("server/lib/ensureMarketingSitePageControlsSchema.ts");
+    const server = read("server/_core/index.ts");
     expect(schema).toContain("blogSidebarBlocks");
     expect(schema).toContain("blogSidebarMode");
     expect(migration).toContain("blogExcerpt");
@@ -120,6 +122,9 @@ describe("dual public-site tenant architecture", () => {
     expect(importer).toContain('$("*").contents()');
     expect(router).toContain("saveBlogSidebar");
     expect(router).toContain("blogSidebarMode");
+    expect(schemaAssurance).toContain("blogSidebarMode");
+    expect(schemaAssurance).toContain("blogSidebarBlocks");
+    expect(server).toContain("ensureMarketingSitePageControlsSchema");
   });
 
   it("defines safe page-tree, visibility, navigation, SEO, and nested-column controls", () => {

@@ -1243,6 +1243,15 @@ async function startServer() {
         return ensureQuestionBankSchema(db);
       })
       .catch((err) => console.error("[Startup] ensureQuestionBankSchema error:", err));
+    // Ensure public-site CMS controls before public .net/.com requests query
+    // the imported website copies. This is additive only and closes the gap
+    // when Railway deploys code before the 0082/0083 migrations are complete.
+    getDb()
+      .then(async (db) => {
+        const { ensureMarketingSitePageControlsSchema } = await import("../lib/ensureMarketingSitePageControlsSchema");
+        return ensureMarketingSitePageControlsSchema(db);
+      })
+      .catch((err) => console.error("[Startup] ensureMarketingSitePageControlsSchema error:", err));
     // Requeue interrupted SCORM work; pending packages remain available to the Always On worker.
     healStuckScormVersions().then(({ healed }) => {
       console.log("[Startup] Durable SCORM queue enabled — pending packages will not be skipped");
