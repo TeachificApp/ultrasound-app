@@ -17,6 +17,7 @@ import { formatWorkshopDollars } from "../../../shared/workshopPricing";
 import { formatInTimeZone } from "@shared/platformTime";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from "@shared/availabilityPresentation";
+import { hasFiniteWorkshopCapacity } from "@shared/workshopAvailability";
 
 function formatPrice(dollars: number | string | null | undefined, isFree: boolean) {
   if (isFree || dollars === 0 || dollars == null) return "Free";
@@ -38,7 +39,7 @@ export function WorkshopInstanceCard({ instance, workshopSlug, isDraft, onWaitli
     : null;
   const startDate = instance.startDate ? new Date(instance.startDate) : null;
   const endDate = instance.endDate ? new Date(instance.endDate) : null;
-  const spotsLeft = instance.capacity != null
+  const spotsLeft = hasFiniteWorkshopCapacity(instance.capacity)
     ? Math.max(0, instance.capacity - (instance.enrolledCount ?? 0))
     : null;
   const restricted = shouldHideEnrollmentPresentation({ status: instance.status, availableForPurchase: instance.availableForPurchase });

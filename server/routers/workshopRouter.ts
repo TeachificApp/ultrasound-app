@@ -4,6 +4,7 @@ import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../sha
 import { buildWorkshopCheckoutIdempotencyKey, resolveWorkshopCheckoutPrice, workshopDollarsToCents } from "../../shared/workshopPricing";
 import { isScheduledDeadlineOpen, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "../../shared/platformTime";
 import { shiftDateFromStart } from "../../shared/scheduledContentDuplication";
+import { hasFiniteWorkshopCapacity } from "../../shared/workshopAvailability";
 import { cloneScheduledContentLinks, grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -49,8 +50,8 @@ function isInstanceOnSale(instance: {
   // Legacy workshop timestamps carry wall-clock values in the instance timezone.
   const closeDate = instance.salesCloseDate ?? instance.enrollmentCloseDate ?? instance.startDate;
   if (!isScheduledDeadlineOpen(closeDate, instance.timezone, now)) return false;
-  // Capacity check — if capacity is set and fully enrolled, not on sale
-  if (instance.capacity != null && (instance.enrolledCount ?? 0) >= instance.capacity) return false;
+  // Positive capacity is finite; legacy zero capacity means unlimited.
+  if (hasFiniteWorkshopCapacity(instance.capacity) && (instance.enrolledCount ?? 0) >= instance.capacity) return false;
   return true;
 }
 
@@ -72,8 +73,8 @@ function isInstanceSoldOut(instance: {
   if (instance.salesOpenDate && now < instance.salesOpenDate) return false;
   const closeDate = instance.salesCloseDate ?? instance.enrollmentCloseDate ?? instance.startDate;
   if (!isScheduledDeadlineOpen(closeDate, instance.timezone, now)) return false;
-  // Must have capacity set and be at/over it
-  return instance.capacity != null && (instance.enrolledCount ?? 0) >= instance.capacity;
+  // Must have a positive finite capacity and be at/over it.
+  return hasFiniteWorkshopCapacity(instance.capacity) && (instance.enrolledCount ?? 0) >= instance.capacity;
 }
 
 // ─── Public Router ────────────────────────────────────────────────────────────
@@ -332,8 +333,8 @@ export const workshopPublicRouter = router({
         ));
       const enrolledCount = Number(countRow?.count ?? row.enrolledCount ?? 0);
       const capacity = row.capacity ?? null;
-      const seatsRemaining = capacity !== null ? Math.max(0, capacity - enrolledCount) : null;
-      const isSoldOut = capacity !== null && enrolledCount >= capacity;
+      const seatsRemaining = hasFiniteWorkshopCapacity(capacity) ? Math.max(0, capacity - enrolledCount) : null;
+      const isSoldOut = hasFiniteWorkshopCapacity(capacity) && enrolledCount >= capacity;
       return {
         id: row.id,
         title: row.title,

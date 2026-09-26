@@ -21,6 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { isWaitlistAvailability } from "../../../shared/contentAvailability";
+import { hasFiniteWorkshopCapacity } from "../../../shared/workshopAvailability";
 import { Briefcase, Calendar, MapPin, Clock, Users, Edit2, ArrowLeft, ExternalLink, CheckCircle, Bell, ChevronRight, X } from "lucide-react";
 import { WorkshopInstancesCalendar } from "@/components/WorkshopInstancesCalendar";
 import { Link } from "wouter";
@@ -179,7 +180,7 @@ function InstanceCard({
                 {instance.location}
               </span>
             )}
-            {instance.maxCapacity && !hideEnrollmentPresentation && (
+            {hasFiniteWorkshopCapacity(instance.maxCapacity) && !hideEnrollmentPresentation && (
               <span className="flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-teal-500" />
                 {instance.maxCapacity} spots

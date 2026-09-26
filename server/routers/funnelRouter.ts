@@ -13,6 +13,7 @@ import { evaluateBranchRules, type VisitorContext } from "../lib/funnelBranchEng
 import { computeFunnelCheckoutTotalCents } from "../lib/checkoutPricing";
 import { getStripeClient } from "../lib/stripeClient";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
+import { hasFiniteWorkshopCapacity } from "../../shared/workshopAvailability";
 
 /** Pick the next purchasable workshop instance for direct-checkout redirects. */
 function pickWorkshopCheckoutInstance(instances: Array<{
@@ -34,7 +35,7 @@ function pickWorkshopCheckoutInstance(instances: Array<{
     if (instance.salesOpenDate && now < instance.salesOpenDate) return false;
     const closeDate = instance.salesCloseDate ?? instance.enrollmentCloseDate ?? instance.startDate;
     if (!isScheduledDeadlineOpen(closeDate, instance.timezone, now)) return false;
-    if (instance.capacity != null && (instance.enrolledCount ?? 0) >= instance.capacity) return false;
+    if (hasFiniteWorkshopCapacity(instance.capacity) && (instance.enrolledCount ?? 0) >= instance.capacity) return false;
     return true;
   });
   return onSale.find(i => i.startDate && new Date(i.startDate) >= now)
