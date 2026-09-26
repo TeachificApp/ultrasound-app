@@ -31,6 +31,7 @@ import { evaluateInlineLessonQuizCompletion } from "../../shared/inlineLessonQui
 import { lessonHasAssessmentContent } from "../../shared/lessonAccessGating";
 import { resolvePresaleWelcome } from "../../shared/contentAvailability";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
+import { isCohortItemReleased, cohortLessonReleaseDay } from "../../shared/cohortDrip";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb, getOrCreateAccessToken } from "../db";
@@ -4021,7 +4022,7 @@ export const lmsLearnerRouter = router({
       // Verify the user is enrolled (or is admin)
       const isAdmin = ctx.user.role === "admin";
       if (!isAdmin) {
-        const [enrollment] = await db.select({ id: lmsEnrollments.id })
+        const [enrollment] = await db.select({ id: lmsEnrollments.id, enrolledAt: lmsEnrollments.enrolledAt })
           .from(lmsEnrollments)
           .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId)))
           .limit(1);
@@ -4038,7 +4039,7 @@ export const lmsLearnerRouter = router({
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       // Get the user's cohort group assignment first (needed for filtering)
       const [myGroupEnrollment] = await db
-        .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId })
+        .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId, enrollmentId: lmsCohortGroupEnrollments.enrollmentId })
         .from(lmsCohortGroupEnrollments)
         .where(and(eq(lmsCohortGroupEnrollments.userId, ctx.user.id), eq(lmsCohortGroupEnrollments.courseId, input.courseId)))
         .limit(1);
@@ -4049,6 +4050,11 @@ export const lmsLearnerRouter = router({
       }
       // When multi-cohort mode is on, filter content by the student's group
       const groupId = course.multiCohortMode && myGroup ? myGroup.id : null;
+      const [myEnrollment] = await db.select({ enrolledAt: lmsEnrollments.enrolledAt })
+        .from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId)))
+        .limit(1);
+      const enrollmentDate = myEnrollment?.enrolledAt ?? null;
       const { cohortCourseContentWhere } = await import("../lib/cohortGroupQuery");
       const resourceWhere = cohortCourseContentWhere(
         lmsCohortResources.courseId,
@@ -4057,7 +4063,7 @@ export const lmsLearnerRouter = router({
         groupId ?? undefined,
         eq(lmsCohortResources.status, "published"),
       );
-      const [sessions, assignments, recordings, resourceRows, mySubmissions] = await Promise.all([
+      const [sessions, rawAssignments, rawRecordings, resourceRows, mySubmissions] = await Promise.all([
         db.select().from(lmsCohortSessions)
           .where(cohortCourseContentWhere(
             lmsCohortSessions.courseId,
@@ -4105,6 +4111,18 @@ export const lmsLearnerRouter = router({
         db.select().from(lmsCohortSubmissions)
           .where(eq(lmsCohortSubmissions.userId, ctx.user.id)),
       ]);
+      const assignmentLessonIds = rawAssignments.map((assignment) => assignment.lessonId).filter((id): id is number => id != null);
+      const assignmentLessons = assignmentLessonIds.length > 0
+        ? await db.select({ id: lmsLessons.id, dripDays: lmsLessons.dripDays }).from(lmsLessons).where(inArray(lmsLessons.id, assignmentLessonIds))
+        : [];
+      const lessonDripDays = new Map(assignmentLessons.map((lesson) => [lesson.id, lesson.dripDays]));
+      const assignments = rawAssignments.filter((assignment) => {
+        if (isAdmin || !enrollmentDate) return true;
+        return isCohortItemReleased(enrollmentDate, cohortLessonReleaseDay(lessonDripDays.get(assignment.lessonId ?? -1), assignment.dripDays));
+      });
+      const recordings = (myGroup?.recordingsEnabled === false ? [] : rawRecordings).filter((recording) =>
+        isAdmin || !enrollmentDate || isCohortItemReleased(enrollmentDate, recording.dripDays)
+      );
       const resources = await enrichCohortResources(db, resourceRows);
       return { course, sessions, assignments, recordings, resources, mySubmissions, myGroup };
     }),
@@ -4148,6 +4166,13 @@ export const lmsLearnerRouter = router({
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, assignment.courseId)))
         .limit(1);
       if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
+      const enrollmentTiming = (await db.select({ enrolledAt: lmsEnrollments.enrolledAt }).from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollment.id)).limit(1))[0];
+      const linkedLesson = assignment.lessonId
+        ? (await db.select({ dripDays: lmsLessons.dripDays }).from(lmsLessons).where(eq(lmsLessons.id, assignment.lessonId)).limit(1))[0]
+        : null;
+      if (!isCohortItemReleased(enrollmentTiming?.enrolledAt ?? new Date(), cohortLessonReleaseDay(linkedLesson?.dripDays, assignment.dripDays))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This assignment is not available yet." });
+      }
       // Upsert submission
       const existing = await db.select({ id: lmsCohortSubmissions.id })
         .from(lmsCohortSubmissions)
@@ -4189,7 +4214,7 @@ export const lmsLearnerRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Verify assignment exists and user is enrolled
-      const [assignment] = await db.select({ courseId: lmsCohortAssignments.courseId })
+      const [assignment] = await db.select({ courseId: lmsCohortAssignments.courseId, lessonId: lmsCohortAssignments.lessonId, dripDays: lmsCohortAssignments.dripDays })
         .from(lmsCohortAssignments).where(eq(lmsCohortAssignments.id, input.assignmentId)).limit(1);
       if (!assignment) throw new TRPCError({ code: "NOT_FOUND" });
       const [enrollment] = await db.select({ id: lmsEnrollments.id })
@@ -4197,6 +4222,13 @@ export const lmsLearnerRouter = router({
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, assignment.courseId)))
         .limit(1);
       if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
+      const enrollmentTiming = (await db.select({ enrolledAt: lmsEnrollments.enrolledAt }).from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollment.id)).limit(1))[0];
+      const linkedLesson = assignment.lessonId
+        ? (await db.select({ dripDays: lmsLessons.dripDays }).from(lmsLessons).where(eq(lmsLessons.id, assignment.lessonId)).limit(1))[0]
+        : null;
+      if (!isCohortItemReleased(enrollmentTiming?.enrolledAt ?? new Date(), cohortLessonReleaseDay(linkedLesson?.dripDays, assignment.dripDays))) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This assignment is not available yet." });
+      }
       // Decode and upload
       const b64Marker = ";base64,";
       const b64Idx = input.dataUri.indexOf(b64Marker);
@@ -4222,12 +4254,21 @@ export const lmsLearnerRouter = router({
       if (!assignment) throw new TRPCError({ code: "NOT_FOUND" });
       console.log(`[getAssignmentDetail] id=${input.assignmentId} contentBlocks type=${typeof assignment.contentBlocks} isArray=${Array.isArray(assignment.contentBlocks)} len=${Array.isArray(assignment.contentBlocks) ? assignment.contentBlocks.length : 'N/A'} raw=${JSON.stringify(assignment.contentBlocks)?.substring(0, 200)}`);
       // Verify enrollment
-      const [enrollment] = await db.select({ id: lmsEnrollments.id })
+      const [enrollment] = await db.select({ id: lmsEnrollments.id, enrolledAt: lmsEnrollments.enrolledAt })
         .from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, assignment.courseId)))
         .limit(1);
       if (!enrollment && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
       if (assignment.status !== "published" && ctx.user.role !== "admin") throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "admin" && enrollment && !isCohortItemReleased(enrollment.enrolledAt, assignment.dripDays)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This assignment is not available yet." });
+      }
+      if (ctx.user.role !== "admin" && enrollment && assignment.lessonId) {
+        const [linkedLesson] = await db.select({ dripDays: lmsLessons.dripDays }).from(lmsLessons).where(eq(lmsLessons.id, assignment.lessonId)).limit(1);
+        if (linkedLesson && !isCohortItemReleased(enrollment.enrolledAt, linkedLesson.dripDays)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "The linked lesson is not available yet." });
+        }
+      }
       const [mySubmission] = await db.select().from(lmsCohortSubmissions)
         .where(and(eq(lmsCohortSubmissions.assignmentId, input.assignmentId), eq(lmsCohortSubmissions.userId, ctx.user.id)))
         .limit(1);
@@ -4435,7 +4476,7 @@ export const lmsLearnerRouter = router({
 
       // Verify enrollment (or effective Platform Admin).
       if (!isAdmin) {
-        const [enrollment] = await db.select({ id: lmsEnrollments.id })
+        const [enrollment] = await db.select({ id: lmsEnrollments.id, enrolledAt: lmsEnrollments.enrolledAt })
           .from(lmsEnrollments)
           .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId)))
           .limit(1);
@@ -4449,6 +4490,20 @@ export const lmsLearnerRouter = router({
         ))
         .limit(1);
       if (!recording) throw new TRPCError({ code: "NOT_FOUND", message: "Recording not found" });
+      if (!isAdmin) {
+        const [groupSetting] = recording.cohortGroupId != null
+          ? await db.select({ recordingsEnabled: lmsCohortGroups.recordingsEnabled })
+              .from(lmsCohortGroups).where(eq(lmsCohortGroups.id, recording.cohortGroupId)).limit(1)
+          : [];
+        if (groupSetting?.recordingsEnabled === false) throw new TRPCError({ code: "FORBIDDEN", message: "Recordings are disabled for this cohort." });
+        const [enrollment] = await db.select({ enrolledAt: lmsEnrollments.enrolledAt })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId)))
+          .limit(1);
+        if (enrollment && !isCohortItemReleased(enrollment.enrolledAt, recording.dripDays)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This recording is not available yet." });
+        }
+      }
 
       // Match the direct replay route to the Recordings tab: a learner may only
       // view a recording that is shared or assigned to their own cohort group.

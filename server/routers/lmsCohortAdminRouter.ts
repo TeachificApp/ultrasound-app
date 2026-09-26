@@ -91,6 +91,7 @@ import {
 import { sendEmail, buildFreePreviewConfirmationEmail } from "../_core/email";
 import { parseScheduledTimestamp, PLATFORM_TIMEZONE } from "../../shared/platformTime";
 import { shiftDateFromStart } from "../../shared/scheduledContentDuplication";
+import { isCohortItemReleased, cohortLessonReleaseDay } from "../../shared/cohortDrip";
 import { cloneScheduledContentLinks, grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -292,7 +293,9 @@ export const lmsCohortAdminRouter = router({
       title: z.string().min(1).max(255),
       description: z.string().optional(),
       contentBlocks: z.array(z.any()).optional(),
+      lessonId: z.number().int().positive().nullable().optional(),
       dueDate: z.string().nullable().optional(),
+      dripDays: z.number().int().min(0).default(0),
       maxPoints: z.number().int().min(0).default(100),
       submissionType: z.enum(["text", "file", "url", "none"]).default("none"),
       status: z.enum(["draft", "published"]).default("draft"),
@@ -310,10 +313,12 @@ export const lmsCohortAdminRouter = router({
       const [result] = await db.insert(lmsCohortAssignments).values({
         courseId: input.courseId,
         cohortGroupId: input.cohortGroupId ?? null,
+        lessonId: input.lessonId ?? null,
         title: input.title,
         description,
         contentBlocks: input.contentBlocks ?? null,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        dripDays: input.dripDays,
         maxPoints: input.maxPoints,
         submissionType: input.submissionType,
         status: input.status,
@@ -365,7 +370,9 @@ export const lmsCohortAdminRouter = router({
       title: z.string().min(1).max(255).optional(),
       description: z.string().nullable().optional(),
       contentBlocks: z.array(z.any()).nullable().optional(),
+      lessonId: z.number().int().positive().nullable().optional(),
       dueDate: z.string().nullable().optional(),
+      dripDays: z.number().int().min(0).optional(),
       maxPoints: z.number().int().min(0).optional(),
       submissionType: z.enum(["text", "file", "url", "none"]).optional(),
       status: z.enum(["draft", "published"]).optional(),
@@ -426,6 +433,7 @@ export const lmsCohortAdminRouter = router({
       videoUrl: z.string().optional(),
       thumbnailUrl: z.string().optional(),
       durationSeconds: z.number().int().min(0).optional(),
+      dripDays: z.number().int().min(0).default(0),
       status: z.enum(["draft", "published"]).default("draft"),
       showControls: z.boolean().default(true),
     }))
@@ -447,6 +455,7 @@ export const lmsCohortAdminRouter = router({
         videoUrl: input.videoUrl ?? null,
         thumbnailUrl: input.thumbnailUrl ?? null,
         durationSeconds: input.durationSeconds ?? null,
+        dripDays: input.dripDays,
         status: input.status,
         showControls: input.showControls,
         position: Number(maxPos) + 1,
@@ -463,6 +472,7 @@ export const lmsCohortAdminRouter = router({
       videoUrl: z.string().nullable().optional(),
       thumbnailUrl: z.string().nullable().optional(),
       durationSeconds: z.number().int().min(0).nullable().optional(),
+      dripDays: z.number().int().min(0).optional(),
       status: z.enum(["draft", "published"]).optional(),
       showControls: z.boolean().optional(),
       position: z.number().int().optional(),
@@ -999,6 +1009,7 @@ export const lmsCohortAdminRouter = router({
       endDate: z.string().optional(),
       enrollmentCloseDate: z.string().optional(),
       maxStudents: z.number().optional(),
+      recordingsEnabled: z.boolean().default(true),
       status: z.enum(["draft", "open", "waitlist", "presale", "active", "completed", "archived"]).default("draft"),
       sortOrder: z.number().default(0),
       presaleWelcomeHeading: z.string().max(500).optional(),
@@ -1011,13 +1022,13 @@ export const lmsCohortAdminRouter = router({
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const { courseId, name, slug, description, startDate, endDate, enrollmentCloseDate, maxStudents, status, sortOrder, presaleWelcomeMediaUrl, presaleWelcomeCtaUrl, ...presaleWelcome } = input;
+      const { courseId, name, slug, description, startDate, endDate, enrollmentCloseDate, maxStudents, recordingsEnabled, status, sortOrder, presaleWelcomeMediaUrl, presaleWelcomeCtaUrl, ...presaleWelcome } = input;
       const [result] = await db.insert(lmsCohortGroups).values({
         courseId, name, slug, description,
         startDate: startDate ? parseScheduledTimestamp(startDate, PLATFORM_TIMEZONE, "start") : undefined,
         endDate: endDate ? parseScheduledTimestamp(endDate, PLATFORM_TIMEZONE, "end") : undefined,
         enrollmentCloseDate: enrollmentCloseDate ? parseScheduledTimestamp(enrollmentCloseDate, PLATFORM_TIMEZONE, "end") : undefined,
-        maxStudents, status, sortOrder, ...presaleWelcome,
+        maxStudents, recordingsEnabled, status, sortOrder, ...presaleWelcome,
         presaleWelcomeMediaUrl: presaleWelcomeMediaUrl || undefined,
         presaleWelcomeCtaUrl: presaleWelcomeCtaUrl || undefined,
       }).$returningId();
@@ -1035,6 +1046,7 @@ export const lmsCohortAdminRouter = router({
       endDate: z.string().nullable().optional(),
       enrollmentCloseDate: z.string().nullable().optional(),
       maxStudents: z.number().nullable().optional(),
+      recordingsEnabled: z.boolean().optional(),
       status: z.enum(["draft", "open", "waitlist", "presale", "active", "completed", "archived"]).optional(),
       sortOrder: z.number().optional(),
       accessDurationDays: z.number().int().min(1).nullable().optional(),
@@ -1115,6 +1127,7 @@ export const lmsCohortAdminRouter = router({
         isFeaturedOnLanding: false,
         sortOrder: (lastGroup?.sortOrder ?? -1) + 1,
         accessDurationDays: source.accessDurationDays,
+        recordingsEnabled: source.recordingsEnabled,
         waitlistEnabled: source.waitlistEnabled,
         waitlistHeading: source.waitlistHeading,
         waitlistBody: source.waitlistBody,
@@ -1168,7 +1181,9 @@ export const lmsCohortAdminRouter = router({
           title: assignment.title,
           description: assignment.description,
           contentBlocks: assignment.contentBlocks,
+          lessonId: assignment.lessonId,
           dueDate: shiftDateFromStart(assignment.dueDate, sourceDate, newStartDate),
+          dripDays: assignment.dripDays,
           maxPoints: assignment.maxPoints,
           submissionType: assignment.submissionType,
           status: assignment.status,
@@ -1216,6 +1231,7 @@ export const lmsCohortAdminRouter = router({
             videoUrl: recording.videoUrl,
             thumbnailUrl: recording.thumbnailUrl,
             durationSeconds: recording.durationSeconds,
+            dripDays: recording.dripDays,
             status: recording.status,
             showControls: recording.showControls,
             position: recording.position,

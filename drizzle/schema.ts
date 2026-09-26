@@ -6091,10 +6091,12 @@ export type InsertLmsCohortSession = typeof lmsCohortSessions.$inferInsert;
 export const lmsCohortAssignments = mysqlTable("lms_cohort_assignments", {
   id: int("id").autoincrement().primaryKey(),
   courseId: int("course_id").notNull(),
+  lessonId: int("lesson_id"), // optional lesson this assignment belongs to / follows
   title: varchar("title", { length: 255 }).notNull(),
   description: longtext("description"),
   contentBlocks: json("content_blocks").$type<any[]>(),  // page-builder blocks
   dueDate: timestamp("due_date"),
+  dripDays: int("drip_days").default(0).notNull(), // days after enrollment before this assignment is available
   maxPoints: int("max_points").default(100).notNull(),
   // text = typed submission; file = file upload; url = link submission; none = no submission required
   submissionType: mysqlEnum("submission_type", ["text", "file", "url", "none"]).default("none").notNull(),
@@ -6119,6 +6121,7 @@ export const lmsCohortRecordings = mysqlTable("lms_cohort_recordings", {
   videoUrl: text("video_url"),
   thumbnailUrl: text("thumbnail_url"),
   durationSeconds: int("duration_seconds"),
+  dripDays: int("drip_days").default(0).notNull(), // days after enrollment before this recording is available
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
   showControls: boolean("show_controls").default(true).notNull(),
   position: int("position").default(0).notNull(),
@@ -6247,6 +6250,7 @@ export const lmsCohortGroups = mysqlTable("lms_cohort_groups", {
   sortOrder: int("sort_order").default(0).notNull(),
   // How many days students retain access from group start date (null = indefinite)
   accessDurationDays: int("access_duration_days"),
+  recordingsEnabled: boolean("recordings_enabled").default(true).notNull(), // allows a cohort to hide the learner Recordings tab
   // Waitlist settings
   waitlistEnabled: boolean("waitlist_enabled").default(false).notNull(),
   waitlistHeading: varchar("waitlist_heading", { length: 500 }),

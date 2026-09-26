@@ -12403,7 +12403,7 @@ function CohortTab({ courseId }: { courseId: number }) {
     },
     onError: (error) => toast.error(error.message),
   });
-  const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "waitlist" | "presale" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false, accessDurationDays: "", presaleWelcomeHeading: "", presaleWelcomeBody: "", presaleWelcomeMediaUrl: "", presaleWelcomeCtaLabel: "", presaleWelcomeCtaUrl: "" });
+  const [groupForm, setGroupForm] = useState({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft" as "draft" | "open" | "waitlist" | "presale" | "active" | "completed" | "archived", sortOrder: 0, isFeaturedOnLanding: false, accessDurationDays: "", recordingsEnabled: true, presaleWelcomeHeading: "", presaleWelcomeBody: "", presaleWelcomeMediaUrl: "", presaleWelcomeCtaLabel: "", presaleWelcomeCtaUrl: "" });
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [groupEnrollDialogOpen, setGroupEnrollDialogOpen] = useState(false);
   const [groupEnrollGroupId, setGroupEnrollGroupId] = useState<number | null>(null);
@@ -12547,15 +12547,15 @@ function CohortTab({ courseId }: { courseId: number }) {
   });
   const openGroupDialog = (group?: any) => {
     if (group) {
-      setGroupForm({ name: group.name, slug: group.slug, description: group.description ?? "", startDate: group.startDate ? new Date(group.startDate).toISOString().slice(0, 10) : "", endDate: group.endDate ? new Date(group.endDate).toISOString().slice(0, 10) : "", enrollmentCloseDate: group.enrollmentCloseDate ? new Date(group.enrollmentCloseDate).toISOString().slice(0, 10) : "", maxStudents: group.maxStudents?.toString() ?? "", status: group.status, sortOrder: group.sortOrder, isFeaturedOnLanding: group.isFeaturedOnLanding, accessDurationDays: group.accessDurationDays?.toString() ?? "", presaleWelcomeHeading: group.presaleWelcomeHeading ?? "", presaleWelcomeBody: group.presaleWelcomeBody ?? "", presaleWelcomeMediaUrl: group.presaleWelcomeMediaUrl ?? "", presaleWelcomeCtaLabel: group.presaleWelcomeCtaLabel ?? "", presaleWelcomeCtaUrl: group.presaleWelcomeCtaUrl ?? "" });
+      setGroupForm({ name: group.name, slug: group.slug, description: group.description ?? "", startDate: group.startDate ? new Date(group.startDate).toISOString().slice(0, 10) : "", endDate: group.endDate ? new Date(group.endDate).toISOString().slice(0, 10) : "", enrollmentCloseDate: group.enrollmentCloseDate ? new Date(group.enrollmentCloseDate).toISOString().slice(0, 10) : "", maxStudents: group.maxStudents?.toString() ?? "", status: group.status, sortOrder: group.sortOrder, isFeaturedOnLanding: group.isFeaturedOnLanding, accessDurationDays: group.accessDurationDays?.toString() ?? "", recordingsEnabled: group.recordingsEnabled !== false, presaleWelcomeHeading: group.presaleWelcomeHeading ?? "", presaleWelcomeBody: group.presaleWelcomeBody ?? "", presaleWelcomeMediaUrl: group.presaleWelcomeMediaUrl ?? "", presaleWelcomeCtaLabel: group.presaleWelcomeCtaLabel ?? "", presaleWelcomeCtaUrl: group.presaleWelcomeCtaUrl ?? "" });
     } else {
-      setGroupForm({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft", sortOrder: cohortGroups.length, isFeaturedOnLanding: false, accessDurationDays: "", presaleWelcomeHeading: "", presaleWelcomeBody: "", presaleWelcomeMediaUrl: "", presaleWelcomeCtaLabel: "", presaleWelcomeCtaUrl: "" });
+      setGroupForm({ name: "", slug: "", description: "", startDate: "", endDate: "", enrollmentCloseDate: "", maxStudents: "", status: "draft", sortOrder: cohortGroups.length, isFeaturedOnLanding: false, accessDurationDays: "", recordingsEnabled: true, presaleWelcomeHeading: "", presaleWelcomeBody: "", presaleWelcomeMediaUrl: "", presaleWelcomeCtaLabel: "", presaleWelcomeCtaUrl: "" });
     }
     setGroupDialog({ open: true, group });
   };
   const handleSaveGroup = () => {
     if (!groupForm.name.trim() || !groupForm.slug.trim()) { toast.error("Name and slug are required"); return; }
-    const payload = { courseId, name: groupForm.name.trim(), slug: groupForm.slug.trim(), description: groupForm.description || undefined, startDate: groupForm.startDate || undefined, endDate: groupForm.endDate || undefined, enrollmentCloseDate: groupForm.enrollmentCloseDate || undefined, maxStudents: groupForm.maxStudents ? parseInt(groupForm.maxStudents) : undefined, status: groupForm.status, sortOrder: groupForm.sortOrder, accessDurationDays: groupForm.accessDurationDays ? parseInt(groupForm.accessDurationDays) : undefined, presaleWelcomeHeading: groupForm.presaleWelcomeHeading || undefined, presaleWelcomeBody: groupForm.presaleWelcomeBody || undefined, presaleWelcomeMediaUrl: groupForm.presaleWelcomeMediaUrl, presaleWelcomeCtaLabel: groupForm.presaleWelcomeCtaLabel || undefined, presaleWelcomeCtaUrl: groupForm.presaleWelcomeCtaUrl };
+    const payload = { courseId, name: groupForm.name.trim(), slug: groupForm.slug.trim(), description: groupForm.description || undefined, startDate: groupForm.startDate || undefined, endDate: groupForm.endDate || undefined, enrollmentCloseDate: groupForm.enrollmentCloseDate || undefined, maxStudents: groupForm.maxStudents ? parseInt(groupForm.maxStudents) : undefined, recordingsEnabled: groupForm.recordingsEnabled, status: groupForm.status, sortOrder: groupForm.sortOrder, accessDurationDays: groupForm.accessDurationDays ? parseInt(groupForm.accessDurationDays) : undefined, presaleWelcomeHeading: groupForm.presaleWelcomeHeading || undefined, presaleWelcomeBody: groupForm.presaleWelcomeBody || undefined, presaleWelcomeMediaUrl: groupForm.presaleWelcomeMediaUrl, presaleWelcomeCtaLabel: groupForm.presaleWelcomeCtaLabel || undefined, presaleWelcomeCtaUrl: groupForm.presaleWelcomeCtaUrl };
     if (groupDialog.group) {
       updateCohortGroup.mutate({ id: groupDialog.group.id, ...payload, isFeaturedOnLanding: groupForm.isFeaturedOnLanding });
     } else {
@@ -12595,6 +12595,11 @@ function CohortTab({ courseId }: { courseId: number }) {
   const getIcs = trpc.lmsAdmin.getCohortSessionsIcs.useQuery({ courseId }, { enabled: false });
 
   // Assignments
+  const { data: courseLessonCatalog = [] } = trpc.lmsAdmin.listCoursesWithLessons.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
+  const currentCourseLessons = useMemo(() => {
+    const current = (courseLessonCatalog as any[]).find((course: any) => course.id === courseId);
+    return current ? [...(current.topLevelLessons ?? []), ...(current.sections ?? []).flatMap((section: any) => section.lessons ?? [])] : [];
+  }, [courseLessonCatalog, courseId]);
   const { data: assignments = [], isLoading: assignmentsLoading } = trpc.lmsAdmin.listCohortAssignments.useQuery({ courseId, cohortGroupId: effectiveGroupId });
   const createAssignment = trpc.lmsAdmin.createCohortAssignment.useMutation({
     onSuccess: () => { utils.lmsAdmin.listCohortAssignments.invalidate({ courseId }); toast.success("Assignment created"); },
@@ -12656,17 +12661,17 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [recordingDialog, setRecordingDialog] = useState<{ open: boolean; recording?: CohortRecording }>({ open: false });
   const [recordingForm, setRecordingForm] = useState({
     title: "", description: "", videoUrl: "", thumbnailUrl: "",
-    durationSeconds: 0, status: "draft" as "draft" | "published",
+    durationSeconds: 0, dripDays: 0, status: "draft" as "draft" | "published",
     sessionId: null as number | null,
     showControls: true,
   });
   const openRecordingDialog = (r?: CohortRecording) => {
     if (r) {
       setRecordingForm({ title: r.title, description: r.description ?? "", videoUrl: r.videoUrl ?? "",
-        thumbnailUrl: r.thumbnailUrl ?? "", durationSeconds: r.durationSeconds ?? 0,
+        thumbnailUrl: r.thumbnailUrl ?? "", durationSeconds: r.durationSeconds ?? 0, dripDays: r.dripDays ?? 0,
         status: r.status, sessionId: r.sessionId, showControls: r.showControls ?? true });
     } else {
-      setRecordingForm({ title: "", description: "", videoUrl: "", thumbnailUrl: "", durationSeconds: 0, status: "draft", sessionId: null, showControls: true });
+      setRecordingForm({ title: "", description: "", videoUrl: "", thumbnailUrl: "", durationSeconds: 0, dripDays: 0, status: "draft", sessionId: null, showControls: true });
     }
     setRecordingDialog({ open: true, recording: r });
   };
@@ -12678,6 +12683,7 @@ function CohortTab({ courseId }: { courseId: number }) {
       videoUrl: recordingForm.videoUrl || undefined,
       thumbnailUrl: recordingForm.thumbnailUrl || undefined,
       durationSeconds: recordingForm.durationSeconds || undefined,
+      dripDays: recordingForm.dripDays,
       status: recordingForm.status,
       sessionId: recordingForm.sessionId,
       showControls: recordingForm.showControls,
@@ -12815,6 +12821,7 @@ function CohortTab({ courseId }: { courseId: number }) {
   const { data: copySourceData = [] } = trpc.lmsAdmin.listAssignmentsForCopy.useQuery(undefined, { enabled: copyPickerOpen });
   const [assignForm, setAssignForm] = useState({
     title: "", description: "", dueDate: "", maxPoints: 100,
+    lessonId: null as number | null, dripDays: 0,
     submissionType: "none" as "text" | "file" | "url" | "none",
     status: "draft" as "draft" | "published",
     notifyStudents: false,
@@ -12829,6 +12836,8 @@ function CohortTab({ courseId }: { courseId: number }) {
         title: assignment.title,
         description: assignment.description ?? "",
         dueDate: localISO,
+        lessonId: assignment.lessonId ?? null,
+        dripDays: assignment.dripDays ?? 0,
         maxPoints: assignment.maxPoints,
         submissionType: assignment.submissionType,
         status: assignment.status,
@@ -12836,7 +12845,7 @@ function CohortTab({ courseId }: { courseId: number }) {
         contentBlocks: assignment.contentBlocks ?? [],
       });
     } else {
-      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, submissionType: "none", status: "draft", notifyStudents: false, contentBlocks: [] });
+      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, lessonId: null, dripDays: 0, submissionType: "none", status: "draft", notifyStudents: false, contentBlocks: [] });
     }
     setAssignDialog({ open: true, assignment });
   };
@@ -12851,6 +12860,8 @@ function CohortTab({ courseId }: { courseId: number }) {
       description: assignForm.description || undefined,
       contentBlocks: latestBlocks.length > 0 ? latestBlocks : undefined,
       dueDate: assignForm.dueDate ? new Date(assignForm.dueDate).toISOString() : null,
+      lessonId: assignForm.lessonId,
+      dripDays: assignForm.dripDays,
       maxPoints: assignForm.maxPoints,
       submissionType: assignForm.submissionType,
       status: assignForm.status,
@@ -13271,6 +13282,10 @@ function CohortTab({ courseId }: { courseId: number }) {
                   <Input type="number" min={0} value={recordingForm.durationSeconds} onChange={e => setRecordingForm(p => ({ ...p, durationSeconds: parseInt(e.target.value) || 0 }))} />
                 </div>
                 <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Release after enrollment (days)</Label>
+                  <Input type="number" min={0} value={recordingForm.dripDays} onChange={e => setRecordingForm(p => ({ ...p, dripDays: Math.max(0, parseInt(e.target.value) || 0) }))} />
+                </div>
+                <div>
                   <Label className="text-sm font-medium text-gray-700 mb-1 block">Link to Session (optional)</Label>
                   <Select value={recordingForm.sessionId?.toString() ?? "__none__"} onValueChange={v => setRecordingForm(p => ({ ...p, sessionId: v === "__none__" ? null : parseInt(v) }))}>
                     <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
@@ -13565,6 +13580,18 @@ function CohortTab({ courseId }: { courseId: number }) {
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Due Date</Label>
                 <Input type="datetime-local" value={assignForm.dueDate} onChange={e => setAssignForm(p => ({ ...p, dueDate: e.target.value }))} />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Linked lesson (optional)</Label>
+                <select value={assignForm.lessonId ?? ""} onChange={e => setAssignForm(p => ({ ...p, lessonId: e.target.value ? Number(e.target.value) : null }))} className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm">
+                  <option value="">No linked lesson</option>
+                  {currentCourseLessons.map((lesson: any) => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
+                </select>
+                <p className="text-[11px] text-gray-500 mt-1">The assignment stays locked until its lesson is available.</p>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Assignment drip (days after enrollment)</Label>
+                <Input type="number" min={0} value={assignForm.dripDays} onChange={e => setAssignForm(p => ({ ...p, dripDays: Math.max(0, parseInt(e.target.value) || 0) }))} />
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Max Points</Label>
@@ -14044,6 +14071,10 @@ function CohortTab({ courseId }: { courseId: number }) {
                     <input type="number" min="1" value={groupForm.accessDurationDays} onChange={e => setGroupForm(p => ({ ...p, accessDurationDays: e.target.value }))} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500" placeholder="Leave blank for indefinite access" />
                     <p className="text-xs text-gray-400 mt-1">Students lose access this many days after the group start date. Leave blank for indefinite access.</p>
                   </div>
+                  <label className="flex items-start gap-3 rounded-lg border border-teal-100 bg-teal-50/50 p-3 cursor-pointer">
+                    <input type="checkbox" checked={groupForm.recordingsEnabled} onChange={e => setGroupForm(p => ({ ...p, recordingsEnabled: e.target.checked }))} className="mt-0.5 h-4 w-4 accent-teal-600" />
+                    <span><span className="block text-sm font-medium text-gray-700">Show Recordings tab to learners</span><span className="block text-xs text-gray-500 mt-0.5">Turn this off when recordings should not be available for this cohort group.</span></span>
+                  </label>
                   {groupForm.status === "presale" && (
                     <div className="space-y-3 rounded-xl border border-cyan-200 bg-cyan-50/60 p-4">
                       <div>

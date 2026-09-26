@@ -687,13 +687,13 @@ export default function CohortSchedule() {
                 <Badge className="ml-1 bg-amber-500 text-white text-xs px-1.5 py-0">{pendingAssignments.length}</Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="replays" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+            {myGroup?.recordingsEnabled !== false && <TabsTrigger value="replays" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
               <Film className="w-4 h-4" />
               Replays
               {(recordings ?? []).length > 0 && (
                 <Badge className="ml-1 bg-teal-500 text-white text-xs px-1.5 py-0">{recordings.length}</Badge>
               )}
-            </TabsTrigger>
+            </TabsTrigger>}
             <TabsTrigger value="resources" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
               <FolderOpen className="w-4 h-4" />
               Resources
@@ -794,7 +794,7 @@ export default function CohortSchedule() {
           </TabsContent>
 
           {/* Replays Tab */}
-          <TabsContent value="replays">
+          {myGroup?.recordingsEnabled !== false && <TabsContent value="replays">
             {(recordings ?? []).length === 0 ? (
               <Card className="text-center py-16">
                 <CardContent className="pt-6">
@@ -844,7 +844,7 @@ export default function CohortSchedule() {
                 )}
               </div>
             )}
-          </TabsContent>
+          </TabsContent>}
           {/* Resources Tab */}
           <TabsContent value="resources">
             {(resources ?? []).length === 0 ? (

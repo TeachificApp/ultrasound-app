@@ -20,7 +20,8 @@ describe("cohortGroupQuery", () => {
       fs.readFile(new URL("./routers/lmsCohortAdminRouter.ts", import.meta.url), "utf8"),
     );
     expect(source).toContain("listCohortGroupsForAdmin");
-    expect(source).not.toMatch(/listCohortGroups:[\s\S]*?\.select\(\)\s*\.from\(lmsCohortGroups\)/);
+    const procedure = source.slice(source.indexOf("listCohortGroups:"), source.indexOf("\n  /**", source.indexOf("listCohortGroups:") + 1));
+    expect(procedure).not.toMatch(/\.select\(\)\s*\.from\(lmsCohortGroups\)/);
   });
 
   it("getCohortGroupPage uses resilient helper", async () => {

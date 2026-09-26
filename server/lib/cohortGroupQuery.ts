@@ -66,6 +66,7 @@ export const cohortGroupPublicSelect = {
 export const cohortGroupMirrorGapSelect = {
   landingBlocks: lmsCohortGroups.landingBlocks,
   accessDurationDays: lmsCohortGroups.accessDurationDays,
+  recordingsEnabled: lmsCohortGroups.recordingsEnabled,
   presaleWelcomeHeading: lmsCohortGroups.presaleWelcomeHeading,
   presaleWelcomeBody: lmsCohortGroups.presaleWelcomeBody,
   presaleWelcomeMediaUrl: lmsCohortGroups.presaleWelcomeMediaUrl,
@@ -99,6 +100,7 @@ export type CohortGroupRow = {
   durationHours: number | null;
   landingBlocks: string | null;
   accessDurationDays: number | null;
+  recordingsEnabled: boolean;
   waitlistEnabled: boolean;
   waitlistHeading: string | null;
   waitlistBody: string | null;
@@ -116,6 +118,7 @@ export type CohortGroupRow = {
 const MIRROR_GAP_DEFAULTS = {
   landingBlocks: null,
   accessDurationDays: null,
+  recordingsEnabled: true,
   presaleWelcomeHeading: null,
   presaleWelcomeBody: null,
   presaleWelcomeMediaUrl: null,
