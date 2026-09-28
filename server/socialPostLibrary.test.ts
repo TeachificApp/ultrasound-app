@@ -71,6 +71,18 @@ describe("shared Social Post Library", () => {
     expect(client).toContain("openSavedPost");
   });
 
+  it("removes deleted posts from the visible library immediately and restores them on failure", () => {
+    const client = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
+
+    expect(client).toContain("onMutate: async ({ id, brand })");
+    expect(client).toContain("listSavedPosts.setData({ brand, limit: 100 }");
+    expect(client).toContain("current?.filter((post) => post.id !== id)");
+    expect(client).toContain('toast.error("Unable to delete post"');
+    expect(client).toContain('toast.success("Post deleted from the Post Library.")');
+    expect(client).toContain('type="button"');
+    expect(client).toContain("deleteSavedPostMutation.isPending");
+  });
+
   it("does not enable deferred Google image search without an approved provider", () => {
     const client = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
     expect(client).not.toContain("googleImageSearch");

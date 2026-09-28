@@ -757,7 +757,25 @@ export default function SocialContentGenerator() {
     onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
   });
   const deleteSavedPostMutation = trpc.socialContent.deleteSavedPost.useMutation({
-    onSuccess: () => void utils.socialContent.listSavedPosts.invalidate(),
+    onMutate: async ({ id, brand }) => {
+      await utils.socialContent.listSavedPosts.cancel({ brand, limit: 100 });
+      const previous = utils.socialContent.listSavedPosts.getData({ brand, limit: 100 });
+      utils.socialContent.listSavedPosts.setData({ brand, limit: 100 }, (current) =>
+        current?.filter((post) => post.id !== id)
+      );
+      return { previous, brand };
+    },
+    onError: (error, _input, context) => {
+      if (context?.previous) {
+        utils.socialContent.listSavedPosts.setData({ brand: context.brand, limit: 100 }, context.previous);
+      }
+      toast.error("Unable to delete post", { description: error.message });
+    },
+    onSuccess: (_data, input) => {
+      setSelectedSavedPostIds((current) => current.filter((id) => id !== input.id));
+      void utils.socialContent.listSavedPosts.invalidate({ brand: input.brand, limit: 100 });
+      toast.success("Post deleted from the Post Library.");
+    },
   });
 
   const updatePostDraft = useCallback((idx: number, changes: Partial<GeneratedItem>) => {
@@ -1030,7 +1048,7 @@ export default function SocialContentGenerator() {
                   <div className="flex items-start justify-between gap-2"><label className="mt-0.5 flex items-center gap-1.5 text-[10px] text-white/55"><input type="checkbox" checked={selectedSavedPostIds.includes(saved.id)} onChange={() => toggleSavedPostSelection(saved.id)} className="accent-teal-400" /><span className="sr-only">Select {saved.headline} for bulk export</span></label><div className="line-clamp-2 flex-1 text-sm font-semibold text-white/85">{saved.headline}</div><Badge className={`shrink-0 border-0 text-[9px] ${saved.status === "published" ? "bg-emerald-400/15 text-emerald-200" : "bg-white/10 text-white/55"}`}>{saved.status === "published" ? "Published" : "Draft"}</Badge></div>
                   <div className="mt-1 text-[10px] uppercase tracking-wide text-teal-200/70">{saved.category} · {saved.contentType.replace(/_/g, " ")}</div>
                   {saved.flagComment && <div className="mt-2 rounded border border-amber-300/25 bg-amber-300/10 p-2 text-[10px] text-amber-100"><span className="font-bold">Flag:</span> {saved.flagComment}</div>}
-                  <div className="mt-3 flex flex-wrap items-center gap-1.5"><Button size="sm" onClick={() => openSavedPost(saved)} className="h-7 bg-teal-500 px-2 text-xs text-white hover:bg-teal-400"><Download className="mr-1 h-3 w-3" />Open</Button><Button size="sm" variant="outline" onClick={() => markPublishedMutation.mutate({ id: saved.id, brand: presentation.brand, published: saved.status !== "published" })} className="h-7 border-white/15 px-2 text-[10px] text-white/75 hover:bg-white/10"><CheckCircle2 className="mr-1 h-3 w-3" />{saved.status === "published" ? "Unpublish" : "Publish"}</Button><Button size="sm" variant="outline" onClick={() => deleteSavedPostMutation.mutate({ id: saved.id, brand: presentation.brand })} className="ml-auto h-7 border-rose-300/25 px-2 text-[10px] text-rose-200 hover:bg-rose-400/10"><Trash2 className="h-3 w-3" /><span className="sr-only">Delete</span></Button></div>
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5"><Button type="button" size="sm" onClick={() => openSavedPost(saved)} className="h-7 bg-teal-500 px-2 text-xs text-white hover:bg-teal-400"><Download className="mr-1 h-3 w-3" />Open</Button><Button type="button" size="sm" variant="outline" onClick={() => markPublishedMutation.mutate({ id: saved.id, brand: presentation.brand, published: saved.status !== "published" })} className="h-7 border-white/15 px-2 text-[10px] text-white/75 hover:bg-white/10"><CheckCircle2 className="mr-1 h-3 w-3" />{saved.status === "published" ? "Unpublish" : "Publish"}</Button><Button type="button" size="sm" variant="outline" disabled={deleteSavedPostMutation.isPending} aria-label={`Delete ${saved.headline}`} onClick={() => deleteSavedPostMutation.mutate({ id: saved.id, brand: presentation.brand })} className="ml-auto h-7 border-rose-300/25 px-2 text-[10px] text-rose-200 hover:bg-rose-400/10"><Trash2 className="h-3 w-3" /><span className="sr-only">Delete</span></Button></div>
                   <div className="mt-2 flex gap-1.5"><input value={flagComments[saved.id] ?? ""} onChange={(event) => setFlagComments((current) => ({ ...current, [saved.id]: event.target.value }))} placeholder="Flag comment" className="min-w-0 flex-1 rounded border border-white/10 bg-white/5 px-2 py-1 text-[10px] text-white outline-none placeholder:text-white/35" /><Button size="sm" variant="outline" disabled={!flagComments[saved.id]?.trim()} onClick={() => { flagSavedPostMutation.mutate({ id: saved.id, brand: presentation.brand, comment: flagComments[saved.id].trim() }); setFlagComments((current) => ({ ...current, [saved.id]: "" })); }} className="h-7 border-amber-300/25 px-2 text-[10px] text-amber-100 hover:bg-amber-300/10"><Flag className="mr-1 h-3 w-3" />Flag</Button></div>
                 </article>
               ))}
