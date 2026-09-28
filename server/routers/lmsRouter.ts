@@ -4031,7 +4031,12 @@ export const lmsLearnerRouter = router({
 
   /** Get cohort schedule (sessions + assignments) for an enrolled student */
   getCohortSchedule: protectedProcedure
-    .input(z.object({ courseId: z.number().int().positive() }))
+    .input(z.object({
+      courseId: z.number().int().positive(),
+      // Admin student preview may provide the group being previewed. Learners
+      // may only request the group they are assigned to.
+      cohortGroupId: z.number().int().positive().optional(),
+    }))
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -4058,11 +4063,41 @@ export const lmsLearnerRouter = router({
         .select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId, enrollmentId: lmsCohortGroupEnrollments.enrollmentId })
         .from(lmsCohortGroupEnrollments)
         .where(and(eq(lmsCohortGroupEnrollments.userId, ctx.user.id), eq(lmsCohortGroupEnrollments.courseId, input.courseId)))
+        .orderBy(desc(lmsCohortGroupEnrollments.joinedAt), desc(lmsCohortGroupEnrollments.id))
         .limit(1);
+
+      if (!isAdmin && input.cohortGroupId != null && input.cohortGroupId !== myGroupEnrollment?.cohortGroupId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You are not enrolled in this cohort group" });
+      }
+
+      // A platform admin may also be enrolled in a different cohort. Do not
+      // let that personal enrollment decide student preview; preview uses an
+      // explicit group from the URL or the current group fallback below.
+      let selectedGroupId = input.cohortGroupId ?? (!isAdmin ? myGroupEnrollment?.cohortGroupId : undefined);
+      if (isAdmin && selectedGroupId != null) {
+        const [selectedGroup] = await db
+          .select({ id: lmsCohortGroups.id })
+          .from(lmsCohortGroups)
+          .where(and(eq(lmsCohortGroups.id, selectedGroupId), eq(lmsCohortGroups.courseId, input.courseId)))
+          .limit(1);
+        if (!selectedGroup) throw new TRPCError({ code: "NOT_FOUND", message: "Cohort group not found for this course" });
+      }
+
+      // Admin preview has no learner enrollment. Resolve it to the group that
+      // is currently in progress instead of returning every group's sessions.
+      if (isAdmin && course.multiCohortMode && selectedGroupId == null) {
+        const groups = await db
+          .select({ id: lmsCohortGroups.id, startDate: lmsCohortGroups.startDate, endDate: lmsCohortGroups.endDate, status: lmsCohortGroups.status })
+          .from(lmsCohortGroups)
+          .where(eq(lmsCohortGroups.courseId, input.courseId));
+        const { selectCurrentCohortGroupId } = await import("../lib/cohortGroupQuery");
+        selectedGroupId = selectCurrentCohortGroupId(groups);
+      }
+
       let myGroup = null;
-      if (myGroupEnrollment) {
+      if (selectedGroupId != null) {
         const { getCohortGroupById } = await import("../lib/cohortGroupQuery");
-        myGroup = await getCohortGroupById(db, myGroupEnrollment.cohortGroupId);
+        myGroup = await getCohortGroupById(db, selectedGroupId);
       }
       // When multi-cohort mode is on, filter content by the student's group
       const groupId = course.multiCohortMode && myGroup ? myGroup.id : null;

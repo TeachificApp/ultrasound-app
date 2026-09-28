@@ -93,6 +93,10 @@ export default function CourseOverview() {
   const searchString = useSearch();
   const urlParams = new URLSearchParams(searchString);
   const isStudentPreview = urlParams.get("preview") === "student";
+  const requestedCohortGroupId = Number(urlParams.get("cohortGroupId"));
+  const cohortGroupId = Number.isInteger(requestedCohortGroupId) && requestedCohortGroupId > 0
+    ? requestedCohortGroupId
+    : undefined;
   const { user, loading: authLoading } = useAuth();
   const isAdmin = user?.role === "admin";
   // In student preview mode, treat as non-admin for UI purposes
@@ -112,7 +116,7 @@ export default function CourseOverview() {
   const courseId = (data as any)?.course?.id as number | undefined;
   const isCohortCourse = (data as any)?.course?.type === "cohort";
   const { data: cohortData, isLoading: cohortLoading } = trpc.lmsLearner.getCohortSchedule.useQuery(
-    { courseId: courseId! },
+    { courseId: courseId!, cohortGroupId },
     { enabled: !!courseId && isCohortCourse && !!user }
   );
 

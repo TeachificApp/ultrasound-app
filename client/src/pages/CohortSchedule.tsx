@@ -474,6 +474,10 @@ export default function CohortSchedule() {
   const searchString = useSearch();
   const urlParams = new URLSearchParams(searchString);
   const isStudentPreview = urlParams.get("preview") === "student";
+  const requestedCohortGroupId = Number(urlParams.get("cohortGroupId"));
+  const cohortGroupId = Number.isInteger(requestedCohortGroupId) && requestedCohortGroupId > 0
+    ? requestedCohortGroupId
+    : undefined;
   const { user, isLoading: authLoading } = useAuth();
   const isAdmin = user?.role === "admin";
   const id = parseInt(courseId ?? "0", 10);
@@ -486,7 +490,7 @@ export default function CohortSchedule() {
   }, []);
 
   const { data, isLoading, error } = trpc.lmsLearner.getCohortSchedule.useQuery(
-    { courseId: id },
+    { courseId: id, cohortGroupId },
     { enabled: !!user && id > 0 }
   );
   // Discussion state — must be declared before any early returns (Rules of Hooks)

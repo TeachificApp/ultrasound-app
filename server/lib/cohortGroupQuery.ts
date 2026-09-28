@@ -24,10 +24,59 @@ export function cohortCourseContentWhere(
   cohortGroupId?: number,
   extra?: SQL,
 ): SQL {
-  const base = cohortGroupId
-    ? and(eq(courseIdColumn, courseId), cohortGroupScopeFilter(cohortGroupIdColumn, cohortGroupId))
+  const groupScope = cohortGroupId
+    ? cohortGroupScopeFilter(cohortGroupIdColumn, cohortGroupId)
+    : undefined;
+  const base = groupScope
+    ? and(eq(courseIdColumn, courseId), groupScope)
     : eq(courseIdColumn, courseId);
   return extra ? and(base, extra) : base;
+}
+
+type CohortGroupForSelection = {
+  id: number;
+  startDate: Date | string | null;
+  endDate: Date | string | null;
+  status: string;
+};
+
+/**
+ * Select the group a student preview should represent when no enrollment
+ * supplies a group id. Prefer a group currently in progress, then the next
+ * upcoming group, and finally the first non-archived group. This prevents an
+ * admin preview (which has no learner enrollment) from exposing sessions from
+ * every cohort under the course.
+ */
+export function selectCurrentCohortGroupId(
+  groups: CohortGroupForSelection[],
+  now = new Date(),
+): number | undefined {
+  const timestamp = now.getTime();
+  const eligible = groups.filter((group) => !["draft", "archived"].includes(group.status));
+  const current = eligible
+    .filter((group) => {
+      const start = group.startDate ? new Date(group.startDate).getTime() : Number.NEGATIVE_INFINITY;
+      const end = group.endDate ? new Date(group.endDate).getTime() : Number.POSITIVE_INFINITY;
+      return start <= timestamp && timestamp <= end;
+    })
+    .sort((a, b) => {
+      const statusRank = (status: string) => status === "active" ? 0 : status === "open" ? 1 : 2;
+      return statusRank(a.status) - statusRank(b.status)
+        || new Date(b.startDate ?? 0).getTime() - new Date(a.startDate ?? 0).getTime()
+        || a.id - b.id;
+    });
+  if (current[0]) return current[0].id;
+
+  const upcoming = eligible
+    .filter((group) => group.startDate && new Date(group.startDate).getTime() > timestamp)
+    .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime() || a.id - b.id);
+  if (upcoming[0]) return upcoming[0].id;
+
+  return eligible.sort((a, b) => {
+    const aStart = a.startDate ? new Date(a.startDate).getTime() : Number.POSITIVE_INFINITY;
+    const bStart = b.startDate ? new Date(b.startDate).getTime() : Number.POSITIVE_INFINITY;
+    return aStart - bStart || a.id - b.id;
+  })[0]?.id;
 }
 
 /** Columns present in the original Manus/Railway mirror (0007 migration). */
