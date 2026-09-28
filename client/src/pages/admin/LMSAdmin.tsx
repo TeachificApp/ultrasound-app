@@ -320,13 +320,10 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
   const [copyStep, setCopyStep] = useState<"idle" | "copying" | "reformatting" | "done">("idle");
 
   const duplicateCourse = trpc.lmsAdmin.duplicateCourse.useMutation({
-    onError: e => { toast.error(`Error: ${e.message}`); setCopyStep("idle"); },
   });
   const reformatLandingPage = trpc.lmsAdmin.reformatLandingPage.useMutation({
-    onError: e => { toast.error(`Reformat error: ${e.message}`); setCopyStep("idle"); },
   });
   const renameCourse = trpc.lmsAdmin.updateCourse.useMutation({
-    onError: e => { toast.error(`Rename error: ${e.message}`); setCopyStep("idle"); },
   });
 
   const handleOpenCopyDialog = (id: number, title: string) => {
@@ -344,20 +341,31 @@ function CoursesTab({ onEdit, typeFilter = "course" }: { onEdit: (id: number) =>
     try {
       setCopyStep("copying");
       const result = await duplicateCourse.mutateAsync({ id: copySourceId });
+      let reformatFailed = false;
       if (copyAiReformat) {
         setCopyStep("reformatting");
         // AI reformat: rewrites all landing page text fields for the new course name
-        await reformatLandingPage.mutateAsync({ courseId: result.id, newCourseName: copyNewName.trim(), newCmeCredits: copyCmeCredits.trim() || undefined });
+        try {
+          await reformatLandingPage.mutateAsync({ courseId: result.id, newCourseName: copyNewName.trim(), newCmeCredits: copyCmeCredits.trim() || undefined });
+        } catch {
+          // Copying the course is still successful if the optional AI provider is unavailable.
+          reformatFailed = true;
+          await renameCourse.mutateAsync({ id: result.id, title: copyNewName.trim() });
+        }
       } else {
         // No AI reformat: just update the course title directly
         setCopyStep("reformatting");
         await renameCourse.mutateAsync({ id: result.id, title: copyNewName.trim() });
       }
       setCopyStep("done");
-      toast.success(`Course copied as "${copyNewName.trim()}"`);
+      toast.success(reformatFailed
+        ? `Course copied as "${copyNewName.trim()}". AI reformatting was unavailable; you can edit the copied landing page.`
+        : `Course copied as "${copyNewName.trim()}"`);
       refetch();
       setTimeout(() => setCopyDialogOpen(false), 1200);
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unexpected error";
+      toast.error(`Error copying course: ${message}`);
       setCopyStep("idle");
     }
   };
