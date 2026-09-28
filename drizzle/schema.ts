@@ -6097,6 +6097,8 @@ export const lmsCohortAssignments = mysqlTable("lms_cohort_assignments", {
   contentBlocks: json("content_blocks").$type<any[]>(),  // page-builder blocks
   dueDate: timestamp("due_date"),
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment before this assignment is available
+  dripReleaseMode: mysqlEnum("drip_release_mode", ["after_enrollment", "after_publish", "after_cohort_start"]).default("after_enrollment").notNull(),
+  publishedAt: timestamp("published_at"),
   maxPoints: int("max_points").default(100).notNull(),
   // text = typed submission; file = file upload; url = link submission; none = no submission required
   submissionType: mysqlEnum("submission_type", ["text", "file", "url", "none"]).default("none").notNull(),
@@ -6122,6 +6124,8 @@ export const lmsCohortRecordings = mysqlTable("lms_cohort_recordings", {
   thumbnailUrl: text("thumbnail_url"),
   durationSeconds: int("duration_seconds"),
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment before this recording is available
+  dripReleaseMode: mysqlEnum("drip_release_mode", ["after_enrollment", "after_publish", "after_cohort_start"]).default("after_enrollment").notNull(),
+  publishedAt: timestamp("published_at"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
   showControls: boolean("show_controls").default(true).notNull(),
   position: int("position").default(0).notNull(),

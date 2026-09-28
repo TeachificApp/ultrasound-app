@@ -12257,6 +12257,9 @@ type CohortRecording = {
   videoUrl: string | null;
   thumbnailUrl: string | null;
   durationSeconds: number | null;
+  dripDays: number;
+  dripReleaseMode: "after_enrollment" | "after_publish" | "after_cohort_start";
+  showControls: boolean;
   status: "draft" | "published";
   position: number;
 };
@@ -12267,7 +12270,10 @@ type CohortAssignment = {
   title: string;
   description: string | null;
   contentBlocks: any[] | null;
+  lessonId: number | null;
   dueDate: Date | string | null;
+  dripDays: number;
+  dripReleaseMode: "after_enrollment" | "after_publish" | "after_cohort_start";
   maxPoints: number;
   submissionType: "text" | "file" | "url" | "none";
   status: "draft" | "published";
@@ -12661,17 +12667,17 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [recordingDialog, setRecordingDialog] = useState<{ open: boolean; recording?: CohortRecording }>({ open: false });
   const [recordingForm, setRecordingForm] = useState({
     title: "", description: "", videoUrl: "", thumbnailUrl: "",
-    durationSeconds: 0, dripDays: 0, status: "draft" as "draft" | "published",
+    durationSeconds: 0, dripDays: 0, dripReleaseMode: "after_enrollment" as "after_enrollment" | "after_publish" | "after_cohort_start", status: "draft" as "draft" | "published",
     sessionId: null as number | null,
     showControls: true,
   });
   const openRecordingDialog = (r?: CohortRecording) => {
     if (r) {
       setRecordingForm({ title: r.title, description: r.description ?? "", videoUrl: r.videoUrl ?? "",
-        thumbnailUrl: r.thumbnailUrl ?? "", durationSeconds: r.durationSeconds ?? 0, dripDays: r.dripDays ?? 0,
+        thumbnailUrl: r.thumbnailUrl ?? "", durationSeconds: r.durationSeconds ?? 0, dripDays: r.dripDays ?? 0, dripReleaseMode: r.dripReleaseMode ?? "after_enrollment",
         status: r.status, sessionId: r.sessionId, showControls: r.showControls ?? true });
     } else {
-      setRecordingForm({ title: "", description: "", videoUrl: "", thumbnailUrl: "", durationSeconds: 0, dripDays: 0, status: "draft", sessionId: null, showControls: true });
+      setRecordingForm({ title: "", description: "", videoUrl: "", thumbnailUrl: "", durationSeconds: 0, dripDays: 0, dripReleaseMode: "after_enrollment", status: "draft", sessionId: null, showControls: true });
     }
     setRecordingDialog({ open: true, recording: r });
   };
@@ -12684,6 +12690,7 @@ function CohortTab({ courseId }: { courseId: number }) {
       thumbnailUrl: recordingForm.thumbnailUrl || undefined,
       durationSeconds: recordingForm.durationSeconds || undefined,
       dripDays: recordingForm.dripDays,
+      dripReleaseMode: recordingForm.dripReleaseMode,
       status: recordingForm.status,
       sessionId: recordingForm.sessionId,
       showControls: recordingForm.showControls,
@@ -12821,7 +12828,7 @@ function CohortTab({ courseId }: { courseId: number }) {
   const { data: copySourceData = [] } = trpc.lmsAdmin.listAssignmentsForCopy.useQuery(undefined, { enabled: copyPickerOpen });
   const [assignForm, setAssignForm] = useState({
     title: "", description: "", dueDate: "", maxPoints: 100,
-    lessonId: null as number | null, dripDays: 0,
+    lessonId: null as number | null, dripDays: 0, dripReleaseMode: "after_enrollment" as "after_enrollment" | "after_publish" | "after_cohort_start",
     submissionType: "none" as "text" | "file" | "url" | "none",
     status: "draft" as "draft" | "published",
     notifyStudents: false,
@@ -12838,6 +12845,7 @@ function CohortTab({ courseId }: { courseId: number }) {
         dueDate: localISO,
         lessonId: assignment.lessonId ?? null,
         dripDays: assignment.dripDays ?? 0,
+        dripReleaseMode: assignment.dripReleaseMode ?? "after_enrollment",
         maxPoints: assignment.maxPoints,
         submissionType: assignment.submissionType,
         status: assignment.status,
@@ -12845,7 +12853,7 @@ function CohortTab({ courseId }: { courseId: number }) {
         contentBlocks: assignment.contentBlocks ?? [],
       });
     } else {
-      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, lessonId: null, dripDays: 0, submissionType: "none", status: "draft", notifyStudents: false, contentBlocks: [] });
+      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, lessonId: null, dripDays: 0, dripReleaseMode: "after_enrollment", submissionType: "none", status: "draft", notifyStudents: false, contentBlocks: [] });
     }
     setAssignDialog({ open: true, assignment });
   };
@@ -12862,6 +12870,7 @@ function CohortTab({ courseId }: { courseId: number }) {
       dueDate: assignForm.dueDate ? new Date(assignForm.dueDate).toISOString() : null,
       lessonId: assignForm.lessonId,
       dripDays: assignForm.dripDays,
+      dripReleaseMode: assignForm.dripReleaseMode,
       maxPoints: assignForm.maxPoints,
       submissionType: assignForm.submissionType,
       status: assignForm.status,
@@ -13282,8 +13291,20 @@ function CohortTab({ courseId }: { courseId: number }) {
                   <Input type="number" min={0} value={recordingForm.durationSeconds} onChange={e => setRecordingForm(p => ({ ...p, durationSeconds: parseInt(e.target.value) || 0 }))} />
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Release after enrollment (days)</Label>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Release basis</Label>
+                  <Select value={recordingForm.dripReleaseMode} onValueChange={v => setRecordingForm(p => ({ ...p, dripReleaseMode: v as typeof p.dripReleaseMode }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="after_enrollment">After enrollment</SelectItem>
+                      <SelectItem value="after_publish">After publish</SelectItem>
+                      <SelectItem value="after_cohort_start">After cohort start date</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Delay (days)</Label>
                   <Input type="number" min={0} value={recordingForm.dripDays} onChange={e => setRecordingForm(p => ({ ...p, dripDays: Math.max(0, parseInt(e.target.value) || 0) }))} />
+                  <p className="text-[11px] text-gray-500 mt-1">Zero releases at the selected basis; positive values add a day delay.</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-1 block">Link to Session (optional)</Label>
@@ -13527,6 +13548,9 @@ function CohortTab({ courseId }: { courseId: number }) {
                               title: a.title + " (Copy)",
                               description: a.description ?? "",
                               dueDate: "",
+                              lessonId: a.lessonId ?? null,
+                              dripDays: a.dripDays ?? 0,
+                              dripReleaseMode: a.dripReleaseMode ?? "after_enrollment",
                               maxPoints: a.maxPoints,
                               submissionType: a.submissionType as any,
                               status: "draft",
@@ -13590,8 +13614,20 @@ function CohortTab({ courseId }: { courseId: number }) {
                 <p className="text-[11px] text-gray-500 mt-1">The assignment stays locked until its lesson is available.</p>
               </div>
               <div>
-                <Label className="text-sm font-medium text-gray-700 mb-1 block">Assignment drip (days after enrollment)</Label>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Release basis</Label>
+                <Select value={assignForm.dripReleaseMode} onValueChange={v => setAssignForm(p => ({ ...p, dripReleaseMode: v as typeof p.dripReleaseMode }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="after_enrollment">After enrollment</SelectItem>
+                    <SelectItem value="after_publish">After publish</SelectItem>
+                    <SelectItem value="after_cohort_start">After cohort start date</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Delay (days)</Label>
                 <Input type="number" min={0} value={assignForm.dripDays} onChange={e => setAssignForm(p => ({ ...p, dripDays: Math.max(0, parseInt(e.target.value) || 0) }))} />
+                <p className="text-[11px] text-gray-500 mt-1">Zero releases at the selected basis; positive values add a day delay.</p>
               </div>
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Max Points</Label>

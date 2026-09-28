@@ -296,6 +296,7 @@ export const lmsCohortAdminRouter = router({
       lessonId: z.number().int().positive().nullable().optional(),
       dueDate: z.string().nullable().optional(),
       dripDays: z.number().int().min(0).default(0),
+      dripReleaseMode: z.enum(["after_enrollment", "after_publish", "after_cohort_start"]).default("after_enrollment"),
       maxPoints: z.number().int().min(0).default(100),
       submissionType: z.enum(["text", "file", "url", "none"]).default("none"),
       status: z.enum(["draft", "published"]).default("draft"),
@@ -319,6 +320,8 @@ export const lmsCohortAdminRouter = router({
         contentBlocks: input.contentBlocks ?? null,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
         dripDays: input.dripDays,
+        dripReleaseMode: input.dripReleaseMode,
+        publishedAt: input.status === "published" ? new Date() : null,
         maxPoints: input.maxPoints,
         submissionType: input.submissionType,
         status: input.status,
@@ -373,6 +376,7 @@ export const lmsCohortAdminRouter = router({
       lessonId: z.number().int().positive().nullable().optional(),
       dueDate: z.string().nullable().optional(),
       dripDays: z.number().int().min(0).optional(),
+      dripReleaseMode: z.enum(["after_enrollment", "after_publish", "after_cohort_start"]).optional(),
       maxPoints: z.number().int().min(0).optional(),
       submissionType: z.enum(["text", "file", "url", "none"]).optional(),
       status: z.enum(["draft", "published"]).optional(),
@@ -383,6 +387,9 @@ export const lmsCohortAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, dueDate, description, ...rest } = input;
       const updates: Record<string, any> = { ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) };
+      const [existingAssignment] = await db.select({ status: lmsCohortAssignments.status, publishedAt: lmsCohortAssignments.publishedAt })
+        .from(lmsCohortAssignments).where(eq(lmsCohortAssignments.id, id)).limit(1);
+      if (input.status === "published" && existingAssignment?.status !== "published") updates.publishedAt = new Date();
       if (description !== undefined) {
         updates.description = description != null
           ? (await processRichTextHtml(description, "cohort-assignment")) ?? null
@@ -434,6 +441,7 @@ export const lmsCohortAdminRouter = router({
       thumbnailUrl: z.string().optional(),
       durationSeconds: z.number().int().min(0).optional(),
       dripDays: z.number().int().min(0).default(0),
+      dripReleaseMode: z.enum(["after_enrollment", "after_publish", "after_cohort_start"]).default("after_enrollment"),
       status: z.enum(["draft", "published"]).default("draft"),
       showControls: z.boolean().default(true),
     }))
@@ -456,6 +464,8 @@ export const lmsCohortAdminRouter = router({
         thumbnailUrl: input.thumbnailUrl ?? null,
         durationSeconds: input.durationSeconds ?? null,
         dripDays: input.dripDays,
+        dripReleaseMode: input.dripReleaseMode,
+        publishedAt: input.status === "published" ? new Date() : null,
         status: input.status,
         showControls: input.showControls,
         position: Number(maxPos) + 1,
@@ -473,6 +483,7 @@ export const lmsCohortAdminRouter = router({
       thumbnailUrl: z.string().nullable().optional(),
       durationSeconds: z.number().int().min(0).nullable().optional(),
       dripDays: z.number().int().min(0).optional(),
+      dripReleaseMode: z.enum(["after_enrollment", "after_publish", "after_cohort_start"]).optional(),
       status: z.enum(["draft", "published"]).optional(),
       showControls: z.boolean().optional(),
       position: z.number().int().optional(),
@@ -483,6 +494,9 @@ export const lmsCohortAdminRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { id, description, ...rest } = input;
       const updates = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) as Record<string, unknown>;
+      const [existingRecording] = await db.select({ status: lmsCohortRecordings.status })
+        .from(lmsCohortRecordings).where(eq(lmsCohortRecordings.id, id)).limit(1);
+      if (input.status === "published" && existingRecording?.status !== "published") updates.publishedAt = new Date();
       if (description !== undefined) {
         updates.description = description != null
           ? (await processRichTextHtml(description, "cohort-recording")) ?? null
@@ -1184,6 +1198,8 @@ export const lmsCohortAdminRouter = router({
           lessonId: assignment.lessonId,
           dueDate: shiftDateFromStart(assignment.dueDate, sourceDate, newStartDate),
           dripDays: assignment.dripDays,
+          dripReleaseMode: assignment.dripReleaseMode,
+          publishedAt: assignment.status === "published" ? new Date() : null,
           maxPoints: assignment.maxPoints,
           submissionType: assignment.submissionType,
           status: assignment.status,
@@ -1232,6 +1248,8 @@ export const lmsCohortAdminRouter = router({
             thumbnailUrl: recording.thumbnailUrl,
             durationSeconds: recording.durationSeconds,
             dripDays: recording.dripDays,
+            dripReleaseMode: recording.dripReleaseMode,
+            publishedAt: recording.status === "published" ? new Date() : null,
             status: recording.status,
             showControls: recording.showControls,
             position: recording.position,
