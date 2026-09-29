@@ -1,1 +1,708 @@
+# Project TODO
+
+- [x] Trace and repair purchaser-access emails that state an access button exists but render without a usable button or link.
+- [x] Add regression coverage for purchaser-access email CTA rendering and URL generation.
+- [x] Verify the corrected purchaser-access email output before requesting approval to resend it to Jennifer Olsen.
+- [x] Send the user-approved corrected course access email to Jennifer Olsen and verify SendGrid accepts delivery.
+- [x] Audit recurring Stripe plans, price mappings, subscriptions, and corresponding app-access entitlements.
+- [x] Verify subscription webhooks and lifecycle transitions grant, retain, and revoke app access correctly.
+- [x] Repair verified recurring-billing or access-entitlement discrepancies and add regression coverage.
+- [x] Replace production-missing brand membership Stripe Price IDs with verified live recurring price mappings.
+- [x] Enable the missing invoice.paid and invoice.payment_failed events on the production Stripe webhook before relying on renewal and failed-payment workflows.
+- [x] Exclude sunsetted Thinkific billing from current-platform recurring-payment reconciliation and remediation.
+- [x] Create, map, and validate live current-platform Stripe recurring prices without modifying existing subscriptions.
+- [x] Add executable invoice.paid and invoice.payment_failed entitlement tests for brand, LMS, and native membership subscriptions.
+- [x] Investigate the active subscription linked to the inactive $0 Free Membership price and either document it as an intentional comped plan or correct its billing/access mapping.
+- [x] Extend the recurring audit to validate active subscription product and amount expectations, not only Stripe status parity.
+- [x] Add executable failed-payment grace and terminal-revocation tests for native membership subscriptions and LMS subscription-backed access.
+- [x] Document the active $0 Free Membership subscription as an intentional comped/free plan or correct its linked brand/native entitlements.
+- [x] Add an audit regression that flags active paid-brand access mapped to a $0/free subscription unless an explicit approved exemption applies.
+- [x] Verify Allison Gillan’s legacy Thinkific history before removing any premium current-platform access.
+- [x] Resolve the Thinkific API authentication gap or use an authoritative legacy export to verify Allison’s paid lifetime and enrollment history.
+- [x] Record the final Free Membership resolution after legacy verification, or restore approved premium access if a valid lifetime or migrated entitlement is found.
+- [x] Verify and checkpoint the Free Membership operations note and post-documentation recurring audit result.
+- [x] Add a narrow yellow maintenance banner visible only to signed-in users with the August 22–24, 2026 notice.
+- [x] Persist each user browser’s dismissal of the maintenance banner and add focused regression coverage.
+- [x] Automatically remove the maintenance banner after August 25, 2026 at 9:00 AM Eastern Time.
+- [x] Add a component-level MaintenanceBanner interaction regression for dismissal, localStorage persistence, remount hiding, signed-in visibility, and logged-out suppression.
+- [x] Design a live Teach gamification architecture for teacher-led QR/PIN sessions with persistent game and response state.
+- [x] Add mixed interactive game slides: multiple choice, true/false, free-word word cloud, hotspot, and puzzle interactions.
+- [x] Build teacher game authoring with ordered/rotatable slides and question-level image, video URL, and GIF media controls.
+- [x] Build participant QR/PIN joining, live answer submission, teacher presentation controls, and real-time group results.
+- [ ] Add end-to-end regression coverage for session joining, question progression, scoring, media, and response aggregation.
+- [ ] Select and configure an education-appropriate GIF search provider for Teach game authoring.
+- [ ] Activate the deferred GIPHY search integration after the user supplies a GIPHY API key; retain direct GIF URL support in the meantime.
+- [x] Update the reused live host and player screens with Teach branding, Teach navigation, and no admin-only presentation assumptions.
+- [ ] Add interaction-level regression coverage for Teach host/player route navigation, QR/PIN joining, question progression, and collaborative results across all interactive slide types.
+- [ ] Add end-to-end regression coverage for session joining, scoring, media rendering, and teacher presentation controls on the real Teach routes.
+- [x] Add mounted Teach host-route interaction tests for branding, teacher controls, question progression, and collaborative result rendering.
+- [x] Extend the mounted Teach host-route suite to cover Reveal Answers, Next, and End session controls.
+- [x] Assert mounted host phase transitions through lobby, question, results, and leaderboard states using real callbacks and socket events.
+- [x] Add mounted host collaborative-result assertions for a second interaction type such as hotspot or puzzle.
+- [ ] Add mounted participant join/play interaction tests for PIN/QR join, media rendering, and word-cloud, hotspot, and puzzle submissions.
+- [x] Add mounted participant coverage for PIN joining, slide media rendering, hotspot submission, and puzzle submission.
+- [ ] Add mounted participant word-cloud text-entry and submission coverage using the real controlled-input flow.
+- [x] Add a WebSocket integration regression that exercises the actual session join protocol and broadcasts across interactive Teach slides.
+- [x] Extend the real WebSocket regression to cover interaction-specific word-cloud or puzzle payloads and result broadcasts in addition to hotspot slides.
+- [x] Trace and repair Registry Review Quiz access emails whose password-setup link returns a not-found page.
+- [x] Add regression coverage for password-setup URL generation, route registration, and learner-access completion.
+- [x] Verify the corrected password-setup flow before requesting approval to resend access instructions to the affected learner.
+- [x] Add a mounted route regression proving /auth/reset-password preserves its token and resolves to the ResetPassword page.
+- [x] Add a route-level valid-token password completion regression before offering a corrected access-email resend.
+- [x] Send the user-approved corrected Registry Review Quiz access email to badici Lavinia and verify delivery acceptance.
+- [ ] Inventory Manus-managed and Railway MySQL schemas, record counts, identities, and data freshness before synchronization.
+- [x] Produce a non-destructive Manus-to-Railway reconciliation plan with clear conflict rules and excluded data categories.
+- [ ] Prepare source and target backup evidence plus a dry-run synchronization report before requesting migration approval.
+- [x] Perform the approved controlled synchronization and verify Railway data integrity.
+- [x] Create backups for the seven approved Railway tables and insert only the 706 source-only primary-key rows identified by the dry run.
+- [x] Add the five approved nullable Question Bank metadata columns to Railway before the insert-only synchronization.
+- [x] Add source/target freshness reporting for synchronization-scoped tables and archive the report.
+- [x] Archive the executed Railway backup manifest and checksums, and require backup creation before approval for future synchronization batches.
+- [ ] Run and archive a true pre-sync freshness audit before future synchronization batches.
+- [ ] Generate and archive the Railway backup manifest/checksums before requesting approval for future synchronization batches.
+- [ ] Identify and map dependencies for a high-priority Manus-only learner and Teach-game synchronization batch.
+- [ ] Produce a future-batch pre-sync freshness, backup, schema, and conflict dry-run proposal before requesting execution approval.
+- [x] Document the next learner and Teach-game batch dependency order and approval safeguards.
+- [x] Verify Kahoot-supported export or import formats and implement a permitted Teach game import workflow.
+- [x] Implement and run a fresh read-only next-batch synchronization dry-run with exact table, dependency, schema, identity-conflict, freshness, and insert-count evidence.
+- [x] Update the next-batch proposal with the fresh dry-run findings and an explicit no-update/no-delete approval table.
+- [x] Design independent Railway authentication and a deterministic Manus-to-Railway user-ID mapping that excludes managed credentials and authentication tokens.
+- [x] Create a complete read-only dependency, schema, conflict, and batch inventory for the remaining Manus-only tables.
+- [x] Create verified pre-write Railway backups and apply only approved additive schema foundations.
+- [x] Migrate remaining authorized platform data in dependency-ordered, guarded, insert-only batches.
+- [x] Reconcile all completed migration batches and document any deliberate exclusions or pending integrations.
+- [ ] Repair Railway-backed password and magic-link sign-in so it no longer queries managed-only `users` columns or relies on the managed database connection.
+- [x] Add focused authentication regressions for Railway profile lookup, password sign-in, and magic-link issuance without exposing source authentication material.
+- [x] Inventory every Manus-managed runtime dependency, provider integration, environment variable category, and domain route required for a complete Railway cutover.
+- [ ] Replace Manus OAuth, managed mail delivery, storage, background jobs, and platform-only service dependencies with Railway-compatible integrations.
+- [ ] Deploy the full application runtime to Railway and validate production sign-in, email delivery, data access, and custom-domain routing.
+- [ ] Transfer every production supporting service to Railway-compatible hosting: independent authentication, mail delivery, object storage, AI/media providers, scheduled work, webhooks, and domain configuration.
+- [ ] Add executable Railway-local authentication regressions for local-session profile resolution, password success/failure, and provider-accepted versus provider-rejected magic-link issuance.
+- [x] Create an exact Railway cutover inventory mapping every production hostname, canonical route, cookie scope, redirect, and webhook destination.
+- [ ] Confirm each per-production-host Railway service target and production custom-domain binding from the authenticated Railway project.
+- [ ] Confirm every active provider webhook endpoint and dashboard setting, including the single Stripe production route, after Railway deployment.
+- [ ] Reconcile every source user against Railway identity records, including IDs, email uniqueness, open-ID values, and excluded-account reasons.
+- [ ] Diagnose and repair Railway’s live user lookup, password setup, and magic-link provider handoff so existing users are recognized and delivery is verifiable.
+- [ ] Reconcile Railway `JWT_SECRET` and cookie configuration so locally issued sessions verify across every Railway application instance without relying on Manus values.
+- [ ] Verify SendGrid delivery events, sender verification, suppression status, and inbox receipt for a separately approved Railway magic-link test.
+- [x] Show the scheduled maintenance banner on the All About Ultrasound, Learn, and iHeartEcho login pages while retaining expiry and dismissal behavior.
+- [x] Inventory and reconcile all user access records, including enrollments, entitlements, memberships, subscriptions, progress, quiz attempts, completions, CME credentials, and access grants.
+- [x] Synchronize verified missing user-access and learning-content records to Railway with parent-to-child, insert-only safeguards and post-sync parity evidence.
+- [x] Complete a bounded primary-key parity sweep for the remaining equal-count learning and user-access tables, retaining any deliberate sensitive exclusions.
+- [x] Verify explicit composite-key parity and the four column-name review tables in the closing Railway audit.
+- [x] Finalize and verify the complete Railway parity document after the composite-key and schema-review evidence is archived.
+- [x] Verify the supported Manus AI integration option for the Railway-hosted runtime without copying managed Forge credentials.
+- [x] Design and validate a secure Railway server-side integration for the selected Manus AI capability while keeping Railway hosting, MySQL, and GitHub authentication unchanged.
+- [ ] Verify the Railway-held `MANUS_API_KEY` through a server-side health-safe integration path without logging or exposing its value.
+- [x] Add a secure Manus API v2 server client and task lifecycle handling without using managed Forge credentials or exposing keys to browsers.
+- [ ] Connect the selected application AI workflows to the Railway-held Manus API client and validate their success and provider-error states.
+- [x] Remove the unrequested administrator-facing Manus AI connection control only after receiving explicit approval for that specific rollback.
+- [ ] Present a proposed scope and obtain explicit approval before every future implementation, deployment, or configuration change.
+- [x] Diagnose and repair the PDF-driven bulk question-generation error for Chronic Venous Insufficiency and Venous Disease.
+- [x] Run a factual source-grounding QA pass on the 350 generated questions and correct any clinically inaccurate, weakly grounded, or duplicate-concept items.
+- [x] Save the 350 questions to the RPhS Question Bank folder and add them to the RPhS Quiz in Quiz Creator.
+- [x] Complete source-traceability and clinical-quality validation for the 350 questions beyond structural answer, feedback, duplicate-stem, count, and attachment checks.
+- [x] Replace only the 99 RPhS questions rejected by the source-grounding quality review, preserving all existing folder and quiz counts and order.
+- [x] Re-run the factual-quality, Question Bank, and Quiz Creator attachment checks after the approved 99-question correction.
+- [ ] Perform a read-only audit of current learner login, session, content-access, email-delivery, and domain-routing failures before recommending a hosting decision.
+- [ ] Compare evidence-supported Railway remediation against a controlled Manus rollback, with no configuration or data changes until explicitly approved.
+- [ ] Continue the read-only production audit of learner login, session, content-access, email-delivery, and domain-routing failures and report evidence before proposing changes.
+- [x] Inspect the standalone-quiz publishing status, missing control, and learner-assignment behavior for the RPhS Quiz.
+- [x] Present a scoped standalone-quiz publishing and learner-availability remediation before making any UI or status change.
+- [x] Inspect and diagnose the RPhS administrator preview route that rejects the draft quiz as not found.
+- [x] Add a clear standalone-quiz publish or unpublish status control in Quiz Creator and make administrator preview work for draft quizzes without exposing drafts to learners.
+- [ ] Ensure published standalone quizzes remain available only through an assigned learning module or explicit HTML widget and are not open for direct enrollment, checkout, catalog, search, or learner-facing listing discovery.
+- [x] Implement and verify a dedicated protected published standalone-quiz HTML-widget access path that does not depend on LMS assignment.
+- [ ] Audit and test every learner-facing catalog, checkout, search, dashboard, and direct-route surface to ensure standalone quizzes remain hidden outside approved module/widget paths.
+- [x] Add a secure administrator-generated, expiry-bound widget launch path for published standalone quizzes that does not require LMS assignment and does not create direct learner discovery.
+- [x] Remove the standalone quiz feedback OK button and make Next dismiss feedback and advance, while preserving final-question submission behavior.
+- [x] Align Quiz Creator Design settings and preview with the existing dark navy-to-aqua player pattern, including primary teal, gradient background, and readable text color.
+- [x] Audit the RPhS PDF-derived questions for direct guide, PDF, source-document, or similar provenance references in question text or feedback.
+- [x] Present the exact affected RPhS records and obtain explicit approval before changing any source-reference language.
+- [x] Remove direct source-document wording from the 313 audited RPhS PDF-derived questions while preserving their clinical facts, answers, feedback, links, and order.
+- [x] Verify zero direct PDF/guide/source/transcript references remain in the RPhS generated set after the approved cleanup.
+- [x] Correct standalone quiz progress counters so they display only the active attempt’s selected-question count, never the full linked question-bank count.
+- [x] Audit all stored quiz questions and feedback for direct transcript, source, document, guide, PDF, or analogous provenance references, then remove only those references while preserving clinical content and learner data.
+- [x] Add URL-based source input to Question Bank and Quiz Creator question generation, with server-side retrieval, secure URL validation, and source-blind question/feedback wording that never cites the source page, document, transcript, PDF, or URL.
+- [x] Replace every RPhS quiz reference to “Greater Saphenous Vein” with the correct “Great Saphenous Vein” nomenclature while preserving questions, answers, feedback, and order.
+- [x] Trace and remove every remaining learner-visible “the source” reference in the RPhS quiz across Question Bank, visual-builder configuration, and rendered answer/feedback data while preserving clinical content and assessment behavior.
+- [x] Trace and remove every RPhS learner-visible reference to a transcript, source material, source page, document, guide, PDF, file, passage, reading, or supplied material across Question Bank and visual-builder content while preserving assessment behavior.
+- [x] Add Visual Builder question-text search and find-and-replace, requiring an administrator to choose between updating the quiz only or also synchronizing its linked Question Bank records.
+- [x] Restore a learner’s prior instant-feedback panel when they return to an already answered standalone quiz question.
+- [x] Add mock-exam question flags, a pre-submission flagged-question review list, and direct navigation for answering or revising responses before scoring.
+- [x] Remove RPhS learner-visible “source-specified” language and any feedback that identifies source-document numbers or letters, preserving clinical content, answers, scoring, and order.
+- [x] Restore post-attempt question review when quiz settings allow it and suppress the learner-facing Uncategorized header unless question grouping is explicitly enabled.
+- [x] Trace and remove any remaining active RPhS learner-path source-language, including content cached in attempt records or result payloads, then verify the rendered review data is source-blind.
+- [x] Repair the learner My Content runtime error caused by an undefined isEnrollmentCompleted reference, restoring access to assigned quiz content without changing enrollment data.
+- [x] Restore quiz and flashcard display for supported SCORM ZIP lesson content and add focused regression coverage for the affected learner rendering path.
+- [x] Remove all direct source, transcript, source-guidance, and source question/answer locator wording from the full active RPhS visual-builder question set and feedback, preserving clinical facts and answer keys.
+- [x] Audit and propose a single canonical Question Bank source of truth for Visual Builder questions so question text, answers, and feedback remain synchronized before any existing records are migrated or changed.
+- [x] Implement the approved canonical Question Bank synchronization for Visual Builder loads and saves, while retaining an explicit quiz-only find-and-replace override.
+- [x] Add explicit Visual Builder revision choices to update the linked Question Bank record or create a new linked Question Bank record for the revised quiz question.
+- [x] Add a native Quiz Builder image-labeling question type with creator-defined image targets and label choices, without changing existing hotspot questions or quiz records.
+- [x] Build learner label-to-image-target matching, answer persistence, correctness feedback, and scoring for native image-labeling questions.
+- [x] Add focused regressions for image-labeling authoring, accessible learner matching, answer evaluation, scoring, and legacy hotspot compatibility.
+- [x] Repair magic-link URL generation and completion routing so valid learner links on learn.allaboutultrasound.com never land on an inactive funnel page, without resending email unless separately approved.
+- [x] Repair the learner content-access page runtime error “Can’t find variable: cn” without changing enrollment, entitlement, or content data.
+- [x] Repair the authorized RPhS quiz launch path that currently shows “Quiz not found,” while retaining standalone quiz non-discovery rules.
+- [x] Restore the user-confirmed Published status for RPhS Test & Learn Quiz after its unexpected reversal to Draft, without enabling any public discovery surface.
+- [ ] Trace and repair the RPhS publish control or persistence path so administrator-selected Published status remains active and the protected learner launch recognizes it.
+- [ ] Trace and repair the deployment handoff so approved project updates reach the Railway-hosted live site and the live version can be verified.
+- [x] Republish the current workspace through the built-in hosted deployment at the user’s request.
+- [x] Allow authenticated administrators to preview any standalone quiz without a learner module assignment or widget token, while retaining learner module/widget-only restrictions.
+- [x] Create a GitHub pull request containing the current verified project revision for Railway deployment review.
+- [x] Verify and correct visibility of the requested Railway deployment handoff pull request in the user’s intended GitHub repository.
+- [x] Assign all eligible open pull requests in the connected repository to the GitHub account associated with hello@teachific.app.
+- [ ] Add Meta Pixel 1250905844949244 completed-sale tracking for all product purchases without sending payment details or secrets to the browser.
+- [ ] Preserve email-campaign attribution through checkout and record completed campaign-attributed sales for campaign reporting.
+- [ ] Add product-sale and email-campaign conversion metrics to the existing administrator analytics workflow.
+- [ ] Repair the editor image-upload Access Denied failure so authorized administrators can upload images from the device without weakening storage access controls.
+- [x] Add a safe administrator-only Railway storage health check that reports write/delete permission stages without exposing secret values or retaining test objects.
+- [ ] Implement and validate a production-safe editor image-upload fallback that succeeds when the Railway R2 primary path is denied, without storing files in the database or weakening authorization.
+- [x] Honor an explicitly configured Railway R2 S3 endpoint for editor uploads, while preserving the canonical account-derived endpoint fallback and secret-safe error handling.
+- [x] Recognize persisted Platform Admin and content-authoring roles directly in the authenticated uploader path, while retaining session verification and learner denial.
+- [ ] Repair the Railway production R2 credential or bucket policy so authenticated editor writes to the lms-images prefix succeed.
+- [x] Restore the Quizzes tab for every user while showing My Quiz Results only when a user has direct or lesson-module native quiz results.
+- [x] Add focused navigation and result-visibility regression coverage for the all-user Quizzes tab and native quiz results condition.
+- [ ] Trace and repair the Railway editor-upload upstream 502 failure after the R2 credential update, then verify a live Platform Admin upload.
+- [x] Repair the lesson editor AI content generator so it completes server-side without requiring a Manus task confirmation from the author.
+- [x] Prefer the Railway-configured Forge chat API for interactive lesson content generation when both Forge and Manus task credentials are present.
+- [ ] Verify a live Railway lesson-editor generation completes through the configured server-side AI transport without a user confirmation. Supersedes the unavailable Forge-only verification.
+- [ ] Ensure the Railway production application service exposes both required Forge variables so the direct lesson generator can authenticate.
+- [x] Trace and repair the current live Railway Forge generation error with a safe author-facing failure response and targeted regression coverage. Resolved by selecting the configured Manus API fallback when Forge credentials are absent.
+- [x] Route interactive AI generation through the configured Railway Manus API key without creating confirmation-prone or open-ended tasks.
+- [ ] Replace the confirmed confirmation-prone Railway Manus task path with a generation response flow that can complete without an author interaction.
+- [ ] Configure a direct Railway model-completions endpoint and server-only key for synchronous authoring generation; do not use the Manus task API as the interactive fallback.
+- [ ] Verify the Railway OpenAI-compatible credential is available to the production service and route all synchronous authoring generation through that direct completion path.
+- [ ] Identify and repair the live direct AI provider rejection using the non-sensitive Railway HTTP status and compatible request parameters.
+- [x] Add bounded server-side retry/backoff for direct AI provider HTTP 429 responses, with no provider error body or credential exposed to authors.
+- [x] Add one bounded Retry-After-aware server-side retry for direct AI provider HTTP 429 responses, with no provider error body or credential exposed to authors.
+- [ ] Validate the newly funded Railway OpenAI direct-completions integration through authorized lesson, question, flashcard, and image-generation workflows before any hosting move.
+- [x] Add a course-level AI regeneration workflow that preserves modules, lesson order, blocks, layout, and media placement while adapting instructional content to a new focus and objective.
+- [x] Require administrator review before applying generated course-content changes, preserving all original content until an explicit apply action.
+- [x] Add focused validation that a focus change rewrites only content fields and never changes course structure, lesson identities, access, completion, quiz attempts, enrollments, or pricing.
+- [x] Ensure course-level regeneration updates every lesson’s title, objectives, and instructional body content for the new focus while preserving blocks, layout, media placement, and learner records.
+- [x] Add a lesson-level focus-regeneration workflow with the same review-before-apply, content-only safeguards as the course-level workflow.
+- [ ] Validate the course and lesson focus-regeneration preview and explicit apply flow on Railway with an administrator before using it on active course content.
+- [x] Trace and repair the blocked Railway course focus-regeneration preview request without applying any content changes.
+- [x] Replace the 30-lesson hard stop with rate-safe, reviewable course regeneration batches that cover every lesson without altering course structure.
+- [x] Show batch progress and retain generated previews until the administrator explicitly applies or discards each reviewed batch.
+- [x] Let administrators select any set of up to 25 lessons for a course focus-regeneration preview, preserving every unselected lesson unchanged.
+- [x] Enforce the 25-lesson selection limit server-side and present clear selection counts, review status, and explicit apply behavior in the course dialog.
+- [x] Repair focus-regeneration proposals that change only lesson headers rather than substantively rewriting the selected lessons’ instructional content for the new clinical focus.
+- [x] Add regressions confirming focus regeneration returns meaningful editable instructional body and block-text proposals while protected media, layouts, quizzes, and learner records remain unchanged.
+- [x] Require the lesson AI content-generation module to produce at least 1,500 words for a full lesson and reject undersized full-lesson drafts before they can be saved.
+- [x] Add focused regression coverage for full-lesson word-count validation and the author-facing short-draft error path.
+- [x] Repair live Full Lesson generation when two short AI drafts trigger the 1,500-word guard, using reliable continuation or completion handling without saving undersized content.
+- [x] Add regression coverage for recovering a short Full Lesson draft to the required minimum while retaining the rejection of incomplete output.
+- [x] Repair mathematical-equation rendering that stopped working after the application moved from Manus hosting to Railway, without altering lesson content.
+- [x] Add regression coverage for inline and display mathematical equations in the affected content-rendering paths.
+- [x] Ensure every opted-in newsletter subscription is included exactly once in the Email Campaigns All audience while preserving unsubscribes and suppressions.
+- [x] Add focused regression coverage for newsletter subscription, All-audience inclusion, duplicate prevention, and opt-out preservation.
+- [x] Extract the uploaded Standardized CME Survey questions and create an unpublished reusable lesson-quiz template without assigning it to learners.
+- [x] Validate the CME lesson-quiz template’s question count, wording, creator-controlled settings, and non-discovery status before administrator review.
+- [x] Expose saved lesson templates in the active lesson editor with a clear picker and an Add to Lesson action, including the CME Activity Evaluation Survey template.
+- [x] Add focused regression coverage that template insertion creates safe fresh content-block IDs and does not mutate the saved source template.
+- [x] Add the supplied activity-quality ratings, narrative feedback, recommendation, and referral-source questions to the reusable CME Activity Evaluation Survey template.
+- [x] Validate that the expanded CME evaluation template records all added questions as unscored survey responses suitable for CME activity export.
+- [x] Persist submitted inline CME lesson-quiz responses by learner, course, lesson, and question so survey answers are available for activity-level reporting and export.
+- [x] Create a separate unassigned, unscored CME Speaker Evaluation Survey template with the supplied knowledge, effectiveness, and engagement rating questions.
+- [x] Validate the CME Speaker Evaluation Survey template’s three question ratings and CME export-compatible response format before checkpointing the survey templates.
+- [x] Build an administrator-only CME Management panel that lists CME courses and activities with learner enrollment and completion reporting.
+- [x] Include certificate management in CME Management with per-activity issued-certificate status, issuance date, and export visibility.
+- [x] Add per-CME-activity reporting and CSV export with learner full name, email, activity and completion dates, quiz results, and recorded quiz or survey responses.
+- [x] Add focused authorization, reporting-accuracy, and CSV export regressions for the CME Management panel without exposing learner data to non-administrators.
+- [ ] Trace and repair CME lesson-quiz access and completion gating that prevents enrolled learners from reaching a required CME quiz and certificate eligibility.
+- [ ] Verify and repair the learner-facing lookup and parsing of existing CME lesson quizzes without replacing, duplicating, or modifying quiz content.
+- [x] Repair CME course progression so every completed lesson persists correctly, eligible next lessons unlock normally, and displayed progress reflects the learner’s actual completion state.
+- [x] Preserve the active lesson-editor view and lesson context across a page refresh so administrators return directly to Lesson Editor rather than lesson settings.
+- [x] Allow a CME lesson quiz configured as an unscored survey to be required for lesson and certificate completion by response submission, without requiring a passing score.
+- [x] Add focused regressions for required unscored survey completion, explicit scored-pass requirements, and CME certificate eligibility.
+- [x] Allow lesson-quiz authors to configure a dependent question that displays only when a specified prior-answer condition is met, and exclude hidden dependent questions from scoring and required-completion checks.
+- [x] Add focused regressions for author-configured Yes/No dependent-question branching, learner visibility, and required-survey completion behavior.
+- [x] Ensure the required-survey completion setting applies to existing CME survey blocks with legacy single-choice question types, without requiring those blocks to be rebuilt.
+- [x] Add regression coverage confirming legacy CME survey questions complete by visible response submission and never by a passing-score threshold when survey completion is enabled.
+- [ ] Repair the reported CME Ergonomics survey completion error without changing existing learner attempts or certificate records.
+- [x] Repair the inline CME survey attempt-insert failure shown during required survey completion, preserving existing responses, learner progress, and certificate records.
+- [x] Add focused regression coverage for the inline-survey attempt insert contract and the resulting certificate-eligibility completion path.
+- [x] Audit and repair the shared inline lesson-quiz submission path for all courses and instances, preserving valid learner attempts, scores, progress, and certificate records.
+- [x] Add focused all-course inline quiz submission regressions for legacy and current attempt-table compatibility, response persistence, progress, and certificate eligibility.
+- [x] Resolve learner name and email merge fields in the existing embedded CME Ergonomics form URL so the form no longer receives literal placeholder values.
+- [x] Add focused regression coverage for encoded embedded-form name, last-name, and email placeholder substitution without exposing user data.
+- [x] Ensure professional-role and other CME survey questions are unscored response fields that never mark a valid answer wrong or require a specific role selection.
+- [x] Add an explicit non-scoring selectable-answer lesson-survey option that records a response without correct-answer, score, pass/fail, or graded-feedback behavior.
+- [x] Keep required CME survey completion independent from scoring so authors can require visible responses without configuring a correct answer or passing score.
+- [x] Add focused regressions confirming non-scoring selectable survey responses never display correct/incorrect treatment and still satisfy configured completion requirements.
+- [x] Make explicit non-scoring Survey Mode available on every Lesson Quiz module, including legacy question types, while retaining an independent required-response completion option.
+- [x] Repair the production build failure caused by the missing BlockPreview authentication-hook import so the global Survey Mode and CME embedded-form updates can deploy.
+- [x] Add focused regression coverage confirming global Survey Mode suppresses correct/incorrect feedback for all Lesson Quiz question types and the production client bundle resolves the authentication hook.
+- [x] Make enabling Survey Mode clear all correct-answer keys from every lesson-quiz question and hide answer-key configuration until Survey Mode is turned off.
+- [x] Repair the lesson-quiz dependent-question selector crash caused by an empty select-item value.
+- [x] Add focused regressions proving Survey Mode removes stored answer keys and the dependent-question selector renders without an empty option value.
+- [x] Improve the lesson-quiz dependent-question layout so the prior-question and answer-condition controls are clearly separated, readable, and responsive.
+- [x] Add author-configured dependent-question branching to the standalone Quiz Builder and exclude hidden questions from visible navigation, scoring, and required-answer checks.
+- [x] Add focused regressions for lesson-layout clarity and standalone Quiz Builder conditional visibility, scoring, and completion behavior.
+- [x] Repair saved Page Template discovery so administrator-created templates appear in the page editor insertion picker.
+- [x] Ensure Page Template insertion creates safe new block copies without overwriting the open page or mutating the saved source template.
+- [x] Add focused regressions for page-template listing, picker visibility, and copy-on-insert behavior.
+- [x] Repair the failing production Page Template list endpoint so existing saved templates load in the page editor without changing template data.
+- [x] Add focused regression coverage for successful filtered Page Template listing and safe client recovery from an endpoint failure.
+- [ ] Capture and repair the remaining live Page Template Library request failure after the initial minimal-column list query did not restore saved templates.
+- [ ] Add regression coverage for the confirmed production Page Template failure mode before redeploying the corrected endpoint.
+- [x] Repair page-editor explicit-save and autosave persistence so administrator edits survive a reload without overwriting authored content.
+- [x] Ensure blocks added from a saved Page Template enter the page editor’s dirty state and durable save path, with a clear confirmation before page reload.
+- [x] Add focused regressions for page-editor save, autosave, and reload persistence.
+- [x] Repair the Page Regenerate workflow so administrators receive a reviewable AI page draft without overwriting current page content unless they explicitly apply it.
+- [x] Add focused regression coverage for page-regeneration request handling, safe draft display, and explicit apply-only persistence.
+- [x] Add focused regressions for role-neutral CME survey responses, completion submission, and safe retry behavior after a transient completion error.
+- [x] Move editable FAQ items directly below the FAQ section headline in the settings panel, before all color and formatting controls, without changing saved FAQ content or style values.
+- [x] Add focused regression coverage for FAQ editor control order and retain the existing browser bundle validation.
+- [x] Allow discount codes to target the full catalog, one or more selected content types, or one or more individual products.
+- [x] Enforce discount-code scope consistently in administrator configuration and checkout validation while retaining date, redemption-limit, and eligibility safeguards.
+- [x] Add focused regressions for full-catalog, content-type, and multi-product discount-code eligibility and ineligible checkout rejection.
+- [ ] Add focused regressions proving an authorized CME learner can access required lesson quizzes, record completion, and reach the existing certificate-eligibility path without changing unrelated learner records.
+- [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
+- [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
+- [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.
+- [ ] Prepare backup evidence and a no-write migration dry run for Railway data and storage references without changing the production source of truth.
+- [ ] Create an encrypted Railway MySQL source snapshot and R2 object manifest, then record checksums and timestamps outside source control.
+- [ ] Collect a read-only aggregate R2 object inventory by prefix, count, and size without retaining object names or bytes.
+- [x] Produce a no-write Railway-to-Manus schema and table-count reconciliation baseline using approved read-only source and target evidence. Identity and media-reference comparison remain pending encrypted backup evidence.
+- [x] Produce a read-only hashed stable-key reconciliation for 20 core identity, learning, assessment, commerce, and media tables without retaining raw identifiers or application row content.
+- [x] Confirm declared foreign-key relationships have zero orphan counts in the Railway source and Manus target without reading application row content.
+- [ ] Produce a read-only stable-ID and parent-child relationship reconciliation for users, roles, content, enrollments, purchases, quiz records, and media references before considering a Manus test import.
+- [ ] Reuse the prior Manus-to-Railway ID and dependency mappings to classify current Railway deltas for a controlled reverse-sync dry run.
+- [x] Define Manus test-environment configuration, parity validation, and DNS rollback requirements without repointing any production domain.
+- [x] Deliver the parallel Manus migration package for review before requesting any import, sync, or cutover approval.
+- [x] Verify that the uploaded Manus backup corresponds to the intended UltrasoundAssist project and define the no-write staging reconciliation steps, based on owner confirmation and current restored-project scope without reopening the one-time restoration.
+- [x] Add one constrained automatic resume for ordinary Manus text-generation questions, without confirming external actions or requesting account access.
+- [x] Accept the existing Railway VITE Forge configuration as a server-side compatibility fallback only when server-only Forge variables are absent.
+- [x] Inventory every AI generation workflow and its current model transport, authorization gate, input limits, output handling, and failure path.
+- [x] Move each compatible interactive AI generation workflow to the Railway-configured Forge chat or image-generation path and add focused regressions.
+- [x] Remove quiz read-aloud UI controls, text-to-speech calls, and related settings without altering quiz questions, attempts, scores, or accessibility text. Superseded by the creator-controlled setting request.
+- [ ] Verify every AI generation workflow and the creator-controlled read-aloud setting on the live Railway deployment. Supersedes the removed-feature verification request.
+- [x] Remove the synthetic customer-testimonial generator and its UI entry points because fabricated reviews and ratings must not be generated or stored.
+- [x] Remove hardcoded synthetic customer-review defaults and AI landing-page prompts that create fictitious testimonials, while retaining fields for genuine administrator-entered reviews.
+- [x] Add an administrator/creator-controlled read-aloud setting per quiz, preserve existing quiz behavior by default, and show the learner control only when enabled. Superseded by the default-off request.
+- [x] Provide two basic creator-selectable quiz read-aloud voices, Female and Male, with natural pacing and a stable browser-supported fallback.
+- [x] Make read-aloud default to off for newly created and previously unset quizzes, leaving it visible only when a creator explicitly enables it.
+- [x] Repair the failed `lms_inline_quiz_attempts` write that prevents inline CME survey progress and lesson completion from persisting, without changing existing learner data.
+- [x] Ensure completed required CME survey modules persist their completion state, advance course progress accurately, and unlock the existing certificate path only when all required course items are complete.
+- [x] Preserve previously recorded inline lesson-quiz and CME survey answers when a learner uses Previous, Next, lesson navigation, or returns to the lesson.
+- [x] Add focused regressions for failed survey-write handling, answer restoration, required CME survey completion, displayed course progress, and certificate eligibility.
+- [x] Add an accessible teal/aqua branded confetti-cannon celebration when the CME certificate availability window is displayed, without changing certificate records or access behavior.
+- [x] Add focused regression coverage for the CME certificate celebration trigger and reduced-motion suppression.
+- [x] Add an administrator-only Survey Results tab in LMS course settings that appears only for CME courses and lists individual stored inline-survey responses.
+- [x] Add validated date-range filtering and a CSV export that contains only the currently filtered CME survey result rows.
+- [x] Add focused authorization, CME-only tab-visibility, date-filter, detail-display, and export-format regressions without exposing learner responses outside administrators.
+- [x] Add creator-selected account-data fields to standalone quizzes, inline lesson quizzes, and mock exams, including a controlled display and required-field configuration.
+- [x] Prefill only selected permitted account fields from the signed-in learner at quiz delivery time and persist resulting responses through existing authorized result records.
+- [x] Add focused authoring, prefill, required-field, privacy, and result-persistence regressions across standalone, inline lesson-quiz, and mock-exam modes.
+- [x] Add accessible drag-and-drop and keyboard-friendly reordering for questions in the inline Lesson Quiz editor while preserving every question’s answer configuration and dependency rules.
+- [x] Add focused regression coverage confirming lesson-quiz question reordering persists the creator-selected sequence without mutating question content or settings.
+- [x] Name each CME certificate download with the `AllAboutUltrasound_CME_` prefix and a safe unique suffix, without changing certificate content, access, or learner records.
+- [x] Add focused regression coverage for the CMS certificate download filename prefix, safe filename normalization, and uniqueness suffix.
+- [x] Audit every learner-facing workshop and group query, card, landing page, player, and enrollment surface for counts, capacity, seats, or other learner information.
+- [x] Remove learner-visible workshop/group enrollment totals, seat availability, capacity, and peer details while retaining those details for authorized administrators and group managers only.
+- [x] Add focused data-contract and UI regressions proving learners cannot receive or render workshop/group counts, seat data, or other-student details.
+- [x] Add administrator-authorized exports of enrolled learner name, email, credentials, specialty, location, enrollment, progress, and completion details for all LMS courses, excluding billing and authentication data.
+- [ ] Add active-participant-only authorized cohort-group and workshop-instance learner-detail exports, retaining group manager scope only for their assigned group and administrator scope for all records; expose non-active records only through an explicit administrative filter.
+- [x] Add focused authorization, CSV formula-safety, scope, and field-format regressions for course, cohort, and workshop learner-detail exports.
+- [x] Add administrator-managed approved From email and sender-name options for course, cohort, and workshop participant communications.
+- [x] Reuse the email campaign editor for a draft-only participant composer built into course settings, with authorized cohort and workshop-instance entry points, while locking the recipient audience to active participants in the selected enrollment scope by default.
+- [x] Require a separate explicit administrator confirmation immediately before sending any participant email, and add authorization, audience, sender, and send-confirmation regressions.
+- [x] Repair the LMS course-settings runtime failure caused by the unresolved CardHeader reference without changing course, learner, export, or email data.
+- [x] Add focused regression coverage confirming LMS course settings renders its participant communication card and related tab content without unresolved component references.
+- [x] Repair the Platform Admin `/question-bank` route so it renders the same authorized Question Bank data and extracted Advanced Cardiac Sonographer questions as the LMS Question Bank route.
+- [x] Add focused regression coverage for route registration and shared Question Bank data-contract parity without changing any question records.
+- [x] Make Question Bank folders navigable so opening a folder shows its assigned questions and supports nested folder hierarchy navigation.
+- [x] Add clear rename and reorder controls for Question Bank folders, preserving existing folder IDs, parent assignments, and question assignments.
+- [x] Add focused hierarchy, folder-filtering, rename, reorder, and question-preservation regressions for the Question Bank folder experience.
+- [x] Create or reuse Question Bank subfolders for each ZIP or SCORM extracted quiz group beneath the administrator-selected parent folder, preserving every imported question and group assignment.
+- [x] Add focused import-subfolder hierarchy and question-preservation regression coverage for grouped ZIP and SCORM quiz extraction.
+- [x] Redesign the Question Bank as a full-screen repository-style workspace with a persistent active-folder sidebar and selected-folder questions in the main pane.
+- [x] Move nested folder opening, creation, subfolder, rename, and sibling reorder controls into the Question Bank sidebar while preserving folder and question assignments.
+- [x] Add focused full-screen Question Bank layout, sidebar hierarchy, selected-folder, rename, and reorder regressions.
+- [x] Move Question Bank out of LMS navigation into a dedicated full-screen administration route with links back to Platform Admin and LMS Admin, preserving the authorized Question Bank data contract.
+- [x] Archive closed workshop instances and cohorts after their end date; show waitlist only when no alternative available instance or cohort group exists for the same offering, preserving historical enrollment, learner, completion, attendance, and reporting data.
+- [x] Add focused date-boundary, alternative-availability, public visibility, waitlist, archive, and historical-data preservation regressions for past closed workshop instances and cohorts.
+- [ ] Repair the Fetal Echocardiography workshop URL’s public title, description, image, canonical URL, and social metadata so link previews do not fall back to Adult Echo content.
+- [ ] Add focused public metadata-route regression coverage confirming each workshop URL receives its own saved SEO and social preview fields without changing its URL or workshop content.
+- [x] Repair email logo rendering by replacing the unreliable source with publicly reachable absolute image markup while preserving the existing branded email header.
+- [x] Add focused email-template regression coverage for an absolute public logo URL, meaningful alt text, and email-client-safe image dimensions without sending email.
+- [x] Perform a read-only audit of the supplied addresses against current active newsletter subscriptions and report only addresses that are not subscribed.
+- [x] Superseded the campaign/list-management audit after clarification that the supplied addresses must be compared against platform user accounts; no campaign-list data was queried or changed.
+- [x] Audit the supplied addresses against current platform user records and report only addresses with no matching user account, without changing accounts, subscriptions, or lists.
+- [x] Add a server-enforced Manager role with broad limited administrative access to users, subscriptions, content, and email campaigns.
+- [x] Allow Platform Admins to assign or remove the Manager role through the existing user-management interface, with server-side authorization and no self-escalation path.
+- [x] Prevent Managers from receiving or viewing currency amounts, revenue totals, sales-money analytics, or financial reporting data across all administrative APIs and interfaces.
+- [x] Allow Managers to create and update approved content and administrative records while denying destructive product and course actions server-side and hiding related UI controls.
+- [x] Add focused Manager authorization, money-data redaction, content-management, email-campaign analytics, and create-without-delete regressions.
+- [x] Remove “Founding Member” language from app membership names, descriptions, badges, and member-facing displays without changing membership identifiers, access, pricing, subscriptions, enrollments, or historical records.
+- [x] Add focused regression coverage confirming membership copy no longer exposes “Founding Member” language and membership access behavior remains unchanged.
+- [x] Remove expired lifetime membership purchase offers and lifetime checkout paths from the app while preserving existing lifetime-member access and records.
+- [x] Enable annual membership presentation and checkout using the matching configured Stripe recurring annual price for each offered membership.
+- [x] Configure iHeartEcho’s annual membership checkout to use a matching live $99.97/year recurring Stripe price rather than the existing $99.70 annual price.
+- [x] Add focused regressions for annual purchase availability, annual Stripe price selection, rejection of new lifetime checkout, and preservation of existing lifetime access.
+- [x] Build a shared mobile-only app shell for UltrasoundAssist and EchoAssist with a compact teal header, touch-friendly feature cards, clear menu access, and bottom navigation modeled on the supplied reference.
+- [x] Keep existing desktop and tablet navigation, layout, visual hierarchy, and functionality unchanged by isolating the mobile experience to phone breakpoints only.
+- [x] Add brand-aware mobile routing and feature-card labels for both UltrasoundAssist and EchoAssist without exposing unsupported features or changing access controls.
+- [x] Add focused responsive and brand-navigation regressions and visually validate both brand experiences at a phone viewport. Visual capture remains blocked by the existing local preview connection issue; source-level breakpoint and route validation passed.
+- [x] Repair the LMS course-editor runtime failure caused by `isRestrictedManager` being referenced before definition, preserving all Platform Admin and Manager restrictions.
+- [x] Add focused regression coverage that the LMS course editor renders for authorized administrators and retains Manager-safe pricing and delete restrictions.
+- [x] Repair automatic sign-in on app.iheartecho.com for users already authenticated on All About Ultrasound, preserving existing accounts, sessions, and domain security boundaries.
+- [x] Add brand-correct logo display to phone-only app headers for UltrasoundAssist and EchoAssist without changing tablet or desktop headers.
+- [x] Add focused cross-domain sign-in and mobile-header logo regressions without exposing session tokens or account details.
+- [ ] Trace and repair the remaining live app.iheartecho.com automatic sign-in failure across Learn/App bridge, returned exchange, and iHeartEcho first-party session creation without changing user accounts or existing sessions.
+- [ ] Add focused full bridge-sequence regressions covering iHeartEcho fallback across approved source domains and first-party session completion without exposing tokens or account details.
+- [x] Audit all active-domain password login, magic-link request, token verification, session creation, return-path, and protected-content access flows without sending an email or exposing authentication data.
+- [x] Confirm no separate password-login or magic-link verification defect in the shared audited paths; retain the live iHeartEcho automatic SSO issue as a separate open repair without changing accounts, sessions, passwords, access, or domain-security controls.
+- [x] Add focused cross-domain login and magic-link issuance, verification, redirect, cookie, and protected-content regressions without generating or disclosing real tokens.
+- [ ] Inspect and propose an embedded, Stripe-compatible product-import workflow inside the existing platform Products and Product Types administration that can obtain approved store or supplier product details, images, descriptions, and pricing for local product pages without changing the existing Stripe integration.
+- [ ] Design an approved product-level fulfillment handoff for Printful and/or Bookvault after successful Stripe checkout, preserving existing payment, order, and shipping data safeguards.
+- [ ] Add administrator-controlled selective imported-product landing-page population, local checkout, and fulfillment-source configuration within the current Products workflow only after the compatible source and required credentials are approved.
+- [x] Repair the Pediatric Digital Flashcards SCORM package display and launch path without replacing the uploaded package or changing course access, learner progress, or completion records.
+- [x] Add focused SCORM launch, asset-access, and learner-player regressions for the Pediatric Digital Flashcards package and compatible course-content packages.
+- [ ] Add LMS-native standalone Flashcards alongside standalone quizzes and mock exams, with a dedicated visual builder while retaining the existing app flashcards unchanged.
+- [x] Duplicate existing app flashcards into an LMS Flashcards Question Bank parent folder with category-specific subfolders, preserving source records and avoiding duplicate imports. Completed idempotent copy: 550 active app flashcards into 12 category subfolders; the protected importer supports later imports.
+- [ ] Support Flashcard Question Bank authoring, learner feedback, configurable total and per-group draws, and selected question-group sourcing for standalone and embedded flashcards.
+- [ ] Add standalone flashcard URL and embeddable delivery using the existing protected standalone-quiz publication and access patterns.
+- [ ] Add Flashcard lesson and page content modules with Question Bank selection, group-draw configuration, progress, and learner feedback without changing existing lesson quizzes.
+- [ ] Add AI and approved PDF, PowerPoint, and Word flashcard generation, treating each PDF/PPT page pair as front and back while avoiding direct source references in generated learner content.
+- [ ] Add focused regressions for app-flashcard preservation, import hierarchy, visual authoring, Question Bank storage, configurable delivery, embeds, lesson modules, and AI/document generation.
+- [x] Create one LMS Flashcards starter deck for each imported app challenge category, source each deck from its own Flashcards Question Bank subfolder, and configure 50 cards per attempt.
+- [x] Verify every category deck’s Question Bank assignment and 50-card draw setting while preserving all imported LMS cards and app-source flashcards.
+- [ ] Add private My Quiz Results analytics with distinct Quizzes, Mock Exams, and Flashcards sections, showing per-attempt results and content-type aggregate results only for the signed-in learner.
+- [ ] Show recorded quiz/mock scores and learner self-reported flashcard Correct % results per deck/attempt and as separate all-quizzes, all-mocks, and all-decks aggregates.
+- [ ] Add focused privacy, result grouping, per-attempt, and aggregate analytics regressions without exposing any other learner’s performance data.
+- [ ] Use the existing app Challenge Flashcards “Got it right” or “Missed it” learner marking procedure for LMS Flashcard decks and calculate private Correct % from those recorded card-level responses.
+- [ ] Create an Advanced Cardiac Sonographer Flashcard Deck draft using only existing imported LMS flashcard records, with no lesson change and no non-flashcard Question Bank questions.
+- [ ] Ensure every current app flashcard category has its own LMS Flashcards folder and separate 50-card draft deck sourced only from that category’s imported app flashcards.
+- [x] Repair Lesson Focus Regeneration when valid requests are rejected as incomplete, while preserving review-only drafts and preventing automatic lesson saves.
+- [x] Superseded the ACS lesson-draft request after clarification that ACS work must be Flashcards only; no ACS lesson draft was created or changed.
+- [x] Finish and checkpoint the Ultrasound Physics AI lesson-regeneration repair before resuming any ACS Flashcards work.
+- [ ] Diagnose and repair the actual populated-content Ultrasound Physics Lesson Focus Regeneration failure; do not assume fields are empty or claim success without a populated-case result.
+- [ ] Add a populated-content regeneration regression that preserves review-only drafts and detects the true incomplete-rewrite failure reason without storing raw lesson content.
+- [ ] Repair the explicit Lesson Focus Regeneration draft-apply flow so a generated reviewed draft is written to the intended lesson only after the administrator chooses to apply/save it.
+- [ ] Add focused regression coverage for generation preview, explicit draft application, and no automatic lesson save.
+- [ ] Repair Apply Reviewed Changes when a populated generated lesson draft is acknowledged but not persisted to the selected course lesson.
+- [ ] Add a populated reviewed-draft persistence regression verifying the intended lesson changes only after Apply Reviewed Changes and survives a refresh.
+- [ ] Add a newsletter double-opt-in flow that holds new subscriptions pending confirmation and activates only after valid confirmation, without sending test email.
+- [ ] Replace the proposed double-opt-in flow with an immediate subscription and one-time “You’re in!” welcome notification confirming subscription and requesting inbox whitelisting; do not send a confirmation link.
+- [ ] Update newsletter signup consent text to state educational and marketing emails.
+- [ ] Prepare the confirmation email with inbox-whitelisting guidance and request final approval of audience, sender, subject, and content before enabling delivery.
+- [ ] Add focused confirmation-token, pending-state, activation, consent-copy, and no-email-sent regressions.
+- [x] Add an editable PDF/PowerPoint-to-rich-content lesson and page block that extracts document text and visual assets into a visually configured draft rather than a standard file viewer.
+- [x] Convert each PDF page and PowerPoint slide into a separate responsive editable lesson/page content block rather than retaining fixed-page display.
+- [x] Insert converted editable PDF/PPT page and slide blocks directly into the current lesson after conversion, retaining the original source file and preserving other lesson blocks.
+- [x] Clean up the Add Content Block picker grid so block icons and labels have consistent spacing, wrapping, and touch-friendly row sizing without overlap.
+- [x] Rebuild Add Content Block picker cells so icon and multi-line label layout cannot overlap at the current desktop picker width.
+- [x] Preserve the exact active lesson view across refresh, returning to the same Lesson Editor or Lesson Settings view instead of Course Settings.
+- [x] Add focused picker-cell and lesson-view refresh-state regressions.
+- [x] Preserve the original source PDF/PowerPoint and asset references while allowing administrators to edit generated text and visual layout before saving the rich-content block.
+- [x] Add focused document extraction, visual-asset preservation, rich-content editing, and source-file retention regressions.
+- [x] Expose the PDF/PowerPoint conversion action visibly in the current Lesson Editor’s Add Content Block workflow and verify it appends converted blocks without replacing existing content.
+- [x] Allow Lesson Quiz and Lesson Flashcard modules to select and insert appropriate Question Bank questions or flashcards using the same controlled source-selection workflow as standalone builders.
+- [x] Record lesson-module quiz attempts and flashcard self-reported Got It Right/Missed outcomes in the signed-in learner’s private My Quiz Results sections, without exposing other learners’ records or class counts.
+- [x] Add focused authoring, Question Bank preservation, embedded-attempt, flashcard outcome, My Quiz Results, and privacy regressions for lesson modules.
+- [x] Allow authors to add new lesson-module quiz questions and flashcards into the appropriate Question Bank, with duplicate-safe source linkage and without changing existing learner attempts or source records.
+- [x] Reorder the Content block picker as Text/Rich Text, Image, Video, all AI-generation blocks, then the remaining standard content blocks.
+- [x] Require First Name, Last Name, and Email on newsletter signup, with no optional newsletter input fields.
+- [x] Verify that Lesson Quiz and Lesson Flashcard module editors visibly expose their Question Bank selection controls and preserve the established Question Bank workflows.
+- [x] Add focused newsletter required-field and lesson-module Question Bank visibility regressions.
+- [x] Correct the rendered Content selector order to show Text, Image, Video, then all AI-generation blocks, matching the catalog rather than the current stale visual order.
+- [x] Group File Upload, File Download, and Convert File consecutively in the Content selector.
+- [x] Increase the PDF/PPTX Convert File upload limit above 25 MB while retaining supported-type checks, server-side bounds, source-file preservation, and focused validation coverage.
+- [x] Convert each PowerPoint slide into one editable rich-text lesson block that retains the slide background, positioned formatted text, titles, image assets, and visual composition rather than emitting separate plain text and image blocks.
+- [x] Add focused PowerPoint composition-preservation regressions using the supplied SPI Anatomy of Sound deck structure, without modifying the existing converted lesson until an author explicitly reconverts and saves it.
+- [x] Repair PPTX conversion so source text formatting and grouped visual composition remain faithful in the converted lesson output, rather than flattening or degrading slide elements.
+- [x] Replace cumbersome positioned-fragment editing for converted PPTX slides with manageable slide-level editing controls that preserve the rendered visual composition.
+- [x] Add visual-fidelity and author-usability regressions based on the supplied conversion recording, without modifying existing lesson blocks automatically.
+- [x] Ask authors whether to include or exclude PowerPoint slide headers and footers before conversion, and apply the selected behavior consistently to every generated slide block.
+- [x] Add focused PowerPoint header/footer classification and conversion-choice regressions without changing source files or existing lesson blocks automatically.
+- [x] Remove the unrequested Convert File item from the top Add Content Block menu and keep future top-menu additions limited to explicitly requested items.
+- [x] Add a focused regression proving Convert File is not rendered as a top-level Add Content Block action while its approved conversion workflow remains available elsewhere.
+- [x] Replace positioned PPTX slide overlays with reflowed editable rich text that uses semantic headings, paragraphs, tables, images, responsive columns, and spacing rather than overlapping absolute layers.
+- [x] Ensure converted PowerPoint text is directly editable in the normal rich-text editor and extracted images are placed as responsive editable content rather than non-editable overlays.
+- [x] Repair the header/footer exclusion selection so it removes identified headers and footers from reflowed slide content before insertion.
+- [x] Add focused reflow, direct-editability, responsive-image, spacing, table, and header/footer-exclusion regressions based on the reported failed conversions, without modifying existing lesson blocks automatically.
+- [x] Review `0059_standalone_quiz_schema_sync.sql` against the connected database and deployed Quiz Creator contracts before any production schema action.
+- [x] Verify the standalone-quiz schema synchronization migration is already applied in the connected database: the required columns and flashcards quiz type are present, so no duplicate production schema write is needed before checking Quiz Creator.
+- [x] Repair the mismatch where imported rich-text colors and styling appear correctly in the lesson editor but are not honored by the displayed lesson content, without altering lesson text or source files automatically.
+- [x] Add focused regressions for editor-to-display rich-text style parity, including formatted text and table color preservation.
+- [x] Repair standalone Flashcards quiz creation when the form submits the valid `flashcards` type but the active server validation accepts only quiz and mock exam types.
+- [x] Add focused creation-contract regressions covering quiz, mock exam, and flashcards types without creating quiz records during testing.
+- [x] Diagnose and repair the standalone Flashcards quiz database-insert failure shown after the client and server accepted the `flashcards` type, without creating duplicate or test quiz records.
+- [x] Add focused schema-contract coverage for standalone Flashcards quiz creation and existing quiz preservation.
+- [x] Reconcile every standalone Flashcards quiz insert field with the live service database after the approved two-column migration did not resolve the reported production error.
+- [x] Verify the live Learn service database target and correct only the confirmed remaining standalone-quiz creation mismatch, without creating test or duplicate quizzes.
+- [x] Apply the approved additive Railway MySQL alignment for the five missing standalone-quiz fields and `flashcards` enum value, then verify the live Quiz Creator insert contract without creating a test quiz.
+- [x] Repair the direct Quiz Creator editor lookup for newly created standalone Flashcards quizzes so `/admin/quiz-creator/:id` loads the saved quiz without modifying quiz records or questions.
+- [x] Add focused route and retrieval regressions for Flashcards editor loading alongside existing quiz and mock-exam records.
+- [x] Add the missing Railway `standalone_quiz_widget_launches` table required by the existing direct editor lookup, then confirm the new Flashcards quiz opens without creating widget or quiz records.
+- [x] Repair Railway Question Bank insertion for SCORM-extracted questions by reconciling the complete extractor insert contract with the live schema, without re-extracting packages or changing existing Question Bank records.
+- [x] Add focused SCORM Question Bank save-contract and Railway schema-alignment regressions, then verify the live insert contract without creating test questions.
+- [x] Preserve native SCORM question types during Question Bank extraction and verify that schema compatibility for flashcards never creates flashcard records from SCORM quizzes.
+- [x] Add an individual preview action for each Question Bank question, allowing administrators to inspect rendered question text, answers, feedback, and attached media without entering edit mode.
+- [x] Repair SCORM Question Bank media import so extracted image and video references are uploaded or retained safely and associated with their imported questions.
+- [x] Add focused individual-preview, SCORM-image, SCORM-video, media-reference, and existing-question-preservation regressions.
+- [x] Add a non-admin single-active-device session policy that detects an existing active session on another device and presents a clear user choice to continue here or remain signed in there.
+- [x] Keep Platform Admin accounts exempt from the single-device policy while retaining existing authentication and session-security safeguards.
+- [x] Add focused regressions for existing-device detection, user-declined replacement, confirmed session replacement, old-device invalidation, and Platform Admin multi-device exemption.
+- [x] Repair magic-link request delivery when the account has an active session, keeping the second-device confirmation strictly after link verification rather than blocking email issuance.
+- [x] Add focused regressions for magic-link request acceptance with an active session and the preserved post-verification session-replacement choice.
+- [x] Trace and repair the failed non-admin prior-session invalidation that allowed two simultaneous active device sessions after a confirmed replacement choice.
+- [x] Add focused end-to-end enforcement regressions proving the replaced ordinary-user device is rejected by the central authenticated-request gate while Platform Admin sessions remain exempt.
+- [x] Detect competing pre-existing ordinary-user sessions during authenticated application bootstrap and protected session checks, then present the user-selected active-device prompt instead of allowing two concurrent sessions.
+- [x] Add focused regressions for app-load detection, choosing the other device, choosing this device, legacy-session migration, and Platform Admin exemption.
+- [x] Audit the reported $29.97 transaction display so cents are formatted correctly and do not appear as $2,997.
+- [x] Trace the configured Judith Buckland 25% revenue-share allocation and related Stripe payment, transfer, or application-fee records without moving funds.
+- [x] Repair the verified cents-reporting defect and preserve future assigned partner shares as pending ledger entries when Stripe onboarding is incomplete, without moving funds.
+- [ ] After explicit authorization, refresh Judith Buckland’s Stripe Connect status and, if active, backfill and transfer the verified historical 25% revenue-share amount using reviewed order-level evidence.
+- [ ] Retry the user-authorized $7.49 Judith Buckland share for the latest $29.97 sale only after sufficient available platform Stripe balance exists; Stripe confirmed her account is payout-enabled, but the initial transfer was declined for insufficient platform funds. Earlier historical orders remain explicitly excluded.
+- [x] Preserve future shares as pending ledger entries when partner onboarding is incomplete, while routing an eligible single active partner’s share directly from the same customer charge at payment time.
+- [x] Configure eligible future revenue-share sales as a single customer charge with Stripe payment-time transfer data, sending the assigned partner share directly from that same charge and retaining the platform remainder without any second customer charge.
+- [x] Add focused payment-time split, customer-single-charge, active-partner, multi-partner fallback, and incomplete-onboarding regressions before enabling the new checkout behavior.
+- [x] Repair the Sales tab display so stored-cent amounts such as 2997 render as $29.97 across every visible reporting view.
+- [x] Trace and repair the empty Analytics tab data contract, query, or client-state path without altering payment, order, revenue-share, or learner records.
+- [x] Add focused regressions for Sales cents formatting and populated administrator analytics rendering.
+- [x] Defer automatic SCORM inventory and source-wide Question Bank re-extraction to the administrator’s existing manual Media Repository workflow, per the user’s instruction; existing question records remain unchanged.
+- [x] Retain the existing administrator-controlled per-package Question Bank extraction path rather than adding a bulk re-extraction operation, per the user’s instruction.
+- [x] Make the Question Bank individual preview render with the actual learner quiz-player presentation, including media, answer interactions, and the existing visual style, without creating an attempt or result record.
+- [x] Add focused regressions for SCORM source-media extraction, duplicate-safe reconciliation, and learner-player-style Question Bank preview behavior.
+- [x] Repair the manual SCORM Question Bank importer so supported package image and video references in question stems, answer choices, and feedback are uploaded and displayed on the corresponding saved Question Bank record.
+- [x] Validate the corrected manual SCORM import path with representative image and video source references, without starting a bulk re-extraction.
+- [x] Verify the exact Media Repository per-quiz Question Bank extraction route: its Save Questions action passes the selected media asset to the extracted-prefix media importer, which maps parsed image and video references to the saved Question Bank record and learner-style preview.
+- [x] Trace and repair Email Campaign image URL-link handling across editor insertion, draft persistence, publish, preview, and outbound HTML rendering so linked images remain clickable in delivered email.
+- [x] Add focused regressions for valid image URL links, safe URL sanitization, draft/published campaign persistence, and outgoing email HTML anchor/image output without sending an email.
+- [x] Provide a safe, sender-configuration-neutral Email Campaign deliverability improvement checklist without changing DNS, sender authentication, subscriptions, suppression, or campaign records.
+- [x] Audit and repair Email Campaign analytics calculations so overview, recipient, geography, and link metrics are derived consistently from authorized recorded campaign events.
+- [x] Replace link-only campaign analytics export with a complete authorized export of recorded delivery-relevant campaign events and available metadata, including opens, clicks, unsubscribes, timestamps, destinations, and non-sensitive location fields where captured.
+- [x] Add focused accuracy, deduplication, filter, and complete-export regressions for campaign analytics without exposing data across campaigns or to non-administrators.
+- [x] Remove the confirmed Media Repository SCORM per-group extraction cap that imported only 200 of at least 300 source multiple-choice questions, while preserving source grouping and avoiding duplicate Question Bank records.
+- [x] Repair the affected Media Repository SCORM package’s question-to-image and question-to-video attachment mapping, then add a source-specific regression for the reported 20/300/40/22 group structure and supported media references.
+- [x] Trace and repair the Media Repository SCORM Save Questions request that returns an HTML document where the tRPC client expects JSON, without creating or duplicating Question Bank records.
+- [x] Add a focused response-contract regression for Media Repository SCORM Save Questions, then verify the deployed retry reaches the authorized JSON procedure response.
+- [ ] Identify the live Railway response source for the persistent Media Repository Save Questions HTML-versus-JSON failure after checkpoint 57a37866, without re-importing or changing Question Bank records.
+- [ ] Repair and verify the actual deployed request-routing or runtime configuration mismatch, then request one controlled duplicate-safe Save Questions retry for the affected package.
+- [ ] Keep GitHub main as the source of truth for application code and verify the GitHub-connected Railway deployment advances to the current approved main revision before further live SCORM import testing.
+- [ ] Inspect the confirmed active Railway deployment logs and the internal Media Repository Save Questions sequence to identify the remaining HTML response source after the current GitHub main commit deployed successfully.
+- [ ] Verify whether Email Campaign sends use SendGrid API, SMTP, or another transport; reconcile the actual provider message identifiers and event reporting path with the statistics dashboard the administrator is checking, without sending mail or changing provider configuration.
+- [ ] Preserve a safe SendGrid provider correlation identifier for future Email Campaign sends and expose a privacy-safe delivery-status reconciliation path, without sending email, importing provider event data, or altering historical campaign records.
+- [ ] Add safe stage-specific logging and user-facing error classification for Media Repository SCORM media import failures so the remaining internal HTML response source can be identified without logging storage keys, session data, or package content.
+- [ ] Inventory and validate available SMTP configuration for transactional email, then route transactional messages through SMTP while retaining the separate Email Campaign delivery/analytics path unless explicitly changed.
+- [ ] Add focused transport-selection and safe no-send failure regressions for SMTP transactional email without exposing credentials or sending messages.
+- [x] Investigate and repair the Media Repository authorization mismatch that returns Forbidden when Vanessa, an administrator, uploads video; preserve least privilege and do not change her account, role, or files during diagnosis.
+- [x] Add focused role/permission regressions for authorized administrator video upload and verify the corrected path does not weaken access for ordinary users.
+- [x] Preserve and reconcile the uncheckpointed Media Repository upload-authorization and SCORM diagnostic repairs with the newer GitHub main SMTP and SCORM changes, without discarding either code path or changing production records.
+- [x] Run focused merged-path validation and checkpoint the reconciled GitHub-main code before asking for live Media Repository upload or SCORM import retries.
+- [x] Repair membership-plan card vertical spacing and responsive purchase-button sizing so all call-to-action labels remain visible without changing pricing, plan availability, or checkout behavior.
+- [x] Add focused layout regression coverage for full membership-button labels and consistent CTA placement across plan cards.
+- [ ] Visually validate the membership-plan CTA spacing and full labels on the live desktop and phone breakpoints after deployment; the local preview did not render this public route.
+- [x] Ensure every Platform Admin can browse and upload in Media Repository through the same effective-role policy, while ordinary users remain denied.
+- [x] Ensure authorized Platform Admins can select and reuse existing Media Repository items in Email Campaigns, pages, and courses without requiring a content change or granting cross-user media access.
+- [x] Add focused cross-surface Platform Admin browse/upload/media-picker regressions and ordinary-user denial coverage.
+- [x] Inspect the affected user’s account eligibility, active authentication state, password/magic-link request history, and non-sensitive provider delivery evidence for the reported two-day sign-in failure, without sending or disclosing a login link.
+- [x] Repair only the verified user-facing authentication defect, add a focused regression, and request explicit approval before resending a login or password-recovery email.
+- [x] Remove every pre-registration or pending-account authentication block so all existing accounts with a deliverable email may use valid password login, magic-link recovery, or password reset without exposing account existence.
+- [x] Add focused password-login, magic-link, and password-reset regressions proving pending administrative metadata does not block valid account recovery or weaken credential validation.
+- [x] Remove the unapproved Quizzes top-navigation link and both Quizzes/My Quiz Results profile-menu entries; do not add top or side navigation links without explicit approval.
+- [x] Keep Quizzes available only inside My Dashboard → My Content, and show My Quiz Results there only to learners with recorded standalone-system quiz results.
+- [x] Add focused navigation and standalone-result visibility regressions for the corrected discovery rules.
+- [x] Repair My Content → Quizzes so a learner sees entitled standalone quizzes and courses flagged as quizzes rather than an empty My Quizzes list.
+- [x] Repair My Quiz Results so completed standalone-system quiz attempts render actual learner-only result records instead of blank placeholder rows; lesson-embedded quizzes must not reveal, populate, or count toward this tab.
+- [x] Add focused entitlement, quiz-course classification, lesson-quiz exclusion, result-display, and learner-privacy regressions for the corrected My Content quiz experience.
+- [x] Repair missing UltrasoundAssist and EchoAssist membership/course card images on the learner dashboard without changing memberships, pricing, subscriptions, or access.
+- [x] Add focused brand-card image-source and fallback regressions for the learner dashboard.
+- [ ] Validate on the deployed learner dashboard that entitled standalone quizzes, LMS quiz courses, learner-only standalone results, and both brand-card images render correctly.
+- [x] Repair the My Dashboard runtime crash caused by an undefined `buildStudentDashboardUrl` reference before validating the learner quiz-result rows.
+- [x] Add focused regression coverage proving the My Content quiz card actions resolve their dashboard URL helper and completed standalone result rows leave loading state.
+- [x] Reconcile the reported digital-download payment with the purchaser, product, webhook, purchase, download-entitlement, and email-delivery records using read-only evidence only.
+- [x] Present the confirmed fulfillment gap and request explicit approval before creating any purchase/download access record or sending any customer access email.
+- [x] Repair the reported customer’s digital-download account association so the confirmed paid purchase appears in her Downloads and Purchases views, without sending email unless separately approved.
+- [x] Harden completed digital-download fulfillment so every valid checkout produces one durable purchase entitlement for the intended account and a truthful delivery status.
+- [x] Add focused digital-download account-association, dashboard-access, duplicate-safety, and failed-delivery-status regressions.
+- [ ] Validate the customer’s live Purchases and Downloads views after the authorized entitlement correction; do not send a replacement email unless separately approved.
+- [x] Make learner My Content areas default to a course-card presentation while preserving the existing authorized content set and access actions.
+- [x] Add an accessible learner-controlled card/list view toggle and search across visible My Content items without changing content records or entitlements.
+- [x] Add focused regressions for default card view, view-mode switching, search filtering, responsive behavior, and authorized-content preservation.
+- [x] Confirm the current GitHub main revision and identify any Cursor-originated payment-state edits before making further changes.
+- [x] Exclude all non-completed payments, including pending and open records, from learner spending, administrator revenue, and transaction-count totals across affected interfaces.
+- [x] Audit stale pending payment records with read-only provider and application evidence, then request explicit authorization before changing any record or payment state.
+- [x] Add focused payment-status, aggregate-total, transaction-count, and stale-pending regressions without changing payment, enrollment, entitlement, or ledger records during validation.
+- [x] Show unresolved or abandoned checkout records only in authorized administrator member transaction history with a clear non-payment label, while excluding them from all spending, revenue, and transaction-count totals and all learner purchase history.
+- [ ] Diagnose the reported deployment failure for checkpoint 03020f68, isolate whether it is application configuration or deployment-platform related, and apply only a validated deployment-safe correction.
+- [x] Automatically grant an idempotent Free Membership when a member receives any qualifying paid course, product, content, bundle, workshop, webinar, or enrollment access, without changing existing direct membership or purchase records.
+- [x] Suppress individual membership-item access emails and all automatic-Free-Membership welcome/access emails created as a consequence of another purchase or enrollment; retain one membership-level welcome/access email only for direct membership enrollment.
+- [x] Add focused grant-source, idempotency, email-suppression, direct-membership-delivery, and no-email-sent validation coverage without sending messages or modifying member access records during tests.
+- [x] With explicit approval, add only missing active Free Membership subscriptions and their included access to all current user accounts, using duplicate-safe writes and sending no welcome or item-access email.
+- [x] Add administrator member-profile controls to grant and manage individual download or content access, with duplicate-safe safeguards and no automatic email delivery.
+- [x] Show administrator-visible per-member download access activity, entitlement status, limits, and management controls under the Content → Downloads view.
+- [x] Show administrator-visible standalone, lesson-quiz, and survey result records under the member Content → Quizzes view without exposing those results to other learners.
+- [x] Repair LMS Download Students, Sales, and Analytics views so they identify the correct student and render stored-cent monetary values such as 700 as $7.00 rather than $700.00.
+- [x] Add focused authorization, access-management, quiz-result, student-identity, cents-formatting, and no-email-sent regression coverage for administrator member content management.
+- [x] Add administrator-only drill-down views that show a member’s stored response for every question in standalone quizzes, lesson quizzes, and lesson surveys without changing learner attempt or response records.
+- [x] Show all quiz-type course enrollments and their associated access state in the administrator member Content → Quizzes view, in addition to direct standalone quiz access and completed results.
+- [x] Add focused authorization, response-detail accuracy, survey-response, and quiz-course-access regressions without exposing learner responses or content access to unauthorized users.
+- [x] Trace and repair the live LMS Download Students and Analytics query path that still returns unnamed $0.00 access-holder rows instead of paid purchaser identity and confirmed stored-cent revenue; preserve nonfinancial access records separately and send no email.
+- [x] Add a focused deployed-contract regression that distinguishes paid download purchasers from silent/zero-cost access holders and verifies student identity and cents-correct totals in both LMS Download Students and Analytics views.
+- [x] Inventory every brand-specific tool and destination, then ensure each resolves from the current selected All About Ultrasound or iHeartEcho brand rather than defaulting to All About Ultrasound.
+- [x] Add focused cross-brand routing, title, label, and data-context regressions for Challenge Cards and every other brand-specific tool without changing user content or brand access records.
+- [x] Show complete available IP-location fields and provide a protected export of recorded IP access logs for authorized administrators, preserving existing privacy and security boundaries.
+- [x] Add focused authorization, privacy, field-format, and CSV export regressions for IP-access logs without changing existing access, login, or security records.
+- [x] Add the supplied clinical image quiz-card visual styles as selectable brand-aware Challenge Card templates, including light, aqua, teal, and dark variants.
+- [x] Build an administrator-only Question Bank social-card generator that saves standalone quiz-question output and prefers existing question-linked media as the clinical image/video source.
+- [x] Allow authorized administrators to choose a Media Repository image/video or upload approved image/video media for a social quiz card, without changing the source Question Bank record.
+- [x] Provide image, video/MP4, and no-media social-card variants with question text and answer options, preserving selected-brand identity and export-ready output.
+- [x] Add focused template, media-precedence, authorization, no-media, video-output, and source-record-preservation regressions for Question Bank social-card generation.
+- [x] Make the Challenge Card templates and Question Bank social-card generator available to all effective Platform Admins, while retaining ordinary-user and unrelated-role denial.
+- [x] Resolve administrator quiz-response drill-downs to actual question wording and selected-answer text rather than internal IDs or stored numeric values.
+- [x] Organize administrator member Content → Quizzes into distinct Quizzes, Mock Exams, and Lesson/Survey result tabs while preserving existing access and attempt records.
+- [x] Repair Challenge Card source selection so the selected iHeartEcho route retrieves iHeartEcho challenge categories and questions instead of general UltrasoundAssist content.
+- [ ] Verify the new Railway build serves the clinical Challenge Card template selector after the GitHub-main repair is deployed, then close the live deployment-handoff item.
+- [x] Replace the deployed-schema-incompatible member quiz mock-exam query with a schema-safe classification path and restore administrator member profile loading without changing attempts or scores.
+- [x] After completing the original Challenge Card and member quiz-result repairs, trace and repair Sharing Monitor student-detail selection so flagged user rows open their protected detail panel rather than returning “User not found,” without changing flags, IP logs, user accounts, or access records.
+- [x] Make the active Platform Admin brand selector authoritative for every per-brand tool, ensuring an All About Ultrasound selection never opens, renders, or queries iHeartEcho routes/data and vice versa.
+- [x] Keep Challenge Card question and answer outputs visually matched for every selected clinical template, including background, framing, typography, logo treatment, and selected-brand styling.
+- [x] Derive Challenge Card contextual labels from the actual selected challenge category or content-specific label, never from an unrelated hardcoded specialty label.
+- [x] Dynamically fit Challenge Card question, options, correct answer, and explanation typography and spacing so all content remains visible within the selected matched card template without clipping.
+- [x] Use A–D option labels on clinical Challenge Cards and align their answer-card hierarchy with the classic answer-card layout while retaining the selected clinical template.
+- [x] Make the all-Platform-Admin Question Bank Social Cards generator clearly discoverable from the approved Platform Admin engagement surface.
+- [x] Register a valid iHeartEcho Engagement route and ensure selected-brand Engagement links never resolve to a 404 page.
+- [x] Make Question Bank Social Cards return to the selected brand’s valid Platform Admin route rather than an incorrect or unavailable URL.
+- [x] Use A–D option labels consistently in Question Bank Social Cards, Quiz Card Generator outputs, and clinical Challenge Cards.
+- [x] Store generated Social Post Generator outputs in a durable shared library available to all effective Platform Admins, with later download access and selected-brand context.
+- [x] Add authorized Social Post image-source choices for AI generation, device upload, and Media Repository selection, with source metadata and existing role boundaries preserved; Google image search is deferred separately.
+- [x] Add focused Social Post Library persistence, all-Platform-Admin authorization, download, selected-brand, image-source, attribution, and source-record-preservation regressions.
+- [ ] Add Google image search to Social Post Generator after an approved supported provider and its credentials are configured; deferred by user so it does not block the current Social Post Library release.
+- [ ] Repair the live Social Post Library insert failure that blocks successful Social Content generation, and ensure a temporary archive-write error cannot mask an otherwise successful generated post.
+- [x] Add focused live-schema compatibility and generation-degradation regressions for Social Post Library persistence without creating test posts or media records.
+- [x] Render Question Bank Social Card answer options with the Challenge Classic individual-row layout, A–D markers, and matched readable spacing across selected brands.
+- [x] Remove internal question-type labels such as MCQ from public Question Bank Social Card output, using only meaningful contextual labels when available.
+- [x] Ensure a temporary Social Post Library archive-write error cannot mask an otherwise successful generated post.
+- [x] Transform Quiz Card Generator into a dual-brand Platform Admin tool that searches all Question Bank questions, shows folders, and filters by text, tags, and attached image or video media.
+- [x] Add a creator-selected All About Ultrasound or iHeartEcho card brand to the dual-brand Quiz Card Generator without changing the source Question Bank record.
+- [x] Use www.allaboutultrasound.com and www.iheartecho.com as public URLs in Quiz and Social Generator output while retaining app URLs for Challenge Cards.
+- [x] Add #AllAboutUltrasound #iHeartEcho #Ultrasound #Sonographer #Sonography #UltrasoundEducation to every generated Social Post and Quiz Card caption.
+- [x] Add a restrained professional emoji treatment to both Social Post and Quiz Card captions without inserting emojis into clinical questions, options, answers, or explanations.
+- [x] Add focused dual-brand Question Bank filtering, creator-brand selection, public-link, and standardized-hashtag regressions without changing Question Bank records.
+- [x] Remove “daily” language from Quiz Card Generator captions and card output while retaining Challenge Card daily-challenge wording.
+- [x] Add an optional Quiz Card Generator source-folder label for the selected question’s Question Bank folder on exported cards and captions without changing Question Bank records.
+- [x] Add an optional custom Quiz Card Generator label field for exported cards and captions without changing source questions or folders.
+- [x] Repair SCORM-to-native Question Bank extraction so supported stem, option, and feedback images/videos are imported and attached for new extractions without changing existing Question Bank records.
+- [x] Add shared export presets for Facebook, Instagram, LinkedIn, X, Instagram Reels, Facebook Reels, TikTok, YouTube Video, and YouTube Shorts across Challenge, Social, and Quiz Card Generators.
+- [x] Support platform-sized PNG exports and locally rendered animated MP4 exports for all card generators, preserving the complete card design within every target frame.
+- [x] Animate Question Card prompts and answer choices sequentially, animate Answer Card choice review followed by answer reveal, and animate Social Content headlines and insights before the completed-card reveal.
+- [x] Add focused social-platform export regression coverage and retain the existing Platform Admin authorization and source-record-preservation boundaries.
+- [x] Add a Stripe-native three-day introductory trial to eligible new single-brand and dual-brand Premium App subscription checkout sessions, without altering existing subscriptions, prices, access records, or payment data.
+- [x] Grant authorized Premium access at the valid Stripe no-payment-required trial checkout event, preserve unpaid-checkout deferral for all other statuses, prevent repeat trials for prior Stripe-managed app memberships, and advertise the trial through shared and direct app upgrade prompts.
+- [x] Add a prominent dashboard-top countdown banner for active Premium App trials using only Stripe’s live trial status and expiry timestamp, with a continuously refreshed remaining-time display.
+- [x] Add a once-per-session in-app final-day alert when fewer than 24 hours remain in a Premium App trial, without notifying non-trial or expired memberships.
+- [x] Add an optional feedback modal before a member cancels an active Premium App trial, schedule the Stripe cancellation only after confirmation, and send the reason/details to the configured Platform Admin notification channel once per newly scheduled trial cancellation.
+- [x] Add focused trial dashboard, final-day alert, cancellation-feedback, no-duplicate-alert, and safe live-trial-status regression coverage without creating or changing subscriptions, payments, memberships, or emails during validation.
+- [x] Replace the Premium trial cancellation feedback dropdown with prominent keyboard-accessible multiple-choice reason cards while retaining the optional comment, selected-reason submission, and Platform Admin notification behavior.
+- [x] Add durable, structured Premium trial cancellation feedback storage and an administrator-only bar chart that aggregates selected reasons without exposing member identities or relying on clearable notification records.
+- [x] Restore iHeartEcho POCUS Cardiac, eFAST, RUSH, and Lung Navigator URL aliases so established navigator links no longer fall through to a 404 page.
+- [x] Prevent anonymous visitors from receiving interactive Premium content previews, while retaining timed previews only for authenticated free members and improving SoundBytes sign-in gating with visible but non-interactive blurred library cards.
+- [x] Repair the student dashboard subscription view so legacy, free, or otherwise non-Stripe membership records cannot crash the Premium trial countdown lookup when their live Stripe payload is absent.
+- [x] Repair the Railway pre-build `healthcheckPath` validation failure by removing duplicate config-as-code sources and the invalid code-level health-check overrides; retain the live unauthenticated `/api/health` endpoint and manage its setting only in Railway service configuration.
+- [x] Build separate All About Ultrasound and iHeartEcho public-site tenants with WYSIWYG per-page editing, public page rendering, dedicated blog post editing/listing, per-brand Platform Admin launchers, and a URL-preserving .net-to-.com promotion model.
+- [x] Add tenant-specific SEO metadata, sitemaps, review-host noindex controls, and controlled source imports that rewrite legacy member-domain links to `learn.allaboutultrasound.com` and verified legacy CME calls-to-action to their matching current Learn courses without modifying either current public source site.
+- [x] Add focused public-site tenant, routing, editor, import, and promotion-contract regressions; retain existing effective Platform Admin authorization for all content management actions.
+- [x] Route the configured `.net` apex domains to their matching public-site tenants ahead of app-domain detection, preserve their review noindex behavior, and provide a branded public homepage instead of an app shell or 404 while CMS content has not yet been imported.
+- [x] Apply migration `0069_dual_public_site_editor.sql` and complete the authorized controlled sitemap import for both public-source tenants: 178 All About Ultrasound records and 73 iHeartEcho records now exist as independently editable, published CMS copies; source sites were not modified.
+- [ ] Repair and live-verify `www.allaboutultrasound.net` TLS/custom-domain routing. The apex review host renders the imported All About Ultrasound site, but the configured `www` Railway hostname timed out during HTTPS verification.
+- [ ] At the approved launch date, attach the matching .com domains to the Railway service, change DNS with URL-preserving redirects from the prior hosts, and verify Search Console / page-level canonical / sitemap behavior before retiring the previous public-site hosting.
+- [x] Add Study Groups to the Learn education library: private email-invite groups, discussion, task tracking, protected document uploads, and group-owned live meeting links that support Zoom and Microsoft Teams.
+- [x] Add the $99/month Study Groups Organization plan with unlimited participants, organization-admin seat and activity controls, WYSIWYG organization learning modules, and effective Platform Admin oversight of groups, seats, activity, and uploaded documents.
+- [x] Apply additive migration `0070_study_groups.sql` to Railway MySQL; the migration created Study Group collaboration, access, activity, document, workspace-block, and organization-plan tables only and did not create group, seat, user, subscription, purchase, content-access, or document records.
+- [x] Encrypt Study Group documents before object storage and require active-group or effective Platform Admin authorization for decrypted downloads; direct storage URLs and keys are not exposed through the group workspace API or browser.
+- [x] Repair Study Group registration by creating the missing parent `study_groups` table from the approved additive migration and simplify the learner-facing invitation copy without exposing internal directory details.
+- [x] Correct iHeartEcho Social Content categories to Transthoracic Echo, Transesophageal Echo, Intracardiac Echo, Pediatric/Congenital Echo, and Fetal Echo; add white, teal, aqua, and dark Social Content card themes.
+- [x] Harden the shared Social Post Library so same-brand posts persist across refreshes and are visible to all effective Platform Admins; add shared published, flag-with-comment, and soft-delete actions without changing existing source Question Bank records.
+- [x] Repair Quiz Card clinical image/video rendering, make all three card-generator previews respond to the selected social-platform aspect ratio, and use safe contained media presentation.
+- [x] Enhance all Challenge, Social, and Quiz Card MP4 exports with corrected staged motion spacing, standalone question/answer or Quiz Card combined question-and-answer sequences, selected brand outro/logo, and administrator-selected Media Repository background music.
+- [x] Evaluate and connect a licensed, usage-permitted external music catalogue/search provider: Openverse is restricted server-side to non-mature CC0 1.0 HTTPS MP3 previews with attribution and an administrator verification notice; non-CC0, scraped, and credential-gated catalogue tracks are excluded.
+- [x] Repair iHeartEcho Social Card categories, add white/teal/aqua/dark Social Card themes, persist shared cross-admin posts reliably, and add shared Post Library publishing, flag/comment, deletion, and multi-post export controls.
+- [x] Add a CC0-only Openverse music catalogue search and a direct audio-upload option to Challenge, Social, and Quiz Card MP4 exports; preserve title, creator, source, license, and attribution metadata for selected external tracks.
+- [x] Add standalone question, answer, and combined question-plus-answer MP4 sequences with corrected animation spacing, selected platform dimensions, optional music, and brand-specific logo outro to all three card generators.
+- [x] Add the effective-Platform-Admin shared Quiz Card Library with saved presentation snapshots, cross-admin visibility, publish, flag/comment, resolve, delete, reopen, and export actions; the additive `0072_quiz_card_library.sql` migration is maintained in GitHub main.
+- [x] Correct Question Bank clinical image/video card spacing, media sizing, and source-media rendering so option text remains clear when media is present.
+- [x] Exclude `quickReview` flashcards from Daily Challenge selection for both echo and physics/general categories and repair legacy daily-set references with active eligible challenge questions before display; flashcards remain limited to the Flashcards experience.
+- [x] Repair the live Study Group creation insert contract by adding the missing nullable legacy `stripe_current_period_end` compatibility column alongside the current `current_period_end` column; verified the additive MySQL change directly without creating or changing any Study Group, membership, user, payment, subscription, or content record.
+- [x] Keep the current Study Group Drizzle insert contract limited to `current_period_end`, so current code never requires the older additive `stripe_current_period_end` column; add regression coverage for the one-way legacy compatibility rule.
+- [x] Verify the GitHub-connected Railway runtime advances to the current Study Group insert mapping. The September 22 runtime now reported its missing Study Group schema clearly; do not create another group merely for diagnosis.
+- [x] Add browser-native sample-audio playback for selected Media Repository and CC0 Openverse tracks in all shared Challenge, Social, and Quiz Card export controls, without changing music authorization or catalogue restrictions.
+- [x] Refine shared MP4 staging so question/answer rows have stable reserved positions, combined Question + Answer exports hold exactly three seconds after the final option before revealing the correct answer, and content-stage branding does not crowd the answer panel.
+- [x] Make each MP4 end with an aspect-ratio-preserved unboxed brand logo and a 10-second dedicated website screen: public `www` host for Social and Quiz cards, selected app host for Challenge cards.
+- [x] Replace the ambiguous mixed music dropdown in Challenge, Social, and Quiz Card exports with explicit No music, Free CC0 search, and Upload audio modes; show debounced CC0 search results as individually selectable browser-preview rows and keep Media Repository uploads/listings in the upload mode.
+- [x] Replace square-card letterboxing with selected-platform export frames across Challenge, Social, and Quiz Card generators. Add the supplied exact feed, story/reel, cover, preview, profile, thumbnail, and banner sizes; reflow clinical/content card dimensions and density before PNG/MP4 rasterization; and preserve direct full-frame output when the rendered card already matches the target aspect ratio.
+- [x] Add effective-Platform-Admin AI music generation to all shared Challenge, Social, and Quiz Card export controls: the AI composes a constrained original instrumental blueprint, the browser synthesizes a previewable 20-second WAV beat/loop, and the selected brand’s private Media Repository retains it for later MP4 selection. No third-party tracks are copied or labelled as AI-generated.
+- [x] Reserve explicit baseline-aware clearance below static Clinical Question, Answer Reveal, and Clinical Insight headings in MP4 motion panels so staged animated titles and choices begin below rather than overlap the header.
+- [x] Expand original AI music-loop generation with R&B rhythm, rap beat, hip-hop, pop, upbeat, and rock instrumental styles. Each style uses a distinct bounded 16-step rhythm/voicing profile while prohibiting vocals, rapping, spoken words, samples, artist references, and third-party music.
+- [x] Upgrade browser-synthesized AI card music from a simple oscillator loop to a layered contemporary mix: shaped kick click/body/sub, snare/clap, closed/open hats, saturated layered bass, detuned lead, evolving chord pads, generated room response, compression, and limiting. Refine the AI blueprint prompt for modern production depth while preserving the original instrumental-only/no-sample design.
+- [x] Make the eligible Premium App free-trial default the single-app annual plan: omitted checkout interval requests resolve to annual, the annual card appears first and is explicitly marked as the Default Trial Plan, and monthly/dual plans remain available as deliberate alternatives.
+- [x] Repair MP4 audio embedding for new AI-generated and directly uploaded card music: retain the browser-local WAV/file bytes through Challenge, Social, and Quiz motion construction so encoding does not depend on private Media Repository CORS, and fail visibly rather than silently producing a musicless MP4 when a separately selected remote track cannot be decoded.
+- [x] Harden Quiz Card Library save feedback: require a returned MySQL record ID plus immediate read-after-write verification, automatically open and refresh the shared library after a save, and surface a specific save or load API failure rather than presenting an empty library silently. Remove database URL fragments from the public DB-status diagnostic response.
+- [x] Apply the missing additive Study Group schema to live Railway MySQL from the GitHub migration: `0070_study_groups.sql` created the ten empty `study_group%` tables and guarded `0073` added `stripe_current_period_end` beside `current_period_end`. No group, member, user, payment, subscription, content-access, document, or other business record was created or changed.
+- [x] Repair the second Study Group creation failure caused by reading the MySQL/Drizzle insert ID from the wrong result shape: create now atomically creates both the group and owner membership using `$returningId()`, and an exact-name retry finishes only the creator's prior incomplete private group instead of creating a duplicate. The learner-facing Study Groups list is now membership-only for every signed-in user; platform-wide safeguarding oversight remains isolated to the protected Platform Admin page.
+- [x] Verify the Railway Study Group schema repair through the authorized real `echo` group creation; no test group was created for diagnosis.
+- [x] Add secure, reusable Study Group member share links: group managers can generate, copy, replace, and revoke a high-entropy link; signed-in recipients join only as ordinary participants; revoked links and archived groups are rejected; the free group seat limit remains enforced; no roster is exposed by the link. Added the empty `study_group_share_links` table directly to live Railway MySQL and verified its schema without creating business records.
+- [x] Require at least three active Study Group participants before a 10% group-content discount is shown or applied. Server-side catalog and Stripe checkout prices now use the full price below that threshold; pending invitations do not qualify, and the group workspace explains the current eligibility status.
+- [x] Add Organization Group Access tiers: $49/month covers one group with up to 20 active or invited participants, and $99/month covers up to three groups with unlimited participants; additional groups remain free groups with free-group limits. The chosen tier is encoded in the server-created Stripe Checkout session and subscription metadata, saved through the existing verified webhook path, enforced for email and share-link joins, and clearly selectable in the group workspace without modifying any existing group, subscription, payment, or member record.
+- [x] Repair the live Quiz Card Library save failure by applying the already versioned additive `0072_quiz_card_library.sql` migration to Railway MySQL. The missing table now has all 22 expected fields and three indexes, and the table remains empty; no saved card, Question Bank record, media, user, payment, subscription, or other business record was created or changed.
+- [x] Remove the opaque blue square from iHeartEcho MP4 brand outros by retaining the CORS-enabled existing mark and clipping its circular emblem in the shared canvas renderer. Quiz, Social, and Challenge cards now pass the selected brand’s optional outro shape without changing static card logos, content, or source-brand URLs.
+- [x] Repair Social Post Generator custom-image rendering without making private Media Repository assets public: uploaded and selected repository images now use a same-origin, authenticated, brand-scoped image proxy for previews, PNG/MP4 canvas rendering, and image-only downloads. Add an editable Social Post panel for headline, card text, supporting/reference text, caption, category, and post type; edits update the card immediately and save to the shared Post Library with validation and visible success/error feedback.
+- [x] Replace the initial Social Post image crop with contained clinical-media presentation; default new Social Post generation to one item; and make shared-library saving a deliberate administrator action after editing rather than an automatic generation side effect. Apply the additive Social Post theme compatibility migration to Railway MySQL without creating post records.
+- [x] Align Challenge and Quiz Card media treatment with the full-image Social Post approach, keeping source question media contained and media provenance tied to the original question or feedback context rather than inventing new source media.
+- [x] Add protected native Quiz Question media delivery after an attempt starts, right-click/context-menu suppression, download-disabled player controls, and teal/aqua question/player treatments. Imported SCORM questions now receive `media:image` and/or `media:video` tags; the backfill tagged only existing Question Bank records with existing media URLs.
+- [x] Preserve imported SCORM media candidates and their question-versus-feedback provenance for administrator reassignment. Default source feedback images/videos to feedback only, prefer a source question video when both a video and image are present, and expose explicit Question/Feedback assignment buttons when multiple images are available. The additive candidate metadata schema was applied to Railway MySQL without re-extracting packages or changing imported question media assignments.
+- [x] Extend iSpring/SCORM native Question Bank parsing to preserve Matching, Sequence, and Fill-in-the-Blank content for future manual imports, including matching pairs, sequence options, and flashcard front/back fields, with focused parser and persistence regressions. Existing ACS records were not re-extracted or modified.
+- [x] Add Question Bank sibling-folder move controls with server-enforced parent boundaries and default the folder tree to closed; every folder remains accessible by expanding its parent. Folder moves retain existing folder IDs, question assignments, and hierarchy constraints.
+- [x] Add public Study Groups sales content for logged-out visitors, retain the sales highlights when signed in, rename the signed-in section to My Study Groups, add the same entry to the learner dashboard, and provide Organization/Group Learning signup buttons. Group Learning checkout requires a minimum of three participants but permits adding them later; a one-person purchased seat remains permanently assigned and cannot be reassigned.
+- [x] Enforce Organization Group Access coverage across eligible groups: the $49 tier is limited to one Organization group, while the $99 tier is limited to three; the existing subscription can activate eligible groups within those limits and remaining groups continue as free groups.
+- [x] Repair Quiz Card MP4 exports containing Question Bank video by routing stored question/option media through a same-origin, effective-Platform-Admin-only proxy before HTML/canvas capture. The combined Question + Answer MP4 now plays the full selected question video, holds the completed question/options for three seconds, then reveals the correct answer before the dedicated 10-second brand outro. Source Question Bank records and media storage remain unchanged.
+- [x] Restyle public and signed-in Study Groups sales highlights to the Education Library teal/aqua visual language and replace implementation-oriented explanations with outcome-led sales copy, while retaining truthful access tiers, signup actions, and the signed-in My Study Groups area.
+- [x] Remove the remaining fixed Social Post image crop geometry so uploaded or selected images retain their full intrinsic ratio and expand the card vertically as needed; fixed-width source images no longer force a 3:2 crop frame.
+- [x] Add an optional Quiz Card MP4 clinical-image review stage. When selected for a Quiz Card with an image, the export presents the clinical question, smoothly magnifies the contained image, then animates answer options, holds the completed options for three seconds, reveals the answer, and ends with the branded outro. Video-media cards retain the complete-video-before-answer sequence.
+- [x] Correct iSpring SCORM answer-option media parsing by excluding each choice's feedback branch from option-media discovery while retaining direct choice assets such as `ia`. Verified the Vascular source package (asset 650003) now resolves the monophasic-flow options to three distinct image refs without modifying production Question Bank records. Quiz Card browsing now excludes questions with answer-image/video media, which remain available for native quizzes where every answer asset can render faithfully.
+- [x] Repair missing Question Bank media classifications for recent SCORM imports: audited and added only the missing `Media: Image` and/or `Media: Video` tag mappings to 142 existing media-bearing imported questions, without altering their question text, answers, media URLs, folders, provenance, users, or any other content fields.
+- [x] Restyle native standalone-quiz explanation feedback from blue to the platform teal treatment, retaining correct/incorrect outcomes and existing feedback media behavior.
+- [x] Add a pricing comparison popup to the public Study Groups “See group options” action, clearly showing the free five-person group, $49/month 20-member/one-group Organization Access, $99/month unlimited/three-group Organization Unlimited tier, and the three-active-member 10% Group Learning discount condition.
+- [x] Add Study Group Platform Admin oversight and safeguarding controls. Admins can review groups, members, documents, content access, and private member reports; invite or revoke members; remove shared documents or reported content; resolve/dismiss reports; and permanently delete non-subscribed groups only after entering the exact group name. Active Organization subscriptions cannot be deleted from the dashboard. Learners can privately report documents, discussion messages, tasks, or modules; reports notify the platform owner and are persisted in the additive `0077_study_group_content_reports.sql` Railway schema.
+- [x] Add explicit Feedback Image URL and Feedback Video URL fields to the Question Bank editor. Saved direct question or feedback image/video URLs now automatically retain `Media: Image`/`Media: Video` discovery tags alongside any administrator-selected tags.
+- [x] Improve Quiz Card source browsing with a searchable, hierarchical, taller Folder navigator showing question counts, and a searchable Tag picker that retains selected tags, supports match-all filtering, and provides a clear-all action. These browser filters do not change Question Bank source records.
+- [x] Reconcile all nine SCORM packages imported on 2026-09-23 against their source question totals and safely reimport only the four verified missing ACS records. The final audit confirms 0 missing questions across ACS (846), Adult Echo (310), Abdomen (146), Breast (147), Fetal Echo (299), OB GYN (349), Pediatric Echo (356), Physics SPI (386), and Vascular (179); existing Question Bank content was not overwritten.
+- [x] Add durable SCORM source asset/question identifiers for future idempotent, source-scoped reimports and apply the additive `0078_question_bank_scorm_source_provenance.sql` schema change to live Railway MySQL.
+- [x] Make image/video Question Bank classification visible in the admin list from actual question, feedback, flashcard, and answer-option media, while preserving existing Media tags.
+- [x] Keep all video-backed Social Post, Quiz Card, and Challenge Card selections in MP4-only export mode, hiding static PNG choice and passing the source video into the local MP4 timeline. Social Post upload and Media Repository selection now accepts video as well as images.
+- [x] Apply the platform teal explanation feedback treatment to the Question Bank learner-preview dialog and expand Quiz Card folder entries for readable hierarchy and long folder names.
+- [x] Add a non-blocking shared-library prior-use indicator to the Quiz Card Generator source selector. Every Platform Admin sees the count of saved Quiz Card library records for each Question Bank question, including prior outputs created by other admins; the question remains fully selectable.
+- [x] Refresh native Question Bank quiz questions with a responsive clinical teal/aqua card treatment: question and answer choices sit beside question media on larger screens, feedback remains teal, and media is still protected through the existing signed attempt routes. Add a `quiz_logo_url` setting to Question Bank folders; a configured logo is inherited by subfolders and displayed in the native question footer, while Quiz Builder branding continues to override this native presentation. The additive `0079_question_bank_folder_quiz_logo.sql` schema change was applied to live Railway MySQL.
+- [x] Make Organization Access sales language explicit across the public and signed-in Study Groups views: both $49 and $99 tiers clearly include the ability to build and manage the organization’s own group modules and learning content.
+- [x] Integrate active Organization Study Groups with their own scoped TEACH live-game workspaces. An Organization owner or organization admin can open **Create TEACH activity** from the group learning-modules tab, create/import and manage only that group’s TEACH activities, and launch live sessions. The group-scoped game association is additive (`0080_study_group_teach_games.sql`) and was applied to live Railway MySQL; Platform Admin oversight remains intact.
+- [x] Widen the public Study Groups pricing comparison dialog to use the available viewport and keep tier cards from becoming cramped on narrow displays. Update all Organization Access sales messages to state plainly that organizations create their own modules and TEACH activities **within this platform**.
+- [x] Reconcile live Stripe Connect onboarding status against stored partner records: Judith Buckland and Daniel Bourque are now marked Active after confirming `details_submitted` and payouts enabled; incomplete partner records remain Onboarding.
+- [x] Reconcile historical eligible paid course sales into the live payout ledger without sending funds. The first six Judith Buckland 25% shares ($7.49 each; $44.94 total) were reconciled, and the final historical pass now shows 12 Pending ledger entries totaling $88.63. Reconciliation is idempotent and does not transfer funds.
+- [x] Add admin controls to refresh all Stripe Connect statuses and reconcile missing paid course-sale ledger entries; add `account.updated` webhook synchronization for future onboarding status updates.
+- [x] Repair the shared cohort landing countdown so standard countdown blocks calculate and refresh from their saved target date, use the platform Eastern schedule resolver, and no longer render static `00` placeholders; synchronize advanced countdown reconfiguration and add cross-landing regression coverage.
+- [x] Verify My Cohort recording access for the enrolled September cohort, retain Thinkific source URLs while resolving their existing Wistia player IDs only at embedded playback time, and prevent source-less recordings from being presented as watchable.
+- [x] Show each partner's assigned revenue-share courses and percentages directly in the Partners list; repair assignment labels to use course titles instead of an undefined product ID; and reconcile all eligible historical paid LMS course sales into Pending ledger records without creating any Stripe transfer. Add the missing additive `0081_revenue_share_ledger_processing_columns.sql` compatibility columns to live Railway MySQL.
+- [x] Add per-ledger-entry **Process** controls with a two-step confirmation that displays the partner, course, gross sale, exact share percentage, and exact Stripe transfer amount before sending. The bulk pending-payout action now also requires a confirmation showing its selected partner scope, number of transfers, and total amount; neither confirmation sends a payment until the administrator explicitly selects **Confirm & Send**.
+- [x] Audit the 2026-09-23 Situs course checkout: live MySQL holds **one** paid LMS order (`#7800177`) and Stripe holds one $29.97 charge (`pi_3UJ1jJBj9HgnkZLK1FtQixsM`); the emailed `#9750001` does not exist in any live order table. The $29.97 charge came from a stale active Stripe Price whose old product label was 2 SDMS CME, while the current course is $24.97 / 1 CME. Clear the live stale price cache so the next checkout immediately creates the current $24.97 price.
+- [x] Record the already-completed direct 25% Stripe Connect transfer of **$6.24** (`tr_3UJ1jJBj9HgnkZLK1wPfOXEf`) in live MySQL’s Revenue Share ledger as `paid` / `payment_time`; this was ledger reconciliation only and did not initiate a second transfer.
+- [x] Harden future LMS checkout pricing: invalidate cached Stripe Price/Payment Link IDs when admin pricing or billing terms change, verify an existing Stripe Price’s amount/currency/recurrence before every hosted or embedded checkout, and verify a cached Payment Link still uses that exact price. Checkout-complete fallback fulfillment now mirrors the webhook’s idempotent revenue-share ledger recorder, including expanded PaymentIntent normalization.
+- [x] Build out the two independently editable public website tenants: **www.allaboutultrasound.net** now carries the All About Ultrasound source site and Making Waves archive, while **www.iheartecho.net** carries the iHeartEcho source site and EchoBlog archive. Imported content totals 179 All About Ultrasound URLs (59 articles) and 73 iHeartEcho URLs (10 articles), with editable native page blocks, mirrored owned source images, brand navigation, and legacy `member.allaboutultrasound.com` / Teachable course links redirected to the current Learn platform. The source imports completed without failed pages; the only non-mirrored source media was a timed-out remote iHeartEcho GIF, which safely retains its source URL.
+- [x] Add a reusable, drag-sortable **Blog Sidebar** block editor for platform admins. Each brand can configure a shared blog sidebar with promotions and content blocks from Public Sites, and each individual article can use that shared sidebar or override it. Public blog listings and posts now display click-through archives, posts, and sidebar content. The additive `0082_public_site_tenants_and_blog_sidebars.sql` schema change was applied to live Railway MySQL.
+- [x] Add per-brand Weebly-style public-site page trees, draggable page ordering, hide/navigation and page visibility controls, secure page passwords, member access gating, page SEO/robots metadata, expandable page settings, and reusable column-contained block editing; validate with focused regressions, production build, and guarded Railway MySQL migration 0083.
+- [x] Add reusable scheduled cohort-group and workshop-instance linked-content access, date-shifted duplication of scheduled runs, optional cohort recording copying, and idempotent course/download/webinar/workshop entitlement fulfillment without copying learners or payment records; validate migration, regressions, and production build.
+- [x] Add cohort-specific drip controls: reuse existing lesson drip timing, link assignments to lessons, add assignment/recording release delays, hide the learner Replays tab per cohort group, enforce the release policy in schedule, detail, submission, file-upload, and playback routes, preserve settings when duplicating cohort groups, and validate with 10 focused feature/schema tests plus the production build. Live MySQL schema assurance confirmed the additive columns and index.
+- [x] Correct workshop availability so legacy `capacity = 0` records are treated as unlimited rather than sold out; the vascular workshop remains sales-open when purchasable, while positive capacities continue enforcing seat limits. Added shared semantics and regression coverage.
+- [x] Add cohort assignment and recording drip release bases: after enrollment, after publish, or after cohort start date; preserve legacy rows as after enrollment and enforce the same rules in learner lists, detail routes, submission uploads, and recording playback.
+- [x] Make LMS course copying resilient: preserve successful copies when optional AI landing-page reformatting is unavailable, rename the copied course, show a clear warning, and cover the no-landing-page and AI-fallback paths with regression tests.
+- [x] Fix cohort student preview schedule leakage: preview now uses the active/current cohort group instead of an admin’s personal enrollment or course-wide sessions; learners remain restricted to their assigned group, with optional explicit group preview support.
+- [x] Fix Social Post Library deletion so posts are removed immediately from the shared admin list, failed deletes roll back with an error message, duplicate clicks are prevented, and the soft-delete mutation remains brand-scoped.
+- [x] Add specific drip dates for native lessons and cohort assignments/recordings; shift explicit drip dates with the source cohort timeline when duplicating a cohort group.
+- [x] Fix shared Post Library delete, publish, and flag actions to send each saved record's persisted brand instead of the currently selected generator brand; preserve copied assignment drip dates in the admin form.
+- [x] Add in-page brand selectors to Social Content Generator and Challenge Card Generator; switching brands updates logos/hosts/media/music context, clears stale generated selections, and routes Social Library saves and queries to the selected brand.
 - [x] Route public funnel root and page paths on `www.allaboutultrasound.net` through the funnel renderer before the marketing-site catch-all, preventing valid funnel URLs from displaying the marketing-site 404.
