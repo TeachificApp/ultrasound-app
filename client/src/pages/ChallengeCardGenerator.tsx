@@ -1184,10 +1184,12 @@ function formatDateLabel(dateStr: string): string {
 
 export default function ChallengeCardGenerator() {
   const [location] = useLocation();
-  const presentation = useMemo(
-    () => getBrandToolPresentation(resolveToolBrand(location, window.location.hostname)),
-    [location],
-  );
+  const routeBrand = useMemo(() => resolveToolBrand(location, window.location.hostname), [location]);
+  const [selectedBrand, setSelectedBrand] = useState<"aaus" | "iheartecho">(routeBrand);
+  const presentation = useMemo(() => getBrandToolPresentation(selectedBrand), [selectedBrand]);
+  useEffect(() => {
+    setSelectedBrand(routeBrand);
+  }, [routeBrand]);
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const [selectedDate, setSelectedDate] = useState<string>(today);
   const isToday = selectedDate === today;
@@ -1236,6 +1238,16 @@ export default function ChallengeCardGenerator() {
   const questionRefs = useRef<Record<string, DownloadableCardHandle>>({});
   const answerRefs = useRef<Record<string, DownloadableCardHandle>>({});
   const [batchLoading, setBatchLoading] = useState<"questions" | "answers" | null>(null);
+  const handleBrandChange = useCallback((brand: "aaus" | "iheartecho") => {
+    if (brand === selectedBrand) return;
+    setSelectedBrand(brand);
+    setSelectedMusic(null);
+    questionRefs.current = {};
+    answerRefs.current = {};
+    toast.success(`Switched to ${brand === "aaus" ? "All About Ultrasound" : "iHeartEcho"} branding.`, {
+      description: "Newly exported challenge cards will use the selected brand.",
+    });
+  }, [selectedBrand]);
 
   const handleBatchDownload = useCallback(async (type: "questions" | "answers") => {
     setBatchLoading(type);
@@ -1309,6 +1321,18 @@ export default function ChallengeCardGenerator() {
           <Badge className="text-[10px] px-1.5 py-0 ml-0.5" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>
             Admin
           </Badge>
+          <label className="ml-3 flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/55">
+            Brand
+            <select
+              aria-label="Generator brand"
+              value={selectedBrand}
+              onChange={(event) => handleBrandChange(event.target.value as "aaus" | "iheartecho")}
+              className="bg-transparent text-xs font-bold normal-case tracking-normal text-white outline-none"
+            >
+              <option value="aaus" className="bg-[#0e1a24]">All About Ultrasound</option>
+              <option value="iheartecho" className="bg-[#0e1a24]">iHeartEcho</option>
+            </select>
+          </label>
 
           {/* Date navigation */}
           <div className="flex items-center gap-1 ml-4">

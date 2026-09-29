@@ -704,3 +704,4 @@
 - [x] Fix Social Post Library deletion so posts are removed immediately from the shared admin list, failed deletes roll back with an error message, duplicate clicks are prevented, and the soft-delete mutation remains brand-scoped.
 - [x] Add specific drip dates for native lessons and cohort assignments/recordings; shift explicit drip dates with the source cohort timeline when duplicating a cohort group.
 - [x] Fix shared Post Library delete, publish, and flag actions to send each saved record's persisted brand instead of the currently selected generator brand; preserve copied assignment drip dates in the admin form.
+- [x] Add in-page brand selectors to Social Content Generator and Challenge Card Generator; switching brands updates logos/hosts/media/music context, clears stale generated selections, and routes Social Library saves and queries to the selected brand.

@@ -683,10 +683,12 @@ const IMAGE_STYLE_HINTS = [
 // ── Main Page ────────────────────────────────────────────────────────────────
 export default function SocialContentGenerator() {
   const [location] = useLocation();
-  const presentation = useMemo(
-    () => getBrandToolPresentation(resolveToolBrand(location, window.location.hostname)),
-    [location],
-  );
+  const routeBrand = useMemo(() => resolveToolBrand(location, window.location.hostname), [location]);
+  const [selectedBrand, setSelectedBrand] = useState<"aaus" | "iheartecho">(routeBrand);
+  const presentation = useMemo(() => getBrandToolPresentation(selectedBrand), [selectedBrand]);
+  useEffect(() => {
+    setSelectedBrand(routeBrand);
+  }, [routeBrand]);
   const brandCategories = useMemo(
     () => presentation.brand === "iheartecho" ? IHE_CATEGORIES : AAUS_CATEGORIES,
     [presentation.brand],
@@ -726,6 +728,17 @@ export default function SocialContentGenerator() {
     .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: asset.currentVersion?.s3Url, source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
   const hasVideoItem = useMemo(() => items.some(hasSocialPostVideo), [items]);
+  const handleBrandChange = useCallback((brand: "aaus" | "iheartecho") => {
+    if (brand === selectedBrand) return;
+    setSelectedBrand(brand);
+    setItems([]);
+    setSelectedSavedPostIds([]);
+    setSelectedMusic(null);
+    setShowLibrary(false);
+    toast.success(`Switched to ${brand === "aaus" ? "All About Ultrasound" : "iHeartEcho"} branding.`, {
+      description: "Newly generated and saved posts will use this brand's Post Library.",
+    });
+  }, [selectedBrand]);
 
   useEffect(() => {
     if (hasVideoItem && exportFormat !== "mp4") setExportFormat("mp4");
@@ -980,6 +993,18 @@ export default function SocialContentGenerator() {
           <h1 className="text-base font-bold text-white">{presentation.displayName} Social Content Generator</h1>
           <Badge className="text-[10px] px-1.5 py-0 ml-0.5" style={{ background: BRAND + "22", color: BRAND_AQUA, border: "none" }}>Admin</Badge>
           <div className="ml-auto flex items-center gap-2">
+            <label className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/55">
+              Brand
+              <select
+                aria-label="Generator brand"
+                value={selectedBrand}
+                onChange={(event) => handleBrandChange(event.target.value as "aaus" | "iheartecho")}
+                className="bg-transparent text-xs font-bold normal-case tracking-normal text-white outline-none"
+              >
+                <option value="aaus" className="bg-[#0e1a24]">All About Ultrasound</option>
+                <option value="iheartecho" className="bg-[#0e1a24]">iHeartEcho</option>
+              </select>
+            </label>
             {/* Layout toggle */}
             <div className="flex rounded-lg overflow-hidden" style={{ border: `1px solid ${BRAND}44` }}>
               <button
