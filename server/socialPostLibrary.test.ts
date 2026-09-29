@@ -50,6 +50,15 @@ describe("shared Social Post Library", () => {
     expect(client).not.toContain("and saved them to the Post Library");
   });
 
+  it("treats an unchanged edit as a successful save instead of a false brand-scoped not-found", () => {
+    const router = readProjectFile("server/routers/socialContentRouter.ts");
+
+    expect(router).toContain("const [existingPost] = await db");
+    expect(router).toContain("eq(socialPostLibrary.id, id), eq(socialPostLibrary.brand, brand), isNull(socialPostLibrary.deletedAt)");
+    expect(router).toContain("if (!existingPost)");
+    expect(router).not.toContain("const result = await db\n        .update(socialPostLibrary)\n        .set(changes)");
+  });
+
   it("keeps every generator theme compatible with the MySQL library enum", () => {
     const schema = readProjectFile("drizzle/schema.ts");
     const migration = readProjectFile("drizzle/0075_social_post_library_theme_options.sql");

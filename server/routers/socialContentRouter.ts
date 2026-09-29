@@ -405,13 +405,21 @@ export const socialContentRouter = router({
           throw new TRPCError({ code: "FORBIDDEN", message: "Selected media asset is not available for this brand" });
         }
       }
-      const result = await db
+      // MySQL reports affectedRows=0 when the submitted values are identical
+      // to the existing row. Confirm the record first so a no-op save is not
+      // incorrectly surfaced as "not found for this brand".
+      const [existingPost] = await db
+        .select({ id: socialPostLibrary.id })
+        .from(socialPostLibrary)
+        .where(and(eq(socialPostLibrary.id, id), eq(socialPostLibrary.brand, brand), isNull(socialPostLibrary.deletedAt)))
+        .limit(1);
+      if (!existingPost) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Saved social post not found for this brand" });
+      }
+      await db
         .update(socialPostLibrary)
         .set(changes)
         .where(and(eq(socialPostLibrary.id, id), eq(socialPostLibrary.brand, brand), isNull(socialPostLibrary.deletedAt)));
-      if (Number((result as any).affectedRows ?? 0) === 0) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Saved social post not found for this brand" });
-      }
       return { success: true };
     }),
 
