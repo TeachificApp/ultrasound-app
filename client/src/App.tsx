@@ -1648,6 +1648,11 @@ function PublicWebsiteRouter() {
   return (
     <Suspense fallback={pageFallback}>
       <Switch>
+        {/* Public funnels share the `.net` marketing host but must take precedence
+            over the editable site catch-all, otherwise every funnel slug renders
+            the marketing site's 404 page. */}
+        <Route path="/:slug/:pageSlug" component={PublicFunnelPageRoute} />
+        <Route path="/:slug" component={FunnelRootRedirect} />
         <Route component={PublicMarketingSitePage} />
       </Switch>
     </Suspense>
