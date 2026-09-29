@@ -13576,6 +13576,7 @@ function CohortTab({ courseId }: { courseId: number }) {
                               lessonId: a.lessonId ?? null,
                               dripDays: a.dripDays ?? 0,
                               dripReleaseMode: a.dripReleaseMode ?? "after_enrollment",
+                              dripDate: a.dripDate ? new Date(new Date(a.dripDate).getTime() - new Date(a.dripDate).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "",
                               maxPoints: a.maxPoints,
                               submissionType: a.submissionType as any,
                               status: "draft",

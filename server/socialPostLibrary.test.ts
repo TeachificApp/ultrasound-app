@@ -83,6 +83,15 @@ describe("shared Social Post Library", () => {
     expect(client).toContain("deleteSavedPostMutation.isPending");
   });
 
+  it("uses the saved record brand for shared-library actions", () => {
+    const client = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
+
+    expect(client).toContain("brand: saved.brand, published: saved.status !== \"published\"");
+    expect(client).toContain("brand: saved.brand })}");
+    expect(client).toContain("brand: saved.brand, comment: flagComments[saved.id].trim()");
+    expect(client).not.toContain("deleteSavedPostMutation.mutate({ id: saved.id, brand: presentation.brand })");
+  });
+
   it("does not enable deferred Google image search without an approved provider", () => {
     const client = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
     expect(client).not.toContain("googleImageSearch");
