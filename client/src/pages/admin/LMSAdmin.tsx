@@ -5229,6 +5229,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     lesson.requireManualComplete === null || lesson.requireManualComplete === undefined ? null : lesson.requireManualComplete === 1
   );
   const [dripDays, setDripDays] = useState(String(lesson.dripDays ?? ""));
+  const [dripDate, setDripDate] = useState((lesson as any).dripDate ? new Date(new Date((lesson as any).dripDate).getTime() - new Date((lesson as any).dripDate).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
   const [dripOutDays, setDripOutDays] = useState(String((lesson as any).dripOutDays ?? ""));
   const [showInstructor, setShowInstructor] = useState<"inherit" | "show" | "hide">(lesson.showInstructor ?? "inherit");
   const [isPrerequisite, setIsPrerequisite] = useState<boolean>(!!lesson.isPrerequisite);
@@ -5262,6 +5263,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       lessonShallow.requireManualComplete === null || lessonShallow.requireManualComplete === undefined ? null : lessonShallow.requireManualComplete === 1
     );
     setDripDays(String(lessonShallow.dripDays ?? ""));
+    setDripDate((lessonShallow as any).dripDate ? new Date(new Date((lessonShallow as any).dripDate).getTime() - new Date((lessonShallow as any).dripDate).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
     setDripOutDays(String((lessonShallow as any).dripOutDays ?? ""));
     setShowInstructor(lessonShallow.showInstructor ?? "inherit");
     setIsPrerequisite(!!lessonShallow.isPrerequisite);
@@ -5296,6 +5298,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       setPreviewMode((fullLesson as any).previewMode ?? (fullLesson.isPreview ? "preview" : "none"));
       setDurationMinutes(String(fullLesson.durationMinutes ?? ""));
       setDripDays(String(fullLesson.dripDays ?? ""));
+      setDripDate((fullLesson as any).dripDate ? new Date(new Date((fullLesson as any).dripDate).getTime() - new Date((fullLesson as any).dripDate).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
       setDripOutDays(String((fullLesson as any).dripOutDays ?? ""));
       setShowInstructor(fullLesson.showInstructor ?? "inherit");
       setMeetingLink((fullLesson as any).meetingLink ?? "");
@@ -5349,7 +5352,8 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       // Auto-enable requireVideoCompletion when lesson is a prerequisite gate (video lessons only)
       requireVideoCompletion: (isPrerequisite && (lessonType === "video" || lessonType === "video_text")) ? true : requireVideoCompletion,
       requireManualComplete,
-      dripDays: dripDays.trim() ? parseInt(dripDays) : null,
+      dripDays: dripDate ? 0 : (dripDays.trim() ? parseInt(dripDays) : null),
+      dripDate: dripDate ? new Date(dripDate).toISOString() : null,
       dripOutDays: dripOutDays.trim() && parseInt(dripOutDays) > 0 ? parseInt(dripOutDays) : null,
       showInstructor,
       isPrerequisite,
@@ -5683,21 +5687,23 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           <div className="border border-gray-200 rounded-lg p-4 space-y-2 bg-gray-50">
             <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><Clock className="w-4 h-4 text-teal-600" /> Drip Schedule</p>
             <p className="text-xs text-gray-500">Optionally lock this lesson until a set number of days after enrollment. Leave blank to inherit section drip or be available immediately.</p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Input
                 type="number"
                 min="0"
-                value={dripDays}
-                onChange={e => setDripDays(e.target.value)}
+                value={dripDate ? "" : dripDays}
+                onChange={e => { setDripDays(e.target.value); setDripDate(""); }}
                 placeholder="e.g. 3"
                 className="w-28"
+                disabled={!!dripDate}
               />
               <span className="text-sm text-gray-500">days after enrollment</span>
-              {dripDays && parseInt(dripDays) > 0 && (
-                <button className="text-xs text-red-500 hover:text-red-700 underline ml-2" onClick={() => setDripDays("")}>Clear</button>
-              )}
+              <span className="text-xs text-gray-400">or</span>
+              <Input type="datetime-local" value={dripDate} onChange={e => { setDripDate(e.target.value); setDripDays(""); }} className="w-56" />
+              <span className="text-sm text-gray-500">specific release date</span>
+              {(dripDays || dripDate) && <button className="text-xs text-red-500 hover:text-red-700 underline ml-2" onClick={() => { setDripDays(""); setDripDate(""); }}>Clear</button>}
             </div>
-            {dripDays && parseInt(dripDays) > 0 && (
+            {dripDate ? <p className="text-xs text-teal-600">Students can access this lesson on the selected date.</p> : dripDays && parseInt(dripDays) > 0 && (
               <p className="text-xs text-teal-600">Students enrolled today will unlock this lesson on day {dripDays}.</p>
             )}
           </div>
@@ -12266,7 +12272,8 @@ type CohortRecording = {
   thumbnailUrl: string | null;
   durationSeconds: number | null;
   dripDays: number;
-  dripReleaseMode: "after_enrollment" | "after_publish" | "after_cohort_start";
+  dripReleaseMode: "after_enrollment" | "after_publish" | "after_cohort_start" | "specific_date";
+  dripDate: Date | string | null;
   showControls: boolean;
   status: "draft" | "published";
   position: number;
@@ -12281,7 +12288,8 @@ type CohortAssignment = {
   lessonId: number | null;
   dueDate: Date | string | null;
   dripDays: number;
-  dripReleaseMode: "after_enrollment" | "after_publish" | "after_cohort_start";
+  dripReleaseMode: "after_enrollment" | "after_publish" | "after_cohort_start" | "specific_date";
+  dripDate: Date | string | null;
   maxPoints: number;
   submissionType: "text" | "file" | "url" | "none";
   status: "draft" | "published";
@@ -12675,17 +12683,17 @@ function CohortTab({ courseId }: { courseId: number }) {
   const [recordingDialog, setRecordingDialog] = useState<{ open: boolean; recording?: CohortRecording }>({ open: false });
   const [recordingForm, setRecordingForm] = useState({
     title: "", description: "", videoUrl: "", thumbnailUrl: "",
-    durationSeconds: 0, dripDays: 0, dripReleaseMode: "after_enrollment" as "after_enrollment" | "after_publish" | "after_cohort_start", status: "draft" as "draft" | "published",
+    durationSeconds: 0, dripDays: 0, dripReleaseMode: "after_enrollment" as "after_enrollment" | "after_publish" | "after_cohort_start" | "specific_date", dripDate: "", status: "draft" as "draft" | "published",
     sessionId: null as number | null,
     showControls: true,
   });
   const openRecordingDialog = (r?: CohortRecording) => {
     if (r) {
       setRecordingForm({ title: r.title, description: r.description ?? "", videoUrl: r.videoUrl ?? "",
-        thumbnailUrl: r.thumbnailUrl ?? "", durationSeconds: r.durationSeconds ?? 0, dripDays: r.dripDays ?? 0, dripReleaseMode: r.dripReleaseMode ?? "after_enrollment",
+        thumbnailUrl: r.thumbnailUrl ?? "", durationSeconds: r.durationSeconds ?? 0, dripDays: r.dripDays ?? 0, dripReleaseMode: r.dripReleaseMode ?? "after_enrollment", dripDate: r.dripDate ? new Date(new Date(r.dripDate).getTime() - new Date(r.dripDate).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "",
         status: r.status, sessionId: r.sessionId, showControls: r.showControls ?? true });
     } else {
-      setRecordingForm({ title: "", description: "", videoUrl: "", thumbnailUrl: "", durationSeconds: 0, dripDays: 0, dripReleaseMode: "after_enrollment", status: "draft", sessionId: null, showControls: true });
+      setRecordingForm({ title: "", description: "", videoUrl: "", thumbnailUrl: "", durationSeconds: 0, dripDays: 0, dripReleaseMode: "after_enrollment", dripDate: "", status: "draft", sessionId: null, showControls: true });
     }
     setRecordingDialog({ open: true, recording: r });
   };
@@ -12699,6 +12707,7 @@ function CohortTab({ courseId }: { courseId: number }) {
       durationSeconds: recordingForm.durationSeconds || undefined,
       dripDays: recordingForm.dripDays,
       dripReleaseMode: recordingForm.dripReleaseMode,
+      dripDate: recordingForm.dripReleaseMode === "specific_date" && recordingForm.dripDate ? new Date(recordingForm.dripDate).toISOString() : null,
       status: recordingForm.status,
       sessionId: recordingForm.sessionId,
       showControls: recordingForm.showControls,
@@ -12836,7 +12845,7 @@ function CohortTab({ courseId }: { courseId: number }) {
   const { data: copySourceData = [] } = trpc.lmsAdmin.listAssignmentsForCopy.useQuery(undefined, { enabled: copyPickerOpen });
   const [assignForm, setAssignForm] = useState({
     title: "", description: "", dueDate: "", maxPoints: 100,
-    lessonId: null as number | null, dripDays: 0, dripReleaseMode: "after_enrollment" as "after_enrollment" | "after_publish" | "after_cohort_start",
+    lessonId: null as number | null, dripDays: 0, dripReleaseMode: "after_enrollment" as "after_enrollment" | "after_publish" | "after_cohort_start" | "specific_date", dripDate: "",
     submissionType: "none" as "text" | "file" | "url" | "none",
     status: "draft" as "draft" | "published",
     notifyStudents: false,
@@ -12854,6 +12863,7 @@ function CohortTab({ courseId }: { courseId: number }) {
         lessonId: assignment.lessonId ?? null,
         dripDays: assignment.dripDays ?? 0,
         dripReleaseMode: assignment.dripReleaseMode ?? "after_enrollment",
+        dripDate: assignment.dripDate ? new Date(new Date(assignment.dripDate).getTime() - new Date(assignment.dripDate).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "",
         maxPoints: assignment.maxPoints,
         submissionType: assignment.submissionType,
         status: assignment.status,
@@ -12861,7 +12871,7 @@ function CohortTab({ courseId }: { courseId: number }) {
         contentBlocks: assignment.contentBlocks ?? [],
       });
     } else {
-      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, lessonId: null, dripDays: 0, dripReleaseMode: "after_enrollment", submissionType: "none", status: "draft", notifyStudents: false, contentBlocks: [] });
+      setAssignForm({ title: "", description: "", dueDate: "", maxPoints: 100, lessonId: null, dripDays: 0, dripReleaseMode: "after_enrollment", dripDate: "", submissionType: "none", status: "draft", notifyStudents: false, contentBlocks: [] });
     }
     setAssignDialog({ open: true, assignment });
   };
@@ -12879,6 +12889,7 @@ function CohortTab({ courseId }: { courseId: number }) {
       lessonId: assignForm.lessonId,
       dripDays: assignForm.dripDays,
       dripReleaseMode: assignForm.dripReleaseMode,
+      dripDate: assignForm.dripReleaseMode === "specific_date" && assignForm.dripDate ? new Date(assignForm.dripDate).toISOString() : null,
       maxPoints: assignForm.maxPoints,
       submissionType: assignForm.submissionType,
       status: assignForm.status,
@@ -13306,9 +13317,15 @@ function CohortTab({ courseId }: { courseId: number }) {
                       <SelectItem value="after_enrollment">After enrollment</SelectItem>
                       <SelectItem value="after_publish">After publish</SelectItem>
                       <SelectItem value="after_cohort_start">After cohort start date</SelectItem>
+                      <SelectItem value="specific_date">Specific date</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                {recordingForm.dripReleaseMode === "specific_date" && <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-1 block">Release date and time</Label>
+                  <Input type="datetime-local" value={recordingForm.dripDate} onChange={e => setRecordingForm(p => ({ ...p, dripDate: e.target.value }))} />
+                  <p className="text-[11px] text-gray-500 mt-1">Students can access this recording on this date. The date is stored in UTC.</p>
+                </div>}
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-1 block">Delay (days)</Label>
                   <Input type="number" min={0} value={recordingForm.dripDays} onChange={e => setRecordingForm(p => ({ ...p, dripDays: Math.max(0, parseInt(e.target.value) || 0) }))} />
@@ -13629,9 +13646,15 @@ function CohortTab({ courseId }: { courseId: number }) {
                     <SelectItem value="after_enrollment">After enrollment</SelectItem>
                     <SelectItem value="after_publish">After publish</SelectItem>
                     <SelectItem value="after_cohort_start">After cohort start date</SelectItem>
+                    <SelectItem value="specific_date">Specific date</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              {assignForm.dripReleaseMode === "specific_date" && <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1 block">Release date and time</Label>
+                <Input type="datetime-local" value={assignForm.dripDate} onChange={e => setAssignForm(p => ({ ...p, dripDate: e.target.value }))} />
+                <p className="text-[11px] text-gray-500 mt-1">Students can access this assignment on this date. The date is stored in UTC.</p>
+              </div>}
               <div>
                 <Label className="text-sm font-medium text-gray-700 mb-1 block">Delay (days)</Label>
                 <Input type="number" min={0} value={assignForm.dripDays} onChange={e => setAssignForm(p => ({ ...p, dripDays: Math.max(0, parseInt(e.target.value) || 0) }))} />

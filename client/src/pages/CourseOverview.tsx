@@ -272,6 +272,7 @@ export default function CourseOverview() {
 
   // Determine if a lesson is drip-locked
   const isDripLocked = (lesson: any, section?: any) => {
+    if (lesson.dripDate) return Date.now() < new Date(lesson.dripDate).getTime();
     if (dripBypassed) return false;
     if (!course.isDrip) return false;
     const sectionDrip = section?.dripDays ?? 0;
@@ -283,6 +284,7 @@ export default function CourseOverview() {
   const dripUnlockDate = (lesson: any, section?: any) => {
     const sectionDrip = section?.dripDays ?? 0;
     const lessonDrip = lesson.dripDays ?? 0;
+    if (lesson.dripDate) return new Date(lesson.dripDate).toLocaleDateString("en-US", { month: "short", day: "numeric" });
     const effectiveDrip = Math.max(sectionDrip, lessonDrip);
     const unlockDate = new Date(enrolledAt.getTime() + effectiveDrip * 24 * 60 * 60 * 1000);
     return unlockDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });

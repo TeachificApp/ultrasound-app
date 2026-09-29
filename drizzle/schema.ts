@@ -3236,6 +3236,7 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   //   'preview_hide_after_purchase' = free preview for non-enrolled, hidden once user purchases
   previewMode: mysqlEnum("preview_mode", ["none", "preview", "preview_hide_after_purchase"]).default("none").notNull(),
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment to unlock
+  dripDate: timestamp("drip_date"), // explicit UTC unlock date; takes precedence over dripDays
   dripOutDays: int("drip_out_days"), // days after enrollment after which lesson expires (null = never expires)
   durationMinutes: int("duration_minutes"),
   requireVideoCompletion: int("require_video_completion").default(0).notNull(), // 1 = must watch video before marking complete
@@ -6097,7 +6098,8 @@ export const lmsCohortAssignments = mysqlTable("lms_cohort_assignments", {
   contentBlocks: json("content_blocks").$type<any[]>(),  // page-builder blocks
   dueDate: timestamp("due_date"),
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment before this assignment is available
-  dripReleaseMode: mysqlEnum("drip_release_mode", ["after_enrollment", "after_publish", "after_cohort_start"]).default("after_enrollment").notNull(),
+  dripReleaseMode: mysqlEnum("drip_release_mode", ["after_enrollment", "after_publish", "after_cohort_start", "specific_date"]).default("after_enrollment").notNull(),
+  dripDate: timestamp("drip_date"), // explicit UTC release date when release mode is specific_date
   publishedAt: timestamp("published_at"),
   maxPoints: int("max_points").default(100).notNull(),
   // text = typed submission; file = file upload; url = link submission; none = no submission required
@@ -6124,7 +6126,8 @@ export const lmsCohortRecordings = mysqlTable("lms_cohort_recordings", {
   thumbnailUrl: text("thumbnail_url"),
   durationSeconds: int("duration_seconds"),
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment before this recording is available
-  dripReleaseMode: mysqlEnum("drip_release_mode", ["after_enrollment", "after_publish", "after_cohort_start"]).default("after_enrollment").notNull(),
+  dripReleaseMode: mysqlEnum("drip_release_mode", ["after_enrollment", "after_publish", "after_cohort_start", "specific_date"]).default("after_enrollment").notNull(),
+  dripDate: timestamp("drip_date"), // explicit UTC release date when release mode is specific_date
   publishedAt: timestamp("published_at"),
   status: mysqlEnum("status", ["draft", "published"]).default("draft").notNull(),
   showControls: boolean("show_controls").default(true).notNull(),

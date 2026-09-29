@@ -2145,6 +2145,9 @@ export const lmsLearnerRouter = router({
       if (pm !== "preview" && !isAdmin) {
         const { resolveEnrollmentForCourse } = await import("../lib/enrollmentAccess");
         const enrollment = await resolveEnrollmentForCourse(db as any, ctx.user.id, resolvedCourseId);
+        if ((lesson as any).dripDate && Date.now() < new Date((lesson as any).dripDate).getTime()) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This lesson is not available yet" });
+        }
         // Block expired lessons (drip-out): lesson is unavailable after dripOutDays from enrollment
         if ((lesson as any).dripOutDays != null && enrollment?.enrolledAt) {
           const daysSinceEnroll = Math.floor((Date.now() - new Date(enrollment.enrolledAt).getTime()) / 86400000);
@@ -4169,10 +4172,10 @@ export const lmsLearnerRouter = router({
       const lessonDripDays = new Map(assignmentLessons.map((lesson) => [lesson.id, lesson.dripDays]));
       const assignments = rawAssignments.filter((assignment) => {
         if (isAdmin || !enrollmentDate) return true;
-        return isCohortItemReleased({ enrolledAt: enrollmentDate, dripDays: cohortLessonReleaseDay(lessonDripDays.get(assignment.lessonId ?? -1), assignment.dripDays), releaseMode: assignment.dripReleaseMode, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate: myGroup?.startDate });
+        return isCohortItemReleased({ enrolledAt: enrollmentDate, dripDays: cohortLessonReleaseDay(lessonDripDays.get(assignment.lessonId ?? -1), assignment.dripDays), releaseMode: assignment.dripReleaseMode, releaseDate: assignment.dripDate, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate: myGroup?.startDate });
       });
       const recordings = (myGroup?.recordingsEnabled === false ? [] : rawRecordings).filter((recording) =>
-        isAdmin || !enrollmentDate || isCohortItemReleased({ enrolledAt: enrollmentDate, dripDays: recording.dripDays, releaseMode: recording.dripReleaseMode, publishedAt: recording.publishedAt, createdAt: recording.createdAt, cohortStartDate: myGroup?.startDate })
+        isAdmin || !enrollmentDate || isCohortItemReleased({ enrolledAt: enrollmentDate, dripDays: recording.dripDays, releaseMode: recording.dripReleaseMode, releaseDate: recording.dripDate, publishedAt: recording.publishedAt, createdAt: recording.createdAt, cohortStartDate: myGroup?.startDate })
       );
       const resources = await enrichCohortResources(db, resourceRows);
       return { course, sessions, assignments, recordings, resources, mySubmissions, myGroup };
@@ -4222,7 +4225,7 @@ export const lmsLearnerRouter = router({
         ? (await db.select({ dripDays: lmsLessons.dripDays }).from(lmsLessons).where(eq(lmsLessons.id, assignment.lessonId)).limit(1))[0]
         : null;
       const cohortStartDate = await resolveCohortStartDate(db, assignment.courseId, ctx.user.id, assignment.cohortGroupId);
-      if (!isCohortItemReleased({ enrolledAt: enrollmentTiming?.enrolledAt ?? new Date(), dripDays: cohortLessonReleaseDay(linkedLesson?.dripDays, assignment.dripDays), releaseMode: assignment.dripReleaseMode, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate })) {
+      if (!isCohortItemReleased({ enrolledAt: enrollmentTiming?.enrolledAt ?? new Date(), dripDays: cohortLessonReleaseDay(linkedLesson?.dripDays, assignment.dripDays), releaseMode: assignment.dripReleaseMode, releaseDate: assignment.dripDate, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate })) {
         throw new TRPCError({ code: "FORBIDDEN", message: "This assignment is not available yet." });
       }
       // Upsert submission
@@ -4266,7 +4269,7 @@ export const lmsLearnerRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       // Verify assignment exists and user is enrolled
-      const [assignment] = await db.select({ courseId: lmsCohortAssignments.courseId, cohortGroupId: lmsCohortAssignments.cohortGroupId, lessonId: lmsCohortAssignments.lessonId, dripDays: lmsCohortAssignments.dripDays, dripReleaseMode: lmsCohortAssignments.dripReleaseMode, publishedAt: lmsCohortAssignments.publishedAt, createdAt: lmsCohortAssignments.createdAt })
+      const [assignment] = await db.select({ courseId: lmsCohortAssignments.courseId, cohortGroupId: lmsCohortAssignments.cohortGroupId, lessonId: lmsCohortAssignments.lessonId, dripDays: lmsCohortAssignments.dripDays, dripReleaseMode: lmsCohortAssignments.dripReleaseMode, dripDate: lmsCohortAssignments.dripDate, publishedAt: lmsCohortAssignments.publishedAt, createdAt: lmsCohortAssignments.createdAt })
         .from(lmsCohortAssignments).where(eq(lmsCohortAssignments.id, input.assignmentId)).limit(1);
       if (!assignment) throw new TRPCError({ code: "NOT_FOUND" });
       const [enrollment] = await db.select({ id: lmsEnrollments.id })
@@ -4279,7 +4282,7 @@ export const lmsLearnerRouter = router({
         ? (await db.select({ dripDays: lmsLessons.dripDays }).from(lmsLessons).where(eq(lmsLessons.id, assignment.lessonId)).limit(1))[0]
         : null;
       const cohortStartDate = await resolveCohortStartDate(db, assignment.courseId, ctx.user.id, assignment.cohortGroupId);
-      if (!isCohortItemReleased({ enrolledAt: enrollmentTiming?.enrolledAt ?? new Date(), dripDays: cohortLessonReleaseDay(linkedLesson?.dripDays, assignment.dripDays), releaseMode: assignment.dripReleaseMode, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate })) {
+      if (!isCohortItemReleased({ enrolledAt: enrollmentTiming?.enrolledAt ?? new Date(), dripDays: cohortLessonReleaseDay(linkedLesson?.dripDays, assignment.dripDays), releaseMode: assignment.dripReleaseMode, releaseDate: assignment.dripDate, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate })) {
         throw new TRPCError({ code: "FORBIDDEN", message: "This assignment is not available yet." });
       }
       // Decode and upload
@@ -4314,12 +4317,12 @@ export const lmsLearnerRouter = router({
       if (!enrollment && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
       if (assignment.status !== "published" && ctx.user.role !== "admin") throw new TRPCError({ code: "NOT_FOUND" });
       const cohortStartDate = await resolveCohortStartDate(db, assignment.courseId, ctx.user.id, assignment.cohortGroupId);
-      if (ctx.user.role !== "admin" && enrollment && !isCohortItemReleased({ enrolledAt: enrollment.enrolledAt, dripDays: assignment.dripDays, releaseMode: assignment.dripReleaseMode, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate })) {
+      if (ctx.user.role !== "admin" && enrollment && !isCohortItemReleased({ enrolledAt: enrollment.enrolledAt, dripDays: assignment.dripDays, releaseMode: assignment.dripReleaseMode, releaseDate: assignment.dripDate, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate })) {
         throw new TRPCError({ code: "FORBIDDEN", message: "This assignment is not available yet." });
       }
       if (ctx.user.role !== "admin" && enrollment && assignment.lessonId) {
         const [linkedLesson] = await db.select({ dripDays: lmsLessons.dripDays }).from(lmsLessons).where(eq(lmsLessons.id, assignment.lessonId)).limit(1);
-        if (linkedLesson && !isCohortItemReleased({ enrolledAt: enrollment.enrolledAt, dripDays: cohortLessonReleaseDay(linkedLesson.dripDays, assignment.dripDays), releaseMode: assignment.dripReleaseMode, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate })) {
+        if (linkedLesson && !isCohortItemReleased({ enrolledAt: enrollment.enrolledAt, dripDays: cohortLessonReleaseDay(linkedLesson.dripDays, assignment.dripDays), releaseMode: assignment.dripReleaseMode, releaseDate: assignment.dripDate, publishedAt: assignment.publishedAt, createdAt: assignment.createdAt, cohortStartDate })) {
           throw new TRPCError({ code: "FORBIDDEN", message: "The linked lesson is not available yet." });
         }
       }
@@ -4555,7 +4558,7 @@ export const lmsLearnerRouter = router({
           .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId)))
           .limit(1);
         const cohortStartDate = await resolveCohortStartDate(db, recording.courseId, ctx.user.id, recording.cohortGroupId);
-        if (enrollment && !isCohortItemReleased({ enrolledAt: enrollment.enrolledAt, dripDays: recording.dripDays, releaseMode: recording.dripReleaseMode, publishedAt: recording.publishedAt, createdAt: recording.createdAt, cohortStartDate })) {
+        if (enrollment && !isCohortItemReleased({ enrolledAt: enrollment.enrolledAt, dripDays: recording.dripDays, releaseMode: recording.dripReleaseMode, releaseDate: recording.dripDate, publishedAt: recording.publishedAt, createdAt: recording.createdAt, cohortStartDate })) {
           throw new TRPCError({ code: "FORBIDDEN", message: "This recording is not available yet." });
         }
       }

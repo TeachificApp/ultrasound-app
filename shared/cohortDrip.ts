@@ -3,7 +3,8 @@ export const COHORT_DRIP_DAY_MS = 24 * 60 * 60 * 1000;
 export type CohortDripReleaseMode =
   | "after_enrollment"
   | "after_publish"
-  | "after_cohort_start";
+  | "after_cohort_start"
+  | "specific_date";
 
 export function cohortDaysSinceEnrollment(
   enrolledAt: Date | string | number,
@@ -19,8 +20,12 @@ export function cohortReleaseAt(input: {
   publishedAt?: Date | string | number | null;
   createdAt?: Date | string | number | null;
   cohortStartDate?: Date | string | number | null;
+  releaseDate?: Date | string | number | null;
 }): Date {
   const mode = input.releaseMode ?? "after_enrollment";
+  if (mode === "specific_date" && input.releaseDate) {
+    return new Date(input.releaseDate);
+  }
   if (mode === "after_publish") {
     // Existing published rows may not have published_at yet; created_at is a
     // safe migration fallback and keeps those records available immediately.
@@ -42,6 +47,7 @@ export function isCohortItemReleased(
         publishedAt?: Date | string | number | null;
         createdAt?: Date | string | number | null;
         cohortStartDate?: Date | string | number | null;
+        releaseDate?: Date | string | number | null;
         dripDays?: number | null;
       }
     | Date
@@ -67,9 +73,10 @@ export function isCohortItemReleased(
   const releaseAt = cohortReleaseAt(input);
   const effectiveNow =
     objectForm && dripDaysOrNow instanceof Date ? dripDaysOrNow : now;
+  const effectiveDripDays = input.releaseMode === "specific_date" ? 0 : dripDays;
   return (
     effectiveNow.getTime() >=
-    releaseAt.getTime() + dripDays * COHORT_DRIP_DAY_MS
+    releaseAt.getTime() + effectiveDripDays * COHORT_DRIP_DAY_MS
   );
 }
 

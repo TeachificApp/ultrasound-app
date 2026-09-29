@@ -1631,11 +1631,11 @@ function MobileSidebarContent({
             {topLevelLessons.map((lesson: any, idx: number) => {
               const done = completedIds.has(lesson.id);
               const active = lesson.id === selectedLessonId;
-              const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+              const dripLocked = ((lesson.dripDate && Date.now() < new Date(lesson.dripDate).getTime()) || (!lesson.dripDate && !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays));
               const dripExpired = !dripBypassed && (lesson.dripOutDays ?? 0) > 0 && daysSinceEnroll >= lesson.dripOutDays;
               const prereqLocked = prereqLockedIds.has(lesson.id);
               const lessonLocked = dripLocked || dripExpired || prereqLocked;
-              const lessonUnlockDate = dripLocked ? formatInTimeZone(new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
+              const lessonUnlockDate = dripLocked ? formatInTimeZone(lesson.dripDate ? new Date(lesson.dripDate) : new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
               const lessonExpiredDate = dripExpired ? formatInTimeZone(new Date(enrolledAt.getTime() + (lesson.dripOutDays ?? 0) * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
               return (
                 <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
@@ -1695,11 +1695,11 @@ function MobileSidebarContent({
                       {section.lessons.map((lesson: any) => {
                         const done = completedIds.has(lesson.id);
                         const active = lesson.id === selectedLessonId;
-                        const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+                        const dripLocked = ((lesson.dripDate && Date.now() < new Date(lesson.dripDate).getTime()) || (!lesson.dripDate && !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays));
                         const dripExpired = !dripBypassed && (lesson.dripOutDays ?? 0) > 0 && daysSinceEnroll >= lesson.dripOutDays;
                         const prereqLocked = prereqLockedIds.has(lesson.id);
                         const lessonLocked = dripLocked || dripExpired || prereqLocked;
-                        const lessonUnlockDate = dripLocked ? formatInTimeZone(new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
+                        const lessonUnlockDate = dripLocked ? formatInTimeZone(lesson.dripDate ? new Date(lesson.dripDate) : new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
                         const lessonExpiredDate = dripExpired ? formatInTimeZone(new Date(enrolledAt.getTime() + (lesson.dripOutDays ?? 0) * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
                         return (
                           <button key={lesson.id} onClick={() => { if (!lessonLocked) setSelectedLessonId(lesson.id); }} disabled={lessonLocked}
@@ -2764,10 +2764,10 @@ export default function CoursePlayer() {
             {topLevelLessons.map((lesson: any, idx: number) => {
               const done = completedIds.has(lesson.id);
               const active = lesson.id === selectedLessonId;
-              const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+              const dripLocked = ((lesson.dripDate && Date.now() < new Date(lesson.dripDate).getTime()) || (!lesson.dripDate && !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays));
               const prereqLocked = prereqLockedIds.has(lesson.id);
               const lessonLocked = dripLocked || prereqLocked;
-              const lessonUnlockDate = dripLocked ? formatInTimeZone(new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
+              const lessonUnlockDate = dripLocked ? formatInTimeZone(lesson.dripDate ? new Date(lesson.dripDate) : new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
               return (
                 <button
                   key={lesson.id}
@@ -2868,10 +2868,10 @@ export default function CoursePlayer() {
                       {section.lessons.map((lesson: any) => {
                         const done = completedIds.has(lesson.id);
                         const active = lesson.id === selectedLessonId;
-                        const dripLocked = !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays;
+                        const dripLocked = ((lesson.dripDate && Date.now() < new Date(lesson.dripDate).getTime()) || (!lesson.dripDate && !dripBypassed && (lesson.dripDays ?? 0) > 0 && daysSinceEnroll < lesson.dripDays));
                         const prereqLocked = prereqLockedIds.has(lesson.id);
                         const lessonLocked = dripLocked || prereqLocked;
-                        const lessonUnlockDate = dripLocked ? formatInTimeZone(new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
+                        const lessonUnlockDate = dripLocked ? formatInTimeZone(lesson.dripDate ? new Date(lesson.dripDate) : new Date(enrolledAt.getTime() + lesson.dripDays * 86400000), { month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null;
                         return (
                           <button
                             key={lesson.id}

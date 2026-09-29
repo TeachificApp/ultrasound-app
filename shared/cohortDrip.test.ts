@@ -50,4 +50,29 @@ describe("cohort drip timing", () => {
       )
     ).toBe(false);
   });
+  it("supports release at an explicit date without applying enrollment days", () => {
+    const releaseDate = new Date("2026-02-15T15:00:00Z");
+    expect(
+      isCohortItemReleased(
+        {
+          enrolledAt,
+          releaseMode: "specific_date",
+          releaseDate,
+          dripDays: 0,
+        },
+        new Date("2026-02-15T14:59:59Z")
+      )
+    ).toBe(false);
+    expect(
+      isCohortItemReleased(
+        {
+          enrolledAt,
+          releaseMode: "specific_date",
+          releaseDate,
+          dripDays: 0,
+        },
+        releaseDate
+      )
+    ).toBe(true);
+  });
 });

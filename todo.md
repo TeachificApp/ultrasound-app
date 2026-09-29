@@ -702,3 +702,4 @@
 - [x] Make LMS course copying resilient: preserve successful copies when optional AI landing-page reformatting is unavailable, rename the copied course, show a clear warning, and cover the no-landing-page and AI-fallback paths with regression tests.
 - [x] Fix cohort student preview schedule leakage: preview now uses the active/current cohort group instead of an admin’s personal enrollment or course-wide sessions; learners remain restricted to their assigned group, with optional explicit group preview support.
 - [x] Fix Social Post Library deletion so posts are removed immediately from the shared admin list, failed deletes roll back with an error message, duplicate clicks are prevented, and the soft-delete mutation remains brand-scoped.
+- [x] Add specific drip dates for native lessons and cohort assignments/recordings; shift explicit drip dates with the source cohort timeline when duplicating a cohort group.

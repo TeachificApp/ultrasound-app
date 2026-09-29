@@ -1211,6 +1211,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       mediaAssetId: z.number().optional(),
       isPreview: z.boolean().default(false),
       dripDays: z.number().int().default(0),
+      dripDate: z.string().datetime().nullable().optional(),
       durationMinutes: z.number().int().optional(),
       requireVideoCompletion: z.boolean().default(false),
       requireManualComplete: z.boolean().default(false),
@@ -1261,6 +1262,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         mediaAssetId: input.mediaAssetId ?? null,
       isPreview: input.isPreview,
       dripDays: input.dripDays,
+      dripDate: input.dripDate ? new Date(input.dripDate) : null,
       durationMinutes: input.durationMinutes ?? null,
       requireVideoCompletion: input.requireVideoCompletion ? 1 : 0,
       requireManualComplete: input.requireManualComplete ? 1 : 0,
@@ -1377,6 +1379,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       standaloneQuizId: z.number().int().nullable().optional(),
       previewMode: z.enum(["none", "preview", "preview_hide_after_purchase"]).optional(),
       dripDays: z.number().int().nullable().optional(),
+      dripDate: z.string().datetime().nullable().optional(),
       dripOutDays: z.number().int().min(1).nullable().optional(),
       durationMinutes: z.number().int().nullable().optional(),
       requireVideoCompletion: z.boolean().optional(),
@@ -1425,6 +1428,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       }
       // Convert null dripDays to 0 (no drip)
       if (updates.dripDays === null) updates.dripDays = 0;
+      if (updates.dripDate !== undefined) updates.dripDate = updates.dripDate ? new Date(String(updates.dripDate)) : null;
       // Guard: never clear embedUrl with null/empty unless the admin explicitly blanked it.
       // The frontend sends embedUrl: undefined (no-op) when the field is untouched, and
       // embedUrl: "" (empty string) only when the admin deleted the URL. Convert empty string

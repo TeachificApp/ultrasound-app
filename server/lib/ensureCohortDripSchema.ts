@@ -11,16 +11,19 @@ export async function ensureCohortDripSchema(db: Db | null | undefined) {
     [
       "lms_cohort_assignments",
       "drip_release_mode",
-      "ENUM('after_enrollment','after_publish','after_cohort_start') NOT NULL DEFAULT 'after_enrollment'",
+      "ENUM('after_enrollment','after_publish','after_cohort_start','specific_date') NOT NULL DEFAULT 'after_enrollment'",
     ],
     ["lms_cohort_assignments", "published_at", "TIMESTAMP NULL"],
+    ["lms_cohort_assignments", "drip_date", "TIMESTAMP NULL"],
     ["lms_cohort_recordings", "drip_days", "INT NOT NULL DEFAULT 0"],
     [
       "lms_cohort_recordings",
       "drip_release_mode",
-      "ENUM('after_enrollment','after_publish','after_cohort_start') NOT NULL DEFAULT 'after_enrollment'",
+      "ENUM('after_enrollment','after_publish','after_cohort_start','specific_date') NOT NULL DEFAULT 'after_enrollment'",
     ],
     ["lms_cohort_recordings", "published_at", "TIMESTAMP NULL"],
+    ["lms_cohort_recordings", "drip_date", "TIMESTAMP NULL"],
+    ["lms_lessons", "drip_date", "TIMESTAMP NULL"],
     [
       "lms_cohort_groups",
       "recordings_enabled",

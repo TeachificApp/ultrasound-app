@@ -47,5 +47,7 @@ describe("cohort drip feature contracts", () => {
     expect(source).toContain("lessonId: assignment.lessonId");
     expect(source).toContain("dripDays: assignment.dripDays");
     expect(source).toContain("dripDays: recording.dripDays");
+    expect(source).toContain("dripDate: shiftDateFromStart(assignment.dripDate, sourceDate, newStartDate)");
+    expect(source).toContain("dripDate: shiftDateFromStart(recording.dripDate, sourceDate, newStartDate)");
   });
 });
