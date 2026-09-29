@@ -1,7 +1,6 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { JSDOM } from "jsdom";
 
 const mocks = vi.hoisted(() => ({ join: vi.fn(), submit: vi.fn(), socket: null as any }));
@@ -43,6 +42,7 @@ describe("Teach participant route interaction", () => {
     (globalThis as any).addEventListener = dom.window.addEventListener.bind(dom.window); (globalThis as any).removeEventListener = dom.window.removeEventListener.bind(dom.window);
     (globalThis as any).HTMLInputElement = dom.window.HTMLInputElement; (globalThis as any).Event = dom.window.Event; (globalThis as any).MouseEvent = dom.window.MouseEvent;
     (globalThis as any).WebSocket = FakeWebSocket; (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    const { createRoot } = await import("react-dom/client");
     const { default: SonoQuizPlay } = await import("../client/src/pages/SonoQuizPlay");
     const container = document.createElement("div"); document.body.appendChild(container); const root = createRoot(container);
     await act(async () => { root.render(React.createElement(SonoQuizPlay)); });
@@ -65,6 +65,13 @@ describe("Teach participant route interaction", () => {
     await act(async () => { mocks.socket.emit({ type: "question_started", questionIndex: 1, totalQuestions: 3, timeLimitSeconds: 20, question: { id: 6, question: "Name the structure", interactionType: "word_cloud", points: 0, options: "[]", mediaUrl: null, mediaType: null } }); });
     const wordInput = container.querySelector('input[placeholder="Share a word or short phrase"]') as HTMLInputElement;
     expect(wordInput).not.toBeNull();
+    const setInputValue = Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, "value")?.set;
+    setInputValue?.call(wordInput, "mitral valve");
+    await act(async () => { wordInput.dispatchEvent(new dom.window.InputEvent("input", { bubbles: true, inputType: "insertText", data: "mitral valve" })); });
+    const wordCloudButton = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Add to the group word cloud")) as HTMLButtonElement;
+    expect(wordCloudButton.disabled).toBe(false);
+    await act(async () => wordCloudButton.click());
+    expect(mocks.submit).toHaveBeenLastCalledWith(expect.objectContaining({ questionId: 6, responsePayload: { words: ["mitral", "valve"] } }));
     await act(async () => { mocks.socket.emit({ type: "question_started", questionIndex: 2, totalQuestions: 3, timeLimitSeconds: 20, question: { id: 7, question: "Order the steps", interactionType: "puzzle", points: 0, options: "[]", interactionConfig: JSON.stringify({ correctOrder: ["Assess", "Measure"] }), mediaUrl: null, mediaType: null } }); });
     const puzzleSubmit = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Submit puzzle order")) as HTMLButtonElement;
     await act(async () => puzzleSubmit.click());

@@ -41,7 +41,7 @@
 - [x] Add mounted host collaborative-result assertions for a second interaction type such as hotspot or puzzle.
 - [ ] Add mounted participant join/play interaction tests for PIN/QR join, media rendering, and word-cloud, hotspot, and puzzle submissions.
 - [x] Add mounted participant coverage for PIN joining, slide media rendering, hotspot submission, and puzzle submission.
-- [ ] Add mounted participant word-cloud text-entry and submission coverage using the real controlled-input flow.
+- [x] Add mounted participant word-cloud text-entry and submission coverage using the real controlled-input flow.
 - [x] Add a WebSocket integration regression that exercises the actual session join protocol and broadcasts across interactive Teach slides.
 - [x] Extend the real WebSocket regression to cover interaction-specific word-cloud or puzzle payloads and result broadcasts in addition to hotspot slides.
 - [x] Trace and repair Registry Review Quiz access emails whose password-setup link returns a not-found page.
