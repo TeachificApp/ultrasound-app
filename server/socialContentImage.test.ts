@@ -93,18 +93,21 @@ describe("socialContent.generateContent input schema", () => {
 });
 
 describe("Social Post image composition", () => {
-  it("uses prominent placement-aware contain frames so clinical images are never cropped", () => {
+  it("conforms the visible media frame to native image or video proportions without cropping", () => {
     const source = require("node:fs").readFileSync(
       new URL("../client/src/pages/SocialContentGenerator.tsx", import.meta.url),
       "utf8",
     );
 
     expect(source).toContain("const imageMaxWidth");
-    expect(source).toContain("const imageFrameHeight");
-    expect(source).toContain("width: imageMaxWidth");
-    expect(source).toContain("height: imageFrameHeight");
+    expect(source).toContain("function NativeAspectClinicalMedia");
+    expect(source).toContain("const [nativeAspectRatio, setNativeAspectRatio]");
+    expect(source).toContain("const imageFrameMaxHeight");
+    expect(source).toContain("data-social-native-media-frame");
+    expect(source).toContain("naturalWidth, event.currentTarget.naturalHeight");
+    expect(source).toContain("videoWidth, event.currentTarget.videoHeight");
+    expect(source).toContain("contentMaxWidth / aspectRatio");
     expect(source).toContain('width: "100%", height: "100%"');
-    expect(source).not.toContain("imageFrameAspectRatio");
     expect(source).toContain('objectFit: "contain"');
     expect(source).toContain('background: t.isDark ? "#07131a" : "#d9eff0"');
     expect(source).not.toContain('objectFit: "cover" }} crossOrigin="anonymous" />\n          <div style={{ position: "absolute", bottom: 0');

@@ -304,6 +304,91 @@ function BrandedFooter({ t, presentation }: { t: ThemeTokens; presentation: Bran
   );
 }
 
+function NativeAspectClinicalMedia({
+  src,
+  alt,
+  isVideo,
+  maxWidth,
+  maxHeight,
+  padding,
+  borderRadius,
+  background,
+}: {
+  src: string;
+  alt: string;
+  isVideo: boolean;
+  maxWidth: number;
+  maxHeight: number;
+  padding: number;
+  borderRadius: number;
+  background: string;
+}) {
+  const [nativeAspectRatio, setNativeAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNativeAspectRatio(null);
+  }, [src]);
+
+  const contentMaxWidth = Math.max(1, maxWidth - padding * 2);
+  const contentMaxHeight = Math.max(1, maxHeight - padding * 2);
+  // Until browser metadata arrives, reserve a predictable compact stage. After
+  // it arrives, make the bordered frame itself match the source rather than
+  // placing a narrow image inside a wide empty panel.
+  const aspectRatio = nativeAspectRatio ?? 4 / 3;
+  const contentHeight = Math.min(contentMaxHeight, contentMaxWidth / aspectRatio);
+  const contentWidth = Math.min(contentMaxWidth, contentHeight * aspectRatio);
+  const frameWidth = Math.round(contentWidth + padding * 2);
+  const frameHeight = Math.round(contentHeight + padding * 2);
+  const resolveAspectRatio = (width: number, height: number) => {
+    if (width > 0 && height > 0) setNativeAspectRatio(width / height);
+  };
+  const frameStyle: React.CSSProperties = {
+    width: frameWidth,
+    height: frameHeight,
+    alignSelf: "center",
+    padding,
+    borderRadius,
+    overflow: "hidden",
+    border: `${Math.max(1, Math.round(padding * 0.3))}px solid ${BRAND}44`,
+    boxShadow: `0 ${Math.max(1, Math.round(padding * 0.6))}px ${Math.max(1, Math.round(padding * 3.4))}px rgba(0,0,0,0.25)`,
+    background,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    boxSizing: "border-box",
+  };
+  const mediaStyle: React.CSSProperties = { width: "100%", height: "100%", objectFit: "contain", display: "block" };
+
+  return (
+    <div style={frameStyle} data-social-native-media-frame="true">
+      {isVideo ? (
+        <video
+          src={src}
+          aria-label={alt}
+          autoPlay
+          muted
+          loop
+          playsInline
+          controls={false}
+          preload="metadata"
+          style={mediaStyle}
+          crossOrigin="anonymous"
+          onLoadedMetadata={(event) => resolveAspectRatio(event.currentTarget.videoWidth, event.currentTarget.videoHeight)}
+        />
+      ) : (
+        <img
+          src={src}
+          alt={alt}
+          style={mediaStyle}
+          crossOrigin="anonymous"
+          onLoad={(event) => resolveAspectRatio(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Simple Card Layout ───────────────────────────────────────────────────────
 function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: ThemeTokens; presentation: BrandToolPresentation }) {
   const frame = useSocialCardFrame();
@@ -318,10 +403,10 @@ function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: 
   const imageGutter = px(48);
   const imagePadding = px(7);
   const imageMaxWidth = frame.width - imageGutter * 2;
-  // Give clinical media a deliberately prominent portion of the card. Setting
-  // a real frame (rather than only max dimensions on the source) lets smaller
-  // uploaded images and videos scale up to a useful presentation size.
-  const imageFrameHeight = Math.round(frame.height * (frame.layout === "wide" ? 0.4 : frame.layout === "landscape" ? 0.42 : 0.44));
+  // The frame sets an upper bound only. NativeAspectClinicalMedia then sizes the
+  // actual visible frame to the asset, eliminating the unused colored gutters
+  // visible around tall or narrow uploaded clinical images.
+  const imageFrameMaxHeight = Math.round(frame.height * (frame.layout === "wide" ? 0.4 : frame.layout === "landscape" ? 0.42 : 0.44));
 	return (
 	<CardShell t={t}>
       <BrandedHeader item={item} t={t} presentation={presentation} />
@@ -333,8 +418,17 @@ function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: 
       </div>
       {/* Image area */}
       {hasImage && (
-        <div style={{ margin: `0 ${imageGutter}px ${px(24)}px`, width: imageMaxWidth, height: imageFrameHeight, alignSelf: "center", padding: imagePadding, borderRadius: px(16), overflow: "hidden", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, background: t.isDark ? "#07131a" : "#d9eff0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          {hasVideo ? <video src={imageUrl} aria-label={item.headline} autoPlay muted loop playsInline controls={false} preload="metadata" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" /> : <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" />}
+        <div style={{ margin: `0 ${imageGutter}px ${px(24)}px`, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+          <NativeAspectClinicalMedia
+            src={imageUrl}
+            alt={item.headline}
+            isVideo={hasVideo}
+            maxWidth={imageMaxWidth}
+            maxHeight={imageFrameMaxHeight}
+            padding={imagePadding}
+            borderRadius={px(16)}
+            background={t.isDark ? "#07131a" : "#d9eff0"}
+          />
         </div>
       )}
       {/* Content area */}
