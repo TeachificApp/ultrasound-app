@@ -1276,6 +1276,94 @@ export const lmsPublicRouter = router({
     return db.select().from(lmsInstructors).where(eq(lmsInstructors.isActive, true)).orderBy(asc(lmsInstructors.name));
   }),
 
+  /** Public: published and waitlist cohort courses assigned to the Cross-Training collection. */
+  listCrossTrainingCohorts: publicProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+    const [collection] = await db
+      .select()
+      .from(lmsCollections)
+      .where(and(
+        eq(lmsCollections.isPublished, true),
+        sql`(
+          LOWER(${lmsCollections.title}) LIKE '%cross%training%'
+          OR LOWER(${lmsCollections.label}) LIKE '%cross%training%'
+          OR LOWER(${lmsCollections.slug}) LIKE '%cross%training%'
+        )`,
+      ))
+      .orderBy(asc(lmsCollections.position))
+      .limit(1);
+
+    if (!collection) return { collection: null, cohorts: [] };
+
+    const collectionItems = await db
+      .select({ itemId: lmsCollectionItems.itemId })
+      .from(lmsCollectionItems)
+      .where(and(
+        eq(lmsCollectionItems.collectionId, collection.id),
+        eq(lmsCollectionItems.itemType, "course"),
+      ))
+      .orderBy(asc(lmsCollectionItems.position));
+    const legacyCourses = await db
+      .select({ courseId: lmsCollectionCourses.courseId })
+      .from(lmsCollectionCourses)
+      .where(eq(lmsCollectionCourses.collectionId, collection.id))
+      .orderBy(asc(lmsCollectionCourses.position));
+    const orderedCourseIds = Array.from(new Set(
+      (collectionItems.length > 0 ? collectionItems.map((item) => item.itemId) : legacyCourses.map((item) => item.courseId)),
+    ));
+    if (orderedCourseIds.length === 0) return { collection, cohorts: [] };
+
+    const courses = await db
+      .select()
+      .from(lmsCourses)
+      .where(and(
+        inArray(lmsCourses.id, orderedCourseIds),
+        eq(lmsCourses.type, "cohort"),
+        sql`${lmsCourses.status} IN ('public', 'waitlist', 'presale')`,
+      ));
+    const courseById = new Map(courses.map((course) => [course.id, course]));
+    const groups = await db
+      .select({
+        id: lmsCohortGroups.id,
+        courseId: lmsCohortGroups.courseId,
+        name: lmsCohortGroups.name,
+        slug: lmsCohortGroups.slug,
+        description: lmsCohortGroups.description,
+        startDate: lmsCohortGroups.startDate,
+        endDate: lmsCohortGroups.endDate,
+        status: lmsCohortGroups.status,
+        maxStudents: lmsCohortGroups.maxStudents,
+        location: lmsCohortGroups.location,
+      })
+      .from(lmsCohortGroups)
+      .where(and(
+        inArray(lmsCohortGroups.courseId, orderedCourseIds),
+        sql`${lmsCohortGroups.status} IN ('open', 'presale', 'waitlist', 'active')`,
+      ));
+    const statusPriority: Record<string, number> = { open: 0, presale: 1, waitlist: 2, active: 3 };
+    const primaryGroupByCourse = new Map<number, typeof groups[number]>();
+    for (const group of groups) {
+      const current = primaryGroupByCourse.get(group.courseId);
+      const rank = statusPriority[group.status] ?? 99;
+      const currentRank = current ? (statusPriority[current.status] ?? 99) : 100;
+      const startsEarlier = !current || (group.startDate?.getTime() ?? Infinity) < (current.startDate?.getTime() ?? Infinity);
+      if (!current || rank < currentRank || (rank === currentRank && startsEarlier)) {
+        primaryGroupByCourse.set(group.courseId, group);
+      }
+    }
+
+    const cohorts = orderedCourseIds
+      .map((courseId) => courseById.get(courseId))
+      .filter((course): course is NonNullable<typeof course> => Boolean(course))
+      .map((course) => ({
+        ...course,
+        primaryCohortGroup: primaryGroupByCourse.get(course.id) ?? null,
+      }));
+    return { collection, cohorts };
+  }),
+
   /** List all published collections (with course count) */
   listCollections: publicProcedure.query(async () => {
     const db = await getDb();

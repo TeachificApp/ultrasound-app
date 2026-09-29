@@ -99,6 +99,7 @@ const funnelPageFallback = (
 const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
 // ── Workshops ────────────────────────────────────────────────────────────────
 const WorkshopsBrowse = lazy(() => import("./pages/WorkshopsBrowse"));
+const CrossTrainingBrowse = lazy(() => import("./pages/CrossTrainingBrowse"));
 const WorkshopDetail = lazy(() => import("./pages/WorkshopDetail"));
 const WorkshopLanding = lazy(() => import("./pages/WorkshopLanding"));
 const DownloadLanding = lazy(() => import("./pages/DownloadLanding"));
@@ -966,6 +967,8 @@ function LMSRouter() {
         {/* Workshops */}
         <Route path="/workshops" component={WorkshopsBrowse} />
         <Route path="/workshops/:slug" component={WorkshopLanding} />
+        {/* Cross-Training */}
+        <Route path="/cross-training" component={CrossTrainingBrowse} />
         {/* Webinars */}
         <Route path="/webinars/:slug" component={WebinarLanding} />
         <Route path="/webinar/:slug" component={WebinarPlayer} />

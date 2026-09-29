@@ -42,6 +42,7 @@ const IHE_SITE_URL = "https://www.iheartecho.com";
 const NAV_ITEMS: NavItem[] = [
   { label: "Education Library", href: "/education-library", icon: <BookOpen className="w-4 h-4" /> },
   { label: "Workshops", href: "/workshops", icon: <Briefcase className="w-4 h-4" /> },
+  { label: "Cross-Training", href: "/cross-training", icon: <Users className="w-4 h-4" /> },
   { label: "Community", href: "/community/all-about-ultrasound", icon: <Users className="w-4 h-4" /> },
 ];
 
@@ -54,7 +55,18 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
     href: item.href,
     external: item.external,
   })));
-  const headerNavItems = removeQuizNavigationItems(managedHeaderNavItems);
+  const headerNavWithoutQuizItems = removeQuizNavigationItems(managedHeaderNavItems);
+  const headerNavItems = (() => {
+    const crossTraining = { label: "Cross-Training", href: "/cross-training" };
+    if (headerNavWithoutQuizItems.some((item) => item.href === crossTraining.href)) return headerNavWithoutQuizItems;
+    const workshopsIndex = headerNavWithoutQuizItems.findIndex((item) => item.href === "/workshops");
+    if (workshopsIndex < 0) return [...headerNavWithoutQuizItems, crossTraining];
+    return [
+      ...headerNavWithoutQuizItems.slice(0, workshopsIndex + 1),
+      crossTraining,
+      ...headerNavWithoutQuizItems.slice(workshopsIndex + 1),
+    ];
+  })();
   const { items: managedProfileNavItems } = useSiteNavMenu("profile", []);
   const profileNavItems = removeQuizNavigationItems(managedProfileNavItems);
 
