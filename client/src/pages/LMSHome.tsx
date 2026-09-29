@@ -36,7 +36,7 @@ export default function LMSHome() {
     { enabled: !!cmeCollection?.id },
   );
   const cmeCourses = (cmeCollectionDetail?.courses ?? [])
-    .filter((course: any) => course?._source === "lms_course" && course?.type !== "download")
+    .filter((course: any) => course?._source === "lms_course" && course?.type === "course")
     .slice(0, 8);
   const { data: downloadsData, isLoading: loadingDownloads } = trpc.downloads.list.useQuery({ limit: 4 });
   const downloads = downloadsData?.products ?? [];
