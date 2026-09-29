@@ -20,11 +20,24 @@ import {
   Play,
   FileDown,
   Sparkles,
+  Award,
 } from "lucide-react";
 
 export default function LMSHome() {
   const { user, isAuthenticated } = useAuth();
   const { data: featuredCourses, isLoading: loadingFeatured } = trpc.lms.listFeatured.useQuery();
+  const { data: collections, isLoading: loadingCollections } = trpc.lms.listCollections.useQuery();
+  const cmeCollection = collections?.find((collection: any) => {
+    const searchable = `${collection.title ?? ""} ${collection.label ?? ""} ${collection.slug ?? ""}`.toLowerCase();
+    return searchable.includes("cme");
+  });
+  const { data: cmeCollectionDetail, isLoading: loadingCme } = trpc.lms.getCollection.useQuery(
+    { id: cmeCollection?.id ?? 0 },
+    { enabled: !!cmeCollection?.id },
+  );
+  const cmeCourses = (cmeCollectionDetail?.courses ?? [])
+    .filter((course: any) => course?._source === "lms_course" && course?.type !== "download")
+    .slice(0, 8);
   const { data: downloadsData, isLoading: loadingDownloads } = trpc.downloads.list.useQuery({ limit: 4 });
   const downloads = downloadsData?.products ?? [];
 
@@ -182,6 +195,77 @@ export default function LMSHome() {
             </Link>
           </div>
         )}
+      </section>
+
+      {/* CME Courses — sourced from the published CME collection */}
+      <section className="bg-white border-y border-gray-100">
+        <div className="max-w-6xl mx-auto px-6 py-14">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Award className="w-5 h-5 text-[#189aa1]" />
+                Continuing Medical Education — AMA PRA Category 1 Credits™
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">Accredited continuing medical education for your next step forward</p>
+            </div>
+            <Link href={`/education-library?collection=${cmeCollection?.slug ?? "cme"}`}>
+              <Button variant="ghost" className="text-[#189aa1] hover:text-[#0e6b70] font-medium">
+                View All <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+
+          {loadingCollections || loadingCme ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="rounded-xl border border-gray-200 overflow-hidden">
+                  <Skeleton className="h-40 w-full" />
+                  <div className="p-4 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : cmeCourses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+              {cmeCourses.map((course: any) => (
+                <Link key={course.id} href={`/courses/${course.slug}`}>
+                  <div className="group bg-gray-50 rounded-xl border border-gray-200 hover:border-[#4ad9e0] hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer flex flex-col h-full">
+                    <div className="relative h-40 bg-gradient-to-br from-teal-50 to-teal-100 overflow-hidden">
+                      {course.coverImageUrl ? (
+                        <img src={course.coverImageUrl} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <BookOpen className="w-10 h-10 text-teal-300" />
+                        </div>
+                      )}
+                      <span className="absolute top-3 left-3 rounded-full bg-[#0e6b70]/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">CME</span>
+                    </div>
+                    <div className="p-4 flex flex-col flex-1">
+                      <h3 className="font-semibold text-gray-900 text-sm leading-snug line-clamp-2 mb-1 group-hover:text-[#189aa1] transition-colors">
+                        {course.title}
+                      </h3>
+                      {course.subtitle && <p className="text-xs text-gray-500 line-clamp-1 mb-2">{course.subtitle}</p>}
+                      <div className="mt-auto flex items-center justify-between gap-2">
+                        {course.creditHours ? <span className="text-xs font-medium text-[#0e6b70]">{course.creditHours} CME credits</span> : <span />}
+                        {course.isFree && <Badge className="bg-green-500 text-white text-xs">Free</Badge>}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
+              <Award className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm">CME courses coming soon</p>
+              <Link href={`/education-library?collection=${cmeCollection?.slug ?? "cme"}`}>
+                <Button variant="link" className="text-[#189aa1] mt-2">Browse the Education Library <ArrowRight className="w-3 h-3 ml-1" /></Button>
+              </Link>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* New Downloads */}
