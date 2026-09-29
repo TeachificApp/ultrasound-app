@@ -318,7 +318,10 @@ function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: 
   const imageGutter = px(48);
   const imagePadding = px(7);
   const imageMaxWidth = frame.width - imageGutter * 2;
-  const imageMaxHeight = Math.round(frame.height * (frame.layout === "wide" ? 0.34 : frame.layout === "landscape" ? 0.38 : 0.35));
+  // Give clinical media a deliberately prominent portion of the card. Setting
+  // a real frame (rather than only max dimensions on the source) lets smaller
+  // uploaded images and videos scale up to a useful presentation size.
+  const imageFrameHeight = Math.round(frame.height * (frame.layout === "wide" ? 0.4 : frame.layout === "landscape" ? 0.42 : 0.44));
 	return (
 	<CardShell t={t}>
       <BrandedHeader item={item} t={t} presentation={presentation} />
@@ -330,8 +333,8 @@ function SimpleContentCard({ item, t, presentation }: { item: GeneratedItem; t: 
       </div>
       {/* Image area */}
       {hasImage && (
-        <div style={{ margin: `0 ${imageGutter}px ${px(24)}px`, maxWidth: imageMaxWidth, maxHeight: imageMaxHeight, alignSelf: "center", padding: imagePadding, borderRadius: px(16), overflow: "visible", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, background: t.isDark ? "#07131a" : "#d9eff0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-          {hasVideo ? <video src={imageUrl} aria-label={item.headline} autoPlay muted loop playsInline controls={false} style={{ width: "auto", height: "auto", maxWidth: imageMaxWidth - imagePadding * 2, maxHeight: imageMaxHeight - imagePadding * 2, objectFit: "contain", display: "block" }} crossOrigin="anonymous" /> : <img src={imageUrl} alt={item.headline} style={{ width: "auto", height: "auto", maxWidth: imageMaxWidth - imagePadding * 2, maxHeight: imageMaxHeight - imagePadding * 2, objectFit: "contain", display: "block" }} crossOrigin="anonymous" />}
+        <div style={{ margin: `0 ${imageGutter}px ${px(24)}px`, width: imageMaxWidth, height: imageFrameHeight, alignSelf: "center", padding: imagePadding, borderRadius: px(16), overflow: "hidden", border: `${px(2)}px solid ${BRAND}44`, boxShadow: `0 ${px(4)}px ${px(24)}px rgba(0,0,0,0.25)`, background: t.isDark ? "#07131a" : "#d9eff0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          {hasVideo ? <video src={imageUrl} aria-label={item.headline} autoPlay muted loop playsInline controls={false} preload="metadata" style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" /> : <img src={imageUrl} alt={item.headline} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} crossOrigin="anonymous" />}
         </div>
       )}
       {/* Content area */}

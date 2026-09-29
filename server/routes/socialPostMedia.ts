@@ -25,8 +25,9 @@ function getR2Client(): S3Client | null {
   return r2Client;
 }
 
-function setImageHeaders(res: Response, mimeType: string) {
-  res.setHeader("Content-Type", mimeType.startsWith("image/") ? mimeType : "application/octet-stream");
+function setMediaHeaders(res: Response, mimeType: string) {
+  const isSupportedMedia = mimeType.startsWith("image/") || mimeType.startsWith("video/");
+  res.setHeader("Content-Type", isSupportedMedia ? mimeType : "application/octet-stream");
   res.setHeader("Cache-Control", "private, max-age=300");
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
@@ -65,7 +66,7 @@ function proxyFromStoredUrl(url: string, res: Response): Promise<boolean> {
       const length = upstream.headers["content-length"];
       if (length) res.setHeader("Content-Length", length);
       const contentType = upstream.headers["content-type"];
-      if (typeof contentType === "string" && contentType.startsWith("image/")) {
+      if (typeof contentType === "string" && (contentType.startsWith("image/") || contentType.startsWith("video/"))) {
         res.setHeader("Content-Type", contentType);
       }
       upstream.pipe(res);
@@ -76,7 +77,7 @@ function proxyFromStoredUrl(url: string, res: Response): Promise<boolean> {
 }
 
 /**
- * Serves a private Media Repository image to an authenticated Platform Admin.
+ * Serves a private Media Repository image or video to an authenticated Platform Admin.
  * The same-origin URL prevents private CDN/CORS restrictions from blanking a
  * Social Post card preview or tainting its PNG/MP4 export canvas.
  */
@@ -111,8 +112,8 @@ router.get("/api/social-post-media/:assetId", async (req: Request, res: Response
     .where(and(eq(mediaAssets.id, assetId), isNull(mediaAssets.deletedAt)))
     .limit(1);
 
-  if (!asset || asset.brand !== brand || asset.mediaType !== "image") {
-    res.status(404).json({ error: "Image asset not found for this brand" });
+  if (!asset || asset.brand !== brand || (asset.mediaType !== "image" && asset.mediaType !== "video")) {
+    res.status(404).json({ error: "Image or video asset not found for this brand" });
     return;
   }
 
@@ -128,18 +129,18 @@ router.get("/api/social-post-media/:assetId", async (req: Request, res: Response
     .limit(1);
 
   if (!version?.s3Url) {
-    res.status(404).json({ error: "Image file not found" });
+    res.status(404).json({ error: "Media file not found" });
     return;
   }
 
-  setImageHeaders(res, version.mimeType ?? asset.mimeType ?? "application/octet-stream");
+  setMediaHeaders(res, version.mimeType ?? asset.mimeType ?? "application/octet-stream");
   try {
     const servedFromUrl = await proxyFromStoredUrl(version.s3Url, res);
     if (servedFromUrl) return;
     if (version.s3Key && await proxyFromR2(version.s3Key, res)) return;
-    if (!res.headersSent) res.status(502).json({ error: "Unable to load image from storage" });
+    if (!res.headersSent) res.status(502).json({ error: "Unable to load media from storage" });
   } catch {
-    if (!res.headersSent) res.status(502).json({ error: "Unable to load image from storage" });
+    if (!res.headersSent) res.status(502).json({ error: "Unable to load media from storage" });
   }
 });
 
