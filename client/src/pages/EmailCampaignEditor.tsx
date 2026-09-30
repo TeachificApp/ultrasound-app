@@ -34,6 +34,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import type { AudienceFilter, LegacyInterestKey } from "@shared/emailCampaignAudience";
 import { DEFAULT_AUDIENCE_FILTER } from "@shared/emailCampaignAudience";
 import { wrapInBrandedCampaignEmail, EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX } from "@shared/emailCampaignLayout";
+import { resolveCampaignTestSubject } from "@shared/emailCampaignTestSubject";
 import { formatInTimeZone, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 // Block type is imported from LandingPageBuilder via EmailBlockEditor
@@ -668,6 +669,7 @@ export default function EmailCampaignEditor({ campaignId, onClose, initialAudien
     () => wrapInBrandedEmail(htmlBody, previewText, headerTitle || undefined, headerSubtext || undefined, headerColor || undefined, headerEnabled),
     [htmlBody, previewText, headerTitle, headerSubtext, headerColor, headerEnabled]
   );
+  const testEmailSubject = useMemo(() => resolveCampaignTestSubject(subject), [subject]);
 
   function handleSaveDraft() {
     setIsSaving(true);
@@ -1011,11 +1013,16 @@ export default function EmailCampaignEditor({ campaignId, onClose, initialAudien
                 className="mt-1"
               />
             </div>
+            {!subject.trim() && (
+              <p className="text-xs text-amber-700 rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
+                No campaign subject has been entered yet. This preview will use <strong>[TEST] {testEmailSubject}</strong>; live and scheduled campaigns still require a subject line.
+              </p>
+            )}
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setTestEmailDialogOpen(false)}>Cancel</Button>
             <Button
-              onClick={() => sendTestMutation.mutate({ toEmail: testEmailAddress, subject, htmlBody: wrappedHtml, previewText, headerTitle, headerSubtext, headerColor, headerEnabled })}
+              onClick={() => sendTestMutation.mutate({ toEmail: testEmailAddress.trim(), subject: testEmailSubject, htmlBody: wrappedHtml, previewText, headerTitle, headerSubtext, headerColor, headerEnabled })}
               disabled={!testEmailAddress || sendTestMutation.isPending}
               style={{ background: "#189aa1" }} className="text-white hover:opacity-90"
             >

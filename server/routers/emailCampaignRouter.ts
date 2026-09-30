@@ -55,6 +55,7 @@ import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
 import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
 import { normalizeCampaignEmailHtml } from "../../shared/emailCampaignLayout";
+import { resolveCampaignTestSubject } from "../../shared/emailCampaignTestSubject";
 import {
   injectTrackingPixel,
   wrapLinksForTracking,
@@ -2255,7 +2256,10 @@ Rules:
 
     .input(z.object({
       toEmail: z.string().email(),
-      subject: z.string().min(1).max(500),
+      // A campaign draft may legitimately have no subject yet. The test-send
+      // flow supplies a visible preview fallback while live/scheduled sends
+      // continue to require an authored subject.
+      subject: z.string().max(500).optional(),
       htmlBody: z.string().min(1),
       previewText: z.string().max(300).optional(),
       headerTitle: z.string().max(300).optional(),
@@ -2266,9 +2270,10 @@ Rules:
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx.user.id);
       const html = normalizeCampaignEmailHtml(input.htmlBody);
+      const subject = resolveCampaignTestSubject(input.subject);
       const ok = await sendEmail({
         to: { email: input.toEmail },
-        subject: `[TEST] ${input.subject}`,
+        subject: `[TEST] ${subject}`,
         htmlBody: html,
         previewText: input.previewText ?? undefined,
       });
