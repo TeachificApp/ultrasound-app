@@ -34,6 +34,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import type { AudienceFilter, LegacyInterestKey } from "@shared/emailCampaignAudience";
 import { DEFAULT_AUDIENCE_FILTER } from "@shared/emailCampaignAudience";
 import { wrapInBrandedCampaignEmail, EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX } from "@shared/emailCampaignLayout";
+import { getEmailCampaignErrorMessage } from "@shared/emailCampaignErrorMessage";
 import { resolveCampaignTestSubject } from "@shared/emailCampaignTestSubject";
 import { formatInTimeZone, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
@@ -641,12 +642,12 @@ export default function EmailCampaignEditor({ campaignId, onClose, initialAudien
       setSendDialogOpen(false);
       if (onClose) onClose(); else navigate("/admin/email-campaigns");
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(getEmailCampaignErrorMessage(e, "Unable to send the campaign. Please try again.")),
   });
 
   const sendTestMutation = trpc.emailCampaign.sendTestEmail.useMutation({
     onSuccess: () => { toast.success("Test email sent!"); setTestEmailDialogOpen(false); },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(getEmailCampaignErrorMessage(e, "Unable to send the test email. Please try again.")),
   });
   const scheduleMutation = trpc.emailCampaign.scheduleCampaign.useMutation({
     onSuccess: (r) => {
@@ -654,7 +655,7 @@ export default function EmailCampaignEditor({ campaignId, onClose, initialAudien
       setScheduleDialogOpen(false);
       if (onClose) onClose(); else navigate("/admin/email-campaigns");
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(getEmailCampaignErrorMessage(e, "Unable to schedule the campaign. Please try again.")),
   });
 
   const saveTemplateMutation = trpc.emailCampaign.saveTemplate.useMutation({
