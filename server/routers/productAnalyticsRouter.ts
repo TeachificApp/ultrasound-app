@@ -16,13 +16,15 @@ import {
   funnelPurchases, lmsOrders, lmsCourses, lmsEnrollments,
   digitalProducts, digitalPurchases, digitalBundles, digitalBundlePurchases,
   physicalProducts, physicalProductOrders, users, funnels, funnelPages,
-  manualInvoices, workshopEnrollments, workshops, webinarRegistrations, webinars,
+  manualInvoices, workshopEnrollments, workshops, webinarRegistrations, webinars, lmsSubscriptionInvoices,
 } from "../../drizzle/schema";
 import {
   getAdministratorTransactionStatus,
   summarizeCompletedPayments,
   type PaymentTransactionSource,
 } from "../lib/paymentState";
+import { getStripeClient } from "../lib/stripeClient";
+import { reconcileLmsSubscriptionBilling } from "../lib/lmsSubscriptionReconciliation";
 
 async function assertAdmin(ctx: any) {
   if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -459,6 +461,12 @@ export const productAnalyticsRouter = router({
         // Fetch each source table individually using Drizzle ORM (avoids UNION ALL column-name issues)
         const uid = input.userId;
 
+        try {
+          await reconcileLmsSubscriptionBilling(db, getStripeClient(), { userId: uid });
+        } catch (error) {
+          console.warn(`[getUserTransactions] LMS recurring billing reconciliation failed for user ${uid}:`, error);
+        }
+
         // 1. Funnel purchases
         const funnelRows = await db
           .select({
@@ -490,6 +498,21 @@ export const productAnalyticsRouter = router({
           .from(lmsOrders)
           .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
           .where(eq(lmsOrders.userId, uid));
+
+        const courseRenewalRows = await db
+          .select({
+            id: lmsSubscriptionInvoices.id,
+            courseTitle: lmsCourses.title,
+            amountPaid: lmsSubscriptionInvoices.amountPaid,
+            currency: lmsSubscriptionInvoices.currency,
+            stripePaymentIntentId: lmsSubscriptionInvoices.stripePaymentIntentId,
+            invoiceNumber: lmsSubscriptionInvoices.invoiceNumber,
+            description: lmsSubscriptionInvoices.description,
+            paidAt: lmsSubscriptionInvoices.paidAt,
+          })
+          .from(lmsSubscriptionInvoices)
+          .leftJoin(lmsCourses, eq(lmsCourses.id, lmsSubscriptionInvoices.courseId))
+          .where(eq(lmsSubscriptionInvoices.userId, uid));
 
         // 3. Digital download purchases
         const downloadRows = await db
@@ -619,6 +642,23 @@ export const productAnalyticsRouter = router({
             paymentSource: 'stripe',
             notes: null,
             lineItems: [{ name: r.courseTitle || 'Course', amount: Number(r.amountPaid ?? 0), qty: 1 }],
+          })),
+          ...courseRenewalRows.map(r => ({
+            transactionId: r.id,
+            sourceTable: 'course',
+            productName: r.courseTitle || r.description || 'Course Subscription Renewal',
+            productType: 'course',
+            amountPaid: Number(r.amountPaid ?? 0),
+            currency: r.currency || 'usd',
+            status: 'paid',
+            stripePaymentIntentId: r.stripePaymentIntentId ?? null,
+            purchasedAt: r.paidAt ? new Date(r.paidAt) : new Date(),
+            orderType: 'subscription',
+            hasStripeReference: true,
+            invoiceNumber: r.invoiceNumber ?? null,
+            paymentSource: 'stripe',
+            notes: r.description ?? 'Recurring Stripe subscription payment',
+            lineItems: [{ name: r.courseTitle || r.description || 'Course Subscription Renewal', amount: Number(r.amountPaid ?? 0), qty: 1 }],
           })),
           ...downloadRows.map(r => ({
             transactionId: r.id,

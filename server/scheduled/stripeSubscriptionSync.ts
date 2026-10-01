@@ -23,6 +23,7 @@ import { sendEmail, emailWrapper } from "../_core/email";
 import { isNotNull, eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { formatStripeSubscriptionSyncReport, isAccountAddedSincePreviousSync, type RevokedStripeAccessAccount } from "./stripeSubscriptionSyncReport";
+import { reconcileLmsSubscriptionBilling } from "../lib/lmsSubscriptionReconciliation";
 
 const GRACE_PERIOD_DAYS = 3;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
@@ -38,6 +39,12 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
     if (!db) return res.json({ ok: true, skipped: "no-db" });
 
     const now = new Date();
+    const stripe = getStripeClient();
+
+    // Repair any legacy/missed LMS subscription references and mirror every paid
+    // recurring invoice before making entitlement decisions. This prevents a
+    // malformed local ID from being treated as a canceled Stripe subscription.
+    const billingReconciliation = await reconcileLmsSubscriptionBilling(db, stripe);
 
     // ── 1. Fetch all enrollments with a direct stripeSubscriptionId ──────────
     const enrollmentsWithSub = await db
@@ -97,7 +104,6 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
       return res.json({ ok: true, synced: 0, errors: 0 });
     }
 
-    const stripe = getStripeClient();
     const [previousRun] = await db.select({ id: stripeSubscriptionSyncRuns.id })
       .from(stripeSubscriptionSyncRuns).limit(1);
     const knownSnapshots = await db.select({ enrollmentId: stripeSubscriptionSyncSnapshots.enrollmentId })
@@ -279,7 +285,17 @@ export async function stripeSubscriptionSyncHandler(req: Request, res: Response)
       }),
     });
 
-    return res.json({ ok: true, total: allRows.length, synced, accountsAdded, errors, accessRevoked, revokedAccounts, warningEmailsSent });
+      return res.json({
+        ok: true,
+        total: allRows.length,
+        synced,
+        accountsAdded,
+        errors,
+        accessRevoked,
+        revokedAccounts,
+        warningEmailsSent,
+        billingReconciliation,
+      });
   } catch (err: any) {
     console.error("[StripeSubSync] Unhandled error:", err);
     return res.status(500).json({

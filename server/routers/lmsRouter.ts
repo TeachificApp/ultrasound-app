@@ -108,6 +108,7 @@ import {
   lmsCohortGroupEnrollments,
   lmsCohortStaff,
   lmsCohortMessages,
+  postingAliases,
   instructorCoursePermissions,
   instructorPublishRequests,
   userRoles,
@@ -4473,6 +4474,7 @@ export const lmsLearnerRouter = router({
         body: lmsCohortMessages.body,
         mediaUrls: lmsCohortMessages.mediaUrls,
         isAdminPost: lmsCohortMessages.isAdminPost,
+        aliasId: lmsCohortMessages.aliasId,
         isPinned: lmsCohortMessages.isPinned,
         createdAt: lmsCohortMessages.createdAt,
         userName: users.name,
@@ -4489,7 +4491,28 @@ export const lmsLearnerRouter = router({
         .orderBy(desc(lmsCohortMessages.isPinned), desc(lmsCohortMessages.createdAt))
         .limit(input.limit)
         .offset(input.offset);
-      return { messages, cohortGroupId: groupEnrollment.cohortGroupId, currentUserId: ctx.user.id };
+
+      const aliasIds = [...new Set(messages.flatMap((message) => message.aliasId ? [message.aliasId] : []))];
+      const aliases = aliasIds.length > 0
+        ? await db.select({ id: postingAliases.id, name: postingAliases.name, avatarUrl: postingAliases.avatarUrl })
+          .from(postingAliases)
+          .where(inArray(postingAliases.id, aliasIds))
+        : [];
+      const aliasMap = new Map(aliases.map((alias) => [alias.id, alias]));
+      const displayMessages = messages.map((message) => {
+        const alias = message.aliasId ? aliasMap.get(message.aliasId) : null;
+        return alias
+          ? {
+              ...message,
+              userName: alias.name,
+              userDisplayName: alias.name,
+              userAvatar: alias.avatarUrl ?? message.userAvatar,
+              isAlias: true,
+            }
+          : { ...message, isAlias: false };
+      });
+
+      return { messages: displayMessages, cohortGroupId: groupEnrollment.cohortGroupId, currentUserId: ctx.user.id };
     }),
 
   /** Post a message in the student's cohort group discussion */

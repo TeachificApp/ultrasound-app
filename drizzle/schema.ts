@@ -3603,6 +3603,32 @@ export const lmsOrders = mysqlTable("lms_orders", {
 });
 export type LmsOrder = typeof lmsOrders.$inferSelect;
 
+// ─── LMS Subscription Invoice Ledger ──────────────────────────────────────────
+// The initial Checkout charge lives in lms_orders. This table mirrors every later
+// paid Stripe invoice so recurring billing is visible in the learner and admin
+// transaction history without creating duplicate course enrollments.
+export const lmsSubscriptionInvoices = mysqlTable("lms_subscription_invoices", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  courseId: int("course_id").notNull(),
+  orderId: int("order_id").notNull(),
+  stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }).notNull(),
+  stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }).notNull(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  amountPaid: int("amount_paid").notNull(), // cents
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  invoiceNumber: varchar("invoice_number", { length: 255 }),
+  invoiceUrl: text("invoice_url"),
+  description: varchar("description", { length: 1024 }),
+  paidAt: timestamp("paid_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("lms_subscription_invoices_stripe_invoice_unique").on(table.stripeInvoiceId),
+  index("lms_subscription_invoices_user_paid_idx").on(table.userId, table.paidAt),
+  index("lms_subscription_invoices_order_idx").on(table.orderId),
+]);
+export type LmsSubscriptionInvoice = typeof lmsSubscriptionInvoices.$inferSelect;
+
 // ─── LMS Page Templates ───────────────────────────────────────────────────────
 
 export const lmsPageTemplates = mysqlTable("lms_page_templates", {

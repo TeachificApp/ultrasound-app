@@ -67,6 +67,10 @@ import { restoreMissingCourseCertificate } from "./lmsHelpers";
 import { isEnrollmentCompleted } from "../lib/enrollmentAccess";
 import { isActiveBrandPremiumTrialSubscription } from "../lib/brandMembershipTrial";
 import { notifyOwner } from "../_core/notification";
+import {
+  getLmsSubscriptionInvoicesForUser,
+  reconcileLmsSubscriptionBilling,
+} from "../lib/lmsSubscriptionReconciliation";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -834,6 +838,12 @@ export const dashboardRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
+    try {
+      await reconcileLmsSubscriptionBilling(db, getStripeClient(), { userId: ctx.user.id });
+    } catch (error) {
+      console.warn(`[Dashboard] LMS subscription reference reconciliation failed for user ${ctx.user.id}:`, error);
+    }
+
     // Fetch all brand memberships for this user
     const memberships = await db
       .select()
@@ -1084,6 +1094,12 @@ export const dashboardRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      try {
+        await reconcileLmsSubscriptionBilling(db, getStripeClient(), { userId: ctx.user.id });
+      } catch (error) {
+        console.warn(`[Dashboard] LMS cancellation reference reconciliation failed for user ${ctx.user.id}:`, error);
+      }
 
       // Verify ownership — student can only cancel their own orders
       const [order] = await db
@@ -1441,6 +1457,14 @@ export const dashboardRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const userId = ctx.user.id;
 
+    // Keep course renewals visible even if an old Stripe webhook was missed or a
+    // legacy stored subscription ID needs safe recovery from Stripe.
+    try {
+      await reconcileLmsSubscriptionBilling(db, getStripeClient(), { userId });
+    } catch (error) {
+      console.warn(`[Dashboard] LMS recurring billing reconciliation failed for user ${userId}:`, error);
+    }
+
     // 1. Funnel / embedded-checkout purchases (one-time)
     const funnelRows = await db
       .select({
@@ -1479,6 +1503,9 @@ export const dashboardRouter = router({
       .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
       .where(and(eq(lmsOrders.userId, userId), eq(lmsOrders.status, "paid")))
       .orderBy(desc(lmsOrders.createdAt));
+
+    const subscriptionInvoiceRows = await getLmsSubscriptionInvoicesForUser(db, userId);
+    const lmsRenewalInvoiceIds = new Set(subscriptionInvoiceRows.map((invoice) => invoice.stripeInvoiceId));
 
     // 3. Digital download purchases
     const downloadRows = await db
@@ -1581,24 +1608,10 @@ export const dashboardRouter = router({
       .from(brandMemberships)
       .where(eq(brandMemberships.userId, userId));
 
-    // Also look up Stripe customer ID from lms_orders subscription charges
-    // (course subscriptions store stripeSubscriptionId but not customerId directly;
-    //  we retrieve the customer from Stripe using the subscription ID)
-    const courseSubOrders = await db
-      .select({ stripeSubscriptionId: lmsOrders.stripeSubscriptionId })
-      .from(lmsOrders)
-      .where(and(eq(lmsOrders.userId, userId), eq(lmsOrders.status, "paid")))
-      .orderBy(desc(lmsOrders.createdAt));
-
     const allCustomerIds = [...new Set([
       ...brandMembershipRows.map(m => m.stripeCustomerId),
       ...membershipSubRows.map(m => m.stripeCustomerId),
     ].filter(Boolean) as string[])];
-
-    // For course subscriptions, fetch invoices directly via subscription ID
-    const courseSubIds = [...new Set(
-      courseSubOrders.map(o => o.stripeSubscriptionId).filter(Boolean) as string[]
-    )];
 
     // Fetch manual invoices (admin-created off-platform records)
     let manualInvoiceRows: typeof manualInvoices.$inferSelect[] = [];
@@ -1674,34 +1687,6 @@ export const dashboardRouter = router({
       }
     }
 
-    // Also fetch invoices for course subscriptions by subscription ID
-    for (const subId of courseSubIds) {
-      try {
-        const invoices = await getStripeClient().invoices.list({
-          subscription: subId,
-          status: "paid",
-          limit: 50,
-        });
-        for (const inv of invoices.data) {
-          // Avoid duplicates if customer was already fetched above
-          if (!stripeInvoices.find(i => i.id === inv.id)) {
-            stripeInvoices.push({
-              id: inv.id,
-              description: inv.lines?.data?.[0]?.description ?? inv.description ?? "Course subscription renewal",
-              amount: inv.amount_paid,
-              currency: inv.currency,
-              date: new Date((inv.status_transitions?.paid_at ?? inv.created) * 1000),
-              type: "subscription_payment",
-              invoiceUrl: inv.hosted_invoice_url ?? null,
-              paymentIntentId: typeof inv.payment_intent === "string" ? inv.payment_intent : (inv.payment_intent as any)?.id ?? null,
-            });
-          }
-        }
-      } catch (err) {
-        console.warn("[Dashboard] Failed to fetch Stripe invoices for subscription:", subId, err);
-      }
-    }
-
     // Combine all into a unified timeline
     const allPurchases = [
       ...funnelRows.map(p => ({
@@ -1736,6 +1721,22 @@ export const dashboardRouter = router({
         invoiceUrl: null as string | null,
         transactionId: o.stripePaymentIntentId ?? o.stripeSessionId ?? null as string | null,
         brand: o.courseBrand ?? null as string | null,
+        fulfillmentStatus: null as string | null,
+      })),
+      ...subscriptionInvoiceRows.map(inv => ({
+        id: `course-renewal-${inv.id}`,
+        description: inv.description ?? inv.courseTitle ?? "Course subscription renewal",
+        type: "subscription_payment" as const,
+        productType: "course",
+        amount: inv.amountPaid,
+        currency: inv.currency,
+        date: inv.paidAt,
+        status: "paid" as const,
+        sourceType: null as string | null,
+        orderBumps: null as string | null,
+        invoiceUrl: inv.invoiceUrl,
+        transactionId: inv.stripePaymentIntentId ?? inv.stripeInvoiceId,
+        brand: null as string | null,
         fulfillmentStatus: null as string | null,
       })),
       ...downloadRows
@@ -1824,7 +1825,7 @@ export const dashboardRouter = router({
         brand: null as string | null,
         fulfillmentStatus: p.fulfillmentStatus ?? null as string | null,
       })),
-      ...stripeInvoices.map(inv => ({
+      ...stripeInvoices.filter((invoice) => !lmsRenewalInvoiceIds.has(invoice.id)).map(inv => ({
         id: `invoice-${inv.id}`,
         description: inv.description,
         type: "subscription_payment" as const,

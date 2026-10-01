@@ -31,6 +31,7 @@ import { buildPersistentAccessUrl, sendBundleAccessEmail } from "../lib/enrollme
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
 import { BRAND_PREMIUM_TRIAL_DAYS, hasBrandMembershipTrial, isBrandMembershipTrialCheckout } from "../lib/brandMembershipTrial";
 import { grantScheduledContentAccess } from "../lib/scheduledContentLinks";
+import { persistLmsSubscriptionInvoice } from "../lib/lmsSubscriptionReconciliation";
 
 // Stripe webhook secret — optional but strongly recommended in production.
 // Resolve at request time so a rotated secret takes effect without a module reload.
@@ -2067,6 +2068,24 @@ export async function handleInvoicePaid(invoice: Record<string, unknown>) {
   if (!subscriptionId) return;
   const db = await getDb();
   if (!db) return;
+
+  // Mirror recurring LMS charges in the local transaction ledger. The original
+  // Checkout invoice remains represented by lms_orders; this only records later
+  // paid invoices and is idempotent by Stripe invoice ID.
+  if (typeof invoice.id === "string") {
+    const courseOrders = await db
+      .select({ id: lmsOrders.id, userId: lmsOrders.userId, courseId: lmsOrders.courseId })
+      .from(lmsOrders)
+      .where(and(eq(lmsOrders.stripeSubscriptionId, subscriptionId), eq(lmsOrders.status, "paid")));
+    for (const order of courseOrders) {
+      try {
+        await persistLmsSubscriptionInvoice(db, order, subscriptionId, invoice);
+      } catch (error) {
+        console.error(`[Stripe] invoice.paid — failed to mirror LMS renewal invoice ${invoice.id}:`, error);
+      }
+    }
+  }
+
   const periodEnd = (invoice.lines as any)?.data?.[0]?.period?.end as number | undefined;
   const expiresAt = periodEnd ? new Date(periodEnd * 1000) : null;
   // Update brandMemberships

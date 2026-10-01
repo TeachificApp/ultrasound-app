@@ -67,6 +67,7 @@ import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail, buil
 import { getOrCreateAccessToken } from "../db";
 import { getBrandDisplayConfig } from "../../shared/brands";
 import { generateAutoLoginToken } from "../routes/autoLogin";
+import { reconcileLmsSubscriptionBilling } from "../lib/lmsSubscriptionReconciliation";
 import { or, like, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
 import { serializeCouponTargeting, validateCouponTargeting } from "../lib/couponTargeting";
@@ -3435,12 +3436,24 @@ export const adminUserRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-      const [order] = await db
+      let [order] = await db
         .select()
         .from(lmsOrders)
         .where(eq(lmsOrders.id, input.orderId))
         .limit(1);
 
+      if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
+
+      try {
+        await reconcileLmsSubscriptionBilling(db, getStripeClient(), { userId: order.userId });
+        [order] = await db
+          .select()
+          .from(lmsOrders)
+          .where(eq(lmsOrders.id, input.orderId))
+          .limit(1);
+      } catch (error) {
+        console.warn(`[Admin] LMS subscription reference reconciliation failed for order ${input.orderId}:`, error);
+      }
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Order not found" });
 
       if (order.stripeSubscriptionId) {        if (STRIPE_SECRET_KEY) {
