@@ -2080,8 +2080,13 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-gray-800 capitalize">{m.tier} Membership</span>
+                          <span className="font-semibold text-gray-800 capitalize">{m.isTrial ? "Premium TRIAL" : `${m.tier} Membership`}</span>
                           <StatusBadge status={m.status} />
+                          {m.isTrial && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200">
+                              <Clock className="w-3 h-3" /> 3-day free trial
+                            </span>
+                          )}
                           {m.source === "admin" && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 border border-teal-200">Admin granted</span>
                           )}
@@ -2093,6 +2098,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                         </div>
                         <div className="text-xs text-gray-500 space-y-0.5">
                           <p>Granted: {formatDate(m.grantedAt ?? m.createdAt)}</p>
+                          {m.isTrial && m.trialEndsAt && <p>Trial ends: {formatDate(m.trialEndsAt)}</p>}
                           {m.expiresAt && <p>{m.cancelAtPeriodEnd ? "Access until" : "Expires"}: {formatDate(m.expiresAt)}</p>}
                           {m.stripeSubscriptionId && (
                             <p className="font-mono text-gray-400">{m.stripeSubscriptionId}</p>
@@ -2105,7 +2111,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
                             onClick={() => setCancelConfirm({ membershipId: m.id, stripeSubId: m.stripeSubscriptionId })}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
                           >
-                            <XCircle className="w-3 h-3" /> Cancel
+                            <XCircle className="w-3 h-3" /> {m.isTrial ? "Cancel Trial" : "Cancel"}
                           </button>
                         )}
                         {m.status !== "cancelled" && (
@@ -4201,12 +4207,14 @@ export default function AdminUserDetailPage() {
   }
 
   if (error || !data) {
-    const errMsg = (error as any)?.message ?? "User not found.";
     const isForbidden = (error as any)?.data?.code === "FORBIDDEN";
+    const errMsg = isForbidden
+      ? "Access denied. Please ensure you are logged in as an admin."
+      : "We could not load this member profile just now. Please try again in a moment. No member information was changed.";
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-screen gap-4">
-          <p className="text-gray-500">{isForbidden ? "Access denied. Please ensure you are logged in as an admin." : errMsg}</p>
+          <p className="max-w-md text-center text-gray-500">{errMsg}</p>
           <button onClick={() => refetch()} className="text-sm text-teal-600 hover:underline">Try again</button>
           <button onClick={() => navigate("/admin/members")} className="text-sm text-gray-400 hover:underline">← Back to Members</button>
         </div>

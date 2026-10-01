@@ -4226,6 +4226,10 @@ export const brandMemberships = mysqlTable("brandMemberships", {
   grantedAt: timestamp("grantedAt").defaultNow().notNull(),
   expiresAt: timestamp("expiresAt"),
   cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").notNull().default(false),
+  // Cached from Stripe so Premium Trial remains identifiable when a live Stripe
+  // read is delayed or unavailable. Stripe lifecycle webhooks remain authoritative.
+  isTrial: boolean("isTrial").notNull().default(false),
+  trialEndsAt: timestamp("trialEndsAt"),
   source: varchar("source", { length: 64 }), // "stripe" | "admin" | "thinkific" | "promo"
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

@@ -882,6 +882,17 @@ export const dashboardRouter = router({
                 amount: null,
                 currency: null,
               };
+            } else if (m.isTrial && m.trialEndsAt && m.trialEndsAt.getTime() > Date.now()) {
+              stripeData = {
+                status: "trialing",
+                currentPeriodEnd: m.trialEndsAt,
+                trialEnd: m.trialEndsAt,
+                cancelAtPeriodEnd: m.cancelAtPeriodEnd,
+                isMissing: false,
+                interval: null,
+                amount: null,
+                currency: null,
+              };
             }
           }
         }
@@ -899,6 +910,8 @@ export const dashboardRouter = router({
           grantedAt: m.grantedAt,
           expiresAt: m.expiresAt,
           cancelAtPeriodEnd: m.cancelAtPeriodEnd,
+          isTrial: m.isTrial,
+          trialEndsAt: m.trialEndsAt,
           stripeSubscriptionId: m.stripeSubscriptionId,
           isThinkific,
           thinkificManageUrl,
@@ -1315,6 +1328,8 @@ export const dashboardRouter = router({
           status: "active",
           tier: "premium",
           cancelAtPeriodEnd: true,
+          isTrial: isTrialCancellation,
+          ...(isTrialCancellation && trialEnd ? { trialEndsAt: trialEnd } : {}),
           ...(cancellation.periodEnd ? { expiresAt: cancellation.periodEnd } : {}),
         })
         .where(eq(brandMemberships.id, membership.id));

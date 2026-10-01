@@ -259,12 +259,18 @@ export const adminUserRouter = router({
         ORDER BY cert.issued_at DESC
       `);
 
-      // Brand memberships
-      const memberships = await db
-        .select()
-        .from(brandMemberships)
-        .where(eq(brandMemberships.userId, input.userId))
-        .orderBy(desc(brandMemberships.createdAt));
+      // Brand memberships are useful billing context, but a transient read issue
+      // must never prevent Platform Admins from opening the rest of a member profile.
+      let memberships: Array<typeof brandMemberships.$inferSelect> = [];
+      try {
+        memberships = await db
+          .select()
+          .from(brandMemberships)
+          .where(eq(brandMemberships.userId, input.userId))
+          .orderBy(desc(brandMemberships.createdAt));
+      } catch (membershipReadError) {
+        console.error(`[AdminUser] Could not load brand memberships for user ${input.userId}:`, membershipReadError);
+      }
 
       // Funnel/inline checkout purchases
       const funnelPurchaseList = await db
@@ -1317,14 +1323,17 @@ export const adminUserRouter = router({
         ? await stripe.subscriptions.cancel(input.stripeSubscriptionId)
         : await stripe.subscriptions.update(input.stripeSubscriptionId, { cancel_at_period_end: true });
       const scheduledEnd = stripeSubscription.trial_end ?? stripeSubscription.current_period_end;
+      const isTrial = stripeSubscription.status === "trialing" && !!stripeSubscription.trial_end;
 
       await db.update(brandMemberships)
         .set(input.immediately
-          ? { status: "cancelled", tier: "free", expiresAt: new Date(), cancelAtPeriodEnd: false }
+          ? { status: "cancelled", tier: "free", expiresAt: new Date(), cancelAtPeriodEnd: false, isTrial: false, trialEndsAt: null }
           : {
             status: "active",
             tier: "premium",
             cancelAtPeriodEnd: true,
+            isTrial,
+            ...(isTrial && scheduledEnd ? { trialEndsAt: new Date(scheduledEnd * 1000) } : {}),
             ...(scheduledEnd ? { expiresAt: new Date(scheduledEnd * 1000) } : {}),
           })
         .where(eq(brandMemberships.id, input.membershipId));
@@ -1357,6 +1366,8 @@ export const adminUserRouter = router({
 
       const stripeStatus = sub.status as string; // active | trialing | past_due | unpaid | canceled | paused | incomplete | incomplete_expired
       const currentPeriodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null;
+      const trialEndsAt = sub.trial_end ? new Date(sub.trial_end * 1000) : null;
+      const isTrial = stripeStatus === "trialing" && !!trialEndsAt;
       const cancelAtPeriodEnd = sub.cancel_at_period_end as boolean;
       const isActive = stripeStatus === "active" || stripeStatus === "trialing";
       const isDeleted = stripeStatus === "canceled" || stripeStatus === "incomplete_expired";
@@ -1416,18 +1427,20 @@ export const adminUserRouter = router({
               status: "active",
               tier: "premium",
               cancelAtPeriodEnd,
+              isTrial,
+              trialEndsAt,
               ...(currentPeriodEnd ? { expiresAt: currentPeriodEnd } : {}),
             })
             .where(eq(brandMemberships.id, bm.id));
           updated.push(`brandMembership #${bm.id} (${bm.brand}): restored to active/premium`);
         } else if (isDeleted) {
           await db.update(brandMemberships)
-            .set({ status: "cancelled", tier: "free", cancelAtPeriodEnd: false })
+            .set({ status: "cancelled", tier: "free", cancelAtPeriodEnd: false, isTrial: false, trialEndsAt: null })
             .where(eq(brandMemberships.id, bm.id));
           updated.push(`brandMembership #${bm.id} (${bm.brand}): cancelled`);
         } else if (stripeStatus === "past_due" || stripeStatus === "unpaid") {
           await db.update(brandMemberships)
-            .set({ status: "expired" })
+            .set({ status: "expired", isTrial: false, trialEndsAt: null })
             .where(eq(brandMemberships.id, bm.id));
           updated.push(`brandMembership #${bm.id} (${bm.brand}): expired (past_due)`);
         }

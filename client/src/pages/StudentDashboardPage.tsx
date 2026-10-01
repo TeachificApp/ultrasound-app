@@ -1837,16 +1837,26 @@ function SubscriptionsTab() {
                     const isThinkific = sub.isThinkific;
                     const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true || sub.cancelAtPeriodEnd === true;
                     const isStripeEnded = sub.stripe?.isMissing === true || sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled";
-                    const activeTrial = getActivePremiumTrial([sub.stripe]);
-                    const tierLabel = sub.tier === "premium" ? "Premium" : sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1);
+                    const activeTrial = getActivePremiumTrial([
+                      sub.stripe,
+                      sub.isTrial ? { status: "trialing", trialEnd: sub.trialEndsAt } : null,
+                    ]);
+                    const tierLabel = sub.tier === "premium"
+                        ? "Premium"
+                        : sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1);
 
                     return (
                       <div key={sub.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
                         <div className="flex items-start justify-between gap-4 flex-wrap">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-gray-800">{tierLabel} Membership</span>
+                              <span className="font-semibold text-gray-800">{activeTrial ? "Premium TRIAL" : `${tierLabel} Membership`}</span>
                               <StatusBadge status={sub.stripe?.status ?? sub.status} />
+                              {activeTrial && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200">
+                                  <Clock className="w-3 h-3" /> Free 3-day trial
+                                </span>
+                              )}
                               {isCancelPending && (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 border border-orange-200">
                                   <XCircle className="w-3 h-3" /> Cancels at period end
@@ -1865,8 +1875,11 @@ function SubscriptionsTab() {
                               {sub.stripe?.currentPeriodEnd && (
                                 <p className="flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5" />
-                                  {isCancelPending ? "Access until" : "Renews"}: {formatDate(sub.stripe.currentPeriodEnd)}
+                                  {activeTrial ? "Trial ends" : isCancelPending ? "Access until" : "Renews"}: {formatDate(activeTrial?.endsAt ?? sub.stripe.currentPeriodEnd)}
                                 </p>
+                              )}
+                              {activeTrial && !isCancelPending && (
+                                <p className="text-xs font-medium text-sky-700">Cancel before the trial ends and you will not be charged.</p>
                               )}
                               {!sub.stripe && sub.expiresAt && (
                                 <p className="flex items-center gap-1">

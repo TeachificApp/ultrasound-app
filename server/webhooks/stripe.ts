@@ -29,13 +29,31 @@ import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmai
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { buildPersistentAccessUrl, sendBundleAccessEmail } from "../lib/enrollmentEmail";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
-import { hasBrandMembershipTrial, isBrandMembershipTrialCheckout } from "../lib/brandMembershipTrial";
+import { BRAND_PREMIUM_TRIAL_DAYS, hasBrandMembershipTrial, isBrandMembershipTrialCheckout } from "../lib/brandMembershipTrial";
 import { grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 
 // Stripe webhook secret — optional but strongly recommended in production.
 // Resolve at request time so a rotated secret takes effect without a module reload.
 function getStripeWebhookSecret(): string {
   return process.env.STRIPE_WEBHOOK_SECRET ?? "";
+}
+
+/**
+ * Keep an explicit local trial marker at Checkout completion, using Stripe's
+ * exact trial end when available and a deterministic three-day fallback if a
+ * transient Stripe read fails. Subscription lifecycle webhooks then refresh it.
+ */
+async function resolveBrandPremiumTrialEnd(subscriptionId: string | undefined, isTrial: boolean): Promise<Date | null> {
+  if (!isTrial) return null;
+  const fallback = new Date(Date.now() + BRAND_PREMIUM_TRIAL_DAYS * 24 * 60 * 60 * 1_000);
+  if (!subscriptionId) return fallback;
+  try {
+    const subscription = await getStripeClient().subscriptions.retrieve(subscriptionId) as { trial_end?: number | null };
+    return subscription.trial_end ? new Date(subscription.trial_end * 1_000) : fallback;
+  } catch (error) {
+    console.warn(`[Stripe] Unable to read trial end for ${subscriptionId}; using the configured trial duration.`, error);
+    return fallback;
+  }
 }
 
 // Stripe Concierge product price ID (from the payment link)
@@ -964,6 +982,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
   // ── Grant brand membership ─────────────────────────────────────────────────
   const isLifetime = meta.interval === "lifetime" || !subscriptionId;
   const isTrial = hasBrandMembershipTrial(meta);
+  const trialEndsAt = await resolveBrandPremiumTrialEnd(subscriptionId, isTrial);
   const membershipTier = isLifetime ? "lifetime" : "premium";
   const [existing] = await db
     .select()
@@ -980,6 +999,9 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
         stripeSubscriptionId: subscriptionId ?? null,
         stripeCustomerId: customerId ?? null,
         grantedAt: new Date(),
+        isTrial,
+        trialEndsAt,
+        ...(trialEndsAt ? { expiresAt: trialEndsAt } : {}),
       })
       .where(eq(brandMemberships.id, existing.id));
   } else {
@@ -1125,8 +1147,12 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
     }
   }
   await notifyOwner({
-    title: `\u2b50 New ${brand === "iheartecho" ? "EchoAssist" : "UltrasoundAssist"} Premium Subscription`,
-    content: `User ID ${userId} (${customerEmail ?? meta.customer_email}) upgraded to ${brand} premium via Stripe.${isNewUser ? " [NEW ACCOUNT AUTO-CREATED]" : ""} Subscription: ${subscriptionId ?? "N/A"}.`,
+    title: isTrial
+      ? `⭐ New ${brand === "iheartecho" ? "EchoAssist" : "UltrasoundAssist"} Premium TRIAL`
+      : `⭐ New ${brand === "iheartecho" ? "EchoAssist" : "UltrasoundAssist"} Premium Subscription`,
+    content: isTrial
+      ? `User ID ${userId} (${customerEmail ?? meta.customer_email}) began a 3-day ${brand} Premium TRIAL via Stripe.${isNewUser ? " [NEW ACCOUNT AUTO-CREATED]" : ""} Trial ends: ${trialEndsAt?.toISOString() ?? "pending Stripe confirmation"}. Subscription: ${subscriptionId ?? "N/A"}. No payment has been collected yet.`
+      : `User ID ${userId} (${customerEmail ?? meta.customer_email}) upgraded to ${brand} premium via Stripe.${isNewUser ? " [NEW ACCOUNT AUTO-CREATED]" : ""} Subscription: ${subscriptionId ?? "N/A"}.`,
   });
 
   console.log(`[Stripe] Brand membership upgrade recorded: user ${userId}, brand ${brand}, subscription ${subscriptionId}`);
@@ -1193,6 +1219,7 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
   // ── Grant both brand memberships ─────────────────────────────────────────────
   const source = isLifetime ? "stripe_dual_lifetime" : "stripe_dual";
   const isTrial = hasBrandMembershipTrial(meta);
+  const trialEndsAt = await resolveBrandPremiumTrialEnd(subscriptionId, isTrial);
   const brands: ("aaus" | "iheartecho")[] = ["aaus", "iheartecho"];
   for (const brand of brands) {
     const [existing] = await db
@@ -1210,6 +1237,9 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
           stripeSubscriptionId: subscriptionId ?? null,
           stripeCustomerId: customerId ?? null,
           grantedAt: new Date(),
+          isTrial,
+          trialEndsAt,
+          ...(trialEndsAt ? { expiresAt: trialEndsAt } : {}),
         })
         .where(eq(brandMemberships.id, existing.id));
     } else {
@@ -1221,6 +1251,9 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
         source,
         stripeSubscriptionId: subscriptionId ?? null,
         stripeCustomerId: customerId ?? null,
+        isTrial,
+        trialEndsAt,
+        ...(trialEndsAt ? { expiresAt: trialEndsAt } : {}),
       });
     }
   }
@@ -1371,10 +1404,14 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
   }
   const planDescription = isLifetime
     ? "All Access Dual Lifetime Membership ($147 one-time)"
+    : isTrial
+      ? "All Access Dual Membership — 3-Day Premium TRIAL (no payment collected yet)"
     : "All Access Dual Membership ($12.99/mo)";
   await notifyOwner({
-    title: `\u2b50\u2b50 New Dual Membership${isLifetime ? " (Lifetime)" : ""} Subscription`,
-    content: `User ID ${userId} (${customerEmail}) \u2014 ${planDescription}. Both AAUS + iHeartEcho premium granted.${
+    title: isTrial
+      ? "⭐⭐ New Dual Premium TRIAL"
+      : `⭐⭐ New Dual Membership${isLifetime ? " (Lifetime)" : ""} Subscription`,
+    content: `User ID ${userId} (${customerEmail}) — ${planDescription}.${isTrial ? ` Trial ends: ${trialEndsAt?.toISOString() ?? "pending Stripe confirmation"}.` : ""} Both AAUS + iHeartEcho premium granted.${
       isNewUser ? " [NEW ACCOUNT AUTO-CREATED]" : ""
     } Subscription: ${subscriptionId ?? "N/A"}.`,
   });
@@ -1474,6 +1511,9 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
   const status = subscription.status as string;
   const periodEnd = subscription.current_period_end as number | undefined;
   const currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000) : null;
+  const trialEnd = subscription.trial_end as number | undefined;
+  const trialEndsAt = trialEnd ? new Date(trialEnd * 1000) : null;
+  const isTrial = status === "trialing" && !!trialEndsAt;
   const cancelAtPeriodEnd = (subscription.cancel_at_period_end as boolean) ?? false;
 
   // Only cancel when Stripe definitively deletes the subscription.
@@ -1481,13 +1521,13 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
   // Stripe always follows a deleted subscription with a customer.subscription.deleted event.
   if (eventType === "customer.subscription.deleted") {
     await db.update(brandMemberships)
-      .set({ status: "cancelled", tier: "free", cancelAtPeriodEnd: false })
+      .set({ status: "cancelled", tier: "free", cancelAtPeriodEnd: false, isTrial: false, trialEndsAt: null })
       .where(eq(brandMemberships.id, membership.id));
     console.log(`[Stripe] Brand membership cancelled: user ${membership.userId}, brand ${membership.brand}`);
   } else if (status === "past_due" || status === "unpaid") {
     // Keep premium but mark as expired for grace period
     await db.update(brandMemberships)
-      .set({ status: "expired", ...(currentPeriodEnd ? { expiresAt: currentPeriodEnd } : {}) })
+      .set({ status: "expired", isTrial: false, trialEndsAt: null, ...(currentPeriodEnd ? { expiresAt: currentPeriodEnd } : {}) })
       .where(eq(brandMemberships.id, membership.id));
     console.log(`[Stripe] Brand membership past_due/unpaid: user ${membership.userId}, brand ${membership.brand}`);
   } else if (status === "active" || status === "trialing") {
@@ -1496,6 +1536,8 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
       status: "active",
       tier: "premium",
       cancelAtPeriodEnd,
+      isTrial,
+      trialEndsAt,
     };
     if (currentPeriodEnd) updates.expiresAt = currentPeriodEnd;
     if (cancelAtPeriodEnd) {
