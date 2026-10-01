@@ -898,6 +898,7 @@ export const dashboardRouter = router({
           source: m.source,
           grantedAt: m.grantedAt,
           expiresAt: m.expiresAt,
+          cancelAtPeriodEnd: m.cancelAtPeriodEnd,
           stripeSubscriptionId: m.stripeSubscriptionId,
           isThinkific,
           thinkificManageUrl,
@@ -1266,7 +1267,7 @@ export const dashboardRouter = router({
 
       if (cancellation.outcome === "already_ended") {
         await db.update(brandMemberships)
-          .set({ status: "cancelled", expiresAt: new Date() })
+          .set({ status: "cancelled", expiresAt: new Date(), cancelAtPeriodEnd: false })
           .where(eq(brandMemberships.id, membership.id));
         return {
           success: true,
@@ -1308,6 +1309,15 @@ export const dashboardRouter = router({
           ].join("\n"),
         }).catch(() => {});
       }
+
+      await db.update(brandMemberships)
+        .set({
+          status: "active",
+          tier: "premium",
+          cancelAtPeriodEnd: true,
+          ...(cancellation.periodEnd ? { expiresAt: cancellation.periodEnd } : {}),
+        })
+        .where(eq(brandMemberships.id, membership.id));
 
       return {
         success: true,
@@ -1352,10 +1362,14 @@ export const dashboardRouter = router({
       );
       if (!reactivation.reactivated) {
         await db.update(brandMemberships)
-          .set({ status: "cancelled", expiresAt: new Date() })
+          .set({ status: "cancelled", expiresAt: new Date(), cancelAtPeriodEnd: false })
           .where(eq(brandMemberships.id, membership.id));
         return { success: true, message: "This subscription has already ended and cannot be reactivated. You will not be charged again." };
       }
+
+      await db.update(brandMemberships)
+        .set({ status: "active", tier: "premium", cancelAtPeriodEnd: false })
+        .where(eq(brandMemberships.id, membership.id));
 
       return { success: true, message: "Your subscription has been reactivated." };
     }),

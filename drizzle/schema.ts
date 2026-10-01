@@ -4225,6 +4225,7 @@ export const brandMemberships = mysqlTable("brandMemberships", {
   stripeSubscriptionId: varchar("stripeSubscriptionId", { length: 128 }),
   grantedAt: timestamp("grantedAt").defaultNow().notNull(),
   expiresAt: timestamp("expiresAt"),
+  cancelAtPeriodEnd: boolean("cancelAtPeriodEnd").notNull().default(false),
   source: varchar("source", { length: 64 }), // "stripe" | "admin" | "thinkific" | "promo"
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

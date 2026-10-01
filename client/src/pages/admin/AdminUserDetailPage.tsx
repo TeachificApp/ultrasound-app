@@ -4173,10 +4173,17 @@ export default function AdminUserDetailPage() {
   const [mergeOpen, setMergeOpen] = useState(false);
 
   const isAdmin = !loading && !!adminUser && adminUser.role === "admin";
-  const { data, isLoading, error, refetch } = trpc.adminUser.getUserDetail.useQuery(
+  const { data, isLoading, isFetching, error, refetch } = trpc.adminUser.getUserDetail.useQuery(
     { userId: userId! },
     { enabled: !!userId && isAdmin, retry: false }
   );
+
+  // A Stripe event can update a membership while an administrator keeps this
+  // member profile open. Re-fetch as soon as the billing tab is viewed so the
+  // Premium tier, trial end, and cancellation state are never stale.
+  useEffect(() => {
+    if (activeTab === "subscriptions") void refetch();
+  }, [activeTab, refetch]);
 
   if (loading || (isAdmin && isLoading)) {
     return (
@@ -4252,6 +4259,15 @@ export default function AdminUserDetailPage() {
                 className="flex-shrink-0 gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50 ml-auto"
               >
                 <GitMerge className="w-3.5 h-3.5" /> Merge Accounts
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="flex-shrink-0 gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} /> Refresh
               </Button>
             </div>
           </div>

@@ -61,7 +61,7 @@ describe("Premium trial dashboard experience", () => {
     const dashboardRouter = read("routers/dashboardRouter.ts");
     expect(dashboardRouter).toContain("trialFeedback");
     expect(dashboardRouter).toContain("Premium trial cancellation feedback");
-    expect(dashboardRouter).toContain("const isNewTrialCancellation = isTrialCancellation && !wasAlreadyScheduledForCancellation");
+    expect(dashboardRouter).toContain('const isNewTrialCancellation = isTrialCancellation && cancellation.outcome === "scheduled"');
     expect(dashboardRouter).toContain("notifyOwner({");
   });
 

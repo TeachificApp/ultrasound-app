@@ -1313,14 +1313,20 @@ export const adminUserRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const stripe = getStripeClient();
 
-      if (input.immediately) {
-        await stripe.subscriptions.cancel(input.stripeSubscriptionId);
-      } else {
-        await stripe.subscriptions.update(input.stripeSubscriptionId, { cancel_at_period_end: true });
-      }
+      const stripeSubscription = input.immediately
+        ? await stripe.subscriptions.cancel(input.stripeSubscriptionId)
+        : await stripe.subscriptions.update(input.stripeSubscriptionId, { cancel_at_period_end: true });
+      const scheduledEnd = stripeSubscription.trial_end ?? stripeSubscription.current_period_end;
 
       await db.update(brandMemberships)
-        .set({ status: "cancelled" })
+        .set(input.immediately
+          ? { status: "cancelled", tier: "free", expiresAt: new Date(), cancelAtPeriodEnd: false }
+          : {
+            status: "active",
+            tier: "premium",
+            cancelAtPeriodEnd: true,
+            ...(scheduledEnd ? { expiresAt: new Date(scheduledEnd * 1000) } : {}),
+          })
         .where(eq(brandMemberships.id, input.membershipId));
 
       return { success: true };
@@ -1406,12 +1412,17 @@ export const adminUserRouter = router({
       for (const bm of brandMems) {
         if (isActive) {
           await db.update(brandMemberships)
-            .set({ status: "active", tier: "premium" })
+            .set({
+              status: "active",
+              tier: "premium",
+              cancelAtPeriodEnd,
+              ...(currentPeriodEnd ? { expiresAt: currentPeriodEnd } : {}),
+            })
             .where(eq(brandMemberships.id, bm.id));
           updated.push(`brandMembership #${bm.id} (${bm.brand}): restored to active/premium`);
         } else if (isDeleted) {
           await db.update(brandMemberships)
-            .set({ status: "cancelled", tier: "free" })
+            .set({ status: "cancelled", tier: "free", cancelAtPeriodEnd: false })
             .where(eq(brandMemberships.id, bm.id));
           updated.push(`brandMembership #${bm.id} (${bm.brand}): cancelled`);
         } else if (stripeStatus === "past_due" || stripeStatus === "unpaid") {

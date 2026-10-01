@@ -1835,7 +1835,7 @@ function SubscriptionsTab() {
                 <div className="space-y-4">
                   {subs.map(sub => {
                     const isThinkific = sub.isThinkific;
-                    const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
+                    const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true || sub.cancelAtPeriodEnd === true;
                     const isStripeEnded = sub.stripe?.isMissing === true || sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled";
                     const activeTrial = getActivePremiumTrial([sub.stripe]);
                     const tierLabel = sub.tier === "premium" ? "Premium" : sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1);

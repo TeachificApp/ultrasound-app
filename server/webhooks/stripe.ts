@@ -1481,7 +1481,7 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
   // Stripe always follows a deleted subscription with a customer.subscription.deleted event.
   if (eventType === "customer.subscription.deleted") {
     await db.update(brandMemberships)
-      .set({ status: "cancelled", tier: "free" })
+      .set({ status: "cancelled", tier: "free", cancelAtPeriodEnd: false })
       .where(eq(brandMemberships.id, membership.id));
     console.log(`[Stripe] Brand membership cancelled: user ${membership.userId}, brand ${membership.brand}`);
   } else if (status === "past_due" || status === "unpaid") {
@@ -1492,7 +1492,11 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
     console.log(`[Stripe] Brand membership past_due/unpaid: user ${membership.userId}, brand ${membership.brand}`);
   } else if (status === "active" || status === "trialing") {
     // Active or reactivated — update expiry and cancel_at_period_end flag
-    const updates: Record<string, unknown> = { status: "active", tier: "premium" };
+    const updates: Record<string, unknown> = {
+      status: "active",
+      tier: "premium",
+      cancelAtPeriodEnd,
+    };
     if (currentPeriodEnd) updates.expiresAt = currentPeriodEnd;
     if (cancelAtPeriodEnd) {
       // Scheduled to cancel at period end — keep active but note it
