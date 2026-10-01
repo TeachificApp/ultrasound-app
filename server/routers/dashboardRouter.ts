@@ -55,6 +55,11 @@ import {
 import { eq, and, desc, inArray, sql, or, isNotNull, gte } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
 import {
+  isStripeSubscriptionMissingError,
+  reactivateStripeSubscription,
+  scheduleStripeSubscriptionCancellation,
+} from "../lib/subscriptionCancellation";
+import {
   THINKIFIC_LEGACY_BILLING_URL,
   isActiveThinkificMembership,
 } from "../../shared/thinkificLegacy";
@@ -844,6 +849,7 @@ export const dashboardRouter = router({
           currentPeriodEnd: Date | null;
           trialEnd: Date | null;
           cancelAtPeriodEnd: boolean;
+          isMissing: boolean;
           interval: string | null;
           amount: number | null;
           currency: string | null;
@@ -858,12 +864,25 @@ export const dashboardRouter = router({
               currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
               trialEnd: sub.trial_end ? new Date(sub.trial_end * 1000) : null,
               cancelAtPeriodEnd: sub.cancel_at_period_end,
+              isMissing: false,
               interval: item?.price?.recurring?.interval ?? null,
               amount: item?.price?.unit_amount ?? null,
               currency: item?.price?.currency ?? null,
             };
           } catch (err) {
             console.warn("[Dashboard] Failed to fetch Stripe subscription:", m.stripeSubscriptionId, err);
+            if (isStripeSubscriptionMissingError(err)) {
+              stripeData = {
+                status: "canceled",
+                currentPeriodEnd: null,
+                trialEnd: null,
+                cancelAtPeriodEnd: false,
+                isMissing: true,
+                interval: null,
+                amount: null,
+                currency: null,
+              };
+            }
           }
         }
 
@@ -914,6 +933,7 @@ export const dashboardRouter = router({
             status: string;
             currentPeriodEnd: Date | null;
             cancelAtPeriodEnd: boolean;
+            isMissing: boolean;
             interval: string | null;
             amount: number | null;
             currency: string | null;
@@ -927,12 +947,24 @@ export const dashboardRouter = router({
                 status: sub.status,
                 currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
                 cancelAtPeriodEnd: sub.cancel_at_period_end,
+                isMissing: false,
                 interval: item?.price?.recurring?.interval ?? null,
                 amount: item?.price?.unit_amount ?? null,
                 currency: item?.price?.currency ?? null,
               };
             } catch (err) {
               console.warn("[Dashboard] Failed to fetch Stripe subscription for order:", o.id, err);
+              if (isStripeSubscriptionMissingError(err)) {
+                stripeData = {
+                  status: "canceled",
+                  currentPeriodEnd: null,
+                  cancelAtPeriodEnd: false,
+                  isMissing: true,
+                  interval: null,
+                  amount: null,
+                  currency: null,
+                };
+              }
             }
           }
 
@@ -981,6 +1013,7 @@ export const dashboardRouter = router({
           status: string;
           currentPeriodEnd: Date | null;
           cancelAtPeriodEnd: boolean;
+          isMissing: boolean;
           interval: string | null;
           amount: number | null;
           currency: string | null;
@@ -994,12 +1027,24 @@ export const dashboardRouter = router({
               status: sub.status,
               currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : null,
               cancelAtPeriodEnd: sub.cancel_at_period_end,
+              isMissing: false,
               interval: item?.price?.recurring?.interval ?? null,
               amount: item?.price?.unit_amount ?? null,
               currency: item?.price?.currency ?? null,
             };
           } catch (err) {
             console.warn("[Dashboard] Failed to fetch Stripe subscription for enrollment:", e.enrollmentId, err);
+            if (isStripeSubscriptionMissingError(err)) {
+              stripeData = {
+                status: "canceled",
+                currentPeriodEnd: null,
+                cancelAtPeriodEnd: false,
+                isMissing: true,
+                interval: null,
+                amount: null,
+                currency: null,
+              };
+            }
           }
         }
 
@@ -1036,15 +1081,21 @@ export const dashboardRouter = router({
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
       if (!order.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found for this order" });
 
-      // Cancel at period end — student keeps access until billing period ends
-      const updatedSub = await getStripeClient().subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: true });
-
-      // Set access_expires_at on the enrollment to the Stripe period end date
-      const periodEnd = new Date(updatedSub.current_period_end * 1000);
+      const cancellation = await scheduleStripeSubscriptionCancellation(
+        getStripeClient(),
+        order.stripeSubscriptionId,
+      );
+      const accessExpiresAt = cancellation.periodEnd ?? new Date();
       await db.update(lmsEnrollments)
-        .set({ accessExpiresAt: periodEnd })
+        .set({ accessExpiresAt })
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.orderId, input.orderId)));
 
+      if (cancellation.outcome === "already_ended") {
+        return { success: true, message: "This subscription has already ended. You will not be charged again." };
+      }
+      if (cancellation.outcome === "already_scheduled") {
+        return { success: true, message: "Your subscription is already scheduled to end. You will not be charged again." };
+      }
       return { success: true, message: "Your subscription will be cancelled at the end of the current billing period. You will retain access until then." };
     }),
 
@@ -1065,7 +1116,17 @@ export const dashboardRouter = router({
       if (!order) throw new TRPCError({ code: "NOT_FOUND", message: "Subscription not found" });
       if (!order.stripeSubscriptionId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active subscription found" });
 
-      await getStripeClient().subscriptions.update(order.stripeSubscriptionId, { cancel_at_period_end: false });
+      const reactivation = await reactivateStripeSubscription(
+        getStripeClient(),
+        order.stripeSubscriptionId,
+      );
+
+      if (!reactivation.reactivated) {
+        await db.update(lmsEnrollments)
+          .set({ accessExpiresAt: new Date() })
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.orderId, input.orderId)));
+        return { success: true, message: "This subscription has already ended and cannot be reactivated. You will not be charged again." };
+      }
 
       return { success: true, message: "Your subscription has been reactivated." };
     }),
@@ -1097,13 +1158,21 @@ export const dashboardRouter = router({
 
       if (!stripeSubId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Stripe subscription linked to this enrollment" });
 
-      // Cancel at period end — student keeps access until billing period ends
-      const updatedSub = await getStripeClient().subscriptions.update(stripeSubId, { cancel_at_period_end: true }) as any;
-      const periodEnd = new Date(updatedSub.current_period_end * 1000);
+      const cancellation = await scheduleStripeSubscriptionCancellation(
+        getStripeClient(),
+        stripeSubId,
+      );
+      const accessExpiresAt = cancellation.periodEnd ?? new Date();
       await db.update(lmsEnrollments)
-        .set({ accessExpiresAt: periodEnd })
+        .set({ accessExpiresAt })
         .where(eq(lmsEnrollments.id, input.enrollmentId));
 
+      if (cancellation.outcome === "already_ended") {
+        return { success: true, message: "This subscription has already ended. You will not be charged again." };
+      }
+      if (cancellation.outcome === "already_scheduled") {
+        return { success: true, message: "Your subscription is already scheduled to end. You will not be charged again." };
+      }
       return { success: true, message: "Your subscription will be cancelled at the end of the current billing period. You will retain access until then." };
     }),
 
@@ -1132,7 +1201,13 @@ export const dashboardRouter = router({
 
       if (!stripeSubId) throw new TRPCError({ code: "BAD_REQUEST", message: "No active Stripe subscription linked to this enrollment" });
 
-      await getStripeClient().subscriptions.update(stripeSubId, { cancel_at_period_end: false });
+      const reactivation = await reactivateStripeSubscription(getStripeClient(), stripeSubId);
+      if (!reactivation.reactivated) {
+        await db.update(lmsEnrollments)
+          .set({ accessExpiresAt: new Date() })
+          .where(eq(lmsEnrollments.id, input.enrollmentId));
+        return { success: true, message: "This subscription has already ended and cannot be reactivated. You will not be charged again." };
+      }
       // Clear the access_expires_at that was set when cancellation was scheduled
       await db.update(lmsEnrollments)
         .set({ accessExpiresAt: null })
@@ -1178,22 +1253,27 @@ export const dashboardRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "This subscription cannot be cancelled here. Please contact support." });
       }
 
-      const stripe = getStripeClient();
-      const liveSubscription = await stripe.subscriptions.retrieve(membership.stripeSubscriptionId) as any;
-      const trialEnd = liveSubscription.trial_end
-        ? new Date(liveSubscription.trial_end * 1000)
-        : null;
+      const cancellation = await scheduleStripeSubscriptionCancellation(
+        getStripeClient(),
+        membership.stripeSubscriptionId,
+      );
+      const trialEnd = cancellation.trialEnd;
       const isTrialCancellation = isActiveBrandPremiumTrialSubscription({
-        status: liveSubscription.status,
+        status: cancellation.status,
         trialEnd,
       });
-      const wasAlreadyScheduledForCancellation = liveSubscription.cancel_at_period_end === true;
-      const isNewTrialCancellation = isTrialCancellation && !wasAlreadyScheduledForCancellation;
+      const isNewTrialCancellation = isTrialCancellation && cancellation.outcome === "scheduled";
 
-      // Cancel at the current trial or billing period end (not immediately).
-      await stripe.subscriptions.update(membership.stripeSubscriptionId, {
-        cancel_at_period_end: true,
-      });
+      if (cancellation.outcome === "already_ended") {
+        await db.update(brandMemberships)
+          .set({ status: "cancelled", expiresAt: new Date() })
+          .where(eq(brandMemberships.id, membership.id));
+        return {
+          success: true,
+          trialCancelled: false,
+          message: "This subscription has already ended. You will not be charged again.",
+        };
+      }
 
       if (isNewTrialCancellation) {
         const reasonLabels: Record<NonNullable<typeof input.trialFeedback>["reason"], string> = {
@@ -1234,8 +1314,10 @@ export const dashboardRouter = router({
         trialCancelled: isTrialCancellation,
         message: isNewTrialCancellation
           ? "Your free trial will end at its scheduled time. Your feedback has been shared with the team."
-          : isTrialCancellation
+          : cancellation.outcome === "already_scheduled" && isTrialCancellation
           ? "Your free trial is already set to end at its scheduled time. You will not be charged."
+          : cancellation.outcome === "already_scheduled"
+          ? "Your subscription is already scheduled to end. You will not be charged again."
           : "Your subscription will be cancelled at the end of the current billing period.",
       };
     }),
@@ -1264,9 +1346,16 @@ export const dashboardRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "This subscription cannot be managed here." });
       }
 
-      await getStripeClient().subscriptions.update(membership.stripeSubscriptionId, {
-        cancel_at_period_end: false,
-      });
+      const reactivation = await reactivateStripeSubscription(
+        getStripeClient(),
+        membership.stripeSubscriptionId,
+      );
+      if (!reactivation.reactivated) {
+        await db.update(brandMemberships)
+          .set({ status: "cancelled", expiresAt: new Date() })
+          .where(eq(brandMemberships.id, membership.id));
+        return { success: true, message: "This subscription has already ended and cannot be reactivated. You will not be charged again." };
+      }
 
       return { success: true, message: "Your subscription has been reactivated." };
     }),

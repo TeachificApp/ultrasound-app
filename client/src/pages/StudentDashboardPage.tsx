@@ -1836,6 +1836,7 @@ function SubscriptionsTab() {
                   {subs.map(sub => {
                     const isThinkific = sub.isThinkific;
                     const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
+                    const isStripeEnded = sub.stripe?.isMissing === true || sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled";
                     const activeTrial = getActivePremiumTrial([sub.stripe]);
                     const tierLabel = sub.tier === "premium" ? "Premium" : sub.tier.charAt(0).toUpperCase() + sub.tier.slice(1);
 
@@ -1878,7 +1879,11 @@ function SubscriptionsTab() {
                           </div>
 
                           <div className="flex flex-col gap-2 items-end">
-                            {isThinkific ? (
+                            {isStripeEnded ? (
+                              <p className="max-w-56 text-right text-xs leading-relaxed text-gray-500">
+                                This subscription has ended. You will not be charged again.
+                              </p>
+                            ) : isThinkific ? (
                               <a
                                 href={sub.thinkificManageUrl}
                                 target="_blank"
@@ -1953,6 +1958,7 @@ function SubscriptionsTab() {
           <div className="space-y-4">
             {courseSubscriptions.map(sub => {
               const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
+              const isStripeEnded = sub.stripe?.isMissing === true || sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled";
               return (
                 <div key={sub.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -1980,7 +1986,11 @@ function SubscriptionsTab() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 items-end">
-                      {sub.stripeSubscriptionId && (
+                      {isStripeEnded ? (
+                        <p className="max-w-56 text-right text-xs leading-relaxed text-gray-500">
+                          This subscription has ended. You will not be charged again.
+                        </p>
+                      ) : sub.stripeSubscriptionId && (
                         isCancelPending ? (
                           <Button
                             size="sm"
@@ -2027,7 +2037,7 @@ function SubscriptionsTab() {
           <div className="space-y-4">
             {enrollmentSubscriptions.map((sub: any) => {
               const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
-              const isCancelled = sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled";
+              const isCancelled = sub.stripe?.isMissing === true || sub.stripe?.status === "cancelled" || sub.stripe?.status === "canceled";
               return (
                 <div key={sub.enrollmentId} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -2055,7 +2065,11 @@ function SubscriptionsTab() {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 items-end">
-                      {isCancelPending ? (
+                      {isCancelled ? (
+                        <p className="max-w-56 text-right text-xs leading-relaxed text-gray-500">
+                          This subscription has ended. You will not be charged again.
+                        </p>
+                      ) : isCancelPending ? (
                         <Button
                           size="sm"
                           variant="outline"
@@ -2071,7 +2085,6 @@ function SubscriptionsTab() {
                           size="sm"
                           variant="outline"
                           onClick={() => setConfirmCancelEnrollment({ enrollmentId: sub.enrollmentId, courseTitle: sub.courseTitle })}
-                          disabled={isCancelled}
                           className="text-red-600 border-red-200 hover:bg-red-50"
                         >
                           <XCircle className="w-3.5 h-3.5 mr-1" />

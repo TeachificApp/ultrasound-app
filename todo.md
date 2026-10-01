@@ -7,6 +7,7 @@
 - [x] Audit recurring Stripe plans, price mappings, subscriptions, and corresponding app-access entitlements.
 - [x] Verify subscription webhooks and lifecycle transitions grant, retain, and revoke app access correctly.
 - [x] Repair verified recurring-billing or access-entitlement discrepancies and add regression coverage.
+- [x] Make learner cancellation and reactivation safe when a local course, enrollment, or app-membership record references a Stripe subscription that has already been deleted or is unavailable in the configured billing account: reconcile local access, suppress unusable controls, and show that the subscription has ended and will not be charged again instead of exposing a raw Stripe API error.
 - [x] Replace production-missing brand membership Stripe Price IDs with verified live recurring price mappings.
 - [x] Enable the missing invoice.paid and invoice.payment_failed events on the production Stripe webhook before relying on renewal and failed-payment workflows.
 - [x] Exclude sunsetted Thinkific billing from current-platform recurring-payment reconciliation and remediation.
