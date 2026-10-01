@@ -82,6 +82,7 @@ import { sonoTravelersRouter } from "./routers/sonoTravelersRouter";
 import { siteSettingsRouter } from "./routers/siteSettingsRouter";
 import { newsletterRouter } from "./routers/newsletterRouter";
 import { scheduledContentAdminRouter } from "./routers/scheduledContentAdminRouter";
+import { surveyPulseRouter } from "./routers/surveyPulseRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -202,6 +203,7 @@ export const appRouter = router({
   openverseMusic: openverseMusicRouter,
   aiMusic: aiMusicRouter,
   quizCardLibrary: quizCardLibraryRouter,
+  surveyPulse: surveyPulseRouter,
   marketingSitePublic: marketingSitePublicRouter,
   marketingSiteAdmin: marketingSiteAdminRouter,
   scheduledContentAdmin: scheduledContentAdminRouter,

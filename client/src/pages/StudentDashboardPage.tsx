@@ -52,6 +52,7 @@ import {
   type StudentDashboardContentTab,
 } from "@shared/studentDashboardUrls";
 import { StudentQuizResultsPanel } from "@/pages/StudentQuizDashboard";
+import { SurveyPulse } from "@/pages/SurveyPulse";
 
 export function resolveDashboardSubscriptionCancelledAt(
   stripeSubscriptionId: string | null | undefined,
@@ -198,8 +199,8 @@ function PremiumTrialCountdownBanner() {
 }
 
 // ─── Tab types ────────────────────────────────────────────────────────────────
-type Tab = "profile" | "content" | "groups" | "subscriptions" | "purchases" | "certificates" | "instructor" | "revenue_partner";
-const VALID_TABS: Tab[] = ["profile", "content", "groups", "subscriptions", "purchases", "certificates", "instructor", "revenue_partner"];
+type Tab = "profile" | "content" | "groups" | "survey_pulse" | "subscriptions" | "purchases" | "certificates" | "instructor" | "revenue_partner";
+const VALID_TABS: Tab[] = ["profile", "content", "groups", "survey_pulse", "subscriptions", "purchases", "certificates", "instructor", "revenue_partner"];
 
 function GroupsTab() {
   return (
@@ -2941,6 +2942,7 @@ export default function StudentDashboardPage() {
   const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "content",       label: "My Content",    icon: BookOpen },
     { key: "groups",        label: "My Groups",     icon: Users },
+    { key: "survey_pulse",  label: "Survey Pulse",  icon: BarChart2 },
     { key: "profile",       label: "Profile",       icon: User },
     { key: "subscriptions", label: "Subscriptions", icon: CreditCard },
     { key: "purchases",     label: "Purchases",     icon: ShoppingCart },
@@ -3123,6 +3125,7 @@ export default function StudentDashboardPage() {
           {activeTab === "profile"       && <ProfileTab />}
           {activeTab === "content"       && <MyContentTab initialContentTab={initialContentTab} initialQuizView={initialQuizView} />}
           {activeTab === "groups"        && <GroupsTab />}
+          {activeTab === "survey_pulse"  && <SurveyPulse embedded />}
           {activeTab === "subscriptions" && <SubscriptionsTab />}
           {activeTab === "purchases"     && <PurchasesTab />}
           {activeTab === "certificates"  && <CertificatesTab />}

@@ -1,6 +1,7 @@
 export type StudentDashboardMainTab =
   | "profile"
   | "content"
+  | "survey_pulse"
   | "subscriptions"
   | "purchases"
   | "certificates"
@@ -21,6 +22,7 @@ export type StudentDashboardContentTab =
 export const STUDENT_DASHBOARD_MAIN_TABS = new Set<StudentDashboardMainTab>([
   "profile",
   "content",
+  "survey_pulse",
   "subscriptions",
   "purchases",
   "certificates",

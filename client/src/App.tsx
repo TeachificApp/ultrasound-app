@@ -339,6 +339,7 @@ const LabAdmin = lazy(() => import("./pages/iheartecho/LabAdmin"));
 const EducatorAdmin = lazy(() => import("./pages/iheartecho/EducatorAdmin"));
 const StudentDashboard = lazy(() => import("./pages/iheartecho/StudentDashboard"));
 const StudentDashboardPage = lazy(() => import("./pages/StudentDashboardPage"));
+const SurveyPulse = lazy(() => import("./pages/SurveyPulse"));
 const SoundBytesPage = lazy(() => import("./pages/SoundBytes"));
 
 // ── CME Hub ─────────────────────────────────────────────────────────────────────────
@@ -422,6 +423,8 @@ function Router() {
         <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/survey-pulse/:view" component={SurveyPulse} />
+        <Route path="/survey-pulse" component={SurveyPulse} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
 
@@ -814,6 +817,9 @@ function MembersRouter() {
       <Route path="/reports/analytics/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsReport embed /></Suspense>}</Route>
       <Route path="/reports/dashboard/:token">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard /></Suspense>}</Route>
       <Route path="/reports/dashboard/:token/embed">{() => <Suspense fallback={null}><PublicFormAnalyticsDashboard embed /></Suspense>}</Route>
+      {/* ── Sonographer Survey Pulse — public and independently anonymous ── */}
+      <Route path="/survey-pulse/:view" component={SurveyPulse} />
+      <Route path="/survey-pulse" component={SurveyPulse} />
       {/* ── Public purchase pages — outside MembersLayout (no auth required) ── */}
       <Route path="/memberships/:slug">{() => <Suspense fallback={pageFallback}><MembershipPage /></Suspense>}</Route>
       <Route path="/bundles/:slug" component={BundleLanding} />
@@ -940,6 +946,8 @@ function LMSRouter() {
           <Switch>
             {/* LMS Home */}
             <Route path="/" component={LMSHome} />
+            <Route path="/survey-pulse/:view" component={SurveyPulse} />
+            <Route path="/survey-pulse" component={SurveyPulse} />
             {/* Community — static paths before /:slug catch-all */}
             <Route path="/community" component={CommunityHub} />
             <Route path="/community/leaderboard" component={CommunityLeaderboard} />
@@ -1113,6 +1121,8 @@ function IHeartEchoRouter() {
         <Route path="/dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard/my-content" component={LegacyStudentDashboardRedirect} />
         <Route path="/my-dashboard" component={StudentDashboardPage} />
+        <Route path="/survey-pulse/:view" component={SurveyPulse} />
+        <Route path="/survey-pulse" component={SurveyPulse} />
         <Route path="/affiliate-dashboard" component={AffiliateDashboard} />
         <Route path="/ref/:slug" component={AffiliateRedirect} />
         {/* ── Team / University Subscriptions ──────────────────────── */}

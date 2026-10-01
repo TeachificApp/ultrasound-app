@@ -8,7 +8,7 @@ import {
   Heart, Calculator, ClipboardList, Activity,
   BookOpen, Stethoscope, Zap, ExternalLink, MessageCircle, Award, Shield, GraduationCap,
   BookMarked, Library, Crown, Layers, ClipboardCheck, Brain, Trophy, Volume2, FileText, BookCheck,
-  Briefcase
+  Briefcase, BarChart3
 } from "lucide-react";
 
 export interface NavItem {
@@ -61,6 +61,7 @@ const AAUS_NAV_GROUPS: NavGroup[] = [
       { path: "/case-library", label: "Case Library", icon: Library },
       { path: "/soundbytes-aaus", label: "SoundBytes\u2122", icon: BookMarked },
       { path: "/cme", label: "CME Hub", icon: GraduationCap },
+      { path: "/survey-pulse", label: "Survey Pulse", icon: BarChart3 },
       { path: "/registry-review", label: "Registry Review Hub", icon: ClipboardCheck },
       { path: "__LEARN_FETAL_ECHO_URL__", label: "Learn Fetal Echo", icon: BookOpen, external: true },
       { path: "__LEARN_ECHO_URL__", label: "Learn Echo", icon: BookOpen, external: true },
@@ -185,6 +186,7 @@ const IHE_NAV_GROUPS: NavGroup[] = [
       { path: "/leaderboard", label: "Leaderboard", icon: Trophy },
       { path: "/soundbytes-ihe", label: "SoundBytes\u2122", icon: Volume2 },
       { path: "/cme", label: "CME Hub", icon: GraduationCap },
+      { path: "/survey-pulse", label: "Survey Pulse", icon: BarChart3 },
       { path: "/registry-review", label: "Registry Review", icon: BookMarked },
       { path: "__LEARN_ACS_URL__", label: "ACS Mastery", icon: Award, external: true },
       { path: "__LEARN_ECHO_URL__", label: "Learn Echo", icon: GraduationCap, external: true },

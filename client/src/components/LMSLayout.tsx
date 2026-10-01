@@ -10,7 +10,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users, DollarSign, Briefcase
+  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users, DollarSign, Briefcase, BarChart3
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -43,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Education Library", href: "/education-library", icon: <BookOpen className="w-4 h-4" /> },
   { label: "Workshops", href: "/workshops", icon: <Briefcase className="w-4 h-4" /> },
   { label: "Cross-Training", href: "/cross-training", icon: <Users className="w-4 h-4" /> },
+  { label: "Survey Pulse", href: "/survey-pulse", icon: <BarChart3 className="w-4 h-4" /> },
   { label: "Community", href: "/community/all-about-ultrasound", icon: <Users className="w-4 h-4" /> },
 ];
 
@@ -57,15 +58,14 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
   })));
   const headerNavWithoutQuizItems = removeQuizNavigationItems(managedHeaderNavItems);
   const headerNavItems = (() => {
-    const crossTraining = { label: "Cross-Training", href: "/cross-training" };
-    if (headerNavWithoutQuizItems.some((item) => item.href === crossTraining.href)) return headerNavWithoutQuizItems;
-    const workshopsIndex = headerNavWithoutQuizItems.findIndex((item) => item.href === "/workshops");
-    if (workshopsIndex < 0) return [...headerNavWithoutQuizItems, crossTraining];
-    return [
-      ...headerNavWithoutQuizItems.slice(0, workshopsIndex + 1),
-      crossTraining,
-      ...headerNavWithoutQuizItems.slice(workshopsIndex + 1),
-    ];
+    const ensureAfter = (items: typeof headerNavWithoutQuizItems, required: { label: string; href: string }, afterHref: string) => {
+      if (items.some((item) => item.href === required.href)) return items;
+      const index = items.findIndex((item) => item.href === afterHref);
+      if (index < 0) return [...items, required];
+      return [...items.slice(0, index + 1), required, ...items.slice(index + 1)];
+    };
+    const withCrossTraining = ensureAfter(headerNavWithoutQuizItems, { label: "Cross-Training", href: "/cross-training" }, "/workshops");
+    return ensureAfter(withCrossTraining, { label: "Survey Pulse", href: "/survey-pulse" }, "/cross-training");
   })();
   const { items: managedProfileNavItems } = useSiteNavMenu("profile", []);
   const profileNavItems = removeQuizNavigationItems(managedProfileNavItems);

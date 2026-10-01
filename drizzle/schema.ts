@@ -8909,3 +8909,32 @@ export const studyGroupWorkspaceBlocks = mysqlTable("study_group_workspace_block
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
 export type StudyGroupWorkspaceBlock = typeof studyGroupWorkspaceBlocks.$inferSelect;
+
+// ─── Sonographer Survey Pulse ─────────────────────────────────────────────────
+// Purposefully anonymous compensation and workforce survey records. This table
+// has no account, contact, device, IP, employer, or free-text columns.
+export const surveyPulseResponses = mysqlTable("survey_pulse_responses", {
+  id: int("id").autoincrement().primaryKey(),
+  state: varchar("state", { length: 2 }).notNull(),
+  specialty: varchar("specialty", { length: 100 }).notNull(),
+  credentialsJson: text("credentials_json"),
+  experienceBand: varchar("experience_band", { length: 40 }).notNull(),
+  employmentSetting: varchar("employment_setting", { length: 100 }).notNull(),
+  employmentType: varchar("employment_type", { length: 50 }).notNull(),
+  role: varchar("role", { length: 100 }).notNull(),
+  annualBaseSalaryCents: int("annual_base_salary_cents").notNull(),
+  hourlyRateCents: int("hourly_rate_cents"),
+  weeklyHours: smallint("weekly_hours"),
+  callResponsibilities: boolean("call_responsibilities").notNull().default(false),
+  callPayType: varchar("call_pay_type", { length: 80 }),
+  additionalCompensationCents: int("additional_compensation_cents"),
+  travelAssignment: boolean("travel_assignment").notNull().default(false),
+  benefitsJson: text("benefits_json"),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+}, (t) => ({
+  stateIdx: index("idx_survey_pulse_state").on(t.state),
+  specialtyIdx: index("idx_survey_pulse_specialty").on(t.specialty),
+  submittedIdx: index("idx_survey_pulse_submitted").on(t.submittedAt),
+}));
+export type SurveyPulseResponse = typeof surveyPulseResponses.$inferSelect;
+export type InsertSurveyPulseResponse = typeof surveyPulseResponses.$inferInsert;
