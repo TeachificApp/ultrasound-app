@@ -11,6 +11,7 @@ import { z } from "zod";
 import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import { syncStripeProduct } from "../stripeSync";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import {
@@ -82,25 +83,18 @@ export const workshopPublicRouter = router({
   /** Get a workshop landing page (slug-based, public) */
   getBySlug: publicProcedure
     .input(z.object({ slug: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [workshop] = await db
         .select()
         .from(workshops)
-        .where(
-          and(
-            eq(workshops.slug, input.slug),
-            or(
-              eq(workshops.status, "public"),
-              eq(workshops.status, "hidden"),
-              eq(workshops.status, "waitlist"),
-              eq(workshops.status, "presale")
-            )
-          )
-        )
+        .where(eq(workshops.slug, input.slug))
         .limit(1);
       if (!workshop) throw new TRPCError({ code: "NOT_FOUND" });
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      const isPublicStatus = ["public", "hidden", "waitlist", "presale"].includes(workshop.status);
+      if (!isPublicStatus && !canPreview) throwUnavailableDraftContent();
 
       // Expose active, pre-sale, and waitlist instances so each can render its own CTA.
       const allInstances = await db
@@ -227,7 +221,7 @@ export const workshopPublicRouter = router({
   /** Public: get workshop instances by their IDs — used by cohort_instance_cards_auto block on course landing pages */
   getInstancesByIds: publicProcedure
     .input(z.object({ ids: z.array(z.number()) }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       if (input.ids.length === 0) return [];
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -247,17 +241,21 @@ export const workshopPublicRouter = router({
           venueState: workshopInstances.venueState,
           description: workshopInstances.description,
           workshopTitle: workshops.title,
+          workshopStatus: workshops.status,
         })
         .from(workshopInstances)
         .innerJoin(workshops, eq(workshopInstances.workshopId, workshops.id))
         .where(sql`${workshopInstances.id} IN (${sql.join(input.ids.map(id => sql`${id}`), sql`, `)})`);
-      return rows;
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      return canPreview
+        ? rows
+        : rows.filter((row) => ["public", "hidden", "waitlist", "presale"].includes(row.workshopStatus) && ["published", "presale", "waitlist"].includes(row.status));
     }),
 
   /** Public: get all upcoming published instances for a specific workshop (used by CICA block when no specific instances are selected) */
   getInstancesByWorkshopId: publicProcedure
     .input(z.object({ workshopId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const rows = await db
@@ -276,6 +274,7 @@ export const workshopPublicRouter = router({
           venueState: workshopInstances.venueState,
           description: workshopInstances.description,
           workshopTitle: workshops.title,
+          workshopStatus: workshops.status,
         })
         .from(workshopInstances)
         .innerJoin(workshops, eq(workshopInstances.workshopId, workshops.id))
@@ -283,12 +282,15 @@ export const workshopPublicRouter = router({
           sql`${workshopInstances.workshopId} = ${input.workshopId} AND ${workshopInstances.status} IN ('published', 'open', 'active')`
         )
         .orderBy(workshopInstances.startDate);
-      return rows;
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      return canPreview
+        ? rows
+        : rows.filter((row) => ["public", "hidden", "waitlist", "presale"].includes(row.workshopStatus));
     }),
   /** Public: get live seat availability for a workshop instance (no cache — real-time) */
   getSeatAvailability: publicProcedure
     .input(z.object({ instanceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [instance] = await db
@@ -297,11 +299,17 @@ export const workshopPublicRouter = router({
           title: workshopInstances.title,
           status: workshopInstances.status,
           availableForPurchase: workshopInstances.availableForPurchase,
+          workshopStatus: workshops.status,
         })
         .from(workshopInstances)
+        .innerJoin(workshops, eq(workshops.id, workshopInstances.workshopId))
         .where(eq(workshopInstances.id, input.instanceId))
         .limit(1);
       if (!instance) throw new TRPCError({ code: "NOT_FOUND" });
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (!canPreview && (!["public", "hidden", "waitlist", "presale"].includes(instance.workshopStatus) || !["published", "presale", "waitlist"].includes(instance.status))) {
+        throwUnavailableDraftContent();
+      }
       return {
         instanceId: instance.id,
         title: instance.title,
@@ -314,7 +322,7 @@ export const workshopPublicRouter = router({
   /** Public: get landing blocks + basic info for a specific workshop instance */
   getInstancePage: publicProcedure
     .input(z.object({ instanceId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const row = await db
@@ -323,6 +331,15 @@ export const workshopPublicRouter = router({
         .where(eq(workshopInstances.id, input.instanceId))
         .then(r => r[0] ?? null);
       if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      const [workshop] = await db
+        .select({ status: workshops.status })
+        .from(workshops)
+        .where(eq(workshops.id, row.workshopId))
+        .limit(1);
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      const isPublicWorkshop = !!workshop && ["public", "hidden", "waitlist", "presale"].includes(workshop.status);
+      const isPublicInstance = ["published", "presale", "waitlist"].includes(row.status);
+      if (!canPreview && (!isPublicWorkshop || !isPublicInstance)) throwUnavailableDraftContent();
       // Count active enrollments for real-time seat availability
       const [countRow] = await db
         .select({ count: sql<number>`count(*)` })
@@ -496,6 +513,9 @@ export const workshopLearnerRouter = router({
       const [workshop] = await db.select().from(workshops)
         .where(eq(workshops.id, input.workshopId)).limit(1);
       if (!workshop) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop not found" });
+      if (!["public", "hidden", "waitlist", "presale"].includes(workshop.status)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This workshop is currently unavailable." });
+      }
       // Pick the best instance: first upcoming, else first active, else any
       const allInstances = await db.select().from(workshopInstances)
         .where(eq(workshopInstances.workshopId, input.workshopId))
@@ -505,6 +525,9 @@ export const workshopLearnerRouter = router({
         ?? allInstances.find(i => i.status === "active")
         ?? allInstances[0];
       if (!instance) throw new TRPCError({ code: "NOT_FOUND", message: "No available instance for this workshop" });
+      if (!["published", "presale", "waitlist"].includes(instance.status)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This workshop is currently unavailable." });
+      }
       // Idempotent: skip if already enrolled
       const [existing] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)
         .where(and(
@@ -562,6 +585,9 @@ export const workshopLearnerRouter = router({
         .where(eq(workshopInstances.id, input.instanceId))
         .limit(1);
       if (!instance) throw new TRPCError({ code: "NOT_FOUND", message: "Workshop instance not found" });
+      if (!["public", "hidden", "waitlist", "presale"].includes(workshop.status) || !["published", "presale", "waitlist"].includes(instance.status)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This workshop is currently unavailable." });
+      }
 
       const { platformSettings } = await import("../../drizzle/schema");
       const [settings] = await db.select().from(platformSettings).limit(1);

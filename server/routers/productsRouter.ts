@@ -7,6 +7,7 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
+import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import {
   getTitleByIsbn,
@@ -99,10 +100,10 @@ export const productsPublicRouter = router({
       const [product] = await db.select().from(physicalProducts)
         .where(eq(physicalProducts.slug, input.slug)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND" });
-      // Allow preview for admins
-      const isAdmin = (ctx.user as any)?.role === "admin" || (ctx.user as any)?.role === "platform_admin";
-      if (product.status !== "published" && !input.preview && !isAdmin) {
-        throw new TRPCError({ code: "NOT_FOUND" });
+      // Never trust a preview query parameter: only Platform Admin access can reveal drafts.
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (["draft", "archived", "private"].includes(product.status) && !canPreview) {
+        throwUnavailableDraftContent();
       }
       // Fetch active pricing options
       const pricingOptions = await db.select().from(physicalProductPricingOptions)
@@ -161,7 +162,7 @@ export const productsLearnerRouter = router({
       const [product] = await db.select().from(physicalProducts)
         .where(eq(physicalProducts.slug, input.productSlug)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
-      if (product.status !== "published" && !product.isFree) throw new TRPCError({ code: "FORBIDDEN", message: "This product is not available." });
+      if (product.status !== "published") throw new TRPCError({ code: "FORBIDDEN", message: "This product is not available." });
       if (product.checkoutMode !== "native") throw new TRPCError({ code: "BAD_REQUEST", message: "This product uses an external checkout." });
       const userId = ctx.user?.id ?? 0;
       if (product.isFree || Number(product.price) === 0) {

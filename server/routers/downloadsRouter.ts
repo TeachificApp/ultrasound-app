@@ -6,6 +6,7 @@ import { and, desc, eq, sql, asc, or, like, gte, lte, count } from "drizzle-orm"
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb, getUserById, getOrCreateAccessToken } from "../db";
+import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import {
   digitalProducts,
   digitalProductFiles,
@@ -72,11 +73,12 @@ export const downloadsPublicRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [product] = await db.select().from(digitalProducts)
         .where(eq(digitalProducts.slug, input.slug)).limit(1);
-      // 'published' and 'hidden' are accessible by direct URL; draft/archived/private are not
-      // Admins can always see any product regardless of status
-      const isAdmin = ctx.user?.role === "admin";
-      if (!product || (!isAdmin && (product.status === "draft" || product.status === "archived" || product.status === "private"))) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+      if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+      // Published and hidden downloads retain direct-link behavior; draft-like
+      // records are visible only to a Platform Admin, never via ?preview=admin.
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (!canPreview && ["draft", "archived", "private"].includes(product.status)) {
+        throwUnavailableDraftContent();
       }
       // Get file count (not full URLs — those are only for purchasers)
       const files = await db.select({
@@ -251,6 +253,7 @@ export const downloadsLearnerRouter = router({
       const [product] = await db.select().from(digitalProducts)
         .where(eq(digitalProducts.id, input.productId)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND" });
+      if (["draft", "archived", "private"].includes(product.status)) throw new TRPCError({ code: "FORBIDDEN", message: "This download is currently unavailable." });
       if ((product as any).bundleOnly) throw new TRPCError({ code: "FORBIDDEN", message: "This product is only available as part of a bundle." });
       if (product.status === "waitlist") throw new TRPCError({ code: "FORBIDDEN", message: "This download is currently accepting Waitlist signups." });
       if (product.status === "enrollment_closed") throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment Closed" });
@@ -589,6 +592,7 @@ export const downloadsLearnerRouter = router({
       const [product] = await db.select().from(digitalProducts)
         .where(eq(digitalProducts.slug, input.productSlug)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
+      if (["draft", "archived", "private"].includes(product.status)) throw new TRPCError({ code: "FORBIDDEN", message: "This download is currently unavailable." });
       if ((product as any).bundleOnly) throw new TRPCError({ code: "FORBIDDEN", message: "This product is only available as part of a bundle." });
       const userId = ctx.user?.id ?? 0;
       if (product.isFree) {

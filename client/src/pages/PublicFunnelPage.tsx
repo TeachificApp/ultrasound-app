@@ -29,6 +29,7 @@ import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from
 import { LEARN_APP_URL } from "@/hooks/useSubdomain";
 import { getLoginUrl } from "@/const";
 import { MathContent } from "@/components/MathContent";
+import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
 
@@ -1685,13 +1686,7 @@ export default function PublicFunnelPage() {
   }
 
   if (error || !data) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-600">
-        <h1 className="text-2xl font-bold mb-2">Page Not Found</h1>
-        <p className="text-gray-400 mb-4">This funnel page doesn't exist or is no longer active.</p>
-        <Button onClick={() => navigate("/")} variant="outline">Go Home</Button>
-      </div>
-    );
+    return <UnavailableContentPage kind="page" />;
   }
 
   return <FunnelPageContent data={data} />;

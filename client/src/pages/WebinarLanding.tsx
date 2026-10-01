@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Calendar, Clock, Users, Video, Bell, CheckCircle } from "lucide-react";
 import type { Block } from "@/components/BlockPreview";
 import { BlockPreview } from "@/components/BlockPreview";
+import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { useDirectCheckout } from "@/lib/directCheckout";
 import type { UserParamSource } from "@/lib/userUrlParams";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
@@ -345,13 +346,7 @@ export default function WebinarLanding() {
   }
 
   if (!webinar || error) {
-    return (
-      <div className="text-center py-20 text-gray-500">
-        <Video className="w-12 h-12 mx-auto mb-3 opacity-30" />
-        <p className="text-lg font-medium">Webinar not found</p>
-        <Button variant="link" onClick={() => navigate("/")}>Back to Home</Button>
-      </div>
-    );
+    return <UnavailableContentPage kind="webinar" returnHref="/" returnLabel="Back to Home" />;
   }
 
   const isWaitlist = webinar.status === "waitlist";

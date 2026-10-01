@@ -31,6 +31,7 @@ import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { handleCtaBtnClick, type DirectCheckoutHandler } from "@/lib/ctaUtils";
 import { useDirectCheckout } from "@/lib/directCheckout";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
+import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { getAdminUrl } from "@/hooks/useSubdomain";
 import { formatWorkshopDollars, shouldRouteWorkshopCtaToCheckout } from "../../../shared/workshopPricing";
 import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from "@shared/availabilityPresentation";
@@ -408,21 +409,7 @@ export default function WorkshopLanding() {
 
   // ── Not found ──────────────────────────────────────────────────────────────
   if (error || !workshop) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Briefcase className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h1 className="text-xl font-semibold text-gray-700 mb-2">Workshop Not Found</h1>
-          <p className="text-gray-500 mb-4">This workshop is not available.</p>
-          <Link href="/education-library">
-            <Button variant="outline" className="gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Back to Library
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
+    return <UnavailableContentPage kind="workshop" returnHref="/education-library" returnLabel="Browse Education Library" />;
   }
 
   // ── Landing blocks (page builder) ─────────────────────────────────────────

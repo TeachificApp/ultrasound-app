@@ -31,6 +31,7 @@ import { useSeoHead } from "@/hooks/useSeoHead";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { CountdownV2Block, ImageLinkWrapper, CC } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
+import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 import { resolveScheduledCountdownTarget } from "@shared/platformTime";
 
@@ -776,16 +777,7 @@ export default function DownloadLanding() {
   }
 
   if (error || !product) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <FileDown className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-          <h2 className="text-xl font-semibold text-gray-700">Product Not Found</h2>
-          <p className="text-gray-500 mt-1">This download may have been removed or is not yet available.</p>
-          <Link href="/downloads"><Button variant="outline" className="mt-4"><ArrowLeft className="w-4 h-4 mr-1" /> Browse Downloads</Button></Link>
-        </div>
-      </div>
-    );
+    return <UnavailableContentPage kind="download" returnHref="/downloads" returnLabel="Browse Downloads" />;
   }
 
   const price = product.isFree ? "Free" : formatAuthoredDollars(product.price);

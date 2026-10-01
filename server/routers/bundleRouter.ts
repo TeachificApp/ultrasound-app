@@ -9,6 +9,7 @@ import { and, desc, eq, sql, asc } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
+import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import {
   bundles, bundleItems, bundleEnrollments, users,
   lmsCourses, lmsEnrollments, lmsQuizzes, digitalBundlePurchases,
@@ -84,8 +85,9 @@ export const bundlePublicRouter = router({
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [bundle] = await db.select().from(bundles).where(eq(bundles.slug, input.slug)).limit(1);
       if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
-      const isAdmin = (ctx.user as any)?.role === "admin";
-      if (!["published", "waitlist", "presale", "enrollment_closed"].includes(bundle.status) && !input.preview && !isAdmin) throw new TRPCError({ code: "NOT_FOUND" });
+      // Only a verified Platform Admin can review a draft bundle by direct URL.
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (!["published", "waitlist", "presale", "enrollment_closed"].includes(bundle.status) && !canPreview) throwUnavailableDraftContent();
       const items = await db.select().from(bundleItems).where(eq(bundleItems.bundleId, bundle.id)).orderBy(asc(bundleItems.sortOrder));
       // Enrich items with titles from their respective tables
       const enrichedItems = await Promise.all(items.map(async (item) => {
@@ -159,6 +161,7 @@ export const bundleLearnerRouter = router({
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [bundle] = await db.select().from(bundles).where(eq(bundles.id, input.bundleId)).limit(1);
       if (!bundle) throw new TRPCError({ code: "NOT_FOUND" });
+      if (bundle.status === "draft") throw new TRPCError({ code: "FORBIDDEN", message: "This bundle is currently unavailable." });
       if (bundle.status === "waitlist") throw new TRPCError({ code: "FORBIDDEN", message: "This bundle is currently accepting Waitlist signups." });
       if (bundle.status === "enrollment_closed") throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment Closed" });
       // If free bundle, just enroll directly (requires login)

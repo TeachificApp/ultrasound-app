@@ -41,6 +41,7 @@ import { availabilityPresentationLabel, shouldHideEnrollmentPresentation } from 
 import { handleCtaBtnClick } from "@/lib/ctaUtils";
 export { handleCtaBtnClick };
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
+import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 import { isScheduledDeadlineOpen, resolveScheduledCountdownTarget, scheduledWallTimeToUtc } from "@shared/platformTime";
 import { shouldRouteWorkshopCtaToCheckout } from "@shared/workshopPricing";
@@ -1937,13 +1938,7 @@ export default function CourseLanding() {
   }
 
   if (!course) {
-    return (
-      <div className="text-center py-20 text-gray-500">
-        <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
-        <p className="text-lg font-medium">Course not found</p>
-        <Button variant="link" onClick={() => navigate("/education-library")}>Back to Library</Button>
-      </div>
-    );
+    return <UnavailableContentPage kind="course" returnHref="/education-library" returnLabel="Browse Education Library" />;
   }
 
   const lp = course.landingPage;

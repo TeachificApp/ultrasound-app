@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { Suspense, lazy } from "react";
 import { useSeoHead } from "@/hooks/useSeoHead";
+import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 
 // Re-use the same block renderer from PublicFunnelPage
 const PublicFunnelPage = lazy(() => import("./PublicFunnelPage"));
@@ -31,13 +32,7 @@ export default function StandaloneLandingPage() {
   }
 
   if (error || !data) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-600">
-        <h1 className="text-2xl font-bold mb-2">Page Not Found</h1>
-        <p className="text-gray-400 mb-4">This page doesn't exist or is no longer active.</p>
-        <Button onClick={() => navigate("/")} variant="outline">Go Home</Button>
-      </div>
-    );
+    return <UnavailableContentPage kind="page" />;
   }
 
   const { funnel, page } = data;

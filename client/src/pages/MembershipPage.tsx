@@ -15,6 +15,7 @@ import { BlockPreview } from "@/components/BlockPreview";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
+import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { Check, Award, Loader2, Tag } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
@@ -191,12 +192,7 @@ export default function MembershipPage() {
   }
 
   if (!plan) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen text-gray-500">
-        <Award className="w-12 h-12 mb-3 opacity-30" />
-        <p className="text-lg font-medium">Membership not found</p>
-      </div>
-    );
+    return <UnavailableContentPage kind="membership" returnHref="/education-library" returnLabel="Browse Education Library" />;
   }
 
   const blocks = plan.landingPageBlocks ? JSON.parse(plan.landingPageBlocks) : [];

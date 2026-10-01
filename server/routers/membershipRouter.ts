@@ -3,6 +3,7 @@ import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "../_core/trpc";
 import { getDb } from "../db";
+import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import {
   membershipPlans,
   membershipPlanAccess,
@@ -87,16 +88,17 @@ const listPublicMemberships = publicProcedure
 
 const getMembershipBySlug = publicProcedure
   .input(z.object({ slug: z.string() }))
-  .query(async ({ input }) => {
+  .query(async ({ input, ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const [plan] = await db
       .select()
       .from(membershipPlans)
-      .where(eq(membershipPlans.slug, input.slug));
+    .where(eq(membershipPlans.slug, input.slug));
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found" });
-    if (!["published", "waitlist", "presale", "enrollment_closed"].includes(plan.status)) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found" });
+    const canPreview = await canPreviewDraftContent(db, ctx.user);
+    if (!["published", "waitlist", "presale", "enrollment_closed"].includes(plan.status) && !canPreview) {
+      throwUnavailableDraftContent();
     }
     const rawItems = await db
       .select()
@@ -768,6 +770,7 @@ const createMembershipCheckout = protectedProcedure
       .from(membershipPlans)
       .where(eq(membershipPlans.id, input.planId));
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership not found" });
+    if (plan.status === "draft") throw new TRPCError({ code: "FORBIDDEN", message: "This membership is currently unavailable." });
     if (plan.status === "waitlist") throw new TRPCError({ code: "FORBIDDEN", message: "This membership is currently accepting Waitlist signups." });
     if (plan.status === "enrollment_closed") throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment Closed" });
 
@@ -868,11 +871,13 @@ const saveMembershipCheckoutPageConfig = protectedProcedure
 
 const getPublicMembershipCheckoutPageConfig = publicProcedure
   .input(z.object({ planSlug: z.string() }))
-  .query(async ({ input }) => {
+  .query(async ({ input, ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const [plan] = await db.select({ checkoutPageConfig: membershipPlans.checkoutPageConfig }).from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
+    const [plan] = await db.select({ status: membershipPlans.status, checkoutPageConfig: membershipPlans.checkoutPageConfig }).from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
     if (!plan) throw new TRPCError({ code: "NOT_FOUND" });
+    const canPreview = await canPreviewDraftContent(db, ctx.user);
+    if (plan.status === "draft" && !canPreview) throwUnavailableDraftContent();
     return { config: plan.checkoutPageConfig ?? null, courseStats: { totalLessons: 0, totalSections: 0, hasCertificate: false } };
   });
 
@@ -883,6 +888,7 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+    if (plan.status === "draft") throw new TRPCError({ code: "FORBIDDEN", message: "This membership is currently unavailable." });
     if (plan.status === "waitlist") throw new TRPCError({ code: "FORBIDDEN", message: "This membership is currently accepting Waitlist signups." });
     if (plan.status === "enrollment_closed") throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment Closed" });
 
@@ -1029,6 +1035,7 @@ const guestMembershipCheckoutRegister = publicProcedure
 
     const [plan] = await db.select().from(membershipPlans).where(eq(membershipPlans.slug, input.planSlug)).limit(1);
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+    if (plan.status === "draft") throw new TRPCError({ code: "FORBIDDEN", message: "This membership is currently unavailable." });
 
     const { getOrCreateUserByEmail } = await import("../db");
     const { user } = await getOrCreateUserByEmail({
@@ -1473,6 +1480,7 @@ const selfEnrollFree = protectedProcedure
       .where(eq(membershipPlans.id, input.planId))
       .limit(1);
     if (!plan) throw new TRPCError({ code: "NOT_FOUND", message: "Membership plan not found" });
+    if (plan.status === "draft") throw new TRPCError({ code: "FORBIDDEN", message: "This membership is currently unavailable." });
     if (plan.stripePriceId) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "This membership requires payment. Please use the checkout flow." });
     }

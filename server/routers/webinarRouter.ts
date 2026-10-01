@@ -10,6 +10,7 @@ import { and, desc, eq, sql, asc, isNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
+import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import {
   webinars, webinarRegistrations, webinarComments, webinarSessions, webinarFunnelSteps, users, cmeActivityForms,
 } from "../../drizzle/schema";
@@ -81,8 +82,9 @@ export const webinarPublicRouter = router({
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [w] = await db.select().from(webinars).where(eq(webinars.slug, input.slug)).limit(1);
       if (!w) throw new TRPCError({ code: "NOT_FOUND" });
-      const isAdmin = (ctx.user as any)?.role === "admin";
-      if (w.status !== "published" && !input.preview && !isAdmin) throw new TRPCError({ code: "NOT_FOUND" });
+      // A `preview` URL parameter does not grant access to a draft webinar.
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (w.status === "draft" && !canPreview) throwUnavailableDraftContent();
       let isRegistered = false;
       let isPresaleRestricted = false;
       if ((ctx.user as any)?.id) {
@@ -113,6 +115,7 @@ export const webinarLearnerRouter = router({
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
       if (!webinar) throw new TRPCError({ code: "NOT_FOUND" });
+      if (webinar.status === "draft") throw new TRPCError({ code: "FORBIDDEN", message: "This webinar is currently unavailable." });
       const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
         .where(and(eq(webinarRegistrations.webinarId, input.webinarId), eq(webinarRegistrations.userId, ctx.user.id))).limit(1);
       if (!ex) await db.insert(webinarRegistrations).values({ webinarId: input.webinarId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId, accessLevel: webinar.status === "presale" ? "presale" : "full" });
@@ -452,6 +455,7 @@ export const webinarSessionRouter = router({
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [webinar] = await db.select().from(webinars).where(eq(webinars.slug, input.webinarSlug)).limit(1);
       if (!webinar) throw new TRPCError({ code: "NOT_FOUND", message: "Webinar not found" });
+      if (webinar.status === "draft") throw new TRPCError({ code: "FORBIDDEN", message: "This webinar is currently unavailable." });
       const { isFree, priceCents } = resolveWebinarPricing(webinar, input.pricingOptionId);
       const subtitle = webinar.hostTitle ?? null;
       const userId = ctx.user?.id ?? 0;

@@ -23,6 +23,7 @@ import { BlockPreview } from "@/components/BlockPreview";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
+import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 
 const ITEM_TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -122,19 +123,7 @@ export default function BundleLanding() {
   }
 
   if (!data?.bundle) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Package className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-          <h2 className="text-xl font-semibold text-gray-700">Bundle Not Found</h2>
-          <Link href="/education">
-            <Button variant="outline" className="mt-4">
-              <ArrowLeft className="w-4 h-4 mr-1" /> Browse Education Library
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
+    return <UnavailableContentPage kind="bundle" returnHref="/education-library" returnLabel="Browse Education Library" />;
   }
 
   const { bundle, items, isEnrolled } = data;

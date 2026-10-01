@@ -45,6 +45,7 @@ import { toCheckoutAmountCents } from "../lib/paymentState";
 import { isCachedStripePriceCompatible, shouldInvalidateCourseStripeCache } from "../lib/stripePriceCache";
 import { resolveCheckoutTerms } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
+import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import { resolveCohortRecordingPlayback } from "../lib/cohortRecordingPlayback";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
@@ -1113,12 +1114,11 @@ export const lmsPublicRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      // draft is viewable via direct URL but CTAs are disabled ("Not Available For Purchase")
-      // archived and private are not publicly accessible; hidden is accessible by direct URL
-      // Admins can always see any course regardless of status
-      const isAdmin = ctx.user?.role === "admin";
-      if (!isAdmin) {
-        if (course.status === "archived" || course.status === "private") throw new TRPCError({ code: "NOT_FOUND" });
+      // Direct links must never expose draft landing data to learners or guests.
+      // The optional client preview flag is deliberately not an authorization signal.
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (!canPreview && ["draft", "archived", "private"].includes(course.status)) {
+        throwUnavailableDraftContent();
       }
 
       // Sections + preview lessons
@@ -1689,12 +1689,21 @@ export const lmsPublicRouter = router({
   /** Public: get landing blocks + basic info for a specific cohort group */
   getCohortGroupPage: publicProcedure
     .input(z.object({ cohortGroupId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const { getCohortGroupById, getCohortGroupLandingBlocks } = await import("../lib/cohortGroupQuery");
       const row = await getCohortGroupById(db, input.cohortGroupId);
       if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+      const [course] = await db
+        .select({ status: lmsCourses.status })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, row.courseId))
+        .limit(1);
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (!canPreview && (row.status === "draft" || !course || ["draft", "archived", "private"].includes(course.status))) {
+        throwUnavailableDraftContent();
+      }
       const landingBlocks = row.landingBlocks
         ? (JSON.parse(row.landingBlocks) as unknown[])
         : await getCohortGroupLandingBlocks(db, input.cohortGroupId);
@@ -1722,15 +1731,21 @@ export const lmsPublicRouter = router({
   /** Public: get live seat availability for a cohort group (no cache — real-time) */
   getCohortSeatAvailability: publicProcedure
     .input(z.object({ cohortGroupId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [group] = await db
-        .select({ id: lmsCohortGroups.id, name: lmsCohortGroups.name, maxStudents: lmsCohortGroups.maxStudents, status: lmsCohortGroups.status, endDate: lmsCohortGroups.endDate })
+        .select({ id: lmsCohortGroups.id, name: lmsCohortGroups.name, courseId: lmsCohortGroups.courseId, maxStudents: lmsCohortGroups.maxStudents, status: lmsCohortGroups.status, endDate: lmsCohortGroups.endDate })
         .from(lmsCohortGroups)
         .where(eq(lmsCohortGroups.id, input.cohortGroupId))
         .limit(1);
       if (!group) throw new TRPCError({ code: "NOT_FOUND" });
+      const [course] = await db.select({ status: lmsCourses.status })
+        .from(lmsCourses).where(eq(lmsCourses.id, group.courseId)).limit(1);
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (!canPreview && (group.status === "draft" || !course || ["draft", "archived", "private"].includes(course.status))) {
+        throwUnavailableDraftContent();
+      }
       // Count active enrollments directly from the enrollments table for accuracy
       const [countRow] = await db
         .select({ count: sql<number>`count(*)` })
@@ -1749,7 +1764,7 @@ export const lmsPublicRouter = router({
   /** Public: get published live sessions for a specific cohort group (for calendar embed) */
   getCohortGroupSessions: publicProcedure
     .input(z.object({ cohortGroupId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [group] = await db
@@ -1757,6 +1772,7 @@ export const lmsPublicRouter = router({
           id: lmsCohortGroups.id,
           name: lmsCohortGroups.name,
           courseId: lmsCohortGroups.courseId,
+          status: lmsCohortGroups.status,
           startDate: lmsCohortGroups.startDate,
           endDate: lmsCohortGroups.endDate,
         })
@@ -1764,6 +1780,12 @@ export const lmsPublicRouter = router({
         .where(eq(lmsCohortGroups.id, input.cohortGroupId))
         .limit(1);
       if (!group) throw new TRPCError({ code: "NOT_FOUND" });
+      const [course] = await db.select({ status: lmsCourses.status })
+        .from(lmsCourses).where(eq(lmsCourses.id, group.courseId)).limit(1);
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (!canPreview && (group.status === "draft" || !course || ["draft", "archived", "private"].includes(course.status))) {
+        throwUnavailableDraftContent();
+      }
       // Fetch published sessions for this group OR shared sessions (no group assignment)
       const sessions = await db
         .select({
@@ -2962,6 +2984,9 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (["draft", "archived", "private"].includes(course.status)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This course is currently unavailable." });
+      }
       const isPresale = (course.status as string) === "presale";
       if ((course.status as string) === "waitlist") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "This course is currently accepting waitlist signups rather than enrollments." });
@@ -3360,6 +3385,9 @@ export const lmsLearnerRouter = router({
       // 4. Create Stripe checkout session (same logic as createCheckout but with user.id)
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (["draft", "archived", "private"].includes(course.status)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This course is currently unavailable." });
+      }
       if (course.enrollmentCloseDate && !isScheduledDeadlineOpen(course.enrollmentCloseDate, "America/New_York")) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Enrollment is closed for this cohort" });
       }
@@ -4899,7 +4927,7 @@ export const lmsLearnerRouter = router({
 
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
-      if (course.status === "draft" || course.status === "archived") throw new TRPCError({ code: "NOT_FOUND" });
+      if (["draft", "archived", "private"].includes(course.status)) throw new TRPCError({ code: "NOT_FOUND" });
 
       // Fetch org-level legal URLs and checkout terms from platform_settings
       const [orgSettings] = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);

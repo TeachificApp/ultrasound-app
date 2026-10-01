@@ -8,7 +8,7 @@
 import * as crypto from "crypto";
 import { parse as parseCookieHeader } from "cookie";
 import { SignJWT, jwtVerify } from "jose";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { Request, Response } from "express";
 import { userActiveSessions, userRoles, type User } from "../../drizzle/schema";
 import { ENV } from "../_core/env";
@@ -56,7 +56,10 @@ export async function isPlatformAdminUser(db: Db, user: Pick<User, "id" | "role"
   const [role] = await db
     .select({ role: userRoles.role })
     .from(userRoles)
-    .where(and(eq(userRoles.userId, user.id), eq(userRoles.role, "platform_admin")))
+    .where(and(
+      eq(userRoles.userId, user.id),
+      inArray(userRoles.role, ["platform_admin", "platform_owner"]),
+    ))
     .limit(1);
   return Boolean(role);
 }

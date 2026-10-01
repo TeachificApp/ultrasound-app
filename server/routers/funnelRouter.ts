@@ -14,6 +14,7 @@ import { computeFunnelCheckoutTotalCents } from "../lib/checkoutPricing";
 import { getStripeClient } from "../lib/stripeClient";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
 import { hasFiniteWorkshopCapacity } from "../../shared/workshopAvailability";
+import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 
 /** Pick the next purchasable workshop instance for direct-checkout redirects. */
 function pickWorkshopCheckoutInstance(instances: Array<{
@@ -1093,13 +1094,16 @@ export const funnelPublicRouter = router({
   /** Get a funnel by slug (public) */
   getBySlug: publicProcedure
     .input(z.object({ slug: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [funnel] = await db
         .select()
         .from(funnels)
         .where(eq(funnels.slug, input.slug));
       if (!funnel) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel not found" });
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (funnel.status !== "active" && !canPreview) throwUnavailableDraftContent();
       // Track view
       await db.execute(sql`UPDATE funnels SET total_views = total_views + 1 WHERE id = ${funnel.id}`);
       const pages = await db
@@ -1108,28 +1112,30 @@ export const funnelPublicRouter = router({
         .where(eq(funnelPages.funnelId, funnel.id))
         .orderBy(asc(funnelPages.sortOrder));
       // Filter out hidden pages from the public sequence
-      const visiblePages = pages.filter(p => !p.isHidden);
+      const visiblePages = canPreview ? pages : pages.filter(p => !p.isHidden && p.isActive);
       return { ...funnel, pages: visiblePages };
     }),
 
   /** Get a standalone landing page by its slug (public — served at /p/{slug}) */
   getStandalonePage: publicProcedure
     .input(z.object({ slug: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [page] = await db
         .select()
         .from(funnelPages)
         .where(
           and(
             eq(funnelPages.slug, input.slug),
-            eq(funnelPages.isStandaloneLanding, true),
-            eq(funnelPages.isActive, true)
+            eq(funnelPages.isStandaloneLanding, true)
           )
         );
       if (!page) throw new TRPCError({ code: "NOT_FOUND", message: "Page not found" });
       // Get the parent funnel for branding
       const [funnel] = await db.select().from(funnels).where(eq(funnels.id, page.funnelId));
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (!funnel || (!canPreview && (funnel.status !== "active" || !page.isActive))) throwUnavailableDraftContent();
       // Track page view
       await db.execute(sql`UPDATE funnel_pages SET views = views + 1 WHERE id = ${page.id}`);
        return { funnel: funnel || null, page };
@@ -1138,13 +1144,16 @@ export const funnelPublicRouter = router({
   /** Get the first page of a funnel by slug — used to redirect /:slug → /:slug/:firstPageSlug */
   getFirstPage: publicProcedure
     .input(z.object({ funnelSlug: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [funnel] = await db
         .select()
         .from(funnels)
         .where(eq(funnels.slug, input.funnelSlug));
       if (!funnel) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel not found" });
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (funnel.status !== "active" && !canPreview) throwUnavailableDraftContent();
       const [firstPage] = await db
         .select({ slug: funnelPages.slug, title: funnelPages.title })
         .from(funnelPages)
@@ -1158,13 +1167,16 @@ export const funnelPublicRouter = router({
   /** Get a specific funnel page (public) */
   getPage: publicProcedure
     .input(z.object({ funnelSlug: z.string(), pageSlug: z.string() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [funnel] = await db
         .select()
         .from(funnels)
         .where(eq(funnels.slug, input.funnelSlug));
       if (!funnel) throw new TRPCError({ code: "NOT_FOUND", message: "Funnel not found" });
+      const canPreview = await canPreviewDraftContent(db, ctx.user);
+      if (funnel.status !== "active" && !canPreview) throwUnavailableDraftContent();
       const [page] = await db
         .select()
         .from(funnelPages)
@@ -1175,6 +1187,7 @@ export const funnelPublicRouter = router({
           )
         );
       if (!page) throw new TRPCError({ code: "NOT_FOUND", message: "Page not found" });
+      if (!page.isActive && !canPreview) throwUnavailableDraftContent();
       // Track page view
       await db.execute(sql`UPDATE funnel_pages SET views = views + 1 WHERE id = ${page.id}`);
       // Get next page info — prefer explicit nextPageId, fall back to next sort_order
