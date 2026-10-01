@@ -69,6 +69,11 @@ import { generateAutoLoginToken } from "../routes/autoLogin";
 import { or, like, gte, lte } from "drizzle-orm";
 import crypto from "crypto";
 import { serializeCouponTargeting, validateCouponTargeting } from "../lib/couponTargeting";
+import {
+  isStripePromotionCodeConflict,
+  normalizePromotionCode,
+  promotionCodeConflictMessage,
+} from "../lib/couponAdmin";
 import { parseBuilderConfig } from "../lib/quizBuilderConfig";
 import { stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
 type AdminAccessScope = "full" | "manager";
@@ -1792,6 +1797,24 @@ export const adminUserRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const stripe = getStripeClient();
+      const normalizedPromoCode = normalizePromotionCode(input.promoCode);
+
+      // A promotion-code value is globally unique within Stripe. Check before
+      // creating its coupon so a duplicate request cannot leave an orphan coupon.
+      if (normalizedPromoCode) {
+        const existingPromoCodes = await (stripe.promotionCodes as any).list({
+          code: normalizedPromoCode,
+          active: true,
+          limit: 1,
+        });
+        if (existingPromoCodes.data.length > 0) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: promotionCodeConflictMessage(normalizedPromoCode),
+          });
+        }
+      }
+
       const stripeProductIds = await resolveStripeCouponProductIds(db, stripe, targeting);
       const couponParams: Record<string, unknown> = {
         name: input.name,
@@ -1804,30 +1827,50 @@ export const adminUserRouter = router({
       if (stripeProductIds.length) couponParams.applies_to = { products: stripeProductIds };
       if (input.maxRedemptions) couponParams.max_redemptions = input.maxRedemptions;
       if (input.redeemBy) couponParams.redeem_by = Math.floor(new Date(input.redeemBy).getTime() / 1000);
-      const coupon = await (stripe.coupons as any).create(couponParams);
-      let promoCodeObj: Record<string, unknown> | null = null;
-      if (input.promoCode) {
-        promoCodeObj = await (stripe.promotionCodes as any).create({
-          coupon: coupon.id,
-          code: input.promoCode.toUpperCase(),
-        });
-      }
+      let coupon: any = null;
+      try {
+        coupon = await (stripe.coupons as any).create(couponParams);
+        const promoCodeObj = normalizedPromoCode
+          ? await (stripe.promotionCodes as any).create({
+              coupon: coupon.id,
+              code: normalizedPromoCode,
+            })
+          : null;
 
-      await db.insert(couponMetadata).values({
-        stripeCouponId: coupon.id,
-        scope: targeting.scope,
-        productKeys: JSON.stringify(serializeCouponTargeting(targeting)),
-        duration: "once",
-        updatedAt: Date.now(),
-      }).onDuplicateKeyUpdate({
-        set: {
+        await db.insert(couponMetadata).values({
+          stripeCouponId: coupon.id,
           scope: targeting.scope,
           productKeys: JSON.stringify(serializeCouponTargeting(targeting)),
+          duration: "once",
           updatedAt: Date.now(),
-        },
-      });
+        }).onDuplicateKeyUpdate({
+          set: {
+            scope: targeting.scope,
+            productKeys: JSON.stringify(serializeCouponTargeting(targeting)),
+            updatedAt: Date.now(),
+          },
+        });
 
-      return { coupon, promoCode: promoCodeObj, targeting };
+        return { coupon, promoCode: promoCodeObj, targeting };
+      } catch (error) {
+        // Stripe has no transaction spanning coupon, promotion code, and our
+        // local targeting metadata. Remove a brand-new coupon on any later
+        // failure so the admin list never accumulates unusable duplicates.
+        if (coupon?.id) {
+          try {
+            await (stripe.coupons as any).del(coupon.id);
+          } catch (rollbackError) {
+            console.error("[CouponAdmin] Failed to remove incomplete coupon:", coupon.id, rollbackError);
+          }
+        }
+        if (normalizedPromoCode && isStripePromotionCodeConflict(error)) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: promotionCodeConflictMessage(normalizedPromoCode),
+          });
+        }
+        throw error;
+      }
     }),
 
   listCoupons: protectedProcedure

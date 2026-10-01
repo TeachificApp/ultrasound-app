@@ -65,7 +65,12 @@ function CreateCouponDialog({ open, onClose, onCreated }: { open: boolean; onClo
       setName(""); setDiscountType("percent"); setDiscountValue(""); setPromoCode(""); setMaxRedemptions(""); setRedeemBy("");
       setScope("site_wide"); setContentTypes([]); setProductKeys([]); setTargetSearch("");
     },
-    onError: (e) => toast.error(`Failed: ${e.message}`),
+    onError: (e) => {
+      // Refresh after an error too: older releases could create a coupon before
+      // Stripe rejected a duplicate code, and the list should reveal it.
+      onCreated();
+      toast.error(e.message);
+    },
   });
 
   const handleSubmit = () => {
@@ -235,6 +240,7 @@ function CouponRow({ coupon, promoCodes, targeting, onRefresh }: { coupon: any; 
     : `${fmtDollars(coupon.amount_off / 100, coupon.currency)} off`; // Stripe returns amount_off in cents
 
   const isValid = coupon.valid !== false;
+  const visiblePromoCodes = promoCodes.filter((promoCode: any) => typeof promoCode.code === "string" && promoCode.code.length > 0);
   const targetLabels = (() => {
     if (!targeting || targeting.scope === "site_wide") return ["All products"];
     try {
@@ -278,6 +284,18 @@ function CouponRow({ coupon, promoCodes, targeting, onRefresh }: { coupon: any; 
                 <span className="flex items-center gap-1 text-[#189aa1]">
                   <Tag className="w-3 h-3" /> {promoCodes.length} promo code{promoCodes.length !== 1 ? "s" : ""}
                 </span>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {visiblePromoCodes.length > 0 ? visiblePromoCodes.map((promoCode: any) => (
+                <code
+                  key={promoCode.id}
+                  className={`rounded border px-1.5 py-0.5 font-mono text-xs font-bold ${promoCode.active ? "border-teal-200 bg-teal-50 text-[#147a80]" : "border-gray-200 bg-gray-50 text-gray-400 line-through"}`}
+                >
+                  {promoCode.code}
+                </code>
+              )) : (
+                <span className="text-xs text-gray-400">No customer-facing promo code</span>
               )}
             </div>
           </div>
@@ -372,7 +390,7 @@ function CouponRow({ coupon, promoCodes, targeting, onRefresh }: { coupon: any; 
 export default function AdminDiscountCodesPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data, isLoading, refetch } = trpc.adminUser.listCoupons.useQuery({ limit: 50 });
+  const { data, isLoading, isFetching, isError, error, refetch } = trpc.adminUser.listCoupons.useQuery({ limit: 50 });
 
   const coupons: any[] = data?.coupons ?? [];
   const promoCodesByCoupon: Record<string, any[]> = data?.promoCodesByCoupon ?? {};
@@ -402,9 +420,14 @@ export default function AdminDiscountCodesPage() {
             Create Stripe coupons and promo codes for all products, selected content types, or selected individual products.
           </p>
         </div>
-        <Button className="bg-[#189aa1] hover:bg-[#0e4a50] text-white gap-2" onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4" /> New Coupon
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => void refetch()} disabled={isFetching}>
+            <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh from Stripe
+          </Button>
+          <Button className="bg-[#189aa1] hover:bg-[#0e4a50] text-white gap-2" onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4" /> New Coupon
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -428,6 +451,17 @@ export default function AdminDiscountCodesPage() {
         <div className="flex items-center justify-center py-16 text-gray-400">
           <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading coupons from Stripe…
         </div>
+      ) : isError ? (
+        <Card className="border border-red-200 bg-red-50/50">
+          <CardContent className="py-10 text-center">
+            <XCircle className="mx-auto mb-3 h-9 w-9 text-red-500" />
+            <p className="font-semibold text-red-900">Discount codes could not be loaded from Stripe</p>
+            <p className="mx-auto mt-1 max-w-lg text-sm text-red-700">{error.message || "Refresh to try again. No coupon data has been removed."}</p>
+            <Button variant="outline" className="mt-4 gap-2 border-red-200 bg-white text-red-700 hover:bg-red-100" onClick={() => void refetch()}>
+              <RefreshCw className="h-4 w-4" /> Try Again
+            </Button>
+          </CardContent>
+        </Card>
       ) : coupons.length === 0 ? (
         <Card className="border border-dashed border-gray-200">
           <CardContent className="py-16 text-center text-gray-400">

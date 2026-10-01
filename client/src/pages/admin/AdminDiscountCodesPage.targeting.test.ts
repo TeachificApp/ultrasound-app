@@ -12,4 +12,11 @@ describe("discount-code targeting controls", () => {
     expect(source).toContain("productKeys");
     expect(source).toContain("contentTypes");
   });
+
+  it("shows customer-facing promo code values and a recoverable Stripe refresh state", () => {
+    expect(source).toContain("visiblePromoCodes");
+    expect(source).toContain("No customer-facing promo code");
+    expect(source).toContain("Refresh from Stripe");
+    expect(source).toContain("Discount codes could not be loaded from Stripe");
+  });
 });
