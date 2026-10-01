@@ -23,7 +23,12 @@ import sgMail from "@sendgrid/mail";
 import crypto from "crypto";
 import { ENV } from "../_core/env";
 import { syncIheUnsubscribes } from "./syncIheUnsubscribes";
-import { CHALLENGE_CATEGORIES, IHE_CHALLENGE_CATEGORIES } from "../../shared/quickfireCategories";
+import {
+  CHALLENGE_CATEGORIES,
+  IHE_CHALLENGE_CATEGORIES,
+  getDailyChallengeArchiveCategories,
+} from "../../shared/quickfireCategories";
+import { getDailyChallengeDate } from "../../shared/dailyChallengeDate";
 import { ensureTodaySet } from "../lib/quickfireDailySet";
 
 /**
@@ -59,7 +64,7 @@ let cronRunning = false;
 
 /** Returns today's date string in YYYY-MM-DD format in Eastern Time. */
 function todayET(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+  return getDailyChallengeDate();
 }
 
 /** Returns today's date formatted as "Month DD, YYYY" in Eastern Time (e.g., "March 24, 2026"). */
@@ -155,6 +160,7 @@ export async function runChallengeCron() {
       // Step A: pick one queued/scheduled challenge per category
       for (const category of categories) {
         let next: typeof quickfireChallenges.$inferSelect | undefined;
+        const archiveCategories = getDailyChallengeArchiveCategories(brand, category);
 
         // First: try queued or scheduled
         const [queued] = await db
@@ -169,7 +175,7 @@ export async function runChallengeCron() {
                   or(isNull(quickfireChallenges.publishDate), lte(quickfireChallenges.publishDate, todayStr))
                 )
               ),
-              eq(quickfireChallenges.category, category as any),
+              inArray(quickfireChallenges.category, archiveCategories as never[]),
               eq(quickfireChallenges.brand, brand)
             )
           )
@@ -187,7 +193,7 @@ export async function runChallengeCron() {
             .where(
               and(
                 eq(quickfireChallenges.status, "archived"),
-                eq(quickfireChallenges.category, category as any),
+                inArray(quickfireChallenges.category, archiveCategories as never[]),
                 eq(quickfireChallenges.brand, brand)
               )
             )

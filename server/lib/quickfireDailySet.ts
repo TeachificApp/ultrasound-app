@@ -1,6 +1,11 @@
 import { eq, and, inArray, or, sql } from "drizzle-orm";
 import { quickfireQuestions, quickfireDailySets, quickfireChallenges } from "../../drizzle/schema";
-import { getBrandCategoryConfig, CROSS_BRAND_CATEGORIES, type QuickfireBrand } from "../../shared/quickfireCategories";
+import {
+  getBrandCategoryConfig,
+  getDailyChallengeArchiveCategories,
+  CROSS_BRAND_CATEGORIES,
+  type QuickfireBrand,
+} from "../../shared/quickfireCategories";
 import { notifyOwner } from "../_core/notification";
 
 function sampleN<T>(arr: T[], n: number): T[] {
@@ -8,7 +13,13 @@ function sampleN<T>(arr: T[], n: number): T[] {
   return shuffled.slice(0, n);
 }
 
-async function firstDailyEligibleQuestion(
+/**
+ * A scheduled question is intentionally removed from the new-question pool by
+ * setting `isActive` false. Its queued or archived challenge record remains a
+ * reusable, brand-scoped Daily Challenge source, so archive recovery must not
+ * apply the new-question-pool activity filter here. Flashcards stay excluded.
+ */
+async function firstChallengeArchiveQuestion(
   db: NonNullable<Awaited<ReturnType<typeof import("../db").getDb>>>,
   questionIds: number[],
 ) {
@@ -18,7 +29,6 @@ async function firstDailyEligibleQuestion(
     .from(quickfireQuestions)
     .where(and(
       inArray(quickfireQuestions.id, questionIds),
-      eq(quickfireQuestions.isActive, true),
       sql`${quickfireQuestions.type} != 'quickReview'` as never,
     ))
     .limit(1);
@@ -50,6 +60,10 @@ export async function ensureTodaySet(
     ? allCategories.filter(c => categoriesToFill.includes(c))
     : allCategories;
   const questionMap: Record<string, number | null> = { ...defaultMap };
+  const resolveDailyCategory = (storedCategory: string | null) =>
+    storedCategory
+      ? allCategories.find((candidate) => getDailyChallengeArchiveCategories(brand, candidate).includes(storedCategory))
+      : undefined;
 
   // Mark categories already covered by today's live OR archived challenges
   const todaysChallenges = await db
@@ -65,10 +79,12 @@ export async function ensureTodaySet(
 
   for (const liveC of todaysChallenges) {
     if (!liveC.category) continue;
-    const key = catKey[liveC.category];
+    const dailyCategory = resolveDailyCategory(liveC.category);
+    if (!dailyCategory) continue;
+    const key = catKey[dailyCategory];
     if (!key) continue;
     const ids: number[] = JSON.parse(liveC.questionIds || "[]");
-    const eligible = await firstDailyEligibleQuestion(db, ids);
+    const eligible = await firstChallengeArchiveQuestion(db, ids);
     if (eligible && questionMap[key] === null) {
       questionMap[key] = eligible.id;
     }
@@ -92,15 +108,16 @@ export async function ensureTodaySet(
   for (const cat of categories) {
     const key = catKey[cat];
     if (questionMap[key] !== null) continue;
+    const archiveCategories = getDailyChallengeArchiveCategories(brand, cat);
     const match = queuedChallenges.find(
       (c) =>
         !usedChallengeIds.includes(c.id) &&
-        (c.category === cat || (!c.category && cat === firstCat)) &&
+        (archiveCategories.includes(c.category ?? "") || (!c.category && cat === firstCat)) &&
         (!c.publishDate || c.publishDate <= date),
     );
     if (match) {
       const ids: number[] = JSON.parse(match.questionIds || "[]");
-      const eligible = await firstDailyEligibleQuestion(db, ids);
+      const eligible = await firstChallengeArchiveQuestion(db, ids);
       if (eligible) {
         questionMap[key] = eligible.id;
         usedChallengeIds.push(match.id);
@@ -155,7 +172,7 @@ export async function ensureTodaySet(
 
   const usedIdsByCategory: Record<string, Set<number>> = {};
   for (const row of recentArchived) {
-    const catLabel = row.category ?? "";
+    const catLabel = resolveDailyCategory(row.category) ?? "";
     if (!usedIdsByCategory[catLabel]) usedIdsByCategory[catLabel] = new Set();
     try {
       const ids: number[] = JSON.parse(row.questionIds || "[]");
@@ -173,13 +190,14 @@ export async function ensureTodaySet(
   for (const cat of categories) {
     const key = catKey[cat];
     if (questionMap[key] !== null) continue;
+    const archiveCategories = getDailyChallengeArchiveCategories(brand, cat);
     const [oldestArchived] = await db
       .select()
       .from(quickfireChallenges)
       .where(
         and(
           eq(quickfireChallenges.status, "archived"),
-          eq(quickfireChallenges.category, cat as never),
+          inArray(quickfireChallenges.category, archiveCategories as never[]),
           eq(quickfireChallenges.brand, brand),
         )
       )
@@ -187,7 +205,7 @@ export async function ensureTodaySet(
       .limit(1);
     if (oldestArchived) {
       const ids: number[] = JSON.parse(oldestArchived.questionIds || "[]");
-      const eligible = await firstDailyEligibleQuestion(db, ids);
+      const eligible = await firstChallengeArchiveQuestion(db, ids);
       if (eligible) {
         questionMap[key] = eligible.id;
         fallbackLiveNeeded.push({ cat, questionId: eligible.id });
@@ -199,7 +217,7 @@ export async function ensureTodaySet(
   // Brand filter: always include cross-brand categories (Fetal Echo, Physics) regardless of which brand created them
   const brandFilter = or(
     eq(quickfireQuestions.brand, brand),
-    inArray(quickfireQuestions.category, CROSS_BRAND_CATEGORIES as string[]),
+    inArray(quickfireQuestions.category, CROSS_BRAND_CATEGORIES as never[]),
   )!;
 
   for (const cat of categories) {

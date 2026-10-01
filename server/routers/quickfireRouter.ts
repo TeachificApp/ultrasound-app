@@ -47,6 +47,7 @@ import {
   CROSS_BRAND_CATEGORIES,
   getBrandCategoryConfig,
 } from "../../shared/quickfireCategories";
+import { getDailyChallengeDate } from "../../shared/dailyChallengeDate";
 import { ensureTodaySet, parseDailySetIds } from "../lib/quickfireDailySet";
 
 // ─── IP-based daily flashcard tracker (DB-backed, survives server restarts) ───────
@@ -89,7 +90,7 @@ async function incrementIpFlashcardCount(ip: string): Promise<number> {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function todayDateStr(): string {
-  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD UTC
+  return getDailyChallengeDate();
 }
 
 /** Pick N random items from an array */

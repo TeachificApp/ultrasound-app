@@ -171,6 +171,19 @@ export function getBrandCategoryConfig(brand: string): {
   };
 }
 
+/**
+ * Returns the archived challenge category labels that can safely fill a Daily
+ * Challenge slot for one app. AAU has legacy granular challenge labels (such
+ * as Pelvic/Gyn and Breast), while iHeartEcho archives use their live slot
+ * labels directly. Never return another brand's categories here.
+ */
+export function getDailyChallengeArchiveCategories(brand: string, category: string): string[] {
+  if (brand === "aaus") {
+    return AAUS_QUESTION_POOL_LABELS[category] ?? [category];
+  }
+  return [category];
+}
+
 export function getChallengeCategoriesForBrand(brand: string): readonly string[] {
   return getBrandCategoryConfig(brand).categories;
 }
