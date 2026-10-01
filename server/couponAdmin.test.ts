@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   isStripePromotionCodeConflict,
   normalizePromotionCode,
   promotionCodeConflictMessage,
 } from "./lib/couponAdmin";
+
+const routerSource = readFileSync(new URL("./routers/adminUserRouter.ts", import.meta.url), "utf8");
 
 describe("coupon administration promotion-code safety", () => {
   it("normalizes visible promo codes before all Stripe operations", () => {
@@ -21,5 +24,12 @@ describe("coupon administration promotion-code safety", () => {
   it("gives administrators an actionable duplicate-code message", () => {
     expect(promotionCodeConflictMessage("MUAM2026")).toContain("MUAM2026");
     expect(promotionCodeConflictMessage("MUAM2026")).toContain("already exists and is active");
+  });
+
+  it("keeps LMS membership codes visible when Stripe cannot be read", () => {
+    expect(routerSource).toContain("membershipDiscountCodes");
+    expect(routerSource).toContain("membershipCodes");
+    expect(routerSource).toContain("stripeAvailable");
+    expect(routerSource).toContain("Stripe discount-code list unavailable");
   });
 });

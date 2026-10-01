@@ -13,10 +13,12 @@ describe("discount-code targeting controls", () => {
     expect(source).toContain("contentTypes");
   });
 
-  it("shows customer-facing promo code values and a recoverable Stripe refresh state", () => {
+  it("shows customer-facing Stripe promo codes plus LMS-native code visibility", () => {
     expect(source).toContain("visiblePromoCodes");
     expect(source).toContain("No customer-facing promo code");
-    expect(source).toContain("Refresh from Stripe");
-    expect(source).toContain("Discount codes could not be loaded from Stripe");
+    expect(source).toContain("Refresh Stripe");
+    expect(source).toContain("LMS membership code");
+    expect(source).toContain("Active LMS membership codes");
+    expect(source).toContain("LMS membership discount codes remain visible below");
   });
 });

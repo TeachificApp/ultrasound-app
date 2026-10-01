@@ -386,18 +386,59 @@ function CouponRow({ coupon, promoCodes, targeting, onRefresh }: { coupon: any; 
   );
 }
 
+// ─── LMS Membership Code Row ─────────────────────────────────────────────────
+function MembershipCodeRow({ code }: { code: any }) {
+  const isActive = code.isActive === true;
+  const discountLabel = code.discountType === "percent"
+    ? `${code.discountValue}% off`
+    : `$${Number(code.discountValue).toFixed(2)} off`;
+
+  return (
+    <div className={`rounded-xl border bg-white p-4 shadow-sm ${isActive ? "border-gray-200" : "border-gray-100 opacity-60"}`}>
+      <div className="flex items-start gap-4">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-violet-50">
+          {code.discountType === "percent" ? <Percent className="h-5 w-5 text-violet-700" /> : <DollarSign className="h-5 w-5 text-violet-700" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="rounded border border-violet-200 bg-violet-50 px-2 py-0.5 font-mono text-sm font-bold text-violet-800">{code.code}</code>
+            <Badge className={`border-0 text-xs ${isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+              {isActive ? "Active" : "Inactive"}
+            </Badge>
+            <Badge className="border-0 bg-violet-100 text-xs text-violet-700">{discountLabel}</Badge>
+            <Badge className="border-0 bg-slate-100 text-xs text-slate-600">LMS membership code</Badge>
+          </div>
+          <p className="mt-2 text-xs text-gray-500">
+            Applies to {code.planId ? "a specific membership plan" : "any eligible membership plan"}. Managed in the LMS; this is separate from Stripe promotion codes.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+            <span className="flex items-center gap-1"><Hash className="h-3 w-3" /> {code.usedCount ?? 0} use{code.usedCount === 1 ? "" : "s"}{code.maxUses ? ` / ${code.maxUses}` : ""}</span>
+            {code.expiresAt && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Expires {new Date(code.expiresAt).toLocaleDateString()}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function AdminDiscountCodesPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data, isLoading, isFetching, isError, error, refetch } = trpc.adminUser.listCoupons.useQuery({ limit: 50 });
+  const { data, isLoading, isFetching, refetch } = trpc.adminUser.listCoupons.useQuery({ limit: 50 });
 
   const coupons: any[] = data?.coupons ?? [];
+  const membershipCodes: any[] = data?.membershipCodes ?? [];
   const promoCodesByCoupon: Record<string, any[]> = data?.promoCodesByCoupon ?? {};
   const targetingByCoupon: Record<string, { scope: string; productKeys: string | null }> = data?.targetingByCoupon ?? {};
+  const stripeAvailable = data?.stripeAvailable !== false;
 
   const activeCoupons = coupons.filter(c => c.valid !== false);
   const inactiveCoupons = coupons.filter(c => c.valid === false);
+  const activeMembershipCodes = membershipCodes.filter(code => code.isActive === true);
+  const inactiveMembershipCodes = membershipCodes.filter(code => code.isActive !== true);
+  const activeStripePromoCodes = Object.values(promoCodesByCoupon).flat().filter((promo: any) => promo.active).length;
+  const hasAnyCodes = coupons.length > 0 || membershipCodes.length > 0;
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
@@ -417,12 +458,12 @@ export default function AdminDiscountCodesPage() {
             <Tag className="w-6 h-6 text-[#189aa1]" /> Discount Codes
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Create Stripe coupons and promo codes for all products, selected content types, or selected individual products.
+            Create and manage Stripe coupons, promo codes, and LMS membership discount codes in one place.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="gap-2" onClick={() => void refetch()} disabled={isFetching}>
-            <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh from Stripe
+            <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh Stripe
           </Button>
           <Button className="bg-[#189aa1] hover:bg-[#0e4a50] text-white gap-2" onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4" /> New Coupon
@@ -433,9 +474,9 @@ export default function AdminDiscountCodesPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Active Coupons", value: activeCoupons.length, color: "text-green-600" },
-          { label: "Total Promo Codes", value: Object.values(promoCodesByCoupon).flat().filter((p: any) => p.active).length, color: "text-[#189aa1]" },
-          { label: "Total Redemptions", value: coupons.reduce((s, c) => s + (c.times_redeemed ?? 0), 0), color: "text-blue-600" },
+          { label: "Active Stripe Coupons", value: activeCoupons.length, color: "text-green-600" },
+          { label: "Active Codes", value: activeStripePromoCodes + activeMembershipCodes.length, color: "text-[#189aa1]" },
+          { label: "Total Redemptions", value: coupons.reduce((sum, coupon) => sum + (coupon.times_redeemed ?? 0), 0) + membershipCodes.reduce((sum, code) => sum + (code.usedCount ?? 0), 0), color: "text-blue-600" },
         ].map(s => (
           <Card key={s.label} className="border border-gray-200">
             <CardContent className="p-4 text-center">
@@ -446,52 +487,67 @@ export default function AdminDiscountCodesPage() {
         ))}
       </div>
 
-      {/* Coupon list */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16 text-gray-400">
-          <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading coupons from Stripe…
-        </div>
-      ) : isError ? (
-        <Card className="border border-red-200 bg-red-50/50">
-          <CardContent className="py-10 text-center">
-            <XCircle className="mx-auto mb-3 h-9 w-9 text-red-500" />
-            <p className="font-semibold text-red-900">Discount codes could not be loaded from Stripe</p>
-            <p className="mx-auto mt-1 max-w-lg text-sm text-red-700">{error.message || "Refresh to try again. No coupon data has been removed."}</p>
-            <Button variant="outline" className="mt-4 gap-2 border-red-200 bg-white text-red-700 hover:bg-red-100" onClick={() => void refetch()}>
-              <RefreshCw className="h-4 w-4" /> Try Again
+      {!stripeAvailable && (
+        <Card className="border border-amber-200 bg-amber-50/70">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div>
+              <p className="font-semibold text-amber-900">Stripe codes are temporarily unavailable</p>
+              <p className="mt-0.5 text-sm text-amber-800">LMS membership discount codes remain visible below. No code records have been removed.</p>
+            </div>
+            <Button variant="outline" className="gap-2 border-amber-300 bg-white text-amber-900 hover:bg-amber-100" onClick={() => void refetch()}>
+              <RefreshCw className="h-4 w-4" /> Retry Stripe
             </Button>
           </CardContent>
         </Card>
-      ) : coupons.length === 0 ? (
+      )}
+
+      {/* Discount-code list */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-gray-400">
+          <RefreshCw className="mr-2 h-5 w-5 animate-spin" /> Loading discount codes…
+        </div>
+      ) : !hasAnyCodes ? (
         <Card className="border border-dashed border-gray-200">
           <CardContent className="py-16 text-center text-gray-400">
-            <Tag className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="font-medium">No coupons yet</p>
-            <p className="text-sm mt-1">Create your first coupon to offer discounts at checkout.</p>
-            <Button className="mt-4 bg-[#189aa1] hover:bg-[#0e4a50] text-white gap-2" onClick={() => setCreateOpen(true)}>
-              <Plus className="w-4 h-4" /> Create First Coupon
+            <Tag className="mx-auto mb-3 h-10 w-10 opacity-30" />
+            <p className="font-medium">No discount codes yet</p>
+            <p className="mt-1 text-sm">Create your first coupon to offer a Stripe promotion code at checkout.</p>
+            <Button className="mt-4 gap-2 bg-[#189aa1] text-white hover:bg-[#0e4a50]" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4" /> Create First Coupon
             </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {activeCoupons.length > 0 && (
             <div>
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Active ({activeCoupons.length})</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Active Stripe coupons ({activeCoupons.length})</h2>
               <div className="space-y-3">
-                {activeCoupons.map(c => (
-                  <CouponRow key={c.id} coupon={c} promoCodes={promoCodesByCoupon[c.id] ?? []} targeting={targetingByCoupon[c.id]} onRefresh={refetch} />
-                ))}
+                {activeCoupons.map(coupon => <CouponRow key={coupon.id} coupon={coupon} promoCodes={promoCodesByCoupon[coupon.id] ?? []} targeting={targetingByCoupon[coupon.id]} onRefresh={refetch} />)}
+              </div>
+            </div>
+          )}
+          {activeMembershipCodes.length > 0 && (
+            <div>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-500">Active LMS membership codes ({activeMembershipCodes.length})</h2>
+              <div className="space-y-3">
+                {activeMembershipCodes.map(code => <MembershipCodeRow key={code.id} code={code} />)}
               </div>
             </div>
           )}
           {inactiveCoupons.length > 0 && (
             <div>
-              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Deleted / Expired ({inactiveCoupons.length})</h2>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Deleted / expired Stripe coupons ({inactiveCoupons.length})</h2>
               <div className="space-y-3">
-                {inactiveCoupons.map(c => (
-                  <CouponRow key={c.id} coupon={c} promoCodes={promoCodesByCoupon[c.id] ?? []} targeting={targetingByCoupon[c.id]} onRefresh={refetch} />
-                ))}
+                {inactiveCoupons.map(coupon => <CouponRow key={coupon.id} coupon={coupon} promoCodes={promoCodesByCoupon[coupon.id] ?? []} targeting={targetingByCoupon[coupon.id]} onRefresh={refetch} />)}
+              </div>
+            </div>
+          )}
+          {inactiveMembershipCodes.length > 0 && (
+            <div>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Inactive LMS membership codes ({inactiveMembershipCodes.length})</h2>
+              <div className="space-y-3">
+                {inactiveMembershipCodes.map(code => <MembershipCodeRow key={code.id} code={code} />)}
               </div>
             </div>
           )}

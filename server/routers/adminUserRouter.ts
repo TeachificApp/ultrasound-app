@@ -49,6 +49,7 @@ import {
   webinars,
   bundles,
   bundleEnrollments,
+  membershipDiscountCodes,
   lmsLessonProgress,
   lmsLessons,
   platformSettings,
@@ -1879,25 +1880,50 @@ export const adminUserRouter = router({
       startingAfter: z.string().optional(),
     }))
     .query(async ({ ctx, input }) => {
-      await assertAdmin(ctx);      const stripe = getStripeClient();
-      const params: Record<string, unknown> = { limit: input.limit };
-      if (input.startingAfter) params.starting_after = input.startingAfter;
-      const coupons = await (stripe.coupons as any).list(params);
-      const couponIds: string[] = coupons.data.map((c: any) => c.id);
-      const promoCodeResults = await Promise.all(
-        couponIds.map((id: string) =>
-          (stripe.promotionCodes as any).list({ coupon: id, limit: 10 }).then((r: any) => r.data)
-        )
-      );
+      await assertAdmin(ctx);
+      const db = await getDb();
+      const membershipCodes = db
+        ? await db.select().from(membershipDiscountCodes).orderBy(desc(membershipDiscountCodes.createdAt))
+        : [];
+
+      // LMS membership codes are first-party MySQL records. Keep displaying
+      // them if Stripe is momentarily unavailable instead of blanking the page.
+      let coupons: { data: any[]; has_more: boolean } = { data: [], has_more: false };
       const promoCodesByCoupon: Record<string, any[]> = {};
-      couponIds.forEach((id: string, i: number) => { promoCodesByCoupon[id] = promoCodeResults[i]; });
-	  const db = await getDb();
+      let stripeAvailable = true;
+      try {
+        const stripe = getStripeClient();
+        const params: Record<string, unknown> = { limit: input.limit };
+        if (input.startingAfter) params.starting_after = input.startingAfter;
+        coupons = await (stripe.coupons as any).list(params);
+        const couponIds: string[] = coupons.data.map((coupon: any) => coupon.id);
+        const promoCodeResults = await Promise.all(
+          couponIds.map((id: string) =>
+            (stripe.promotionCodes as any).list({ coupon: id, limit: 10 }).then((result: any) => result.data)
+          )
+        );
+        couponIds.forEach((id: string, index: number) => {
+          promoCodesByCoupon[id] = promoCodeResults[index] ?? [];
+        });
+      } catch (error) {
+        stripeAvailable = false;
+        console.error("[CouponAdmin] Stripe discount-code list unavailable:", error);
+      }
+
+      const couponIds: string[] = coupons.data.map((coupon: any) => coupon.id);
       const metadata = db && couponIds.length
         ? await db.select().from(couponMetadata).where(sql`${couponMetadata.stripeCouponId} IN (${sql.join(couponIds.map(id => sql`${id}`), sql`, `)})`)
         : [];
       const targetingByCoupon: Record<string, { scope: string; productKeys: string | null }> = {};
       metadata.forEach((entry) => { targetingByCoupon[entry.stripeCouponId] = { scope: entry.scope, productKeys: entry.productKeys }; });
-      return { coupons: coupons.data, hasMore: coupons.has_more, promoCodesByCoupon, targetingByCoupon };
+      return {
+        coupons: coupons.data,
+        hasMore: coupons.has_more,
+        promoCodesByCoupon,
+        targetingByCoupon,
+        membershipCodes,
+        stripeAvailable,
+      };
     }),
 
   deactivateCoupon: protectedProcedure
