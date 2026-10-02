@@ -72,9 +72,16 @@ function AccessGate({ mode, title, onPasswordAccepted }: { mode: "site_password"
   return <div className="min-h-[55vh] flex items-center justify-center bg-slate-50 px-5"><div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-teal-700"><LockKeyhole className="h-6 w-6" /></div><h1 className="mt-4 text-2xl font-bold text-slate-900">{title || (isPassword ? "Protected page" : "Member access required")}</h1><p className="mt-2 text-sm leading-relaxed text-slate-600">{isPassword ? "Enter the page password to continue." : "This page is available to signed-in platform members."}</p>{isPassword ? <form className="mt-5 space-y-3" onSubmit={(event) => { event.preventDefault(); setError(""); verify.mutate({ tenantKey, path: window.location.pathname, password }); }}><Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Page password" autoComplete="current-password" /><Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700" disabled={!password || verify.isPending}>{verify.isPending ? "Checking…" : "Unlock page"}</Button>{error && <p className="text-sm text-red-600">{error}</p>}</form> : <Button className="mt-5 w-full bg-teal-600 hover:bg-teal-700" onClick={() => { window.location.href = getLoginUrl(window.location.pathname); }}>Sign in to continue</Button>}</div></div>;
 }
 
-export default function PublicMarketingSitePage() {
+type PublicMarketingSitePageProps = {
+  /** Use a public-site tenant as the editable CMS content source on a routed application host. */
+  tenantKey?: PublicSiteTenantKey;
+  /** Override the SEO canonical base for a page deliberately served on another approved host. */
+  canonicalOrigin?: string;
+};
+
+export default function PublicMarketingSitePage({ tenantKey: tenantKeyOverride, canonicalOrigin }: PublicMarketingSitePageProps = {}) {
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
-  const tenant = getTenantForBrowser(); const tenantKey = (tenant?.key ?? "aaus-net") as PublicSiteTenantKey;
+  const tenant = getTenantForBrowser(); const tenantKey = tenantKeyOverride ?? (tenant?.key ?? "aaus-net") as PublicSiteTenantKey;
   const [, navigate] = useLocation(); const [accessRefresh, setAccessRefresh] = useState(0);
   const { data: settings, isLoading: settingsLoading } = trpc.marketingSitePublic.getSettings.useQuery({ tenantKey });
   const { data: navigationPages = [] } = trpc.marketingSitePublic.listNavigation.useQuery({ tenantKey });
@@ -85,8 +92,9 @@ export default function PublicMarketingSitePage() {
   useEffect(() => {
     const title = data?.page?.seoTitle || data?.page?.title || settings?.tenant.siteName; if (title) document.title = title;
     const description = data?.page?.seoDescription; if (description) { let element = document.querySelector('meta[name="description"]'); if (!element) { element = document.createElement("meta"); element.setAttribute("name", "description"); document.head.appendChild(element); } element.setAttribute("content", description); }
-    const canonical = settings?.tenant?.promotionOrigin && `${settings.tenant.promotionOrigin}${pathname === "/" ? "" : pathname}`; if (canonical) { let element = document.querySelector('link[rel="canonical"]'); if (!element) { element = document.createElement("link"); element.setAttribute("rel", "canonical"); document.head.appendChild(element); } element.setAttribute("href", canonical); }
-  }, [data?.page?.seoDescription, data?.page?.seoTitle, data?.page?.title, pathname, settings?.tenant?.promotionOrigin, settings?.tenant?.siteName]);
+    const canonicalBase = canonicalOrigin ?? settings?.tenant?.promotionOrigin;
+    const canonical = canonicalBase && `${canonicalBase}${pathname === "/" ? "" : pathname}`; if (canonical) { let element = document.querySelector('link[rel="canonical"]'); if (!element) { element = document.createElement("link"); element.setAttribute("rel", "canonical"); document.head.appendChild(element); } element.setAttribute("href", canonical); }
+  }, [canonicalOrigin, data?.page?.seoDescription, data?.page?.seoTitle, data?.page?.title, pathname, settings?.tenant?.promotionOrigin, settings?.tenant?.siteName]);
 
   const blocks = useMemo(() => (data?.page?.blocks ?? []) as Block[], [data?.page?.blocks]);
   const nav = useMemo<NavItem[]>(() => {

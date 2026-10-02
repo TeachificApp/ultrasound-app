@@ -16,13 +16,16 @@ describe("CME Speakers landing page", () => {
     expect(migration).toContain("WHERE NOT EXISTS");
   });
 
-  it("routes the single-segment page before the funnel catch-all", () => {
+  it("serves the page on Learn before the LMS navigation shell and not from the public-site funnel router", () => {
     const app = readProjectFile("client/src/App.tsx");
-    const pageRoute = app.indexOf('<Route path="/cme-speakers" component={PublicMarketingSitePage} />');
-    const funnelRoute = app.indexOf('<Route path="/:slug" component={FunnelRootRedirect} />', pageRoute);
+    const pageRoute = app.indexOf('<Route path="/cme-speakers">');
+    const lmsLayout = app.indexOf("<LMSLayout>", pageRoute);
 
     expect(pageRoute).toBeGreaterThan(-1);
-    expect(funnelRoute).toBeGreaterThan(pageRoute);
+    expect(lmsLayout).toBeGreaterThan(pageRoute);
+    expect(app.slice(pageRoute, lmsLayout)).toContain('tenantKey="aaus-net"');
+    expect(app.slice(pageRoute, lmsLayout)).toContain('canonicalOrigin="https://learn.allaboutultrasound.com"');
+    expect(app).not.toContain('<Route path="/cme-speakers" component={PublicMarketingSitePage} />');
   });
 
   it("keeps the public-site visual editor capable of file-download blocks", () => {

@@ -902,6 +902,11 @@ function LMSRouter() {
       <Route path="/cme-disclosure/:token">
         <Suspense fallback={pageFallback}><CmeDisclosureForm /></Suspense>
       </Route>
+      {/* CME speaker disclosure is a direct public Learn link with no LMS menu shell.
+          Content remains managed under the AAU public Site Pages tenant. */}
+      <Route path="/cme-speakers">
+        <Suspense fallback={pageFallback}><PublicMarketingSitePage tenantKey="aaus-net" canonicalOrigin="https://learn.allaboutultrasound.com" /></Suspense>
+      </Route>
       {/* Partner signup — public, no auth, no layout */}
       <Route path="/partner-signup">
         <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>
@@ -1664,8 +1669,6 @@ function PublicWebsiteRouter() {
         {/* Public funnels share the `.net` marketing host but must take precedence
             over the editable site catch-all, otherwise every funnel slug renders
             the marketing site's 404 page. */}
-        {/* Hidden public-site page: must precede the single-segment funnel route. */}
-        <Route path="/cme-speakers" component={PublicMarketingSitePage} />
         <Route path="/:slug/:pageSlug" component={PublicFunnelPageRoute} />
         <Route path="/:slug" component={FunnelRootRedirect} />
         <Route component={PublicMarketingSitePage} />

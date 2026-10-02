@@ -1,4 +1,5 @@
--- Additive All About Ultrasound CME Speakers landing page.
+-- Additive All About Ultrasound CMS source for the Learn-domain CME Speakers landing page.
+-- Public URL: https://learn.allaboutultrasound.com/cme-speakers
 -- The page stays out of all public menus but is editable in the Site Pages visual editor.
 INSERT INTO `marketingSitePages` (
   `siteKey`, `parentId`, `path`, `title`, `pageType`, `blocks`,
