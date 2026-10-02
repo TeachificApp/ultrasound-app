@@ -29,6 +29,17 @@ describe("CME Speakers landing page", () => {
     expect(app).not.toContain('<Route path="/cme-speakers" component={PublicMarketingSitePage} />');
   });
 
+  it("routes the Learn hostname before any public-site catch-all", () => {
+    const app = readProjectFile("client/src/App.tsx");
+    const appShell = app.slice(app.indexOf("function App()"));
+
+    expect(appShell.indexOf(") : onLearnSubdomain ? (")).toBeGreaterThan(-1);
+    expect(appShell.indexOf(") : onPublicWebsite ? (")).toBeGreaterThan(-1);
+    expect(appShell.indexOf(") : onLearnSubdomain ? (")).toBeLessThan(
+      appShell.indexOf(") : onPublicWebsite ? ("),
+    );
+  });
+
   it("keeps the public-site visual editor capable of file-download blocks", () => {
     const builder = readProjectFile("client/src/pages/admin/PublicSitePageBuilder.tsx");
     const catalog = readProjectFile("client/src/pages/admin/LandingPageBuilder.tsx");

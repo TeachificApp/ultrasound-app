@@ -1694,12 +1694,12 @@ function App() {
           <LegacyPasswordSetupRedirect />
           {onMarketingStaging ? (
             <MarketingSiteRouter />
+          ) : onLearnSubdomain ? (
+            <><ProfileNameBanner /><LMSRouter /></>
           ) : onPublicWebsite ? (
             <PublicWebsiteRouter />
           ) : onMembersSubdomain ? (
             <><ProfileNameBanner /><MembersRouter /></>
-          ) : onLearnSubdomain ? (
-            <><ProfileNameBanner /><LMSRouter /></>
           ) : onAccreditationSubdomain ? (
             <AccreditationDivisionRouter />
           ) : onIHeartEchoSubdomain ? (
