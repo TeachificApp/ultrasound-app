@@ -38,6 +38,7 @@ interface NavItem {
 
 const AAUS_SITE_URL = "https://www.allaboutultrasound.com";
 const IHE_SITE_URL = "https://www.iheartecho.com";
+const IHE_APP_URL = "https://app.iheartecho.com";
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Education Library", href: "/education-library", icon: <BookOpen className="w-4 h-4" /> },
@@ -143,7 +144,14 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
               onClick={() => setMobileMenuOpen(false)}
               className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all min-h-[52px]">
               <ExternalLink className="w-5 h-5 text-[#189aa1] flex-shrink-0" />
-              <span className="flex-1">UltrasoundAssist™ App</span>
+              <span className="flex-1">UltrasoundAssist™</span>
+              <ExternalLink className="w-3.5 h-3.5 text-gray-300" />
+            </a>
+            <a href={IHE_APP_URL} target="_blank" rel="noopener noreferrer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all min-h-[52px]">
+              <ExternalLink className="w-5 h-5 text-[#189aa1] flex-shrink-0" />
+              <span className="flex-1">EchoAssist™</span>
               <ExternalLink className="w-3.5 h-3.5 text-gray-300" />
             </a>
             {isPlatformAdmin && (
@@ -191,7 +199,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
             location={location}
             className="hidden md:flex ml-4"
           />
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden lg:flex items-center gap-0.5">
             {/* External brand links */}
             <a
               href={AAUS_SITE_URL}
@@ -208,6 +216,22 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-900"
             >
               iHeartEcho™
+            </a>
+            <a
+              href={AAUS_APP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors text-[#158087] hover:bg-[#f0fbfc] hover:text-[#0e6369]"
+            >
+              UltrasoundAssist™
+            </a>
+            <a
+              href={IHE_APP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-colors text-[#158087] hover:bg-[#f0fbfc] hover:text-[#0e6369]"
+            >
+              EchoAssist™
             </a>
           </nav>
 
