@@ -19,9 +19,10 @@ describe("CME Speakers landing page", () => {
   it("serves the page inside the Learn LMS layout and not from the public-site funnel router", () => {
     const app = readProjectFile("client/src/App.tsx");
     const lmsLayout = app.indexOf("<LMSLayout>");
-    const pageRoute = app.indexOf('<Route path="/cme-speakers">', lmsLayout);
+    const pageRoute = app.indexOf("<Route path={CME_SPEAKERS_PATH}>", lmsLayout);
     const homeRoute = app.indexOf('<Route path="/" component={LMSHome} />', lmsLayout);
 
+    expect(app).toContain('const CME_SPEAKERS_PATH = "/cme-speakers";');
     expect(lmsLayout).toBeGreaterThan(-1);
     expect(pageRoute).toBeGreaterThan(homeRoute);
     expect(app.slice(homeRoute, pageRoute + 450)).toContain('tenantKey="aaus-net"');

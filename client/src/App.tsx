@@ -143,6 +143,7 @@ const PartnerSignup = lazy(() => import("./pages/PartnerSignup"));
 const StripeOnboardingRedirect = lazy(() => import("./pages/StripeOnboardingRedirect"));
 const CmeDisclosureForm = lazy(() => import("./pages/CmeDisclosureForm"));
 const CmeDisclosureFormGeneric = lazy(() => import("./pages/CmeDisclosureFormGeneric"));
+const CME_SPEAKERS_PATH = "/cme-speakers";
 const TeachDashboard = lazy(() => import("./pages/teach/TeachDashboard"));
 const TeachGames = lazy(() => import("./pages/teach/TeachGames"));
 const TeachPresentationEditor = lazy(() => import("./pages/teach/TeachPresentationEditor"));
@@ -948,7 +949,7 @@ function LMSRouter() {
             <Route path="/" component={LMSHome} />
             {/* Direct CME speaker disclosure link. Content is edited through the
                 AAU Site Pages CMS while presentation uses the Learn header/menu. */}
-            <Route path="/cme-speakers">
+            <Route path={CME_SPEAKERS_PATH}>
               <PublicMarketingSitePage tenantKey="aaus-net" canonicalOrigin="https://learn.allaboutultrasound.com" />
             </Route>
             <Route path="/survey-pulse/:view" component={SurveyPulse} />
