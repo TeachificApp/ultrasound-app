@@ -997,6 +997,10 @@ function LMSRouter() {
         <Route path="/admin/career-network">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><CareerNetworkAdmin /></RoleGuard>}</Route>
 
         {/* Admin (platform_admin only) */}
+        {perBrandAdminRouteElements([
+          { base: "/admin/public-site/page/:pageId/edit", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSitePageBuilder /></RoleGuard> },
+          { base: "/admin/public-site", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSiteAdmin /></RoleGuard> },
+        ])}
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePagesAdmin /></Suspense></RoleGuard>}</Route>

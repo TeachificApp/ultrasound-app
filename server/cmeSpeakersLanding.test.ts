@@ -104,6 +104,19 @@ describe("CME Speakers landing page", () => {
     expect(sitePagesAdmin).toContain('"folder:learn-cms"');
   });
 
+  it("registers the branded public-site visual editor inside the Learn router", () => {
+    const app = readProjectFile("client/src/App.tsx");
+    const lmsRouter = app.slice(
+      app.indexOf("function LMSRouter()"),
+      app.indexOf("function IHeartEchoRouter()")
+    );
+
+    expect(lmsRouter).toContain('base: "/admin/public-site/page/:pageId/edit"');
+    expect(lmsRouter).toContain("<PublicSitePageBuilder />");
+    expect(lmsRouter).toContain('base: "/admin/public-site"');
+    expect(lmsRouter).toContain("<PublicSiteAdmin />");
+  });
+
   it("suppresses the legacy marketing header across All About Ultrasound .net pages", () => {
     const page = readProjectFile(
       "client/src/pages/PublicMarketingSitePage.tsx"
