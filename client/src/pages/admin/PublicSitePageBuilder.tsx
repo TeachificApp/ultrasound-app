@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
@@ -11,11 +11,12 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { type Block, type BlockType } from "@/components/BlockPreview";
-import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid } from "@/pages/admin/LandingPageBuilder";
+import { BLOCK_CATALOG, CATALOG_CATEGORIES, BlockSettings, SortableBlock, uid, getCatalogItemsForCategory } from "@/pages/admin/LandingPageBuilder";
 import { ArrowLeft, ChevronDown, Eye, FileText, Globe2, Layers3, LockKeyhole, PenLine, Save, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { resolveToolBrand } from "@/lib/brandToolPresentation";
 import { getPublicSiteTenantForBrand, type PublicSiteTenantKey } from "@shared/publicSiteTenants";
 import { BlogSidebarBlockEditor } from "@/components/public-site/BlogSidebarBlockEditor";
+import { BlockTemplateLibraryProvider, OpenTemplateLibraryButton, useBlockTemplateLibrary } from "@/components/BlockTemplateLibrary";
 
 type ColumnSide = "left" | "right";
 type BlockLocation =
@@ -94,7 +95,31 @@ function SettingsSection({ title, icon, children, open = false }: { title: strin
   </details>;
 }
 
+type TemplateInsertionHandler = ((block: Block) => void) | null;
+
 export default function PublicSitePageBuilder() {
+  const templateInsertionRef = useRef<TemplateInsertionHandler>(null);
+  const registerTemplateInsertion = useCallback((handler: TemplateInsertionHandler) => {
+    templateInsertionRef.current = handler;
+  }, []);
+
+  return (
+    <BlockTemplateLibraryProvider
+      onInsert={(block) => templateInsertionRef.current?.(block)}
+    >
+      <PublicSitePageBuilderWorkspace
+        registerTemplateInsertion={registerTemplateInsertion}
+      />
+    </BlockTemplateLibraryProvider>
+  );
+}
+
+function PublicSitePageBuilderWorkspace({
+  registerTemplateInsertion,
+}: {
+  registerTemplateInsertion: (handler: TemplateInsertionHandler) => void;
+}) {
+  const { saveAsTemplate } = useBlockTemplateLibrary();
   const { pageId } = useParams<{ pageId: string }>();
   const [, navigate] = useLocation();
   const id = Number(pageId);
@@ -105,6 +130,10 @@ export default function PublicSitePageBuilder() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState("Layout");
+  const [rightPanelWidth, setRightPanelWidth] = useState(
+    typeof window !== "undefined" ? Math.round(window.innerWidth * 0.65) : 650
+  );
+  const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [loadedId, setLoadedId] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [path, setPath] = useState("");
@@ -141,6 +170,34 @@ export default function PublicSitePageBuilder() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const selectedBlock = useMemo(() => findBlock(blocks, selectedId), [blocks, selectedId]);
   const parentOptions = useMemo(() => allPages.filter((candidate) => candidate.id !== id && candidate.pageType === "page"), [allPages, id]);
+  const catalogItems = useMemo(
+    () => getCatalogItemsForCategory(activeCategory),
+    [activeCategory]
+  );
+
+  const handleRightPanelMouseDown = (event: React.MouseEvent) => {
+    event.preventDefault();
+    rightPanelDragRef.current = {
+      startX: event.clientX,
+      startWidth: rightPanelWidth,
+    };
+    const onMove = (moveEvent: MouseEvent) => {
+      if (!rightPanelDragRef.current) return;
+      const delta = rightPanelDragRef.current.startX - moveEvent.clientX;
+      const nextWidth = Math.min(
+        Math.round(window.innerWidth * 0.92),
+        Math.max(300, rightPanelDragRef.current.startWidth + delta)
+      );
+      setRightPanelWidth(nextWidth);
+    };
+    const onUp = () => {
+      rightPanelDragRef.current = null;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   useEffect(() => {
     if (!page || loadedId === page.id) return;
@@ -186,6 +243,15 @@ export default function PublicSitePageBuilder() {
     const block: Block = { id: uid(), type, data: { ...definition.defaultData } };
     setBlocks((items) => [...items, block]); setSelectedId(block.id);
   };
+
+  useEffect(() => {
+    registerTemplateInsertion((template) => {
+      const block = { ...template, id: uid() };
+      setBlocks((items) => [...items, block]);
+      setSelectedId(block.id);
+    });
+    return () => registerTemplateInsertion(null);
+  }, [registerTemplateInsertion]);
 
   const addBlockToColumn = (parentBlockId: string, side: ColumnSide, newBlock: Block) => {
     setBlocks((items) => items.map((item) => {
@@ -273,7 +339,7 @@ export default function PublicSitePageBuilder() {
   return <div className="min-h-screen bg-slate-100 flex flex-col">
     <header className="h-16 shrink-0 bg-white border-b px-4 flex items-center justify-between gap-3">
       <div className="min-w-0 flex items-center gap-3"><Button size="sm" variant="ghost" onClick={() => navigate(adminRoot(brand))}><ArrowLeft className="w-4 h-4 mr-1" /> Pages</Button><div className="min-w-0"><p className="font-semibold text-sm truncate">{title || "Untitled page"}</p><p className="font-mono text-xs text-slate-500 truncate">{tenant.currentHost}{path}</p></div></div>
-      <div className="flex items-center gap-2"><a href={previewUrl} target="_blank" rel="noreferrer"><Button size="sm" variant="outline"><Eye className="w-4 h-4 mr-1" /> Preview</Button></a><Button size="sm" variant="outline" disabled={save.isPending} onClick={() => void savePage()}><Save className="w-4 h-4 mr-1" /> Save</Button><Button size="sm" disabled={save.isPending} onClick={() => void savePage(!published)} className={published ? "bg-amber-600 hover:bg-amber-700" : "bg-teal-600 hover:bg-teal-700"}>{published ? "Unpublish" : <><Send className="w-4 h-4 mr-1" /> Publish</>}</Button></div>
+      <div className="flex flex-wrap items-center justify-end gap-2"><OpenTemplateLibraryButton className="hidden sm:inline-flex" /><a href={previewUrl} target="_blank" rel="noreferrer"><Button size="sm" variant="outline"><Eye className="w-4 h-4 mr-1" /> Preview</Button></a><Button size="sm" variant="outline" disabled={save.isPending} onClick={() => void savePage()}><Save className="w-4 h-4 mr-1" /> Save</Button><Button size="sm" disabled={save.isPending} onClick={() => void savePage(!published)} className={published ? "bg-amber-600 hover:bg-amber-700" : "bg-teal-600 hover:bg-teal-700"}>{published ? "Unpublish" : <><Send className="w-4 h-4 mr-1" /> Publish</>}</Button></div>
     </header>
 
     <div className="flex-1 min-h-0 flex">
@@ -281,7 +347,7 @@ export default function PublicSitePageBuilder() {
         <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2"><Layers3 className="w-4 h-4 text-teal-600" /> Build</div>
         <p className="text-[11px] leading-relaxed text-slate-500 mb-3">Drag blocks onto the page or add modules inside a Columns block.</p>
         <div className="space-y-1">{CATALOG_CATEGORIES.map((category) => <button type="button" key={category} onClick={() => setActiveCategory(category)} className={`w-full text-left px-2 py-1.5 rounded text-xs ${activeCategory === category ? "bg-teal-100 text-teal-900 font-semibold" : "text-slate-600 hover:bg-slate-50"}`}>{category}</button>)}</div>
-        <div className="mt-3 space-y-1">{BLOCK_CATALOG.filter((item) => item.category === activeCategory).map((item) => <button type="button" key={item.type} onClick={() => addBlock(item.type)} className="w-full text-left border border-dashed border-slate-300 hover:border-teal-500 hover:bg-teal-50 rounded px-2 py-2 text-xs text-slate-700">+ {item.label}</button>)}</div>
+        <div className="mt-3 space-y-1">{catalogItems.map((item) => <button type="button" key={item.type} onClick={() => addBlock(item.type)} className="w-full text-left border border-dashed border-slate-300 hover:border-teal-500 hover:bg-teal-50 rounded px-2 py-2 text-xs text-slate-700">+ {item.label}</button>)}</div>
       </aside>
 
       <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-7">
@@ -291,6 +357,7 @@ export default function PublicSitePageBuilder() {
               {blocks.length === 0 ? <div className="m-5 py-24 border-2 border-dashed rounded-lg text-center text-slate-400"><FileText className="w-7 h-7 mx-auto mb-2" />Add blocks from the left to compose this page.</div> : blocks.map((block, index) => <SortableBlock key={block.id} block={block} isSelected={block.id === selectedId} onSelect={() => setSelectedId(block.id)} onSelectChild={(child) => setSelectedId(child.id)} selectedChildId={selectedId} activeDragId={activeDragId}
                 onDelete={() => { setBlocks((items) => items.filter((item) => item.id !== block.id)); if (selectedId === block.id) setSelectedId(null); }}
                 onDuplicate={() => { const copy = cloneBlockWithFreshIds(block); setBlocks((items) => [...items.slice(0, index + 1), copy, ...items.slice(index + 1)]); setSelectedId(copy.id); }}
+                onSaveAsTemplate={saveAsTemplate}
                 onMoveUp={index > 0 ? () => setBlocks((items) => arrayMove(items, index, index - 1)) : undefined}
                 onMoveDown={index < blocks.length - 1 ? () => setBlocks((items) => arrayMove(items, index, index + 1)) : undefined}
                 onMoveBlockOutOfColumn={(parent, side, child) => removeChild(parent, side, child, true)}
@@ -303,7 +370,15 @@ export default function PublicSitePageBuilder() {
         </DndContext>
       </main>
 
-      <aside className="w-[350px] shrink-0 bg-white border-l overflow-y-auto p-4 space-y-1">
+      <aside
+        className="relative w-[350px] shrink-0 bg-white border-l overflow-y-auto p-4 space-y-1"
+        style={{ width: rightPanelWidth }}
+      >
+        <div
+          onMouseDown={handleRightPanelMouseDown}
+          className="absolute bottom-0 left-0 top-0 z-10 w-1.5 cursor-col-resize transition-colors hover:bg-teal-400 active:bg-teal-500"
+          title="Drag to resize settings panel"
+        />
         <div className="mb-2"><p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Settings</p><p className="text-xs text-slate-500 mt-1">Expand a section to control this page.</p></div>
         <SettingsSection title="Page" icon={<Globe2 className="w-4 h-4 text-teal-600" />} open>
           <div><Label className="text-xs">Title</Label><Input value={title} onChange={(event) => setTitle(event.target.value)} /></div>
