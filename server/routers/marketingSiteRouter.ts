@@ -125,6 +125,93 @@ const publicPageShape = {
   isPublished: marketingSitePages.isPublished,
 };
 
+/**
+ * The CME Speakers page is a deliberately hidden CMS page served from Learn.
+ * Railway has previously been connected to a database that did not receive the
+ * source data migration; this one-time, idempotent recovery keeps that drift
+ * from becoming a public 404 while preserving all subsequent visual-editor edits.
+ */
+const CME_SPEAKERS_PATH = "/cme-speakers";
+const CME_SPEAKERS_BLOCKS = [
+  {
+    id: "cme-speakers-hero",
+    type: "hero",
+    data: {
+      headline: "CME Speaker Disclosure",
+      subheadline: "Complete your financial disclosure for an All About Ultrasound™ continuing medical education activity.",
+      bgType: "gradient",
+      gradientDir: "to bottom right",
+      gradientFrom: "#0e4a50",
+      gradientTo: "#179ca3",
+      textColor: "#ffffff",
+      headlineColor: "#ffffff",
+      align: "center",
+      hideButtons: true,
+      heroMinHeight: 260,
+    },
+  },
+  {
+    id: "cme-speakers-intro",
+    type: "text",
+    data: {
+      html: "<div><h2>For speakers, faculty, planners, and content reviewers</h2><p>Please complete the disclosure below for each CME activity you support. Your response is securely delivered to the All About Ultrasound™ CME team and CardioServ for review.</p><p>If you have questions or need to share supporting material, contact <a href=mailto:admin@allaboutultrasound.com>admin@allaboutultrasound.com</a>.</p></div>",
+      align: "center",
+      bgColor: "#ffffff",
+      textColor: "#24313a",
+    },
+  },
+  {
+    id: "cme-speakers-disclosure-form",
+    type: "embed",
+    data: {
+      embedCode: "<iframe src=/cme-disclosure/generic title=CME-Speaker-Financial-Disclosure-Form style=width:100%;height:1280px;border:0;display:block loading=lazy></iframe>",
+      height: 1320,
+      align: "center",
+      maxWidth: "100%",
+      caption: "",
+    },
+  },
+  {
+    id: "cme-speakers-supporting-documents",
+    type: "alert",
+    data: {
+      alertType: "info",
+      icon: "📎",
+      text: "Supporting documents and downloads can be added or updated by a Platform Admin in this page’s visual editor.",
+    },
+  },
+];
+
+async function ensureCmeSpeakersPage(db: NonNullable<Awaited<ReturnType<typeof getDb>>>) {
+  const [existing] = await db.select({ id: marketingSitePages.id })
+    .from(marketingSitePages)
+    .where(and(
+      eq(marketingSitePages.siteKey, "aaus-net"),
+      eq(marketingSitePages.path, CME_SPEAKERS_PATH),
+    ))
+    .limit(1);
+  if (existing) return false;
+
+  await db.insert(marketingSitePages).values({
+    siteKey: "aaus-net",
+    path: CME_SPEAKERS_PATH,
+    title: "CME Speaker Disclosure",
+    pageType: "page",
+    blocks: JSON.stringify(CME_SPEAKERS_BLOCKS),
+    hideInNavigation: true,
+    visibility: "public",
+    headerType: "no_header",
+    seoTitle: "CME Speaker Disclosure | All About Ultrasound",
+    seoDescription: "Submit a CME speaker financial disclosure to All About Ultrasound and CardioServ.",
+    seoKeywords: "CME speaker disclosure, financial disclosure, ultrasound CME faculty",
+    hideFromSearch: true,
+    isPublished: true,
+    sortOrder: 9999,
+    importStatus: "imported",
+  });
+  return true;
+}
+
 export const marketingSitePublicRouter = router({
   getSettings: publicProcedure
     .input(z.object({ tenantKey: tenantKeySchema }))
@@ -196,6 +283,9 @@ export const marketingSitePublicRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const path = normalizePath(input.path);
+      if (input.tenantKey === "aaus-net" && path === CME_SPEAKERS_PATH) {
+        await ensureCmeSpeakersPage(db);
+      }
       let page: typeof marketingSitePages.$inferSelect | undefined;
       try {
         [page] = await db.select().from(marketingSitePages)

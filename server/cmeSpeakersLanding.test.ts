@@ -16,6 +16,15 @@ describe("CME Speakers landing page", () => {
     expect(migration).toContain("WHERE NOT EXISTS");
   });
 
+  it("recovers the published CMS page on the serving database if an additive seed was skipped", () => {
+    const router = readProjectFile("server/routers/marketingSiteRouter.ts");
+
+    expect(router).toContain("async function ensureCmeSpeakersPage");
+    expect(router).toContain('input.tenantKey === "aaus-net" && path === CME_SPEAKERS_PATH');
+    expect(router).toContain("await ensureCmeSpeakersPage(db);");
+    expect(router).toContain('embedCode: "<iframe src=/cme-disclosure/generic');
+  });
+
   it("serves the page inside the Learn LMS layout and not from the public-site funnel router", () => {
     const app = readProjectFile("client/src/App.tsx");
     const lmsLayout = app.indexOf("<LMSLayout>");
