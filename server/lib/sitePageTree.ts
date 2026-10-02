@@ -10,6 +10,7 @@ import {
   funnelPages,
   funnels,
   lmsCourses,
+  marketingSitePages,
   sitePages,
   webinars,
 } from "../../drizzle/schema";
@@ -19,7 +20,10 @@ import {
   type SitePageTreeNode,
 } from "../../shared/sitePagesConstants";
 
-export async function ensureDefaultSitePages(domain: string, userId?: number): Promise<void> {
+export async function ensureDefaultSitePages(
+  domain: string,
+  userId?: number
+): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
@@ -38,7 +42,8 @@ export async function ensureDefaultSitePages(domain: string, userId?: number): P
       pageKind: def.pageKind,
       status: "published",
       blocks: JSON.stringify(def.defaultBlocks),
-      isHiddenFromNav: def.pageKind.startsWith("legal_") || def.pageKind === "error_404",
+      isHiddenFromNav:
+        def.pageKind.startsWith("legal_") || def.pageKind === "error_404",
       showInHeaderNav: false,
       showInSidebarNav: false,
       showInProfileNav: def.pageKind.startsWith("legal_"),
@@ -51,7 +56,7 @@ export async function ensureDefaultSitePages(domain: string, userId?: number): P
 function folderNode(
   id: string,
   label: string,
-  children: SitePageTreeNode[],
+  children: SitePageTreeNode[]
 ): SitePageTreeNode {
   return {
     id,
@@ -70,7 +75,10 @@ function folderNode(
   };
 }
 
-function siteRowToNode(row: typeof sitePages.$inferSelect, parentId: string | null): SitePageTreeNode {
+function siteRowToNode(
+  row: typeof sitePages.$inferSelect,
+  parentId: string | null
+): SitePageTreeNode {
   return {
     id: `site:${row.id}`,
     label: row.title,
@@ -90,7 +98,10 @@ function siteRowToNode(row: typeof sitePages.$inferSelect, parentId: string | nu
   };
 }
 
-export async function buildSitePageTree(domain: string, userId?: number): Promise<SitePageTreeNode[]> {
+export async function buildSitePageTree(
+  domain: string,
+  userId?: number
+): Promise<SitePageTreeNode[]> {
   await ensureDefaultSitePages(domain, userId);
   const db = await getDb();
   if (!db) return [];
@@ -101,37 +112,57 @@ export async function buildSitePageTree(domain: string, userId?: number): Promis
     .where(eq(sitePages.domain, domain))
     .orderBy(asc(sitePages.navSortOrder), asc(sitePages.title));
 
-  const siteNodes = rows.map((r) => siteRowToNode(r, null));
-  const systemSlugs = new Set(DEFAULT_SYSTEM_PAGES.map((p) => p.slug));
-  const systemNodes = siteNodes.filter((n) => n.slug && systemSlugs.has(n.slug));
-  const customNodes = siteNodes.filter((n) => !n.slug || !systemSlugs.has(n.slug));
+  const siteNodes = rows.map(r => siteRowToNode(r, null));
+  const systemSlugs = new Set(DEFAULT_SYSTEM_PAGES.map(p => p.slug));
+  const systemNodes = siteNodes.filter(n => n.slug && systemSlugs.has(n.slug));
+  const customNodes = siteNodes.filter(
+    n => !n.slug || !systemSlugs.has(n.slug)
+  );
 
-  const [courses, downloads, funnelList, webinarList, communityList] = await Promise.all([
-    db
-      .select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type })
-      .from(lmsCourses)
-      .where(eq(lmsCourses.status, "public"))
-      .orderBy(asc(lmsCourses.title)),
-    db
-      .select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug })
-      .from(digitalProducts)
-      .where(eq(digitalProducts.status, "published"))
-      .orderBy(asc(digitalProducts.title)),
-    db.select({ id: funnels.id, name: funnels.name, slug: funnels.slug }).from(funnels).orderBy(asc(funnels.name)),
-    db
-      .select({ id: webinars.id, title: webinars.title, slug: webinars.slug })
-      .from(webinars)
-      .where(eq(webinars.status, "published"))
-      .orderBy(asc(webinars.title)),
-    db
-      .select({ id: communities.id, title: communities.title, slug: communities.slug })
-      .from(communities)
-      .where(eq(communities.status, "published"))
-      .orderBy(asc(communities.title)),
-  ]);
+  const [courses, downloads, funnelList, webinarList, communityList] =
+    await Promise.all([
+      db
+        .select({
+          id: lmsCourses.id,
+          title: lmsCourses.title,
+          slug: lmsCourses.slug,
+          type: lmsCourses.type,
+        })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.status, "public"))
+        .orderBy(asc(lmsCourses.title)),
+      db
+        .select({
+          id: digitalProducts.id,
+          title: digitalProducts.title,
+          slug: digitalProducts.slug,
+        })
+        .from(digitalProducts)
+        .where(eq(digitalProducts.status, "published"))
+        .orderBy(asc(digitalProducts.title)),
+      db
+        .select({ id: funnels.id, name: funnels.name, slug: funnels.slug })
+        .from(funnels)
+        .orderBy(asc(funnels.name)),
+      db
+        .select({ id: webinars.id, title: webinars.title, slug: webinars.slug })
+        .from(webinars)
+        .where(eq(webinars.status, "published"))
+        .orderBy(asc(webinars.title)),
+      db
+        .select({
+          id: communities.id,
+          title: communities.title,
+          slug: communities.slug,
+        })
+        .from(communities)
+        .where(eq(communities.status, "published"))
+        .orderBy(asc(communities.title)),
+    ]);
 
-  const courseChildren: SitePageTreeNode[] = courses.map((c) => {
-    const type = c.type === "quiz" ? "quiz" : c.type === "cohort" ? "cohort" : "course";
+  const courseChildren: SitePageTreeNode[] = courses.map(c => {
+    const type =
+      c.type === "quiz" ? "quiz" : c.type === "cohort" ? "cohort" : "course";
     return {
       id: `${type}:${c.id}:landing`,
       label: c.title,
@@ -151,7 +182,7 @@ export async function buildSitePageTree(domain: string, userId?: number): Promis
     };
   });
 
-  const downloadChildren: SitePageTreeNode[] = downloads.map((d) => ({
+  const downloadChildren: SitePageTreeNode[] = downloads.map(d => ({
     id: `download:${d.id}:landing`,
     label: d.title,
     slug: d.slug,
@@ -171,7 +202,7 @@ export async function buildSitePageTree(domain: string, userId?: number): Promis
 
   const funnelChildren: SitePageTreeNode[] = [];
   if (funnelList.length > 0) {
-    const funnelIds = funnelList.map((f) => f.id);
+    const funnelIds = funnelList.map(f => f.id);
     const pages = funnelIds.length
       ? await db
           .select({
@@ -186,7 +217,7 @@ export async function buildSitePageTree(domain: string, userId?: number): Promis
       : [];
 
     for (const f of funnelList) {
-      const fPages = pages.filter((p) => p.funnelId === f.id);
+      const fPages = pages.filter(p => p.funnelId === f.id);
       funnelChildren.push({
         id: `funnel:${f.id}`,
         label: f.name,
@@ -194,7 +225,7 @@ export async function buildSitePageTree(domain: string, userId?: number): Promis
         kind: "funnel",
         entityId: f.id,
         parentId: "folder:funnels",
-        children: fPages.map((p) => ({
+        children: fPages.map(p => ({
           id: `funnel:${f.id}:page:${p.id}`,
           label: p.title,
           slug: p.slug,
@@ -222,7 +253,7 @@ export async function buildSitePageTree(domain: string, userId?: number): Promis
     }
   }
 
-  const webinarChildren: SitePageTreeNode[] = webinars.map((w) => ({
+  const webinarChildren: SitePageTreeNode[] = webinarList.map(w => ({
     id: `webinar:${w.id}:landing`,
     label: w.title,
     slug: w.slug,
@@ -240,7 +271,7 @@ export async function buildSitePageTree(domain: string, userId?: number): Promis
     showInProfileNav: false,
   }));
 
-  const communityChildren: SitePageTreeNode[] = communityList.map((c) => ({
+  const communityChildren: SitePageTreeNode[] = communityList.map(c => ({
     id: `community:${c.id}:landing`,
     label: c.title,
     slug: c.slug,
@@ -258,9 +289,54 @@ export async function buildSitePageTree(domain: string, userId?: number): Promis
     showInProfileNav: false,
   }));
 
+  // The CME Speaker Disclosure is deliberately served on Learn but authored in
+  // the AAU public-site CMS. Surface it here so Platform Admins can select the
+  // page from the Learn Site Pages tree and open its full visual block editor.
+  const learnCmsChildren: SitePageTreeNode[] =
+    domain === "learn.allaboutultrasound.com"
+      ? (
+          await db
+            .select({
+              id: marketingSitePages.id,
+              title: marketingSitePages.title,
+              path: marketingSitePages.path,
+              isPublished: marketingSitePages.isPublished,
+              hideInNavigation: marketingSitePages.hideInNavigation,
+            })
+            .from(marketingSitePages)
+            .where(
+              and(
+                eq(marketingSitePages.siteKey, "aaus-net"),
+                eq(marketingSitePages.path, "/cme-speakers")
+              )
+            )
+        ).map(page => ({
+          id: `marketing:${page.id}`,
+          label: page.title || "CME Speaker Disclosure",
+          slug: page.path,
+          kind: "site" as const,
+          entityId: page.id,
+          parentId: "folder:learn-cms",
+          children: [],
+          editable: true,
+          editorRoute: `/admin/public-site/page/${page.id}/edit-aaus`,
+          previewUrl: `https://learn.allaboutultrasound.com${page.path}`,
+          hiddenFromNav: page.hideInNavigation,
+          showInHeaderNav: false,
+          showInSidebarNav: false,
+          showInProfileNav: false,
+          status: page.isPublished
+            ? ("published" as const)
+            : ("draft" as const),
+        }))
+      : [];
+
   return [
     folderNode("folder:system", "System Pages", systemNodes),
     folderNode("folder:custom", "Site Pages", customNodes),
+    ...(learnCmsChildren.length
+      ? [folderNode("folder:learn-cms", "Learn CMS Pages", learnCmsChildren)]
+      : []),
     folderNode("folder:courses", "Courses & Quizzes", courseChildren),
     folderNode("folder:downloads", "Downloads", downloadChildren),
     folderNode("folder:funnels", "Funnels", funnelChildren),
@@ -276,7 +352,8 @@ export function validateSiteSlug(slug: string): string | null {
     .replace(/^-+|-+$/g, "")
     .slice(0, 200);
   if (!normalized) return "Slug is required";
-  if (RESERVED_SITE_SLUGS.has(normalized)) return `Slug "${normalized}" is reserved`;
+  if (RESERVED_SITE_SLUGS.has(normalized))
+    return `Slug "${normalized}" is reserved`;
   return null;
 }
 

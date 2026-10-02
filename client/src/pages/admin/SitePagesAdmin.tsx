@@ -58,39 +58,112 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 // Default pages that have editable zones instead of (or in addition to) the block editor
-const DEFAULT_EDITABLE_PAGES: Record<string, { label: string; zones: Array<{ key: string; label: string; hint: string; multiline?: boolean }> }> = {
+const DEFAULT_EDITABLE_PAGES: Record<
+  string,
+  {
+    label: string;
+    zones: Array<{
+      key: string;
+      label: string;
+      hint: string;
+      multiline?: boolean;
+    }>;
+  }
+> = {
   "/": {
     label: "Home",
     zones: [
-      { key: "hero_headline", label: "Hero Headline", hint: "Main headline shown in the hero banner" },
-      { key: "hero_subtitle", label: "Hero Subtitle", hint: "Supporting text below the headline", multiline: true },
-      { key: "cta_headline", label: "CTA Section Headline", hint: "Headline for the bottom call-to-action section" },
-      { key: "cta_body", label: "CTA Section Body", hint: "Body text for the call-to-action section", multiline: true },
-      { key: "cta_button", label: "CTA Button Label", hint: "Text on the CTA button" },
+      {
+        key: "hero_headline",
+        label: "Hero Headline",
+        hint: "Main headline shown in the hero banner",
+      },
+      {
+        key: "hero_subtitle",
+        label: "Hero Subtitle",
+        hint: "Supporting text below the headline",
+        multiline: true,
+      },
+      {
+        key: "cta_headline",
+        label: "CTA Section Headline",
+        hint: "Headline for the bottom call-to-action section",
+      },
+      {
+        key: "cta_body",
+        label: "CTA Section Body",
+        hint: "Body text for the call-to-action section",
+        multiline: true,
+      },
+      {
+        key: "cta_button",
+        label: "CTA Button Label",
+        hint: "Text on the CTA button",
+      },
     ],
   },
   "/education-library": {
     label: "Education Library",
     zones: [
-      { key: "hero_headline", label: "Hero Headline", hint: "Main headline on the Education Library page" },
-      { key: "hero_subtitle", label: "Hero Subtitle", hint: "Supporting text below the headline", multiline: true },
-      { key: "cta_headline", label: "CTA Section Headline", hint: "Headline for the educator CTA section" },
-      { key: "cta_body", label: "CTA Section Body", hint: "Body text for the educator CTA section", multiline: true },
-      { key: "cta_button", label: "CTA Button Label", hint: "Text on the CTA button" },
+      {
+        key: "hero_headline",
+        label: "Hero Headline",
+        hint: "Main headline on the Education Library page",
+      },
+      {
+        key: "hero_subtitle",
+        label: "Hero Subtitle",
+        hint: "Supporting text below the headline",
+        multiline: true,
+      },
+      {
+        key: "cta_headline",
+        label: "CTA Section Headline",
+        hint: "Headline for the educator CTA section",
+      },
+      {
+        key: "cta_body",
+        label: "CTA Section Body",
+        hint: "Body text for the educator CTA section",
+        multiline: true,
+      },
+      {
+        key: "cta_button",
+        label: "CTA Button Label",
+        hint: "Text on the CTA button",
+      },
     ],
   },
   "/workshops": {
     label: "Workshops",
     zones: [
-      { key: "hero_headline", label: "Hero Headline", hint: "Main headline on the Workshops page" },
-      { key: "hero_subtitle", label: "Hero Subtitle", hint: "Supporting text below the headline", multiline: true },
+      {
+        key: "hero_headline",
+        label: "Hero Headline",
+        hint: "Main headline on the Workshops page",
+      },
+      {
+        key: "hero_subtitle",
+        label: "Hero Subtitle",
+        hint: "Supporting text below the headline",
+        multiline: true,
+      },
     ],
   },
   "/community": {
     label: "Community",
     zones: [
-      { key: "hero_headline", label: "Hero Headline", hint: "Main headline on the Community page" },
-      { key: "hero_subtitle", label: "Hero Subtitle", hint: "Supporting text below the headline", multiline: true },
+      {
+        key: "hero_headline",
+        label: "Hero Headline",
+        hint: "Main headline on the Community page",
+      },
+      {
+        key: "hero_subtitle",
+        label: "Hero Subtitle",
+        hint: "Supporting text below the headline",
+        multiline: true,
+      },
     ],
   },
 };
@@ -106,7 +179,10 @@ function PageZoneEditor({
   pageDef: (typeof DEFAULT_EDITABLE_PAGES)[string];
   onClose: () => void;
 }) {
-  const { data, isLoading } = trpc.sitePages.admin.getPageZones.useQuery({ domain, slug });
+  const { data, isLoading } = trpc.sitePages.admin.getPageZones.useQuery({
+    domain,
+    slug,
+  });
   const [values, setValues] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
 
@@ -118,8 +194,11 @@ function PageZoneEditor({
   }, [data, loaded]);
 
   const save = trpc.sitePages.admin.savePageZones.useMutation({
-    onSuccess: () => { toast.success("Page content saved"); onClose(); },
-    onError: (e) => toast.error(e.message),
+    onSuccess: () => {
+      toast.success("Page content saved");
+      onClose();
+    },
+    onError: e => toast.error(e.message),
   });
 
   return (
@@ -127,7 +206,7 @@ function PageZoneEditor({
       {isLoading ? (
         <p className="text-sm text-gray-500">Loading...</p>
       ) : (
-        pageDef.zones.map((zone) => (
+        pageDef.zones.map(zone => (
           <div key={zone.key} className="space-y-1">
             <Label className="text-sm font-medium">{zone.label}</Label>
             <p className="text-xs text-gray-500">{zone.hint}</p>
@@ -135,13 +214,17 @@ function PageZoneEditor({
               <Textarea
                 rows={3}
                 value={values[zone.key] ?? ""}
-                onChange={(e) => setValues((v) => ({ ...v, [zone.key]: e.target.value }))}
+                onChange={e =>
+                  setValues(v => ({ ...v, [zone.key]: e.target.value }))
+                }
                 placeholder={`Default: (leave blank to use default)`}
               />
             ) : (
               <Input
                 value={values[zone.key] ?? ""}
-                onChange={(e) => setValues((v) => ({ ...v, [zone.key]: e.target.value }))}
+                onChange={e =>
+                  setValues(v => ({ ...v, [zone.key]: e.target.value }))
+                }
                 placeholder="Leave blank to use default"
               />
             )}
@@ -149,7 +232,9 @@ function PageZoneEditor({
         ))
       )}
       <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
         <Button
           className="bg-teal-600 hover:bg-teal-700"
           onClick={() => save.mutate({ domain, slug, zones: values })}
@@ -195,16 +280,22 @@ function TreeFolder({
           style={{ paddingLeft: 8 + depth * 12 }}
         >
           {hasChildren ? (
-            isOpen ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+            isOpen ? (
+              <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+            )
           ) : (
             <span className="w-3.5" />
           )}
           <Folder className="w-3.5 h-3.5 text-amber-500 shrink-0" />
           <span className="truncate">{node.label}</span>
-          <span className="ml-auto text-xs text-gray-400">{node.children.length}</span>
+          <span className="ml-auto text-xs text-gray-400">
+            {node.children.length}
+          </span>
         </button>
         {isOpen &&
-          node.children.map((child) => (
+          node.children.map(child => (
             <TreeFolder
               key={child.id}
               node={child}
@@ -227,23 +318,33 @@ function TreeFolder({
         onClick={() => onSelect(node)}
         className={cn(
           "w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-sm rounded group",
-          isSelected ? "bg-teal-100 text-teal-900" : "hover:bg-gray-50 text-gray-700",
+          isSelected
+            ? "bg-teal-100 text-teal-900"
+            : "hover:bg-gray-50 text-gray-700"
         )}
         style={{ paddingLeft: 8 + depth * 12 }}
       >
         <FileText className="w-3.5 h-3.5 shrink-0 text-gray-400" />
         <span className="truncate flex-1">{node.label}</span>
         {node.hiddenFromNav ? (
-          <EyeOff className="w-3 h-3 text-gray-300 shrink-0" title="Hidden from nav" />
+          <EyeOff
+            className="w-3 h-3 text-gray-300 shrink-0"
+            title="Hidden from nav"
+          />
         ) : (
-          <Eye className="w-3 h-3 text-teal-500 shrink-0 opacity-0 group-hover:opacity-100" title="Visible in nav" />
+          <Eye
+            className="w-3 h-3 text-teal-500 shrink-0 opacity-0 group-hover:opacity-100"
+            title="Visible in nav"
+          />
         )}
         {node.status === "draft" && (
-          <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded shrink-0">draft</span>
+          <span className="text-[10px] bg-amber-100 text-amber-700 px-1 rounded shrink-0">
+            draft
+          </span>
         )}
       </button>
       {node.children.length > 0 &&
-        node.children.map((child) => (
+        node.children.map(child => (
           <TreeFolder
             key={child.id}
             node={child}
@@ -275,7 +376,8 @@ function SortableNavItem({
   expanded?: Set<string>;
   onToggleExpand?: (id: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: item.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
   const children = item.children ?? [];
   const hasChildren = children.length > 0;
@@ -283,31 +385,53 @@ function SortableNavItem({
 
   return (
     <div ref={setNodeRef} style={style} className="mb-1">
-      <div className="flex items-center gap-2" style={{ paddingLeft: depth * 16 }}>
-        <button type="button" className="cursor-grab text-gray-400" {...attributes} {...listeners}>
+      <div
+        className="flex items-center gap-2"
+        style={{ paddingLeft: depth * 16 }}
+      >
+        <button
+          type="button"
+          className="cursor-grab text-gray-400"
+          {...attributes}
+          {...listeners}
+        >
           <GripVertical className="w-4 h-4" />
         </button>
         {hasChildren ? (
-          <button type="button" onClick={() => onToggleExpand?.(item.id)} className="text-gray-400">
-            {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          <button
+            type="button"
+            onClick={() => onToggleExpand?.(item.id)}
+            className="text-gray-400"
+          >
+            {isOpen ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
           </button>
         ) : (
           <span className="w-4" />
         )}
         <Input
           value={item.label}
-          onChange={(e) => onChange({ ...item, label: e.target.value })}
+          onChange={e => onChange({ ...item, label: e.target.value })}
           className="h-8 text-sm flex-1"
           placeholder="Label"
         />
         <Input
           value={item.href ?? ""}
-          onChange={(e) => onChange({ ...item, href: e.target.value })}
+          onChange={e => onChange({ ...item, href: e.target.value })}
           className="h-8 text-sm flex-[2]"
           placeholder="/path or https://"
         />
         {onAddChild && (
-          <Button type="button" variant="ghost" size="sm" onClick={onAddChild} title="Add submenu">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onAddChild}
+            title="Add submenu"
+          >
             <Plus className="w-3.5 h-3.5" />
           </Button>
         )}
@@ -324,7 +448,7 @@ function SortableNavItem({
               depth={depth + 1}
               expanded={expanded}
               onToggleExpand={onToggleExpand}
-              onChange={(updated) =>
+              onChange={updated =>
                 onChange({
                   ...item,
                   children: children.map((c, i) => (i === idx ? updated : c)),
@@ -344,11 +468,18 @@ function SortableNavItem({
   );
 }
 
-function updateNavItemById(items: SiteNavItem[], id: string, updater: (item: SiteNavItem) => SiteNavItem): SiteNavItem[] {
-  return items.map((item) => {
+function updateNavItemById(
+  items: SiteNavItem[],
+  id: string,
+  updater: (item: SiteNavItem) => SiteNavItem
+): SiteNavItem[] {
+  return items.map(item => {
     if (item.id === id) return updater(item);
     if (item.children?.length) {
-      return { ...item, children: updateNavItemById(item.children, id, updater) };
+      return {
+        ...item,
+        children: updateNavItemById(item.children, id, updater),
+      };
     }
     return item;
   });
@@ -356,9 +487,11 @@ function updateNavItemById(items: SiteNavItem[], id: string, updater: (item: Sit
 
 function removeNavItemById(items: SiteNavItem[], id: string): SiteNavItem[] {
   return items
-    .filter((item) => item.id !== id)
-    .map((item) =>
-      item.children?.length ? { ...item, children: removeNavItemById(item.children, id) } : item,
+    .filter(item => item.id !== id)
+    .map(item =>
+      item.children?.length
+        ? { ...item, children: removeNavItemById(item.children, id) }
+        : item
     );
 }
 
@@ -369,24 +502,35 @@ export default function SitePagesAdmin() {
 
   const [domain, setDomain] = useState(initialDomain);
   const [expanded, setExpanded] = useState<Set<string>>(
-    () => new Set(["folder:system", "folder:custom", "folder:courses"]),
+    () =>
+      new Set([
+        "folder:system",
+        "folder:custom",
+        "folder:learn-cms",
+        "folder:courses",
+      ])
   );
-  const [selectedNode, setSelectedNode] = useState<SitePageTreeNode | null>(null);
+  const [selectedNode, setSelectedNode] = useState<SitePageTreeNode | null>(
+    null
+  );
   const [zoneEditorSlug, setZoneEditorSlug] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newSlug, setNewSlug] = useState("");
-  const [menuKey, setMenuKey] = useState<(typeof SITE_NAV_MENU_KEYS)[number]>("header");
+  const [menuKey, setMenuKey] =
+    useState<(typeof SITE_NAV_MENU_KEYS)[number]>("header");
   const [navItems, setNavItems] = useState<SiteNavItem[]>([]);
   const [navLoaded, setNavLoaded] = useState(false);
   const [navExpanded, setNavExpanded] = useState<Set<string>>(() => new Set());
 
   const { data: domains } = trpc.sitePages.admin.listDomains.useQuery();
-  const { data: tree, refetch: refetchTree } = trpc.sitePages.admin.listPageTree.useQuery({ domain });
-  const { data: navData, refetch: refetchNav } = trpc.sitePages.admin.getNavMenu.useQuery(
-    { domain, menuKey },
-    { enabled: !!domain },
-  );
+  const { data: tree, refetch: refetchTree } =
+    trpc.sitePages.admin.listPageTree.useQuery({ domain });
+  const { data: navData, refetch: refetchNav } =
+    trpc.sitePages.admin.getNavMenu.useQuery(
+      { domain, menuKey },
+      { enabled: !!domain }
+    );
 
   useEffect(() => {
     if (navData) {
@@ -396,7 +540,7 @@ export default function SitePagesAdmin() {
   }, [navData, menuKey, domain]);
 
   const createPage = trpc.sitePages.admin.createPage.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       toast.success("Page created");
       setCreateOpen(false);
       setNewTitle("");
@@ -404,7 +548,7 @@ export default function SitePagesAdmin() {
       refetchTree();
       navigate(`/admin/lms/site-pages/${data.id}/edit`);
     },
-    onError: (e) => toast.error(e.message),
+    onError: e => toast.error(e.message),
   });
 
   const saveNav = trpc.sitePages.admin.saveNavMenu.useMutation({
@@ -412,13 +556,15 @@ export default function SitePagesAdmin() {
       toast.success("Navigation saved");
       refetchNav();
     },
-    onError: (e) => toast.error(e.message),
+    onError: e => toast.error(e.message),
   });
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   const toggleFolder = (id: string) => {
-    setExpanded((prev) => {
+    setExpanded(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -440,23 +586,23 @@ export default function SitePagesAdmin() {
   const handleNavDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    setNavItems((prev) => {
-      const oldIdx = prev.findIndex((i) => i.id === active.id);
-      const newIdx = prev.findIndex((i) => i.id === over.id);
+    setNavItems(prev => {
+      const oldIdx = prev.findIndex(i => i.id === active.id);
+      const newIdx = prev.findIndex(i => i.id === over.id);
       if (oldIdx === -1 || newIdx === -1) return prev;
       return arrayMove(prev, oldIdx, newIdx);
     });
   };
 
   const addNavItem = () => {
-    setNavItems((prev) => [
+    setNavItems(prev => [
       ...prev,
       { id: `nav-${Date.now()}`, label: "New link", href: "/" },
     ]);
   };
 
   const toggleNavFolder = (id: string) => {
-    setNavExpanded((prev) => {
+    setNavExpanded(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -477,20 +623,33 @@ export default function SitePagesAdmin() {
         </div>
         <div className="flex items-center gap-3">
           <Label className="text-xs text-gray-500">Domain</Label>
-          <Select value={domain} onValueChange={(v) => { setDomain(v); setNavLoaded(false); setSelectedNode(null); }}>
+          <Select
+            value={domain}
+            onValueChange={v => {
+              setDomain(v);
+              setNavLoaded(false);
+              setSelectedNode(null);
+            }}
+          >
             <SelectTrigger className="w-64 h-9">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(domains ?? []).map((d) => (
-                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+              {(domains ?? []).map(d => (
+                <SelectItem key={d.value} value={d.value}>
+                  {d.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </header>
 
-      <Tabs defaultValue="pages" className="flex-1 flex flex-col min-h-0" onValueChange={() => setNavLoaded(false)}>
+      <Tabs
+        defaultValue="pages"
+        className="flex-1 flex flex-col min-h-0"
+        onValueChange={() => setNavLoaded(false)}
+      >
         <div className="border-b bg-white px-4">
           <TabsList>
             <TabsTrigger value="pages">Pages</TabsTrigger>
@@ -501,13 +660,20 @@ export default function SitePagesAdmin() {
         <TabsContent value="pages" className="flex-1 flex min-h-0 m-0">
           <aside className="w-72 border-r bg-white flex flex-col shrink-0">
             <div className="p-3 border-b flex items-center justify-between">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pages</span>
-              <Button size="sm" variant="outline" className="h-7 px-2" onClick={() => setCreateOpen(true)}>
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                Pages
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                onClick={() => setCreateOpen(true)}
+              >
                 <Plus className="w-3.5 h-3.5" />
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto p-2">
-              {(tree ?? []).map((folder) => (
+              {(tree ?? []).map(folder => (
                 <TreeFolder
                   key={folder.id}
                   node={folder}
@@ -524,9 +690,13 @@ export default function SitePagesAdmin() {
           <main className="flex-1 flex items-center justify-center p-8 text-center text-gray-500">
             {selectedNode ? (
               <div className="max-w-md space-y-4">
-                <h2 className="text-lg font-semibold text-gray-800">{selectedNode.label}</h2>
+                <h2 className="text-lg font-semibold text-gray-800">
+                  {selectedNode.label}
+                </h2>
                 {selectedNode.previewUrl && (
-                  <p className="text-sm text-gray-500">{selectedNode.previewUrl}</p>
+                  <p className="text-sm text-gray-500">
+                    {selectedNode.previewUrl}
+                  </p>
                 )}
                 {selectedNode.editorRoute && (
                   <Button asChild className="bg-teal-600 hover:bg-teal-700">
@@ -537,7 +707,11 @@ export default function SitePagesAdmin() {
                 )}
                 {selectedNode.previewUrl && (
                   <Button variant="outline" asChild>
-                    <a href={selectedNode.previewUrl} target="_blank" rel="noreferrer">
+                    <a
+                      href={selectedNode.previewUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
                       <ExternalLink className="w-4 h-4 mr-2" /> Preview live
                     </a>
                   </Button>
@@ -545,7 +719,9 @@ export default function SitePagesAdmin() {
                 {(() => {
                   // Normalize slug: selectedNode.slug may not have leading slash
                   const rawSlug = selectedNode.slug ?? "";
-                  const normalizedSlug = rawSlug.startsWith("/") ? rawSlug : "/" + rawSlug;
+                  const normalizedSlug = rawSlug.startsWith("/")
+                    ? rawSlug
+                    : "/" + rawSlug;
                   const pageDef = DEFAULT_EDITABLE_PAGES[normalizedSlug];
                   return pageDef ? (
                     <Button
@@ -561,22 +737,29 @@ export default function SitePagesAdmin() {
             ) : (
               <div>
                 <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p>Select a page from the left menu to edit, or create a new site page.</p>
+                <p>
+                  Select a page from the left menu to edit, or create a new site
+                  page.
+                </p>
                 <p className="text-xs mt-2 text-gray-400">
-                  System pages (Privacy, Terms, 404, Login) are seeded per domain and use the full block editor.
+                  System pages (Privacy, Terms, 404, Login) are seeded per
+                  domain and use the full block editor.
                 </p>
               </div>
             )}
           </main>
         </TabsContent>
 
-        <TabsContent value="navigation" className="flex-1 m-0 p-6 overflow-y-auto">
+        <TabsContent
+          value="navigation"
+          className="flex-1 m-0 p-6 overflow-y-auto"
+        >
           <div className="max-w-2xl mx-auto space-y-4">
             <div className="flex items-center gap-3">
               <Label>Menu</Label>
               <Select
                 value={menuKey}
-                onValueChange={(v) => {
+                onValueChange={v => {
                   setMenuKey(v as typeof menuKey);
                   setNavLoaded(false);
                 }}
@@ -597,45 +780,65 @@ export default function SitePagesAdmin() {
               <Button
                 size="sm"
                 className="bg-teal-600 hover:bg-teal-700 ml-auto"
-                onClick={() => saveNav.mutate({ domain, menuKey, items: navItems })}
+                onClick={() =>
+                  saveNav.mutate({ domain, menuKey, items: navItems })
+                }
                 disabled={saveNav.isPending}
               >
                 Save menu
               </Button>
             </div>
             <p className="text-sm text-gray-500">
-              Drag to reorder. Links can point to site pages ({`/`}slug) or external URLs.
-              Pages with &quot;Show in header nav&quot; enabled also appear automatically when no custom menu is saved.
-              {menuKey === "sidebar" && domain === "app.allaboutultrasound.com" && (
-                <>
-                  {" "}
-                  Sidebar menus for the App domain are saved here for planning and export; the live clinical
-                  tools sidebar on app.allaboutultrasound.com is not replaced.
-                </>
-              )}
+              Drag to reorder. Links can point to site pages ({`/`}slug) or
+              external URLs. Pages with &quot;Show in header nav&quot; enabled
+              also appear automatically when no custom menu is saved.
+              {menuKey === "sidebar" &&
+                domain === "app.allaboutultrasound.com" && (
+                  <>
+                    {" "}
+                    Sidebar menus for the App domain are saved here for planning
+                    and export; the live clinical tools sidebar on
+                    app.allaboutultrasound.com is not replaced.
+                  </>
+                )}
             </p>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleNavDragEnd}>
-              <SortableContext items={navItems.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-                {navItems.map((item) => (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleNavDragEnd}
+            >
+              <SortableContext
+                items={navItems.map(i => i.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {navItems.map(item => (
                   <SortableNavItem
                     key={item.id}
                     item={item}
                     depth={0}
                     expanded={navExpanded}
                     onToggleExpand={toggleNavFolder}
-                    onChange={(updated) =>
-                      setNavItems((prev) => updateNavItemById(prev, item.id, () => updated))
+                    onChange={updated =>
+                      setNavItems(prev =>
+                        updateNavItemById(prev, item.id, () => updated)
+                      )
                     }
-                    onRemove={() => setNavItems((prev) => removeNavItemById(prev, item.id))}
+                    onRemove={() =>
+                      setNavItems(prev => removeNavItemById(prev, item.id))
+                    }
                     onAddChild={() =>
-                      setNavItems((prev) =>
-                        updateNavItemById(prev, item.id, (current) => ({
+                      setNavItems(prev =>
+                        updateNavItemById(prev, item.id, current => ({
                           ...current,
                           children: [
                             ...(current.children ?? []),
-                            { id: `nav-${Date.now()}`, label: "Sub link", href: "/" },
+                            {
+                              id: `nav-${Date.now()}`,
+                              label: "Sub link",
+                              href: "/",
+                            },
                           ],
-                        })),
+                        }))
                       )
                     }
                   />
@@ -648,10 +851,18 @@ export default function SitePagesAdmin() {
 
       {/* Zone editor dialog */}
       {zoneEditorSlug && DEFAULT_EDITABLE_PAGES[zoneEditorSlug] && (
-        <Dialog open={!!zoneEditorSlug} onOpenChange={(open) => { if (!open) setZoneEditorSlug(null); }}>
+        <Dialog
+          open={!!zoneEditorSlug}
+          onOpenChange={open => {
+            if (!open) setZoneEditorSlug(null);
+          }}
+        >
           <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Edit Page Content — {DEFAULT_EDITABLE_PAGES[zoneEditorSlug].label}</DialogTitle>
+              <DialogTitle>
+                Edit Page Content —{" "}
+                {DEFAULT_EDITABLE_PAGES[zoneEditorSlug].label}
+              </DialogTitle>
             </DialogHeader>
             <PageZoneEditor
               domain={domain}
@@ -673,14 +884,14 @@ export default function SitePagesAdmin() {
               <Label>Title</Label>
               <Input
                 value={newTitle}
-                onChange={(e) => {
+                onChange={e => {
                   setNewTitle(e.target.value);
                   if (!newSlug) {
                     setNewSlug(
                       e.target.value
                         .toLowerCase()
                         .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/^-+|-+$/g, ""),
+                        .replace(/^-+|-+$/g, "")
                     );
                   }
                 }}
@@ -688,7 +899,11 @@ export default function SitePagesAdmin() {
             </div>
             <div>
               <Label>URL slug</Label>
-              <Input value={newSlug} onChange={(e) => setNewSlug(e.target.value)} placeholder="about-us" />
+              <Input
+                value={newSlug}
+                onChange={e => setNewSlug(e.target.value)}
+                placeholder="about-us"
+              />
             </div>
           </div>
           <DialogFooter>
