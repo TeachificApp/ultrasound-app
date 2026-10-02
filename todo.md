@@ -209,6 +209,7 @@
 - [x] Persist submitted inline CME lesson-quiz responses by learner, course, lesson, and question so survey answers are available for activity-level reporting and export.
 - [x] Create a separate unassigned, unscored CME Speaker Evaluation Survey template with the supplied knowledge, effectiveness, and engagement rating questions.
 - [x] Validate the CME Speaker Evaluation Survey template’s three question ratings and CME export-compatible response format before checkpointing the survey templates.
+- [x] Create the hidden, editable CME Speaker Disclosure landing page at `/cme-speakers`: it has no public navigation entry or page header, embeds the existing no-login CME financial disclosure form, is editable under All About Ultrasound Site Pages, supports adding downloadable files and other content blocks, and is protected from funnel catch-all routing by the explicit public-site route. Seeded through the additive `0092_cme_speakers_landing_page.sql` migration.
 - [x] Build an administrator-only CME Management panel that lists CME courses and activities with learner enrollment and completion reporting.
 - [x] Include certificate management in CME Management with per-activity issued-certificate status, issuance date, and export visibility.
 - [x] Add per-CME-activity reporting and CSV export with learner full name, email, activity and completion dates, quiz results, and recorded quiz or survey responses.
