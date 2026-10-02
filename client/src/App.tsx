@@ -902,11 +902,6 @@ function LMSRouter() {
       <Route path="/cme-disclosure/:token">
         <Suspense fallback={pageFallback}><CmeDisclosureForm /></Suspense>
       </Route>
-      {/* CME speaker disclosure is a direct public Learn link with no LMS menu shell.
-          Content remains managed under the AAU public Site Pages tenant. */}
-      <Route path="/cme-speakers">
-        <Suspense fallback={pageFallback}><PublicMarketingSitePage tenantKey="aaus-net" canonicalOrigin="https://learn.allaboutultrasound.com" /></Suspense>
-      </Route>
       {/* Partner signup — public, no auth, no layout */}
       <Route path="/partner-signup">
         <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>
@@ -951,6 +946,11 @@ function LMSRouter() {
           <Switch>
             {/* LMS Home */}
             <Route path="/" component={LMSHome} />
+            {/* Direct CME speaker disclosure link. Content is edited through the
+                AAU Site Pages CMS while presentation uses the Learn header/menu. */}
+            <Route path="/cme-speakers">
+              <PublicMarketingSitePage tenantKey="aaus-net" canonicalOrigin="https://learn.allaboutultrasound.com" />
+            </Route>
             <Route path="/survey-pulse/:view" component={SurveyPulse} />
             <Route path="/survey-pulse" component={SurveyPulse} />
             {/* Community — static paths before /:slug catch-all */}

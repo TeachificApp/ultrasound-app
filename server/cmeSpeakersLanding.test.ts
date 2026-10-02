@@ -16,15 +16,16 @@ describe("CME Speakers landing page", () => {
     expect(migration).toContain("WHERE NOT EXISTS");
   });
 
-  it("serves the page on Learn before the LMS navigation shell and not from the public-site funnel router", () => {
+  it("serves the page inside the Learn LMS layout and not from the public-site funnel router", () => {
     const app = readProjectFile("client/src/App.tsx");
-    const pageRoute = app.indexOf('<Route path="/cme-speakers">');
-    const lmsLayout = app.indexOf("<LMSLayout>", pageRoute);
+    const lmsLayout = app.indexOf("<LMSLayout>");
+    const pageRoute = app.indexOf('<Route path="/cme-speakers">', lmsLayout);
+    const homeRoute = app.indexOf('<Route path="/" component={LMSHome} />', lmsLayout);
 
-    expect(pageRoute).toBeGreaterThan(-1);
-    expect(lmsLayout).toBeGreaterThan(pageRoute);
-    expect(app.slice(pageRoute, lmsLayout)).toContain('tenantKey="aaus-net"');
-    expect(app.slice(pageRoute, lmsLayout)).toContain('canonicalOrigin="https://learn.allaboutultrasound.com"');
+    expect(lmsLayout).toBeGreaterThan(-1);
+    expect(pageRoute).toBeGreaterThan(homeRoute);
+    expect(app.slice(homeRoute, pageRoute + 450)).toContain('tenantKey="aaus-net"');
+    expect(app.slice(homeRoute, pageRoute + 450)).toContain('canonicalOrigin="https://learn.allaboutultrasound.com"');
     expect(app).not.toContain('<Route path="/cme-speakers" component={PublicMarketingSitePage} />');
   });
 
@@ -35,5 +36,13 @@ describe("CME Speakers landing page", () => {
     expect(builder).toContain("BlockSettings");
     expect(catalog).toContain('type: "file_download"');
     expect(catalog).toContain("File Download");
+  });
+
+  it("suppresses the legacy marketing header across All About Ultrasound .net pages", () => {
+    const page = readProjectFile("client/src/pages/PublicMarketingSitePage.tsx");
+
+    expect(page).toContain('host === "allaboutultrasound.net" || host === "www.allaboutultrasound.net"');
+    expect(page).toContain("const showHeader = !hideMarketingNav && data.page.headerType !== \"no_header\";");
+    expect(page).toContain("hideMarketingNav={hideMarketingNav}");
   });
 });

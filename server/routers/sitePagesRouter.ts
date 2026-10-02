@@ -6,7 +6,7 @@ import { z } from "zod";
 import { and, asc, eq } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { siteNavMenus, sitePages } from "../../drizzle/schema";
+import { platformSettings, siteNavMenus, sitePages } from "../../drizzle/schema";
 import {
   SITE_NAV_MENU_KEYS,
   SITE_PAGE_DOMAINS,
@@ -40,7 +40,37 @@ const navItemSchema: z.ZodType<SiteNavItem> = z.lazy(() =>
 );
 
 export const sitePagesAdminRouter = router({
-  listDomains: protectedProcedure.query(() => SITE_PAGE_DOMAINS),
+  listDomains: protectedProcedure.query(async ({ ctx }) => {
+    requireAdmin(ctx.user.role);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+    const [settings] = await db
+      .select({ customDomains: platformSettings.customDomains })
+      .from(platformSettings)
+      .where(eq(platformSettings.id, 1))
+      .limit(1);
+
+    let configuredDomains: string[] = [];
+    try {
+      const parsed = settings?.customDomains ? JSON.parse(settings.customDomains) : [];
+      configuredDomains = Array.isArray(parsed)
+        ? parsed.filter((domain): domain is string => typeof domain === "string")
+          .map((domain) => domain.trim().toLowerCase())
+          .filter((domain) => /^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain))
+        : [];
+    } catch {
+      configuredDomains = [];
+    }
+
+    const knownDomains = new Set(SITE_PAGE_DOMAINS.map((domain) => domain.value));
+    return [
+      ...SITE_PAGE_DOMAINS,
+      ...configuredDomains
+        .filter((domain) => !knownDomains.has(domain))
+        .map((domain) => ({ value: domain, label: `Custom domain — ${domain}`, brand: "aaus" as const })),
+    ];
+  }),
 
   listPageTree: protectedProcedure
     .input(z.object({ domain: domainSchema }))
