@@ -130,6 +130,7 @@ export default function RevenueShareAdmin() {
 
 // ─── Partners Tab ─────────────────────────────────────────────────────────────
 function PartnersTab() {
+  const genericSetupUrl = "https://learn.allaboutultrasound.com/revenue-partner/stripe-setup";
   const [showInvite, setShowInvite] = useState(false);
   const [inviteTab, setInviteTab] = useState<"existing" | "new">("existing");
   const [searchQuery, setSearchQuery] = useState("");
@@ -220,6 +221,13 @@ function PartnersTab() {
     }
   }
 
+  function copyGenericSetupLink() {
+    navigator.clipboard?.writeText(genericSetupUrl).then(
+      () => toast.success("Revenue Partner Stripe setup link copied"),
+      () => toast.error("Could not copy the link. Please copy it from the field."),
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -242,6 +250,21 @@ function PartnersTab() {
           </Button>
         </div>
       </div>
+
+      <Card className="border-[#189aa1]/30 bg-[#f2fbfb]">
+        <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-900">Reusable Revenue Partner Stripe Setup Link</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Add the partner first, then share this stable link. They confirm their approved email and complete their Stripe Connect payout setup.</p>
+          </div>
+          <div className="flex w-full shrink-0 gap-2 sm:w-auto">
+            <Input aria-label="Reusable Revenue Partner Stripe setup link" value={genericSetupUrl} readOnly className="min-w-0 bg-white text-xs sm:w-[330px]" onFocus={(event) => event.currentTarget.select()} />
+            <Button type="button" variant="outline" className="gap-1.5 border-[#189aa1]/40 text-[#147a80] hover:bg-white" onClick={copyGenericSetupLink}>
+              <Link2 className="h-4 w-4" /> Copy
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading partners…</div>

@@ -1,7 +1,7 @@
 /**
  * PartnerSignup.tsx
- * Private, unlisted revenue partner sign-up page.
- * URL: /partner-signup
+ * Private, unlisted revenue partner Stripe setup page.
+ * Canonical URL: /revenue-partner/stripe-setup
  * Not linked from anywhere — share the URL directly with pre-approved partners.
  *
  * Flow:
@@ -28,7 +28,7 @@ function BrandHeader() {
       <div className="w-14 h-14 rounded-2xl bg-teal-600 flex items-center justify-center shadow-lg mb-4">
         <ShieldCheck className="w-8 h-8 text-white" />
       </div>
-      <h1 className="text-2xl font-bold text-gray-900 text-center">Revenue Partner Registration</h1>
+      <h1 className="text-2xl font-bold text-gray-900 text-center">Revenue Partner Stripe Setup</h1>
       <p className="text-sm text-gray-500 mt-1 text-center">All About Ultrasound™ · Powered by Stripe Connect</p>
     </div>
   );
@@ -113,7 +113,6 @@ export default function PartnerSignup() {
     register.mutate({
       name: name.trim(),
       email: email.trim(),
-      origin: window.location.origin,
     });
   };
 
@@ -183,8 +182,8 @@ export default function PartnerSignup() {
         <BrandHeader />
 
         <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-6 text-sm text-teal-800">
-          <strong>Invitation-only.</strong> This page is for pre-approved revenue partners only.
-          If you have not been invited, please contact{" "}
+          <strong>For approved revenue partners.</strong> Enter the email address associated with your revenue-share partnership to securely complete Stripe Connect payout setup.
+          If your email has not yet been approved, please contact{" "}
           <a href="mailto:admin@allaboutultrasound.com" className="underline font-medium">
             admin@allaboutultrasound.com
           </a>{" "}
@@ -218,7 +217,7 @@ export default function PartnerSignup() {
               className="h-11"
               disabled={register.isPending}
             />
-            <p className="text-xs text-gray-400">Must match the email address you were invited with.</p>
+            <p className="text-xs text-gray-400">Must match the email address associated with your approved revenue-share partnership.</p>
           </div>
 
           {errorMsg && (
@@ -247,7 +246,7 @@ export default function PartnerSignup() {
             {register.isPending ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Setting up your account…</>
             ) : (
-              <>Register as Revenue Partner <ArrowRight className="w-4 h-4" /></>
+              <>Continue to Stripe Setup <ArrowRight className="w-4 h-4" /></>
             )}
           </Button>
         </form>

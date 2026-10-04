@@ -832,52 +832,75 @@ export const revenueShareRouter = router({
       return { allowed: true, alreadyRegistered: !!row.usedAt, name: row.name };
     }),
 
-  // ── Public: Self-register as a revenue partner (allowlist-gated) ─────────
+  // ── Public: Complete revenue-partner registration and Stripe onboarding ───
+  // Existing partners may use the stable, generic setup URL to resume onboarding.
+  // Brand-new partners still require an administrator's allowlist approval.
   selfRegisterPartner: publicProcedure
     .input(z.object({
       email: z.string().email(),
       name: z.string().min(1).max(255),
-      origin: z.string().url().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const normalizedEmail = input.email.toLowerCase().trim();
-      // Check allowlist
-      const [allowed] = await db
-        .select()
-        .from(partnerAllowlist)
-        .where(eq(partnerAllowlist.email, normalizedEmail))
-        .limit(1);
-      if (!allowed) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Your email is not on the partner allowlist. Please contact admin@allaboutultrasound.com to enable your partner account.",
-        });
-      }
-      // Check if partner already exists (may be resuming an incomplete onboarding)
+      // An administrator-created partner is already approved to use the generic
+      // setup link. For a new record, retain the allowlist gate so a public URL
+      // cannot create arbitrary Stripe Connect accounts.
       const [existing] = await db
-        .select({ id: revenueSharePartners.id, stripeAccountId: revenueSharePartners.stripeAccountId, onboardingStatus: revenueSharePartners.onboardingStatus })
+        .select({
+          id: revenueSharePartners.id,
+          name: revenueSharePartners.name,
+          email: revenueSharePartners.email,
+          stripeAccountId: revenueSharePartners.stripeAccountId,
+          onboardingStatus: revenueSharePartners.onboardingStatus,
+        })
         .from(revenueSharePartners)
         .where(eq(revenueSharePartners.email, normalizedEmail))
         .limit(1);
-      // Block only if fully active — allow retry if still onboarding/pending
-      if (allowed.usedAt && existing?.onboardingStatus === "active") {
+      if (existing?.onboardingStatus === "active") {
         throw new TRPCError({
           code: "CONFLICT",
           message: "Your partner account is already active. Log in to your Stripe Express dashboard to manage payouts, or contact admin@allaboutultrasound.com for assistance.",
         });
       }
+      const [allowed] = await db
+        .select()
+        .from(partnerAllowlist)
+        .where(eq(partnerAllowlist.email, normalizedEmail))
+        .limit(1);
+      if (!existing && !allowed) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Your email is not approved for revenue-partner setup. Please contact admin@allaboutultrasound.com to receive an invitation.",
+        });
+      }
+
+      const rawDomain = process.env.CANONICAL_ROOT_DOMAIN ?? "learn.allaboutultrasound.com";
+      const baseUrl = rawDomain.startsWith("http") ? rawDomain : `https://${rawDomain}`;
+      const completeUrl = `${baseUrl}/revenue-partner/stripe-setup?status=complete`;
+      const refreshUrl = `${baseUrl}/revenue-partner/stripe-setup?status=refresh`;
       let partnerId: number;
       let onboardingUrl: string | null = null;
       if (existing) {
         partnerId = existing.id;
-        // Generate a new onboarding link if not yet active
-        if (existing.stripeAccountId) {
+        let stripeAccountId = existing.stripeAccountId;
+        if (!stripeAccountId) {
           try {
-            const origin = input.origin || "https://learn.allaboutultrasound.com";
-            onboardingUrl = await createOnboardingLink(existing.stripeAccountId, `${origin}/partner-signup?status=complete`, `${origin}/partner-signup?status=refresh`);
-          } catch {}
+            stripeAccountId = await createStripeConnectAccount({ email: existing.email, name: existing.name });
+            await db.update(revenueSharePartners)
+              .set({ stripeAccountId, onboardingStatus: "onboarding", updatedAt: Date.now() })
+              .where(eq(revenueSharePartners.id, existing.id));
+          } catch (err: any) {
+            console.error("[PartnerSignup] Stripe account creation failed:", err?.message);
+          }
+        }
+        if (stripeAccountId) {
+          try {
+            onboardingUrl = await createOnboardingLink(stripeAccountId, completeUrl, refreshUrl);
+          } catch (err: any) {
+            console.error("[PartnerSignup] Stripe onboarding link creation failed:", err?.message);
+          }
         }
       } else {
         // Create Stripe Express account
@@ -901,15 +924,19 @@ export const revenueShareRouter = router({
         partnerId = result.id;
         if (stripeAccountId) {
           try {
-            const origin = input.origin || "https://learn.allaboutultrasound.com";
-            onboardingUrl = await createOnboardingLink(stripeAccountId, `${origin}/partner-signup?status=complete`, `${origin}/partner-signup?status=refresh`);
-          } catch {}
+            onboardingUrl = await createOnboardingLink(stripeAccountId, completeUrl, refreshUrl);
+          } catch (err: any) {
+            console.error("[PartnerSignup] Stripe onboarding link creation failed:", err?.message);
+          }
         }
       }
-      // Mark allowlist entry as used
-      await db.update(partnerAllowlist)
-        .set({ usedAt: new Date() })
-        .where(eq(partnerAllowlist.email, normalizedEmail));
+      // Mark self-service allowlist entries as used, while preserving the
+      // administrator-created partner path that does not need an allowlist row.
+      if (allowed) {
+        await db.update(partnerAllowlist)
+          .set({ usedAt: new Date() })
+          .where(eq(partnerAllowlist.email, normalizedEmail));
+      }
       return { success: true, partnerId, onboardingUrl };
     }),
 

@@ -907,6 +907,10 @@ function LMSRouter() {
       <Route path="/partner-signup">
         <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>
       </Route>
+      {/* Stable, shareable Stripe Connect setup link for approved revenue partners. */}
+      <Route path="/revenue-partner/stripe-setup">
+        <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>
+      </Route>
       {/* Hosted checkout pages — outside LMSLayout (full-screen, no nav) */}
       <Route path="/checkout/complete">
         <Suspense fallback={pageFallback}><CheckoutComplete /></Suspense>
