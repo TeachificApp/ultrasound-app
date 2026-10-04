@@ -17,4 +17,17 @@ describe("Site Builder custom domain support", () => {
     expect(admin).toContain('href: getAdminUrl("/admin/lms/site-pages")');
     expect(admin).toContain("any configured custom domain");
   });
+
+  it("lets an admin choose the published domain when creating a page and preserves it for previews", () => {
+    const manager = read("client/src/pages/admin/SitePagesAdmin.tsx");
+    const builder = read("client/src/pages/admin/SitePageBuilder.tsx");
+    const tree = read("server/lib/sitePageTree.ts");
+
+    expect(manager).toContain("Published domain");
+    expect(manager).toContain("createPage.mutate({");
+    expect(manager).toContain("domain: newPageDomain");
+    expect(manager).toContain("/edit?domain=${encodeURIComponent(newPageDomain)}");
+    expect(builder).toContain("https://${page.domain}/${page.slug}");
+    expect(tree).toContain("https://${row.domain}/${row.slug}");
+  });
 });

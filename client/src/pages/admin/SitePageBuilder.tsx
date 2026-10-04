@@ -138,7 +138,7 @@ export default function SitePageBuilder() {
   }
 
   const backUrl = `/admin/lms/site-pages?domain=${encodeURIComponent(page.domain)}&edit=${page.id}`;
-  const previewUrl = `/${page.slug}`;
+  const previewUrl = `https://${page.domain}/${page.slug}`;
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">

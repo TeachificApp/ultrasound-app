@@ -89,7 +89,7 @@ function siteRowToNode(
     children: [],
     editable: true,
     editorRoute: `/admin/lms/site-pages?domain=${encodeURIComponent(row.domain)}&edit=${row.id}`,
-    previewUrl: row.slug ? `/${row.slug}` : null,
+    previewUrl: row.slug ? `https://${row.domain}/${row.slug}` : null,
     hiddenFromNav: row.isHiddenFromNav,
     showInHeaderNav: row.showInHeaderNav,
     showInSidebarNav: row.showInSidebarNav,

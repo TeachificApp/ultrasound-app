@@ -517,6 +517,7 @@ export default function SitePagesAdmin() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newSlug, setNewSlug] = useState("");
+  const [newPageDomain, setNewPageDomain] = useState(initialDomain);
   const [menuKey, setMenuKey] =
     useState<(typeof SITE_NAV_MENU_KEYS)[number]>("header");
   const [navItems, setNavItems] = useState<SiteNavItem[]>([]);
@@ -546,7 +547,9 @@ export default function SitePagesAdmin() {
       setNewTitle("");
       setNewSlug("");
       refetchTree();
-      navigate(`/admin/lms/site-pages/${data.id}/edit`);
+      navigate(
+        `/admin/lms/site-pages/${data.id}/edit?domain=${encodeURIComponent(newPageDomain)}`
+      );
     },
     onError: e => toast.error(e.message),
   });
@@ -570,6 +573,11 @@ export default function SitePagesAdmin() {
       else next.add(id);
       return next;
     });
+  };
+
+  const openCreatePage = () => {
+    setNewPageDomain(domain);
+    setCreateOpen(true);
   };
 
   const handleSelectNode = (node: SitePageTreeNode) => {
@@ -667,7 +675,7 @@ export default function SitePagesAdmin() {
                 size="sm"
                 variant="outline"
                 className="h-7 px-2"
-                onClick={() => setCreateOpen(true)}
+                onClick={openCreatePage}
               >
                 <Plus className="w-3.5 h-3.5" />
               </Button>
@@ -881,6 +889,24 @@ export default function SitePagesAdmin() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div>
+              <Label>Published domain</Label>
+              <Select value={newPageDomain} onValueChange={setNewPageDomain}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select a domain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(domains ?? []).map(item => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-gray-500">
+                This page is stored and previewed only on the selected domain.
+              </p>
+            </div>
+            <div>
               <Label>Title</Label>
               <Input
                 value={newTitle}
@@ -909,9 +935,13 @@ export default function SitePagesAdmin() {
           <DialogFooter>
             <Button
               onClick={() =>
-                createPage.mutate({ domain, title: newTitle, slug: newSlug })
+                createPage.mutate({
+                  domain: newPageDomain,
+                  title: newTitle,
+                  slug: newSlug,
+                })
               }
-              disabled={!newTitle || !newSlug || createPage.isPending}
+              disabled={!newPageDomain || !newTitle || !newSlug || createPage.isPending}
               className="bg-teal-600 hover:bg-teal-700"
             >
               Create &amp; edit
