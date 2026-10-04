@@ -78,6 +78,8 @@ import UserParamTagsHelper from "@/components/UserParamTagsHelper";
 import { useAutoSave } from "@/hooks/useAutoSave";
 import { AutoSaveIndicator } from "@/components/AutoSaveIndicator";
 import { InteractiveQuestionEditorPanel } from "@/components/InteractiveQuestionEditorPanel";
+import { AiContentSourceFields, EMPTY_AI_CONTENT_SOURCE_STATE, parseTargetWordCount, type AiContentSourceFieldState } from "@/components/admin/AiContentSourceFields";
+import { buildAiSourceMutationPayload, hasAiSourceInput } from "@/lib/aiSourceUpload";
 import { copyPageTemplateBlocks } from "@/lib/pageTemplateInsertion";
 
 export function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -3332,14 +3334,30 @@ function EnrollmentCounterBlockEditor({ d, set }: { d: Record<string, any>; set:
 // ── AiContentBlockEditor ─────────────────────────────────────────────────────
 // Extracted into its own component so hooks (useState, useMutation) are always
 // called at the top level — never conditionally inside a switch case.
+function readBlockAiSourceState(d: Record<string, any>): AiContentSourceFieldState {
+  return {
+    sourceText: d.aiSourceText ?? "",
+    sourceUrls: Array.isArray(d.aiSourceUrls) && d.aiSourceUrls.length > 0 ? d.aiSourceUrls : [""],
+    sourceFiles: d.aiSourceFiles ?? [],
+    targetWordCount: d.aiTargetWordCount != null ? String(d.aiTargetWordCount) : "",
+  };
+}
+
 function TextBlockEditor({ d, set, setMany, lessonTitle, courseTitle }: { d: Record<string, any>; set: (field: string, value: any) => void; setMany: (patch: Record<string, any>) => void; lessonTitle?: string | null; courseTitle?: string | null }) {
   const [aiFormat, setAiFormat] = React.useState<"text" | "outline" | "summary" | "quiz_questions">("text");
   const [aiPanelOpen, setAiPanelOpen] = React.useState(false);
+  const [aiSources, setAiSources] = React.useState<AiContentSourceFieldState>(() => readBlockAiSourceState(d));
   const generateContent = trpc.lmsAdmin.generateLessonContent.useMutation({
     onSuccess: (data) => {
-      set("html", data.content);
+      setMany({
+        html: data.content,
+        aiSourceText: aiSources.sourceText,
+        aiSourceUrls: aiSources.sourceUrls.filter(url => url.trim()),
+        aiSourceFiles: aiSources.sourceFiles,
+        aiTargetWordCount: parseTargetWordCount(aiSources.targetWordCount) ?? null,
+      });
       setAiPanelOpen(false);
-      toast.success("AI content generated — review and edit as needed.");
+      toast.success(`AI content generated${data.wordCount ? ` — ${data.wordCount.toLocaleString("en-US")} words` : ""}. Review and edit as needed.`);
     },
     onError: (err) => toast.error(`AI generation failed: ${err.message}`),
   });
@@ -3377,10 +3395,19 @@ function TextBlockEditor({ d, set, setMany, lessonTitle, courseTitle }: { d: Rec
                 <option value="quiz_questions">Quiz questions &amp; answers</option>
               </select>
             </div>
+            <AiContentSourceFields value={aiSources} onChange={setAiSources} />
             <div className="flex gap-2">
               <button
-                onClick={() => generateContent.mutate({ lessonTitle: lessonTitle ?? "lesson", courseTitle: courseTitle ?? undefined, format: aiFormat })}
-                disabled={generateContent.isPending}
+                onClick={() => generateContent.mutate({
+                  lessonTitle: lessonTitle ?? "lesson",
+                  courseTitle: courseTitle ?? undefined,
+                  format: aiFormat,
+                  ...buildAiSourceMutationPayload({
+                    ...aiSources,
+                    targetWordCount: parseTargetWordCount(aiSources.targetWordCount) ?? null,
+                  }),
+                })}
+                disabled={generateContent.isPending || !hasAiSourceInput({ prompt: lessonTitle ?? "lesson", ...aiSources })}
                 className="flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white rounded px-3 py-1.5 transition-colors disabled:opacity-60"
               >
                 {generateContent.isPending ? <><RefreshCw size={11} className="animate-spin" /> Generating…</> : <><Sparkles size={11} /> Generate</>}
@@ -3549,6 +3576,7 @@ function AiImageBlockSettings({ d, set, setMany, uploading, bgImageRef, handleFi
 
 function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string, any>; set: (field: string, value: any) => void; setMany: (patch: Record<string, any>) => void; emailMode?: boolean }) {
   const [aiPrompt, setAiPrompt] = React.useState<string>(d.prompt ?? "");
+  const [aiSources, setAiSources] = React.useState<AiContentSourceFieldState>(() => readBlockAiSourceState(d));
   const [aiContentType, setAiContentType] = React.useState<string>(d.contentType ?? (emailMode ? "announcement" : "lesson"));
   const [aiMode, setAiMode] = React.useState<"prompt" | "edit">(d.html ? "edit" : "prompt");
   const [isAiGenerating, setIsAiGenerating] = React.useState(false);
@@ -3556,12 +3584,26 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
   const [promoProductType, setPromoProductType] = React.useState<string>(d.promoProductType ?? "course");
   const [promoFormat, setPromoFormat] = React.useState<string>(d.promoFormat ?? "promo_block");
   const allProducts = trpc.funnel.listAllProducts.useQuery(undefined, { enabled: aiContentType === "course_promo" });
+  const sourcePayload = buildAiSourceMutationPayload({
+    ...aiSources,
+    targetWordCount: parseTargetWordCount(aiSources.targetWordCount) ?? null,
+  });
   const generateAiContent = trpc.lmsAdmin.generateLessonContent.useMutation({
     onSuccess: (result) => {
-      setMany({ html: result.content, prompt: aiPrompt, contentType: aiContentType });
+      setMany({
+        html: result.content,
+        prompt: aiPrompt,
+        contentType: aiContentType,
+        aiSourceText: aiSources.sourceText,
+        aiSourceUrls: aiSources.sourceUrls.filter(url => url.trim()),
+        aiSourceFiles: aiSources.sourceFiles,
+        aiTargetWordCount: parseTargetWordCount(aiSources.targetWordCount) ?? null,
+      });
       setAiMode("edit");
       setIsAiGenerating(false);
-      toast.success(aiContentType === "lesson" ? `Full lesson generated — ${result.wordCount.toLocaleString("en-US")} words. Review and edit as needed.` : "Content generated — review and edit as needed.");
+      toast.success(result.wordCount
+        ? `Content generated — ${result.wordCount.toLocaleString("en-US")} words. Review and edit as needed.`
+        : "Content generated — review and edit as needed.");
     },
     onError: (e) => {
       toast.error(`AI generation failed: ${e.message}`);
@@ -3592,10 +3634,11 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
         productName: selectedProduct.name,
         prompt: aiPrompt || undefined,
         format: promoFormat as any,
+        ...sourcePayload,
       });
       return;
     }
-    if (!aiPrompt.trim()) { toast.error("Please enter a prompt."); return; }
+    if (!hasAiSourceInput({ prompt: aiPrompt, ...aiSources })) { toast.error("Enter a prompt or provide source material."); return; }
     setIsAiGenerating(true);
     const formatMap: Record<string, "full_lesson" | "text" | "outline" | "summary" | "quiz_questions"> = {
       lesson: "full_lesson", explanation: "text", summary: "summary", outline: "outline",
@@ -3604,7 +3647,11 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
       event_recap: "text", follow_up: "text", intro_paragraph: "text", closing_paragraph: "text",
     };
     const emailTypeContext = emailMode ? ` (email content type: ${aiContentType.replace(/_/g, " ")})` : "";
-    generateAiContent.mutate({ lessonTitle: aiPrompt + emailTypeContext, format: formatMap[aiContentType] ?? "text" });
+    generateAiContent.mutate({
+      lessonTitle: (aiPrompt || "Generate from the supplied source material") + emailTypeContext,
+      format: formatMap[aiContentType] ?? "text",
+      ...sourcePayload,
+    });
   };
   return (
     <div className="space-y-4">
@@ -3680,11 +3727,12 @@ function AiContentBlockEditor({ d, set, setMany, emailMode }: { d: Record<string
             </div>
           )}
           <div>
-            <label className="text-xs text-gray-500 block mb-1">{aiContentType === "course_promo" ? "Additional Instructions (optional)" : "Prompt *"}</label>
+            <label className="text-xs text-gray-500 block mb-1">{aiContentType === "course_promo" ? "Additional Instructions (optional)" : "Prompt"}</label>
             <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} placeholder={aiContentType === "course_promo" ? "Any specific angles, offers, or details to highlight..." : "Describe what content to generate, e.g. 'Explain the fundamentals of cardiac anatomy for beginner sonographers'"} className="w-full rounded-md border border-gray-200 px-2.5 py-2 text-xs resize-none h-20 focus:outline-none focus:ring-2 focus:ring-teal-400" />
           </div>
+          <AiContentSourceFields value={aiSources} onChange={setAiSources} showWordCount={aiContentType !== "quiz_questions"} />
           {d.html && <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-xs text-amber-700">\u26a0 Generating new content will replace the existing content in this block.</div>}
-          <button onClick={handleAiGenerate} disabled={isAiGenerating || (aiContentType === "course_promo" ? !promoProductId : !aiPrompt.trim())} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gradient-to-r from-[#189aa1] to-[#17a2b8] hover:from-[#147f86] hover:to-[#138496] text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+          <button onClick={handleAiGenerate} disabled={isAiGenerating || (aiContentType === "course_promo" ? !promoProductId : !hasAiSourceInput({ prompt: aiPrompt, ...aiSources }))} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gradient-to-r from-[#189aa1] to-[#17a2b8] hover:from-[#147f86] hover:to-[#138496] text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all">
             {isAiGenerating ? <><Loader2 size={13} className="animate-spin" /> Generating...</> : <><Sparkles size={13} /> Generate Content</>}
           </button>
           {d.html && <button onClick={() => setAiMode("edit")} className="w-full text-xs text-gray-500 hover:text-gray-700 underline">View / edit existing content instead</button>}

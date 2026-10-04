@@ -37,6 +37,8 @@ import { wrapInBrandedCampaignEmail, EMAIL_CAMPAIGN_CONTAINER_WIDTH_PX } from "@
 import { getEmailCampaignErrorMessage } from "@shared/emailCampaignErrorMessage";
 import { resolveCampaignTestSubject } from "@shared/emailCampaignTestSubject";
 import { formatInTimeZone, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "@shared/platformTime";
+import { AiContentSourceFields, EMPTY_AI_CONTENT_SOURCE_STATE, parseTargetWordCount } from "@/components/admin/AiContentSourceFields";
+import { buildAiSourceMutationPayload, hasAiSourceInput } from "@/lib/aiSourceUpload";
 
 // Block type is imported from LandingPageBuilder via EmailBlockEditor
 function uid() { return Math.random().toString(36).slice(2, 10); }
@@ -525,6 +527,7 @@ export default function EmailCampaignEditor({ campaignId, onClose, initialAudien
   const [aiGenerateImage, setAiGenerateImage] = useState(false);
   const [aiIncludeEmoji, setAiIncludeEmoji] = useState(false);
   const [aiGeneratedImageUrl, setAiGeneratedImageUrl] = useState<string | null>(null);
+  const [aiSources, setAiSources] = useState(() => ({ ...EMPTY_AI_CONTENT_SOURCE_STATE }));
   const [draftId, setDraftId] = useState<number | undefined>(campaignId);
   const [isSaving, setIsSaving] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(!campaignId);
@@ -1189,6 +1192,8 @@ export default function EmailCampaignEditor({ campaignId, onClose, initialAudien
               </div>
             </div>
 
+            <AiContentSourceFields value={aiSources} onChange={setAiSources} />
+
             {/* Emoji toggle */}
             <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
               <input
@@ -1231,7 +1236,7 @@ export default function EmailCampaignEditor({ campaignId, onClose, initialAudien
           <DialogFooter className="gap-2 mt-2">
             <button onClick={() => setAiPanelOpen(false)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
             <button
-              disabled={!aiBrief.trim() || aiGenerateMutation.isPending}
+              disabled={!hasAiSourceInput({ prompt: aiBrief, ...aiSources }) || aiGenerateMutation.isPending}
               onClick={() => aiGenerateMutation.mutate({
                 brief: aiBrief,
                 tone: aiTone,
@@ -1240,6 +1245,10 @@ export default function EmailCampaignEditor({ campaignId, onClose, initialAudien
                 ctaUrl: aiCtaUrl || undefined,
                 generateBannerImage: aiGenerateImage,
                 includeEmoji: aiIncludeEmoji,
+                ...buildAiSourceMutationPayload({
+                  ...aiSources,
+                  targetWordCount: parseTargetWordCount(aiSources.targetWordCount) ?? null,
+                }),
                 ...(aiEmailType === "course_promo" && aiPromoProductId ? {
                   brief: aiBrief + (allProductsForPromo.data?.find(p => p.id === aiPromoProductId && p.type === aiPromoProductType)
                     ? `\n\nProduct to promote: "${allProductsForPromo.data?.find(p => p.id === aiPromoProductId && p.type === aiPromoProductType)?.name}" (${aiPromoProductType}). Price: ${allProductsForPromo.data?.find(p => p.id === aiPromoProductId && p.type === aiPromoProductType)?.price > 0 ? "$" + allProductsForPromo.data?.find(p => p.id === aiPromoProductId && p.type === aiPromoProductType)?.price.toFixed(2) : "Free"}. Landing page: https://learn.allaboutultrasound.com/${aiPromoProductType === "webinar" ? "webinars" : aiPromoProductType === "workshop" ? "workshops" : "courses"}/${aiPromoProductType}`

@@ -15,13 +15,20 @@ describe("AI source file input", () => {
     expect(content).toContainEqual(expect.objectContaining({ type: "image_url", image_url: { url: "https://files.example/scan.png", detail: "high" } }));
   });
 
-  it("combines up to three reviewed source files and enforces the 50 MB per-file limit", () => {
+  it("combines up to ten reviewed source files and enforces the 50 MB per-file limit", () => {
     const content = buildAiSourceMessage("Generate from all sources.", [
       { url: "https://files.example/one.pdf", mimeType: "application/pdf", name: "one.pdf" },
       { url: "https://files.example/two.png", mimeType: "image/png", name: "two.png" },
       { url: "https://files.example/three.jpg", mimeType: "image/jpeg", name: "three.jpg" },
     ]);
     expect((content as any[]).filter(item => item.type !== "text")).toHaveLength(3);
+    const tenFiles = Array.from({ length: 10 }, (_, index) => ({
+      url: `https://files.example/file-${index}.pdf`,
+      mimeType: "application/pdf" as const,
+      name: `file-${index}.pdf`,
+    }));
+    const tenContent = buildAiSourceMessage("Generate from all sources.", tenFiles);
+    expect((tenContent as any[]).filter(item => item.type !== "text")).toHaveLength(10);
     expect(isWithinAiSourceFileSizeLimit(AI_SOURCE_FILE_MAX_BYTES)).toBe(true);
     expect(isWithinAiSourceFileSizeLimit(AI_SOURCE_FILE_MAX_BYTES + 1)).toBe(false);
   });
