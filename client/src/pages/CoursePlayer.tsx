@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import { STUDENT_DASHBOARD_PATH } from "@shared/studentDashboardUrls";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -46,6 +47,7 @@ import { InteractiveQuestionPlayer, scoreInteractiveAnswer, isInteractiveSurveyT
 const LessonBlockEditor = lazy(() => import("@/components/LessonBlockEditor"));
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
+const AUTH_PENDING_MAX_RETRIES = 5;
 
 // ─── Quiz Runner ──────────────────────────────────────────────────────────────
 function QuizRunner({ lesson, courseSlug, onComplete, submitQuizLabel = "Submit Quiz", isAdminPreview = false }: { lesson: any; courseSlug: string; onComplete: () => void; submitQuizLabel?: string; isAdminPreview?: boolean }) {
@@ -1771,7 +1773,10 @@ export default function CoursePlayer() {
   const searchString = useSearch();
   const isPreviewMode = searchString.includes("preview=student") || searchString.includes("preview=admin");
   const [, navigate] = useLocation();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, isAuthenticated, refresh } = useAuth();
+  const authPending = new URLSearchParams(searchString).get("auth_pending") === "1";
+  const [authRetryCount, setAuthRetryCount] = useState(0);
+  const [authRetrying, setAuthRetrying] = useState(authPending);
   const isAdmin = user?.role === "admin";
   // adminPreviewStudent must be declared BEFORE adminBypass (useMemo depends on it)
   const [adminPreviewStudent, setAdminPreviewStudent] = useState(isPreviewMode);
@@ -1797,6 +1802,40 @@ export default function CoursePlayer() {
   const [showCourseStartModal, setShowCourseStartModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const utils = trpc.useUtils();
+
+  // Access links reach the player immediately after the server sets the new
+  // session cookie. On some browsers/CDN edges the first auth.me request can
+  // race that cookie, which previously redirected a paid learner away from
+  // their course. Retry briefly before treating the user as signed out.
+  useEffect(() => {
+    if (!authPending) return;
+    clearSsoSessionLocks();
+    utils.auth.me.reset();
+  }, [authPending, utils.auth.me]);
+
+  useEffect(() => {
+    if (!authPending) return;
+
+    if (isAuthenticated) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("auth_pending");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      setAuthRetrying(false);
+      return;
+    }
+
+    if (authLoading) return;
+    if (authRetryCount >= AUTH_PENDING_MAX_RETRIES) {
+      setAuthRetrying(false);
+      return;
+    }
+
+    const delayMs = authRetryCount === 0 ? 100 : 400;
+    const timer = window.setTimeout(() => {
+      void refresh().finally(() => setAuthRetryCount((count) => count + 1));
+    }, delayMs);
+    return () => window.clearTimeout(timer);
+  }, [authPending, authLoading, authRetryCount, isAuthenticated, refresh]);
 
   const { data, isLoading } = trpc.lmsLearner.getCoursePlayer.useQuery(
     { slug: slug!, preview: isPreviewMode || adminPreviewStudent || isAdmin },
@@ -2032,7 +2071,7 @@ export default function CoursePlayer() {
   };
 
   // Wait for auth to finish loading before redirecting — avoids false redirect on initial render
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || (authPending && authRetrying)) {
     return (
       <div className="flex h-screen bg-gray-50 overflow-hidden">
         {/* Left sidebar skeleton */}

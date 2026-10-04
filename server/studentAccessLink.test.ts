@@ -36,6 +36,17 @@ describe("student access link fixes", () => {
     expect(url).toContain("auth_pending=1");
   });
 
+  it("retries Learn course-player authentication after an emailed access-link redirect", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(new URL("../client/src/pages/CoursePlayer.tsx", import.meta.url), "utf8"),
+    );
+    expect(source).toContain('new URLSearchParams(searchString).get("auth_pending") === "1"');
+    expect(source).toContain("AUTH_PENDING_MAX_RETRIES = 5");
+    expect(source).toContain("clearSsoSessionLocks()");
+    expect(source).toContain("void refresh().finally");
+    expect(source).toContain("(authPending && authRetrying)");
+  });
+
   it("auto-login route accepts persistent users.accessToken as fallback", async () => {
     const source = await import("node:fs/promises").then((fs) =>
       fs.readFile(new URL("./routes/autoLogin.ts", import.meta.url), "utf8"),
