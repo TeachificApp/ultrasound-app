@@ -703,6 +703,7 @@ export const appRouter = router({
           htmlBody: emailPayload.htmlBody,
           previewText: emailPayload.previewText,
           brandMode,
+          transactional: true,
         });
         if (!deliveryAccepted) {
           console.error(`[auth] Magic-link delivery was not accepted for user ${user.id}`);

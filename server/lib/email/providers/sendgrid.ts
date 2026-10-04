@@ -22,6 +22,10 @@ export async function sendViaSendGrid(
     reply_to: { name: sender.name, email: sender.email },
     content: [
       {
+        type: "text/plain",
+        value: opts.previewText || opts.subject,
+      },
+      {
         type: "text/html",
         value: opts.htmlBody,
       },
@@ -45,6 +49,16 @@ export async function sendViaSendGrid(
           headers: {
             "List-Unsubscribe": `<${opts.listUnsubscribeUrl}>`,
             "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          },
+        }
+      : {}),
+    // A person who actively requests a security/access email must receive it
+    // even if they previously opted out of marketing messages. This is limited
+    // to explicitly marked transactional messages, not campaigns or newsletters.
+    ...(opts.transactional
+      ? {
+          mail_settings: {
+            bypass_list_management: { enable: true },
           },
         }
       : {}),

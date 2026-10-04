@@ -22,4 +22,16 @@ describe("magic-link delivery status", () => {
     const requestEnd = router.indexOf("loginWithPassword: publicProcedure", requestStart);
     expect(router.slice(requestStart, requestEnd)).not.toContain("prepareUserSession");
   });
+
+  it("marks requested sign-in links as transactional and sends a plain-text fallback", () => {
+    const router = source("server/routers.ts");
+    const sendgrid = source("server/lib/email/providers/sendgrid.ts");
+    const requestStart = router.indexOf("requestMagicLink: publicProcedure");
+    const requestEnd = router.indexOf("loginWithPassword: publicProcedure", requestStart);
+
+    expect(router.slice(requestStart, requestEnd)).toContain("transactional: true");
+    expect(sendgrid).toContain('type: "text/plain"');
+    expect(sendgrid).toContain("bypass_list_management");
+    expect(sendgrid).toContain("opts.transactional");
+  });
 });

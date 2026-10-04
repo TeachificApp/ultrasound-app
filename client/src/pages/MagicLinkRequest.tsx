@@ -169,7 +169,7 @@ export default function MagicLinkRequest() {
                     Didn't request this? Someone may have entered your email by mistake. You can ignore the message — your account stays secure.
                   </p>
                   <p className="text-xs text-gray-400 mt-2">
-                    Can't find it? Check your spam or junk folder for an email from All About Ultrasound™.
+                    Can't find it after a few minutes? Check spam or junk for an email from All About Ultrasound™. You can also contact <a className="text-[#189aa1] hover:underline" href="mailto:support@allaboutultrasound.com?subject=Magic%20link%20help">support@allaboutultrasound.com</a> for help signing in.
                   </p>
                 </div>
 

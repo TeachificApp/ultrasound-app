@@ -29,6 +29,12 @@ export interface SendEmailOptions {
   fromEmail?: string;
   /** List-Unsubscribe header value (RFC 8058 one-click) */
   listUnsubscribeUrl?: string;
+  /**
+   * Security or access email explicitly requested by the recipient (for example,
+   * a magic sign-in link). These messages must not inherit marketing-list
+   * suppression behavior.
+   */
+  transactional?: boolean;
   /** Optional file attachments */
   attachments?: EmailAttachment[];
 }
