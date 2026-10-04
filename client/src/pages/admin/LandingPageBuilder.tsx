@@ -1159,6 +1159,60 @@ const CTA_ACTION_LABELS: Record<CTAAction, string> = {
   enroll_next_available: "Enroll in Next Available (Workshop/Cohort)",
 };
 
+type CheckoutCatalogProduct = {
+  id: number;
+  type: string;
+  name: string;
+  price: number;
+  priceLabel?: string;
+  slug?: string;
+};
+
+export type CheckoutProductSort = "name" | "type" | "price_low" | "price_high";
+
+const CHECKOUT_PRODUCT_SORT_LABELS: Record<CheckoutProductSort, string> = {
+  name: "Name (A–Z)",
+  type: "Product type, then name",
+  price_low: "Price (low to high)",
+  price_high: "Price (high to low)",
+};
+
+export function filterAndSortCheckoutProducts(
+  products: CheckoutCatalogProduct[],
+  search: string,
+  productType: string,
+  sort: CheckoutProductSort,
+) {
+  const normalizedSearch = search.trim().toLocaleLowerCase();
+  const compareName = (a: CheckoutCatalogProduct, b: CheckoutCatalogProduct) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+
+  return products
+    .filter((product) => {
+      if (productType !== "all" && product.type !== productType) return false;
+      if (!normalizedSearch) return true;
+      return [product.name, product.type, product.slug ?? ""]
+        .some((value) => value.toLocaleLowerCase().includes(normalizedSearch));
+    })
+    .sort((a, b) => {
+      if (sort === "price_low") return (Number(a.price) - Number(b.price)) || compareName(a, b);
+      if (sort === "price_high") return (Number(b.price) - Number(a.price)) || compareName(a, b);
+      if (sort === "type") return a.type.localeCompare(b.type, undefined, { sensitivity: "base" }) || compareName(a, b);
+      return compareName(a, b);
+    });
+}
+
+function formatCheckoutProduct(product: CheckoutCatalogProduct) {
+  const price = product.priceLabel
+    ?? (Number(product.price) === 0
+      ? "Free"
+      : `$${Number(product.price).toLocaleString("en-US", {
+        minimumFractionDigits: Number(product.price) % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2,
+      })}`);
+  return `${product.name} (${product.type}) — ${price}`;
+}
+
 function CTAActionPicker({
   label = "Button Action",
   behaviorValue,
@@ -1201,7 +1255,7 @@ function CTAActionPicker({
   onLinkChange?: (v: string) => void;
   emailValue?: string;
   onEmailChange?: (v: string) => void;
-  productCatalog?: Array<{ id: number; type: string; name: string; price: number }>;
+  productCatalog?: CheckoutCatalogProduct[];
   orderBumpsList?: Array<{ id: number; headline?: string | null; slug?: string | null; bumpType: string; bumpProductId: number }>;
   funnelList?: Array<{ id: number; name: string; slug: string; pages?: Array<{ id: number; name: string; slug: string }> }>;
   orderBumpIdValue?: number | null;
@@ -1237,6 +1291,29 @@ function CTAActionPicker({
 }) {
   const behavior = (behaviorValue ?? "url") as CTAAction;
   const isCheckoutBehavior = behavior === "direct_checkout" || behavior === "free_preview" || behavior === "group_purchase";
+  const [checkoutSearch, setCheckoutSearch] = React.useState("");
+  const [checkoutTypeFilter, setCheckoutTypeFilter] = React.useState("all");
+  const [checkoutSort, setCheckoutSort] = React.useState<CheckoutProductSort>("name");
+  const checkoutProducts = productCatalog ?? [];
+  const checkoutProductTypes = React.useMemo(
+    () => [...new Set(checkoutProducts.map((product) => product.type))].sort((a, b) => a.localeCompare(b)),
+    [checkoutProducts],
+  );
+  const selectedCheckoutValue = checkoutProductIdValue ? `${checkoutProductTypeValue}:${checkoutProductIdValue}` : "";
+  const selectedCheckoutProduct = React.useMemo(
+    () => checkoutProducts.find((product) => `${product.type}:${product.id}` === selectedCheckoutValue),
+    [checkoutProducts, selectedCheckoutValue],
+  );
+  const filteredCheckoutProducts = React.useMemo(
+    () => filterAndSortCheckoutProducts(checkoutProducts, checkoutSearch, checkoutTypeFilter, checkoutSort),
+    [checkoutProducts, checkoutSearch, checkoutSort, checkoutTypeFilter],
+  );
+  const visibleCheckoutProducts = React.useMemo(() => {
+    if (!selectedCheckoutProduct || filteredCheckoutProducts.some((product) => product.type === selectedCheckoutProduct.type && product.id === selectedCheckoutProduct.id)) {
+      return filteredCheckoutProducts;
+    }
+    return [selectedCheckoutProduct, ...filteredCheckoutProducts];
+  }, [filteredCheckoutProducts, selectedCheckoutProduct]);
 
   // Group free enrollment: courses query (only courses supported for group analytics)
   const { data: gfeCourses } = trpc.lmsAdmin.listCourses.useQuery(
@@ -1363,38 +1440,101 @@ function CTAActionPicker({
             {behavior === "free_preview" && "Opens Stripe Checkout with a 100% discount (free preview). Product must support free enrollment."}
             {behavior === "group_purchase" && "Opens Stripe Checkout for group/team purchase. Buyer can specify number of seats."}
           </p>
-          <div>
-            <label className="text-xs text-gray-500 block mb-0.5">Product</label>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs text-gray-500">Stripe product</label>
+              <span className="text-[10px] text-gray-400">{filteredCheckoutProducts.length} matching</span>
+            </div>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+              <input
+                type="search"
+                value={checkoutSearch}
+                onChange={(event) => setCheckoutSearch(event.target.value)}
+                placeholder="Search products by name, type, or slug…"
+                className="h-8 w-full rounded border border-gray-200 bg-white pl-7 pr-2 text-xs"
+                aria-label="Search Stripe checkout products"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={checkoutTypeFilter}
+                onChange={(event) => setCheckoutTypeFilter(event.target.value)}
+                className="h-7 min-w-0 rounded border border-gray-200 bg-white px-2 text-xs"
+                aria-label="Filter Stripe checkout products by type"
+              >
+                <option value="all">All product types</option>
+                {checkoutProductTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+              <select
+                value={checkoutSort}
+                onChange={(event) => setCheckoutSort(event.target.value as CheckoutProductSort)}
+                className="h-7 min-w-0 rounded border border-gray-200 bg-white px-2 text-xs"
+                aria-label="Sort Stripe checkout products"
+              >
+                {(Object.entries(CHECKOUT_PRODUCT_SORT_LABELS) as [CheckoutProductSort, string][]).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
             <select
-              value={checkoutProductIdValue ? `${checkoutProductTypeValue}:${checkoutProductIdValue}` : ""}
+              value={selectedCheckoutValue}
               onChange={e => {
                 const [type, id] = e.target.value.split(":");
                 onCheckoutProductChange?.(type || "", id ? Number(id) : null);
-                // Also store the checkout URL in ctaLink so email renderer can use it
-                const prod = (productCatalog ?? []).find((p: any) => p.type === type && p.id === Number(id));
-                if (prod && (prod as any).slug) {
-                  const slug = (prod as any).slug as string;
+                // Also store the checkout URL in ctaLink so email renderer can use it.
+                const product = checkoutProducts.find((item) => item.type === type && item.id === Number(id));
+                if (product?.slug) {
                   const checkoutUrl = type === "workshop"
                     // Workshops need an instance ID — use landing page as placeholder;
-                    // getCampaign server resolver will upgrade to /checkout/workshop/{slug}?instance={id}
-                    ? `https://learn.allaboutultrasound.com/workshops/${slug}`
+                    // getCampaign server resolver will upgrade to /checkout/workshop/{slug}?instance={id}.
+                    ? `https://learn.allaboutultrasound.com/workshops/${product.slug}`
                     : type === "webinar"
-                    ? `https://learn.allaboutultrasound.com/checkout/${slug}?type=webinar`
+                    ? `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=webinar`
                     : type === "download"
-                    ? `https://learn.allaboutultrasound.com/checkout/${slug}?type=download`
+                    ? `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=download`
                     : type === "bundle"
-                    ? `https://learn.allaboutultrasound.com/checkout/${slug}?type=bundle`
-                    : `https://learn.allaboutultrasound.com/checkout/${slug}`;
+                    ? `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=bundle`
+                    : `https://learn.allaboutultrasound.com/checkout/${product.slug}`;
                   onLinkChange?.(checkoutUrl);
+                } else {
+                  onLinkChange?.("");
                 }
               }}
-              className="w-full h-7 text-xs rounded border border-gray-200 px-2"
+              className="w-full min-h-8 rounded border border-gray-200 bg-white px-2 py-1 text-xs"
+              size={Math.min(Math.max(visibleCheckoutProducts.length + 1, 3), 7)}
+              aria-label="Select Stripe checkout product"
             >
-              <option value="">-- Select product --</option>
-              {(productCatalog ?? []).map(p => (
-                <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>{p.name} ({p.type}) — {(p as any).priceLabel ?? `$${p.price % 1 === 0 ? Number(p.price).toLocaleString("en-US") : Number(p.price).toFixed(2)}`}</option>
+              <option value="">-- Select product for Stripe Checkout --</option>
+              {visibleCheckoutProducts.map((product) => (
+                <option key={`${product.type}:${product.id}`} value={`${product.type}:${product.id}`}>{formatCheckoutProduct(product)}</option>
               ))}
             </select>
+            {selectedCheckoutProduct && <p className="rounded bg-white/70 px-2 py-1 text-[10px] text-teal-800">Selected: {formatCheckoutProduct(selectedCheckoutProduct)}</p>}
+            {linkValue && (
+              <div className="space-y-1 rounded border border-teal-200 bg-white/80 p-2">
+                <label className="block text-[10px] font-medium text-teal-800">Resolved checkout link</label>
+                <div className="flex gap-1">
+                  <input
+                    readOnly
+                    value={linkValue}
+                    className="h-7 min-w-0 flex-1 rounded border border-gray-200 bg-slate-50 px-2 text-[10px] text-slate-600"
+                    aria-label="Resolved Stripe checkout link"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(linkValue);
+                      toast.success("Checkout link copied");
+                    }}
+                    className="shrink-0 rounded border border-teal-200 px-2 text-[10px] font-medium text-teal-700 hover:bg-teal-50"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500">The button opens this product’s Stripe checkout flow; this link is also available to copy for direct use.</p>
+              </div>
+            )}
+            {checkoutProducts.length === 0 && <p className="text-[10px] text-gray-400">Loading products…</p>}
+            {checkoutProducts.length > 0 && filteredCheckoutProducts.length === 0 && <p className="text-[10px] text-gray-400">No products match this search. Clear or change the filters to find a checkout target.</p>}
           </div>
           {behavior === "group_purchase" && (
             <div className="border-t border-teal-200 pt-2 mt-1 space-y-2">
