@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { type Block, type BlockType } from "@/components/BlockPreview";
 import { uid, BLOCK_CATALOG, BlockSettings, SortableBlock } from "./LandingPageBuilder";
 import {
-  ArrowLeft, Save, Eye, Plus, X, Layers, Copy, Search, BookmarkPlus, Bookmark, FolderOpen, Trash2,
+  ArrowLeft, Save, Eye, Plus, X, Layers, Copy, Search, BookmarkPlus, Bookmark, FolderOpen, Trash2, Sparkles,
 } from "lucide-react";
 
 export default function WebinarLandingPageBuilder() {
@@ -34,6 +34,7 @@ export default function WebinarLandingPageBuilder() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [aiDraftLoaded, setAiDraftLoaded] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [pageInfo, setPageInfo] = useState<{ title: string; slug?: string } | null>(null);
   // SEO state
@@ -107,6 +108,15 @@ export default function WebinarLandingPageBuilder() {
     onSuccess: () => toast.success("Webinar landing page saved!"),
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
   });
+  const regenerateLandingPage = trpc.webinarAdmin.aiGenerateLandingPage.useMutation({
+    onSuccess: (result) => {
+      setBlocks(result.blocks as Block[]);
+      setSelectedId(null);
+      setAiDraftLoaded(true);
+      toast.success("AI landing page draft is ready for review. Save Page to publish it.");
+    },
+    onError: (error) => toast.error(`AI error: ${error.message}`),
+  });
 
   // ── Save SEO ──
   const saveSeoMutation = trpc.webinarAdmin.update.useMutation({
@@ -122,6 +132,7 @@ export default function WebinarLandingPageBuilder() {
     setIsSaving(true);
     try {
       await saveBlocks.mutateAsync({ id: numericId, landingPageBlocks: JSON.stringify(blocks) });
+      setAiDraftLoaded(false);
     } finally {
       setIsSaving(false);
     }
@@ -189,6 +200,17 @@ export default function WebinarLandingPageBuilder() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => regenerateLandingPage.mutate({ webinarId: numericId })}
+            disabled={regenerateLandingPage.isPending || !pageInfo}
+            size="sm"
+            className="gap-1.5 border-purple-200 bg-purple-50 px-3 py-1.5 text-sm text-purple-700 hover:bg-purple-100 hover:text-purple-800 h-8"
+            title="Create a new AI draft from the current webinar details"
+          >
+            <Sparkles size={14} className={regenerateLandingPage.isPending ? "animate-pulse" : ""} />
+            {regenerateLandingPage.isPending ? "Generating…" : "Regenerate with AI"}
+          </Button>
           {previewPath && (
             <a href={previewPath} target="_blank" rel="noopener noreferrer">
               <Button variant="outline" size="sm" className="gap-1.5 text-sm px-4 py-1.5 h-8">
@@ -201,6 +223,13 @@ export default function WebinarLandingPageBuilder() {
           </Button>
         </div>
       </div>
+
+      {aiDraftLoaded && (
+        <div className="flex items-center gap-2 border-b border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900">
+          <Sparkles className="h-4 w-4 shrink-0 text-amber-600" />
+          <span><strong>AI draft loaded for review.</strong> The saved webinar page is unchanged until you select Save Page.</span>
+        </div>
+      )}
 
       {/* Main Editor Area */}
       <div className="flex flex-1 overflow-hidden">

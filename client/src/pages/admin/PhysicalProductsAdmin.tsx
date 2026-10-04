@@ -781,8 +781,14 @@ function ProductEditor({ productId, onBack }: { productId: number; onBack: () =>
     onError: (e) => toast.error(e.message),
   });
   const aiGenerateLandingPage = trpc.productsAdmin.aiGenerateLandingPage.useMutation({
-    onSuccess: () => {
-      toast.success("Landing page generated! Opening builder...");
+    onSuccess: (result) => {
+      try {
+        sessionStorage.setItem(`product-landing-page-ai-draft:${productId}`, JSON.stringify(result.blocks));
+      } catch {
+        toast.error("The generated draft could not be opened. Please try again.");
+        return;
+      }
+      toast.success("Landing page draft generated. Review it before saving.");
       setTimeout(() => navigate(`/admin/products/${productId}/landing-builder`), 600);
     },
     onError: (e) => toast.error(`AI error: ${e.message}`),

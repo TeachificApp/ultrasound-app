@@ -1849,12 +1849,13 @@ Make ALL content specific and compelling based on the product title and descript
         console.error("[aiGenerateLandingPage downloads] parse error:", err?.message, "raw:", (response.choices[0]?.message?.content as string)?.slice(0, 400));
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `AI returned invalid JSON: ${err?.message ?? "unknown error"}. Please try again.` });
       }
-      const blocksJson = JSON.stringify(blocks);
-      await db.update(digitalProducts)
-        .set({ landingBlocks: blocksJson })
-        .where(eq(digitalProducts.id, input.productId));
-
-      return { success: true, blockCount: blocks.length };
+      const draftBlocks = blocks.filter((block) => block.type !== "reviews");
+      if (draftBlocks.length === 0) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI did not return a usable page draft. Please try again." });
+      }
+      // Keep the current landing page intact until the administrator reviews this
+      // generated draft in the builder and explicitly chooses Save Page.
+      return { success: true, blockCount: draftBlocks.length, blocks: draftBlocks };
     }),
 
   /** List all buyers/access holders for a digital product */

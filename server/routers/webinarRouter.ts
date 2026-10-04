@@ -10,6 +10,8 @@ import { and, desc, eq, sql, asc, isNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
+import { invokeLLM } from "../_core/llm";
+import { parseLandingBlocks } from "../lib/extractJson";
 import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import {
   webinars, webinarRegistrations, webinarComments, webinarSessions, webinarFunnelSteps, users, cmeActivityForms,
@@ -274,6 +276,91 @@ export const webinarAdminRouter = router({
           .where(and(eq(webinarRegistrations.webinarId, id), eq(webinarRegistrations.accessLevel, "presale")));
       }
       return { success: true };
+    }),
+
+  /** Generate a reviewable webinar landing-page draft from the current webinar details. */
+  aiGenerateLandingPage: protectedProcedure
+    .input(z.object({ webinarId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [webinar] = await db.select({
+        title: webinars.title,
+        subtitle: webinars.subtitle,
+        description: webinars.description,
+        type: webinars.type,
+        accessType: webinars.accessType,
+        price: webinars.price,
+        isFree: webinars.isFree,
+        scheduledAt: webinars.scheduledAt,
+        durationMinutes: webinars.durationMinutes,
+        timezone: webinars.timezone,
+        hostName: webinars.hostName,
+        hostTitle: webinars.hostTitle,
+        coverImage: webinars.coverImage,
+        thumbnailUrl: webinars.thumbnailUrl,
+      }).from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
+      if (!webinar) throw new TRPCError({ code: "NOT_FOUND", message: "Webinar not found" });
+
+      const sessionDetails = webinar.scheduledAt
+        ? `${new Date(webinar.scheduledAt).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short", timeZone: webinar.timezone ?? "America/New_York" })} (${webinar.timezone ?? "America/New_York"}), ${webinar.durationMinutes ?? 60} minutes`
+        : `${webinar.durationMinutes ?? 60} minutes; date and time to be announced`;
+      const pricing = webinar.accessType === "free" || webinar.isFree
+        ? "Free registration"
+        : webinar.price > 0
+          ? `$${(webinar.price / 100).toFixed(2)}`
+          : "Paid registration";
+      const coverImage = webinar.coverImage ?? webinar.thumbnailUrl ?? "";
+      const format = webinar.type === "live" ? "live webinar" : "on-demand webinar";
+
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert webinar landing-page designer. Return only valid JSON—no Markdown. Create accurate, conversion-focused blocks using only the supplied webinar details. Never invent testimonials, reviews, ratings, named attendees, CME credit, speakers, learning outcomes, dates, or guarantees.",
+          },
+          {
+            role: "user",
+            content: `Generate a landing page for this ${format}:
+
+Title: ${webinar.title}
+Subtitle: ${webinar.subtitle ?? ""}
+Description: ${webinar.description ?? ""}
+Registration: ${pricing}
+Schedule: ${sessionDetails}
+Presenter: ${webinar.hostName ?? ""}${webinar.hostTitle ? ` — ${webinar.hostTitle}` : ""}
+Cover image: ${coverImage}
+
+Return a JSON array of 5–6 blocks. Each block needs id, type, and data. Use only these block types: hero, text, faq, cta_standalone.
+
+Hero data: headline, subheadline, bgType: "gradient", gradientFrom: "#179ca3", gradientTo: "#0e4a50", textColor: "#ffffff", align: "center", inlineMediaUrl: "${coverImage}", inlineMediaType: "image", inlineMediaPlacement: "right", buttons: [{text: "Register Now", color: "#ffffff", textColor: "#179ca3", link: "", style: "filled"}].
+Text data: html (use h2, p, ul/li HTML) and bgColor: "#ffffff".
+FAQ data: headline: "Frequently Asked Questions", bgColor: "#f9fafb", items: array of 4–5 {q,a} entries. Only address facts known from the supplied details; use broadly applicable registration questions when necessary.
+CTA data: headline, subtext, ctaText: "Register Now", ctaColor: "#179ca3", ctaTextColor: "#ffffff", bgColor: "#f0fafa", align: "center".
+
+Use this order: hero, text about what participants can expect, text with schedule/presenter details when provided, faq, cta_standalone. Make copy specific to the supplied information and do not use generic placeholder text.`,
+          },
+        ],
+        maxTokens: 6000,
+      });
+
+      let blocks: any[];
+      try {
+        blocks = parseLandingBlocks(response.choices[0].message.content as string);
+      } catch (error: any) {
+        console.error("[aiGenerateLandingPage webinars] parse error:", error?.message);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `AI returned an invalid page draft: ${error?.message ?? "unknown error"}. Please try again.` });
+      }
+
+      const draftBlocks = blocks.filter((block) => block.type !== "reviews");
+      if (draftBlocks.length === 0) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI did not return a usable page draft. Please try again." });
+      }
+      // The public page remains untouched until the administrator reviews the
+      // generated blocks in the builder and explicitly selects Save Page.
+      return { success: true, blockCount: draftBlocks.length, blocks: draftBlocks };
     }),
 
   delete: protectedProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {

@@ -909,12 +909,13 @@ Make ALL content specific and compelling based on the product title and descript
         console.error("[aiGenerateLandingPage products] parse error:", err?.message, "raw:", (response.choices[0]?.message?.content as string)?.slice(0, 400));
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `AI returned invalid JSON: ${err?.message ?? "unknown error"}. Please try again.` });
       }
-      const blocksJson = JSON.stringify(blocks);
-      await db.update(physicalProducts)
-        .set({ landingBlocks: blocksJson })
-        .where(eq(physicalProducts.id, input.productId));
-
-      return { success: true, blockCount: blocks.length };
+      const draftBlocks = blocks.filter((block) => block.type !== "reviews");
+      if (draftBlocks.length === 0) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI did not return a usable page draft. Please try again." });
+      }
+      // Regeneration must never overwrite a published sales page until the administrator
+      // reviews the draft in the builder and explicitly chooses Save Page.
+      return { success: true, blockCount: draftBlocks.length, blocks: draftBlocks };
     }),
 
   // ─── After Purchase Workflow ──────────────────────────────────────────────

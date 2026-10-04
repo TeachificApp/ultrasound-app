@@ -8426,6 +8426,15 @@ export default function LandingPageBuilder() {
     onSuccess: () => toast.success("Landing page saved!"),
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
   });
+  const regenerateLandingPage = trpc.lmsAdmin.aiGenerateLandingPage.useMutation({
+    onSuccess: (result) => {
+      setBlocks(result.blocks as Block[]);
+      setSelectedId(null);
+      setAiDraftLoaded(true);
+      toast.success("AI landing page draft is ready for review. Save Page to publish it.");
+    },
+    onError: (error) => toast.error(`AI error: ${error.message}`),
+  });
 
   // SEO mutation
   const saveSeoMutation = trpc.lmsAdmin.saveLandingPageSeo.useMutation({
@@ -8820,6 +8829,15 @@ export default function LandingPageBuilder() {
           <span className="hidden rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400 md:inline">Page Editor</span>
         </div>
         <div className="flex w-full flex-wrap items-center justify-end gap-1.5 sm:w-auto sm:gap-2">
+          <button
+            onClick={() => regenerateLandingPage.mutate({ courseId: numericCourseId })}
+            disabled={regenerateLandingPage.isPending || !courseInfo}
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-2 py-1.5 text-xs text-purple-700 transition-colors hover:bg-purple-100 hover:text-purple-800 disabled:cursor-not-allowed disabled:opacity-50 sm:px-3 sm:text-sm"
+            title="Create a new AI draft from the current course details"
+          >
+            <Sparkles size={14} className={regenerateLandingPage.isPending ? "animate-pulse" : ""} />
+            {regenerateLandingPage.isPending ? "Generating…" : "Regenerate with AI"}
+          </button>
           <button onClick={() => { setTemplatesInitialTab("page"); setShowTemplates(true); }} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-600 transition-colors hover:text-teal-700 sm:px-3 sm:text-sm">
             <FolderOpen size={14} /> <span className="hidden sm:inline">Page </span>Templates
           </button>
