@@ -29,6 +29,7 @@ import { randomBytes } from "crypto";
 import { evaluateInlineLessonQuizScore } from "../../shared/inlineLessonQuizCompletion";
 import { evaluateInlineLessonQuizCompletion } from "../../shared/inlineLessonQuizFlow";
 import { lessonHasAssessmentContent } from "../../shared/lessonAccessGating";
+import { DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT } from "../../shared/digitalDownloadLicense";
 import { resolvePresaleWelcome } from "../../shared/contentAvailability";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
 import { isCohortItemReleased, cohortLessonReleaseDay } from "../../shared/cohortDrip";
@@ -3644,6 +3645,7 @@ export const lmsLearnerRouter = router({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
           client_reference_id: ctx.user.id.toString(),
+          custom_text: DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT,
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
           line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: resolveUpgradeProductCheckoutCents(product.price) }, quantity: 1 }],
           metadata: { type: "digital_download", product_id: product.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },

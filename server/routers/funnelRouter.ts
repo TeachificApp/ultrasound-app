@@ -15,6 +15,7 @@ import { getStripeClient } from "../lib/stripeClient";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
 import { hasFiniteWorkshopCapacity } from "../../shared/workshopAvailability";
 import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
+import { DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT } from "../../shared/digitalDownloadLicense";
 
 /** Pick the next purchasable workshop instance for direct-checkout redirects. */
 function pickWorkshopCheckoutInstance(instances: Array<{
@@ -1975,6 +1976,9 @@ export const funnelPublicRouter = router({
         success_url: successUrl,
         cancel_url: cancelUrl,
       };
+      if (input.productType === "download") {
+        sessionParams.custom_text = DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT;
+      }
       if (input.email) sessionParams.customer_email = input.email;
       // Apply promo code if provided
       if (input.promoCode) {

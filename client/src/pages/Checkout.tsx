@@ -44,6 +44,7 @@ import {
   ContentBlockSection,
   PresetSealId,
 } from "@/../../shared/checkoutPageConfig";
+import { DIGITAL_DOWNLOAD_LICENSE_CHECKOUT_TEXT } from "@/../../shared/digitalDownloadLicense";
 import { BlockPreview } from "@/pages/admin/LandingPageBuilder";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import type { Block } from "@/pages/admin/LandingPageBuilder";
@@ -823,6 +824,12 @@ export default function Checkout() {
                       )}
                     </span>
                   ) : null}
+                  {entityType === "download" && (
+                    <span className={`block mt-3 rounded-lg border px-3 py-2 text-xs leading-relaxed ${isDark ? "border-teal-800 bg-teal-950/40 text-teal-100" : "border-teal-100 bg-teal-50 text-teal-900"}`}>
+                      <strong className="font-semibold">Digital download license.</strong>{" "}
+                      {DIGITAL_DOWNLOAD_LICENSE_CHECKOUT_TEXT}
+                    </span>
+                  )}
                 </label>
               </div>
 

@@ -27,6 +27,7 @@ import { sendDownloadAccessEmail, sendBundleAccessEmail } from "../lib/enrollmen
 import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import { addToAllContacts } from "../lib/emailListHelper";
 import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
+import { DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT } from "../../shared/digitalDownloadLicense";
 
 function assertAdmin(ctx: any) {
   if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
@@ -335,6 +336,7 @@ export const downloadsLearnerRouter = router({
         mode: "payment",
         customer_email: userEmail,
         client_reference_id: userId ? userId.toString() : undefined,
+        custom_text: DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT,
         ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         line_items: isUpgradeBumpDl
           ? [orderBumpCheckout!.lineItem]
@@ -619,6 +621,7 @@ export const downloadsLearnerRouter = router({
         mode: "payment",
         customer_email: ctx.user?.email ?? undefined,
         client_reference_id: userId ? userId.toString() : undefined,
+        custom_text: DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT,
         allow_promotion_codes: true,
         line_items: [{
           price_data: {
@@ -2166,6 +2169,7 @@ Make ALL content specific and compelling based on the product title and descript
         mode: "payment",
         customer_email: ctx.user.email ?? undefined,
         client_reference_id: ctx.user.id.toString(),
+        custom_text: DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT,
         allow_promotion_codes: true,
         line_items: [{
           price_data: {
