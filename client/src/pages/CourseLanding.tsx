@@ -1832,17 +1832,9 @@ export default function CourseLanding() {
       return;
     }
     if (!user) {
-      // Guest: for paid courses, go directly to /checkout/:slug — Stripe collects email,
-      // webhook auto-creates account after payment. No pre-payment account creation.
-      // For free courses, show the lightweight guest registration form.
-      const resolvedPricingTypeGuest = selectedPricingOptionId
-        ? (course?.pricingOptions?.find((o: any) => o.id === selectedPricingOptionId)?.pricingType ?? course?.pricingType)
-        : (course?.pricingType ?? (course?.isFree ? "free" : "one_time"));
-      if (resolvedPricingTypeGuest === "free") {
-        openGuestCheckoutModal(selectedPricingOptionId);
-      } else {
-        handleGoToCheckoutPage(selectedPricingOptionId);
-      }
+      // Keep guest purchase available, but collect the buyer's real email before
+      // opening Stripe so Apple Pay's private relay cannot become their access identity.
+      openGuestCheckoutModal(selectedPricingOptionId);
       return;
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
@@ -1867,15 +1859,8 @@ export default function CourseLanding() {
       return;
     }
     if (!user) {
-      // Guest: for paid courses, go directly to /checkout/:slug — no pre-payment account creation.
-      const resolvedPricingTypeGuest = pricingOptionId
-        ? (course?.pricingOptions?.find((o: any) => o.id === pricingOptionId)?.pricingType ?? course?.pricingType)
-        : (course?.pricingType ?? (course?.isFree ? "free" : "one_time"));
-      if (resolvedPricingTypeGuest === "free") {
-        openGuestCheckoutModal(pricingOptionId);
-      } else {
-        handleGoToCheckoutPage(pricingOptionId);
-      }
+      // Keep guest purchase available, but make the submitted email authoritative.
+      openGuestCheckoutModal(pricingOptionId);
       return;
     }
     if (enrollment) { navigate(`/courses/${slug}/player`); return; }
@@ -2539,7 +2524,7 @@ export default function CourseLanding() {
         <DialogHeader>
           <DialogTitle className="text-teal-700">Almost there!</DialogTitle>
           <DialogDescription>
-            Enter your name and email to continue to checkout. We'll create your account automatically.
+            Enter your name and the email you want to use for course access. No account setup is required before payment.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleGuestCheckoutSubmit} className="space-y-4 mt-2">
@@ -2566,7 +2551,7 @@ export default function CourseLanding() {
             />
           </div>
           <p className="text-xs text-gray-500">
-            Your account will be created automatically. You'll receive a login link by email after purchase.
+            We use this email for your purchase and access — even if Apple Pay uses a private relay address. After purchase, you’ll be sent to Learn sign-in to access your course.
           </p>
           <Button
             type="submit"

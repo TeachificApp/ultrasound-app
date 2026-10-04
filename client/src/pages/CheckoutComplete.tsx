@@ -9,19 +9,17 @@
  *   ?type=membership       — membership checkout
  */
 import { useMemo, useEffect } from "react";
-import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { CheckCircle2, XCircle, Clock, ArrowRight, BookOpen, Award, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
+import { getLoginUrl } from "@/const";
 import {
   buildQuizCoursePlayerUrl,
   buildStudentDashboardUrl,
 } from "@shared/studentDashboardUrls";
 
 export default function CheckoutComplete() {
-  const [, navigate] = useLocation();
-
   const { sessionId, courseSlug, checkoutType } = useMemo(() => {
     const url = new URL(window.location.href);
     return {
@@ -80,7 +78,7 @@ export default function CheckoutComplete() {
     }
     if (isMembership) {
       const timer = setTimeout(() => {
-        navigate("/my-dashboard");
+        window.location.assign(getLoginUrl("/my-dashboard"));
       }, 4000);
       return () => clearTimeout(timer);
     }
@@ -88,13 +86,14 @@ export default function CheckoutComplete() {
     const timer = setTimeout(() => {
       const dest = getMyContentUrl(resolvedContentType, courseSlug);
       if (dest.startsWith("http") || dest.startsWith("/downloads")) {
-        window.location.href = dest.startsWith("/") ? `${window.location.origin}${dest}` : dest;
+        const returnTo = dest.startsWith("/") ? dest : new URL(dest).pathname;
+        window.location.assign(getLoginUrl(returnTo));
       } else {
-        navigate(dest);
+        window.location.assign(getLoginUrl(dest));
       }
     }, 4000);
     return () => clearTimeout(timer);
-  }, [data?.status, courseSlug, resolvedContentType, navigate, autoLoginUrl, isMembership]);
+  }, [data?.status, courseSlug, resolvedContentType, autoLoginUrl, isMembership]);
 
   if (!sessionId) {
     return (
@@ -225,12 +224,12 @@ export default function CheckoutComplete() {
             {autoLoginUrl
               ? "Signing you in now…"
               : isMembership
-                ? "Redirecting you to your dashboard in a moment…"
+                ? "Opening your Learn account in a moment…"
                 : resolvedContentType === "quiz"
                   ? "Redirecting you to My Content → Quizzes in a moment…"
                   : resolvedContentType === "download"
-                    ? "Redirecting you to your download in a moment…"
-                    : "Redirecting you to the course in a moment…"}
+                    ? "Opening your Learn account in a moment…"
+                    : "Opening your Learn account in a moment…"}
           </p>
           <p className="text-gray-400 text-[10px] mb-7">
             All sales are final. By completing this purchase you agree to our{" "}

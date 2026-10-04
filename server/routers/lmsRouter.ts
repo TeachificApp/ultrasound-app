@@ -3112,12 +3112,13 @@ export const lmsLearnerRouter = router({
         ...orderBumpCheckout?.metadata,
       };
       // ── Post-purchase redirect ────────────────────────────────────────────────
-      // Priority: postPurchaseRedirectUrl (admin-set) → customThankYou page → My Dashboard
+      // Priority: postPurchaseRedirectUrl (admin-set) → customThankYou page →
+      // Learn sign-in handoff for standard purchases.
       const _postPurchasePath = course.postPurchaseRedirectUrl
         ? course.postPurchaseRedirectUrl
         : course.customThankYouEnabled
           ? `/courses/${course.slug}/thank-you`
-          : `/my-dashboard?tab=content&enrolled=1`;
+          : `/login?returnTo=${encodeURIComponent("/my-dashboard?tab=content&enrolled=1")}`;
       const successUrl = _postPurchasePath.startsWith('http')
         ? `${_postPurchasePath}${_postPurchasePath.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
         : `${input.origin}${_postPurchasePath}${_postPurchasePath.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;
@@ -3484,12 +3485,14 @@ export const lmsLearnerRouter = router({
         ...orderBumpCheckout?.metadata,
       };
 
-      // ── Post-purchase redirect (guest checkout) ────────────────────────────────
+      // A configured workflow takes precedence. Otherwise, send the new buyer to
+      // Learn sign-in after Stripe so they can access the account tied to the email
+      // collected before checkout.
       const _guestPostPurchasePath = course.postPurchaseRedirectUrl
         ? course.postPurchaseRedirectUrl
         : course.customThankYouEnabled
           ? `/courses/${course.slug}/thank-you`
-          : `/my-dashboard?tab=content&enrolled=1`;
+          : `/login?returnTo=${encodeURIComponent("/my-dashboard?tab=content&enrolled=1")}`;
       const successUrl = _guestPostPurchasePath.startsWith('http')
         ? `${_guestPostPurchasePath}${_guestPostPurchasePath.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`
         : `${input.origin}${_guestPostPurchasePath}${_guestPostPurchasePath.includes('?') ? '&' : '?'}session_id={CHECKOUT_SESSION_ID}`;

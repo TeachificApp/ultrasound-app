@@ -10,10 +10,10 @@ function buildSuccessUrl(
   course: { slug: string; postPurchaseRedirectUrl?: string | null; customThankYouEnabled?: boolean },
 ): string {
   const postPurchasePath = course.postPurchaseRedirectUrl
-    ? course.postPurchaseRedirectUrl
-    : course.customThankYouEnabled
-      ? `/courses/${course.slug}/thank-you`
-      : `/my-dashboard?tab=content&enrolled=1`;
+      ? course.postPurchaseRedirectUrl
+      : course.customThankYouEnabled
+        ? `/courses/${course.slug}/thank-you`
+      : `/login?returnTo=${encodeURIComponent("/my-dashboard?tab=content&enrolled=1")}`;
   const successUrl = postPurchasePath.startsWith("http")
     ? `${postPurchasePath}${postPurchasePath.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`
     : `${origin}${postPurchasePath}${postPurchasePath.includes("?") ? "&" : "?"}session_id={CHECKOUT_SESSION_ID}`;
@@ -23,9 +23,9 @@ function buildSuccessUrl(
 describe("buildSuccessUrl", () => {
   const origin = "https://learn.allaboutultrasound.com";
 
-  it("defaults to /my-dashboard?tab=content&enrolled=1 when no overrides", () => {
+  it("defaults to Learn sign-in with a My Dashboard return path when no workflow is configured", () => {
     const url = buildSuccessUrl(origin, { slug: "echo-basics" });
-    expect(url).toBe(`${origin}/my-dashboard?tab=content&enrolled=1&session_id={CHECKOUT_SESSION_ID}`);
+    expect(url).toBe(`${origin}/login?returnTo=%2Fmy-dashboard%3Ftab%3Dcontent%26enrolled%3D1&session_id={CHECKOUT_SESSION_ID}`);
   });
 
   it("uses customThankYou page when customThankYouEnabled is true", () => {
