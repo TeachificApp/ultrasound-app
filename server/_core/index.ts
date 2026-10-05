@@ -100,6 +100,9 @@ async function startServer() {
   const server = createServer(app);
   // Stripe webhook MUST register before express.json().
   registerStripeWebhook(app);
+  // SendGrid also reads the raw request body for optional signature verification.
+  // Register it before the global parser so the request stream remains readable.
+  registerSendGridWebhook(app);
   // Configure body parser with larger size limit for file uploads
   // No body-parser limit for chunked media uploads — multer handles streaming directly
   app.use(express.json({ limit: "100mb" }));
@@ -657,8 +660,6 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Chat API with streaming and tool calling
   registerChatRoutes(app);
-  // SendGrid Event Webhook for unsubscribe/spamreport sync
-  registerSendGridWebhook(app);
   // Case media upload endpoint (multipart/form-data)
   registerUploadCaseMediaRoute(app);
   // Navigator section image upload endpoint (admin only)
