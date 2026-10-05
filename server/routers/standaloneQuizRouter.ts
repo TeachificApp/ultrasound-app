@@ -543,6 +543,16 @@ export const standaloneQuizLearnerRouter = router({
 
       let earnedPoints = 0;
       let correctAnswers = 0;
+      const isFlashcardDeck = quiz.type === "flashcards";
+      const isFlashcardKnown = (value: string) => {
+        try {
+          const parsed = JSON.parse(value);
+          const review = parsed?.flashcardReview;
+          return review === "got_it" || review === "known";
+        } catch {
+          return false;
+        }
+      };
       const answerRows: typeof standaloneQuizAttemptAnswers.$inferInsert[] = [];
       let completedTotalPoints = attempt.totalPoints;
       let completedTotalQuestions = attempt.totalQuestions;
@@ -573,7 +583,9 @@ export const standaloneQuizLearnerRouter = router({
           if (!visibleStableIds.has(ans.questionBankId)) continue;
           const q = qMap.get(ans.questionBankId) as { id: string; points: number; type: string; data: unknown } | undefined;
           if (!q) continue;
-          const isCorrect = gradeBuilderAnswer(q, ans.givenAnswer);
+          const isCorrect = isFlashcardDeck
+            ? isFlashcardKnown(ans.givenAnswer)
+            : gradeBuilderAnswer(q, ans.givenAnswer);
           if (isCorrect) {
             earnedPoints += q.points;
             correctAnswers++;
@@ -601,25 +613,27 @@ export const standaloneQuizLearnerRouter = router({
         for (const ans of input.answers) {
           const q = qMap.get(ans.questionBankId);
           if (!q) continue;
-          let isCorrect = false;
-          try {
-            const given = JSON.parse(ans.givenAnswer);
-            if (q.qb.type === "mcq" || q.qb.type === "truefalse") {
-              isCorrect = String(given) === String(q.qb.correctAnswer);
-            } else if (q.qb.type === "multiselect") {
-              const correct: number[] = JSON.parse(q.qb.correctAnswers ?? "[]");
-              const givenArr: number[] = Array.isArray(given) ? given : [];
-              isCorrect =
-                givenArr.length === correct.length &&
-                givenArr.every((v) => correct.includes(v));
-            } else if (q.qb.type === "hotspot") {
-              isCorrect = String(given?.markerId ?? given) === String(q.qb.correctAnswer);
-            } else if (q.qb.type === "matching") {
-              const pairs: { id: string; left: string; right: string }[] = JSON.parse(q.qb.matchingPairs ?? "[]");
-              const givenPairs: { id: string; right: string }[] = Array.isArray(given) ? given : [];
-              isCorrect = pairs.every((p) => givenPairs.find((g) => g.id === p.id)?.right === p.right);
-            }
-          } catch { /* ignore parse errors */ }
+          let isCorrect = isFlashcardDeck && isFlashcardKnown(ans.givenAnswer);
+          if (!isFlashcardDeck) {
+            try {
+              const given = JSON.parse(ans.givenAnswer);
+              if (q.qb.type === "mcq" || q.qb.type === "truefalse") {
+                isCorrect = String(given) === String(q.qb.correctAnswer);
+              } else if (q.qb.type === "multiselect") {
+                const correct: number[] = JSON.parse(q.qb.correctAnswers ?? "[]");
+                const givenArr: number[] = Array.isArray(given) ? given : [];
+                isCorrect =
+                  givenArr.length === correct.length &&
+                  givenArr.every((v) => correct.includes(v));
+              } else if (q.qb.type === "hotspot") {
+                isCorrect = String(given?.markerId ?? given) === String(q.qb.correctAnswer);
+              } else if (q.qb.type === "matching") {
+                const pairs: { id: string; left: string; right: string }[] = JSON.parse(q.qb.matchingPairs ?? "[]");
+                const givenPairs: { id: string; right: string }[] = Array.isArray(given) ? given : [];
+                isCorrect = pairs.every((p) => givenPairs.find((g) => g.id === p.id)?.right === p.right);
+              }
+            } catch { /* ignore parse errors */ }
+          }
 
           if (isCorrect) {
             earnedPoints += q.sqq.points;

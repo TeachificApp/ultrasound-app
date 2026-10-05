@@ -37,7 +37,8 @@ describe("visual-builder flashcard templates", () => {
 
     expect(player).toContain("isStandaloneFlashcardDeck");
     expect(player).toContain("Show Answer");
-    expect(player).toContain("I Know This");
+    expect(player).toContain('reviewAndAdvance("got_it")');
+    expect(player).toContain('reviewAndAdvance("missed")');
     expect(player).toContain("submitAttemptAnswers(nextAnswers, nextTimes)");
     expect(player).toContain("nativeCorrectAnswers");
     expect(player).toContain("flashcardFeedbackText");
@@ -49,5 +50,8 @@ describe("visual-builder flashcard templates", () => {
     expect(frame).toContain("<video src={mediaVideoUrl} controls");
     expect(learnerRouter).toContain('quiz.type === "quiz" || quiz.type === "flashcards"');
     expect(learnerRouter).toContain('quiz.showExplanations || quiz.type === "flashcards"');
+    expect(learnerRouter).toContain('const isFlashcardDeck = quiz.type === "flashcards"');
+    expect(learnerRouter).toContain('review === "got_it" || review === "known"');
+    expect(learnerRouter).toContain('isFlashcardDeck && isFlashcardKnown(ans.givenAnswer)');
   });
 });

@@ -566,7 +566,7 @@ export default function StandaloneQuizPlayer() {
   if (isStandaloneFlashcardDeck) {
     const answer = flashcardAnswerText(q);
     const feedback = flashcardFeedbackText(q, answer);
-    const reviewAndAdvance = (review: "known" | "again") => {
+    const reviewAndAdvance = (review: "got_it" | "missed") => {
       const reviewAnswer = JSON.stringify({ flashcardReview: review });
       const nextAnswers = { ...answers, [q.questionBankId]: reviewAnswer };
       const nextTimes = { ...questionTimes, [q.questionBankId]: Math.max(1, Math.round((Date.now() - qStartTime) / 1000)) };
@@ -602,8 +602,8 @@ export default function StandaloneQuizPlayer() {
             <Button onClick={() => setFlashcardSide("answer")} className="h-11 bg-teal-500 text-white hover:bg-teal-400">Show Answer</Button>
           ) : (
             <>
-              <Button onClick={() => reviewAndAdvance("known")} className="h-11 bg-emerald-500 text-white hover:bg-emerald-400">I Know This</Button>
-              <Button variant="outline" onClick={() => reviewAndAdvance("again")} className="h-11 border-white/40 bg-white/10 text-white hover:bg-white/20 hover:text-white">Review Again</Button>
+              <Button onClick={() => reviewAndAdvance("got_it")} className="h-11 bg-emerald-500 text-white hover:bg-emerald-400">Got It</Button>
+              <Button variant="outline" onClick={() => reviewAndAdvance("missed")} className="h-11 border-white/40 bg-white/10 text-white hover:bg-white/20 hover:text-white">Missed It</Button>
               <Button variant="ghost" onClick={() => setFlashcardSide("front")} className="h-9 text-white/70 hover:bg-white/10 hover:text-white">Return to question</Button>
             </>
           )}
