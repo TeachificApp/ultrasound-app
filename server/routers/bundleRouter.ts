@@ -93,6 +93,8 @@ export const bundlePublicRouter = router({
       const enrichedItems = await Promise.all(items.map(async (item) => {
         let itemTitle = "";
         let itemSlug = "";
+        let itemCoverImage: string | null = null;
+        let itemDescription: string | null = null;
         try {
           if (item.itemType === "course") {
             const [c] = await db.select({ title: lmsCourses.title, slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, item.itemId)).limit(1);
@@ -103,9 +105,11 @@ export const bundlePublicRouter = router({
             itemTitle = d?.title || "";
             itemSlug = d?.slug || "";
           } else if (item.itemType === "product") {
-            const [p] = await db.select({ title: physicalProducts.title, slug: physicalProducts.slug }).from(physicalProducts).where(eq(physicalProducts.id, item.itemId)).limit(1);
+            const [p] = await db.select({ title: physicalProducts.title, slug: physicalProducts.slug, thumbnailUrl: physicalProducts.thumbnailUrl, description: physicalProducts.description }).from(physicalProducts).where(eq(physicalProducts.id, item.itemId)).limit(1);
             itemTitle = p?.title || "";
             itemSlug = p?.slug || "";
+            itemCoverImage = p?.thumbnailUrl ?? null;
+            itemDescription = p?.description ?? null;
           } else if (item.itemType === "webinar") {
             const [w] = await db.select({ title: webinars.title, slug: webinars.slug }).from(webinars).where(eq(webinars.id, item.itemId)).limit(1);
             itemTitle = w?.title || "";
@@ -115,7 +119,7 @@ export const bundlePublicRouter = router({
             itemTitle = q?.title || "";
           }
         } catch {}
-        return { ...item, itemTitle, itemSlug };
+        return { ...item, itemTitle, itemSlug, itemCoverImage, itemDescription };
       }));
       let isEnrolled = false;
       if ((ctx.user as any)?.id) {

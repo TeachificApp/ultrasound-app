@@ -89,6 +89,7 @@ function itemHref(item: IncludedItem): string | null {
   switch (item.itemType) {
     case "course":    return `/courses/${item.itemSlug}`;
     case "download":  return `/downloads/${item.itemSlug}`;
+    case "product":   return `/product/${item.itemSlug}`;
     case "webinar":   return `/webinars/${item.itemSlug}`;
     case "community": return `/community/${item.itemSlug}`;
     default:          return null;
@@ -196,23 +197,12 @@ function GridCard({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData }
           ) : (
             <span />
           )}
-          {href ? (
-            <Link href={href}>
-              <button
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 hover:opacity-90 transition-opacity whitespace-nowrap flex-shrink-0"
-                style={{ backgroundColor: accent }}
-              >
-                {ctaText} <ExternalLink size={10} />
-              </button>
-            </Link>
-          ) : (
-            <span
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 whitespace-nowrap flex-shrink-0"
-              style={{ backgroundColor: accent }}
-            >
-              {ctaText} <ExternalLink size={10} />
-            </span>
-          )}
+          <span
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+            style={{ backgroundColor: accent }}
+          >
+            {ctaText} <ExternalLink size={10} />
+          </span>
         </div>
       </div>
     </div>
@@ -275,23 +265,12 @@ function ListRow({ item, d }: { item: IncludedItem; d: IncludedItemsBlockData })
             Included
           </span>
         )}
-        {href ? (
-          <Link href={href}>
-            <button
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 hover:opacity-90 transition-opacity whitespace-nowrap"
-              style={{ backgroundColor: accent }}
-            >
-              {ctaText} <ExternalLink size={10} />
-            </button>
-          </Link>
-        ) : (
-          <span
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 whitespace-nowrap"
-            style={{ backgroundColor: accent }}
-          >
-            {ctaText} <ExternalLink size={10} />
-          </span>
-        )}
+        <span
+          className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1 whitespace-nowrap"
+          style={{ backgroundColor: accent }}
+        >
+          {ctaText} <ExternalLink size={10} />
+        </span>
       </div>
     </div>
   );
