@@ -218,7 +218,9 @@ async function startServer() {
     res.json({ hasDbUrl, dbConnected: !!db });
   });
   // Temporary debug endpoint to diagnose email provider configuration
-  app.get("/api/debug/email-status", async (_req, res) => {
+  app.get("/api/debug/email-status", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const { emailProviderStatus } = await import("../lib/email/providerConfig");
     const { listSmtpComChannels } = await import("../lib/email/providers/smtpcomChannels");
     const status = emailProviderStatus();

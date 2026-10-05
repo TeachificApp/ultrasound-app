@@ -81,7 +81,6 @@ export function emailProviderStatus() {
     usingFallback: effective !== null && effective !== preferred,
     sendgrid: {
       hasApiKey: isSendGridConfigured(),
-      keyPrefix: process.env.SENDGRID_API_KEY?.substring(0, 7) || "NOT SET",
       fromEmail: process.env.SENDGRID_FROM_EMAIL || "NOT SET",
       fromName: process.env.SENDGRID_FROM_NAME || "NOT SET",
     },

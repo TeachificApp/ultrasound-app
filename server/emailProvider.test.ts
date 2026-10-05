@@ -62,6 +62,8 @@ describe("email provider config", () => {
 
   it("uses smtpcom-specific from env when provider is smtpcom", () => {
     process.env.EMAIL_PROVIDER = "smtpcom";
+    process.env.SMTPCOM_API_KEY = "smtp-test-key";
+    process.env.SMTPCOM_CHANNEL = "transactional";
     process.env.SMTPCOM_FROM_EMAIL = "smtp@example.com";
     process.env.SMTPCOM_FROM_NAME = "SMTP Sender";
     const sender = resolveEmailSender({});
