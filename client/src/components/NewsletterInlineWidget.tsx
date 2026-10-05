@@ -22,9 +22,11 @@ export default function NewsletterInlineWidget({ dark = false, source = "inline_
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [welcomeEmailSent, setWelcomeEmailSent] = useState(false);
 
   const subscribeMutation = trpc.newsletter.subscribe.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setWelcomeEmailSent(result.welcomeEmailSent);
       setSubscribed(true);
     },
     onError: (err) => {
@@ -55,6 +57,11 @@ export default function NewsletterInlineWidget({ dark = false, source = "inline_
           <p className={`text-xs mt-0.5 ${dark ? "text-white/70" : "text-teal-600"}`}>
             Thank you — you'll receive updates from All About Ultrasound™ &amp; iHeartEcho™.
           </p>
+          {welcomeEmailSent && (
+            <p className={`text-xs mt-2 leading-relaxed ${dark ? "text-white/70" : "text-teal-700"}`}>
+              We also sent a welcome confirmation. Add noreply@allaboutultrasound.com to your contacts or safe-sender list.
+            </p>
+          )}
         </div>
       </div>
     );

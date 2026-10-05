@@ -5,12 +5,13 @@
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { newsletterSubscribers } from "../../drizzle/schema";
 import { notifyOwner } from "../_core/notification";
+import { buildNewsletterWelcomeEmail, sendEmail } from "../_core/email";
 import { addToAllContacts, unsubscribeFromAllContacts } from "../lib/emailListHelper";
 import {
   upsertSendGridContacts,
@@ -21,6 +22,67 @@ import {
 /** Generate a URL-safe 32-byte random token */
 function generateToken(): string {
   return randomBytes(32).toString("hex");
+}
+
+const NEWSLETTER_APP_URL = "https://learn.allaboutultrasound.com";
+
+/**
+ * Atomically claims and sends the opt-in confirmation only once per subscriber.
+ * A failed provider attempt releases the claim, so the recipient can retry by
+ * submitting the subscribe form again without receiving duplicate welcomes.
+ */
+async function sendNewsletterWelcomeIfNeeded(input: {
+  id: number;
+  email: string;
+  firstName: string;
+  unsubscribeToken: string;
+}): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const claimedAt = Date.now();
+  const [claim] = await db
+    .update(newsletterSubscribers)
+    .set({ welcomeEmailSentAt: claimedAt })
+    .where(
+      and(
+        eq(newsletterSubscribers.id, input.id),
+        isNull(newsletterSubscribers.welcomeEmailSentAt),
+      ),
+    );
+
+  if (claim.affectedRows !== 1) return false;
+
+  const welcome = buildNewsletterWelcomeEmail({
+    firstName: input.firstName,
+    unsubscribeUrl: `${NEWSLETTER_APP_URL}/unsubscribe?nltoken=${encodeURIComponent(input.unsubscribeToken)}`,
+    brandMode: "combined",
+  });
+
+  try {
+    const sent = await sendEmail({
+      to: { name: input.firstName, email: input.email },
+      subject: welcome.subject,
+      htmlBody: welcome.htmlBody,
+      previewText: welcome.previewText,
+      brandMode: "combined",
+      listUnsubscribeUrl: `${NEWSLETTER_APP_URL}/unsubscribe?nltoken=${encodeURIComponent(input.unsubscribeToken)}`,
+    });
+    if (sent) return true;
+  } catch (err) {
+    console.error(`[newsletter] Welcome email error for ${input.email}:`, err);
+  }
+
+  await db
+    .update(newsletterSubscribers)
+    .set({ welcomeEmailSentAt: null })
+    .where(
+      and(
+        eq(newsletterSubscribers.id, input.id),
+        eq(newsletterSubscribers.welcomeEmailSentAt, claimedAt),
+      ),
+    );
+  return false;
 }
 
 export const newsletterRouter = router({
@@ -53,11 +115,25 @@ export const newsletterRouter = router({
       if (existing.length > 0) {
         if (existing[0].isActive) {
           await addToAllContacts(email, `${input.firstName} ${input.lastName}`, { source: "newsletter_subscribe" });
+          const unsubscribeToken = existing[0].unsubscribeToken ?? generateToken();
+          if (!existing[0].unsubscribeToken) {
+            await db
+              .update(newsletterSubscribers)
+              .set({ unsubscribeToken })
+              .where(eq(newsletterSubscribers.id, existing[0].id));
+          }
+          const welcomeEmailSent = await sendNewsletterWelcomeIfNeeded({
+            id: existing[0].id,
+            email,
+            firstName: input.firstName,
+            unsubscribeToken,
+          });
           // Already active — return success silently (don't reveal subscriber status)
           return {
             success: true,
             alreadySubscribed: true,
-            unsubscribeToken: existing[0].unsubscribeToken,
+            unsubscribeToken,
+            welcomeEmailSent,
           };
         }
         // Re-subscribe — generate a fresh token
@@ -73,7 +149,13 @@ export const newsletterRouter = router({
           })
           .where(eq(newsletterSubscribers.email, email));
         await addToAllContacts(email, `${input.firstName} ${input.lastName}`, { source: "newsletter_subscribe", resubscribe: true });
-        return { success: true, alreadySubscribed: false, unsubscribeToken: token };
+        const welcomeEmailSent = await sendNewsletterWelcomeIfNeeded({
+          id: existing[0].id,
+          email,
+          firstName: input.firstName,
+          unsubscribeToken: token,
+        });
+        return { success: true, alreadySubscribed: false, unsubscribeToken: token, welcomeEmailSent };
       }
 
       // New subscriber — generate token
@@ -93,6 +175,20 @@ export const newsletterRouter = router({
       // Persist to the campaign-visible All Contacts list before reporting success.
       const name = `${input.firstName} ${input.lastName}`;
       await addToAllContacts(email, name || null, { source: "newsletter_subscribe", resubscribe: true });
+
+      const [newSubscriber] = await db
+        .select({ id: newsletterSubscribers.id })
+        .from(newsletterSubscribers)
+        .where(eq(newsletterSubscribers.email, email))
+        .limit(1);
+      const welcomeEmailSent = newSubscriber
+        ? await sendNewsletterWelcomeIfNeeded({
+            id: newSubscriber.id,
+            email,
+            firstName: input.firstName,
+            unsubscribeToken: token,
+          })
+        : false;
 
       // Sync to SendGrid Marketing Contacts separately (fire-and-forget).
       (async () => {
@@ -118,7 +214,7 @@ export const newsletterRouter = router({
         content: `${name} (${email}) subscribed to the newsletter.`,
       }).catch(() => {/* non-blocking */});
 
-      return { success: true, alreadySubscribed: false, unsubscribeToken: token };
+      return { success: true, alreadySubscribed: false, unsubscribeToken: token, welcomeEmailSent };
     }),
 
   // ── Public: unsubscribe via signed token (marketing emails only) ───────────

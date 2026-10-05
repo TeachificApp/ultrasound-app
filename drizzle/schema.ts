@@ -8583,6 +8583,8 @@ export const newsletterSubscribers = mysqlTable("newsletter_subscribers", {
   unsubscribedAt: bigint("unsubscribed_at", { mode: "number" }),
   isActive: smallint("is_active").notNull().default(1),
   unsubscribeToken: varchar("unsubscribe_token", { length: 128 }).unique(),
+  /** Timestamp used as an atomic one-time welcome-email claim and delivery marker. */
+  welcomeEmailSentAt: bigint("welcome_email_sent_at", { mode: "number" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });

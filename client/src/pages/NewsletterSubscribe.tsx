@@ -12,9 +12,11 @@ export default function NewsletterSubscribe() {
     email: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [welcomeEmailSent, setWelcomeEmailSent] = useState(false);
 
   const subscribeMutation = trpc.newsletter.subscribe.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setWelcomeEmailSent(result.welcomeEmailSent);
       setSubmitted(true);
     },
     onError: (err) => {
@@ -63,6 +65,13 @@ export default function NewsletterSubscribe() {
             Thank you for joining the <strong>All About Ultrasound</strong> and <strong>iHeartEcho</strong> community.
             You'll receive updates on new courses, CME opportunities, clinical tools, and upcoming events.
           </p>
+          {welcomeEmailSent && (
+            <div className="mt-5 rounded-lg border border-teal-100 bg-teal-50 px-4 py-3 text-left text-sm leading-relaxed text-teal-900">
+              <strong>Check your inbox:</strong> we sent a welcome confirmation. Add
+              {" "}<span className="font-semibold">noreply@allaboutultrasound.com</span>{" "}
+              to your contacts or safe-sender list so you never miss an update.
+            </div>
+          )}
           <p className="text-xs text-gray-400 mt-6">
             You can unsubscribe at any time by clicking the link in any email we send.
           </p>

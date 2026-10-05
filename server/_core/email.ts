@@ -67,7 +67,11 @@ const brandColor = "#189aa1";
 const brandDark = "#0e1e2e";
 
 /** Brand-aware email wrapper. Pass brandMode to customize header/footer. */
-export function emailWrapper(content: string, brandMode?: BrandMode): string {
+export function emailWrapper(
+  content: string,
+  brandMode?: BrandMode,
+  footerContext = "You received this email because an account was created for you on",
+): string {
   const bc = getBrandDisplayConfig(brandMode || "aaus");
   const logoSrc = bc.emailLogoUrl;
   // For combined mode, show only the AAUS logo (covers both brands)
@@ -108,7 +112,7 @@ export function emailWrapper(content: string, brandMode?: BrandMode): string {
                 \u00a9 ${bc.displayName} \u00b7 <a href="${bc.websiteUrl}" style="color:${bc.primaryColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">${bc.websiteUrl.replace("https://", "")}</a>
               </p>
               <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
-                You received this email because an account was created for you on ${bc.displayName}.
+                ${footerContext} ${bc.displayName}.
               </p>
               <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
                 All sales are final. &bull; <a href="https://app.allaboutultrasound.com/terms" style="color:${bc.primaryColor};text-decoration:underline;" target="_blank" rel="noopener noreferrer">Terms of Service</a>
@@ -519,6 +523,46 @@ export function buildWelcomeEmail(opts: {
        <a href="mailto:${bc.supportEmail}" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">${bc.supportEmail}</a>.
     </p>
   `, opts.brandMode);
+  return { subject, htmlBody, previewText };
+}
+
+/**
+ * Marketing opt-in confirmation. This is intentionally distinct from the account
+ * welcome email: newsletter readers do not need an account to receive it.
+ */
+export function buildNewsletterWelcomeEmail(opts: {
+  firstName: string;
+  unsubscribeUrl: string;
+  brandMode?: BrandMode;
+}): { subject: string; htmlBody: string; previewText: string } {
+  const bc = getBrandDisplayConfig(opts.brandMode || "combined");
+  const subject = "You're in! Welcome to All About Ultrasound & iHeartEcho";
+  const previewText = "Your newsletter subscription is confirmed. Add us to your safe-sender list so you never miss an update.";
+  const htmlBody = emailWrapper(`
+    <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
+      You're in, ${opts.firstName}!
+    </h2>
+    <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
+      Your newsletter subscription is confirmed. You’ll receive practical ultrasound education, new course and CME updates, clinical tools, and upcoming event news from All About Ultrasound™ and iHeartEcho™.
+    </p>
+    <div style="background:#f0fbfc;border-left:3px solid ${bc.primaryColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 22px;">
+      <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:${bc.darkColor};">Help keep every update in your inbox</p>
+      <p style="margin:0;font-size:14px;color:#475569;line-height:1.55;">
+        Please add <a href="mailto:${bc.senderEmail}" style="color:${bc.primaryColor};font-weight:700;text-decoration:none;">${bc.senderEmail}</a> to your contacts or safe-sender list. This helps prevent future education and CME updates from being filtered to spam or promotions.
+      </p>
+    </div>
+    <p style="margin:0 0 22px;font-size:15px;color:#475569;line-height:1.6;">
+      We’re glad you’re here. Expect useful, clinically focused updates—never a cluttered inbox.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="https://learn.allaboutultrasound.com" style="display:inline-block;background:linear-gradient(135deg,${bc.primaryColor},${bc.accentColor});color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;" target="_blank" rel="noopener noreferrer">
+        Explore the Education Library
+      </a>
+    </div>
+    <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.55;text-align:center;">
+      You can <a href="${opts.unsubscribeUrl}" style="color:#64748b;text-decoration:underline;" target="_blank" rel="noopener noreferrer">unsubscribe from these marketing updates</a> at any time.
+    </p>
+  `, opts.brandMode || "combined", "You received this email because you subscribed to updates from");
   return { subject, htmlBody, previewText };
 }
 // ─── Physician Over-Read Invitation Email ─────────────────────────────────────
