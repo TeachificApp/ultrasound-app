@@ -74,4 +74,42 @@ describe("lesson focus regeneration block safeguards", () => {
       blockText: [],
     })).toThrow("block-text proposal is incomplete");
   });
+
+  it("rejects a populated block-only proposal when every editable field was returned unchanged", () => {
+    const source = {
+      content: "",
+      videoContent: "",
+      editableBlockText: [
+        { path: "0.data.html", value: "<p>Explain ultrasound propagation and attenuation.</p>" },
+        { path: "1.data.headline", value: "Image optimization" },
+      ],
+    };
+    expect(() => assertSubstantiveFocusRegeneration(source, {
+      content: "",
+      videoContent: "",
+      blockText: source.editableBlockText,
+    })).toThrow("No editable instructional field");
+  });
+
+  it("accepts a populated block-only rewrite and applies it without altering protected block fields", () => {
+    const source = {
+      content: "",
+      videoContent: "",
+      editableBlockText: [{ path: "0.data.html", value: "<p>Explain ultrasound propagation and attenuation.</p>" }],
+    };
+    const proposal = {
+      content: "",
+      videoContent: "",
+      blockText: [{ path: "0.data.html", value: "<p>Apply propagation and attenuation principles to Doppler optimization.</p>" }],
+    };
+    expect(() => assertSubstantiveFocusRegeneration(source, proposal)).not.toThrow();
+    const applied = applyEditableBlockText(JSON.stringify([
+      { id: "text-1", type: "text", data: { html: source.editableBlockText[0].value, bgColor: "#ffffff" } },
+    ]), proposal.blockText);
+    expect(applied.appliedCount).toBe(1);
+    expect(JSON.parse(applied.contentBlocks ?? "[]")[0].data).toMatchObject({
+      html: proposal.blockText[0].value,
+      bgColor: "#ffffff",
+    });
+  });
 });

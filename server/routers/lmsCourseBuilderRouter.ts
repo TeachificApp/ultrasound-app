@@ -182,38 +182,44 @@ async function generateFocusChange(input: {
     videoContent: input.lesson.videoContent ?? "",
     editableBlockText,
   };
-  const response = await invokeLLM({
-    transport: "auto",
-    maxTokens: 8_000,
-    response_format: focusRegenerationResponseFormat,
-    messages: [
-      {
-        role: "system",
-        content: "You are an expert medical ultrasound educator for All About Ultrasound and iHeartEcho. Create a full instructional adaptation of one lesson for a new clinical focus, not a title-only or objective-only edit. Rewrite every non-empty supplied instructional field with clinically appropriate content for the new focus, preserving the lesson's teaching depth, approximate detail, functional HTML markup, professional US English, and clinical accuracy. Every supplied editable block-text path must appear exactly once in blockText with a rewritten non-empty value; do not add paths. Return strict JSON only. Never invent patient cases, testimonials, study results, sources, citations, or learner records. Do not alter block IDs, types, layout, colors, URLs, media, buttons, quiz questions, answer choices, settings, or access rules. Rewrite only title, learning objectives, HTML instructional content, optional video-supporting instructional content, and the supplied editable block-text paths.",
-      },
-      {
-        role: "user",
-        content: `Course: ${input.courseTitle}\nNew clinical focus: ${input.newFocus}\nLearning objective for this rewrite: ${input.objective}\n\nCurrent editable lesson fields:\n${JSON.stringify(source)}\n\nReturn a complete clinically appropriate rewrite of every supplied non-empty instructional field. The body content and existing editable block text must change substantively for the new focus; a header-only response is invalid. Keep blockText paths exactly as supplied, include every supplied path once, and return no additional paths. If content or videoContent is empty, return an empty string for that field.`,
-      },
-    ],
-  });
-  try {
-    const raw = response.choices?.[0]?.message?.content;
-    const parsed = typeof raw === "string" ? JSON.parse(stripCodeFences(raw)) : raw;
-    const proposal = focusChangeInput.parse({ lessonId: input.lesson.id, ...parsed });
-    const returnedBlockText = new Map(proposal.blockText.map((field) => [field.path, field.value]));
-    proposal.blockText = source.editableBlockText.map((field) => ({
-      path: field.path,
-      value: returnedBlockText.get(field.path)?.trim() || field.value,
-    }));
-    // Some lessons have optional empty fields or legacy block text that cannot be
-    // regenerated. Keep the draft reviewable when the primary instructional body
-    // and title are substantive; applying it still requires an explicit save.
-    assertSubstantiveFocusRegeneration({ ...source, editableBlockText: source.editableBlockText.filter((block) => block.value.trim()) }, proposal);
-    return proposal;
-  } catch {
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "AI did not return a complete instructional rewrite for this lesson. Please try again." });
+  let validationReason = "The response could not be parsed as a complete instructional rewrite.";
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await invokeLLM({
+        transport: "auto",
+        maxTokens: 8_000,
+        response_format: focusRegenerationResponseFormat,
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert medical ultrasound educator for All About Ultrasound and iHeartEcho. Create a full instructional adaptation of one lesson for a new clinical focus, not a title-only or objective-only edit. Rewrite every non-empty supplied instructional field with clinically appropriate content for the new focus, preserving the lesson's teaching depth, approximate detail, functional HTML markup, professional US English, and clinical accuracy. Every supplied editable block-text path must appear exactly once in blockText with a rewritten non-empty value; do not add paths. Return strict JSON only. Never invent patient cases, testimonials, study results, sources, citations, or learner records. Do not alter block IDs, types, layout, colors, URLs, media, buttons, quiz questions, answer choices, settings, or access rules. Rewrite only title, learning objectives, HTML instructional content, optional video-supporting instructional content, and the supplied editable block-text paths.",
+          },
+          {
+            role: "user",
+            content: `Course: ${input.courseTitle}\nNew clinical focus: ${input.newFocus}\nLearning objective for this rewrite: ${input.objective}\n\nCurrent editable lesson fields:\n${JSON.stringify(source)}\n\nReturn a complete clinically appropriate rewrite of every supplied non-empty instructional field. The body content and existing editable block text must change substantively for the new focus; a header-only response is invalid. Keep blockText paths exactly as supplied, include every supplied path once, and return no additional paths. If content or videoContent is empty, return an empty string for that field.${attempt > 0 ? `\n\nThe first draft failed review because: ${validationReason}\nCorrect that specific issue. Return a new complete rewrite; do not leave editable instructional fields unchanged.` : ""}`,
+          },
+        ],
+      });
+      const raw = response.choices?.[0]?.message?.content;
+      const parsed = typeof raw === "string" ? JSON.parse(stripCodeFences(raw)) : raw;
+      const proposal = focusChangeInput.parse({ lessonId: input.lesson.id, ...parsed });
+      const returnedBlockText = new Map(proposal.blockText.map((field) => [field.path, field.value]));
+      proposal.blockText = source.editableBlockText.map((field) => ({
+        path: field.path,
+        value: returnedBlockText.get(field.path)?.trim() || field.value,
+      }));
+      assertSubstantiveFocusRegeneration({ ...source, editableBlockText: source.editableBlockText.filter((block) => block.value.trim()) }, proposal);
+      return proposal;
+    } catch (error) {
+      validationReason = error instanceof Error && error.message.trim()
+        ? error.message.trim().slice(0, 500)
+        : "The response was incomplete or invalid.";
+    }
   }
+  throw new TRPCError({
+    code: "INTERNAL_SERVER_ERROR",
+    message: `AI did not return a complete instructional rewrite for this lesson. ${validationReason}`,
+  });
 }
 
 export const lmsCourseBuilderRouter = router({
@@ -289,6 +295,11 @@ export const lmsCourseBuilderRouter = router({
       await db.transaction(async tx => {
         for (const change of input.changes) {
           const lesson = byId.get(change.lessonId)!;
+          assertSubstantiveFocusRegeneration({
+            content: lesson.content ?? "",
+            videoContent: lesson.videoContent ?? "",
+            editableBlockText: collectEditableBlockText(lesson.contentBlocks).filter((block) => block.value.trim()),
+          }, change);
           const blockResult = applyEditableBlockText(lesson.contentBlocks, change.blockText as BlockTextField[]);
           await tx.update(lmsLessons).set({
             title: change.title,

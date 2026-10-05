@@ -179,11 +179,13 @@ export function assertSubstantiveFocusRegeneration(
   if (new Set(proposalPaths).size !== proposalPaths.length || proposalPaths.length !== sourceByPath.size) {
     throw new Error("The editable block-text proposal is incomplete.");
   }
+  let changedBlockCount = 0;
   for (const field of proposal.blockText) {
     const original = sourceByPath.get(field.path);
     if (original === undefined || !field.value.trim()) {
       throw new Error("The editable block-text proposal is incomplete.");
     }
+    if (materiallyChanged(original, field.value)) changedBlockCount += 1;
   }
 
   const sourceText = [source.content, source.videoContent, ...source.editableBlockText.map(field => field.value)]
@@ -192,5 +194,11 @@ export function assertSubstantiveFocusRegeneration(
     .map(normalizedInstructionalText).join(" ").trim();
   if (sourceText.length >= 400 && proposalText.length < sourceText.length * 0.35) {
     throw new Error("The instructional rewrite is too abbreviated.");
+  }
+
+  const changedBody = Boolean(source.content.trim() && materiallyChanged(source.content, proposal.content));
+  const changedVideoText = Boolean(source.videoContent.trim() && materiallyChanged(source.videoContent, proposal.videoContent));
+  if (!changedBody && !changedVideoText && changedBlockCount === 0) {
+    throw new Error("No editable instructional field was substantively rewritten.");
   }
 }
