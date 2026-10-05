@@ -292,12 +292,14 @@ export async function sendBundleAccessEmail(opts: {
   bundleSlug: string;
   customSubject?: string | null;
   customIntro?: string | null;
+  /** Optional canonical bundle URL; legacy digital bundles retain their app route. */
+  destinationUrl?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `You've been granted access to "${opts.bundleTitle}"`;
-  const bundleDestination = `https://app.allaboutultrasound.com/downloads/bundle/${opts.bundleSlug}`;
+  const bundleDestination = opts.destinationUrl ?? `https://app.allaboutultrasound.com/downloads/bundle/${opts.bundleSlug}`;
   const bundleUrl = buildAccessUrl(bundleDestination, opts.accessToken);
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`

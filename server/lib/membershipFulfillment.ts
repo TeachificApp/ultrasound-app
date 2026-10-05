@@ -303,13 +303,17 @@ async function grantDownload(
   return { title: product.title, slug: product.slug };
 }
 
-async function grantBundle(
+export async function grantBundle(
   db: MySql2Database<typeof schema>,
   userId: number,
   bundleId: number,
   sessionId: string | null,
   notes: string[],
   enrollOpts?: EnrollOpts,
+  checkoutDetails?: {
+    pricingOptionId?: string | null;
+    stripePaymentIntentId?: string | null;
+  },
 ): Promise<{ title: string; slug: string } | null> {
   const [bundle] = await db
     .select({ id: bundles.id, title: bundles.title, slug: bundles.slug })
@@ -324,7 +328,12 @@ async function grantBundle(
     .where(and(eq(bundleEnrollments.bundleId, bundleId), eq(bundleEnrollments.userId, userId)))
     .limit(1);
   if (!existingBundle) {
-    await db.insert(bundleEnrollments).values({ bundleId, userId });
+    await db.insert(bundleEnrollments).values({
+      bundleId,
+      userId,
+      pricingOptionId: checkoutDetails?.pricingOptionId ?? null,
+      stripePaymentIntentId: checkoutDetails?.stripePaymentIntentId ?? null,
+    });
     notes.push(`Bundle: ${bundle.title}`);
   }
 

@@ -9,6 +9,7 @@ export type DirectCheckoutProductType =
   | "download"
   | "product"
   | "bundle"
+  | "canonical_bundle"
   | "workshop"
   | "webinar"
   | "membership";

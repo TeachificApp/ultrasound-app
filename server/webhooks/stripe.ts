@@ -32,6 +32,7 @@ import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/community
 import { BRAND_PREMIUM_TRIAL_DAYS, hasBrandMembershipTrial, isBrandMembershipTrialCheckout } from "../lib/brandMembershipTrial";
 import { grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 import { persistLmsSubscriptionInvoice } from "../lib/lmsSubscriptionReconciliation";
+import { grantBundle } from "../lib/membershipFulfillment";
 
 // Stripe webhook secret — optional but strongly recommended in production.
 // Resolve at request time so a rotated secret takes effect without a module reload.
@@ -1553,6 +1554,88 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
 }
 
 /**
+ * Fulfill canonical bundle purchases created from a public bundle page or a
+ * direct-checkout CTA. This route intentionally uses the same grant helper as
+ * membership access, so included courses, quizzes, and downloads stay in sync.
+ */
+async function handleCanonicalBundleCheckoutCompleted(session: Record<string, unknown>) {
+  const meta = (session.metadata ?? {}) as Record<string, string>;
+  if (meta.purchase_type !== "bundle_purchase") return;
+
+  const bundleId = Number.parseInt(meta.bundle_id ?? "", 10);
+  if (!Number.isInteger(bundleId) || bundleId <= 0) {
+    console.warn("[Stripe] Canonical bundle checkout is missing a valid bundle_id", session.id);
+    return;
+  }
+
+  const customerDetails = (session.customer_details ?? {}) as Record<string, string | undefined>;
+  const email = (session.customer_email as string | undefined) ?? customerDetails.email;
+  if (!email) {
+    console.warn(`[Stripe] Canonical bundle checkout ${session.id} has no customer email`);
+    await notifyOwner({
+      title: "⚠️ Bundle purchase needs review",
+      content: `Stripe checkout ${session.id} for bundle #${bundleId} completed without a purchaser email.`,
+    });
+    return;
+  }
+
+  const db = await getDb();
+  if (!db) return;
+
+  const clientReferenceId = typeof session.client_reference_id === "string" ? session.client_reference_id : "";
+  const configuredUserId = Number.parseInt(meta.user_id ?? clientReferenceId, 10);
+  const resolvedUser = Number.isInteger(configuredUserId) && configuredUserId > 0
+    ? { user: { id: configuredUserId, name: customerDetails.name ?? email }, isNew: false }
+    : await getOrCreateUserByEmail({
+        email,
+        name: customerDetails.name ?? undefined,
+        firstName: customerDetails.name?.trim().split(" ")[0] || undefined,
+      });
+  if (!resolvedUser?.user?.id) {
+    console.error(`[Stripe] Unable to resolve purchaser for canonical bundle ${bundleId}: ${email}`);
+    return;
+  }
+
+  const userId = resolvedUser.user.id;
+  const notes: string[] = [];
+  const bundle = await grantBundle(
+    db,
+    userId,
+    bundleId,
+    (session.id as string | undefined) ?? null,
+    notes,
+    { source: "stripe_bundle" },
+    {
+      pricingOptionId: meta.pricing_option_id || null,
+      stripePaymentIntentId: (session.payment_intent as string | undefined) ?? null,
+    },
+  );
+  if (!bundle) {
+    console.warn(`[Stripe] Canonical bundle ${bundleId} no longer exists; checkout ${session.id} requires review`);
+    return;
+  }
+
+  try {
+    const accessToken = await getOrCreateAccessToken(userId);
+    await sendBundleAccessEmail({
+      to: { name: resolvedUser.user.name || customerDetails.name || email, email },
+      bundleTitle: bundle.title,
+      bundleSlug: bundle.slug,
+      destinationUrl: `https://learn.allaboutultrasound.com/bundles/${bundle.slug}`,
+      accessToken,
+    });
+  } catch (error) {
+    console.error(`[Stripe] Failed to send canonical bundle access email for checkout ${session.id}:`, error);
+  }
+
+  await notifyOwner({
+    title: `💰 Bundle purchase — ${bundle.title}`,
+    content: `Bundle #${bundleId} purchased by ${email}. User ID: ${userId}.\nAccess: ${notes.join(", ") || "already granted"}`,
+  });
+  console.log(`[Stripe] Canonical bundle checkout fulfilled: user ${userId}, bundle ${bundleId}`);
+}
+
+/**
  * Handle payment_intent.succeeded for inline funnel form checkout.
  * This is triggered when a user pays inline via Stripe Elements (PaymentIntent flow)
  * instead of being redirected to Stripe Checkout.
@@ -2790,6 +2873,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       }
       // payment_status === "paid" — safe to grant access immediately
       await handleFunnelCheckoutSessionCompleted(sessionObj);
+      await handleCanonicalBundleCheckoutCompleted(sessionObj);
       await handleCheckoutSessionCompleted(sessionObj);
       await handleEmployerCheckoutCompleted(sessionObj);
       await handleLmsCheckoutCompleted(sessionObj);
@@ -2843,6 +2927,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
                 .where(eq(deferredCheckoutSessions.id, deferred.id));
               // Run all fulfillment handlers with the stored session object
               await handleFunnelCheckoutSessionCompleted(storedSession);
+              await handleCanonicalBundleCheckoutCompleted(storedSession);
               await handleCheckoutSessionCompleted(storedSession);
               await handleEmployerCheckoutCompleted(storedSession);
               await handleLmsCheckoutCompleted(storedSession);

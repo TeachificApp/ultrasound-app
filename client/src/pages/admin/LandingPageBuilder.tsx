@@ -1168,6 +1168,10 @@ type CheckoutCatalogProduct = {
   slug?: string;
 };
 
+function formatCheckoutProductType(type: string) {
+  return type === "canonical_bundle" ? "bundle" : type;
+}
+
 export type CheckoutProductSort = "name" | "type" | "price_low" | "price_high";
 
 const CHECKOUT_PRODUCT_SORT_LABELS: Record<CheckoutProductSort, string> = {
@@ -1210,7 +1214,7 @@ function formatCheckoutProduct(product: CheckoutCatalogProduct) {
         minimumFractionDigits: Number(product.price) % 1 === 0 ? 0 : 2,
         maximumFractionDigits: 2,
       })}`);
-  return `${product.name} (${product.type}) — ${price}`;
+  return `${product.name} (${formatCheckoutProductType(product.type)}) — ${price}`;
 }
 
 function CTAActionPicker({
@@ -1464,7 +1468,7 @@ function CTAActionPicker({
                 aria-label="Filter Stripe checkout products by type"
               >
                 <option value="all">All product types</option>
-                {checkoutProductTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                {checkoutProductTypes.map((type) => <option key={type} value={type}>{formatCheckoutProductType(type)}</option>)}
               </select>
               <select
                 value={checkoutSort}
@@ -1491,6 +1495,8 @@ function CTAActionPicker({
                     ? `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=webinar`
                     : type === "download"
                     ? `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=download`
+                    : type === "canonical_bundle"
+                    ? `https://learn.allaboutultrasound.com/bundles/${product.slug}`
                     : type === "bundle"
                     ? `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=bundle`
                     : `https://learn.allaboutultrasound.com/checkout/${product.slug}`;
