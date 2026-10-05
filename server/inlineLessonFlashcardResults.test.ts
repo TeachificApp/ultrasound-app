@@ -11,10 +11,12 @@ describe("embedded lesson flashcard results", () => {
     expect(source).toContain("block.type !== \"lesson_quiz\" && block.type !== \"lesson_flashcard\"");
   });
 
-  it("requires enrollment and every valid card outcome before storing a private flashcard result", () => {
+  it("requires enrollment and every fixed or Question Bank-drawn card outcome before storing a private result", () => {
     expect(source).toContain("submitInlineLessonFlashcards: protectedProcedure");
     expect(source).toContain("if (!enrollment && !(input.isAdminPreview && ctx.user.role === \"admin\"))");
-    expect(source).toContain("if (outcomesByIndex.size !== cards.length)");
-    expect(source).toContain('answerValue: outcomesByIndex.get(index) ? "got_it" : "missed"');
+    expect(source).toContain("getInlineLessonFlashcardDeck: protectedProcedure");
+    expect(source).toContain("normalizeLessonFlashcardGroupDraws");
+    expect(source).toContain("if (expectedCardCount === 0 || outcomesByKey.size !== expectedCardCount)");
+    expect(source).toContain('answerValue: outcomesByKey.get(sourceKey) ? "got_it" : "missed"');
   });
 });

@@ -29,6 +29,7 @@ import { randomBytes } from "crypto";
 import { evaluateInlineLessonQuizScore } from "../../shared/inlineLessonQuizCompletion";
 import { evaluateInlineLessonQuizCompletion } from "../../shared/inlineLessonQuizFlow";
 import { lessonHasAssessmentContent } from "../../shared/lessonAccessGating";
+import { collectDescendantFolderIds } from "../../shared/questionBankFolders";
 import { DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT } from "../../shared/digitalDownloadLicense";
 import { resolvePresaleWelcome } from "../../shared/contentAvailability";
 import { isScheduledDeadlineOpen } from "../../shared/platformTime";
@@ -151,6 +152,15 @@ import { normalizeQuizAccountFieldKeys, resolveQuizAccountFields } from "../../s
 import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
 import { buildInlineQuizAttemptValues, isMissingInlineQuizAccountFieldsColumn } from "../lib/inlineQuizAttemptPersistence";
 import { ensureInlineLessonQuizSchema } from "../lib/ensureInlineLessonQuizSchema";
+import { selectQuestionBankFolders } from "../lib/questionBankFolderQueries";
+import {
+  authoredLessonFlashcardSourceKey,
+  normalizeLessonFlashcardGroupDraws,
+  parseLessonFlashcardSourceKey,
+  questionBankLessonFlashcardSourceKey,
+  shuffleLessonFlashcards,
+  type ResolvedLessonFlashcardCard,
+} from "../lib/lessonFlashcardGroupDraws";
 async function resolveCohortStartDate(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   courseId: number,
@@ -2075,6 +2085,82 @@ export const lmsDisclosurePublicRouter = router({
 });
 
 export const lmsLearnerRouter = router({
+  /** Resolve a lesson flashcard deck's fixed cards plus its configured Question Bank group draws. */
+  getInlineLessonFlashcardDeck: protectedProcedure
+    .input(z.object({
+      lessonId: z.number().int(),
+      courseSlug: z.string(),
+      flashcardBlockId: z.string().min(1).max(128),
+      isAdminPreview: z.boolean().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const [enrollment] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments).where(and(
+        eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id),
+      )).limit(1);
+      if (!enrollment && !(input.isAdminPreview && ctx.user.role === "admin")) throw new TRPCError({ code: "FORBIDDEN" });
+
+      const [lesson] = await db.select({ id: lmsLessons.id, courseId: lmsLessons.courseId, contentBlocks: lmsLessons.contentBlocks })
+        .from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson || lesson.courseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
+      let blocks: any[] = [];
+      try { blocks = Array.isArray(lesson.contentBlocks) ? lesson.contentBlocks as any[] : JSON.parse(String(lesson.contentBlocks ?? "[]")); } catch { blocks = []; }
+      const deck = blocks.find((block) => block?.type === "lesson_flashcard" && String(block.id) === input.flashcardBlockId);
+      if (!deck) throw new TRPCError({ code: "NOT_FOUND", message: "This lesson does not contain the selected flashcard deck." });
+
+      const authoredCards = (Array.isArray(deck.data?.cards) ? deck.data.cards : [])
+        .filter((card: any) => String(card?.front ?? "").trim() && String(card?.back ?? "").trim())
+        .map((card: any, index: number): ResolvedLessonFlashcardCard => ({
+          questionBankId: Number.isInteger(Number(card.questionBankId)) ? Number(card.questionBankId) : undefined,
+          front: String(card.front),
+          back: String(card.back),
+          hint: card.hint || undefined,
+          imageUrl: card.imageUrl || undefined,
+          backImageUrl: card.backImageUrl || undefined,
+          sourceKey: authoredLessonFlashcardSourceKey(index),
+        }));
+      const groupDraws = normalizeLessonFlashcardGroupDraws(deck.data?.questionBankGroupDraws);
+      if (groupDraws.length === 0) return { cards: authoredCards };
+
+      const folders = await selectQuestionBankFolders(db);
+      const alreadyAuthoredBankIds = new Set(authoredCards.map((card) => card.questionBankId).filter((id): id is number => typeof id === "number"));
+      const dynamicallyDrawn: ResolvedLessonFlashcardCard[] = [];
+      for (const group of groupDraws) {
+        const folderIds = collectDescendantFolderIds(folders, group.folderId);
+        if (folderIds.length === 0) continue;
+        const candidates = await db.select({
+          id: questionBank.id,
+          question: questionBank.question,
+          flashcardFront: questionBank.flashcardFront,
+          flashcardBack: questionBank.flashcardBack,
+          flashcardHint: questionBank.flashcardHint,
+          questionImageUrl: questionBank.questionImageUrl,
+          flashcardBackImageUrl: questionBank.flashcardBackImageUrl,
+        }).from(questionBank).where(and(
+          eq(questionBank.type, "flashcard"),
+          inArray(questionBank.folderId, folderIds),
+        ));
+        dynamicallyDrawn.push(...shuffleLessonFlashcards(candidates)
+          .filter((card) => Boolean((card.flashcardFront || card.question).trim()) && Boolean(card.flashcardBack?.trim()))
+          .filter((card) => !alreadyAuthoredBankIds.has(card.id) && !dynamicallyDrawn.some((drawn) => drawn.questionBankId === card.id))
+          .slice(0, group.count)
+          .map((card): ResolvedLessonFlashcardCard => ({
+            questionBankId: card.id,
+            front: card.flashcardFront || card.question,
+            back: card.flashcardBack || "",
+            hint: card.flashcardHint || undefined,
+            imageUrl: card.questionImageUrl || undefined,
+            backImageUrl: card.flashcardBackImageUrl || undefined,
+            sourceKey: questionBankLessonFlashcardSourceKey(card.id),
+          })),
+        );
+      }
+      return { cards: [...authoredCards, ...dynamicallyDrawn] };
+    }),
+
   /** Get all enrollments for the current user */
   getMyCourses: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
@@ -2695,7 +2781,7 @@ export const lmsLearnerRouter = router({
       courseSlug: z.string(),
       flashcardBlockId: z.string().min(1).max(128),
       outcomes: z.array(z.object({
-        cardKey: z.string().regex(/^\d+$/).max(16),
+        cardKey: z.string().regex(/^(manual|bank):\d+$/).max(32),
         gotIt: z.boolean(),
       })).min(1).max(200),
       isAdminPreview: z.boolean().optional(),
@@ -2716,22 +2802,60 @@ export const lmsLearnerRouter = router({
       let blocks: any[] = [];
       try { blocks = Array.isArray(lesson.contentBlocks) ? lesson.contentBlocks as any[] : JSON.parse(String(lesson.contentBlocks ?? "[]")); } catch { blocks = []; }
       const deck = blocks.find(block => block?.type === "lesson_flashcard" && String(block.id) === input.flashcardBlockId);
-      const cards = Array.isArray(deck?.data?.cards) ? deck.data.cards : [];
-      if (!deck || cards.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "This lesson does not contain the selected flashcard deck." });
+      const cards = (Array.isArray(deck?.data?.cards) ? deck.data.cards : [])
+        .filter((card: any) => String(card?.front ?? "").trim() && String(card?.back ?? "").trim());
+      const groupDraws = normalizeLessonFlashcardGroupDraws(deck?.data?.questionBankGroupDraws);
+      if (!deck || (cards.length === 0 && groupDraws.length === 0)) throw new TRPCError({ code: "BAD_REQUEST", message: "This lesson does not contain the selected flashcard deck." });
 
-      const outcomesByIndex = new Map<number, boolean>();
+      const expectedCards = new Map<string, { front: string }>();
+      const authoredBankIds = new Set<number>();
+      cards.forEach((card: any, index: number) => {
+        expectedCards.set(authoredLessonFlashcardSourceKey(index), { front: String(card.front) });
+        const questionBankId = Number(card.questionBankId);
+        if (Number.isInteger(questionBankId) && questionBankId > 0) authoredBankIds.add(questionBankId);
+      });
+      const dynamicPoolById = new Map<number, { front: string }>();
+      let expectedDynamicCount = 0;
+      if (groupDraws.length > 0) {
+        const folders = await selectQuestionBankFolders(db);
+        for (const group of groupDraws) {
+          const folderIds = collectDescendantFolderIds(folders, group.folderId);
+          if (folderIds.length === 0) continue;
+          const candidates = await db.select({ id: questionBank.id, question: questionBank.question, flashcardFront: questionBank.flashcardFront })
+            .from(questionBank)
+            .where(and(eq(questionBank.type, "flashcard"), inArray(questionBank.folderId, folderIds)));
+          const usableCandidates = candidates.filter((candidate) => {
+            const front = candidate.flashcardFront || candidate.question;
+            return !authoredBankIds.has(candidate.id) && Boolean(front.trim());
+          });
+          expectedDynamicCount += Math.min(group.count, usableCandidates.length);
+          for (const candidate of usableCandidates) {
+            dynamicPoolById.set(candidate.id, { front: candidate.flashcardFront || candidate.question });
+          }
+        }
+      }
+
+      const outcomesByKey = new Map<string, boolean>();
+      const outcomeCards = new Map<string, { front: string }>();
       for (const outcome of input.outcomes) {
-        const index = Number(outcome.cardKey);
-        if (!Number.isInteger(index) || index < 0 || index >= cards.length || outcomesByIndex.has(index)) {
+        const source = parseLessonFlashcardSourceKey(outcome.cardKey);
+        const sourceCard = source?.kind === "manual"
+          ? expectedCards.get(outcome.cardKey)
+          : source?.kind === "bank"
+            ? dynamicPoolById.get(source.questionBankId)
+            : undefined;
+        if (!source || !sourceCard || outcomesByKey.has(outcome.cardKey)) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "The flashcard result does not match this lesson deck." });
         }
-        outcomesByIndex.set(index, outcome.gotIt);
+        outcomesByKey.set(outcome.cardKey, outcome.gotIt);
+        outcomeCards.set(outcome.cardKey, sourceCard);
       }
-      if (outcomesByIndex.size !== cards.length) {
+      const expectedCardCount = expectedCards.size + expectedDynamicCount;
+      if (expectedCardCount === 0 || outcomesByKey.size !== expectedCardCount) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Mark every flashcard Got It or Missed before recording this deck result." });
       }
-      const gotItCount = [...outcomesByIndex.values()].filter(Boolean).length;
-      const score = Math.round((gotItCount / cards.length) * 100);
+      const gotItCount = [...outcomesByKey.values()].filter(Boolean).length;
+      const score = Math.round((gotItCount / expectedCardCount) * 100);
 
       if (!input.isAdminPreview) {
         try { await ensureInlineLessonQuizSchema(db); } catch { console.error("[inline lesson flashcards] schema assurance unavailable"); }
@@ -2741,18 +2865,18 @@ export const lmsLearnerRouter = router({
             userId: ctx.user.id, courseId: course.id, lessonId: lesson.id, quizBlockId: input.flashcardBlockId, score, passed: true,
           }).$returningId();
           if (!attempt) throw new Error("Missing attempt id");
-          await db.insert(lmsInlineQuizResponses).values(cards.map((card: any, index: number) => ({
+          await db.insert(lmsInlineQuizResponses).values([...outcomeCards.entries()].map(([sourceKey, card]) => ({
             attemptId: attempt!.id,
-            questionKey: String(index),
-            questionText: String(card.front ?? "Flashcard"),
+            questionKey: sourceKey,
+            questionText: card.front || "Flashcard",
             questionType: "flashcard",
-            answerValue: outcomesByIndex.get(index) ? "got_it" : "missed",
+            answerValue: outcomesByKey.get(sourceKey) ? "got_it" : "missed",
           })));
         } catch {
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Your flashcard result could not be saved. Please try again." });
         }
       }
-      return { score, gotItCount, cardCount: cards.length };
+      return { score, gotItCount, cardCount: expectedCardCount };
     }),
 
   /** Submit quiz answers */

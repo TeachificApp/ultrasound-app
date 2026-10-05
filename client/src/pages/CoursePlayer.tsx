@@ -1014,7 +1014,7 @@ function InlineLessonFlashcardDeck({
   flashcardBlockId,
   isAdminPreview = false,
 }: {
-  data: { title?: string; cards?: any[]; shuffleCards?: boolean; showHints?: boolean; gotItColor?: string; gotItTextColor?: string; stillLearningColor?: string; stillLearningTextColor?: string };
+  data: { title?: string; cards?: any[]; questionBankGroupDraws?: Array<{ folderId: number; count: number }>; shuffleCards?: boolean; showHints?: boolean; gotItColor?: string; gotItTextColor?: string; stillLearningColor?: string; stillLearningTextColor?: string };
   lessonId: number;
   courseSlug: string;
   flashcardBlockId: string;
@@ -1024,14 +1024,22 @@ function InlineLessonFlashcardDeck({
   const gotItText = data.gotItTextColor ?? "#ffffff";
   const stillBg = data.stillLearningColor ?? "#f0fdfa";
   const stillText = data.stillLearningTextColor ?? "#189593";
-  const cards = data.cards ?? [];
+  const hasQuestionBankGroupDraws = (data.questionBankGroupDraws ?? []).some((group) => Number(group.count) > 0 && Number(group.folderId) > 0);
+  const resolvedDeck = trpc.lmsLearner.getInlineLessonFlashcardDeck.useQuery(
+    { lessonId, courseSlug, flashcardBlockId, isAdminPreview },
+    { enabled: hasQuestionBankGroupDraws },
+  );
+  const cards = hasQuestionBankGroupDraws ? (resolvedDeck.data?.cards ?? []) : (data.cards ?? []);
   const deck = useMemo(() => {
-    const indexed = cards.map((card, sourceIndex) => ({ card, sourceIndex }));
+    const indexed = cards.map((card, sourceIndex) => ({
+      card,
+      sourceKey: card.sourceKey ?? `manual:${sourceIndex}`,
+    }));
     return data.shuffleCards ? indexed.sort(() => Math.random() - 0.5) : indexed;
   }, [cards, data.shuffleCards]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [outcomes, setOutcomes] = useState<Record<number, boolean>>({});
+  const [outcomes, setOutcomes] = useState<Record<string, boolean>>({});
   const [showHint, setShowHint] = useState(false);
   const recordedAttemptRef = useRef(false);
   const recordAttempt = trpc.lmsLearner.submitInlineLessonFlashcards.useMutation({
@@ -1042,9 +1050,15 @@ function InlineLessonFlashcardDeck({
     },
   });
 
+  if (hasQuestionBankGroupDraws && resolvedDeck.isLoading) {
+    return <div className="rounded-xl border border-teal-100 bg-teal-50 px-5 py-4 text-sm text-teal-800">Loading your Question Bank flashcard draw…</div>;
+  }
+  if (hasQuestionBankGroupDraws && resolvedDeck.error) {
+    return <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">Your Question Bank flashcard deck could not be loaded. Please refresh and try again.</div>;
+  }
   if (deck.length === 0) return null;
 
-  const { card, sourceIndex } = deck[currentIndex];
+  const { card, sourceKey } = deck[currentIndex];
   const gotItCount = Object.values(outcomes).filter(Boolean).length;
   const answeredCount = Object.keys(outcomes).length;
   const progress = Math.round((answeredCount / deck.length) * 100);
@@ -1052,7 +1066,7 @@ function InlineLessonFlashcardDeck({
   const goNext = () => { setFlipped(false); setShowHint(false); setCurrentIndex(i => Math.min(i + 1, deck.length - 1)); };
   const goPrev = () => { setFlipped(false); setShowHint(false); setCurrentIndex(i => Math.max(i - 1, 0)); };
   const markCard = (gotIt: boolean) => {
-    const nextOutcomes = { ...outcomes, [sourceIndex]: gotIt };
+    const nextOutcomes = { ...outcomes, [sourceKey]: gotIt };
     setOutcomes(nextOutcomes);
     if (Object.keys(nextOutcomes).length === deck.length && !isAdminPreview && !recordedAttemptRef.current) {
       recordedAttemptRef.current = true;
@@ -1060,7 +1074,7 @@ function InlineLessonFlashcardDeck({
         lessonId,
         courseSlug,
         flashcardBlockId,
-        outcomes: deck.map(({ sourceIndex: cardIndex }) => ({ cardKey: String(cardIndex), gotIt: Boolean(nextOutcomes[cardIndex]) })),
+        outcomes: deck.map(({ sourceKey: deckCardKey }) => ({ cardKey: deckCardKey, gotIt: Boolean(nextOutcomes[deckCardKey]) })),
       });
     }
     goNext();

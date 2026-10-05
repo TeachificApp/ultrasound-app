@@ -1181,6 +1181,9 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
     }
     case "lesson_flashcard": {
       const cards: any[] = d.cards ?? [];
+      const groupDraws: Array<{ count?: number }> = Array.isArray(d.questionBankGroupDraws) ? d.questionBankGroupDraws : [];
+      const dynamicCardCount = groupDraws.reduce((total, group) => total + Math.max(0, Number(group.count) || 0), 0);
+      const totalCardCount = cards.length + dynamicCardCount;
       return (
         <div className="px-6 py-5 bg-white border border-gray-200 rounded-xl">
           <div className="flex items-center gap-2 mb-3">
@@ -1189,7 +1192,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             </div>
             <div>
               <p className="font-semibold text-gray-800 text-sm">{d.title || "Flashcard Deck"}</p>
-              <p className="text-xs text-gray-500">{cards.length} card{cards.length !== 1 ? "s" : ""}</p>
+              <p className="text-xs text-gray-500">{totalCardCount} card{totalCardCount !== 1 ? "s" : ""}{dynamicCardCount > 0 ? ` (${dynamicCardCount} drawn from Question Bank)` : ""}</p>
             </div>
           </div>
           {cards.slice(0, 2).map((c: any, i: number) => (
