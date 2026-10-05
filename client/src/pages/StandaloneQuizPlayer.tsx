@@ -137,9 +137,18 @@ function protectNativeQuestionMedia(question: any, attemptId: number) {
   };
 }
 
+function standaloneQuestionOptions(question: any): Array<{ text?: string; label?: string; value?: string; id?: string; correct?: boolean }> {
+  if (Array.isArray(question?.options)) return question.options;
+  if (typeof question?.options !== "string") return [];
+  try {
+    const parsed = JSON.parse(question.options);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function flashcardAnswerText(question: any): string {
-  if (typeof question?.explanation === "string" && question.explanation.trim()) return question.explanation;
-  if (typeof question?.feedback?.correct === "string" && question.feedback.correct.trim()) return question.feedback.correct;
   const choices = question?.correctData?.choices ?? question?.data?.choices;
   if (Array.isArray(choices)) {
     const correctAnswers = choices
@@ -149,7 +158,7 @@ function flashcardAnswerText(question: any): string {
     if (correctAnswers.length) return correctAnswers.join("\n");
   }
 
-  const options = Array.isArray(question?.options) ? question.options : [];
+  const options = standaloneQuestionOptions(question);
   const rawCorrectAnswers = [question?.correctAnswer, question?.correctAnswers]
     .flatMap((value) => {
       if (Array.isArray(value)) return value;
@@ -172,7 +181,22 @@ function flashcardAnswerText(question: any): string {
     .filter(Boolean);
   if (nativeCorrectAnswers.length) return nativeCorrectAnswers.join("\n");
 
+  if (question?.type === "truefalse" && (question?.correctAnswer === "true" || question?.correctAnswer === "false")) {
+    return question.correctAnswer === "true" ? "True" : "False";
+  }
+
+  if (typeof question?.correctAnswer === "string" && question.correctAnswer.trim()) return question.correctAnswer;
+  if (typeof question?.explanation === "string" && question.explanation.trim()) return question.explanation;
+  if (typeof question?.feedback?.correct === "string" && question.feedback.correct.trim()) return question.feedback.correct;
+
   return "Add the answer or explanation in the visual builder.";
+}
+
+function flashcardFeedbackText(question: any, answer: string): string | null {
+  const candidates = [question?.explanation, question?.feedback?.correct]
+    .filter((candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0)
+    .map((candidate) => candidate.trim());
+  return candidates.find((candidate) => candidate !== answer.trim()) ?? null;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -504,8 +528,7 @@ export default function StandaloneQuizPlayer() {
 
   if (!q) return null;
 
-  let options: { text: string; imageUrl?: string; feedback?: string }[] = [];
-  try { options = JSON.parse(q.options ?? "[]"); } catch { /* ignore */ }
+  const options: { text: string; imageUrl?: string; feedback?: string }[] = standaloneQuestionOptions(q);
 
   const givenAnswer = answers[q.questionBankId];
   const isRevealed = revealed[q.questionBankId];
@@ -542,6 +565,7 @@ export default function StandaloneQuizPlayer() {
 
   if (isStandaloneFlashcardDeck) {
     const answer = flashcardAnswerText(q);
+    const feedback = flashcardFeedbackText(q, answer);
     const reviewAndAdvance = (review: "known" | "again") => {
       const reviewAnswer = JSON.stringify({ flashcardReview: review });
       const nextAnswers = { ...answers, [q.questionBankId]: reviewAnswer };
@@ -563,9 +587,15 @@ export default function StandaloneQuizPlayer() {
         <BuilderFlashcardFrame
           branding={branding}
           side={flashcardSide}
-          title={flashcardSide === "front" ? "Question" : "Answer"}
-          content={flashcardSide === "front" ? (q.question || "Untitled flashcard") : answer}
+          title={flashcardSide === "front" ? "Question" : "Correct answer"}
+          content={flashcardSide === "front" ? (q.question || "Untitled flashcard") : (
+            <>
+              <p className="font-semibold text-slate-900">{answer}</p>
+              {feedback ? <p className="mt-5 border-t border-teal-100 pt-4 text-slate-700"><span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.16em] text-teal-700">Teaching note</span>{feedback}</p> : null}
+            </>
+          )}
           mediaUrl={flashcardSide === "front" ? q.questionImageUrl : q.feedbackImageUrl}
+          mediaVideoUrl={flashcardSide === "answer" ? q.feedbackVideoUrl : q.questionVideoUrl}
         />
         <div className="mx-auto flex max-w-sm flex-col gap-2 px-4">
           {flashcardSide === "front" ? (

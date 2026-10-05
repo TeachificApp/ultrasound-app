@@ -196,12 +196,14 @@ export function BuilderFlashcardFrame({
   title,
   content,
   mediaUrl,
+  mediaVideoUrl,
 }: {
   branding?: BuilderBranding | null;
   side: "front" | "answer";
   title: string;
   content: React.ReactNode;
   mediaUrl?: string | null;
+  mediaVideoUrl?: string | null;
 }) {
   const design = branding?.flashcardTemplate;
   const backgroundImageUrl = side === "front"
@@ -220,6 +222,7 @@ export function BuilderFlashcardFrame({
           <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.19em]" style={{ color: accent }}>{heading}</p>
           <h2 className="text-xl font-bold leading-tight text-slate-900">{title}</h2>
           {mediaUrl && <img src={mediaUrl} alt="Flashcard media" className="mt-5 max-h-40 w-full rounded-xl object-contain" />}
+          {mediaVideoUrl && <video src={mediaVideoUrl} controls className="mt-5 max-h-40 w-full rounded-xl bg-slate-950" />}
           <div className="mt-5 flex-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{content}</div>
         </div>
       </article>

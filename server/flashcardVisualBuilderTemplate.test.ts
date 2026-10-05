@@ -40,7 +40,14 @@ describe("visual-builder flashcard templates", () => {
     expect(player).toContain("I Know This");
     expect(player).toContain("submitAttemptAnswers(nextAnswers, nextTimes)");
     expect(player).toContain("nativeCorrectAnswers");
+    expect(player).toContain("flashcardFeedbackText");
+    expect(player).toContain("Correct answer");
+    expect(player).toContain("Teaching note");
+    expect(player).toContain("mediaVideoUrl={flashcardSide === \"answer\" ? q.feedbackVideoUrl : q.questionVideoUrl}");
     expect(frame).toContain("BuilderFlashcardFrame");
+    expect(frame).toContain("mediaVideoUrl?: string | null");
+    expect(frame).toContain("<video src={mediaVideoUrl} controls");
     expect(learnerRouter).toContain('quiz.type === "quiz" || quiz.type === "flashcards"');
+    expect(learnerRouter).toContain('quiz.showExplanations || quiz.type === "flashcards"');
   });
 });

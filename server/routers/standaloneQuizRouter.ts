@@ -486,9 +486,12 @@ export const standaloneQuizLearnerRouter = router({
             ? {
                 correctAnswer: q.qb.correctAnswer,
                 correctAnswers: q.qb.correctAnswers,
-                explanation: quiz.showExplanations ? q.qb.explanation : null,
-                feedbackImageUrl: quiz.showExplanations ? q.qb.feedbackImageUrl : null,
-                feedbackVideoUrl: quiz.showExplanations ? q.qb.feedbackVideoUrl : null,
+                // A flashcard is a study tool rather than a scored-result screen:
+                // always include its teaching note and feedback media on the answer
+                // side, even when ordinary quiz-result explanations are disabled.
+                explanation: quiz.showExplanations || quiz.type === "flashcards" ? q.qb.explanation : null,
+                feedbackImageUrl: quiz.showExplanations || quiz.type === "flashcards" ? q.qb.feedbackImageUrl : null,
+                feedbackVideoUrl: quiz.showExplanations || quiz.type === "flashcards" ? q.qb.feedbackVideoUrl : null,
               }
             : {}),
         };
