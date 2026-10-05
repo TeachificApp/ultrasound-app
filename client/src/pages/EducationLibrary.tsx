@@ -106,9 +106,11 @@ function BundleCard({ bundle, enrolledBundleIds }: { bundle: any; enrolledBundle
   const pricingOptions = bundle.pricingOptions ? JSON.parse(bundle.pricingOptions) : [];
   const lowestPrice = pricingOptions.length > 0
     ? Math.min(...pricingOptions.map((o: any) => Number(o.price || 0)))
-    : 0;
-  const isFree = bundle.accessType === "free" || lowestPrice === 0;
-  const price = isFree ? "Free" : `$${lowestPrice.toFixed(2)}`;
+    : null;
+  // Access type is authoritative. A missing legacy JSON price must not label a
+  // paid bundle with structured pricing as Free.
+  const isFree = bundle.accessType === "free" || bundle.isFree === true;
+  const price = isFree ? "Free" : lowestPrice != null ? `$${lowestPrice.toFixed(2)}` : null;
   const isOwned = enrolledBundleIds.has(bundle.id);
 
   return (
@@ -142,6 +144,8 @@ function BundleCard({ bundle, enrolledBundleIds }: { bundle: any; enrolledBundle
           <div className="flex items-center justify-between pt-3 border-t border-gray-100 mt-auto">
             {isFree ? (
               <Badge className="bg-green-500 text-white text-xs">Free</Badge>
+            ) : price ? (
+              <span className="text-sm font-semibold text-teal-700">From {price}</span>
             ) : <span />}
             <Button size="sm" variant="outline" className={`text-xs h-7 ${isOwned ? "border-green-400 text-green-700 hover:bg-green-50" : "border-teal-300 text-teal-700 hover:bg-teal-50"}`}>
               {isOwned && <CheckCircle className="w-3 h-3 mr-1" />}

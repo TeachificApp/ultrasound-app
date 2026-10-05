@@ -1,4 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
+import { STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
 /**
  * Brand Membership Router — Multi-tenant premium subscription management.
  *
@@ -336,6 +337,7 @@ export const brandMembershipRouter = router({
         const session = await stripe.checkout.sessions.create({
           mode: "subscription",
           customer_email: ctx.user.email ?? undefined,
+          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
           ...promoOpts,
           line_items: [recurringLineItem],
           subscription_data: {
@@ -387,6 +389,7 @@ export const brandMembershipRouter = router({
         const session = await stripe.checkout.sessions.create({
           mode: "subscription",
           customer_email: ctx.user.email ?? undefined,
+          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
           allow_promotion_codes: true,
           line_items: [dualMonthlyLineItem],
           subscription_data: {
@@ -435,6 +438,7 @@ export const brandMembershipRouter = router({
         const session = await stripe.checkout.sessions.create({
           mode: "subscription",
           customer_email: ctx.user.email ?? undefined,
+          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
           allow_promotion_codes: true,
           line_items: [dualAnnualLineItem],
           subscription_data: {

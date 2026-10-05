@@ -1,5 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
-import { resolveCheckoutTerms } from "./checkoutTermsHelper";
+import { resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "../_core/trpc";
 import { getDb } from "../db";
@@ -825,6 +825,7 @@ const createMembershipCheckout = protectedProcedure
       mode: isRecurring ? "subscription" : "payment",
       line_items: [priceData],
       customer_email: ctx.user.email,
+      ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
       allow_promotion_codes: discounts.length === 0,
       ...(discounts.length > 0 ? { discounts } : {}),
       client_reference_id: ctx.user.id.toString(),

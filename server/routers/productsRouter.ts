@@ -1,5 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
-import { resolveCheckoutTerms } from "./checkoutTermsHelper";
+import { resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, sql, asc } from "drizzle-orm";
@@ -340,6 +340,7 @@ export const productsLearnerRouter = router({
         mode: "payment",
         customer_email: userEmail,
         client_reference_id: userId ? userId.toString() : undefined,
+        ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
         ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         // Always collect shipping address for native physical products
         shipping_address_collection: {

@@ -1,5 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
-import { resolveCheckoutTerms } from "./checkoutTermsHelper";
+import { resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
 import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 import { buildWorkshopCheckoutIdempotencyKey, resolveWorkshopCheckoutPrice, workshopDollarsToCents } from "../../shared/workshopPricing";
 import { isScheduledDeadlineOpen, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "../../shared/platformTime";
@@ -1852,6 +1852,7 @@ export const workshopAdminRouter = router({
         const session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: entry.email,
+          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
           line_items: [{ price_data: { currency: "usd", product_data: { name: workshop.title }, unit_amount: workshopDollarsToCents(priceInDollars) }, quantity: 1 }],
           success_url: `${input.origin}/workshops/${workshop.slug}?enrolled=1`,
           cancel_url: `${input.origin}/workshops/${workshop.slug}`,

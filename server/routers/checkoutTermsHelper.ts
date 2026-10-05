@@ -45,6 +45,11 @@ const DEFAULT_LINK1_URL = "https://www.allaboutultrasound.com/terms";
 const DEFAULT_LINK2_TEXT = "Privacy Policy";
 const DEFAULT_LINK2_URL = "https://www.allaboutultrasound.com/privacy-policy.html";
 
+/** Applied to hosted Stripe sessions; embedded checkout already gates payment behind resolved terms. */
+export const STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT = {
+  consent_collection: { terms_of_service: "required" as const },
+};
+
 /**
  * Resolve the checkout terms for a specific product checkout.
  *

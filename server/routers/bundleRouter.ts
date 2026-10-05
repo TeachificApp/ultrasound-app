@@ -1,5 +1,6 @@
 import { getStripeClient } from "../lib/stripeClient";
 import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
+import { STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
 /**
  * bundleRouter.ts — Bundles: sell multiple items as one package
  */
@@ -47,7 +48,21 @@ export const bundlePublicRouter = router({
         db.select().from(bundles).where(and(...conds)).orderBy(desc(bundles.createdAt)).limit(limit).offset(offset),
         db.select({ count: sql<number>`count(*)` }).from(bundles).where(and(...conds)),
       ]);
-      return { bundles: rows, total: cnt[0]?.count ?? 0 };
+      const pricedRows = await Promise.all(rows.map(async (bundle) => {
+        const options = await db.select().from(bundlePricingOptions)
+          .where(and(eq(bundlePricingOptions.bundleId, bundle.id), eq(bundlePricingOptions.isActive, true)))
+          .orderBy(asc(bundlePricingOptions.sortOrder), asc(bundlePricingOptions.id));
+        if (options.length === 0) return bundle;
+        return {
+          ...bundle,
+          pricingOptions: JSON.stringify(options.map(option => ({
+            id: String(option.id), label: option.label,
+            price: resolveBundleCheckoutDollars(option.price, true),
+            pricingType: option.pricingType, subscriptionInterval: option.subscriptionInterval,
+          }))),
+        };
+      }));
+      return { bundles: pricedRows, total: cnt[0]?.count ?? 0 };
     }),
 
   getIncludedItems: publicProcedure
@@ -66,6 +81,9 @@ export const bundlePublicRouter = router({
           } else if (item.itemType === "download") {
             const [d] = await db.select({ title: digitalProducts.title, slug: digitalProducts.slug, thumbnailUrl: digitalProducts.thumbnailUrl, description: digitalProducts.description }).from(digitalProducts).where(eq(digitalProducts.id, item.itemId)).limit(1);
             itemTitle = d?.title ?? null; itemSlug = d?.slug ?? null; itemCoverImage = d?.thumbnailUrl ?? null; itemDescription = d?.description ?? null;
+          } else if (item.itemType === "product") {
+            const [p] = await db.select({ title: physicalProducts.title, slug: physicalProducts.slug, thumbnailUrl: physicalProducts.thumbnailUrl, description: physicalProducts.description }).from(physicalProducts).where(eq(physicalProducts.id, item.itemId)).limit(1);
+            itemTitle = p?.title ?? null; itemSlug = p?.slug ?? null; itemCoverImage = p?.thumbnailUrl ?? null; itemDescription = p?.description ?? null;
           } else if (item.itemType === "webinar") {
             const [w] = await db.select({ title: webinars.title, slug: webinars.slug, coverImage: webinars.coverImage }).from(webinars).where(eq(webinars.id, item.itemId)).limit(1);
             itemTitle = w?.title ?? null; itemSlug = w?.slug ?? null; itemCoverImage = w?.coverImage ?? null;
@@ -338,6 +356,7 @@ export const bundleLearnerRouter = router({
         mode: isSubscription ? "subscription" : "payment",
         customer_email: userEmail,
         client_reference_id: userId ? userId.toString() : undefined,
+        ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
         ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         ...(bundle.collectShippingAddress ? { shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "AU", "NZ", "IE"] } } : {}),
         metadata: {
