@@ -57,3 +57,15 @@ The live audit returned **0 errors and 0 warnings** after the following record-l
 | Warnings | 0 |
 
 > This audit is an integrity check, not a substitute for medical/editorial review. Draft quiz placeholders must be supplied with validated assessment questions before they are republished.
+
+## Learner Dashboard Contract Check
+
+Use the companion **read-only** dashboard audit to invoke the same `dashboard.getMyContent` procedure used by a signed-in learner. It selects anonymous eligible records and reports only aggregate assertions; it never writes learner, course, quiz, membership, Stripe, or MySQL data.
+
+```bash
+pnpm tsx scripts/validateLearnerDashboardContent.mts
+```
+
+The October 5, 2026 check confirmed that an eligible learner receives an active LMS quiz-course card and that a learner with both active brand memberships receives non-empty **UltrasoundAssist™** and **EchoAssist™** card images. The focused learner-dashboard test suite also passed 33 assertions covering quiz discovery, standalone-result privacy/navigation, and dashboard URL actions.
+
+> There were no completed published standalone-system quiz attempts in live MySQL at this check. The results UI is covered by focused regression tests, but a future completed learner attempt is required before the live results-row portion of the dashboard validation can be closed without creating artificial learner data.
