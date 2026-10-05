@@ -24,6 +24,10 @@ import {
 } from "./questionBankImportSanitize";
 import { insertQuestionBankFolder } from "./questionBankFolderQueries";
 import { scormImportQuestionTagIds } from "../../shared/questionBankFolders";
+import {
+  classifyScormImportFailure,
+  runScormImportStage,
+} from "./scormImportFailure";
 
 export type ScormImportConfirmInput = {
   mediaAssetId?: number;
@@ -126,13 +130,27 @@ export async function commitScormImportToQuestionBank(
   adminUserId: number,
   input: ScormImportConfirmInput,
 ): Promise<ScormImportConfirmResult> {
-  const source = input.mediaAssetId
-    ? await loadScormImportFromMediaAsset(input.mediaAssetId)
-    : input.importStorageKey
-      ? await loadScormImportFromStorageKey(input.importStorageKey)
-      : input.bufferBase64
-        ? await loadScormImportFromBase64(input.bufferBase64)
-        : (() => { throw new TRPCError({ code: "BAD_REQUEST", message: "Provide mediaAssetId, importStorageKey, or bufferBase64 for SCORM import" }); })();
+  try {
+    return await commitScormImportToQuestionBankUnsafe(db, adminUserId, input);
+  } catch (error) {
+    throw classifyScormImportFailure("saving_questions", error);
+  }
+}
+
+async function commitScormImportToQuestionBankUnsafe(
+  db: MySql2Database<any>,
+  adminUserId: number,
+  input: ScormImportConfirmInput,
+): Promise<ScormImportConfirmResult> {
+  const source = await runScormImportStage("reading_package", async () => (
+    input.mediaAssetId
+      ? await loadScormImportFromMediaAsset(input.mediaAssetId)
+      : input.importStorageKey
+        ? await loadScormImportFromStorageKey(input.importStorageKey)
+        : input.bufferBase64
+          ? await loadScormImportFromBase64(input.bufferBase64)
+          : (() => { throw new TRPCError({ code: "BAD_REQUEST", message: "Provide mediaAssetId, importStorageKey, or bufferBase64 for SCORM import" }); })()
+  ));
 
   const parsed = source.parsed;
   const selectedQuestionIds = input.questionIds?.length ? new Set(input.questionIds) : null;
@@ -151,20 +169,11 @@ export async function commitScormImportToQuestionBank(
       ...question.answers.flatMap((answer) => [answer.imageRef, answer.videoRef].filter((ref): ref is string => Boolean(ref))),
     ]))]
     : [...new Set([...parsed.allImageRefs, ...parsed.allVideoRefs])];
-  let mediaMap: Map<string, string>;
-  try {
-    mediaMap = source.extractedPrefix
+  const mediaMap = await runScormImportStage("preparing_media", async () => (
+    source.extractedPrefix
       ? await uploadISpringMediaFromExtractedPrefix(source.extractedPrefix, mediaRefs, source.mediaBasePath)
-      : await uploadISpringMediaFromZip(source.zipEntries, mediaRefs, source.mediaBasePath);
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : "unknown media storage error";
-    // Do not log source package content, storage keys, URLs, or user/session data.
-    console.error(`[QuestionBank] SCORM media preparation failed: ${detail}`);
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "SCORM media could not be prepared, so no Question Bank records were saved. Check the server log for the media-preparation stage and storage configuration.",
-    });
-  }
+      : await uploadISpringMediaFromZip(source.zipEntries, mediaRefs, source.mediaBasePath)
+  ));
 
   let resolvedFolderId: number | null = null;
   if (input.newFolderName?.trim()) {

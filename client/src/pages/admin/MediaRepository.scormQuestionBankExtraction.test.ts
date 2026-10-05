@@ -4,6 +4,7 @@ import path from "path";
 
 describe("Media Repository SCORM Question Bank extraction", () => {
   const source = fs.readFileSync(path.resolve(process.cwd(), "client/src/pages/admin/MediaRepository.tsx"), "utf8");
+  const routeSource = fs.readFileSync(path.resolve(process.cwd(), "server/routes/scormQuestionBankImportRoute.ts"), "utf8");
 
   it("uses the REST SCORM confirm route with the selected Media Repository asset", () => {
     expect(source).toContain("/api/question-bank/scorm-import/confirm");
@@ -22,5 +23,11 @@ describe("Media Repository SCORM Question Bank extraction", () => {
     expect(source).toContain("processed successfully.");
     expect(source).toContain("r.inserted + r.updated");
     expect(source).toContain("existing question");
+  });
+
+  it("returns structured safe-stage errors rather than an HTML response", () => {
+    expect(routeSource).toContain("ScormImportStageError");
+    expect(routeSource).toContain("{ error: err.message, stage: err.stage }");
+    expect(routeSource).toContain("res.status(trpcErrorStatus(err.code)).json");
   });
 });

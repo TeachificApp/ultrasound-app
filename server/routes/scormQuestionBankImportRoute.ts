@@ -10,6 +10,7 @@ import { z } from "zod";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
 import { commitScormImportToQuestionBank } from "../lib/scormQuestionBankCommit";
+import { ScormImportStageError } from "../lib/scormImportFailure";
 
 const router = Router();
 
@@ -74,6 +75,10 @@ router.post(
       const result = await commitScormImportToQuestionBank(db, user.id, parsed.data);
       res.json(result);
     } catch (err: unknown) {
+      if (err instanceof ScormImportStageError) {
+        res.status(trpcErrorStatus(err.code)).json({ error: err.message, stage: err.stage });
+        return;
+      }
       if (err instanceof TRPCError) {
         res.status(trpcErrorStatus(err.code)).json({ error: err.message });
         return;
