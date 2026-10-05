@@ -45,6 +45,16 @@ describe("POST /api/upload-ai-generation-source", () => {
     expect(mocks.storagePut).toHaveBeenCalledWith(expect.stringContaining("ai-generation-sources/7/"), expect.any(Buffer), "application/pdf");
   });
 
+  it("accepts authenticated admin PowerPoint and Word document sources", async () => {
+    mocks.authenticateRequest.mockResolvedValue({ id: 7, role: "admin" });
+    mocks.storagePut.mockResolvedValue({ key: "ai-generation-sources/7/deck.pptx", url: "https://files.example/deck.pptx" });
+    const body = new FormData();
+    body.append("file", new Blob(["pptx"], { type: "application/vnd.openxmlformats-officedocument.presentationml.presentation" }), "deck.pptx");
+    const response = await fetch(`${await startRoute()}/api/upload-ai-generation-source`, { method: "POST", body });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ sourceFile: { storageKey: expect.stringMatching(/^ai-generation-sources\/7\/.*\.pptx$/), name: "deck.pptx" } });
+  });
+
   it("rejects non-admin uploads and unsupported source MIME types", async () => {
     mocks.authenticateRequest.mockResolvedValue({ id: 8, role: "user" });
     const imageBody = new FormData();

@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { getAiSourceUploadDecision, isSupportedAiSourceMimeType } from "./lib/aiSourceFile";
 
 describe("AI source upload validation", () => {
-  it("accepts supported PDF and image source MIME types", () => {
+  it("accepts supported PDF document and image source MIME types", () => {
     expect(isSupportedAiSourceMimeType("application/pdf")).toBe(true);
+    expect(isSupportedAiSourceMimeType("application/vnd.openxmlformats-officedocument.presentationml.presentation")).toBe(true);
+    expect(isSupportedAiSourceMimeType("application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe(true);
     expect(isSupportedAiSourceMimeType("image/jpeg")).toBe(true);
     expect(isSupportedAiSourceMimeType("image/png")).toBe(true);
     expect(isSupportedAiSourceMimeType("image/webp")).toBe(true);
@@ -20,5 +22,6 @@ describe("AI source upload validation", () => {
     expect(getAiSourceUploadDecision({ role: "user" }, "image/png")).toMatchObject({ allowed: false, status: 401 });
     expect(getAiSourceUploadDecision({ role: "admin" }, "application/zip")).toMatchObject({ allowed: false, status: 400 });
     expect(getAiSourceUploadDecision({ role: "admin" }, "application/pdf")).toEqual({ allowed: true, status: 200, error: null });
+    expect(getAiSourceUploadDecision({ role: "admin" }, "", "flashcard-template.pptx")).toEqual({ allowed: true, status: 200, error: null });
   });
 });

@@ -28,7 +28,7 @@ import {
   Users, CheckCircle, XCircle, Clock, Search, ChevronLeft, ChevronRight,
   Eye, EyeOff, Copy, Loader2, AlertTriangle, GripVertical, X,
   Sparkles, Upload, FileSpreadsheet, FolderPlus, Tag, FileUp,
-  Database, Radio, TrendingUp, ExternalLink, FileQuestion,
+  Database, Radio, TrendingUp, ExternalLink, FileQuestion, FileText,
   Download, AlertCircle,
 } from "lucide-react";
 import { getAdminUrl, IHEARTECHO_APP_URL } from "@/hooks/useSubdomain";
@@ -508,14 +508,15 @@ export function AddQuestionsDialog({
   const [aiTopic, setAITopic] = useState("");
   const [aiCount, setAICount] = useState(10);
   const [aiDifficulty, setAIDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
-  const [aiType, setAIType] = useState<"mcq" | "truefalse" | "multiselect" | "matching" | "hotspot" | "mixed">("mcq");
+  const [aiType, setAIType] = useState<"mcq" | "truefalse" | "multiselect" | "matching" | "hotspot" | "flashcard" | "mixed">("mcq");
+  const [aiDocumentMode, setAiDocumentMode] = useState<"ai_generated" | "page_pairs">("ai_generated");
   const [aiFolderId, setAIFolderId] = useState<number | null>(null);
   const [aiNewFolderName, setAINewFolderName] = useState("");
   const [aiTagIds, setAITagIds] = useState<number[]>([]);
   const [aiGenerated, setAIGenerated] = useState<any[] | null>(null);
   const [aiSelectedIds, setAISelectedIds] = useState<Set<number>>(new Set());
   const [aiGroupId, setAIGroupId] = useState("");
-  const [aiSourceFiles, setAiSourceFiles] = useState<{ url: string; mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; name: string }[]>([]);
+  const [aiSourceFiles, setAiSourceFiles] = useState<{ url: string; storageKey?: string; mimeType: "application/pdf" | "image/jpeg" | "image/png" | "image/webp" | "application/vnd.openxmlformats-officedocument.presentationml.presentation" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"; name: string }[]>([]);
   const [aiSourceUrl, setAiSourceUrl] = useState("");
   const [aiSourceUploading, setAiSourceUploading] = useState(false);
 
@@ -597,7 +598,7 @@ export function AddQuestionsDialog({
       }
       setAIGenerated(generated);
       setAISelectedIds(new Set(generated.map((q: any) => q.id)));
-      toast.success(`Generated ${generated.length} questions`);
+      toast.success(res.skippedPageCount ? `Created ${generated.length} flashcards. One unpaired final page or slide was skipped.` : `Generated ${generated.length} ${generated[0]?.type === "flashcard" ? "flashcards" : "questions"}`);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -624,7 +625,7 @@ export function AddQuestionsDialog({
   const resetAll = () => {
     setTab("bank"); setQSearch(""); setQPage(1); setSelectedBankIds(new Set());
     setBankFolderId(""); setBankTagId("");
-    setAITopic(""); setAIGenerated(null); setAISelectedIds(new Set()); setAITagIds([]);
+    setAITopic(""); setAIType("mcq"); setAiDocumentMode("ai_generated"); setAIGenerated(null); setAISelectedIds(new Set()); setAITagIds([]);
     setAIFolderId(null); setAINewFolderName(""); setAIGroupId(""); setAiSourceFiles([]); setAiSourceUrl(""); setAiSourceUploading(false);
     setScormFile(null); setScormPreview(null); setScormImportStorageKey(null); setScormSelectedGroups(new Set());
     setScormFolderId(null); setScormNewFolderName(""); setScormTagIds([]);
@@ -808,7 +809,7 @@ export function AddQuestionsDialog({
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Topic *</Label>
                       <Input value={aiTopic} onChange={e => setAITopic(e.target.value)} placeholder="e.g. Doppler physics, DVT diagnosis, Normal fetal echo anatomy" className="bg-white border-teal-200" />
                     </div>
-                    <div className="md:col-span-2"><AiSourceFileReview sourceFiles={aiSourceFiles} isUploading={aiSourceUploading} onFiles={handleAiSourceUpload} onRemove={index => setAiSourceFiles(current => current.filter((_, sourceIndex) => sourceIndex !== index))} sourceUrl={aiSourceUrl} onSourceUrlChange={setAiSourceUrl} description="Drop up to three PDF, JPG, PNG, or WebP files here, upload files up to 50 MB each, or use one public web-page URL. Generated questions include explanations and answer-level feedback." /></div>
+                    <div className="md:col-span-2"><AiSourceFileReview sourceFiles={aiSourceFiles} isUploading={aiSourceUploading} onFiles={handleAiSourceUpload} onRemove={index => setAiSourceFiles(current => current.filter((_, sourceIndex) => sourceIndex !== index))} sourceUrl={aiSourceUrl} onSourceUrlChange={setAiSourceUrl} allowDocuments={aiType === "flashcard"} description={aiType === "flashcard" ? "Use PDF, PowerPoint (.pptx), Word (.docx), or image material up to 50 MB each. Generated cards never mention the source; page-pair mode directly pairs one PDF or PowerPoint file." : "Drop up to three PDF, JPG, PNG, or WebP files here, upload files up to 50 MB each, or use one public web-page URL. Generated questions include explanations and answer-level feedback."} /></div>
                     <div>
                       <Label className="text-xs font-medium text-teal-700 mb-1 block">Number of Questions</Label>
                       <select value={aiCount} onChange={e => setAICount(Number(e.target.value))} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
@@ -832,9 +833,20 @@ export function AddQuestionsDialog({
                         <option value="multiselect">Multiple Select</option>
                         <option value="matching">Matching</option>
                         <option value="hotspot">Hotspot Template</option>
+                        <option value="flashcard">Flashcard</option>
                         <option value="mixed">Mixed</option>
                       </select>
                     </div>
+                    {aiType === "flashcard" && (
+                      <div>
+                        <Label className="text-xs font-medium text-teal-700 mb-1 block">Flashcard creation method</Label>
+                        <select value={aiDocumentMode} onChange={e => setAiDocumentMode(e.target.value as "ai_generated" | "page_pairs")} className="w-full h-9 rounded-md border border-teal-200 bg-white px-3 text-sm">
+                          <option value="ai_generated">Generate teaching cards with AI</option>
+                          <option value="page_pairs">Pair PDF/PPT pages or slides directly</option>
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">Page pairs use page/slide 1 as the card front, 2 as the back, and continue in order. Use one PDF or .pptx file.</p>
+                      </div>
+                    )}
                     {aiGroups.length > 0 && (
                       <div>
                         <Label className="text-xs font-medium text-teal-700 mb-1 block">Quiz Group</Label>
@@ -865,9 +877,9 @@ export function AddQuestionsDialog({
                     accentColor="teal"
                   />
                   <div className="flex justify-end">
-                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={(!aiTopic.trim() && aiSourceFiles.length === 0 && !aiSourceUrl.trim()) || aiGenerateMut.isPending || aiSourceUploading}
-                      onClick={() => aiGenerateMut.mutate({ topic: aiTopic.trim() || "the provided clinical material", count: aiCount, difficulty: aiDifficulty, questionType: aiType, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined, newFolderName: aiNewFolderName.trim() || undefined, sourceFiles: aiSourceFiles.length > 0 ? aiSourceFiles : undefined, sourceUrl: aiSourceUrl.trim() || undefined })}>
-                      {aiGenerateMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : <><Sparkles className="w-3.5 h-3.5" /> Generate Questions</>}
+                    <Button className="bg-teal-600 hover:bg-teal-700 text-white gap-1.5" disabled={(!aiTopic.trim() && aiSourceFiles.length === 0 && !aiSourceUrl.trim()) || (aiDocumentMode === "page_pairs" && aiSourceFiles.length !== 1) || aiGenerateMut.isPending || aiSourceUploading}
+                      onClick={() => aiGenerateMut.mutate({ topic: aiTopic.trim() || "the provided clinical material", count: aiCount, difficulty: aiDifficulty, questionType: aiType, documentMode: aiDocumentMode, tagIds: aiTagIds.length > 0 ? aiTagIds : undefined, folderId: aiFolderId ?? undefined, newFolderName: aiNewFolderName.trim() || undefined, sourceFiles: aiSourceFiles.length > 0 ? aiSourceFiles : undefined, sourceUrl: aiSourceUrl.trim() || undefined })}>
+                      {aiGenerateMut.isPending ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</> : aiDocumentMode === "page_pairs" ? <><FileText className="w-3.5 h-3.5" /> Create Flashcards</> : <><Sparkles className="w-3.5 h-3.5" /> Generate Questions</>}
                     </Button>
                   </div>
                 </div>

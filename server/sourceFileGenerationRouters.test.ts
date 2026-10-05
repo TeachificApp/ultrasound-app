@@ -3,12 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   invokeLLM: vi.fn(),
   getDb: vi.fn(),
+  extractFlashcardDocumentPages: vi.fn(),
 }));
 
 vi.mock("./_core/llm", () => ({ invokeLLM: mocks.invokeLLM }));
 vi.mock("./db", async () => {
   const actual = await vi.importActual<any>("./db");
   return { ...actual, getDb: mocks.getDb };
+});
+vi.mock("./lib/flashcardDocumentGeneration", async () => {
+  const actual = await vi.importActual<any>("./lib/flashcardDocumentGeneration");
+  return { ...actual, extractFlashcardDocumentPages: mocks.extractFlashcardDocumentPages };
 });
 
 import { lmsEnrollmentAdminRouter } from "./routers/lmsEnrollmentAdminRouter";
@@ -55,6 +60,24 @@ describe("source-file generation routers", () => {
     const values = db.writes[0].values;
     expect(values.explanation).toBe("B is correct");
     expect(JSON.parse(values.options)).toEqual(expect.arrayContaining([{ text: "A", feedback: "A no" }, { text: "B", feedback: "B yes" }]));
+  });
+
+  it("creates editable flashcards from consecutive PDF pages without calling the AI", async () => {
+    mocks.invokeLLM.mockClear();
+    mocks.extractFlashcardDocumentPages.mockResolvedValue(["Card prompt", "Teaching answer"]);
+    const db = createInsertDb();
+    mocks.getDb.mockResolvedValueOnce(db);
+    const caller = questionBankRouter.createCaller(adminContext);
+    const result = await caller.aiGenerateToBank({
+      topic: "Provided deck",
+      count: 5,
+      questionType: "flashcard",
+      documentMode: "page_pairs",
+      sourceFiles: [{ ...sourceFile, storageKey: "ai-generation-sources/17/deck.pdf", name: "deck.pdf" }],
+    });
+    expect(result).toMatchObject({ inserted: 1, skippedPageCount: 0, questions: [expect.objectContaining({ type: "flashcard", flashcardFront: "Card prompt", flashcardBack: "Teaching answer" })] });
+    expect(mocks.invokeLLM).not.toHaveBeenCalled();
+    expect(db.writes[0]?.values).toMatchObject({ type: "flashcard", flashcardFront: "Card prompt", flashcardBack: "Teaching answer" });
   });
 
   it("creates a 350-question source set in seven 50-question batches that can be added to the active quiz", async () => {

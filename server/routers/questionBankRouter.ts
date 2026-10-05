@@ -31,6 +31,13 @@ import os from "os";
 import { AI_SOURCE_BLIND_WRITING_RULE, buildAiSourceMessage, hasDirectAiSourceReference } from "../lib/aiSourceFile";
 import { fetchAiGenerationSourceUrl } from "../lib/aiWebSource";
 import { buildAiQuestionBankInsertValues } from "../lib/aiQuestionBankPersistence";
+import {
+  AI_SOURCE_DOCX_MIME,
+  AI_SOURCE_PPTX_MIME,
+  extractFlashcardDocumentText,
+  extractFlashcardDocumentPages,
+  pairFlashcardDocumentPages,
+} from "../lib/flashcardDocumentGeneration";
 import { plainTextFromISpring } from "../lib/questionBankImportSanitize";
 import {
   deleteQuestionBankFolderTree,
@@ -490,7 +497,8 @@ export const questionBankRouter = router({
       topic: z.string().min(1),
       count: z.number().int().min(1).max(350).default(10),
       difficulty: z.enum(["beginner", "intermediate", "advanced"]).default("intermediate"),
-      questionType: z.enum(["mcq", "truefalse", "multiselect", "matching", "hotspot", "mixed"]).default("mcq"),
+      questionType: z.enum(["mcq", "truefalse", "multiselect", "matching", "hotspot", "flashcard", "mixed"]).default("mcq"),
+      documentMode: z.enum(["ai_generated", "page_pairs"]).default("ai_generated"),
       tagIds: z.array(z.number().int()).optional(),
       isPreset: z.boolean().optional(),
       presetCategory: z.string().optional(),
@@ -498,12 +506,14 @@ export const questionBankRouter = router({
       newFolderName: z.string().max(200).optional(),
       sourceFile: z.object({
         url: z.string().url(),
-        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
+        storageKey: z.string().min(1).max(1024).optional(),
+        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp", AI_SOURCE_PPTX_MIME, AI_SOURCE_DOCX_MIME]),
         name: z.string().min(1).max(255),
       }).optional(),
       sourceFiles: z.array(z.object({
         url: z.string().url(),
-        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp"]),
+        storageKey: z.string().min(1).max(1024).optional(),
+        mimeType: z.enum(["application/pdf", "image/jpeg", "image/png", "image/webp", AI_SOURCE_PPTX_MIME, AI_SOURCE_DOCX_MIME]),
         name: z.string().min(1).max(255),
       })).min(1).max(3).optional(),
       sourceUrl: z.string().url().max(2048).optional(),
@@ -515,6 +525,8 @@ export const questionBankRouter = router({
 
       const typeInstruction = input.questionType === "mixed"
         ? "Mix multiple choice and true/false questions."
+        : input.questionType === "flashcard"
+          ? "All items must be flashcards. Put the learner-facing prompt on flashcardFront and the teaching answer on flashcardBack. Keep question equal to flashcardFront, use empty options, and do not present answer choices."
         : input.questionType === "truefalse"
           ? "All questions must be true/false."
           : input.questionType === "multiselect"
@@ -526,6 +538,66 @@ export const questionBankRouter = router({
                 : "All questions must be multiple choice with 4 options.";
 
       const sourceFiles = input.sourceFiles?.length ? input.sourceFiles : input.sourceFile ? [input.sourceFile] : [];
+
+      if (input.documentMode === "page_pairs") {
+        if (input.questionType !== "flashcard") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Page-pair generation is available only for flashcards." });
+        }
+        if (sourceFiles.length !== 1 || !["application/pdf", AI_SOURCE_PPTX_MIME].includes(sourceFiles[0]?.mimeType)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Choose one uploaded PDF or PowerPoint (.pptx) source to pair its pages or slides into flashcards." });
+        }
+        let pairs;
+        try {
+          pairs = pairFlashcardDocumentPages(await extractFlashcardDocumentPages(sourceFiles[0]!, ctx.user.id));
+        } catch (error) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "The document could not be converted into flashcards." });
+        }
+        let resolvedFolderId: number | null = null;
+        if (input.newFolderName?.trim()) {
+          resolvedFolderId = await insertQuestionBankFolder(db, {
+            name: input.newFolderName.trim(),
+            createdByAdminId: ctx.user.id,
+          });
+        } else if (input.folderId) {
+          resolvedFolderId = input.folderId;
+        }
+        const selectedPairs = pairs.pairs;
+        const inserted: number[] = [];
+        for (const pair of selectedPairs) {
+          const [result] = await db.insert(questionBank).values({
+            question: pair.front,
+            type: "flashcard",
+            correctAnswer: "",
+            flashcardFront: pair.front,
+            flashcardBack: pair.back,
+            explanation: null,
+            correctFeedback: null,
+            incorrectFeedback: null,
+            folderId: resolvedFolderId,
+            createdByAdminId: ctx.user.id,
+          }).$returningId();
+          inserted.push(result.id);
+          if (input.tagIds && input.tagIds.length > 0) {
+            await db.insert(questionBankTagMap).values(input.tagIds.map(tagId => ({ questionId: result.id, tagId })));
+          }
+        }
+        return {
+          inserted: inserted.length,
+          ids: inserted,
+          folderId: resolvedFolderId,
+          skippedPageCount: pairs.skippedPageCount,
+          questions: selectedPairs.map((pair, index) => ({
+            id: inserted[index],
+            question: pair.front,
+            type: "flashcard",
+            options: [],
+            correctAnswer: "",
+            explanation: pair.back,
+            flashcardFront: pair.front,
+            flashcardBack: pair.back,
+          })),
+        };
+      }
       let webSource: Awaited<ReturnType<typeof fetchAiGenerationSourceUrl>> | null = null;
       if (input.sourceUrl) {
         try {
@@ -534,9 +606,23 @@ export const questionBankRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "The web page could not be used as a question source." });
         }
       }
+      const textDocumentSources = sourceFiles.filter(sourceFile => sourceFile.mimeType === AI_SOURCE_PPTX_MIME || sourceFile.mimeType === AI_SOURCE_DOCX_MIME);
+      let documentSourceText = "";
+      if (textDocumentSources.length > 0) {
+        try {
+          documentSourceText = (await Promise.all(textDocumentSources.map(sourceFile => extractFlashcardDocumentText(sourceFile, ctx.user.id))))
+            .join("\n\n")
+            .slice(0, 60_000);
+        } catch (error) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "The document could not be read as a flashcard source." });
+        }
+      }
       const hasSourceInput = sourceFiles.length > 0 || Boolean(webSource);
       const sourceBlindWebContext = webSource
         ? `\n\nThe following public web-page text is for silent factual grounding. Do not reproduce its URL or identify it in learner-facing text.\n--- BEGIN SOURCE MATERIAL ---\n${webSource.text}\n--- END SOURCE MATERIAL ---\n${AI_SOURCE_BLIND_WRITING_RULE}`
+        : "";
+      const sourceBlindDocumentContext = documentSourceText
+        ? `\n\nThe following uploaded document text is for silent factual grounding. Do not identify, cite, or refer to the source document in learner-facing text.\n--- BEGIN SOURCE MATERIAL ---\n${documentSourceText}\n--- END SOURCE MATERIAL ---\n${AI_SOURCE_BLIND_WRITING_RULE}`
         : "";
       const responseFormat = {
           type: "json_schema",
@@ -552,7 +638,7 @@ export const questionBankRouter = router({
                     type: "object",
                     properties: {
                       question: { type: "string" },
-                      type: { type: "string", enum: ["mcq", "truefalse", "multiselect", "matching", "hotspot"] },
+                      type: { type: "string", enum: ["mcq", "truefalse", "multiselect", "matching", "hotspot", "flashcard"] },
                       options: { type: "array", items: { type: "string" } },
                       correctAnswer: { type: "string" },
                       correctAnswers: { type: "array", items: { type: "integer" } },
@@ -569,8 +655,10 @@ export const questionBankRouter = router({
                       explanation: { type: "string" },
                       correctFeedback: { type: "string" },
                       incorrectFeedback: { type: "string" },
+                      flashcardFront: { type: "string" },
+                      flashcardBack: { type: "string" },
                     },
-                    required: ["question", "type", "options", "correctAnswer", "correctAnswers", "optionFeedback", "matchingPairs", "explanation", "correctFeedback", "incorrectFeedback"],
+                    required: ["question", "type", "options", "correctAnswer", "correctAnswers", "optionFeedback", "matchingPairs", "explanation", "correctFeedback", "incorrectFeedback", "flashcardFront", "flashcardBack"],
                     additionalProperties: false,
                   },
                 },
@@ -588,7 +676,7 @@ export const questionBankRouter = router({
           model: hasSourceInput ? "gemini-3-flash-preview" : undefined,
           messages: [
             { role: "system", content: `You are a medical education question writer specializing in ultrasound and echocardiography. Generate clinically accurate ${input.difficulty} questions. ${typeInstruction} For every question, return: (1) explanation, a concise rationale for why the correct answer is correct; (2) correctFeedback, a shared question-based rationale shown after a correct response; (3) incorrectFeedback, a shared question-based rationale shown after an incorrect response that explains the correct concept without referring to a particular selected option; and (4) optionFeedback, one explanation for every option describing why that specific answer is correct or incorrect. ${hasSourceInput ? AI_SOURCE_BLIND_WRITING_RULE : ""} Return JSON only.` },
-            { role: "user", content: buildAiSourceMessage(`Generate ${batchCount} unique questions about: ${input.topic}. This is batch ${Math.floor(offset / batchSize) + 1}; do not repeat questions from earlier batches.${sourceBlindWebContext}`, sourceFiles) as any },
+            { role: "user", content: buildAiSourceMessage(`Generate ${batchCount} unique questions about: ${input.topic}. This is batch ${Math.floor(offset / batchSize) + 1}; do not repeat questions from earlier batches.${sourceBlindWebContext}${sourceBlindDocumentContext}`, sourceFiles) as any },
           ],
           response_format: responseFormat,
         });
@@ -608,7 +696,6 @@ export const questionBankRouter = router({
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The generated wording referred to its source and was not saved. Please generate again." });
       }
 
-      // Resolve or create folder
       let resolvedFolderId: number | null = null;
       if (input.newFolderName?.trim()) {
         resolvedFolderId = await insertQuestionBankFolder(db, {
@@ -623,11 +710,13 @@ export const questionBankRouter = router({
       const inserted: number[] = [];
       const getReturnedQuestions = () => questions.map((question, index) => ({
         id: inserted[index],
-        question: question.question,
+        question: question.type === "flashcard" ? question.flashcardFront ?? question.question : question.question,
         type: question.type,
         options: question.options,
         correctAnswer: question.correctAnswer,
         explanation: question.explanation,
+        flashcardFront: question.type === "flashcard" ? question.flashcardFront ?? question.question : undefined,
+        flashcardBack: question.type === "flashcard" ? question.flashcardBack ?? question.correctAnswer : undefined,
       }));
       for (const q of questions) {
         const [result] = await db.insert(questionBank).values(buildAiQuestionBankInsertValues(q, resolvedFolderId, ctx.user.id)).$returningId();
