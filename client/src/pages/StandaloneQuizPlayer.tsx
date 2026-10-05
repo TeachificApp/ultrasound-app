@@ -148,6 +148,30 @@ function flashcardAnswerText(question: any): string {
       .filter(Boolean);
     if (correctAnswers.length) return correctAnswers.join("\n");
   }
+
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const rawCorrectAnswers = [question?.correctAnswer, question?.correctAnswers]
+    .flatMap((value) => {
+      if (Array.isArray(value)) return value;
+      if (typeof value !== "string") return value == null ? [] : [value];
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [value];
+      } catch {
+        return [value];
+      }
+    })
+    .map((value) => String(value));
+  const nativeCorrectAnswers = options
+    .filter((option: any, index: number) => {
+      const value = String(option?.value ?? option?.id ?? option?.text ?? option?.label ?? "");
+      const label = String(option?.text ?? option?.label ?? option?.value ?? "");
+      return rawCorrectAnswers.includes(String(index)) || rawCorrectAnswers.includes(value) || rawCorrectAnswers.includes(label);
+    })
+    .map((option: any) => option?.text ?? option?.label ?? option?.value)
+    .filter(Boolean);
+  if (nativeCorrectAnswers.length) return nativeCorrectAnswers.join("\n");
+
   return "Add the answer or explanation in the visual builder.";
 }
 
@@ -200,7 +224,7 @@ export default function StandaloneQuizPlayer() {
   const readAloud = useQuizReadAloud(creatorReadAloudEnabled && readAloudEnabled && phase === "started" && isNativeQuizType, readAloudVoice);
   const branding = builderMeta?.branding ?? null;
   const isBuilderMode = !!(quizData?.builderMode || builderMeta);
-  const isVisualFlashcardDeck = isBuilderMode && (quizData?.type ?? quizInfo?.type) === "flashcards";
+  const isStandaloneFlashcardDeck = (quizData?.type ?? quizInfo?.type) === "flashcards";
   const activeQuestions = useMemo(() => {
     if (!isBuilderMode) return questions;
     const answersByBuilderId = new Map(
@@ -339,12 +363,12 @@ export default function StandaloneQuizPlayer() {
     setShowMockExamReview(true);
   }
 
-  function handleSubmit() {
+  function submitAttemptAnswers(answerMap: Record<number, string>, timeMap = questionTimes) {
     if (!attemptId) return;
-    const answerPayload = Object.entries(answers).map(([qBankId, givenAnswer]) => ({
+    const answerPayload = Object.entries(answerMap).map(([qBankId, givenAnswer]) => ({
       questionBankId: Number(qBankId),
       givenAnswer,
-      timeSpentSeconds: questionTimes[Number(qBankId)] ?? undefined,
+      timeSpentSeconds: timeMap[Number(qBankId)] ?? undefined,
     }));
     submitMutation.mutate(
       { attemptId, answers: answerPayload, timeSpentSeconds: elapsed },
@@ -356,6 +380,10 @@ export default function StandaloneQuizPlayer() {
         onError: (e) => toast.error(e.message),
       }
     );
+  }
+
+  function handleSubmit() {
+    submitAttemptAnswers(answers);
   }
 
   // ── Auth gate ──
@@ -512,14 +540,17 @@ export default function StandaloneQuizPlayer() {
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => answers[question.questionBankId] === undefined);
 
-  if (isVisualFlashcardDeck) {
+  if (isStandaloneFlashcardDeck) {
     const answer = flashcardAnswerText(q);
     const reviewAndAdvance = (review: "known" | "again") => {
-      recordAnswer(q.questionBankId, JSON.stringify({ flashcardReview: review }));
+      const reviewAnswer = JSON.stringify({ flashcardReview: review });
+      const nextAnswers = { ...answers, [q.questionBankId]: reviewAnswer };
+      const nextTimes = { ...questionTimes, [q.questionBankId]: Math.max(1, Math.round((Date.now() - qStartTime) / 1000)) };
+      recordAnswer(q.questionBankId, reviewAnswer);
       if (currentIdx < activeQuestions.length - 1) {
         handleNext();
       } else {
-        handleSubmit();
+        submitAttemptAnswers(nextAnswers, nextTimes);
       }
     };
 

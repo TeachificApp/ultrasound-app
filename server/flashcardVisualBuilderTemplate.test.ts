@@ -30,14 +30,16 @@ describe("visual-builder flashcard templates", () => {
     expect(source("server/routers/quizMakerRouter.ts")).toContain("sourcePptxUrl: z.string().min(1).max(2048).optional()");
   });
 
-  it("renders front and answer card sides in the learner player", () => {
+  it("renders front and answer card sides for both visual and Question Bank flashcard decks", () => {
     const player = source("client/src/pages/StandaloneQuizPlayer.tsx");
     const frame = source("client/src/components/quiz/BuilderQuizPlayer.tsx");
     const learnerRouter = source("server/routers/standaloneQuizRouter.ts");
 
-    expect(player).toContain("isVisualFlashcardDeck");
+    expect(player).toContain("isStandaloneFlashcardDeck");
     expect(player).toContain("Show Answer");
     expect(player).toContain("I Know This");
+    expect(player).toContain("submitAttemptAnswers(nextAnswers, nextTimes)");
+    expect(player).toContain("nativeCorrectAnswers");
     expect(frame).toContain("BuilderFlashcardFrame");
     expect(learnerRouter).toContain('quiz.type === "quiz" || quiz.type === "flashcards"');
   });

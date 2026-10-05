@@ -480,8 +480,9 @@ export const standaloneQuizLearnerRouter = router({
           folderQuizLogoUrl: resolveInheritedQuestionBankFolderQuizLogo(folderRows, q.qb.folderId),
           hotspotMarkers: q.qb.hotspotMarkers,
           matchingPairs: q.qb.matchingPairs,
-          // Only send correct answer in quiz mode (not mock_exam)
-          ...(quiz.type === "quiz"
+          // Flashcard decks reveal their answer/explanation for learner self-review;
+          // mock exams remain the only mode that withholds answer data.
+          ...(quiz.type === "quiz" || quiz.type === "flashcards"
             ? {
                 correctAnswer: q.qb.correctAnswer,
                 correctAnswers: q.qb.correctAnswers,
