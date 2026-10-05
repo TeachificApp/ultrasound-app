@@ -389,11 +389,11 @@
 - [x] Repair Lesson Focus Regeneration when valid requests are rejected as incomplete, while preserving review-only drafts and preventing automatic lesson saves.
 - [x] Superseded the ACS lesson-draft request after clarification that ACS work must be Flashcards only; no ACS lesson draft was created or changed.
 - [x] Finish and checkpoint the Ultrasound Physics AI lesson-regeneration repair before resuming any ACS Flashcards work.
-- [ ] Diagnose and repair the actual populated-content Ultrasound Physics Lesson Focus Regeneration failure; do not assume fields are empty or claim success without a populated-case result.
-- [ ] Add a populated-content regeneration regression that preserves review-only drafts and detects the true incomplete-rewrite failure reason without storing raw lesson content.
-- [ ] Repair the explicit Lesson Focus Regeneration draft-apply flow so a generated reviewed draft is written to the intended lesson only after the administrator chooses to apply/save it.
-- [ ] Add focused regression coverage for generation preview, explicit draft application, and no automatic lesson save.
-- [ ] Repair Apply Reviewed Changes when a populated generated lesson draft is acknowledged but not persisted to the selected course lesson.
+- [x] Diagnose and repair the actual populated-content Ultrasound Physics Lesson Focus Regeneration failure; do not assume fields are empty or claim success without a populated-case result. Read-only production-data previews succeeded for populated lessons 360029 and 360053; no lesson content was written during verification.
+- [x] Add a populated-content regeneration regression that preserves review-only drafts and detects the true incomplete-rewrite failure reason without storing raw lesson content. Validation now reports the exact draft-review failure, retries once with that corrective reason, and regression coverage uses structural populated-block fixtures only.
+- [x] Repair the explicit Lesson Focus Regeneration draft-apply flow so a generated reviewed draft is written to the intended lesson only after the administrator chooses to apply/save it. Apply now revalidates the reviewed substantive proposal against the selected course lesson inside the transaction before persisting it.
+- [x] Add focused regression coverage for generation preview, explicit draft application, and no automatic lesson save. Covered block-only populated rewrites, no-op rejection, one corrective retry, apply transaction validation, and the explicit dialog apply action.
+- [x] Repair Apply Reviewed Changes when a populated generated lesson draft is acknowledged but not persisted to the selected course lesson. The reviewed proposal uses its own lesson ID, is checked against the selected course's exact lesson, and persists only after Apply Reviewed Changes succeeds.
 - [ ] Add a populated reviewed-draft persistence regression verifying the intended lesson changes only after Apply Reviewed Changes and survives a refresh.
 - [ ] Add a newsletter double-opt-in flow that holds new subscriptions pending confirmation and activates only after valid confirmation, without sending test email.
 - [ ] Replace the proposed double-opt-in flow with an immediate subscription and one-time “You’re in!” welcome notification confirming subscription and requesting inbox whitelisting; do not send a confirmation link.
