@@ -1851,6 +1851,16 @@ export default function CoursePlayer() {
     return () => window.clearTimeout(timer);
   }, [authPending, authLoading, authRetryCount, isAuthenticated, refresh]);
 
+  // Route authenticated learning pages to Login only after the auth state has
+  // settled. Calling navigate during render lets a second render see /login as
+  // the current path and nest that URL inside returnTo, which strands a learner
+  // at Login instead of sending them back to their course after sign-in.
+  useEffect(() => {
+    if (authLoading || user) return;
+    const returnTo = window.location.pathname + window.location.search;
+    navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
+  }, [authLoading, navigate, user]);
+
   const { data, isLoading } = trpc.lmsLearner.getCoursePlayer.useQuery(
     { slug: slug!, preview: isPreviewMode || adminPreviewStudent || isAdmin },
     { enabled: !!slug && !!user }
@@ -2137,7 +2147,7 @@ export default function CoursePlayer() {
       </div>
     );
   }
-  if (!user) { navigate(`/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`); return null; }
+  if (!user) return null;
   // adminBypass is now defined above (before hooks) via useMemo
 
   // Check if course has any preview lessons — unenrolled registered users can access the player in preview mode

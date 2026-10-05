@@ -15,7 +15,7 @@ describe("Course Player runtime imports", () => {
     expect(fnStart).toBeGreaterThan(-1);
     const body = source.slice(fnStart);
     const hooksMarker = body.indexOf("const lessonMediaRepoScormSrc = useMemo");
-    const earlyReturn = body.indexOf("if (authLoading || isLoading)");
+    const earlyReturn = body.indexOf("if (authLoading || isLoading ||");
     expect(hooksMarker).toBeGreaterThan(-1);
     expect(earlyReturn).toBeGreaterThan(-1);
     expect(hooksMarker).toBeLessThan(earlyReturn);
