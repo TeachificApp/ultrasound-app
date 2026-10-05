@@ -27,6 +27,13 @@ export interface QuizBranding {
   logoUrl?: string;
   backgroundImageUrl?: string;
   backgroundOverlay?: number;
+  flashcardTemplate?: {
+    name: string;
+    source: "built_in" | "pptx";
+    sourcePptxUrl?: string;
+    frontBackgroundUrl: string;
+    answerBackgroundUrl: string;
+  };
 }
 
 export interface QuizFileMeta {
@@ -68,6 +75,7 @@ export interface QuizFileMeta {
     ungroupedDrawCount: number;
   };
   editorViewMode?: "form" | "slide";
+  contentType?: "quiz" | "mock_exam" | "flashcards";
   cloudId?: number;
 }
 
@@ -108,6 +116,7 @@ export function builderConfigFromQuizRow(
     allowRetakes: boolean;
     maxAttempts: number | null;
     brand: BuilderBrand;
+    type?: "quiz" | "mock_exam" | "flashcards";
     builderConfig: string | null;
     readAloudEnabled?: boolean | null;
     readAloudVoice?: QuizReadAloudVoice | null;
@@ -132,6 +141,7 @@ export function builderConfigFromQuizRow(
         readAloudEnabled: quiz.readAloudEnabled ?? false,
         readAloudVoice: quiz.readAloudVoice ?? DEFAULT_QUIZ_READ_ALOUD_VOICE,
         branding: existing.meta.branding ?? defaultBrandingForBrand(quiz.brand),
+        contentType: quiz.type ?? existing.meta.contentType ?? "quiz",
       },
     };
   }
@@ -178,6 +188,7 @@ export function builderConfigFromQuizRow(
       branchingEnabled: false,
       groups: [],
       editorViewMode: "form",
+      contentType: quiz.type ?? "quiz",
       cloudId: quiz.id,
     },
     questions: [],

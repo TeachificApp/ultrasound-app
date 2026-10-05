@@ -25,7 +25,7 @@ export default function QuizVisualBuilder() {
   const quizId = params.quizId ? parseInt(params.quizId, 10) : null;
   const isNew = !quizId || isNaN(quizId);
 
-  const { quiz, loadQuiz, newQuiz, activeSlide, activeQuestionId } = useQuizStore();
+  const { quiz, loadQuiz, newQuiz, updateMeta, activeSlide, activeQuestionId } = useQuizStore();
   const [previewMode, setPreviewMode] = useState<"entire" | "current" | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showCloud, setShowCloud] = useState(false);
@@ -39,6 +39,10 @@ export default function QuizVisualBuilder() {
   useEffect(() => {
     if (isNew) {
       newQuiz();
+      const requestedType = new URLSearchParams(window.location.search).get("type");
+      if (requestedType === "flashcards" || requestedType === "mock_exam") {
+        updateMeta({ contentType: requestedType });
+      }
       return;
     }
     if (data?.builderConfig) {

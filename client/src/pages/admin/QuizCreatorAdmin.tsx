@@ -1360,7 +1360,7 @@ function QuizList() {
             <p className="text-sm text-gray-500 mt-1">Create and manage quizzes, mock exams, and flashcard decks</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate("/admin/quiz-creator/builder/new")} className="border-teal-300 text-teal-700 hover:bg-teal-50">
+            <Button variant="outline" onClick={() => navigate(`/admin/quiz-creator/builder/new?type=${activeTab === "results" ? "quiz" : activeTab}`)} className="border-teal-300 text-teal-700 hover:bg-teal-50">
               <FileQuestion className="w-4 h-4 mr-2" /> Visual Builder
             </Button>
             <Button variant="outline" onClick={() => setShowBatchScormImport(true)} className="border-amber-300 text-amber-800 hover:bg-amber-50">

@@ -16,6 +16,7 @@ import { StandaloneQuestionMedia } from "@/components/quiz/StandaloneQuestionMed
 import { getLoginUrl } from "@/const";
 import {
   BuilderIntroScreen,
+  BuilderFlashcardFrame,
   BuilderQuestionFrame,
   FeedbackPopup,
   getFeedbackMessage,
@@ -136,6 +137,20 @@ function protectNativeQuestionMedia(question: any, attemptId: number) {
   };
 }
 
+function flashcardAnswerText(question: any): string {
+  if (typeof question?.explanation === "string" && question.explanation.trim()) return question.explanation;
+  if (typeof question?.feedback?.correct === "string" && question.feedback.correct.trim()) return question.feedback.correct;
+  const choices = question?.correctData?.choices ?? question?.data?.choices;
+  if (Array.isArray(choices)) {
+    const correctAnswers = choices
+      .filter((choice: any) => choice?.correct)
+      .map((choice: any) => choice?.text)
+      .filter(Boolean);
+    if (correctAnswers.length) return correctAnswers.join("\n");
+  }
+  return "Add the answer or explanation in the visual builder.";
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function StandaloneQuizPlayer() {
   const { quizId } = useParams<{ quizId: string }>();
@@ -175,6 +190,7 @@ export default function StandaloneQuizPlayer() {
   const [showMockExamReview, setShowMockExamReview] = useState(false);
   const [readAloudEnabled, setReadAloudEnabled] = useState(false);
   const [accountFields, setAccountFields] = useState<Array<{ key: string; label: string; value: string }>>([]);
+  const [flashcardSide, setFlashcardSide] = useState<"front" | "answer">("front");
 
   const isNativeQuizType = (quizData?.type ?? quizInfo?.type) !== "mock_exam";
   const builderMeta = (quizInfo as any)?.builderConfig ?? quizData?.builderMeta ?? null;
@@ -184,6 +200,7 @@ export default function StandaloneQuizPlayer() {
   const readAloud = useQuizReadAloud(creatorReadAloudEnabled && readAloudEnabled && phase === "started" && isNativeQuizType, readAloudVoice);
   const branding = builderMeta?.branding ?? null;
   const isBuilderMode = !!(quizData?.builderMode || builderMeta);
+  const isVisualFlashcardDeck = isBuilderMode && (quizData?.type ?? quizInfo?.type) === "flashcards";
   const activeQuestions = useMemo(() => {
     if (!isBuilderMode) return questions;
     const answersByBuilderId = new Map(
@@ -196,6 +213,10 @@ export default function StandaloneQuizPlayer() {
   useEffect(() => {
     setCurrentIdx((index) => Math.max(0, Math.min(index, Math.max(0, activeQuestions.length - 1))));
   }, [activeQuestions.length]);
+
+  useEffect(() => {
+    setFlashcardSide("front");
+  }, [currentQuestion?.questionBankId]);
 
   const limitSeconds = quizInfo?.timeLimitMinutes ? quizInfo.timeLimitMinutes * 60 : null;
 
@@ -490,6 +511,45 @@ export default function StandaloneQuizPlayer() {
   const unansweredReviewItems = activeQuestions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => answers[question.questionBankId] === undefined);
+
+  if (isVisualFlashcardDeck) {
+    const answer = flashcardAnswerText(q);
+    const reviewAndAdvance = (review: "known" | "again") => {
+      recordAnswer(q.questionBankId, JSON.stringify({ flashcardReview: review }));
+      if (currentIdx < activeQuestions.length - 1) {
+        handleNext();
+      } else {
+        handleSubmit();
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-[#0d1f3c] py-5">
+        <div className="mx-auto max-w-xl px-4 text-center text-white">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Flashcard deck</p>
+          <p className="mt-1 text-sm text-white/85">Card {currentIdx + 1} of {activeQuestions.length}</p>
+        </div>
+        <BuilderFlashcardFrame
+          branding={branding}
+          side={flashcardSide}
+          title={flashcardSide === "front" ? "Question" : "Answer"}
+          content={flashcardSide === "front" ? (q.question || "Untitled flashcard") : answer}
+          mediaUrl={flashcardSide === "front" ? q.questionImageUrl : q.feedbackImageUrl}
+        />
+        <div className="mx-auto flex max-w-sm flex-col gap-2 px-4">
+          {flashcardSide === "front" ? (
+            <Button onClick={() => setFlashcardSide("answer")} className="h-11 bg-teal-500 text-white hover:bg-teal-400">Show Answer</Button>
+          ) : (
+            <>
+              <Button onClick={() => reviewAndAdvance("known")} className="h-11 bg-emerald-500 text-white hover:bg-emerald-400">I Know This</Button>
+              <Button variant="outline" onClick={() => reviewAndAdvance("again")} className="h-11 border-white/40 bg-white/10 text-white hover:bg-white/20 hover:text-white">Review Again</Button>
+              <Button variant="ghost" onClick={() => setFlashcardSide("front")} className="h-9 text-white/70 hover:bg-white/10 hover:text-white">Return to question</Button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // ── Builder mode (iSpring-style themed player) ──
   if (isBuilderMode && (q.type === "mcq" || q.type === "image_choice" || q.type === "tf" || q.type === "image_labeling")) {

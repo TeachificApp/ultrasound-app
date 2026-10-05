@@ -385,7 +385,9 @@ export const standaloneQuizLearnerRouter = router({
           accountFieldValues,
         });
         const attemptId = (result as { insertId: number }).insertId;
-        const showAnswers = quiz.type === "quiz";
+        // Flashcard decks are self-paced study tools, so their editable answer
+        // content must be present alongside standard instant-feedback quizzes.
+        const showAnswers = quiz.type === "quiz" || quiz.type === "flashcards";
         const questions = drawn.map((q) =>
           builderQuestionToPlayerPayload(q as Parameters<typeof builderQuestionToPlayerPayload>[0], showAnswers, Boolean(builderConfig.meta.shuffleAnswers))
         );

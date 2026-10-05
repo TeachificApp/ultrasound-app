@@ -259,6 +259,7 @@ export const quizMakerRouter = router({
           .update(standaloneQuizzes)
           .set({
             ...settings,
+            type: meta.contentType ?? quiz.type,
             builderConfig: serializeBuilderConfig({ meta, questions: synchronized.questions }),
           })
           .where(eq(standaloneQuizzes.id, input.quizId));
@@ -267,7 +268,7 @@ export const quizMakerRouter = router({
 
       const [result] = await db.insert(standaloneQuizzes).values({
         ...settings,
-        type: "quiz",
+        type: meta.contentType ?? "quiz",
         status: "draft",
         accessType: "enrolled",
         brand: "aaus",
@@ -370,6 +371,13 @@ export const quizMakerRouter = router({
         backgroundGradient: z.string().nullable().optional(),
         brandTextColor: z.string().nullable().optional(),
         brandLogoUrl: z.string().nullable().optional(),
+        flashcardTemplate: z.object({
+          name: z.string().min(1).max(255),
+          source: z.enum(["built_in", "pptx"]),
+          sourcePptxUrl: z.string().min(1).max(2048).optional(),
+          frontBackgroundUrl: z.string().min(1),
+          answerBackgroundUrl: z.string().min(1),
+        }).nullable().optional(),
         brandFontFamily: z.string().nullable().optional(),
         completionMessage: z.string().nullable().optional(),
       })
@@ -395,6 +403,9 @@ export const quizMakerRouter = router({
         textColor: input.brandTextColor ?? config.meta.branding?.textColor ?? "#ffffff",
         fontFamily: input.brandFontFamily ?? config.meta.branding?.fontFamily,
         logoUrl: input.brandLogoUrl ?? config.meta.branding?.logoUrl,
+        flashcardTemplate: input.flashcardTemplate === null
+          ? undefined
+          : (input.flashcardTemplate ?? config.meta.branding?.flashcardTemplate),
       };
       config.meta.branding = branding;
       if (input.completionMessage !== undefined) {

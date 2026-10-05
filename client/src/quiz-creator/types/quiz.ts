@@ -282,6 +282,14 @@ export interface QuizBranding {
   logoUrl?: string;
   backgroundImageUrl?: string;
   backgroundOverlay?: number; // 0-1 opacity
+  /** A reusable portrait shell that keeps flashcard content editable above the design. */
+  flashcardTemplate?: {
+    name: string;
+    source: "built_in" | "pptx";
+    sourcePptxUrl?: string;
+    frontBackgroundUrl: string;
+    answerBackgroundUrl: string;
+  };
 }
 
 // ─── Intro / Result Slides ───────────────────────────────────────────────────
@@ -367,6 +375,8 @@ export interface QuizMeta {
   drawConfig?: DrawConfig;
   // Editor UI
   editorViewMode?: "form" | "slide";
+  /** Persisted standalone content type, including visual-builder flashcard decks. */
+  contentType?: "quiz" | "mock_exam" | "flashcards";
 }
 
 export interface QuizFile {

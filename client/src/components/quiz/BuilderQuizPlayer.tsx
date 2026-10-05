@@ -15,6 +15,13 @@ export interface BuilderBranding {
   logoUrl?: string;
   backgroundImageUrl?: string;
   backgroundOverlay?: number;
+  flashcardTemplate?: {
+    name: string;
+    source: "built_in" | "pptx";
+    sourcePptxUrl?: string;
+    frontBackgroundUrl: string;
+    answerBackgroundUrl: string;
+  };
 }
 
 export interface BuilderIntroSlide {
@@ -178,6 +185,45 @@ export function BuilderQuestionFrame({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A portrait card shell with accessible, editable content rendered over its PPTX-derived design. */
+export function BuilderFlashcardFrame({
+  branding,
+  side,
+  title,
+  content,
+  mediaUrl,
+}: {
+  branding?: BuilderBranding | null;
+  side: "front" | "answer";
+  title: string;
+  content: React.ReactNode;
+  mediaUrl?: string | null;
+}) {
+  const design = branding?.flashcardTemplate;
+  const backgroundImageUrl = side === "front"
+    ? design?.frontBackgroundUrl
+    : (design?.answerBackgroundUrl ?? design?.frontBackgroundUrl);
+  const accent = branding?.primaryColor ?? "#24abbc";
+  const heading = side === "front" ? "Flashcard" : "Answer";
+
+  return (
+    <div className="mx-auto w-full max-w-sm px-4 py-7">
+      <article
+        className="relative aspect-[330/570] overflow-hidden rounded-[1.7rem] bg-[#0d1f3c] shadow-[0_24px_60px_rgba(13,31,60,0.34)]"
+        style={backgroundImageUrl ? { backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: "100% 100%" } : undefined}
+      >
+        <div className="absolute inset-x-[10%] bottom-[7.5%] top-[7.5%] flex flex-col overflow-y-auto rounded-[1.25rem] bg-white px-6 py-7 text-slate-900 shadow-inner">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.19em]" style={{ color: accent }}>{heading}</p>
+          <h2 className="text-xl font-bold leading-tight text-slate-900">{title}</h2>
+          {mediaUrl && <img src={mediaUrl} alt="Flashcard media" className="mt-5 max-h-40 w-full rounded-xl object-contain" />}
+          <div className="mt-5 flex-1 whitespace-pre-wrap text-sm leading-6 text-slate-700">{content}</div>
+        </div>
+      </article>
+      {design?.name && <p className="mt-3 text-center text-[11px] text-white/60">{design.name}</p>}
     </div>
   );
 }

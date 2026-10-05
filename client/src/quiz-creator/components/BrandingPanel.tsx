@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
-import { Palette, Type, Image, MessageSquare, Save, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { Palette, Type, Image, MessageSquare, Save, Loader2, FileArchive, Upload, X } from "lucide-react";
 import { useQuizStore } from "../store/quizStore";
 import { CURRENT_QUIZ_PLAYER_PATTERN, isLegacyAquaSolidQuizBranding } from "@shared/quizBrandingPattern";
+import { createPptxFlashcardTemplate, type FlashcardTemplateUpload } from "../lib/pptxFlashcardTemplate";
 
 interface BrandingPanelProps {
   quizId: number | null;
@@ -12,6 +14,14 @@ const PRESET_COLORS = [
   "#189aa1", "#4ad9e0", "#24abbc", "#6366f1", "#ec4899", "#f59e0b", "#10b981",
   "#8b5cf6", "#ef4444", "#06b6d4", "#84cc16", "#f97316",
 ];
+
+const SUPPLIED_FLASHCARD_TEMPLATE = {
+  name: "All About Ultrasound + iHeartEcho Flashcard Template",
+  source: "built_in" as const,
+  sourcePptxUrl: "/manus-storage/FlashcardTemplate_06a4c1a7.pptx",
+  frontBackgroundUrl: "/manus-storage/FlashcardTemplate-card-frame_1ffe2b53.png",
+  answerBackgroundUrl: "/manus-storage/FlashcardTemplate-card-frame_1ffe2b53.png",
+};
 
 export default function BrandingPanel({ quizId }: BrandingPanelProps) {
   const updateMeta = useQuizStore((state) => state.updateMeta);
@@ -23,11 +33,15 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
   const [logoUrl, setLogoUrl] = useState("");
   const [fontFamily, setFontFamily] = useState("");
   const [completionMessage, setCompletionMessage] = useState("");
+  const [flashcardTemplate, setFlashcardTemplate] = useState<FlashcardTemplateUpload | typeof SUPPLIED_FLASHCARD_TEMPLATE | null>(null);
+  const [templateUploading, setTemplateUploading] = useState(false);
+  const templateInputRef = useRef<HTMLInputElement>(null);
   const [dirty, setDirty] = useState(false);
 
   const updateBranding = trpc.quizMaker.updateBranding.useMutation({
     onSuccess: () => setDirty(false),
   });
+  const uploadPageMedia = trpc.auth.uploadPageMedia.useMutation();
 
   // Load existing branding when quizId changes
   const { data: quiz } = trpc.quizMaker.getQuiz.useQuery(
@@ -46,6 +60,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
       setTextColor(branding.textColor || CURRENT_QUIZ_PLAYER_PATTERN.textColor);
       setLogoUrl(branding.logoUrl || "");
       setFontFamily(branding.fontFamily || "");
+      setFlashcardTemplate(branding.flashcardTemplate || null);
       setCompletionMessage((quiz as any).completionMessage || "");
     }
   }, [quiz]);
@@ -61,6 +76,7 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
       textColor: textColor || CURRENT_QUIZ_PLAYER_PATTERN.textColor,
       fontFamily: fontFamily || undefined,
       logoUrl: logoUrl || undefined,
+      flashcardTemplate: flashcardTemplate || undefined,
     };
     updateBranding.mutate({
       quizId,
@@ -69,12 +85,44 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
         backgroundMode,
         backgroundGradient: backgroundMode === "gradient" ? backgroundGradient : null,
         brandTextColor: textColor || null,
-      brandLogoUrl: logoUrl || null,
-      brandFontFamily: fontFamily || null,
+        brandLogoUrl: logoUrl || null,
+        flashcardTemplate,
+        brandFontFamily: fontFamily || null,
       completionMessage: completionMessage || null,
     }, {
       onSuccess: () => updateMeta({ branding }),
     });
+  };
+
+  const uploadTemplateFile = async (file: File, context: string) => {
+    const dataUri = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Unable to read the template file."));
+      reader.readAsDataURL(file);
+    });
+    const result = await uploadPageMedia.mutateAsync({
+      dataUri,
+      mimeType: file.type || (file.name.endsWith(".pptx") ? "application/vnd.openxmlformats-officedocument.presentationml.presentation" : "image/png"),
+      fileName: file.name,
+      context,
+    });
+    return result.url;
+  };
+
+  const handleTemplateUpload = async (file: File) => {
+    setTemplateUploading(true);
+    try {
+      const template = await createPptxFlashcardTemplate(file, uploadTemplateFile);
+      setFlashcardTemplate(template);
+      setDirty(true);
+      toast.success("Flashcard design extracted. Save the quiz to apply it.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to import the PowerPoint template.");
+    } finally {
+      setTemplateUploading(false);
+      if (templateInputRef.current) templateInputRef.current.value = "";
+    }
   };
 
   if (!quizId) {
@@ -242,6 +290,50 @@ export default function BrandingPanel({ quizId }: BrandingPanelProps) {
           <option value="Playfair Display">Playfair Display</option>
         </select>
       </div>
+
+      {(quiz as any)?.type === "flashcards" && (
+        <div className="space-y-3 border-t border-gray-100 pt-5">
+          <div>
+            <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+              <FileArchive className="w-3.5 h-3.5" /> Flashcard Design Template
+            </label>
+            <p className="mt-1 text-[11px] leading-relaxed text-gray-400">Use the supplied card design or upload a portrait PowerPoint (.pptx). The editable prompt, answer, and card controls remain above the design shell.</p>
+          </div>
+
+          <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-3">
+            <div className="flex items-start gap-3">
+              <img src={SUPPLIED_FLASHCARD_TEMPLATE.frontBackgroundUrl} alt="Supplied flashcard design" className="h-24 w-14 rounded-md object-cover shadow-sm" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-teal-950">All About Ultrasound + iHeartEcho card design</p>
+                <p className="mt-1 text-[11px] leading-4 text-teal-800">Vertical teal card shell with a clean editable content area.</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => { setFlashcardTemplate(SUPPLIED_FLASHCARD_TEMPLATE); setDirty(true); }} className="rounded-md bg-teal-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-teal-700">{flashcardTemplate?.name === SUPPLIED_FLASHCARD_TEMPLATE.name ? "Selected" : "Use this design"}</button>
+                  <a href={SUPPLIED_FLASHCARD_TEMPLATE.sourcePptxUrl} target="_blank" rel="noreferrer" className="rounded-md border border-teal-200 bg-white px-2.5 py-1 text-[11px] font-medium text-teal-700 hover:bg-teal-50">Download PPTX</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {flashcardTemplate && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="flex items-start gap-3">
+                <img src={flashcardTemplate.frontBackgroundUrl} alt="Selected flashcard design" className="h-20 w-12 rounded object-cover shadow-sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-gray-800">{flashcardTemplate.name}</p>
+                  <p className="mt-0.5 text-[11px] text-gray-500">{flashcardTemplate.source === "pptx" ? "Custom PowerPoint design" : "Supplied design"}</p>
+                </div>
+                <button type="button" onClick={() => { setFlashcardTemplate(null); setDirty(true); }} className="rounded p-1 text-gray-400 hover:bg-white hover:text-red-600" aria-label="Remove flashcard design"><X className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+          )}
+
+          <input ref={templateInputRef} type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleTemplateUpload(file); }} />
+          <button type="button" disabled={templateUploading} onClick={() => templateInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-teal-300 px-3 py-2.5 text-xs font-medium text-teal-700 hover:bg-teal-50 disabled:opacity-50">
+            {templateUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {templateUploading ? "Extracting PowerPoint design…" : "Upload a PowerPoint card design (.pptx)"}
+          </button>
+        </div>
+      )}
 
       {/* Completion Message */}
       <div className="space-y-2">
