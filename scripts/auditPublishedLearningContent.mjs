@@ -32,6 +32,19 @@ function parseJson(value) {
   }
 }
 
+function collectBlocks(value, collected = []) {
+  if (Array.isArray(value)) {
+    for (const item of value) collectBlocks(item, collected);
+    return collected;
+  }
+  if (!value || typeof value !== "object") return collected;
+  if (typeof value.type === "string" && value.data && typeof value.data === "object") {
+    collected.push(value);
+  }
+  for (const child of Object.values(value)) collectBlocks(child, collected);
+  return collected;
+}
+
 async function mapBounded(items, limit, mapper) {
   const output = new Array(items.length);
   let next = 0;
@@ -112,6 +125,13 @@ for (const lesson of lessons) {
   const blocks = parseJson(lesson.content_blocks);
   if (blocks.error) addIssue("error", "content_blocks", subject, `Invalid content_blocks JSON: ${blocks.error}`);
   const hasBlocks = Array.isArray(blocks.value) && blocks.value.length > 0;
+  for (const block of collectBlocks(blocks.value)) {
+    if (block.type !== "lesson_quiz") continue;
+    const questions = block.data.questions;
+    if (!Array.isArray(questions) || questions.length === 0) {
+      addIssue("error", "inline_quiz", subject, "Published lesson contains a Lesson Quiz block with no questions.");
+    }
+  }
 
   const needsPlayableSource = ["video", "video_text", "embed"].includes(lesson.type);
   const hasInlineSource = nonEmpty(lesson.embed_url) || nonEmpty(lesson.content) || hasBlocks;

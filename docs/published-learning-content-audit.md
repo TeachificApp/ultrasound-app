@@ -29,6 +29,7 @@ An audit exits non-zero only when it finds an **error**. Warnings flag external 
 | Media Library links | Detects missing/deleted media assets and missing current media versions. |
 | SCORM packages | Requires interactive package extraction to be complete with an extracted prefix and launch file. |
 | LMS quizzes | Requires each published LMS quiz lesson to have a quiz record with questions. |
+| Inline lesson quizzes | Rejects a published Lesson Quiz block when it has no questions. |
 | Standalone quizzes | Requires published standalone quiz lessons and direct standalone quizzes to have linked or visual-builder questions. |
 | External embeds | Performs bounded HTTP availability checks for external embedded content. |
 
@@ -41,15 +42,16 @@ The live audit returned **0 errors and 0 warnings** after the following record-l
    - Sound Waves Concepts Quiz
    - Ultrasound Imaging Instrumentation Concepts Quiz
    - Doppler Imaging Concepts Quiz
-2. The ACS Sample Test & Learn Quiz in the published ACS Registry Review Quiz and ACS Mastery Course was repointed from a retired `app.iheartecho.com/api/media/.../view` URL to its working Learn-hosted SCORM player.
-3. The Pediatric Echocardiography Registry Review SCORM quiz was verified intact and rendering from its existing Learn-hosted package; it was **not deleted**.
+2. An empty **CME Quiz** placeholder in the All About LV Mechanical Support CME course was also set back to **draft**. It remains available for validated assessment authoring but is no longer shown as an empty learner assessment.
+3. The ACS Sample Test & Learn Quiz in the published ACS Registry Review Quiz and ACS Mastery Course was repointed from a retired `app.iheartecho.com/api/media/.../view` URL to its working Learn-hosted SCORM player.
+4. The Pediatric Echocardiography Registry Review SCORM quiz was verified intact and rendering from its existing Learn-hosted package; it was **not deleted**.
 
 ### Result Summary
 
 | Metric | Result |
 |---|---:|
 | Public course/quiz products checked | 31 |
-| Published lessons checked | 812 |
+| Published lessons checked | 811 |
 | Published standalone quizzes checked | 1 |
 | Errors | 0 |
 | Warnings | 0 |
