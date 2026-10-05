@@ -582,6 +582,7 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         const { getUserByPasswordResetToken, updateUserPassword, clearPasswordResetToken } = await import('./db');
         const { generateAutoLoginToken } = await import('./routes/autoLogin');
+        const { buildPasswordResetAutoLoginUrl } = await import('./lib/passwordResetAutoLogin');
         const bcrypt = await import('bcryptjs');
         const user = await getUserByPasswordResetToken(input.token);
         if (!user) {
@@ -593,8 +594,16 @@ export const appRouter = router({
         const newHash = await bcrypt.hash(input.newPassword, 12);
         await updateUserPassword(user.id, newHash);
         await clearPasswordResetToken(user.id);
-        // Generate a one-time auto-login token so the user is signed in immediately after reset
-        const autoLoginUrl = await generateAutoLoginToken(user.id, '/my-dashboard');
+        // A reset is complete once the password is safely stored and the token is
+        // consumed. Automatic sign-in is a convenience only: never report the
+        // reset as failed if issuing that optional handoff is unavailable.
+        let autoLoginUrl: string | null = null;
+        try {
+          const autoLoginToken = await generateAutoLoginToken(user.id, '/my-dashboard');
+          autoLoginUrl = buildPasswordResetAutoLoginUrl(autoLoginToken);
+        } catch (error) {
+          console.error(`[auth] Password reset completed but automatic sign-in could not be prepared for user ${user.id}:`, error);
+        }
         return { success: true, autoLoginUrl };
       }),
 

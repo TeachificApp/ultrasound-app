@@ -21,13 +21,18 @@ export default function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [done, setDone] = useState(false);
+  const [automaticSignInReady, setAutomaticSignInReady] = useState(false);
 
   const resetMutation = trpc.auth.resetPassword.useMutation({
     onSuccess: (data) => {
       setDone(true);
-      // Use auto-login URL if returned, otherwise fall back to login page
-      const redirectUrl = (data as any)?.autoLoginUrl ?? "/login";
-      setTimeout(() => { window.location.href = redirectUrl; }, 2000);
+      // Password storage is already complete. Automatic sign-in is optional, so
+      // give the learner a clear manual path if its handoff is unavailable.
+      const autoLoginUrl = (data as any)?.autoLoginUrl as string | null | undefined;
+      setAutomaticSignInReady(Boolean(autoLoginUrl));
+      if (autoLoginUrl) {
+        setTimeout(() => { window.location.href = autoLoginUrl; }, 2000);
+      }
     },
     onError: (err) => {
       toast.error(err.message || "Password reset failed");
@@ -59,9 +64,15 @@ export default function ResetPassword() {
               <CheckCircle2 className="w-8 h-8" style={{ color: "#189aa1" }} />
             </div>
             <h2 className="text-2xl font-black mb-3" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>Password updated!</h2>
-            <p className="text-gray-500 text-sm mb-6">Your password has been changed. Signing you in…</p>
-            <Link href="/my-dashboard">
-              <Button className="w-full font-semibold text-white" style={{ background: "#189aa1" }}>Go to Dashboard</Button>
+            <p className="text-gray-500 text-sm mb-6">
+              {automaticSignInReady
+                ? "Your password has been changed. Signing you in…"
+                : "Your password has been changed. Please sign in with your new password."}
+            </p>
+            <Link href={automaticSignInReady ? "/my-dashboard" : "/login"}>
+              <Button className="w-full font-semibold text-white" style={{ background: "#189aa1" }}>
+                {automaticSignInReady ? "Go to Dashboard" : "Sign In"}
+              </Button>
             </Link>
           </div>
         ) : (
