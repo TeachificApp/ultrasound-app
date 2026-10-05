@@ -11,8 +11,10 @@ describe("canonical bundle direct checkout", () => {
     const builder = readProjectFile("client/src/pages/admin/LandingPageBuilder.tsx");
 
     expect(router).toContain('type: "canonical_bundle" as const');
-    expect(router).toContain("firstCanonicalPriceByBundleId");
+    expect(router).toContain("firstPaidCanonicalPriceByBundleId");
     expect(router).toContain("bundlePricingOptions.isActive");
+    expect(router).toContain('where(eq(bundles.status, "published"))');
+    expect(router).toContain('option.pricingType !== "free" && priceCents > 0');
     expect(builder).toContain('return type === "canonical_bundle" ? "bundle" : type;');
     expect(builder).toContain('type === "canonical_bundle"');
   });

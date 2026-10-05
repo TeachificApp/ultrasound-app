@@ -1,4 +1,24 @@
 export const SURVEY_PULSE_MINIMUM_SAMPLE = 5;
+export const SURVEY_PULSE_STANDARD_WEEKLY_HOURS = 40;
+export const SURVEY_PULSE_STANDARD_ANNUAL_WEEKS = 52;
+
+/**
+ * Converts an annual base salary to the 40-hour weekly equivalent hourly rate.
+ * The salary survey keeps reported weekly hours as its own field; this standard
+ * conversion is deliberately consistent for apples-to-apples compensation entry.
+ */
+export function hourlyRateFromAnnualSalary(annualSalary: number) {
+  if (!Number.isFinite(annualSalary) || annualSalary < 0) return null;
+  return Math.round(
+    (annualSalary / (SURVEY_PULSE_STANDARD_WEEKLY_HOURS * SURVEY_PULSE_STANDARD_ANNUAL_WEEKS)) * 100,
+  ) / 100;
+}
+
+/** Converts an hourly rate to its annual 40-hour weekly equivalent. */
+export function annualSalaryFromHourlyRate(hourlyRate: number) {
+  if (!Number.isFinite(hourlyRate) || hourlyRate < 0) return null;
+  return Math.round(hourlyRate * SURVEY_PULSE_STANDARD_WEEKLY_HOURS * SURVEY_PULSE_STANDARD_ANNUAL_WEEKS);
+}
 
 export const US_STATES = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY",

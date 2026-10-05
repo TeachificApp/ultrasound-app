@@ -7,6 +7,7 @@ import { Router, type Request, type Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
+import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import {
   digitalProductFiles,
   digitalProducts,
@@ -84,6 +85,10 @@ router.get(
       const isAdminPreview = user.role === "admin" && req.query.preview === "1";
       let purchase = null;
       if (!product.isFree && !isAdminPreview) {
+        // Every signed-in learner has the Free Membership baseline. Reconcile it
+        // immediately so downloads included with that plan do not depend on a
+        // prior visit to the member dashboard or download library.
+        await ensureFreeMembership(user.id, { db });
         purchase = await loadPurchaseForUser(db, user.id, productId);
         if (!purchase || !isPurchaseAccessActive(purchase)) {
           res.status(403).json({ error: "Download access not available" });

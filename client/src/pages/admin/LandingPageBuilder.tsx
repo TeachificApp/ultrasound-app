@@ -1168,8 +1168,14 @@ type CheckoutCatalogProduct = {
   slug?: string;
 };
 
-function formatCheckoutProductType(type: string) {
+export function checkoutProductTypeFilterKey(type: string) {
   return type === "canonical_bundle" ? "bundle" : type;
+}
+
+function formatCheckoutProductType(type: string) {
+  return checkoutProductTypeFilterKey(type)
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export type CheckoutProductSort = "name" | "type" | "price_low" | "price_high";
@@ -1188,12 +1194,15 @@ export function filterAndSortCheckoutProducts(
   sort: CheckoutProductSort,
 ) {
   const normalizedSearch = search.trim().toLocaleLowerCase();
+  const normalizedProductType = productType === "all"
+    ? "all"
+    : checkoutProductTypeFilterKey(productType);
   const compareName = (a: CheckoutCatalogProduct, b: CheckoutCatalogProduct) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 
   return products
     .filter((product) => {
-      if (productType !== "all" && product.type !== productType) return false;
+      if (normalizedProductType !== "all" && checkoutProductTypeFilterKey(product.type) !== normalizedProductType) return false;
       if (!normalizedSearch) return true;
       return [product.name, product.type, product.slug ?? ""]
         .some((value) => value.toLocaleLowerCase().includes(normalizedSearch));
@@ -1201,7 +1210,7 @@ export function filterAndSortCheckoutProducts(
     .sort((a, b) => {
       if (sort === "price_low") return (Number(a.price) - Number(b.price)) || compareName(a, b);
       if (sort === "price_high") return (Number(b.price) - Number(a.price)) || compareName(a, b);
-      if (sort === "type") return a.type.localeCompare(b.type, undefined, { sensitivity: "base" }) || compareName(a, b);
+      if (sort === "type") return checkoutProductTypeFilterKey(a.type).localeCompare(checkoutProductTypeFilterKey(b.type), undefined, { sensitivity: "base" }) || compareName(a, b);
       return compareName(a, b);
     });
 }
@@ -1215,6 +1224,16 @@ function formatCheckoutProduct(product: CheckoutCatalogProduct) {
         maximumFractionDigits: 2,
       })}`);
   return `${product.name} (${formatCheckoutProductType(product.type)}) — ${price}`;
+}
+
+function resolveCheckoutProductLink(product: CheckoutCatalogProduct) {
+  if (!product.slug) return "";
+  if (product.type === "workshop") return `https://learn.allaboutultrasound.com/workshops/${product.slug}`;
+  if (product.type === "webinar") return `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=webinar`;
+  if (product.type === "download") return `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=download`;
+  if (product.type === "canonical_bundle") return `https://learn.allaboutultrasound.com/bundles/${product.slug}`;
+  if (product.type === "bundle") return `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=bundle`;
+  return `https://learn.allaboutultrasound.com/checkout/${product.slug}`;
 }
 
 function CTAActionPicker({
@@ -1300,7 +1319,7 @@ function CTAActionPicker({
   const [checkoutSort, setCheckoutSort] = React.useState<CheckoutProductSort>("name");
   const checkoutProducts = productCatalog ?? [];
   const checkoutProductTypes = React.useMemo(
-    () => [...new Set(checkoutProducts.map((product) => product.type))].sort((a, b) => a.localeCompare(b)),
+    () => [...new Set(checkoutProducts.map((product) => checkoutProductTypeFilterKey(product.type)))].sort((a, b) => a.localeCompare(b)),
     [checkoutProducts],
   );
   const selectedCheckoutValue = checkoutProductIdValue ? `${checkoutProductTypeValue}:${checkoutProductIdValue}` : "";
@@ -1308,6 +1327,9 @@ function CTAActionPicker({
     () => checkoutProducts.find((product) => `${product.type}:${product.id}` === selectedCheckoutValue),
     [checkoutProducts, selectedCheckoutValue],
   );
+  const resolvedCheckoutLink = selectedCheckoutProduct
+    ? resolveCheckoutProductLink(selectedCheckoutProduct)
+    : (linkValue ?? "");
   const filteredCheckoutProducts = React.useMemo(
     () => filterAndSortCheckoutProducts(checkoutProducts, checkoutSearch, checkoutTypeFilter, checkoutSort),
     [checkoutProducts, checkoutSearch, checkoutSort, checkoutTypeFilter],
@@ -1483,27 +1505,10 @@ function CTAActionPicker({
               value={selectedCheckoutValue}
               onChange={e => {
                 const [type, id] = e.target.value.split(":");
+                // Keep the selected product fields as the single source of truth. Updating
+                // ctaLink separately from the same change event can overwrite the product
+                // selection in nested block editors before their parent re-renders.
                 onCheckoutProductChange?.(type || "", id ? Number(id) : null);
-                // Also store the checkout URL in ctaLink so email renderer can use it.
-                const product = checkoutProducts.find((item) => item.type === type && item.id === Number(id));
-                if (product?.slug) {
-                  const checkoutUrl = type === "workshop"
-                    // Workshops need an instance ID — use landing page as placeholder;
-                    // getCampaign server resolver will upgrade to /checkout/workshop/{slug}?instance={id}.
-                    ? `https://learn.allaboutultrasound.com/workshops/${product.slug}`
-                    : type === "webinar"
-                    ? `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=webinar`
-                    : type === "download"
-                    ? `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=download`
-                    : type === "canonical_bundle"
-                    ? `https://learn.allaboutultrasound.com/bundles/${product.slug}`
-                    : type === "bundle"
-                    ? `https://learn.allaboutultrasound.com/checkout/${product.slug}?type=bundle`
-                    : `https://learn.allaboutultrasound.com/checkout/${product.slug}`;
-                  onLinkChange?.(checkoutUrl);
-                } else {
-                  onLinkChange?.("");
-                }
               }}
               className="w-full min-h-8 rounded border border-gray-200 bg-white px-2 py-1 text-xs"
               size={Math.min(Math.max(visibleCheckoutProducts.length + 1, 3), 7)}
@@ -1515,20 +1520,20 @@ function CTAActionPicker({
               ))}
             </select>
             {selectedCheckoutProduct && <p className="rounded bg-white/70 px-2 py-1 text-[10px] text-teal-800">Selected: {formatCheckoutProduct(selectedCheckoutProduct)}</p>}
-            {linkValue && (
+            {resolvedCheckoutLink && (
               <div className="space-y-1 rounded border border-teal-200 bg-white/80 p-2">
                 <label className="block text-[10px] font-medium text-teal-800">Resolved checkout link</label>
                 <div className="flex gap-1">
                   <input
                     readOnly
-                    value={linkValue}
+                    value={resolvedCheckoutLink}
                     className="h-7 min-w-0 flex-1 rounded border border-gray-200 bg-slate-50 px-2 text-[10px] text-slate-600"
                     aria-label="Resolved Stripe checkout link"
                   />
                   <button
                     type="button"
                     onClick={() => {
-                      void navigator.clipboard?.writeText(linkValue);
+                      void navigator.clipboard?.writeText(resolvedCheckoutLink);
                       toast.success("Checkout link copied");
                     }}
                     className="shrink-0 rounded border border-teal-200 px-2 text-[10px] font-medium text-teal-700 hover:bg-teal-50"
@@ -2894,12 +2899,13 @@ function SortableFaqItem({
 
 // ─── Sortable Pricing Card (used inside BlockSettings pricing case) ───────────
 function SortablePricingCard({
-  card, index, uploading, onSet, onRemove, onImageUpload, productCatalog, orderBumpsList, funnelList,
+  card, index, uploading, onSet, onSetMany, onRemove, onImageUpload, productCatalog, orderBumpsList, funnelList,
 }: {
   card: { id: string; label?: string; sublabel?: string; ctaLabel?: string; ctaUrl?: string; badge?: string; imageUrl?: string; [key: string]: any };
   index: number;
   uploading: string | null;
   onSet: (key: string, val: any) => void;
+  onSetMany?: (patch: Record<string, any>) => void;
   onRemove: () => void;
   onImageUpload: (file: File) => void;
   productCatalog?: Array<{ id: number; type: string; name: string; price: number }>;
@@ -2940,7 +2946,15 @@ function SortablePricingCard({
         onDownloadChange={v => onSet("ctaDownloadUrl", v)}
         checkoutProductTypeValue={card.checkoutProductType}
         checkoutProductIdValue={card.checkoutProductId ?? null}
-        onCheckoutProductChange={(type, id) => { onSet("checkoutProductType", type); onSet("checkoutProductId", id); }}
+        onCheckoutProductChange={(type, id) => {
+          const patch = { checkoutProductType: type, checkoutProductId: id };
+          if (onSetMany) {
+            onSetMany(patch);
+            return;
+          }
+          onSet("checkoutProductType", type);
+          onSet("checkoutProductId", id);
+        }}
         groupDiscountTiersValue={card.groupDiscountTiers ?? []}
         onGroupDiscountTiersChange={v => onSet("groupDiscountTiers", v)}
         pricingOptionIdValue={card.ctaPricingOptionId ?? null}
@@ -5730,7 +5744,11 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
       );
     case "pricing_options_auto": {
       const pricingCards: Array<{ id: string; label?: string; sublabel?: string; ctaLabel?: string; ctaUrl?: string; imageUrl?: string; badge?: string }> = (d.cards ?? []).map((c: any, i: number) => ({ id: c.id ?? `pc-${i}`, ...c }));
-      const setPricingCard = (i: number, key: string, val: any) => { const next = pricingCards.map((c, j) => j === i ? { ...c, [key]: val } : c); set("cards", next); };
+      const setPricingCard = (i: number, keyOrPatch: string | Record<string, any>, val?: any) => {
+        const patch = typeof keyOrPatch === "string" ? { [keyOrPatch]: val } : keyOrPatch;
+        const next = pricingCards.map((card, j) => j === i ? { ...card, ...patch } : card);
+        set("cards", next);
+      };
       const handlePricingImageUpload = async (i: number, file: File) => {
         if (file.size > 10 * 1024 * 1024) { toast.error("Image must be under 10 MB"); return; }
         setUploading(`pricing-img-${i}`);
@@ -5784,6 +5802,7 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
                       index={i}
                       uploading={uploading}
                       onSet={(key, val) => setPricingCard(i, key, val)}
+                      onSetMany={patch => setPricingCard(i, patch)}
                       onRemove={() => set("cards", pricingCards.filter((_, j) => j !== i))}
                       onImageUpload={file => handlePricingImageUpload(i, file)}
                       productCatalog={productCatalog}

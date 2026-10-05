@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { desc } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { surveyPulseResponses } from "../../drizzle/schema";
@@ -89,23 +90,33 @@ export const surveyPulseRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Survey Pulse is temporarily unavailable. Please try again shortly.");
 
-      await db.insert(surveyPulseResponses).values({
-        state: input.state,
-        specialty: input.specialty,
-        credentialsJson: input.credentials.length ? JSON.stringify(input.credentials) : null,
-        experienceBand: input.experienceBand,
-        employmentSetting: input.employmentSetting,
-        employmentType: input.employmentType,
-        role: input.role,
-        annualBaseSalaryCents: input.annualBaseSalary * 100,
-        hourlyRateCents: input.hourlyRate ? Math.round(input.hourlyRate * 100) : null,
-        weeklyHours: input.weeklyHours ?? null,
-        callResponsibilities: input.callResponsibilities,
-        callPayType: input.callResponsibilities ? input.callPayType ?? null : null,
-        additionalCompensationCents: input.additionalCompensation != null ? input.additionalCompensation * 100 : null,
-        travelAssignment: input.travelAssignment,
-        benefitsJson: input.benefits.length ? JSON.stringify(input.benefits) : null,
-      });
+      try {
+        await db.insert(surveyPulseResponses).values({
+          state: input.state,
+          specialty: input.specialty,
+          credentialsJson: input.credentials.length ? JSON.stringify(input.credentials) : null,
+          experienceBand: input.experienceBand,
+          employmentSetting: input.employmentSetting,
+          employmentType: input.employmentType,
+          role: input.role,
+          annualBaseSalaryCents: input.annualBaseSalary * 100,
+          hourlyRateCents: input.hourlyRate ? Math.round(input.hourlyRate * 100) : null,
+          weeklyHours: input.weeklyHours ?? null,
+          callResponsibilities: input.callResponsibilities,
+          callPayType: input.callResponsibilities ? input.callPayType ?? null : null,
+          additionalCompensationCents: input.additionalCompensation != null ? input.additionalCompensation * 100 : null,
+          travelAssignment: input.travelAssignment,
+          benefitsJson: input.benefits.length ? JSON.stringify(input.benefits) : null,
+        });
+      } catch (error) {
+        // Anonymous survey errors must never disclose raw SQL or submitted
+        // response values to the participant. Keep diagnostic details server-side.
+        console.error("[SurveyPulse] Anonymous response insert failed:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "We could not save your anonymous response just now. No response was recorded. Please try again shortly.",
+        });
+      }
 
       return {
         success: true,

@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   SURVEY_PULSE_MINIMUM_SAMPLE,
+  SURVEY_PULSE_STANDARD_ANNUAL_WEEKS,
+  SURVEY_PULSE_STANDARD_WEEKLY_HOURS,
+  annualSalaryFromHourlyRate,
   buildSurveyPulseDashboard,
   filterSurveyPulseResponses,
+  hourlyRateFromAnnualSalary,
   type SurveyPulseResponseForAnalytics,
 } from "../shared/surveyPulse";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 function response(overrides: Partial<SurveyPulseResponseForAnalytics> = {}): SurveyPulseResponseForAnalytics {
   return {
@@ -27,6 +33,28 @@ function response(overrides: Partial<SurveyPulseResponseForAnalytics> = {}): Sur
 }
 
 describe("Survey Pulse aggregate privacy contract", () => {
+  it("converts annual and hourly pay at a standard 40-hour work week", () => {
+    expect(SURVEY_PULSE_STANDARD_WEEKLY_HOURS).toBe(40);
+    expect(SURVEY_PULSE_STANDARD_ANNUAL_WEEKS).toBe(52);
+    expect(hourlyRateFromAnnualSalary(87_000)).toBe(41.83);
+    expect(annualSalaryFromHourlyRate(42)).toBe(87_360);
+    expect(hourlyRateFromAnnualSalary(-1)).toBeNull();
+    expect(annualSalaryFromHourlyRate(Number.NaN)).toBeNull();
+  });
+
+  it("allows either salary field to become the manual source and keeps database errors private", () => {
+    const form = readFileSync(resolve(import.meta.dirname, "../client/src/pages/SurveyPulse.tsx"), "utf8");
+    const router = readFileSync(resolve(import.meta.dirname, "../server/routers/surveyPulseRouter.ts"), "utf8");
+
+    expect(form).toContain("const updateAnnualSalary");
+    expect(form).toContain("const updateHourlyRate");
+    expect(form).toContain("updateAnnualSalary(event.target.value)");
+    expect(form).toContain("updateHourlyRate(event.target.value)");
+    expect(form).toContain("Type into either salary field to manually override");
+    expect(router).toContain("[SurveyPulse] Anonymous response insert failed:");
+    expect(router).toContain("No response was recorded. Please try again shortly.");
+  });
+
   it("suppresses benchmarks and category breakdowns below the five-response threshold", () => {
     const dashboard = buildSurveyPulseDashboard(Array.from({ length: SURVEY_PULSE_MINIMUM_SAMPLE - 1 }, () => response()));
     expect(dashboard.sampleSize).toBe(4);

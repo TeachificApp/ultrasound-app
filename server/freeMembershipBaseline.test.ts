@@ -50,6 +50,16 @@ describe("Free Membership automatic baseline contracts", () => {
     expect(downloadsRouter).toContain("sendDownloadAccessEmail");
   });
 
+  it("reconciles Free Membership before protected non-free download delivery", () => {
+    const protectedDownloads = readSource("server/routes/learnerProtectedDownloads.ts");
+
+    expect(protectedDownloads).toContain('import { ensureFreeMembership } from "../lib/ensureFreeMembership";');
+    expect(protectedDownloads).toContain("await ensureFreeMembership(user.id, { db })");
+    expect(protectedDownloads.indexOf("await ensureFreeMembership(user.id, { db })")).toBeLessThan(
+      protectedDownloads.indexOf("loadPurchaseForUser(db, user.id, productId)"),
+    );
+  });
+
   it("delivers one direct bundle-level email and no included-product email from the Stripe bundle handler", () => {
     const source = readSource("server/webhooks/stripe.ts");
     const start = source.indexOf("async function handleDigitalBundleCheckoutCompleted");

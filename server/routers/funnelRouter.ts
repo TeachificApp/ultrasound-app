@@ -85,8 +85,8 @@ export const funnelRouter = router({
       db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, price: lmsCourses.price, thumbnailUrl: lmsCourses.thumbnailUrl, courseType: lmsCourses.type }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, price: digitalProducts.price, thumbnailUrl: digitalProducts.thumbnailUrl }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
       db.select({ id: digitalBundles.id, title: digitalBundles.title, slug: digitalBundles.slug, price: digitalBundles.discountPrice, thumbnailUrl: digitalBundles.thumbnailUrl }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
-      db.select({ id: bundles.id, title: bundles.title, slug: bundles.slug, price: bundles.price, coverImage: bundles.coverImage, status: bundles.status, accessType: bundles.accessType }).from(bundles).orderBy(asc(bundles.title)),
-      db.select({ bundleId: bundlePricingOptions.bundleId, price: bundlePricingOptions.price, sortOrder: bundlePricingOptions.sortOrder }).from(bundlePricingOptions).where(eq(bundlePricingOptions.isActive, true)).orderBy(asc(bundlePricingOptions.sortOrder), asc(bundlePricingOptions.id)),
+      db.select({ id: bundles.id, title: bundles.title, slug: bundles.slug, price: bundles.price, coverImage: bundles.coverImage, status: bundles.status, accessType: bundles.accessType }).from(bundles).where(eq(bundles.status, "published")).orderBy(asc(bundles.title)),
+      db.select({ bundleId: bundlePricingOptions.bundleId, price: bundlePricingOptions.price, pricingType: bundlePricingOptions.pricingType, sortOrder: bundlePricingOptions.sortOrder }).from(bundlePricingOptions).where(eq(bundlePricingOptions.isActive, true)).orderBy(asc(bundlePricingOptions.sortOrder), asc(bundlePricingOptions.id)),
       db.select({ id: physicalProducts.id, title: physicalProducts.title, price: physicalProducts.price, thumbnailUrl: physicalProducts.thumbnailUrl }).from(physicalProducts).orderBy(asc(physicalProducts.title)),
       db.select({ id: webinars.id, title: webinars.title, slug: webinars.slug, price: webinars.price, coverImage: webinars.coverImage, accessType: webinars.accessType }).from(webinars).where(eq(webinars.status, "published")).orderBy(asc(webinars.title)),
       db.select({ id: communities.id, title: communities.title, slug: communities.slug, coverImage: communities.coverImage, accessType: communities.accessType }).from(communities).where(eq(communities.status, "published")).orderBy(asc(communities.title)),
@@ -105,10 +105,11 @@ export const funnelRouter = router({
       { id: 1004, type: "app" as const, name: "EchoAssist™ — Premium", price: 9.97, imageUrl: IHE_HERO, href: "https://app.iheartecho.com", isFree: false, appLabel: "EchoAssist™", priceLabel: "$9.97/mo" },
       { id: 1005, type: "app" as const, name: "UltrasoundAssist™ + EchoAssist™ — Bundle", price: 12.99, imageUrl: AAUS_HERO, href: "https://app.allaboutultrasound.com", isFree: false, appLabel: "UltrasoundAssist™ + EchoAssist™", priceLabel: "$12.99/mo" },
     ];
-    const firstCanonicalPriceByBundleId = new Map<number, number>();
+    const firstPaidCanonicalPriceByBundleId = new Map<number, number>();
     for (const option of canonicalBundleOptions) {
-      if (!firstCanonicalPriceByBundleId.has(option.bundleId)) {
-        firstCanonicalPriceByBundleId.set(option.bundleId, Number(option.price ?? 0));
+      const priceCents = Number(option.price ?? 0);
+      if (option.pricingType !== "free" && priceCents > 0 && !firstPaidCanonicalPriceByBundleId.has(option.bundleId)) {
+        firstPaidCanonicalPriceByBundleId.set(option.bundleId, priceCents);
       }
     }
 
@@ -117,7 +118,9 @@ export const funnelRouter = router({
       ...courses.map(c => ({ id: c.id, type: (c.courseType === "cohort" ? "cohort" : c.courseType === "quiz" ? "quiz" : "course") as string, name: c.title, slug: c.slug ?? "", price: Number(c.price ?? 0), imageUrl: c.thumbnailUrl ?? "" })),
       ...downloads.map(d => ({ id: d.id, type: "download" as const, name: d.title, slug: d.slug ?? "", price: Number(d.price ?? 0), imageUrl: d.thumbnailUrl ?? "" })),
       ...legacyBundles.map(b => ({ id: b.id, type: "bundle" as const, name: b.title, slug: b.slug ?? "", price: Number(b.price ?? 0), imageUrl: b.thumbnailUrl ?? "" })),
-      ...canonicalBundles.map(b => ({ id: b.id, type: "canonical_bundle" as const, name: b.title, slug: b.slug, price: (firstCanonicalPriceByBundleId.get(b.id) ?? Number(b.price ?? 0)) / 100, imageUrl: b.coverImage ?? "", isFree: b.accessType === "free", status: b.status })),
+      ...canonicalBundles
+        .filter((bundle) => bundle.accessType !== "free" && (firstPaidCanonicalPriceByBundleId.get(bundle.id) ?? Number(bundle.price ?? 0)) > 0)
+        .map(b => ({ id: b.id, type: "canonical_bundle" as const, name: b.title, slug: b.slug, price: (firstPaidCanonicalPriceByBundleId.get(b.id) ?? Number(b.price ?? 0)) / 100, imageUrl: b.coverImage ?? "", isFree: false, status: b.status })),
       ...physical.map(p => ({ id: p.id, type: "physical" as const, name: p.title, slug: "", price: Number(p.price ?? 0), imageUrl: p.thumbnailUrl ?? "" })),
       ...webinarList.map(w => ({ id: w.id, type: "webinar" as const, name: w.title, slug: w.slug ?? "", price: Number(w.price ?? 0), imageUrl: w.coverImage ?? "", isFree: w.accessType === "free" })),
       ...communityList.map(c => ({ id: c.id, type: "community" as const, name: c.title, slug: c.slug ?? "", price: 0, imageUrl: c.coverImage ?? "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp", isFree: c.accessType === "free" })),
