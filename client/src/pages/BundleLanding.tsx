@@ -46,6 +46,96 @@ export function BundleOptionPrice({ price }: { price: number | string | null | u
   return <>{formatAuthoredDollars(price)}</>;
 }
 
+/**
+ * Dynamic pricing for a bundle's visual landing page. The source of truth stays
+ * in Bundle Pricing Options, so pricing, labels, and active options never become
+ * stale inside a saved page block.
+ */
+function BundlePricingOptionsBlock({
+  data,
+  pricingOptions,
+  isEnrolled,
+  isWaitlist,
+  isClosed,
+  isBusy,
+  onChoose,
+}: {
+  data: Record<string, any>;
+  pricingOptions: any[];
+  isEnrolled: boolean;
+  isWaitlist: boolean;
+  isClosed: boolean;
+  isBusy: boolean;
+  onChoose: (pricingOptionId?: string) => void;
+}) {
+  const accentColor = data.accentColor ?? data.ctaColor ?? "#179ca3";
+  const headline = data.headline ?? "Choose Your Bundle Access";
+  const subtext = data.subtext ?? "Select the option that works best for you.";
+  const getIntervalLabel = (option: any) => {
+    const interval = option.subscriptionInterval ?? option.interval;
+    if (interval === "quarterly") return "/3 months";
+    if (interval === "annual") return "/year";
+    if (interval === "monthly") return "/month";
+    return option.type === "subscription" || option.pricingType === "subscription" ? "/month" : "";
+  };
+  const getButtonLabel = (option: any) => {
+    if (isEnrolled) return PURCHASE_ACCESS_LABEL;
+    if (isWaitlist) return "Join Waitlist";
+    if (isClosed) return "Enrollment Closed";
+    if (isBusy) return "Processing…";
+    return option.ctaLabel || option.label || "Choose This Option";
+  };
+
+  if (pricingOptions.length === 0) {
+    return (
+      <section className="py-10 px-4" style={{ backgroundColor: data.bgColor ?? "#f9fafb" }}>
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-2xl font-bold text-gray-900">{headline}</h2>
+          {subtext && <p className="mt-2 text-gray-600">{subtext}</p>}
+          <Button className="mt-6" style={{ backgroundColor: accentColor }} onClick={() => onChoose()} disabled={isClosed || isBusy}>
+            {getButtonLabel({})}
+          </Button>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="py-10 px-4" style={{ backgroundColor: data.bgColor ?? "#f9fafb" }}>
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center mb-7">
+          <h2 className="text-2xl font-bold text-gray-900">{headline}</h2>
+          {subtext && <p className="mt-2 text-gray-600">{subtext}</p>}
+        </div>
+        <div className={`grid gap-5 ${pricingOptions.length === 1 ? "max-w-md mx-auto" : "md:grid-cols-2"}`}>
+          {pricingOptions.map((option, index) => {
+            const featured = option.featured === true || index === 0;
+            return (
+              <article key={option.id ?? index} className="rounded-2xl bg-white p-6 shadow-sm" style={{ border: `2px solid ${featured ? accentColor : "#e5e7eb"}` }}>
+                <p className="font-semibold text-gray-900">{option.label || `Option ${index + 1}`}</p>
+                {option.sublabel && <p className="mt-1 text-sm text-gray-500">{option.sublabel}</p>}
+                <div className="mt-4">
+                  <span className="text-3xl font-black" style={{ color: accentColor }}><BundleOptionPrice price={option.price} /></span>
+                  <span className="ml-1 text-sm text-gray-500">{getIntervalLabel(option)}</span>
+                </div>
+                <Button
+                  className="mt-6 w-full"
+                  variant={featured ? "default" : "outline"}
+                  style={featured ? { backgroundColor: accentColor } : { borderColor: accentColor, color: accentColor }}
+                  onClick={() => onChoose(option.id != null ? String(option.id) : undefined)}
+                  disabled={isClosed || isBusy}
+                >
+                  {getButtonLabel(option)}
+                </Button>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function BundleLanding() {
   const { slug } = useParams<{ slug: string }>();
   const search = useSearch();
@@ -106,9 +196,14 @@ export default function BundleLanding() {
   }, []);
 
   const pricingOptions = useMemo(() => {
+    if (Array.isArray(data?.pricingOptions)) return data.pricingOptions;
     if (!data?.bundle?.pricingOptions) return [];
     try { return JSON.parse(data.bundle.pricingOptions); } catch { return []; }
-  }, [data?.bundle?.pricingOptions]);
+  }, [data?.pricingOptions, data?.bundle?.pricingOptions]);
+  const landingBlocks = useMemo(() => {
+    if (!data?.bundle?.landingPageBlocks) return [];
+    try { return JSON.parse(data.bundle.landingPageBlocks) as any[]; } catch { return []; }
+  }, [data?.bundle?.landingPageBlocks]);
 
   if (isLoading || authLoading) {
     return (
@@ -129,15 +224,12 @@ export default function BundleLanding() {
   const { bundle, items, isEnrolled } = data;
   const isWaitlist = bundle.status === "waitlist";
   const isClosed = bundle.status === "enrollment_closed";
-  const landingBlocks = useMemo(() => {
-    if (!bundle.landingPageBlocks) return [];
-    try { return JSON.parse(bundle.landingPageBlocks) as any[]; } catch { return []; }
-  }, [bundle.landingPageBlocks]);
   const itemCount = items.length;
 
   return (
     <>
     <div className="min-h-screen bg-gray-50">
+      {landingBlocks.length === 0 && <>
       {/* Hero */}
       <div className="bg-gradient-to-br from-slate-900 via-teal-900 to-slate-900 text-white py-16">
         <div className="max-w-3xl mx-auto px-4">
@@ -257,18 +349,39 @@ export default function BundleLanding() {
           </Card>
         </div>
       )}
+      </>}
 
-      {/* Page builder blocks (if configured) — otherwise fall back to default included items layout */}
+      {/* A saved visual page controls the entire public bundle URL. */}
       {landingBlocks.length > 0 ? (
         <div>
           {landingBlocks.map((block: any) => {
             if (block.type === "included_items_auto") {
               return <IncludedItemsBlock key={block.id} data={block.data ?? {}} items={items as any[]} />;
             }
+            if (block.type === "pricing_options_auto") {
+              return (
+                <BundlePricingOptionsBlock
+                  key={block.id}
+                  data={block.data ?? {}}
+                  pricingOptions={pricingOptions}
+                  isEnrolled={isEnrolled}
+                  isWaitlist={isWaitlist}
+                  isClosed={isClosed}
+                  isBusy={checkoutBusy}
+                  onChoose={(pricingOptionId) => runCheckout(bundle.id, pricingOptionId)}
+                />
+              );
+            }
             if (block.type === "related_products") {
               return <RelatedProductsBlock key={block.id} data={block.data ?? {}} currentType={undefined} />;
             }
-            return <BlockPreview key={block.id} block={block} />;
+            return (
+              <BlockPreview
+                key={block.id}
+                block={block}
+                onCheckoutPage={(pricingOptionId?: number) => runCheckout(bundle.id, pricingOptionId != null ? String(pricingOptionId) : undefined)}
+              />
+            );
           })}
         </div>
       ) : (

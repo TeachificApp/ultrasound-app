@@ -123,7 +123,27 @@ export const bundlePublicRouter = router({
           .where(and(eq(bundleEnrollments.bundleId, bundle.id), eq(bundleEnrollments.userId, (ctx.user as any).id))).limit(1);
         isEnrolled = !!enr;
       }
-      return { bundle, items: enrichedItems, isEnrolled };
+      // Structured options are authoritative when configured. Normalize their
+      // cents-based storage to the same public dollars shape used by the legacy
+      // JSON options so the public page and visual builder always show the
+      // current Bundle Pricing Options.
+      const structuredOptions = await db.select().from(bundlePricingOptions)
+        .where(and(eq(bundlePricingOptions.bundleId, bundle.id), eq(bundlePricingOptions.isActive, true)))
+        .orderBy(asc(bundlePricingOptions.sortOrder), asc(bundlePricingOptions.id));
+      let pricingOptions: any[] = structuredOptions.map((option) => ({
+        id: String(option.id),
+        label: option.label,
+        sublabel: option.sublabel,
+        ctaLabel: option.ctaLabel,
+        type: option.pricingType,
+        pricingType: option.pricingType,
+        price: resolveBundleCheckoutDollars(option.price, true),
+        subscriptionInterval: option.subscriptionInterval,
+      }));
+      if (pricingOptions.length === 0) {
+        try { pricingOptions = JSON.parse(bundle.pricingOptions ?? "[]"); } catch { pricingOptions = []; }
+      }
+      return { bundle, items: enrichedItems, isEnrolled, pricingOptions };
     }),
 });
 

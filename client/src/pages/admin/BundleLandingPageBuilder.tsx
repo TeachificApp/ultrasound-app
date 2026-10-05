@@ -28,6 +28,96 @@ import {
   ArrowLeft, Save, Eye, Plus, X, Layers, Copy, Search, BookmarkPlus, Bookmark, FolderOpen, Trash2,
 } from "lucide-react";
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char] ?? char);
+}
+
+function createBundleStarterBlocks(bundle: any): Block[] {
+  const ctaText = bundle.accessType === "free" ? "Enroll Free" : "Choose Your Bundle";
+  const description = typeof bundle.description === "string" ? bundle.description.trim() : "";
+  return [
+    {
+      id: uid(),
+      type: "hero",
+      data: {
+        headline: bundle.title || "Your Bundle Title",
+        subheadline: bundle.subtitle || "A curated collection designed to help you learn more, faster.",
+        bgType: bundle.coverImage ? "image" : "gradient",
+        imageUrl: bundle.coverImage || "",
+        bgImageSize: "cover",
+        gradientFrom: "#0e4a50",
+        gradientTo: "#179ca3",
+        gradientDir: "to bottom right",
+        textColor: "#ffffff",
+        align: "left",
+        hideButtons: false,
+        buttons: [{
+          text: ctaText,
+          color: "#ffffff",
+          textColor: "#0e4a50",
+          link: "",
+          style: "filled",
+          behavior: "direct_checkout",
+          checkoutProductType: "bundle",
+          checkoutProductId: bundle.id,
+        }],
+      },
+    },
+    ...(description ? [{
+      id: uid(),
+      type: "text" as const,
+      data: {
+        html: description.split(/\n{2,}/).map((paragraph: string) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`).join(""),
+        align: "left",
+        bgColor: "#ffffff",
+        textColor: "#1f2937",
+      },
+    }] : []),
+    {
+      id: uid(),
+      type: "pricing_options_auto",
+      data: {
+        headline: "Choose Your Bundle Access",
+        subtext: "Select the option that works best for you.",
+        bgColor: "#f8fffe",
+        accentColor: "#179ca3",
+      },
+    },
+    {
+      id: uid(),
+      type: "included_items_auto",
+      data: {
+        sourceType: "bundle",
+        sourceId: bundle.id,
+        sourceName: bundle.title,
+        headline: "Everything Included",
+        subtext: "Explore the learning content included with this bundle.",
+        layout: "grid",
+        columns: 3,
+        showTypeLabel: true,
+        showCoverImage: true,
+        showCheckIcon: true,
+        accentColor: "#179ca3",
+        bgColor: "#ffffff",
+        cardBgColor: "#ffffff",
+      },
+    },
+    {
+      id: uid(),
+      type: "faq",
+      data: {
+        headline: "Frequently Asked Questions",
+        items: [
+          { q: "What is included with this bundle?", a: "You receive access to every item listed on this page." },
+          { q: "How do I access my content?", a: "After completing checkout, sign in to your Learn dashboard to access your bundle." },
+        ],
+        bgColor: "#f8fffe",
+        accentColor: "#179ca3",
+      },
+    },
+  ];
+}
+
 export default function BundleLandingPageBuilder() {
   const { bundleId } = useParams<{ bundleId: string }>();
   const [, navigate] = useLocation();
@@ -37,11 +127,6 @@ export default function BundleLandingPageBuilder() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [pageInfo, setPageInfo] = useState<{ title: string; slug?: string } | null>(null);
-  // SEO state
-  const [seoTitle, setSeoTitle] = useState("");
-  const [seoDescription, setSeoDescription] = useState("");
-  const [seoImage, setSeoImage] = useState("");
-  const [seoSaved, setSeoSaved] = useState(false);
   // Block picker modal
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [pickerTab, setPickerTab] = useState<"catalog" | "from_pages" | "templates">("catalog");
@@ -111,8 +196,15 @@ export default function BundleLandingPageBuilder() {
     const bundle = lpData.bundle;
     setPageInfo({ title: bundle.title, slug: bundle.slug });
     if (bundle.landingPageBlocks) {
-      try { setBlocks(JSON.parse(bundle.landingPageBlocks) as Block[]); } catch {}
+      try {
+        const savedBlocks = JSON.parse(bundle.landingPageBlocks) as Block[];
+        setBlocks(savedBlocks.length > 0 ? savedBlocks : createBundleStarterBlocks(bundle));
+        return;
+      } catch {
+        // A malformed legacy payload should not leave the page editor blank.
+      }
     }
+    setBlocks(createBundleStarterBlocks(bundle));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lpData]);
 
@@ -121,13 +213,6 @@ export default function BundleLandingPageBuilder() {
     onSuccess: () => toast.success("Bundle landing page saved!"),
     onError: (e: any) => toast.error(`Save failed: ${e.message}`),
   });
-
-  // ── Save SEO ──
-  const seoSavePending = false;
-
-  const handleSaveSeo = () => {
-    toast.info('SEO settings coming soon.');
-  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -289,24 +374,13 @@ export default function BundleLandingPageBuilder() {
             ) : (
               <div className="p-4 space-y-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">SEO / Link Preview</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-xs text-gray-500 mb-1 block">Meta Title</label>
-                      <Input value={seoTitle} onChange={e => setSeoTitle(e.target.value)} placeholder="Page title for search engines" className="text-sm h-8" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 mb-1 block">Meta Description</label>
-                      <textarea value={seoDescription} onChange={e => setSeoDescription(e.target.value)} placeholder="Brief description for search results" className="w-full text-sm border rounded-md p-2 resize-none h-20 focus:outline-none focus:ring-2 focus:ring-teal-500" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 mb-1 block">Social Preview Image URL</label>
-                      <Input value={seoImage} onChange={e => setSeoImage(e.target.value)} placeholder="https://…" className="text-sm h-8" />
-                    </div>
-                    <Button onClick={handleSaveSeo} size="sm" variant="outline" className="w-full h-8 text-xs gap-1">
-                      {seoSaved ? "✓ Saved" : "Save SEO Settings"}
-                    </Button>
-                  </div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Bundle Page Settings</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Edit the public URL, selected domain, page title, description, cover image, and SEO details in Bundle Settings.
+                  </p>
+                  <a href={backPath} className="inline-flex mt-3 text-xs font-medium text-teal-700 hover:text-teal-900 hover:underline">
+                    Open Bundle Settings
+                  </a>
                 </div>
                 <p className="text-xs text-gray-400 text-center">Click a block on the canvas to edit its settings.</p>
               </div>

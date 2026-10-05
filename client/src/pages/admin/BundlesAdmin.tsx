@@ -34,7 +34,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PublishDomainSelect } from "@/components/PublishDomainSelect";
-import CheckoutPageEditor from "@/components/CheckoutPageEditor";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 
@@ -370,7 +369,7 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
           <TabsTrigger value="items" className="text-xs"><Package className="w-3.5 h-3.5 mr-1" />Items</TabsTrigger>
           <TabsTrigger value="enrollments" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Enrollments</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3.5 h-3.5 mr-1" />After Purchase</TabsTrigger>
-          <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
+          <TabsTrigger value="landing-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Landing Page</TabsTrigger>
           <TabsTrigger value="widget" className="text-xs"><Code className="w-3.5 h-3.5 mr-1" />Widget Code</TabsTrigger>
         </TabsList>
 
@@ -575,32 +574,32 @@ function BundleEditor({ bundleId, onBack }: { bundleId: number; onBack: () => vo
           <BundleAfterPurchaseSection bundleId={bundleId} />
         </TabsContent>
 
-        {/* Checkout Page Tab */}
-        <TabsContent value="checkout-page" className="pt-2">
+        {/* Public Bundle Landing Page Tab */}
+        <TabsContent value="landing-page" className="pt-2">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-base font-semibold text-gray-900">Checkout Page Editor</h3>
+                <h3 className="text-base font-semibold text-gray-900">Bundle Landing Page</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  Customise the sections shown on the hosted checkout page at{" "}
-                  <a href={checkoutUrl} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
-                    /checkout/{bundle.slug}
+                  Build the public sales page displayed at{" "}
+                  <a href={`/bundles/${bundle.slug}`} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline font-medium">
+                    /bundles/{bundle.slug}
                   </a>.
                 </p>
               </div>
               <div className="flex gap-2 shrink-0">
-                <a href={checkoutUrl} target="_blank" rel="noopener noreferrer"
+                <a href={`/bundles/${bundle.slug}`} target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">
                   <ExternalLink className="w-3.5 h-3.5" /> Preview
                 </a>
                 <a href={`/admin/bundles/${bundleId}/landing-builder`}
                   className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium">
-                  Open Page Editor
+                  Open Landing Page Editor
                 </a>
               </div>
             </div>
             <div className="mt-5 grid grid-cols-3 gap-3">
-              {["Trust Seals & Badges","What You'll Learn","Money-Back Guarantee","Testimonials","FAQ","Custom HTML"].map(s => (
+              {["Hero & calls to action", "Live bundle pricing options", "Included bundle items", "Testimonials", "FAQ", "Custom content blocks"].map(s => (
                 <div key={s} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
                   <div className="w-2 h-2 rounded-full bg-teal-400" />
                   <span className="text-xs text-gray-600">{s}</span>
