@@ -9,7 +9,17 @@ import type { getDb } from "../db";
 
 type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
-export type CampaignEventType = "open" | "click" | "unsubscribe";
+export type CampaignEventType =
+  | "processed"
+  | "delivered"
+  | "deferred"
+  | "bounce"
+  | "blocked"
+  | "dropped"
+  | "spamreport"
+  | "open"
+  | "click"
+  | "unsubscribe";
 
 /** App origin used in tracking pixel and click-wrap URLs (must include https://). */
 export function getEmailCampaignAppUrl(): string {
@@ -100,6 +110,8 @@ export type RecordCampaignEventInput = {
   campaignId: number;
   recipientKey: string;
   eventType: CampaignEventType;
+  /** Provider event IDs make webhook deliveries idempotent. */
+  providerEventId?: string;
   metadata?: Record<string, unknown>;
   ip?: string;
 };
@@ -140,6 +152,14 @@ export async function recordEmailCampaignEvent(
   input: RecordCampaignEventInput,
 ): Promise<void> {
   const { userId, email } = parseRecipientFromKey(input.recipientKey);
+  if (input.providerEventId) {
+    const [existing] = await db
+      .select({ id: emailCampaignEvents.id })
+      .from(emailCampaignEvents)
+      .where(eq(emailCampaignEvents.providerEventId, input.providerEventId))
+      .limit(1);
+    if (existing) return;
+  }
   const metadata = JSON.stringify({
     recipient: email ?? input.recipientKey,
     ...input.metadata,
@@ -168,6 +188,7 @@ export async function recordEmailCampaignEvent(
     userId,
     recipientKey: input.recipientKey,
     eventType: input.eventType,
+    providerEventId: input.providerEventId ?? null,
     metadata,
     country: geo.country ?? null,
     region: geo.region ?? null,

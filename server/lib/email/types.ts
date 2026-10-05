@@ -33,10 +33,16 @@ export interface SendEmailOptions {
    * Security or access email explicitly requested by the recipient (for example,
    * a magic sign-in link). These messages must not inherit marketing-list
    * suppression behavior.
-   */
+  */
   transactional?: boolean;
   /** Optional file attachments */
   attachments?: EmailAttachment[];
+  /**
+   * Non-PII campaign identifier forwarded to SendGrid as a custom argument.
+   * It associates Event Webhook delivery outcomes with the originating
+   * platform campaign without transmitting recipient identity as metadata.
+   */
+  campaignId?: number;
 }
 
 export type EmailProviderId = "sendgrid" | "smtpcom";

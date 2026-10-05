@@ -305,7 +305,7 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
           {/* Campaign summary banner */}
           {analytics && !isLoading && (
             <div className="mt-2 mb-1 rounded-lg border bg-gradient-to-r from-[#189aa1]/8 to-[#189aa1]/4 px-4 py-3">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
                 <div>
                   <div className="text-lg font-bold text-gray-900">{analytics.totalSent.toLocaleString()}</div>
                   <div className="text-[10px] text-gray-500 uppercase tracking-wide">Sent</div>
@@ -327,6 +327,11 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
                   <div className="text-lg font-bold text-red-600">{analytics.totalUnsubscribes.toLocaleString()}</div>
                   <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unsubscribes</div>
                   <div className="text-[10px] text-red-400 mt-0.5">{analytics.unsubscribeRate}% rate</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-teal-700">{analytics.uniqueDelivered.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Delivered</div>
+                  <div className="text-[10px] text-teal-500 mt-0.5">{analytics.deliveryRate}% confirmed</div>
                 </div>
               </div>
               {!hideFinancials && analytics.orders && analytics.orders.count > 0 && (
@@ -393,6 +398,20 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
                     <div className="text-xl font-bold text-red-700">{analytics.totalUnsubscribes.toLocaleString()}</div>
                     <div className="text-xs text-red-500 font-medium">{analytics.unsubscribeRate}% unsub rate</div>
                     <div className="text-[10px] text-red-400 mt-0.5">unsubscribes</div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-teal-100 bg-teal-50/40 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold text-teal-900">DELIVERY STATUS</p>
+                    <p className="text-[11px] text-teal-700">Confirmed by SendGrid&apos;s Event Webhook.</p>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5 text-center">
+                    <div><p className="text-sm font-bold text-teal-800">{analytics.totalDelivered.toLocaleString()}</p><p className="text-[10px] text-teal-700">delivered</p></div>
+                    <div><p className="text-sm font-bold text-amber-700">{analytics.totalDeferred.toLocaleString()}</p><p className="text-[10px] text-amber-700">deferred</p></div>
+                    <div><p className="text-sm font-bold text-orange-700">{analytics.totalBlocked.toLocaleString()}</p><p className="text-[10px] text-orange-700">blocked</p></div>
+                    <div><p className="text-sm font-bold text-red-700">{analytics.totalBounces.toLocaleString()}</p><p className="text-[10px] text-red-700">bounced</p></div>
+                    <div><p className="text-sm font-bold text-red-800">{analytics.totalDropped.toLocaleString()}</p><p className="text-[10px] text-red-800">dropped</p></div>
                   </div>
                 </div>
 

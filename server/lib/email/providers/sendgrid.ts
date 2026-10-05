@@ -16,6 +16,9 @@ export async function sendViaSendGrid(
       {
         to: [{ name: opts.to.name, email: opts.to.email }],
         subject: opts.subject,
+        ...(opts.campaignId
+          ? { custom_args: { campaignId: String(opts.campaignId) } }
+          : {}),
       },
     ],
     from: { name: sender.name, email: sender.email },

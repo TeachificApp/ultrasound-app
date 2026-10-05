@@ -2212,7 +2212,13 @@ export const emailCampaignEvents = mysqlTable("emailCampaignEvents", {
   campaignId: int("campaignId").notNull(),
   userId: int("userId"),
   recipientKey: varchar("recipientKey", { length: 128 }).notNull(),
-  eventType: mysqlEnum("eventType", ["open", "click", "unsubscribe"]).notNull(),
+  // First-party engagement events plus non-PII SendGrid delivery lifecycle events.
+  eventType: mysqlEnum("eventType", [
+    "processed", "delivered", "deferred", "bounce", "blocked", "dropped", "spamreport",
+    "open", "click", "unsubscribe",
+  ]).notNull(),
+  // SendGrid's sg_event_id prevents duplicate webhook delivery events from inflating analytics.
+  providerEventId: varchar("providerEventId", { length: 255 }).unique(),
   metadata: text("metadata"),
   country: varchar("country", { length: 100 }),
   region: varchar("region", { length: 100 }),

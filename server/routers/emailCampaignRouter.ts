@@ -78,6 +78,11 @@ type CampaignMetricsRow = {
   openCount: number;
   clickCount: number;
   unsubscribeCount: number;
+  deliveredCount: number;
+  deferredCount: number;
+  bounceCount: number;
+  blockedCount: number;
+  droppedCount: number;
   uniqueOpenCount: number;
   uniqueClickCount: number;
   uniqueUnsubscribeCount: number;
@@ -98,6 +103,11 @@ async function loadCampaignMetricsMap(
         SUM(CASE WHEN eventType = 'open' THEN 1 ELSE 0 END) as openCount,
         SUM(CASE WHEN eventType = 'click' THEN 1 ELSE 0 END) as clickCount,
         SUM(CASE WHEN eventType = 'unsubscribe' THEN 1 ELSE 0 END) as unsubscribeCount,
+        SUM(CASE WHEN eventType = 'delivered' THEN 1 ELSE 0 END) as deliveredCount,
+        SUM(CASE WHEN eventType = 'deferred' THEN 1 ELSE 0 END) as deferredCount,
+        SUM(CASE WHEN eventType = 'bounce' THEN 1 ELSE 0 END) as bounceCount,
+        SUM(CASE WHEN eventType = 'blocked' THEN 1 ELSE 0 END) as blockedCount,
+        SUM(CASE WHEN eventType = 'dropped' THEN 1 ELSE 0 END) as droppedCount,
         COUNT(DISTINCT CASE WHEN eventType = 'open' THEN recipientKey END) as uniqueOpenCount,
         COUNT(DISTINCT CASE WHEN eventType = 'click' THEN recipientKey END) as uniqueClickCount,
         COUNT(DISTINCT CASE WHEN eventType = 'unsubscribe' THEN recipientKey END) as uniqueUnsubscribeCount
@@ -318,6 +328,7 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
       fromName: senderName,
       fromEmail: senderEmail,
       listUnsubscribeUrl: listUnsubscribeApiUrl,
+      campaignId,
     });
     if (ok) {
       sent++;
@@ -1353,6 +1364,11 @@ Rules:
       const uniqueOpenCount = Number(m?.uniqueOpenCount ?? 0);
       const uniqueClickCount = Number(m?.uniqueClickCount ?? 0);
       const unsubscribeCount = Number(m?.unsubscribeCount ?? 0);
+      const deliveredCount = Number(m?.deliveredCount ?? 0);
+      const deferredCount = Number(m?.deferredCount ?? 0);
+      const bounceCount = Number(m?.bounceCount ?? 0);
+      const blockedCount = Number(m?.blockedCount ?? 0);
+      const droppedCount = Number(m?.droppedCount ?? 0);
       return {
         ...c,
         openCount,
@@ -1360,6 +1376,12 @@ Rules:
         uniqueOpenCount,
         uniqueClickCount,
         unsubscribeCount,
+        deliveredCount,
+        deferredCount,
+        bounceCount,
+        blockedCount,
+        droppedCount,
+        deliveryRate: sent > 0 ? Math.round((deliveredCount / sent) * 100) : 0,
         openRate: sent > 0 ? Math.round((uniqueOpenCount / sent) * 100) : 0,
         clickRate: sent > 0 ? Math.round((uniqueClickCount / sent) * 100) : 0,
       };
@@ -1442,9 +1464,17 @@ Rules:
       const totalOpens = Number(events.find((e) => e.eventType === "open")?.cnt ?? 0);
       const totalClicks = Number(events.find((e) => e.eventType === "click")?.cnt ?? 0);
       const totalUnsubscribes = Number(events.find((e) => e.eventType === "unsubscribe")?.cnt ?? 0);
+      const totalProcessed = Number(events.find((e) => e.eventType === "processed")?.cnt ?? 0);
+      const totalDelivered = Number(events.find((e) => e.eventType === "delivered")?.cnt ?? 0);
+      const totalDeferred = Number(events.find((e) => e.eventType === "deferred")?.cnt ?? 0);
+      const totalBounces = Number(events.find((e) => e.eventType === "bounce")?.cnt ?? 0);
+      const totalBlocked = Number(events.find((e) => e.eventType === "blocked")?.cnt ?? 0);
+      const totalDropped = Number(events.find((e) => e.eventType === "dropped")?.cnt ?? 0);
+      const totalSpamReports = Number(events.find((e) => e.eventType === "spamreport")?.cnt ?? 0);
       const uniqueOpens = Number(uniqueEvents.find((e) => e.eventType === "open")?.uniqueCnt ?? 0);
       const uniqueClicks = Number(uniqueEvents.find((e) => e.eventType === "click")?.uniqueCnt ?? 0);
       const uniqueUnsubscribes = Number(uniqueEvents.find((e) => e.eventType === "unsubscribe")?.uniqueCnt ?? 0);
+      const uniqueDelivered = Number(uniqueEvents.find((e) => e.eventType === "delivered")?.uniqueCnt ?? 0);
       const sent = campaign.recipientCount ?? 0;
 
       const variantStats: Record<string, { opens: number; clicks: number }> = {};
@@ -1459,6 +1489,7 @@ Rules:
       const openRate = sent > 0 ? Math.round((uniqueOpens / sent) * 100) : 0;
       const clickRate = sent > 0 ? Math.round((uniqueClicks / sent) * 100) : 0;
       const unsubscribeRate = sent > 0 ? Math.round((uniqueUnsubscribes / sent) * 100) : 0;
+      const deliveryRate = sent > 0 ? Math.round((uniqueDelivered / sent) * 100) : 0;
 
       return {
         campaignId: campaign.id,
@@ -1470,14 +1501,23 @@ Rules:
         totalOpens,
         totalClicks,
         totalUnsubscribes,
+        totalProcessed,
+        totalDelivered,
+        totalDeferred,
+        totalBounces,
+        totalBlocked,
+        totalDropped,
+        totalSpamReports,
         uniqueOpens,
         uniqueClicks,
+        uniqueDelivered,
         openCount: totalOpens,
         clickCount: totalClicks,
         unsubscribeCount: totalUnsubscribes,
         openRate,
         clickRate,
         unsubscribeRate,
+        deliveryRate,
         topLinks,
         ...(await isRestrictedManager(ctx.user.id)
           ? {}

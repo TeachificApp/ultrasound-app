@@ -37,11 +37,16 @@ import { getDb } from "../db";
 import { users, webhookEvents } from "../../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
 import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
+import { recordEmailCampaignEvent, type CampaignEventType } from "../lib/emailCampaignTracking";
+import { buildRecipientTrackingKey } from "../../shared/emailCampaignAudience";
 
 const SENDGRID_WEBHOOK_PUBLIC_KEY = process.env.SENDGRID_WEBHOOK_PUBLIC_KEY ?? "";
 
 // Events that indicate the user no longer wants emails
 const UNSUBSCRIBE_EVENTS = new Set(["unsubscribe", "spamreport", "group_unsubscribe"]);
+const CAMPAIGN_DELIVERY_EVENTS = new Set([
+  "processed", "delivered", "deferred", "bounce", "blocked", "dropped", "spamreport",
+] as const);
 
 interface SendGridEvent {
   email: string;
@@ -51,6 +56,54 @@ interface SendGridEvent {
   sg_message_id?: string;
   asm_group_id?: number;
   [key: string]: unknown;
+}
+
+function getCampaignId(event: SendGridEvent): number | null {
+  const candidate = event.campaignId ?? event.campaign_id;
+  const value = typeof candidate === "string" || typeof candidate === "number"
+    ? Number(candidate)
+    : Number.NaN;
+  return Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+export function getCampaignDeliveryEventType(event: SendGridEvent): CampaignEventType | null {
+  const raw = event.event?.toLowerCase();
+  const subtype = typeof event.type === "string" ? event.type.toLowerCase() : "";
+  const normalized = raw === "bounce" && subtype === "blocked" ? "blocked" : raw;
+  return CAMPAIGN_DELIVERY_EVENTS.has(normalized as "processed" | "delivered" | "deferred" | "bounce" | "blocked" | "dropped" | "spamreport")
+    ? normalized as CampaignEventType
+    : null;
+}
+
+async function recordCampaignDeliveryEvent(event: SendGridEvent): Promise<void> {
+  const campaignId = getCampaignId(event);
+  const eventType = getCampaignDeliveryEventType(event);
+  const email = event.email?.toLowerCase().trim();
+  if (!campaignId || !eventType || !email) return;
+
+  const db = await getDb();
+  if (!db) return;
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`LOWER(TRIM(${users.email})) = ${email}`)
+    .limit(1);
+  const recipientKey = buildRecipientTrackingKey({ userId: user?.id ?? null, email });
+
+  await recordEmailCampaignEvent(db, {
+    campaignId,
+    recipientKey,
+    eventType,
+    providerEventId: typeof event.sg_event_id === "string" ? event.sg_event_id : undefined,
+    metadata: {
+      provider: "sendgrid",
+      sgMessageId: typeof event.sg_message_id === "string" ? event.sg_message_id : undefined,
+      response: typeof event.response === "string" ? event.response : undefined,
+      reason: typeof event.reason === "string" ? event.reason : undefined,
+      attempt: typeof event.attempt === "string" || typeof event.attempt === "number" ? event.attempt : undefined,
+      bounceClassification: typeof event.bounce_classification === "string" ? event.bounce_classification : undefined,
+    },
+  });
 }
 
 /**
@@ -209,6 +262,10 @@ export function registerSendGridWebhook(app: Express) {
 
           // Log all events for audit trail
           await logWebhookEvent("sendgrid", eventType, JSON.stringify(event));
+
+          // SendGrid custom_args carry only the campaign ID. Persist its delivery
+          // lifecycle events separately from first-party opens and clicks.
+          await recordCampaignDeliveryEvent(event);
 
           // Handle unsubscribe-type events
           if (UNSUBSCRIBE_EVENTS.has(eventType)) {
