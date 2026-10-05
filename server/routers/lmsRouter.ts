@@ -26,7 +26,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, isNull, sql, asc, isNotNull, max, inArray, or, gte } from "drizzle-orm";
 import { randomBytes } from "crypto";
-import { evaluateInlineLessonQuizScore } from "../../shared/inlineLessonQuizCompletion";
+import { evaluateInlineLessonQuizScore, lessonHasRequiredInlineQuiz } from "../../shared/inlineLessonQuizCompletion";
 import { evaluateInlineLessonQuizCompletion } from "../../shared/inlineLessonQuizFlow";
 import { lessonHasAssessmentContent } from "../../shared/lessonAccessGating";
 import { collectDescendantFolderIds } from "../../shared/questionBankFolders";
@@ -2484,8 +2484,29 @@ export const lmsLearnerRouter = router({
       }
       if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
 
+      const [lesson] = await db.select({
+        id: lmsLessons.id,
+        courseId: lmsLessons.courseId,
+        sectionId: lmsLessons.sectionId,
+        contentBlocks: lmsLessons.contentBlocks,
+      }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      let lessonCourseId = lesson.courseId;
+      if (!lessonCourseId && lesson.sectionId) {
+        const [section] = await db.select({ courseId: lmsSections.courseId })
+          .from(lmsSections).where(eq(lmsSections.id, lesson.sectionId)).limit(1);
+        lessonCourseId = section?.courseId ?? null;
+      }
+      if (lessonCourseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
+
       const [existing] = await db.select().from(lmsLessonProgress)
         .where(and(eq(lmsLessonProgress.enrollmentId, enrollment.id), eq(lmsLessonProgress.lessonId, input.lessonId))).limit(1);
+      if (lessonHasRequiredInlineQuiz(lesson.contentBlocks) && !existing?.quizPassed) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Pass the required lesson quiz before marking this lesson complete.",
+        });
+      }
       let wasAlreadyComplete = false;
       if (existing) {
         wasAlreadyComplete = !!existing.completedAt;

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { formatCmeCreditPhrase } from "@shared/cmeCreditLabel";
 import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse } from "../../../shared/cmeLessonCompletion";
+import { lessonHasRequiredInlineQuiz } from "../../../shared/inlineLessonQuizCompletion";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
 import { getVisibleInlineLessonQuizQuestionIndexes, inlineLessonQuizQuestionKey } from "../../../shared/inlineLessonQuizFlow";
 import { resolveQuizAccountFields, type QuizAccountFieldKey } from "../../../shared/quizAccountFields";
@@ -2038,6 +2039,10 @@ export default function CoursePlayer() {
     try { return lessonData?.contentBlocks ? JSON.parse(lessonData.contentBlocks) : []; }
     catch { return []; }
   }, [lessonData?.contentBlocks]);
+  const hasRequiredInlineLessonQuiz = useMemo(
+    () => lessonHasRequiredInlineQuiz(contentBlocks),
+    [contentBlocks],
+  );
   const lessonMediaRepoScormSrc = useMemo(() => {
     if (!lessonData) return null;
     const linked = (lessonData as {
@@ -2072,6 +2077,10 @@ export default function CoursePlayer() {
 
   const handleMarkComplete = async () => {
     if (!selectedLessonId) return;
+    if (hasRequiredInlineLessonQuiz) {
+      toast.error("Pass the required lesson quiz before marking this lesson complete.");
+      return;
+    }
     // Optimistically mark as complete immediately so checkmarks appear in both sidebars
     setOptimisticCompleted(prev => new Set([...prev, selectedLessonId]));
     // In admin preview mode, pass the flag so the server auto-creates a real enrollment
@@ -3035,7 +3044,7 @@ export default function CoursePlayer() {
                 {contentFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
               {/* ── Top Mark Complete button ── */}
-              {lessonData && lessonData.type !== "quiz" && !isCompleted && requireManualComplete && (
+              {lessonData && lessonData.type !== "quiz" && !isCompleted && requireManualComplete && !hasRequiredInlineLessonQuiz && (
                 <Button
                   size="sm"
                   className="h-7 text-xs text-white font-semibold px-3 rounded-full gap-1 shadow-sm"
@@ -3308,7 +3317,7 @@ export default function CoursePlayer() {
                         <div className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full" style={{ color: primaryColor, backgroundColor: `${primaryColor}18` }}>
                           <CheckCircle className="w-4 h-4" /> {lbl.completed}
                         </div>
-                      ) : requireManualComplete ? (
+                      ) : requireManualComplete && !hasRequiredInlineLessonQuiz ? (
                         <Button
                           className="text-white font-bold px-6 py-2.5 rounded-full uppercase tracking-wide text-sm"
                           style={{ backgroundColor: primaryColor }}
@@ -3319,6 +3328,10 @@ export default function CoursePlayer() {
                           {markComplete.isPending ? "Saving..." : lbl.markComplete}
                           <CheckCircle className="w-4 h-4 ml-2" />
                         </Button>
+                      ) : hasRequiredInlineLessonQuiz ? (
+                        <p className="text-sm font-medium text-teal-800 bg-teal-50 border border-teal-100 rounded-lg px-4 py-2">
+                          Pass the required lesson quiz to complete this lesson.
+                        </p>
                       ) : null}
                     </div>
                   )}

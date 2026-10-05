@@ -216,8 +216,8 @@
 - [x] Include certificate management in CME Management with per-activity issued-certificate status, issuance date, and export visibility.
 - [x] Add per-CME-activity reporting and CSV export with learner full name, email, activity and completion dates, quiz results, and recorded quiz or survey responses.
 - [x] Add focused authorization, reporting-accuracy, and CSV export regressions for the CME Management panel without exposing learner data to non-administrators.
-- [ ] Trace and repair CME lesson-quiz access and completion gating that prevents enrolled learners from reaching a required CME quiz and certificate eligibility.
-- [ ] Verify and repair the learner-facing lookup and parsing of existing CME lesson quizzes without replacing, duplicating, or modifying quiz content.
+- [x] Trace and repair CME lesson-quiz access and completion gating that prevents enrolled learners from reaching a required CME quiz and certificate eligibility. Required inline quizzes now own completion: manual completion cannot bypass an unpassed assessment in either the learner UI or server path.
+- [x] Verify and repair the learner-facing lookup and parsing of existing CME lesson quizzes without replacing, duplicating, or modifying quiz content. Read-only live validation confirmed the published Ergonomics CME Quiz and all eight questions are visible to an enrolled learner.
 - [x] Repair CME course progression so every completed lesson persists correctly, eligible next lessons unlock normally, and displayed progress reflects the learner’s actual completion state.
 - [x] Preserve the active lesson-editor view and lesson context across a page refresh so administrators return directly to Lesson Editor rather than lesson settings.
 - [x] Allow a CME lesson quiz configured as an unscored survey to be required for lesson and certificate completion by response submission, without requiring a passing score.
@@ -226,7 +226,7 @@
 - [x] Add focused regressions for author-configured Yes/No dependent-question branching, learner visibility, and required-survey completion behavior.
 - [x] Ensure the required-survey completion setting applies to existing CME survey blocks with legacy single-choice question types, without requiring those blocks to be rebuilt.
 - [x] Add regression coverage confirming legacy CME survey questions complete by visible response submission and never by a passing-score threshold when survey completion is enabled.
-- [ ] Repair the reported CME Ergonomics survey completion error without changing existing learner attempts or certificate records.
+- [x] Repair the reported CME Ergonomics survey completion error without changing existing learner attempts or certificate records. Existing quiz content, attempts, progress, and certificates were preserved; live validation confirmed the assessment is reachable and completion bypasses are rejected without a write.
 - [x] Repair the inline CME survey attempt-insert failure shown during required survey completion, preserving existing responses, learner progress, and certificate records.
 - [x] Add focused regression coverage for the inline-survey attempt insert contract and the resulting certificate-eligibility completion path.
 - [x] Audit and repair the shared inline lesson-quiz submission path for all courses and instances, preserving valid learner attempts, scores, progress, and certificate records.
@@ -268,7 +268,7 @@
 - [x] Make Discounts resilient to a transient Stripe listing failure: continue showing the platform’s MySQL-backed LMS membership codes, clearly label their separate LMS source, and show a non-destructive Stripe retry banner rather than replacing the entire administration screen with a load error.
 - [x] Reconcile all recurring LMS course billing against Stripe: add the additive `0091_lms_subscription_invoice_ledger.sql` ledger; recover malformed legacy subscription IDs using deterministic Stripe metadata, product, invoice-line, and price-revision matching; mirror each paid renewal invoice once; surface renewals in learner and Platform Admin transaction histories; and exclude ledger-mirrored rows from the generic Stripe feed to prevent duplicate revenue or member-history entries. Run the safe global backfill and ensure the existing daily job repeats reconciliation.
 - [x] Make learner cohort discussions honor the selected Platform Admin posting alias, including the alias name and avatar, so the student-facing message never falls back to the administrator’s personal profile when an alias was selected.
-- [ ] Add focused regressions proving an authorized CME learner can access required lesson quizzes, record completion, and reach the existing certificate-eligibility path without changing unrelated learner records.
+- [x] Add focused regressions proving an authorized CME learner can access required lesson quizzes, record completion, and reach the existing certificate-eligibility path without changing unrelated learner records. Coverage validates scored and response-required completion rules, learner/server enforcement, and the progress-recalculation certificate path; live validation used only read-only queries and an intentionally rejected no-write completion request.
 - [ ] Obtain a supported Manus Forge direct-completions credential or other direct provider credential for Railway; the existing Manus task key is not suitable for synchronous editor generation.
 - [x] Document a reversible Railway-to-Manus migration checklist without changing hosting, DNS, users, payments, or production data unless the user explicitly approves a cutover.
 - [x] Produce a read-only Railway production inventory of application deployment, database scope, object storage, authentication, payments, email, AI, jobs, webhooks, and domain dependencies.
