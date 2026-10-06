@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -91,20 +91,58 @@ function buildEmbedCode(token: string, origin: string): string {
   id="aau-widget-${token.slice(0, 8)}"
   src="${widgetUrl}"
   width="100%"
-  height="400"
+  height="600"
   frameborder="0"
   scrolling="no"
-  style="border:none; width:100%; min-height:200px;"
+  style="border:none; display:block; width:100%; min-height:600px; overflow:hidden;"
   title="Content Widget"
 ></iframe>
 <script>
   window.addEventListener("message", function(e) {
     if (e.data && e.data.type === "ultrasound-widget-resize") {
       var iframe = document.getElementById("aau-widget-${token.slice(0, 8)}");
-      if (iframe) iframe.style.height = (e.data.height + 16) + "px";
+      var reportedHeight = Number(e.data.height);
+      if (iframe && e.source === iframe.contentWindow && Number.isFinite(reportedHeight) && reportedHeight > 0) {
+        var nextHeight = Math.max(200, Math.ceil(reportedHeight) + 24);
+        iframe.style.height = nextHeight + "px";
+        iframe.setAttribute("height", String(nextHeight));
+      }
     }
   });
 </script>`;
+}
+
+function WidgetPreviewFrame({ token }: { token: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(600);
+
+  useEffect(() => {
+    setHeight(600);
+    const receiveWidgetHeight = (event: MessageEvent) => {
+      const iframe = iframeRef.current;
+      const reportedHeight = Number(event.data?.height);
+      if (
+        event.data?.type !== "ultrasound-widget-resize" ||
+        event.source !== iframe?.contentWindow ||
+        !Number.isFinite(reportedHeight) ||
+        reportedHeight <= 0
+      ) return;
+      setHeight(Math.max(200, Math.ceil(reportedHeight) + 24));
+    };
+    window.addEventListener("message", receiveWidgetHeight);
+    return () => window.removeEventListener("message", receiveWidgetHeight);
+  }, [token]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      src={`/widget/${token}`}
+      className="w-full rounded-lg border"
+      style={{ minHeight: 600, height, border: "none", display: "block", overflow: "hidden" }}
+      scrolling="no"
+      title="Widget Preview"
+    />
+  );
 }
 
 // ─── Content Picker Dialog ────────────────────────────────────────────────────
@@ -879,12 +917,7 @@ export default function WidgetManager() {
           </DialogHeader>
           <p className="text-xs text-muted-foreground">This is how the widget will appear when embedded on an external website.</p>
           {previewToken && (
-            <iframe
-              src={`/widget/${previewToken}`}
-              className="w-full rounded-lg border"
-              style={{ minHeight: 300, height: 400 }}
-              title="Widget Preview"
-            />
+            <WidgetPreviewFrame token={previewToken} />
           )}
         </DialogContent>
       </Dialog>

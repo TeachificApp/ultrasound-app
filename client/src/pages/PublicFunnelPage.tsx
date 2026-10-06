@@ -31,6 +31,89 @@ import { getLoginUrl } from "@/const";
 import { MathContent } from "@/components/MathContent";
 import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 
+const EMBED_AUTO_RESIZE_BRIDGE = `<script>
+(() => {
+  let frameId;
+  const reportHeight = () => {
+    const root = document.documentElement;
+    const body = document.body;
+    const height = Math.ceil(Math.max(
+      root ? root.scrollHeight : 0,
+      root ? root.offsetHeight : 0,
+      body ? body.scrollHeight : 0,
+      body ? body.offsetHeight : 0,
+    ));
+    window.parent.postMessage({ type: "ultrasound-embed-resize", height }, "*");
+  };
+  const scheduleHeightReport = () => {
+    if (frameId) cancelAnimationFrame(frameId);
+    frameId = requestAnimationFrame(reportHeight);
+  };
+  window.addEventListener("message", event => {
+    if (event.data && event.data.type === "ultrasound-widget-resize") scheduleHeightReport();
+  });
+  if (window.ResizeObserver && document.documentElement) {
+    new ResizeObserver(scheduleHeightReport).observe(document.documentElement);
+  }
+  window.addEventListener("load", scheduleHeightReport);
+  scheduleHeightReport();
+  setTimeout(scheduleHeightReport, 150);
+})();
+<\/script>`;
+
+function injectEmbedAutoResizeBridge(html: string) {
+  return /<\/body\s*>/i.test(html)
+    ? html.replace(/<\/body\s*>/i, `${EMBED_AUTO_RESIZE_BRIDGE}</body>`)
+    : `${html}${EMBED_AUTO_RESIZE_BRIDGE}`;
+}
+
+function AutoSizingEmbedFrame({
+  html,
+  title,
+  requestedHeight,
+  expandsToContent,
+}: {
+  html: string;
+  title: string;
+  requestedHeight: number;
+  expandsToContent: boolean;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const baseHeight = Math.max(expandsToContent ? 600 : 200, requestedHeight);
+  const [height, setHeight] = useState(baseHeight);
+
+  useEffect(() => {
+    setHeight(baseHeight);
+  }, [baseHeight, html]);
+
+  useEffect(() => {
+    const receiveEmbeddedHeight = (event: MessageEvent) => {
+      const iframe = iframeRef.current;
+      const reportedHeight = Number(event.data?.height);
+      if (
+        event.data?.type !== "ultrasound-embed-resize" ||
+        event.source !== iframe?.contentWindow ||
+        !Number.isFinite(reportedHeight) ||
+        reportedHeight <= 0
+      ) return;
+      setHeight(Math.max(baseHeight, Math.ceil(reportedHeight) + 24));
+    };
+    window.addEventListener("message", receiveEmbeddedHeight);
+    return () => window.removeEventListener("message", receiveEmbeddedHeight);
+  }, [baseHeight]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={injectEmbedAutoResizeBridge(html)}
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
+      scrolling="no"
+      style={{ width: "100%", height, minHeight: baseHeight, border: "none", display: "block", overflow: "hidden" }}
+      title={title}
+    />
+  );
+}
+
 // ─── Opt-Out Link Component ─────────────────────────────────────────────────
 
 function OptOutLink({ d }: { d: Record<string, any> }) {
@@ -535,15 +618,17 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
         />
       );
     case "embed":
+      const embedCode = injectUserParamsIntoHtml(d.embedCode ?? "", user);
+      const expandsToContent = /ultrasound-widget-resize|\/widget\//i.test(d.embedCode ?? "");
       return (
         <div className="py-8">
           <div className="max-w-5xl mx-auto px-4 sm:px-6">
             {d.embedCode ? (
-              <iframe
-                srcDoc={injectUserParamsIntoHtml(d.embedCode, user)}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
-                style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block" }}
+              <AutoSizingEmbedFrame
+                html={embedCode}
                 title={d.caption ?? "Embedded content"}
+                requestedHeight={Number(d.height) || 400}
+                expandsToContent={expandsToContent}
               />
             ) : (
               <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">Embed placeholder</div>

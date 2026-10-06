@@ -414,16 +414,40 @@ export default function WidgetRenderer() {
     { enabled: !!token, retry: false }
   );
 
-  // Auto-resize iframe when content changes
+  // Report the complete rendered height to the containing iframe. This is
+  // deliberately scheduled after layout so image loads, compact-card wrapping,
+  // and dynamically supplied content cannot leave a scrollable iframe behind.
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!containerRef.current) return;
-    const observer = new ResizeObserver(() => {
-      const h = containerRef.current?.scrollHeight ?? 0;
-      window.parent?.postMessage({ type: "ultrasound-widget-resize", height: h }, "*");
-    });
+    let frameId: number | undefined;
+    const reportHeight = () => {
+      const container = containerRef.current;
+      if (!container) return;
+      const height = Math.ceil(Math.max(
+        container.scrollHeight,
+        container.offsetHeight,
+        document.documentElement.scrollHeight,
+        document.body.scrollHeight,
+      ));
+      window.parent?.postMessage({ type: "ultrasound-widget-resize", height }, "*");
+    };
+    const scheduleHeightReport = () => {
+      if (frameId !== undefined) cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(reportHeight);
+    };
+    const observer = new ResizeObserver(scheduleHeightReport);
     observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    window.addEventListener("resize", scheduleHeightReport);
+    // ResizeObserver does not guarantee an initial callback in every embed host.
+    scheduleHeightReport();
+    const delayedReport = window.setTimeout(scheduleHeightReport, 150);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleHeightReport);
+      window.clearTimeout(delayedReport);
+      if (frameId !== undefined) cancelAnimationFrame(frameId);
+    };
   }, [data]);
 
   if (isLoading) {
