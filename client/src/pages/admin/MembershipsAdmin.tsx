@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { IncludedItemsEmbedFrame } from "@/components/IncludedItemsEmbedFrame";
+import { buildIncludedItemsIframeSnippet } from "@/lib/includedItemsEmbed";
 
 import {
   DndContext,
@@ -1783,13 +1785,7 @@ function IncludedItemsWidgetCodePanel({ source, id, title }: { source: "membersh
      data-base-url="${base}"></div>
 <script src="${base}/embed/included-items.js" async></script>`;
 
-  const iframeSnippet = `<iframe
-  src="${iframeSrc}"
-  style="width:100%;border:none;display:block;min-height:200px;"
-  scrolling="no"
-  frameborder="0"
-  allowtransparency="true"
-></iframe>`;
+  const iframeSnippet = buildIncludedItemsIframeSnippet({ src: iframeSrc, source, id, title });
 
   function copySnippet(type: "script" | "iframe") {
     navigator.clipboard.writeText(type === "script" ? scriptSnippet : iframeSnippet);
@@ -1883,22 +1879,9 @@ function IncludedItemsWidgetCodePanel({ source, id, title }: { source: "membersh
       <div className="space-y-2">
         <Label className="text-xs font-medium text-gray-700">Live Preview</Label>
         <div className="rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
-          <iframe
-            key={iframeSrc}
+          <IncludedItemsEmbedFrame
             src={iframeSrc}
-            style={{ width: "100%", border: "none", display: "block", minHeight: "200px" }}
-            scrolling="no"
-            frameBorder="0"
-            onLoad={(e) => {
-              const iframe = e.currentTarget;
-              const handler = (ev: MessageEvent) => {
-                if (ev.data?.type === "included-items-resize" && ev.source === iframe.contentWindow) {
-                  iframe.style.height = (ev.data.height + 8) + "px";
-                  window.removeEventListener("message", handler);
-                }
-              };
-              window.addEventListener("message", handler);
-            }}
+            title="Included items preview"
           />
         </div>
       </div>

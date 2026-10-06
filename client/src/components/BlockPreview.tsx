@@ -31,6 +31,7 @@ function assetUrl(url?: string | null): string {
 }
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { MathContent } from "@/components/MathContent";
+import { AutoSizingHtmlEmbed } from "@/components/AutoSizingHtmlEmbed";
 import { resolveScheduledCountdownTarget } from "@shared/platformTime";
 
 /**
@@ -368,11 +369,10 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
         <div className="py-4 sm:py-6"><CC style={{ display: "flex", flexDirection: "column", alignItems: embedJustify }}>
           <div style={{ width: embedMaxWidth, maxWidth: "100%" }}>
             {d.embedCode ? (
-              <iframe
-                srcDoc={d.embedCode}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
-                style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block" }}
+              <AutoSizingHtmlEmbed
+                html={d.embedCode}
                 title={d.caption ?? "Embedded content"}
+                requestedHeight={Number(d.height) || 400}
               />
             ) : <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}><Globe size={32} /></div>}
             {d.caption && <p className="text-sm text-gray-500 mt-2" style={{ textAlign: embedAlign as any }}>{d.caption}</p>}

@@ -32,6 +32,7 @@ import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from
 import { CountdownV2Block, ImageLinkWrapper, CC } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
 import { UnavailableContentPage } from "@/components/UnavailableContentPage";
+import { AutoSizingHtmlEmbed } from "@/components/AutoSizingHtmlEmbed";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 import { resolveScheduledCountdownTarget } from "@shared/platformTime";
 
@@ -444,11 +445,10 @@ function RenderBlock({ block, onBuy, buying, price, hasPurchased, slug, user, is
         <div className="py-6">
           <CC>
             {d.embedCode ? (
-              <iframe
-                srcDoc={injectUserParamsIntoHtml(d.embedCode, user)}
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
-                style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block" }}
+              <AutoSizingHtmlEmbed
+                html={injectUserParamsIntoHtml(d.embedCode, user)}
                 title={d.caption ?? "Embedded content"}
+                requestedHeight={Number(d.height) || 400}
               />
             ) : (
               <div className="w-full bg-gray-100 rounded-lg flex items-center justify-center text-gray-400" style={{ height: d.height ?? 400 }}>Embed placeholder</div>

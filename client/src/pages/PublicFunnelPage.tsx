@@ -34,15 +34,16 @@ import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 const EMBED_AUTO_RESIZE_BRIDGE = `<script>
 (() => {
   let frameId;
-  const reportHeight = () => {
-    const root = document.documentElement;
+  const renderedContentHeight = () => {
     const body = document.body;
-    const height = Math.ceil(Math.max(
-      root ? root.scrollHeight : 0,
-      root ? root.offsetHeight : 0,
-      body ? body.scrollHeight : 0,
-      body ? body.offsetHeight : 0,
-    ));
+    if (!body) return 0;
+    const children = Array.from(body.children).filter(child => child.tagName !== "SCRIPT");
+    const bottom = children.reduce((max, child) => Math.max(max, child.offsetTop + child.offsetHeight), 0);
+    const style = window.getComputedStyle(body);
+    return Math.ceil(bottom + (parseFloat(style.paddingBottom) || 0));
+  };
+  const reportHeight = () => {
+    const height = renderedContentHeight();
     window.parent.postMessage({ type: "ultrasound-embed-resize", height }, "*");
   };
   const scheduleHeightReport = () => {
@@ -50,10 +51,21 @@ const EMBED_AUTO_RESIZE_BRIDGE = `<script>
     frameId = requestAnimationFrame(reportHeight);
   };
   window.addEventListener("message", event => {
-    if (event.data && event.data.type === "ultrasound-widget-resize") scheduleHeightReport();
+    const reportedHeight = Number(event.data && event.data.height);
+    if (!event.data || !Number.isFinite(reportedHeight) || reportedHeight <= 0) return;
+    if (event.data.type === "ultrasound-widget-resize" || event.data.type === "included-items-resize") {
+      document.querySelectorAll("iframe").forEach(frame => {
+        if (frame.contentWindow === event.source) {
+          const nextHeight = Math.max(200, Math.ceil(reportedHeight) + 24);
+          frame.style.height = nextHeight + "px";
+          frame.setAttribute("height", String(nextHeight));
+        }
+      });
+      scheduleHeightReport();
+    }
   });
-  if (window.ResizeObserver && document.documentElement) {
-    new ResizeObserver(scheduleHeightReport).observe(document.documentElement);
+  if (window.ResizeObserver && document.body) {
+    new ResizeObserver(scheduleHeightReport).observe(document.body);
   }
   window.addEventListener("load", scheduleHeightReport);
   scheduleHeightReport();
@@ -79,12 +91,13 @@ function AutoSizingEmbedFrame({
   expandsToContent: boolean;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const baseHeight = Math.max(expandsToContent ? 600 : 200, requestedHeight);
-  const [height, setHeight] = useState(baseHeight);
+  const minimumHeight = Math.max(200, requestedHeight);
+  const initialHeight = Math.max(expandsToContent ? 800 : minimumHeight, minimumHeight);
+  const [height, setHeight] = useState(initialHeight);
 
   useEffect(() => {
-    setHeight(baseHeight);
-  }, [baseHeight, html]);
+    setHeight(initialHeight);
+  }, [initialHeight, html]);
 
   useEffect(() => {
     const receiveEmbeddedHeight = (event: MessageEvent) => {
@@ -96,11 +109,11 @@ function AutoSizingEmbedFrame({
         !Number.isFinite(reportedHeight) ||
         reportedHeight <= 0
       ) return;
-      setHeight(Math.max(baseHeight, Math.ceil(reportedHeight) + 24));
+      setHeight(Math.max(minimumHeight, Math.ceil(reportedHeight) + 24));
     };
     window.addEventListener("message", receiveEmbeddedHeight);
     return () => window.removeEventListener("message", receiveEmbeddedHeight);
-  }, [baseHeight]);
+  }, [minimumHeight]);
 
   return (
     <iframe
@@ -108,7 +121,7 @@ function AutoSizingEmbedFrame({
       srcDoc={injectEmbedAutoResizeBridge(html)}
       sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
       scrolling="no"
-      style={{ width: "100%", height, minHeight: baseHeight, border: "none", display: "block", overflow: "hidden" }}
+      style={{ width: "100%", height, minHeight: minimumHeight, border: "none", display: "block", overflow: "hidden" }}
       title={title}
     />
   );
@@ -619,7 +632,7 @@ function RenderBlock({ block, funnelId, pageId, funnelSlug, nextPage, user }: {
       );
     case "embed":
       const embedCode = injectUserParamsIntoHtml(d.embedCode ?? "", user);
-      const expandsToContent = /ultrasound-widget-resize|\/widget\//i.test(d.embedCode ?? "");
+      const expandsToContent = /ultrasound-widget-resize|included-items-resize|\/widget\/|\/embed\/included-items/i.test(d.embedCode ?? "");
       return (
         <div className="py-8">
           <div className="max-w-5xl mx-auto px-4 sm:px-6">

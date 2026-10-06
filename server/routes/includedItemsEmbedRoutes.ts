@@ -194,6 +194,7 @@ function buildIncludedItemsHtml(data: NonNullable<Awaited<ReturnType<typeof getM
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;background:${bg};color:${text};line-height:1.5;overflow-x:hidden}
 body{padding:16px}
+#included-items-root{display:block}
 .headline{font-size:20px;font-weight:700;text-align:center;margin-bottom:6px;color:${text}}
 .subtext{font-size:13px;text-align:center;color:${subCol};margin-bottom:18px}
 /* Grid layout */
@@ -223,22 +224,44 @@ body{padding:16px}
 </style>
 </head>
 <body>
+<main id="included-items-root">
 ${headline ? `<div class="headline">${escHtml(headline)}</div>` : ""}
 ${subtext ? `<div class="subtext">${escHtml(subtext)}</div>` : ""}
 <div class="${layout === "list" ? "list-wrap" : "grid-wrap"}">
 ${itemsHtml}
 </div>
+</main>
 <script>
 (function() {
+  var frameId;
   function sendHeight() {
     if (window.parent !== window) {
-      window.parent.postMessage({ type: 'included-items-resize', height: document.body.scrollHeight }, '*');
+      var body = document.body;
+      var content = document.getElementById('included-items-root');
+      var computed = body ? window.getComputedStyle(body) : null;
+      var verticalPadding = computed ? (parseFloat(computed.paddingTop) || 0) + (parseFloat(computed.paddingBottom) || 0) : 0;
+      // Do not use body.scrollHeight here: an iframe viewport is itself at
+      // least as tall as its parent and would otherwise create a resize loop.
+      var height = Math.ceil((content ? content.getBoundingClientRect().height : 0) + verticalPadding);
+      window.parent.postMessage({ type: 'included-items-resize', height: height }, '*');
     }
   }
-  window.addEventListener('load', sendHeight);
-  if (typeof ResizeObserver !== 'undefined') {
-    new ResizeObserver(sendHeight).observe(document.body);
+  function scheduleHeight() {
+    if (frameId) cancelAnimationFrame(frameId);
+    frameId = requestAnimationFrame(sendHeight);
   }
+  window.addEventListener('load', scheduleHeight);
+  window.addEventListener('resize', scheduleHeight);
+  if (typeof ResizeObserver !== 'undefined') {
+    var resizeTarget = document.getElementById('included-items-root') || document.documentElement;
+    new ResizeObserver(scheduleHeight).observe(resizeTarget);
+  }
+  // Ensure cached or lazy-loaded cover images cannot leave the containing
+  // iframe at its original fallback height.
+  document.addEventListener('load', scheduleHeight, true);
+  scheduleHeight();
+  setTimeout(scheduleHeight, 150);
+  setTimeout(scheduleHeight, 750);
 })();
 </script>
 </body>
@@ -279,16 +302,20 @@ const INCLUDED_ITEMS_JS_LOADER = `(function() {
       + '&bg=' + encodeURIComponent(bgColor);
     var iframe = document.createElement('iframe');
     iframe.src = src;
-    iframe.style.cssText = 'width:100%;border:none;display:block;min-height:200px;';
+    iframe.style.cssText = 'width:100%;border:none;display:block;height:800px;min-height:200px;overflow:hidden;';
+    iframe.setAttribute('height', '800');
     iframe.setAttribute('scrolling', 'no');
     iframe.setAttribute('frameborder', '0');
     iframe.setAttribute('allowtransparency', 'true');
-    el.appendChild(iframe);
     window.addEventListener('message', function(e) {
-      if (e.data && e.data.type === 'included-items-resize' && e.source === iframe.contentWindow) {
-        iframe.style.height = (e.data.height + 8) + 'px';
+      var reportedHeight = Number(e.data && e.data.height);
+      if (e.data && e.data.type === 'included-items-resize' && e.source === iframe.contentWindow && Number.isFinite(reportedHeight) && reportedHeight > 0) {
+        var nextHeight = Math.max(200, Math.ceil(reportedHeight) + 24);
+        iframe.style.height = nextHeight + 'px';
+        iframe.setAttribute('height', String(nextHeight));
       }
     });
+    el.appendChild(iframe);
   });
 })();`;
 

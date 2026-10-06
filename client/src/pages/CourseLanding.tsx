@@ -42,6 +42,7 @@ import { handleCtaBtnClick } from "@/lib/ctaUtils";
 export { handleCtaBtnClick };
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 import { UnavailableContentPage } from "@/components/UnavailableContentPage";
+import { AutoSizingHtmlEmbed } from "@/components/AutoSizingHtmlEmbed";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 import { isScheduledDeadlineOpen, resolveScheduledCountdownTarget, scheduledWallTimeToUtc } from "@shared/platformTime";
 import { shouldRouteWorkshopCtaToCheckout } from "@shared/workshopPricing";
@@ -401,11 +402,10 @@ export function RenderBlock({ block, course, onEnroll, onEnrollWithOption, enrol
       return (
         <div className="py-4 sm:py-6" style={{ backgroundColor: d.bgColor ?? "transparent" }}>
           <CC>{d.embedCode ? (
-            <iframe
-              srcDoc={injectUserParamsIntoHtml(d.embedCode, user)}
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals"
-              style={{ width: "100%", height: d.height ?? 400, border: "none", display: "block" }}
+            <AutoSizingHtmlEmbed
+              html={injectUserParamsIntoHtml(d.embedCode, user)}
               title={d.caption ?? "Embedded content"}
+              requestedHeight={Number(d.height) || 400}
             />
           ) : null}
           {d.caption && <p className="text-sm text-gray-500 mt-2 text-center">{d.caption}</p>}</CC>

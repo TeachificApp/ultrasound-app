@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { getAdminUrl } from "@/hooks/useSubdomain";
+import { buildIncludedItemsIframeSnippet } from "@/lib/includedItemsEmbed";
 import {
   Plus, Copy, Trash2, Edit2, Eye, RefreshCw, Code2, ArrowLeft,
   LayoutGrid, List, Rows3, Sparkles, CheckCircle2, X, ChevronLeft,
@@ -608,7 +609,7 @@ export default function WidgetManager() {
   function buildIiIframeSnippet(source: "membership" | "bundle", id: number) {
     const base = window.location.origin;
     const src = `${base}/embed/included-items?source=${source}&id=${id}&accent=%2314b8a6&theme=light&layout=grid&columns=3`;
-    return `<iframe\n  src="${src}"\n  style="width:100%;border:none;display:block;min-height:200px;"\n  scrolling="no" frameborder="0" allowtransparency="true"\n></iframe>`;
+    return buildIncludedItemsIframeSnippet({ src, source, id, title: "Included items" });
   }
 
   // ── List mode ──
