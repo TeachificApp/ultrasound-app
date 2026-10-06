@@ -780,6 +780,8 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const cohorts   = enrollments.filter((e: any) => e.courseType === 'cohort');
   const quizzes   = enrollments.filter((e: any) => e.isQuiz || e.hasQuizContent);
   const downloads = enrollments.filter((e: any) => e.isDownload);
+  const digitalPurchases = data.digitalPurchases ?? [];
+  const downloadAccessCount = downloads.length + digitalPurchases.length;
   const quizResults = data.quizResults ?? { standalone: [], mock: [], lesson: [], inline: [] };
   const quizResultCount = (quizResults.standalone?.length ?? 0) + (quizResults.mock?.length ?? 0) + (quizResults.lesson?.length ?? 0) + (quizResults.inline?.length ?? 0);
   const workshopEnrollmentsList = data.workshopEnrollments ?? [];
@@ -794,7 +796,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: courses.length },
     { key: "cohorts",      label: "Cohorts",      icon: Users,          count: cohorts.length },
     { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: quizzes.length + quizResultCount },
-    { key: "downloads",    label: "Downloads",    icon: Download,       count: downloads.length },
+    { key: "downloads",    label: "Downloads",    icon: Download,       count: downloadAccessCount },
     { key: "workshops",    label: "Workshops",    icon: Calendar,       count: workshopEnrollmentsList.length },
     { key: "webinars",     label: "Webinars",     icon: Play,           count: webinarRegistrations.length },
     { key: "products",     label: "Products",     icon: Package,        count: physOrders.length },
@@ -1275,7 +1277,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       {contentTab === "downloads" && (
         <div className="space-y-3">
           <SectionHeader
-            title={`Downloads (${downloads.length + (data.digitalPurchases?.length ?? 0)})`}
+            title={`Downloads (${downloadAccessCount})`}
             action={
               <Button size="sm" onClick={() => setEnrollOpen(true)} className="bg-[#189aa1] hover:bg-[#157f85] text-white">
                 <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> Grant Download / Content Access
@@ -1322,15 +1324,15 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               ))}
             </div>
           )}
-          {(data.digitalPurchases?.length ?? 0) > 0 && (
+          {digitalPurchases.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Digital file access & activity</p>
-              {data.digitalPurchases.map((d: any) => (
+              {digitalPurchases.map((d: any) => (
                 <MemberDigitalDownloadPurchaseCard key={d.id} purchase={d} />
               ))}
             </div>
           )}
-          {downloads.length === 0 && (data.digitalPurchases?.length ?? 0) === 0 ? (
+          {downloadAccessCount === 0 ? (
             <p className="text-sm text-gray-400 text-center py-8">No digital purchases.</p>
           ) : null}
         </div>
