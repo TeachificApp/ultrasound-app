@@ -1601,7 +1601,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
             <TabsTrigger value="waitlist" className="text-xs">Waitlist</TabsTrigger>
           )}
           <TabsTrigger value="curriculum" className="text-xs">
-            {course.type === "quiz" ? "Questions" : course.type === "download" ? "Files" : "Curriculum"}
+            {course.type === "download" ? "Files" : "Curriculum"}
           </TabsTrigger>
           <TabsTrigger value="landing" className="text-xs">Landing Page</TabsTrigger>
           <TabsTrigger value="overview" className="text-xs">Course Overview</TabsTrigger>
@@ -5366,7 +5366,10 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       showVideoControls,
       content: (lessonType === "text" || lessonType === "video" || lessonType === "download" || lessonType === "video_text") ? (content || null) : undefined,
       videoContent: lessonType === "video_text" ? (videoContent || null) : undefined,
-      embedUrl: lessonType === "embed" ? (embedUrl || undefined) : undefined,
+      // A legacy embed renders before page-builder blocks. Explicitly save null when
+      // an admin clears the field (or switches to another lesson type) so it cannot
+      // remain as an invisible, uneditable student-facing embed.
+      embedUrl: lessonType === "embed" ? (embedUrl.trim() || null) : null,
       mediaAssetId: selectedAsset?.id ?? undefined,
       standaloneQuizId: lessonType === 'standalone_quiz' ? (standaloneQuizId ?? null) : null,
     }, {
@@ -5538,6 +5541,36 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             <Label className="text-sm">Duration (min)</Label>
             <Input value={durationMinutes} onChange={e => { setDurationMinutes(e.target.value); setIsDirty(true); }} type="number" min="0" className="mt-1" />
           </div>
+
+          {lessonType === "embed" && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+              <div>
+                <p className="text-sm font-semibold text-amber-900">Embedded multimedia</p>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  This legacy embed renders above the page-builder blocks in the lesson. Replace its URL or clear it to remove the embedded media.
+                </p>
+              </div>
+              <Input
+                type="url"
+                value={embedUrl}
+                onChange={e => { setEmbedUrl(e.target.value); setIsDirty(true); }}
+                placeholder="https://… or /media/…/scorm/"
+                aria-label="Embedded multimedia URL"
+              />
+              {embedUrl && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="border-red-200 bg-white text-red-700 hover:bg-red-50 hover:text-red-800"
+                  onClick={() => { setEmbedUrl(""); setIsDirty(true); }}
+                >
+                  Remove embedded media
+                </Button>
+              )}
+              <p className="text-xs text-amber-700">Save the lesson after making a change to apply it to the student view.</p>
+            </div>
+          )}
 
           {/* Standalone Quiz picker — shown only for standalone_quiz lesson type */}
           {lessonType === "standalone_quiz" && (
