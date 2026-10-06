@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { resolve } from "node:path";
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -94,5 +95,24 @@ describe("Members Hub direct access dialog", () => {
     expect(mocks.createAndEnroll).toHaveBeenCalledWith({ name: "Taylor Learner", email: "taylor@example.com", courseId: 1 });
     expect(mocks.grantProduct).toHaveBeenCalledWith({ userEmail: "taylor@example.com", productType: "bundle", productId: 3 });
     expect(mocks.grantMembership).toHaveBeenCalledWith({ userId: 42, planId: 5 });
+  });
+
+  it("replaces the raw null-object failure with actionable member access recovery guidance", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(resolve(process.cwd(), "client/src/pages/admin/MembersHub.tsx"), "utf8"),
+    );
+    expect(source).toContain("memberAccessErrorMessage");
+    expect(source).toContain("Cannot convert undefined or null to object");
+    expect(source).toContain("no access has been granted yet");
+  });
+
+  it("uses one conflict-safe member resolver for creation and course enrollment", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(resolve(process.cwd(), "server/routers/lmsEnrollmentAdminRouter.ts"), "utf8"),
+    );
+    expect(source).toContain("async function createOrReuseAdminMember");
+    expect(source).toContain("`user:${userId}`");
+    expect(source).toContain("A member account with this email is being created");
+    expect(source.match(/createOrReuseAdminMember\(db, input\)/g)).toHaveLength(2);
   });
 });

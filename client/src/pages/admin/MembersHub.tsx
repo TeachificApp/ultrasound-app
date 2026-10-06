@@ -442,6 +442,13 @@ export function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCr
   const toggleProduct = (product: MemberAccessProduct) => setSelectedProducts(items => toggleMemberAccessProduct(items, product));
   const togglePlan = (planId: number) => setSelectedPlanIds(ids => toggleMemberAccessId(ids, planId));
   const closeCreate = () => { setCreateOpen(false); setNewName(""); setNewEmail(""); setSelectedCourseIds([]); setSelectedProducts([]); setSelectedPlanIds([]); setAccessSearch(""); setAccessFilter("all"); };
+  const memberAccessErrorMessage = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "";
+    if (/Cannot convert undefined or null to object/i.test(message)) {
+      return "The member account could not be saved. Refresh the page and try again; no access has been granted yet.";
+    }
+    return message || "Unable to create the member and assign access. Please try again.";
+  };
   const submitCreate = async () => {
     if (!newName.trim() || !newEmail.trim()) { toast.error("Enter the member's name and email address."); return; }
     try {
@@ -459,7 +466,7 @@ export function AllMembersPanel({ openCreateSignal, onCreateConsumed }: { openCr
       const assignmentCount = selectedCourseIds.length + selectedProducts.length + selectedPlanIds.length;
       toast.success(`${member.isNewUser ? "Member created" : "Existing member updated"} with ${assignmentCount} access assignment${assignmentCount === 1 ? "" : "s"}.`);
       closeCreate();
-    } catch (error: any) { toast.error(error?.message ?? "Unable to create the member and assign access."); }
+    } catch (error: unknown) { toast.error(memberAccessErrorMessage(error)); }
   };
 
   return (

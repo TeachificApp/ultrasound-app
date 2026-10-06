@@ -124,6 +124,64 @@ async function hasInstructorCourseAccess(db: any, userId: number, courseId: numb
   return !!ci;
 }
 
+/**
+ * Assign a stable sign-in ID without allowing an old or duplicate email ID to
+ * block a manual member/access grant. `user:<id>` remains a valid local-session
+ * ID when a historical duplicate already owns the preferred email-based ID.
+ */
+async function ensureAdminMemberOpenId(db: any, userId: number, email: string, currentOpenId?: string | null) {
+  if (currentOpenId && !currentOpenId.startsWith("pending_")) return currentOpenId;
+  const preferredOpenId = `email:${email}`;
+  const [holder] = await db.select({ id: users.id }).from(users)
+    .where(eq(users.openId, preferredOpenId)).limit(1);
+  const openId = holder && holder.id !== userId ? `user:${userId}` : preferredOpenId;
+  await db.update(users).set({ openId }).where(eq(users.id, userId));
+  return openId;
+}
+
+/** Create or reuse the same normalized email account for all manual access grants. */
+async function createOrReuseAdminMember(db: any, input: { name: string; email: string }) {
+  const email = input.email.trim().toLowerCase();
+  const name = input.name.trim();
+  const [existing] = await db.select({ id: users.id, openId: users.openId }).from(users)
+    .where(sql`LOWER(${users.email}) = LOWER(${email})`).limit(1);
+  if (existing) {
+    await ensureAdminMemberOpenId(db, existing.id, email, existing.openId);
+    return { userId: existing.id, isNewUser: false, email, name };
+  }
+
+  try {
+    // Insert first, then choose a non-conflicting persistent openId using the
+    // resulting user ID. This avoids an old duplicate email openId preventing
+    // the administrator from creating a member or granting their access.
+    const [inserted] = await db.insert(users).values({
+      name,
+      displayName: name,
+      email,
+      role: "user",
+      isPending: false,
+    }).$returningId();
+    await ensureAdminMemberOpenId(db, inserted.id, email);
+    return { userId: inserted.id, isNewUser: true, email, name };
+  } catch (error: any) {
+    // A simultaneous member creation can legitimately race the initial lookup.
+    // Reuse that account instead of surfacing a low-level duplicate-entry error.
+    if (error?.code === "ER_DUP_ENTRY" || error?.message?.includes("Duplicate entry")) {
+      const [raced] = await db.select({ id: users.id, openId: users.openId }).from(users)
+        .where(sql`LOWER(${users.email}) = LOWER(${email})`).limit(1);
+      if (raced) {
+        await ensureAdminMemberOpenId(db, raced.id, email, raced.openId);
+        return { userId: raced.id, isNewUser: false, email, name };
+      }
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "A member account with this email is being created. Please wait a moment, then try assigning access again.",
+      });
+    }
+    throw error;
+  }
+}
+
 export const lmsEnrollmentAdminRouter = router({
   listEnrollments: protectedProcedure
     .input(z.object({ courseId: z.number().optional(), page: z.number().int().min(1).default(1), pageSize: z.number().int().min(1).max(100).default(20) }))
@@ -1719,19 +1777,11 @@ CRITICAL REQUIREMENTS:
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      const email = input.email.trim().toLowerCase();
-      const [existing] = await db.select({ id: users.id, openId: users.openId }).from(users)
-        .where(sql`LOWER(${users.email}) = LOWER(${email})`).limit(1);
-      if (existing) {
-        if (!existing.openId) await db.update(users).set({ openId: `email:${email}` }).where(eq(users.id, existing.id));
-        return { userId: existing.id, isNewUser: false };
+      const member = await createOrReuseAdminMember(db, input);
+      if (member.isNewUser) {
+        addToAllContacts(member.email, member.name, { userId: member.userId, source: "members_hub" }).catch(() => {});
       }
-      const [inserted] = await db.insert(users).values({
-        openId: `email:${email}`, name: input.name.trim(), displayName: input.name.trim(), email,
-        role: "user", isPending: false,
-      }).$returningId();
-      addToAllContacts(email, input.name.trim(), { userId: inserted.id, source: "members_hub" }).catch(() => {});
-      return { userId: inserted.id, isNewUser: true };
+      return { userId: member.userId, isNewUser: member.isNewUser };
     }),
 
   /** Grant a complimentary active membership without creating a Stripe subscription. */
@@ -1767,34 +1817,10 @@ CRITICAL REQUIREMENTS:
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      // Check if user already exists with this email
-      const [existing] = await db.select({ id: users.id }).from(users)
-        .where(sql`LOWER(${users.email}) = LOWER(${input.email})`).limit(1);
-      let userId: number;
-      let isNewUser = false;
-      if (existing) {
-        userId = existing.id;
-        // Backfill openId for existing users created without one (Thinkific imports, bulk imports).
-        // Without openId the magic-link session lookup fails and the user can never log in.
-        const [existingFull] = await db.select({ openId: users.openId }).from(users)
-          .where(eq(users.id, userId)).limit(1);
-        if (!existingFull?.openId) {
-          const generatedOpenId = `email:${input.email.toLowerCase().trim()}`;
-          await db.update(users).set({ openId: generatedOpenId }).where(eq(users.id, userId));
-        }
-      } else {
-        // New user: generate a stable email-based openId so magic link login works immediately
-        const openId = `email:${input.email.toLowerCase().trim()}`;
-        const [inserted] = await db.insert(users).values({
-          openId,
-          name: input.name,
-          displayName: input.name,
-          email: input.email,
-          role: "user",
-        }).$returningId();
-        userId = inserted.id;
-        isNewUser = true;
-        addToAllContacts(input.email, input.name, { userId, source: "enrollment" }).catch(() => {});
+      const member = await createOrReuseAdminMember(db, input);
+      const { userId, isNewUser } = member;
+      if (isNewUser) {
+        addToAllContacts(member.email, member.name, { userId, source: "enrollment" }).catch(() => {});
       }
       // Enroll the user
       const [existingEnrollment] = await db.select().from(lmsEnrollments)
