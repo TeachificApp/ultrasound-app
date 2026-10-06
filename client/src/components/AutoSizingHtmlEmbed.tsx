@@ -49,6 +49,64 @@ function attachAutoSizingBridge(html: string) {
     : `${html}${AUTO_SIZING_EMBED_BRIDGE}`;
 }
 
+/**
+ * Saved page-builder blocks commonly store the direct iframe snippet generated
+ * for Included Items. Rendering that snippet inside srcDoc creates two nested
+ * frames. Each frame can report a height, which is prone to feedback loops as
+ * a parent becomes taller than its content. Extract the known, trusted widget
+ * source and render one direct frame instead.
+ */
+function extractIncludedItemsSrc(html: string): string | null {
+  const match = html.match(/<iframe\b[^>]*?\bsrc\s*=\s*(["'])([^"']*\/embed\/included-items[^"']*)\1[^>]*>/i);
+  return match?.[2]?.replace(/&amp;/gi, "&") ?? null;
+}
+
+function DirectIncludedItemsEmbed({
+  src,
+  title,
+  requestedHeight,
+}: {
+  src: string;
+  title: string;
+  requestedHeight: number;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const minimumHeight = 200;
+  // A short initial frame avoids a flash of a tall empty block; the widget
+  // reports its intrinsic content height immediately after it loads.
+  const initialHeight = Math.max(280, Math.min(Math.max(requestedHeight, minimumHeight), 420));
+  const [height, setHeight] = useState(initialHeight);
+
+  useEffect(() => {
+    setHeight(initialHeight);
+  }, [initialHeight, src]);
+
+  useEffect(() => {
+    const receiveHeight = (event: MessageEvent) => {
+      const reportedHeight = Number(event.data?.height);
+      if (
+        event.data?.type !== "included-items-resize" ||
+        event.source !== iframeRef.current?.contentWindow ||
+        !Number.isFinite(reportedHeight) ||
+        reportedHeight <= 0
+      ) return;
+      setHeight(Math.max(minimumHeight, Math.ceil(reportedHeight) + 24));
+    };
+    window.addEventListener("message", receiveHeight);
+    return () => window.removeEventListener("message", receiveHeight);
+  }, []);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      src={src}
+      scrolling="no"
+      style={{ width: "100%", height, minHeight: minimumHeight, border: "none", display: "block", overflow: "hidden" }}
+      title={title}
+    />
+  );
+}
+
 export function AutoSizingHtmlEmbed({
   html,
   title,
@@ -59,15 +117,14 @@ export function AutoSizingHtmlEmbed({
   requestedHeight?: number;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const expandsToContent = /ultrasound-widget-resize|included-items-resize|\/widget\/|\/embed\/included-items/i.test(html);
+  const includedItemsSrc = useMemo(() => extractIncludedItemsSrc(html), [html]);
   const minimumHeight = Math.max(200, requestedHeight);
-  const initialHeight = Math.max(expandsToContent ? 800 : minimumHeight, minimumHeight);
-  const [height, setHeight] = useState(initialHeight);
+  const [height, setHeight] = useState(minimumHeight);
   const srcDoc = useMemo(() => attachAutoSizingBridge(html), [html]);
 
   useEffect(() => {
-    setHeight(initialHeight);
-  }, [initialHeight, html]);
+    setHeight(minimumHeight);
+  }, [minimumHeight, html]);
 
   useEffect(() => {
     const receiveHeight = (event: MessageEvent) => {
@@ -84,6 +141,10 @@ export function AutoSizingHtmlEmbed({
     window.addEventListener("message", receiveHeight);
     return () => window.removeEventListener("message", receiveHeight);
   }, [minimumHeight]);
+
+  if (includedItemsSrc) {
+    return <DirectIncludedItemsEmbed src={includedItemsSrc} title={title} requestedHeight={requestedHeight} />;
+  }
 
   return (
     <iframe

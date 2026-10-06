@@ -26,7 +26,7 @@ describe("included-items embed automatic sizing", () => {
     expect(route.indexOf("window.addEventListener('message'")).toBeLessThan(route.indexOf("el.appendChild(iframe)"));
   });
 
-  it("includes a no-scroll direct iframe helper and relays its height through saved page embeds", () => {
+  it("renders saved included-items snippets as one direct no-scroll iframe", () => {
     const helper = read("client/src/lib/includedItemsEmbed.ts");
     const funnel = read("client/src/pages/PublicFunnelPage.tsx");
     const autoSizingFrame = read("client/src/components/AutoSizingHtmlEmbed.tsx");
@@ -40,9 +40,12 @@ describe("included-items embed automatic sizing", () => {
     expect(funnel).toContain('event.data.type === "included-items-resize"');
     expect(funnel).toContain("included-items-resize|\\/widget\\/");
     expect(autoSizingFrame).toContain("included-items-resize");
-    expect(autoSizingFrame).toContain('frame.contentWindow === event.source');
-    expect(autoSizingFrame).toContain("const initialHeight = Math.max(expandsToContent ? 800 : minimumHeight, minimumHeight)");
-    expect(autoSizingFrame).toContain("setHeight(Math.max(minimumHeight, Math.ceil(reportedHeight) + 24))");
+    expect(autoSizingFrame).toContain("extractIncludedItemsSrc");
+    expect(autoSizingFrame).toContain("DirectIncludedItemsEmbed");
+    expect(autoSizingFrame).toContain('src={src}');
+    expect(autoSizingFrame).toContain('event.source !== iframeRef.current?.contentWindow');
+    expect(autoSizingFrame).toContain("const initialHeight = Math.max(280, Math.min(Math.max(requestedHeight, minimumHeight), 420))");
+    expect(autoSizingFrame).not.toContain("expandsToContent ? 800");
     expect(blockPreview).toContain("<AutoSizingHtmlEmbed");
   });
 });
