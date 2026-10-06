@@ -5,7 +5,7 @@ import { randomBytes } from "crypto";
 import { router, protectedProcedure, publicProcedure } from "../_core/trpc";
 import { getDb } from "../db";
 import {
-  embedWidgets, lmsCourses, digitalProducts, digitalBundles, webinars,
+  embedWidgets, lmsCourses, digitalProducts, bundles, bundlePricingOptions, webinars,
   membershipPlans, physicalProducts, workshops, communities, workshopInstances, lmsCohortGroups,
 } from "../../drizzle/schema";
 
@@ -134,16 +134,21 @@ export const widgetAdminRouter = router({
         type,
         title: (r.title ?? "") as string,
         coverImageUrl: (r[coverKey] ?? r.thumbnailUrl ?? r.coverImage ?? null) as string | null,
+        status: (r.status ?? null) as string | null,
       }));
     }
 
-    const [courses, downloads, bundles, webinarRows, memberships, physicals, workshopRows, communityRows] = await Promise.all([
+    const [courses, downloads, bundleRows, webinarRows, memberships, physicals, workshopRows, communityRows] = await Promise.all([
       db.select({ id: lmsCourses.id, title: lmsCourses.title, coverImageUrl: lmsCourses.coverImageUrl, type: lmsCourses.type })
         .from(lmsCourses).where(eq(lmsCourses.status, "public")),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, thumbnailUrl: digitalProducts.thumbnailUrl })
         .from(digitalProducts).where(eq(digitalProducts.status, "published")),
-      db.select({ id: digitalBundles.id, title: digitalBundles.title, thumbnailUrl: digitalBundles.thumbnailUrl })
-        .from(digitalBundles).where(eq(digitalBundles.status, "published")),
+      // Canonical bundles are managed in `bundles`, not the retired download-only
+      // `digital_bundles` catalog. Keep drafts selectable for administrators so a
+      // widget can be prepared before launch; the public resolver below still
+      // requires `published` and never exposes a draft card to visitors.
+      db.select({ id: bundles.id, title: bundles.title, coverImage: bundles.coverImage, status: bundles.status })
+        .from(bundles).orderBy(asc(bundles.title)),
       db.select({ id: webinars.id, title: webinars.title, coverImage: webinars.coverImage })
         .from(webinars).where(eq(webinars.status, "published")),
       db.select({ id: membershipPlans.id, title: membershipPlans.title, coverImage: membershipPlans.coverImage })
@@ -158,9 +163,9 @@ export const widgetAdminRouter = router({
 
     return [
       // Courses: split by type (course vs quiz)
-      ...courses.map(r => ({ id: r.id, type: r.type as string, title: r.title, coverImageUrl: r.coverImageUrl ?? null })),
+      ...courses.map(r => ({ id: r.id, type: r.type as string, title: r.title, coverImageUrl: r.coverImageUrl ?? null, status: "published" })),
       ...shape(downloads, "download", "thumbnailUrl"),
-      ...shape(bundles, "bundle", "thumbnailUrl"),
+      ...shape(bundleRows, "bundle", "coverImage"),
       ...shape(webinarRows, "webinar", "coverImage"),
       ...shape(memberships, "membership", "coverImage"),
       ...shape(physicals, "physical", "thumbnailUrl"),
@@ -197,7 +202,7 @@ export const widgetPublicRouter = router({
           coverImageUrl: row.coverImageUrl ?? row.thumbnailUrl ?? row.coverImage ?? null,
           type: itemType,
           price: row.price ?? row.discountPrice ?? 0,
-          isFree: row.isFree ?? row.accessType === "free" ?? false,
+          isFree: row.isFree === true || row.accessType === "free",
           pricingType: row.pricingType ?? row.billingInterval ?? null,
           subscriptionInterval: row.subscriptionInterval ?? row.billingInterval ?? null,
           currency: row.currency ?? "usd",
@@ -274,11 +279,34 @@ export const widgetPublicRouter = router({
       // Bundles
       if (bundleIds.length > 0) {
         const rows = await db.select({
-          id: digitalBundles.id, slug: digitalBundles.slug, title: digitalBundles.title,
-          subtitle: digitalBundles.subtitle, thumbnailUrl: digitalBundles.thumbnailUrl,
-          discountPrice: digitalBundles.discountPrice, currency: digitalBundles.currency, brand: digitalBundles.brand,
-        }).from(digitalBundles).where(and(inArray(digitalBundles.id, bundleIds), eq(digitalBundles.status, "published")));
-        rows.forEach(r => allCards.set(`bundle:${r.id}`, toCard(r, "bundle", { price: r.discountPrice })));
+          id: bundles.id, slug: bundles.slug, title: bundles.title,
+          subtitle: bundles.subtitle, coverImage: bundles.coverImage,
+          price: bundles.price, isFree: bundles.isFree, accessType: bundles.accessType,
+          pricingType: bundles.pricingType, subscriptionInterval: bundles.subscriptionInterval,
+          currency: bundles.currency, brand: bundles.brand,
+        }).from(bundles).where(and(inArray(bundles.id, bundleIds), eq(bundles.status, "published")));
+        const activeOptionRows = rows.length === 0 ? [] : await db.select({
+          bundleId: bundlePricingOptions.bundleId,
+          price: bundlePricingOptions.price,
+        }).from(bundlePricingOptions).where(and(
+          inArray(bundlePricingOptions.bundleId, rows.map(row => row.id)),
+          eq(bundlePricingOptions.isActive, true),
+        ));
+        const priceByBundle = new Map<number, number>();
+        for (const option of activeOptionRows) {
+          const current = priceByBundle.get(option.bundleId);
+          const optionPrice = Number(option.price ?? 0);
+          if (current === undefined || optionPrice < current) priceByBundle.set(option.bundleId, optionPrice);
+        }
+        rows.forEach(r => {
+          const priceCents = priceByBundle.get(r.id) ?? Number(r.price ?? 0);
+          allCards.set(`bundle:${r.id}`, toCard(r, "bundle", {
+            // Canonical bundle pricing is stored in cents, while the public
+            // widget's formatter accepts major currency units.
+            price: priceCents / 100,
+            isFree: Boolean(r.isFree) || r.accessType === "free",
+          }));
+        });
       }
 
       // Webinars

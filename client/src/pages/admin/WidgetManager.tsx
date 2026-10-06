@@ -150,6 +150,9 @@ function ContentPicker({
         <DialogHeader>
           <DialogTitle>Select Content</DialogTitle>
         </DialogHeader>
+        <p className="-mt-2 text-xs text-muted-foreground">
+          Draft bundles can be selected while a widget is being prepared. They will appear to visitors only after the bundle is published.
+        </p>
         <div className="flex gap-2 mb-3">
           <Input placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)} className="flex-1" />
           <Select value={typeFilter} onValueChange={v => setTypeFilter(v as any)}>
@@ -185,7 +188,14 @@ function ContentPicker({
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{c.title}</div>
-                  <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-medium ${meta.color}`}>{meta.label}</span>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                    <span className={`inline-block text-xs px-1.5 py-0.5 rounded font-medium ${meta.color}`}>{meta.label}</span>
+                    {c.type === "bundle" && c.status !== "published" && (
+                      <span className="inline-block text-xs px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-800">
+                        Draft — publish before visitor display
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {sel && <CheckCircle2 className="w-5 h-5 text-teal-500 shrink-0" />}
               </div>
@@ -374,6 +384,9 @@ function WidgetForm({
                   )}
                   <span className="flex-1 text-sm font-medium truncate">{content?.title ?? `ID: ${item.id}`}</span>
                   <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${meta.color}`}>{meta.label}</span>
+                  {item.type === "bundle" && content?.status !== "published" && (
+                    <span className="text-xs text-amber-700 shrink-0">Draft</span>
+                  )}
                   <button
                     onClick={() => set("items", form.items.filter(i => !(i.id === item.id && i.type === item.type)))}
                     className="text-muted-foreground hover:text-destructive transition-colors"
