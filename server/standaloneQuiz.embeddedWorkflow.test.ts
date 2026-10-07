@@ -22,7 +22,9 @@ describe("embedded-only Quiz Creator workflow", () => {
 
   it("requires embedded access for learner metadata and attempts while disabling public metadata", () => {
     const router = read("server/routers/standaloneQuizRouter.ts");
-    expect(router).toContain("assertEmbeddedQuizAccess(db, ctx.user, quiz.id)");
+    const access = read("server/lib/embeddedQuizCourseAccess.ts");
+    expect(router).toContain("assertStandaloneQuizLearnerAccess(db, ctx.user, quiz.id");
+    expect(access).toContain("Open this quiz from its assigned course lesson or approved HTML widget.");
     expect(router).toContain("Quiz Creator quizzes are available through assigned learning experiences.");
     expect(router).toContain("Returning an empty list prevents standalone discovery outside those routes.");
     expect(router).toContain("return [];");
@@ -32,6 +34,16 @@ describe("embedded-only Quiz Creator workflow", () => {
     const admin = read("client/src/pages/admin/QuizCreatorAdmin.tsx");
     expect(admin).toContain("Publish for modules & widgets");
     expect(admin).toContain("It does not create direct enrollment, checkout, catalog, search, or learner-facing listing access.");
+  });
+
+  it("keeps standalone quizzes out of campaign and community discovery pickers", () => {
+    const emailRouter = read("server/routers/emailCampaignRouter.ts");
+    const emailBlocks = read("client/src/components/EmailBlockEditor.tsx");
+    const communityRouter = read("server/routers/communityRouter.ts");
+    expect(emailRouter).not.toContain("standaloneQuizzes");
+    expect(emailBlocks).not.toContain("blockOptions?.quizzes");
+    expect(communityRouter).not.toContain("standaloneQuizList");
+    expect(communityRouter).not.toContain("type: \"standalone_quiz\"");
   });
 
   it("activates an embedded quiz when it is assigned to a course lesson", () => {

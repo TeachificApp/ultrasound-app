@@ -693,7 +693,6 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
     ...(blockOptions?.workshopInstances ?? []).map((p: any) => ({ id: p.id + 100000, title: p.workshopTitle ?? p.title, price: p.price ?? 0, imageUrl: p.workshopCoverImageUrl ?? "", link: `https://learn.allaboutultrasound.com/workshops/${p.workshopSlug}`, description: "" })),
     ...(blockOptions?.bundles ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price ?? 0, imageUrl: p.coverImage ?? "", link: `https://learn.allaboutultrasound.com/bundles/${p.slug}`, description: "" })),
     ...(blockOptions?.downloads ?? []).map((p: any) => ({ id: p.id, title: p.title, price: p.price ?? 0, imageUrl: p.coverImageUrl ?? "", link: `https://learn.allaboutultrasound.com/downloads/${p.slug}`, description: "" })),
-    ...(blockOptions?.quizzes ?? []).map((p: any) => ({ id: p.id, title: p.title, price: 0, imageUrl: "", link: `https://learn.allaboutultrasound.com/quizzes/${p.id}`, description: "" })),
   ], [blockOptions]);
 
   // Auto-resolve: when blockOptions loads and selectedIds exist but resolvedItems is empty OR has relative links, refresh them
@@ -948,11 +947,10 @@ function EmailAutoBlockSettings({ block, onChange }: { block: Block; onChange: (
                 {[
                   ...(blockOptions?.courses ?? []).map((p: any) => ({ ...p, _type: "Course" })),
                   ...(blockOptions?.webinars ?? []).map((p: any) => ({ ...p, _type: "Webinar" })),
-                  ...(blockOptions?.workshopInstances ?? []).map((p: any) => ({ ...p, title: p.workshopTitle ?? p.title, _type: "Workshop" })),
-                  ...(blockOptions?.bundles ?? []).map((p: any) => ({ ...p, _type: "Bundle" })),
-                  ...(blockOptions?.downloads ?? []).map((p: any) => ({ ...p, _type: "Download" })),
-                  ...(blockOptions?.quizzes ?? []).map((p: any) => ({ ...p, _type: "Quiz" })),
-                ].map((p: any) => (
+                   ...(blockOptions?.workshopInstances ?? []).map((p: any) => ({ ...p, title: p.workshopTitle ?? p.title, _type: "Workshop" })),
+                   ...(blockOptions?.bundles ?? []).map((p: any) => ({ ...p, _type: "Bundle" })),
+                   ...(blockOptions?.downloads ?? []).map((p: any) => ({ ...p, _type: "Download" })),
+                 ].map((p: any) => (
                   <label key={`${p._type}-${p.id}`} className="flex items-start gap-2 cursor-pointer hover:bg-white rounded p-1">
                     <input type="checkbox" className="mt-0.5" checked={selectedIds.includes(p.id)} onChange={() => toggleId(p.id)} />
                     <div className="min-w-0 flex-1">

@@ -1,13 +1,13 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { bundles, contentWaitlistEntries, digitalProducts, lmsCohortGroups, lmsCourses, membershipPlans, standaloneQuizzes, users, webinars, workshopInstances, workshops } from "../../drizzle/schema";
+import { bundles, contentWaitlistEntries, digitalProducts, lmsCohortGroups, lmsCourses, membershipPlans, users, webinars, workshopInstances, workshops } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { sendEmail } from "../_core/email";
 import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { buildContentWaitlistAdminNotification } from "../lib/contentWaitlistNotification";
 
-const waitlistProductType = z.enum(["course", "cohort_group", "workshop", "workshop_instance", "webinar", "download", "bundle", "membership", "quiz"]);
+const waitlistProductType = z.enum(["course", "cohort_group", "workshop", "workshop_instance", "webinar", "download", "bundle", "membership"]);
 
 type WaitlistProductType = z.infer<typeof waitlistProductType>;
 
@@ -51,11 +51,6 @@ async function getWaitlistTarget(db: NonNullable<Awaited<ReturnType<typeof getDb
     case "membership": {
       const [row] = await db.select({ id: membershipPlans.id, title: membershipPlans.title, status: membershipPlans.status })
         .from(membershipPlans).where(eq(membershipPlans.id, productId)).limit(1);
-      return row ? { ...row, parentProductId: null } : null;
-    }
-    case "quiz": {
-      const [row] = await db.select({ id: standaloneQuizzes.id, title: standaloneQuizzes.title, status: standaloneQuizzes.status })
-        .from(standaloneQuizzes).where(eq(standaloneQuizzes.id, productId)).limit(1);
       return row ? { ...row, parentProductId: null } : null;
     }
   }

@@ -123,5 +123,8 @@ export async function assertStandaloneQuizLearnerAccess(
     await assertCoursePlayerQuizAccess(db, user.id, opts.courseSlug, quizId);
     return;
   }
-  await assertEmbeddedQuizAccess(db, user, quizId);
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: "Open this quiz from its assigned course lesson or approved HTML widget.",
+  });
 }

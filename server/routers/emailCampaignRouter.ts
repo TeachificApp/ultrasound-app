@@ -41,7 +41,6 @@ import {
   bundles,
   webinars,
   digitalProducts,
-  standaloneQuizzes,
 } from "../../drizzle/schema";
 import { addToEmailList, ensureAllContactsList } from "../lib/emailListHelper";
 import { resolveRecipients } from "../lib/emailCampaignAudienceResolver";
@@ -1228,12 +1227,6 @@ Rules:
         .where(eq(digitalProducts.status, "published"))
         .orderBy(digitalProducts.title)
         .limit(100),
-      db
-        .select({ id: standaloneQuizzes.id, title: standaloneQuizzes.title, brand: standaloneQuizzes.brand })
-        .from(standaloneQuizzes)
-        .where(eq(standaloneQuizzes.status, "published"))
-        .orderBy(standaloneQuizzes.title)
-        .limit(100),
     ]);
 
     return {
@@ -1247,7 +1240,6 @@ Rules:
       courses: courseRows.map((r: any) => ({ id: r.id, title: r.title, price: r.price, coverImageUrl: r.coverImageUrl, slug: r.slug, brand: r.brand, type: "course" as const })),
       webinars: webinarRows.map((r: any) => ({ id: r.id, title: r.title, price: r.price, coverImageUrl: r.coverImageUrl, slug: r.slug, brand: r.brand, type: "webinar" as const })),
       downloads: downloadRows.map((r: any) => ({ id: r.id, title: r.title, price: r.price, coverImageUrl: r.coverImageUrl, slug: r.slug, brand: r.brand, type: "download" as const })),
-      quizzes: quizRows.map((r: any) => ({ id: r.id, title: r.title, brand: r.brand, type: "quiz" as const })),
     };
   }),
 

@@ -124,4 +124,33 @@ describe("embedded quiz course player access", () => {
       ),
     ).resolves.toBeUndefined();
   });
+
+  it("blocks a direct quiz route even when the learner has another course assignment", async () => {
+    const hasActiveWidgetLaunch = vi.fn().mockResolvedValue(false);
+    await expect(
+      assertStandaloneQuizLearnerAccess(
+        mockEnrollmentDatabase([{ lessonId: 42 }]),
+        { id: 7, role: "user" },
+        30001,
+        { adminPreview: false, isStaff: false },
+        hasActiveWidgetLaunch,
+      ),
+    ).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "Open this quiz from its assigned course lesson or approved HTML widget.",
+    });
+    expect(hasActiveWidgetLaunch).toHaveBeenCalledWith(expect.anything(), undefined, 30001);
+  });
+
+  it("allows an approved widget credential without a course URL", async () => {
+    await expect(
+      assertStandaloneQuizLearnerAccess(
+        mockEnrollmentDatabase([]),
+        { id: 7, role: "user" },
+        30001,
+        { adminPreview: false, isStaff: false, widgetToken: "approved-widget-token" },
+        async () => true,
+      ),
+    ).resolves.toBeUndefined();
+  });
 });
