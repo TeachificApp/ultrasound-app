@@ -1112,6 +1112,19 @@ async function startServer() {
   // Initialize SonoQuiz WebSocket hub BEFORE server.listen so it binds to the same HTTP server
   initSonoQuizHub(server);
 
+  // Railway can lag the additive 0066 IP-location migration. Reconcile the
+  // operational log fields before a learner access request can write a row.
+  try {
+    const db = await getDb();
+    const { ensureIpAccessLogLocationSchema } = await import("../lib/ensureIpAccessLogLocationSchema");
+    const result = await ensureIpAccessLogLocationSchema(db);
+    if (result.error) {
+      console.error("[Startup] ensureIpAccessLogLocationSchema incomplete:", result.error);
+    }
+  } catch (err) {
+    console.error("[Startup] ensureIpAccessLogLocationSchema error:", err);
+  }
+
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
     // Start the Daily Challenge lifecycle cron (archive expired, publish next)
