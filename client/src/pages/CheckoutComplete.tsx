@@ -18,6 +18,7 @@ import {
   buildQuizCoursePlayerUrl,
   buildStudentDashboardUrl,
 } from "@shared/studentDashboardUrls";
+import { trackMetaPurchaseOnce } from "@/components/MetaPixel";
 
 export default function CheckoutComplete() {
   const { sessionId, courseSlug, checkoutType } = useMemo(() => {
@@ -68,6 +69,15 @@ export default function CheckoutComplete() {
   // Do NOT auto-redirect if payment is still pending — user needs to see the pending message
   // Only treat 'unpaid' as pending — 'no_payment_required' (free items, 100% discounts) should proceed normally
   const isPaymentPending = data?.status === "complete" && data?.paymentStatus === "unpaid";
+
+  // Meta receives a Purchase only after this return page verifies a confirmed
+  // Stripe session. The shared helper sends no price, payment, or PII fields
+  // and de-duplicates a reload by checkout session ID.
+  useEffect(() => {
+    if (data?.status !== "complete" || isPaymentPending) return;
+    if (data?.paymentStatus !== "paid" && data?.paymentStatus !== "no_payment_required") return;
+    trackMetaPurchaseOnce(sessionId);
+  }, [data?.status, data?.paymentStatus, isPaymentPending, sessionId]);
 
   useEffect(() => {
     if (data?.status !== "complete") return;

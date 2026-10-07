@@ -2032,8 +2032,8 @@ export const funnelPublicRouter = router({
       }
       // ── Build Stripe session ─────────────────────────────────────────────────
       const successUrl = canonicalBundleCheckout
-        ? `${input.origin}/bundles/${canonicalBundleCheckout.slug}?success=1`
-        : `${input.origin}/my-dashboard?purchase=success&product=${encodeURIComponent(productName)}`;
+        ? `${input.origin}/bundles/${canonicalBundleCheckout.slug}?success=1&session_id={CHECKOUT_SESSION_ID}`
+        : `${input.origin}/my-dashboard?purchase=success&product=${encodeURIComponent(productName)}&session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = canonicalBundleCheckout
         ? `${input.origin}/bundles/${canonicalBundleCheckout.slug}?cancelled=1`
         : `${input.origin}`;

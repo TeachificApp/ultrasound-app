@@ -19,6 +19,13 @@ declare global {
   }
 }
 
+const META_PIXEL_READY_EVENT = "meta-pixel-ready";
+const PURCHASE_STORAGE_PREFIX = "meta-pixel-purchase:";
+
+function isValidMetaPixelId(pixelId: string): boolean {
+  return /^\d{5,32}$/.test(pixelId);
+}
+
 function injectPixel(pixelId: string) {
   if (document.getElementById("meta-pixel-script")) return; // already injected
 
@@ -38,6 +45,7 @@ function injectPixel(pixelId: string) {
     fbq('track', 'PageView');
   `;
   document.head.insertBefore(script, document.head.firstChild);
+  window.dispatchEvent(new Event(META_PIXEL_READY_EVENT));
 
   // Noscript fallback
   const noscript = document.createElement("noscript");
@@ -49,6 +57,40 @@ function injectPixel(pixelId: string) {
   img.src = `https://www.facebook.com/tr?id=${pixelId}&ev=PageView&noscript=1`;
   noscript.appendChild(img);
   document.head.insertBefore(noscript, document.head.firstChild);
+}
+
+/**
+ * Records one browser-side Purchase event after the application has verified a
+ * paid Stripe return. Deliberately sends no price, currency, email, order, or
+ * checkout-session data to Meta; the local session key only prevents a reload
+ * from being counted as another conversion.
+ */
+export function trackMetaPurchaseOnce(checkoutSessionId: string): void {
+  if (typeof window === "undefined" || !checkoutSessionId) return;
+
+  const storageKey = `${PURCHASE_STORAGE_PREFIX}${checkoutSessionId}`;
+  try {
+    if (window.sessionStorage.getItem(storageKey)) return;
+  } catch {
+    // Private browsing may deny storage; still attempt the one current-page event.
+  }
+
+  let sent = false;
+  const send = () => {
+    if (sent || typeof window.fbq !== "function") return;
+    sent = true;
+    window.fbq("track", "Purchase", {});
+    try {
+      window.sessionStorage.setItem(storageKey, "1");
+    } catch {
+      // Tracking must never block the verified post-purchase experience.
+    }
+  };
+
+  send();
+  if (!sent) {
+    window.addEventListener(META_PIXEL_READY_EVENT, send, { once: true });
+  }
 }
 
 export function MetaPixel() {
@@ -75,7 +117,7 @@ export function MetaPixel() {
       pixelId = pixelIds.aaus;
     }
 
-    if (pixelId) {
+    if (pixelId && isValidMetaPixelId(pixelId)) {
       injectPixel(pixelId);
     }
   }, [pixelIds]);

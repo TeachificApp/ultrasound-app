@@ -25,6 +25,7 @@ import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
 import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
+import { trackMetaPurchaseOnce } from "@/components/MetaPixel";
 
 const ITEM_TYPE_ICONS: Record<string, React.ReactNode> = {
   course: <BookOpen className="w-5 h-5 text-teal-600" />,
@@ -187,13 +188,17 @@ export default function BundleLanding() {
   // Handle success/cancelled query params
   useEffect(() => {
     const params = new URLSearchParams(search);
+    const checkoutSessionId = params.get("session_id");
+    if (params.get("success") === "1" && checkoutSessionId && data?.isEnrolled) {
+      trackMetaPurchaseOnce(checkoutSessionId);
+    }
     if (params.get("success") === "1") {
       toast.success("Payment successful! Your access has been granted.");
       refetch();
     } else if (params.get("cancelled") === "1") {
       toast.info("Checkout was cancelled.");
     }
-  }, []);
+  }, [search, data?.isEnrolled, refetch]);
 
   const pricingOptions = useMemo(() => {
     if (Array.isArray(data?.pricingOptions)) return data.pricingOptions;

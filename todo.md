@@ -154,7 +154,7 @@
 - [x] Create a GitHub pull request containing the current verified project revision for Railway deployment review.
 - [x] Verify and correct visibility of the requested Railway deployment handoff pull request in the user’s intended GitHub repository.
 - [x] Assign all eligible open pull requests in the connected repository to the GitHub account associated with hello@teachific.app.
-- [ ] Add Meta Pixel 1250905844949244 completed-sale tracking for all product purchases without sending payment details or secrets to the browser.
+- [x] Add Meta Pixel completed-sale tracking for all product purchases without sending payment details or secrets to the browser. The configured Pixel now retains per-host PageView coverage and receives one browser Purchase only after a confirmed Stripe return (standard checkout, canonical bundles, and direct funnel product returns); events omit price, currency, order, email, payment, and session details, and session storage suppresses reload duplicates.
 - [ ] Preserve email-campaign attribution through checkout and record completed campaign-attributed sales for campaign reporting.
 - [ ] Add product-sale and email-campaign conversion metrics to the existing administrator analytics workflow.
 - [ ] Repair the editor image-upload Access Denied failure so authorized administrators can upload images from the device without weakening storage access controls.
