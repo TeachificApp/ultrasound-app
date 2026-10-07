@@ -60,7 +60,9 @@ type RenderedCard = {
 };
 
 const SOURCE_WIDTH = 1080;
-const FRAME_RATE = 12;
+// Use a standard social-video frame rate. TikTok accepts 23–60 fps; 30 fps
+// keeps all generated Social, Challenge, and Quiz Card MP4s smooth and native.
+const FRAME_RATE = 30;
 const OUTRO_HOLD_SECONDS = 10;
 const MOTION_DURATION_SECONDS = 20;
 const OUTRO_START_SECONDS = MOTION_DURATION_SECONDS - OUTRO_HOLD_SECONDS;

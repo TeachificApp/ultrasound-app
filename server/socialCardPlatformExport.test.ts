@@ -57,6 +57,9 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("new Mp4OutputFormat()");
     expect(exporter).toContain('codec: "avc"');
     expect(exporter).toContain("new CanvasSource(canvas");
+    expect(exporter).toContain("const FRAME_RATE = 30");
+    expect(exporter).toContain("const frames = Math.ceil(timeline.totalSeconds * FRAME_RATE)");
+    expect(exporter).toContain("await source.add(elapsed, 1 / FRAME_RATE)");
     expect(exporter).toContain("motion.options?.slice(0, 4).forEach");
     expect(exporter).toContain("CORRECT ANSWER");
     expect(exporter).toContain("drawMotionFrame");
