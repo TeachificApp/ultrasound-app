@@ -1104,7 +1104,7 @@ export const standaloneQuizAdminRouter = router({
 
   /** Update quiz settings */
   updateQuiz: protectedProcedure
-    .input(z.object({ id: z.number().int() }).merge(quizSettingsInput.partial()))
+    .input(z.object({ id: z.number().int() }).merge(quizSettingsInput.omit({ status: true }).partial()))
     .mutation(async ({ ctx, input }) => {
       await assertStandaloneQuizStaff(ctx);
       const db = await getDb();
@@ -1117,6 +1117,32 @@ export const standaloneQuizAdminRouter = router({
       if (accountFields !== undefined) updates.accountFields = JSON.stringify(normalizeQuizAccountFieldKeys(accountFields));
       await db.update(standaloneQuizzes).set(updates).where(eq(standaloneQuizzes.id, id));
       return { success: true };
+    }),
+
+  /**
+   * Publication is intentionally isolated from regular Quiz Creator and
+   * Question Bank saves. This prevents any stale metadata form from silently
+   * reversing an explicit publish/unpublish decision.
+   */
+  setPublicationStatus: protectedProcedure
+    .input(z.object({
+      id: z.number().int(),
+      status: z.enum(["draft", "published"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertStandaloneQuizStaff(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [quiz] = await db
+        .select({ id: standaloneQuizzes.id })
+        .from(standaloneQuizzes)
+        .where(eq(standaloneQuizzes.id, input.id))
+        .limit(1);
+      if (!quiz) throw new TRPCError({ code: "NOT_FOUND", message: "Quiz not found" });
+      await db.update(standaloneQuizzes)
+        .set({ status: input.status, updatedAt: new Date() })
+        .where(eq(standaloneQuizzes.id, input.id));
+      return { success: true, status: input.status };
     }),
 
   /** Delete a quiz and all its questions/attempts */

@@ -1700,6 +1700,10 @@ function QuizEditor({ quizId }: { quizId: number }) {
     onSuccess: () => { toast.success("Saved"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
+  const publicationMutation = trpc.standaloneQuizAdmin.setPublicationStatus.useMutation({
+    onSuccess: () => { toast.success("Publication status saved"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
   const createWidgetLaunchMutation = trpc.standaloneQuizAdmin.createWidgetLaunch.useMutation({
     onSuccess: ({ embedCode, expiresAt }) => {
       navigator.clipboard.writeText(embedCode)
@@ -1761,7 +1765,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
     updateMutation.mutate({ id: quiz.id, ...editableSettings });
   };
   const updatePublicationStatus = (status: "draft" | "published") => {
-    updateMutation.mutate(
+    publicationMutation.mutate(
       { id: quiz.id, status },
       {
         onSuccess: () => {
@@ -1813,11 +1817,11 @@ function QuizEditor({ quizId }: { quizId: number }) {
           <Button
             size="sm"
             variant={quiz.status === "published" ? "outline" : "default"}
-            disabled={updateMutation.isPending}
+            disabled={updateMutation.isPending || publicationMutation.isPending}
             className={quiz.status === "published" ? "border-gray-300 text-gray-700 hover:bg-gray-50" : "bg-teal-600 hover:bg-teal-700 text-white"}
             onClick={() => updatePublicationStatus(quiz.status === "published" ? "draft" : "published")}
           >
-            {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+            {publicationMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
             {quiz.status === "published" ? "Unpublish" : "Publish for modules & widgets"}
           </Button>
         </div>
