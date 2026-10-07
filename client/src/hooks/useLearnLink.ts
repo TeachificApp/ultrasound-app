@@ -10,11 +10,10 @@
  */
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-
-const LEARN_DOMAIN = "https://learn.allaboutultrasound.com";
+import { getLearnAppUrl } from "@/hooks/useSubdomain";
 
 export function getLearnUrl(path: string, ssoToken?: string): string {
-  const base = LEARN_DOMAIN + (path.startsWith("/") ? path : `/${path}`);
+  const base = getLearnAppUrl() + (path.startsWith("/") ? path : `/${path}`);
   if (!ssoToken) return base;
   const sep = base.includes("?") ? "&" : "?";
   return `${base}${sep}sso=${encodeURIComponent(ssoToken)}`;

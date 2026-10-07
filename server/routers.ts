@@ -676,6 +676,7 @@ export const appRouter = router({
         const { getBrandDisplayConfig: gbc } = await import('@shared/brands');
         const KNOWN_APP_SUBDOMAINS = [
           "learn.allaboutultrasound.com",
+          "learn.iheartecho.com",
           "members.allaboutultrasound.com",
           "member.allaboutultrasound.com",
           "app.allaboutultrasound.com",

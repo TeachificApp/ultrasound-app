@@ -10,10 +10,12 @@ const authRouteSource = source("server/routes/authLogin.ts");
 const loginSource = source("client/src/pages/Login.tsx");
 const callbackSource = source("client/src/pages/MagicLinkCallback.tsx");
 const cookieSource = source("server/lib/setAuthSessionCookies.ts");
+const brandSource = source("shared/brands.ts");
 
 describe("shared authentication domain flow", () => {
   const activeAppHosts = [
     "learn.allaboutultrasound.com",
+    "learn.iheartecho.com",
     "members.allaboutultrasound.com",
     "app.allaboutultrasound.com",
     "app.iheartecho.com",
@@ -46,5 +48,9 @@ describe("shared authentication domain flow", () => {
     expect(cookieSource).toContain("getSessionCookieOptions(req, hostname)");
     expect(cookieSource).toContain("getLaxSessionCookieOptions(req, hostname)");
     expect(cookieSource).toContain("getHostOnlyLaxSessionCookieOptions(req)");
+  });
+
+  it("registers iHeart Learn with the iHeartEcho tenant", () => {
+    expect(brandSource).toContain('"learn.iheartecho.com": "iheartecho"');
   });
 });

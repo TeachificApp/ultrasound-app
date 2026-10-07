@@ -14,6 +14,7 @@ export const BRAND_DOMAINS: Record<string, Brand> = {
   "site.allaboutultrasound.com": "aaus",     // staging marketing site replica
   "app.iheartecho.com": "iheartecho",
   "iheartecho.com": "iheartecho",
+  "learn.iheartecho.com": "iheartecho",
   "app.iheartecho.net": "iheartecho",
   "iheartecho.net": "iheartecho",
   "accreditation.iheartecho.com": "iheartecho",

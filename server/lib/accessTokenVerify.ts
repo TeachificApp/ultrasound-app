@@ -17,6 +17,7 @@ export type AccessVerifyResult =
 
 const ALLOWED_ACCESS_REDIRECT_HOSTS = new Set([
   "learn.allaboutultrasound.com",
+  "learn.iheartecho.com",
   "app.allaboutultrasound.com",
   "app.iheartecho.com",
   "app.iheartecho.net",

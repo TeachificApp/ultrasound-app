@@ -5,6 +5,7 @@
  * - Cloudflare Worker getAppRedirect() routes to the correct subdomain
  */
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 
 // ── Re-implement the Worker logic here for unit testing ────────────────────
 // (The actual worker runs in a Cloudflare edge runtime, not Node.js)
@@ -183,6 +184,12 @@ describe("getAppRedirect — routes to correct subdomain", () => {
 describe("domain URL constants", () => {
   it("learn domain is correct", () => {
     expect(LEARN_ORIGIN).toBe("https://learn.allaboutultrasound.com");
+  });
+
+  it("reserves the iHeartEcho Learn mirror as a first-class Learn hostname", () => {
+    const source = readFileSync("client/src/hooks/useSubdomain.ts", "utf8");
+    expect(source).toContain('"learn.iheartecho.com"');
+    expect(source).toContain("export function getLearnAppUrl()");
   });
 
   it("members domain is correct", () => {

@@ -9,6 +9,7 @@
 /** Bridge hosts tried in order — learn first (primary login domain). */
 export const SSO_BRIDGE_ORIGINS = [
   "https://learn.allaboutultrasound.com",
+  "https://learn.iheartecho.com",
   "https://app.allaboutultrasound.com",
 ] as const;
 
@@ -17,6 +18,7 @@ export const SSO_BRIDGE_CLIENT_HOSTS = new Set([
   "app.allaboutultrasound.com",
   "app.iheartecho.com",
   "app.iheartecho.net",
+  "learn.iheartecho.com",
   "accreditation.iheartecho.com",
   "members.allaboutultrasound.com",
 ]);
@@ -24,6 +26,18 @@ export const SSO_BRIDGE_CLIENT_HOSTS = new Set([
 /** Bridge origins to try from the current hostname (never bridge to self). */
 export function getSsoBridgeOrigins(currentHostname: string): string[] {
   const host = currentHostname.toLowerCase();
+  if (host === "app.allaboutultrasound.com") {
+    return ["https://learn.allaboutultrasound.com"];
+  }
+  if (host === "learn.allaboutultrasound.com") {
+    return ["https://app.allaboutultrasound.com"];
+  }
+  if (host === "learn.iheartecho.com") {
+    return ["https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
+  }
+  if (host === "app.iheartecho.com" || host === "app.iheartecho.net") {
+    return ["https://learn.iheartecho.com", "https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
+  }
   return SSO_BRIDGE_ORIGINS.filter((origin) => new URL(origin).hostname !== host);
 }
 

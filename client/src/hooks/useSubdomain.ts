@@ -5,6 +5,7 @@
  *
  * LMS subdomain hostnames:
  *   - learn.allaboutultrasound.com (production)
+ *   - learn.iheartecho.com (production mirror)
  *   - Any hostname starting with "learn."
  *
  * Members subdomain hostnames:
@@ -30,6 +31,7 @@ import { useMemo } from "react";
 
 const LEARN_HOSTNAMES = [
   "learn.allaboutultrasound.com",
+  "learn.iheartecho.com",
 ];
 
 const MEMBERS_HOSTNAMES = [
@@ -55,6 +57,8 @@ export const IHEARTECHO_APP_URL = "https://app.iheartecho.com";
 export const ACCREDITATION_APP_URL = "https://accreditation.iheartecho.com";
 /** The canonical learn subdomain — course/quiz/download/product player access only */
 export const LEARN_APP_URL = "https://learn.allaboutultrasound.com";
+/** iHeartEcho's mirrored Learn subdomain. */
+export const IHEARTECHO_LEARN_APP_URL = "https://learn.iheartecho.com";
 /** The canonical members subdomain — profile, dashboard, subscriptions */
 export const MEMBERS_APP_URL = "https://members.allaboutultrasound.com";
 /** The canonical app/platform admin domain — all admin tools except LMS */
@@ -65,6 +69,20 @@ export const ROOT_DOMAIN_URL = "https://allaboutultrasound.com";
 export const MARKETING_STAGING_URL = "https://site.allaboutultrasound.com";
 
 const MARKETING_STAGING_HOSTNAMES = ["site.allaboutultrasound.com"];
+
+/**
+ * Keeps Learn navigation on the active Learn tenant and chooses the iHeartEcho
+ * mirror for iHeartEcho app traffic. Server-rendered links retain the AAUS
+ * Learn origin as the platform default.
+ */
+export function getLearnAppUrl(): string {
+  if (typeof window === "undefined") return LEARN_APP_URL;
+  const hostname = window.location.hostname.toLowerCase();
+  if (hostname === "learn.iheartecho.com" || hostname === "learn.allaboutultrasound.com") {
+    return window.location.origin;
+  }
+  return hostname.includes("iheartecho") ? IHEARTECHO_LEARN_APP_URL : LEARN_APP_URL;
+}
 
 /** Staging replica of www.allaboutultrasound.com — not the live site */
 export function isMarketingStagingDomain(): boolean {
@@ -87,12 +105,12 @@ export function getAdminUrl(path: string): string {
   const isLearn = isLearnDomain();
   const isMembers = isMembersDomain();
 
-  // LMS-only paths → learn.allaboutultrasound.com
+  // LMS-only paths → brand-matched Learn tenant
   const lmsPaths = ["/admin/lms", "/admin/lesson-comments"];
   const isLmsPath = lmsPaths.some(p => path === p || path.startsWith(p + "/"));
   if (isLmsPath) {
     if (isLearn) return path; // already on learn domain
-    return `${LEARN_APP_URL}${path}`;
+    return `${getLearnAppUrl()}${path}`;
   }
 
   // All other admin/platform paths → app.allaboutultrasound.com

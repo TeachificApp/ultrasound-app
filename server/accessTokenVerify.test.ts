@@ -21,6 +21,11 @@ describe("resolveAccessRedirectUrl", () => {
     );
   });
 
+  it("allows full iHeart Learn URLs", () => {
+    expect(resolveAccessRedirectUrl("https://learn.iheartecho.com/courses/echo/player"))
+      .toBe("https://learn.iheartecho.com/courses/echo/player?auth_pending=1");
+  });
+
   it("rejects external URLs", () => {
     expect(resolveAccessRedirectUrl("https://evil.example/phish")).toBe(
       "/my-dashboard?auth_pending=1",

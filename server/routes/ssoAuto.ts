@@ -53,6 +53,7 @@ const ALLOWED_ORIGINS = new Set([
   "https://app.iheartecho.com",
   "https://app.allaboutultrasound.com",
   "https://learn.allaboutultrasound.com",
+  "https://learn.iheartecho.com",
   "https://members.allaboutultrasound.com",
   "https://accreditation.iheartecho.com",
   // Staging / manus.space domains — allow any *.manus.space origin
@@ -64,6 +65,7 @@ const ALLOWED_COOKIE_DOMAINS = new Set([
   "app.iheartecho.net",
   "app.allaboutultrasound.com",
   "learn.allaboutultrasound.com",
+  "learn.iheartecho.com",
   "members.allaboutultrasound.com",
   "accreditation.iheartecho.com",
 ]);
@@ -73,6 +75,7 @@ const ALLOWED_COOKIE_DOMAINS = new Set([
  * These are intentionally narrower than the full return-origin allowlist.
  */
 const BRIDGE_FALLBACK_ORIGINS = new Set([
+  "https://learn.iheartecho.com",
   "https://learn.allaboutultrasound.com",
   "https://app.allaboutultrasound.com",
 ]);

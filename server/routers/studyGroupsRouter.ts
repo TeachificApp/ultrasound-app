@@ -55,6 +55,7 @@ function getSafeStudyGroupOrigin(value: string) {
   const localPreview = hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".manus.computer");
   const approvedProductionHost = [
     "learn.allaboutultrasound.com",
+    "learn.iheartecho.com",
     "app.allaboutultrasound.com",
     "app.iheartecho.com",
     "app.iheartecho.net",

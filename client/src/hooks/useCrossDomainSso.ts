@@ -24,6 +24,7 @@ const ALL_DOMAINS = [
   "https://app.iheartecho.net",
   "https://app.allaboutultrasound.com",
   "https://learn.allaboutultrasound.com",
+  "https://learn.iheartecho.com",
   "https://members.allaboutultrasound.com",
   "https://accreditation.iheartecho.com",
 ] as const;
