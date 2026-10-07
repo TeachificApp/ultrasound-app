@@ -215,12 +215,17 @@ async function cardToBitmap(cardElement: HTMLElement): Promise<RenderedCard> {
   const clinicalImage = Array.from(cardElement.querySelectorAll("img")).find((image) => image.alt === "Clinical reference");
   const imageBounds = clinicalImage?.getBoundingClientRect();
   const mediaBounds = videoBounds ?? imageBounds;
+  // Card previews are scaled down in the admin UI. Bitmap coordinates are not,
+  // so convert screen bounds back into the unscaled card coordinate system before
+  // using them to draw a video frame or crop the clinical-image zoom stage.
+  const boundsScaleX = width / Math.max(1, cardBounds.width);
+  const boundsScaleY = height / Math.max(1, cardBounds.height);
   const mediaFrame = mediaBounds && mediaBounds.width > 0 && mediaBounds.height > 0
     ? {
-      x: Math.max(0, mediaBounds.left - cardBounds.left),
-      y: Math.max(0, mediaBounds.top - cardBounds.top),
-      width: Math.min(width, mediaBounds.width),
-      height: Math.min(height, mediaBounds.height),
+      x: Math.max(0, (mediaBounds.left - cardBounds.left) * boundsScaleX),
+      y: Math.max(0, (mediaBounds.top - cardBounds.top) * boundsScaleY),
+      width: Math.min(width, mediaBounds.width * boundsScaleX),
+      height: Math.min(height, mediaBounds.height * boundsScaleY),
     }
     : undefined;
   return { image: await createImageBitmap(blob), width, height, mediaFrame };
@@ -678,7 +683,18 @@ async function loadMotionVideo(url: string | null | undefined): Promise<HTMLVide
   if (!url) return null;
   return new Promise((resolve) => {
     const video = document.createElement("video");
-    video.crossOrigin = "anonymous";
+    // A Question Bank video can be a protected same-origin route. Setting an
+    // anonymous CORS mode on that route prevents its pixels from reaching the
+    // canvas, which leaves the exported card's media panel black. Remote assets
+    // continue to use CORS so canvas export remains safe for providers that
+    // explicitly permit it.
+    let isSameOrigin = false;
+    try {
+      isSameOrigin = new URL(url, window.location.origin).origin === window.location.origin;
+    } catch {
+      // The source will dispatch an error below if it cannot be parsed or read.
+    }
+    if (!isSameOrigin) video.crossOrigin = "anonymous";
     video.preload = "auto";
     video.muted = true;
     video.playsInline = true;

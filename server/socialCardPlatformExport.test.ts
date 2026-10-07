@@ -79,6 +79,12 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("drawZoomedCardImage");
     expect(exporter).toContain("imageZoomStartSeconds");
     expect(exporter).toContain("CLINICAL IMAGE REVIEW");
+    expect(exporter).toContain("const boundsScaleX = width / Math.max(1, cardBounds.width)");
+    expect(exporter).toContain("const boundsScaleY = height / Math.max(1, cardBounds.height)");
+    expect(exporter).toContain("mediaBounds.width * boundsScaleX");
+    expect(exporter).toContain("mediaBounds.height * boundsScaleY");
+    expect(exporter).toContain("new URL(url, window.location.origin).origin === window.location.origin");
+    expect(exporter).toContain("if (!isSameOrigin) video.crossOrigin = \"anonymous\"");
   });
 
   it("surfaces platform and PNG-or-MP4 choices in every card generator", () => {
