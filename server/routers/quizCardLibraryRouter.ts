@@ -8,7 +8,30 @@ import { quizCardLibrary } from "../../drizzle/schema";
 const brandSchema = z.enum(["aaus", "iheartecho"]);
 const templateSchema = z.enum(["clinical-white", "clinical-aqua", "clinical-teal", "clinical-dark"]);
 const variantSchema = z.enum(["question", "answer", "combined"]);
-const mediaSchema = z.object({ kind: z.enum(["image", "video", "none"]), url: z.string().url().optional() });
+/**
+ * Quiz Cards may use a public S3/R2 URL or a same-origin protected media route.
+ * The latter is intentional: Question Bank images and videos are served through
+ * an authenticated route so learners cannot download the original media.
+ */
+const libraryMediaUrlSchema = z.string().trim().max(4_096).refine((value) => {
+  if (value.startsWith("/api/question-bank-card-media/")) return true;
+  if (value.startsWith("/api/media/")) return true;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}, "Use a secure media URL or an approved platform media path.");
+
+const mediaSchema = z.object({
+  kind: z.enum(["image", "video", "none"]),
+  url: libraryMediaUrlSchema.optional(),
+}).superRefine((media, ctx) => {
+  if (media.kind !== "none" && !media.url) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["url"], message: "Select or upload media before saving this Quiz Card." });
+  }
+});
 
 const platformAdminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (ctx.user.role === "admin") return next();
