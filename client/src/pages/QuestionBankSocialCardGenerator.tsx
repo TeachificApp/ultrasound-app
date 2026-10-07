@@ -15,6 +15,7 @@ import {
 import {
   DEFAULT_SOCIAL_EXPORT_PLATFORM,
   exportSocialCard,
+  getCardExportAudioUrl,
   SocialExportControls,
   useDefaultMp4Audio,
   type SocialMusicOption,
@@ -363,7 +364,7 @@ export default function QuestionBankSocialCardGenerator() {
   const cardLabel = useMemo(() => customCardLabel.trim() || (includeSourceFolderLabel ? sourceFolderLabel : undefined), [customCardLabel, includeSourceFolderLabel, sourceFolderLabel]);
   const caption = useMemo(() => buildSocialCaption(activeQuestion, presentation, cardLabel), [activeQuestion, cardLabel, presentation]);
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
-    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: asset.currentVersion?.s3Url, source: "media_repository" as const }))
+    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: getCardExportAudioUrl(asset.id), source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
   const exportPreset = useMemo(() => getSocialExportPreset(exportPlatform), [exportPlatform]);
   const hasVideoMedia = media.kind === "video";

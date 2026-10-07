@@ -109,6 +109,11 @@ export type SocialMusicOption = {
   localBlob?: Blob;
 };
 
+/** Same-origin, Platform-Admin-only bytes for preview and WebCodecs MP4 audio. */
+export function getCardExportAudioUrl(assetId: number): string {
+  return `/api/card-export-audio/${assetId}`;
+}
+
 /**
  * Loads the one platform default track for a generator visit. The per-brand
  * marker deliberately prevents a No music override from being immediately
@@ -132,7 +137,7 @@ export function useDefaultMp4Audio(
       onMusicChange({
         id: `media:${defaultAudio.data.assetId}`,
         title: defaultAudio.data.title,
-        url: defaultAudio.data.url,
+        url: getCardExportAudioUrl(defaultAudio.data.assetId),
         source: "media_repository",
       });
     }
@@ -1021,7 +1026,7 @@ export function SocialExportControls({
       chooseTrack({
         id: `media:${uploaded.assetId}`,
         title: file.name.replace(/\.[^.]+$/, ""),
-        url: uploaded.s3Url,
+        url: getCardExportAudioUrl(uploaded.assetId),
         source: "media_repository",
         localBlob: file,
       });
@@ -1055,7 +1060,7 @@ export function SocialExportControls({
       chooseTrack({
         id: `ai:${uploaded.assetId}`,
         title: `AI loop · ${composition.plan.title}`,
-        url: uploaded.s3Url,
+        url: getCardExportAudioUrl(uploaded.assetId),
         source: "ai_generated",
         localBlob: wav,
       });
@@ -1153,7 +1158,7 @@ export function SocialExportControls({
               {musicUploadBrand && <div className="flex items-center gap-2"><input ref={musicInputRef} type="file" accept="audio/mpeg,audio/mp4,audio/aac,audio/x-m4a,audio/wav" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadMusic(file).catch((error) => console.error("Music upload failed:", error)); event.currentTarget.value = ""; }} /><button type="button" disabled={isUploadingMusic} onClick={() => musicInputRef.current?.click()} className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-white/75 transition-colors hover:bg-white/10 disabled:opacity-40">{isUploadingMusic ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}{isUploadingMusic ? "Uploading…" : "Choose audio file"}</button><span className="text-[10px] normal-case tracking-normal text-white/35">MP3, M4A, AAC, or WAV · up to 30 MB</span></div>}
               {musicOptions.length > 0 && <div className="space-y-1.5"><p className="text-[10px] font-semibold normal-case tracking-normal text-white/55">Available Media Repository music</p>{musicOptions.map((option) => <div key={option.id} className={`rounded-md border p-2 ${selectedMusic?.id === option.id ? "border-teal-300/60 bg-teal-300/10" : "border-white/10 bg-black/10"}`}><div className="flex items-center justify-between gap-2"><p className="min-w-0 truncate text-[11px] font-semibold normal-case tracking-normal text-white">{option.title}</p><button type="button" onClick={() => chooseTrack(option)} className="shrink-0 rounded border border-teal-300/30 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-teal-100 hover:bg-teal-300/15">{selectedMusic?.id === option.id ? "Selected" : "Use track"}</button></div><audio controls preload="metadata" src={option.url} className="mt-1.5 h-7 w-full" aria-label={`Preview ${option.title}`} /></div>)}</div>}
             </div>}
-            {selectedMusic && <div className="rounded-md border border-white/10 bg-white/[0.035] p-2"><div className="mb-1 flex items-center gap-1 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Headphones className="h-3 w-3 text-teal-200" />Selected: {selectedMusic.title}</div><audio ref={musicPreviewRef} controls preload="metadata" src={selectedMusic.url} className="h-7 w-full max-w-[290px]" aria-label={`Play a sample of ${selectedMusic.title}`} /><div className="mt-2 flex flex-wrap items-center gap-2">{canSetSelectedAsDefault && <button type="button" onClick={() => updateDefaultMp4Audio.mutate({ assetId: Number(selectedAudioAssetId) })} disabled={updateDefaultMp4Audio.isPending || selectedIsDefault} className="rounded border border-teal-300/35 px-2 py-1 text-[9px] font-semibold normal-case tracking-normal text-teal-100 hover:bg-teal-300/15 disabled:cursor-default disabled:opacity-65">{selectedIsDefault ? "Default for all MP4s" : updateDefaultMp4Audio.isPending ? "Saving default…" : "Use as default for all MP4s"}</button>}{defaultMp4Audio.data && !selectedIsDefault && <button type="button" onClick={() => updateDefaultMp4Audio.mutate({ assetId: null })} disabled={updateDefaultMp4Audio.isPending} className="rounded border border-white/15 px-2 py-1 text-[9px] font-semibold normal-case tracking-normal text-white/60 hover:bg-white/10">Clear global default</button>}</div><p className="mt-1 text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Preview plays in this browser. Freshly generated or uploaded audio is embedded directly in the MP4; other selected tracks must permit browser decoding and CORS access. “Use as default” applies this Media Repository track to new MP4 exports in Social, Quiz Card, and Challenge generators; Generate, Upload, or No music overrides it for this export.</p></div>}
+            {selectedMusic && <div className="rounded-md border border-white/10 bg-white/[0.035] p-2"><div className="mb-1 flex items-center gap-1 text-[10px] font-semibold normal-case tracking-normal text-white/70"><Headphones className="h-3 w-3 text-teal-200" />Selected: {selectedMusic.title}</div><audio ref={musicPreviewRef} controls preload="metadata" src={selectedMusic.url} className="h-7 w-full max-w-[290px]" aria-label={`Play a sample of ${selectedMusic.title}`} /><div className="mt-2 flex flex-wrap items-center gap-2">{canSetSelectedAsDefault && <button type="button" onClick={() => updateDefaultMp4Audio.mutate({ assetId: Number(selectedAudioAssetId) })} disabled={updateDefaultMp4Audio.isPending || selectedIsDefault} className="rounded border border-teal-300/35 px-2 py-1 text-[9px] font-semibold normal-case tracking-normal text-teal-100 hover:bg-teal-300/15 disabled:cursor-default disabled:opacity-65">{selectedIsDefault ? "Default for all MP4s" : updateDefaultMp4Audio.isPending ? "Saving default…" : "Use as default for all MP4s"}</button>}{defaultMp4Audio.data && !selectedIsDefault && <button type="button" onClick={() => updateDefaultMp4Audio.mutate({ assetId: null })} disabled={updateDefaultMp4Audio.isPending} className="rounded border border-white/15 px-2 py-1 text-[9px] font-semibold normal-case tracking-normal text-white/60 hover:bg-white/10">Clear global default</button>}</div><p className="mt-1 text-[9px] leading-relaxed normal-case tracking-normal text-white/40">Preview plays in this browser. An authenticated same-origin audio stream keeps private Media Repository tracks private while embedding reliably. “Use as default” applies this Media Repository track to new MP4 exports in Social, Quiz Card, and Challenge generators; Generate, Upload, or No music overrides it for this export.</p></div>}
             {!selectedMusic && defaultMp4Audio.data && <div className="rounded-md border border-teal-300/20 bg-teal-300/[0.05] p-2 text-[10px] normal-case tracking-normal text-teal-50">Global MP4 default: <strong>{defaultMp4Audio.data.title}</strong><button type="button" onClick={() => updateDefaultMp4Audio.mutate({ assetId: null })} disabled={updateDefaultMp4Audio.isPending} className="ml-2 underline underline-offset-2 hover:text-white">Clear</button></div>}
             {selectedMusic?.source === "openverse" && <p className="text-[10px] leading-relaxed normal-case tracking-normal text-teal-100/80">Selected: {selectedMusic.title} — {selectedMusic.creator} · {selectedMusic.license ?? "CC0 1.0"}</p>}
           </div>

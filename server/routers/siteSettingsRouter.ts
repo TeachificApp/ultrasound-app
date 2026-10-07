@@ -187,13 +187,19 @@ export const siteSettingsRouter = router({
       .limit(1);
     if (!asset) return null;
     const [version] = await db
-      .select({ url: mediaVersions.s3Url })
+      .select({ id: mediaVersions.id })
       .from(mediaVersions)
       .where(eq(mediaVersions.assetId, asset.id))
       .orderBy(desc(mediaVersions.versionNumber))
       .limit(1);
-    if (!version?.url) return null;
-    return { assetId: asset.id, title: asset.title, url: version.url };
+    if (!version) return null;
+    return {
+      assetId: asset.id,
+      title: asset.title,
+      // The browser MP4 encoder needs raw bytes, so proxy the private object
+      // through this authenticated same-origin route rather than exposing S3/R2.
+      url: `/api/card-export-audio/${asset.id}`,
+    };
   }),
 
   /** Select or clear the platform-wide default Media Repository audio for MP4 card exports. */

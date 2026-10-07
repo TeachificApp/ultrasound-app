@@ -23,6 +23,7 @@ import { ClinicalQuizCard, type ClinicalQuizCardTemplate } from "@/components/so
 import {
   DEFAULT_SOCIAL_EXPORT_PLATFORM,
   exportSocialCard,
+  getCardExportAudioUrl,
   renderSocialCard,
   SocialExportControls,
   useDefaultMp4Audio,
@@ -1230,7 +1231,7 @@ export default function ChallengeCardGenerator() {
   useDefaultMp4Audio(presentation.brand, selectedMusic, setSelectedMusic);
   const musicAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "audio", page: 1, pageSize: 50 });
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
-    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: asset.currentVersion?.s3Url, source: "media_repository" as const }))
+    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: getCardExportAudioUrl(asset.id), source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
   const hasVideoMedia = useMemo(() => Boolean(data?.some((item: any) => item.questions?.some((question: QuestionItem) => question.videoUrl || /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(question.imageUrl ?? "")))), [data]);
   useEffect(() => {
