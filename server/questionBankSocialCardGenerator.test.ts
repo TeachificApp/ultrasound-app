@@ -15,7 +15,7 @@ describe("Question Bank social-card generation", () => {
     expect(page).toContain('setMedia({ kind: "none" })');
   });
 
-  it("keeps source questions unchanged while offering approved Media Repository selection plus platform-sized PNG and MP4 output", () => {
+  it("offers Media Repository card overrides plus platform-sized PNG and MP4 output", () => {
     const page = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
     const exporter = readProjectFile("client/src/components/social/SocialCardExport.tsx");
 
@@ -25,9 +25,27 @@ describe("Question Bank social-card generation", () => {
     expect(page).toContain("brand: presentation.brand");
     expect(page).toContain("exportSocialCard");
     expect(page).toContain("SocialExportControls");
-    expect(page).toContain("source questions remain unchanged");
     expect(exporter).toContain("Mp4OutputFormat");
     expect(exporter).toContain("CanvasSource");
+  });
+
+  it("creates and edits Question Bank sources in place, including direct image or video uploads", () => {
+    const page = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+    const mediaDropzone = readProjectFile("client/src/components/MediaDropzone.tsx");
+    const questionRouter = readProjectFile("server/routers/questionBankRouter.ts");
+
+    expect(page).toContain("function SourceQuestionEditor");
+    expect(page).toContain("Create Question Bank source");
+    expect(page).toContain("Edit Question Bank source");
+    expect(page).toContain("trpc.questionBank.createQuestion.useMutation");
+    expect(page).toContain("trpc.questionBank.updateQuestion.useMutation");
+    expect(page).toContain("<MediaDropzone");
+    expect(page).toContain("Upload question image or video");
+    expect(page).toContain("setMedia(getQuestionMedia(refreshed))");
+    expect(page).toContain("Question Bank source updated and selected for this card.");
+    expect(mediaDropzone).toContain('uploadEndpoint = "/api/upload-question-media"');
+    expect(questionRouter).toContain("questionImageUrl: z.string().nullable().optional()");
+    expect(questionRouter).toContain("questionVideoUrl: z.string().nullable().optional()");
   });
 
   it("retains an allowlisted selected brand for approved media uploads", () => {

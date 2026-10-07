@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, CheckCircle2, Copy, Download, FileImage, FileVideo, Flag, Folder, ImageIcon, LibraryBig, Loader2, Search, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Copy, Download, FileImage, FileVideo, Flag, Folder, ImageIcon, LibraryBig, Loader2, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,9 @@ import { SocialCardFrameProvider } from "@/components/social/SocialCardFrame";
 import { getBrandToolPresentation, resolveToolBrand } from "@/lib/brandToolPresentation";
 import { perBrandAdminUrl } from "@/lib/perBrandUrls";
 import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
+import { MediaDropzone, type MediaType } from "@/components/MediaDropzone";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type BankOption = { text: string; imageUrl?: string; videoUrl?: string };
 type MediaFilter = "all" | "image" | "video";
@@ -33,6 +36,27 @@ const OPTION_LETTERS = ["A", "B", "C", "D"];
 type QuestionCardMediaKind = "question-image" | "question-video" | "option-image" | "option-video";
 
 type FolderBrowserEntry = { id: number; name: string; parentId?: number | null; questionCount?: number; depth: number };
+
+type SourceQuestionType = "mcq" | "truefalse" | "multiselect" | "hotspot" | "matching" | "flashcard";
+type SourceQuestionDraft = {
+  id?: number;
+  question: string;
+  type: SourceQuestionType;
+  options: string[];
+  correctAnswer: string;
+  explanation: string;
+  questionImageUrl: string;
+  questionVideoUrl: string;
+};
+
+const SOURCE_QUESTION_TYPES: Array<{ value: SourceQuestionType; label: string }> = [
+  { value: "mcq", label: "Multiple choice" },
+  { value: "truefalse", label: "True / False" },
+  { value: "multiselect", label: "Multiple select" },
+  { value: "hotspot", label: "Hotspot" },
+  { value: "matching", label: "Matching" },
+  { value: "flashcard", label: "Flashcard" },
+];
 
 function stripHtml(value: string | null | undefined): string {
   return (value ?? "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
@@ -122,6 +146,148 @@ function buildSocialCaption(question: any, presentation: ReturnType<typeof getBr
   ].join("\n");
 }
 
+function createSourceQuestionDraft(question?: any): SourceQuestionDraft {
+  const type = (question?.type ?? "mcq") as SourceQuestionType;
+  const sourceOptions = normalizeOptions(question?.options).map((option) => option.text);
+  const options = type === "truefalse"
+    ? ["True", "False"]
+    : sourceOptions.length > 0
+      ? sourceOptions
+      : type === "mcq"
+        ? ["", "", "", ""]
+        : [];
+  const rawCorrectAnswer = String(question?.correctAnswer ?? "");
+  const correctAnswerIndex = /^\d+$/.test(rawCorrectAnswer) ? Number(rawCorrectAnswer) : -1;
+  return {
+    id: question?.id,
+    question: question?.question ?? "",
+    type,
+    options,
+    correctAnswer: correctAnswerIndex >= 0 && correctAnswerIndex < options.length ? options[correctAnswerIndex] : rawCorrectAnswer,
+    explanation: question?.explanation ?? "",
+    questionImageUrl: question?.questionImageUrl ?? "",
+    questionVideoUrl: question?.questionVideoUrl ?? "",
+  };
+}
+
+function SourceQuestionEditor({
+  open,
+  question,
+  folders,
+  isSaving,
+  onOpenChange,
+  onSave,
+}: {
+  open: boolean;
+  question: any | null;
+  folders: any[];
+  isSaving: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (draft: SourceQuestionDraft) => void;
+}) {
+  const [draft, setDraft] = useState<SourceQuestionDraft>(() => createSourceQuestionDraft(question));
+
+  useEffect(() => {
+    if (open) setDraft(createSourceQuestionDraft(question));
+  }, [open, question]);
+
+  const isNewQuestion = !draft.id;
+  const showsTextOptions = draft.type === "mcq" || draft.type === "truefalse" || draft.type === "multiselect";
+  const mediaUrl = draft.questionVideoUrl || draft.questionImageUrl;
+  const correctAnswerOptions = draft.options
+    .map((option, index) => ({ option: option.trim(), index }))
+    .filter(({ option }) => Boolean(option));
+
+  const setType = (type: SourceQuestionType) => {
+    setDraft((current) => ({
+      ...current,
+      type,
+      options: type === "truefalse" ? ["True", "False"] : current.options,
+      correctAnswer: type === "truefalse" && !["True", "False"].includes(current.correctAnswer) ? "" : current.correctAnswer,
+    }));
+  };
+
+  const changeOption = (index: number, text: string) => {
+    setDraft((current) => ({ ...current, options: current.options.map((option, optionIndex) => optionIndex === index ? text : option) }));
+  };
+
+  const handleMediaUploaded = (url: string, mediaType: MediaType) => {
+    setDraft((current) => mediaType === "video"
+      ? { ...current, questionVideoUrl: url, questionImageUrl: "" }
+      : { ...current, questionImageUrl: url, questionVideoUrl: "" });
+  };
+
+  const save = () => {
+    if (!stripHtml(draft.question)) {
+      toast.error("Add the question text before saving it to the Question Bank.");
+      return;
+    }
+    if (showsTextOptions && draft.options.filter((option) => option.trim()).length < 2) {
+      toast.error("Add at least two answer choices before saving this question.");
+      return;
+    }
+    if ((draft.type === "mcq" || draft.type === "truefalse") && !draft.correctAnswer.trim()) {
+      toast.error("Choose the correct answer before saving this question.");
+      return;
+    }
+    onSave({ ...draft, options: draft.options.map((option) => option.trim()) });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[92vh] max-w-3xl overflow-y-auto bg-[#0d2029] text-white sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{isNewQuestion ? "Create Question Bank source" : "Edit Question Bank source"}</DialogTitle>
+          <DialogDescription className="text-white/55">
+            {isNewQuestion
+              ? "Create a source question here, then immediately use it to produce a Quiz Card."
+              : "Changes are saved to the selected Question Bank source and are reflected in future Quiz Cards and native quizzes."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-1">
+          <div className="grid gap-3 sm:grid-cols-[1fr_190px]">
+            <label className="block text-xs font-bold uppercase tracking-wide text-white/55">Question type
+              <select value={draft.type} onChange={(event) => setType(event.target.value as SourceQuestionType)} className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white outline-none focus:border-teal-300">
+                {SOURCE_QUESTION_TYPES.map((type) => <option key={type.value} value={type.value} className="bg-[#0d2029]">{type.label}</option>)}
+              </select>
+            </label>
+            <label className="block text-xs font-bold uppercase tracking-wide text-white/55">Source folder
+              <select value="" disabled className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-white/[0.025] px-3 text-sm text-white/45">
+                <option>{question?.folderId ? folders.find((folder) => folder.id === question.folderId)?.name ?? "Existing folder" : "No folder selected"}</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="block text-xs font-bold uppercase tracking-wide text-white/55">Question
+            <Textarea value={draft.question} onChange={(event) => setDraft((current) => ({ ...current, question: event.target.value }))} rows={4} placeholder="Enter the clinical question" className="mt-1.5 border-white/10 bg-white/5 text-sm text-white placeholder:text-white/30" />
+          </label>
+
+          {showsTextOptions && <div className="rounded-lg border border-white/10 bg-black/15 p-3">
+            <div className="flex items-center justify-between gap-2"><p className="text-xs font-bold uppercase tracking-wide text-white/55">Answer choices</p>{draft.type !== "truefalse" && <Button type="button" size="sm" variant="outline" onClick={() => setDraft((current) => ({ ...current, options: [...current.options, ""] }))} className="h-7 border-white/15 px-2 text-[11px] text-white/75 hover:bg-white/10"><Plus className="mr-1 h-3 w-3" />Add choice</Button>}</div>
+            <div className="mt-3 space-y-2">{draft.options.map((option, index) => <div key={`${index}-${draft.type}`} className="flex items-center gap-2"><span className="w-5 text-center text-xs font-bold text-teal-200">{OPTION_LETTERS[index] ?? index + 1}</span><Input value={option} readOnly={draft.type === "truefalse"} onChange={(event) => changeOption(index, event.target.value)} placeholder={`Answer choice ${index + 1}`} className="border-white/10 bg-white/5 text-white placeholder:text-white/30" />{draft.type !== "truefalse" && draft.options.length > 2 && <Button type="button" size="icon" variant="ghost" onClick={() => setDraft((current) => ({ ...current, options: current.options.filter((_, optionIndex) => optionIndex !== index) }))} className="h-8 w-8 shrink-0 text-white/50 hover:bg-red-400/10 hover:text-red-200"><X className="h-3.5 w-3.5" /></Button>}</div>)}</div>
+            {(draft.type === "mcq" || draft.type === "truefalse") && <label className="mt-3 block text-xs font-bold uppercase tracking-wide text-white/55">Correct answer
+              <select value={draft.correctAnswer} onChange={(event) => setDraft((current) => ({ ...current, correctAnswer: event.target.value }))} className="mt-1.5 h-10 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white outline-none focus:border-teal-300"><option value="" className="bg-[#0d2029]">Select the correct answer</option>{correctAnswerOptions.map(({ option, index }) => <option key={`${option}-${index}`} value={option} className="bg-[#0d2029]">{OPTION_LETTERS[index] ?? index + 1}. {option}</option>)}</select>
+            </label>}
+          </div>}
+
+          <label className="block text-xs font-bold uppercase tracking-wide text-white/55">Explanation / rationale <span className="normal-case font-normal text-white/35">(optional)</span>
+            <Textarea value={draft.explanation} onChange={(event) => setDraft((current) => ({ ...current, explanation: event.target.value }))} rows={3} placeholder="Add an explanation shown with the answer" className="mt-1.5 border-white/10 bg-white/5 text-sm text-white placeholder:text-white/30" />
+          </label>
+
+          <div className="rounded-lg border border-teal-300/20 bg-teal-300/[0.06] p-3">
+            <p className="text-xs font-bold text-teal-100">Clinical source media <span className="font-normal text-teal-100/65">(optional)</span></p>
+            <p className="mt-1 text-xs leading-relaxed text-teal-100/60">Upload an image or video directly to this Question Bank source. This media is saved with the question and becomes the default card media.</p>
+            <div className="mt-3"><MediaDropzone value={mediaUrl} onUploaded={handleMediaUploaded} onClear={() => setDraft((current) => ({ ...current, questionImageUrl: "", questionVideoUrl: "" }))} label="Upload question image or video" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime,video/x-ms-wmv,.wmv,.mp4,.webm,.mov" hint="Drag and drop or select an image or video" className="rounded-lg bg-white p-2 text-gray-900" previewMaxH="max-h-52" /></div>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-2"><Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="border-white/15 text-white/75 hover:bg-white/10">Cancel</Button><Button type="button" onClick={save} disabled={isSaving} className="bg-teal-500 text-white hover:bg-teal-400">{isSaving ? "Saving source…" : isNewQuestion ? "Create source & use it" : "Save source changes"}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function QuestionBankSocialCardGenerator() {
   const [location] = useLocation();
   const routePresentation = useMemo(() => getBrandToolPresentation(resolveToolBrand(location, window.location.hostname)), [location]);
@@ -137,7 +303,10 @@ export default function QuestionBankSocialCardGenerator() {
   const [includeSourceFolderLabel, setIncludeSourceFolderLabel] = useState(false);
   const [customCardLabel, setCustomCardLabel] = useState("");
   const [selectedQuestionId, setSelectedQuestionId] = useState<number | null>(null);
+  const [selectedQuestionSnapshot, setSelectedQuestionSnapshot] = useState<any | null>(null);
   const [savedLibraryCard, setSavedLibraryCard] = useState<any | null>(null);
+  const [sourceEditorOpen, setSourceEditorOpen] = useState(false);
+  const [sourceEditorQuestion, setSourceEditorQuestion] = useState<any | null>(null);
   const [showLibrary, setShowLibrary] = useState(false);
   const [libraryBrandFilter, setLibraryBrandFilter] = useState<"all" | "aaus" | "iheartecho">("all");
   const [flagComments, setFlagComments] = useState<Record<number, string>>({});
@@ -181,7 +350,8 @@ export default function QuestionBankSocialCardGenerator() {
     () => questionsQuery.data?.questions.find((question: any) => question.id === selectedQuestionId) ?? null,
     [questionsQuery.data?.questions, selectedQuestionId],
   );
-  const activeQuestion = savedLibraryCard?.questionSnapshot ?? selectedQuestion;
+  const currentSelectedQuestion = selectedQuestionSnapshot?.id === selectedQuestionId ? selectedQuestionSnapshot : selectedQuestion;
+  const activeQuestion = savedLibraryCard?.questionSnapshot ?? currentSelectedQuestion;
   const questionMedia = useMemo(() => activeQuestion ? getQuestionMedia(activeQuestion) : { kind: "none" } as ClinicalCardMedia, [activeQuestion]);
   const mediaAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, page: 1, pageSize: 24 });
   const musicAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "audio", page: 1, pageSize: 50 });
@@ -229,13 +399,61 @@ export default function QuestionBankSocialCardGenerator() {
   const flagCardMutation = trpc.quizCardLibrary.flag.useMutation({ onSuccess: () => void utils.quizCardLibrary.list.invalidate() });
   const resolveFlagMutation = trpc.quizCardLibrary.resolveFlag.useMutation({ onSuccess: () => void utils.quizCardLibrary.list.invalidate() });
   const deleteCardMutation = trpc.quizCardLibrary.delete.useMutation({ onSuccess: () => void utils.quizCardLibrary.list.invalidate() });
+  const createQuestionMutation = trpc.questionBank.createQuestion.useMutation();
+  const updateQuestionMutation = trpc.questionBank.updateQuestion.useMutation();
 
   const selectQuestion = useCallback((question: any) => {
     setSelectedQuestionId(question.id);
+    setSelectedQuestionSnapshot(question);
     setSavedLibraryCard(null);
     setMedia(getQuestionMedia(question));
     setCardVariant("question");
   }, []);
+
+  const openSourceEditor = useCallback((question: any | null) => {
+    setSourceEditorQuestion(question);
+    setSourceEditorOpen(true);
+  }, []);
+
+  const saveSourceQuestion = useCallback(async (draft: SourceQuestionDraft) => {
+    const options = draft.type === "mcq" || draft.type === "truefalse" || draft.type === "multiselect"
+      ? draft.options.filter((option) => option.trim()).map((text) => ({ text }))
+      : undefined;
+    const sharedPayload = {
+      question: draft.question.trim(),
+      type: draft.type,
+      options,
+      correctAnswer: draft.correctAnswer.trim() || undefined,
+      explanation: draft.explanation.trim() || undefined,
+    };
+    try {
+      let id = draft.id;
+      if (id) {
+        await updateQuestionMutation.mutateAsync({
+          id,
+          ...sharedPayload,
+          questionImageUrl: draft.questionImageUrl.trim() || null,
+          questionVideoUrl: draft.questionVideoUrl.trim() || null,
+        });
+      } else {
+        const created = await createQuestionMutation.mutateAsync({
+          ...sharedPayload,
+          questionImageUrl: draft.questionImageUrl.trim() || undefined,
+          questionVideoUrl: draft.questionVideoUrl.trim() || undefined,
+        });
+        id = created.id;
+      }
+      if (!id) throw new Error("The Question Bank did not return a source ID.");
+      await Promise.all([questionsQuery.refetch(), utils.questionBank.listQuestions.invalidate(), utils.questionBank.listTags.invalidate()]);
+      const refreshed = await utils.questionBank.getQuestion.fetch({ id });
+      selectQuestion(refreshed);
+      setMedia(getQuestionMedia(refreshed));
+      setSourceEditorOpen(false);
+      toast.success(draft.id ? "Question Bank source updated and selected for this card." : "Question Bank source created and selected for this card.");
+    } catch (error: any) {
+      toast.error(error?.message ?? "Unable to save the Question Bank source.");
+    }
+  }, [createQuestionMutation, questionsQuery, selectQuestion, updateQuestionMutation, utils]);
 
   const openSavedCard = useCallback((saved: any) => {
     setSavedLibraryCard(saved);
@@ -253,6 +471,7 @@ export default function QuestionBankSocialCardGenerator() {
   const resetQuestionBrowserPage = useCallback(() => {
     setPage(1);
     setSelectedQuestionId(null);
+    setSelectedQuestionSnapshot(null);
   }, []);
 
   const changeFolder = useCallback((nextFolderId: number | undefined) => {
@@ -337,7 +556,7 @@ export default function QuestionBankSocialCardGenerator() {
     if (!activeQuestion) return;
     saveCardMutation.mutate({
       brand: cardBrand,
-      questionBankId: selectedQuestion?.id,
+      questionBankId: selectedQuestionId ?? undefined,
       questionSnapshot: activeQuestion,
       cardTemplate: template,
       cardVariant,
@@ -345,7 +564,7 @@ export default function QuestionBankSocialCardGenerator() {
       sourceFolderLabel: sourceFolderLabel || undefined,
       customCardLabel: customCardLabel.trim() || undefined,
     });
-  }, [activeQuestion, cardBrand, cardVariant, customCardLabel, media, saveCardMutation, selectedQuestion?.id, sourceFolderLabel, template]);
+  }, [activeQuestion, cardBrand, cardVariant, customCardLabel, media, saveCardMutation, selectedQuestionId, sourceFolderLabel, template]);
 
   const copyCaption = useCallback(async () => {
     try {
@@ -379,8 +598,7 @@ export default function QuestionBankSocialCardGenerator() {
 
       <main className="mx-auto grid max-w-screen-2xl gap-6 px-6 py-6 xl:grid-cols-[440px_minmax(0,1fr)_330px]">
         <section className="rounded-xl border border-white/10 bg-white/[0.035] p-4">
-          <h2 className="text-sm font-bold">1. Browse all Question Bank questions</h2>
-          <p className="mt-1 text-[11px] leading-relaxed text-white/45">Questions with images or video in their answer choices stay available in native quizzes, but are excluded here because Quiz Cards use accessible A–D text answer rows.</p>
+          <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="text-sm font-bold">1. Browse all Question Bank questions</h2><p className="mt-1 max-w-sm text-[11px] leading-relaxed text-white/45">Questions with images or video in their answer choices stay available in native quizzes, but are excluded here because Quiz Cards use accessible A–D text answer rows.</p></div><Button type="button" size="sm" variant="outline" onClick={() => openSourceEditor(null)} className="h-8 gap-1 border-teal-300/30 bg-teal-300/10 px-2 text-[11px] text-teal-100 hover:bg-teal-300/20"><Plus className="h-3.5 w-3.5" />New source</Button></div>
           <div className="relative mt-3"><Search className="absolute left-3 top-2.5 h-4 w-4 text-white/40" /><Input value={search} onChange={(event) => { setSearch(event.target.value); resetQuestionBrowserPage(); }} placeholder="Search all Question Bank questions" className="border-white/10 bg-white/5 pl-9 text-white placeholder:text-white/35" /></div>
           <div className="mt-3 rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="mb-2 flex items-center justify-between gap-2"><div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-white/50"><Folder className="h-3.5 w-3.5" />Folders</div><span className="text-[10px] text-white/35">{visibleFolderEntries.length} shown</span></div><div className="relative"><Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-white/35" /><Input value={folderSearch} onChange={(event) => setFolderSearch(event.target.value)} placeholder="Find a folder" aria-label="Find a Question Bank folder" className="h-8 border-white/10 bg-white/5 pl-8 text-xs text-white placeholder:text-white/30" /></div>{folderId !== undefined && <button onClick={() => changeFolder(undefined)} className="mt-2 text-[10px] font-semibold text-teal-200 hover:text-teal-100">Clear selected folder</button>}<div className="mt-2 max-h-[42vh] min-h-40 space-y-1 overflow-y-auto rounded-md border border-white/5 bg-black/10 p-1 pr-1.5"><button onClick={() => changeFolder(undefined)} className={`flex w-full items-center rounded px-2 py-2 text-left text-xs font-semibold ${folderId === undefined ? "bg-teal-300/15 text-teal-100" : "text-white/75 hover:bg-white/5"}`}><span>All folders</span></button>{visibleFolderEntries.map((folder) => <button key={folder.id} onClick={() => changeFolder(folder.id)} className={`flex w-full items-start justify-between rounded py-2 pr-2 text-left text-xs leading-5 ${folderId === folder.id ? "bg-teal-300/15 text-teal-100" : "text-white/65 hover:bg-white/5"}`} style={{ paddingLeft: `${8 + Math.min(folder.depth, 4) * 14}px` }} title={folder.name}><span className="min-w-0 break-words"><span className="mr-1.5 text-white/30">{folder.depth ? "↳" : "•"}</span>{folder.name}</span><span className="ml-2 shrink-0 rounded bg-white/5 px-1.5 py-0.5 text-[10px] text-white/45">{folder.questionCount}</span></button>)}{visibleFolderEntries.length === 0 && <p className="px-2 py-3 text-xs text-white/40">No folders match “{folderSearch}”.</p>}</div></div>
           <div className="mt-3 rounded-lg border border-white/10 bg-black/15 p-2.5"><div className="mb-2 flex items-center justify-between gap-2"><p className="text-[11px] font-bold uppercase tracking-wide text-white/50">Tags · match all selected</p>{tagIds.length > 0 && <button onClick={() => { setTagIds([]); resetQuestionBrowserPage(); }} className="text-[10px] font-semibold text-teal-200 hover:text-teal-100">Clear {tagIds.length}</button>}</div><div className="relative"><Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-white/35" /><Input value={tagSearch} onChange={(event) => setTagSearch(event.target.value)} placeholder="Search tags" aria-label="Search Question Bank tags" className="h-8 border-white/10 bg-white/5 pl-8 text-xs text-white placeholder:text-white/30" /></div><div className="mt-2 flex max-h-36 flex-wrap content-start gap-1 overflow-y-auto rounded-md border border-white/5 bg-black/10 p-2 pr-1.5">{visibleTags.map((tag: any) => <button key={tag.id} onClick={() => toggleTag(tag.id)} className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${tagIds.includes(tag.id) ? "border-teal-200 bg-teal-300/15 text-teal-100" : "border-white/10 text-white/55 hover:border-white/30"}`}>{tag.name}</button>)}{visibleTags.length === 0 && <p className="px-1 py-2 text-xs text-white/40">No tags match “{tagSearch}”.</p>}</div></div>
@@ -404,7 +622,7 @@ export default function QuestionBankSocialCardGenerator() {
             <div className="flex min-h-[700px] flex-col items-center justify-center text-center text-white/50"><ImageIcon className="mb-3 h-10 w-10 text-teal-200/60" /><p className="font-semibold text-white/75">Choose a Question Bank question</p><p className="mt-1 max-w-sm text-sm">The generator will prefer its existing clinical image or video. You can override it without changing the source question.</p></div>
           ) : (
             <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold">3. Preview and export</h2><p className="mt-1 text-xs text-white/50">Export a Question or Answer card at the selected social-platform size as a full PNG or an animated MP4.</p></div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={saveToLibrary} disabled={saveCardMutation.isPending} className="gap-1.5 border-white/15 text-white/75 hover:bg-white/10"><LibraryBig className="h-3.5 w-3.5" />Save to library</Button><Button size="sm" onClick={exportCard} disabled={exporting !== null} className="gap-1.5 bg-teal-500 text-white hover:bg-teal-400"><Download className="h-3.5 w-3.5" />{exporting ? `Rendering ${exporting.toUpperCase()}` : `Download ${exportFormat.toUpperCase()}`}</Button></div></div>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold">3. Preview and export</h2><p className="mt-1 text-xs text-white/50">Export a Question or Answer card at the selected social-platform size as a full PNG or an animated MP4.</p></div><div className="flex flex-wrap gap-2">{selectedQuestionId && currentSelectedQuestion && <Button type="button" size="sm" variant="outline" onClick={() => openSourceEditor(currentSelectedQuestion)} className="gap-1.5 border-teal-300/30 text-teal-100 hover:bg-teal-300/10"><Pencil className="h-3.5 w-3.5" />Edit source</Button>}<Button size="sm" variant="outline" onClick={saveToLibrary} disabled={saveCardMutation.isPending} className="gap-1.5 border-white/15 text-white/75 hover:bg-white/10"><LibraryBig className="h-3.5 w-3.5" />Save to library</Button><Button size="sm" onClick={exportCard} disabled={exporting !== null} className="gap-1.5 bg-teal-500 text-white hover:bg-teal-400"><Download className="h-3.5 w-3.5" />{exporting ? `Rendering ${exporting.toUpperCase()}` : `Download ${exportFormat.toUpperCase()}`}</Button></div></div>
               <div className="mb-3 flex overflow-hidden rounded-lg border border-white/10"><button onClick={() => setCardVariant("question")} className={`flex-1 px-3 py-2 text-xs font-bold ${cardVariant === "question" ? "bg-teal-500 text-white" : "bg-white/[0.03] text-white/55 hover:bg-white/10"}`}>Question only</button><button onClick={() => setCardVariant("answer")} className={`flex-1 px-3 py-2 text-xs font-bold ${cardVariant === "answer" ? "bg-teal-500 text-white" : "bg-white/[0.03] text-white/55 hover:bg-white/10"}`}>Answer only</button><button onClick={() => setCardVariant("combined")} className={`flex-1 px-3 py-2 text-xs font-bold ${cardVariant === "combined" ? "bg-teal-500 text-white" : "bg-white/[0.03] text-white/55 hover:bg-white/10"}`}>Question + answer MP4</button></div>
               {canZoomQuestionImage && <label className="mb-3 flex cursor-pointer items-start gap-2 rounded-lg border border-teal-300/25 bg-teal-300/10 px-3 py-2 text-xs text-teal-50"><input type="checkbox" checked={zoomQuestionImage} onChange={(event) => setZoomQuestionImage(event.target.checked)} className="mt-0.5 accent-teal-400" /><span><strong>Magnify the clinical image in the MP4</strong><br /><span className="text-teal-100/75">The video shows the question, zooms into the full image for review, brings in the answer options, waits three seconds, then reveals the correct answer and brand outro.</span></span></label>}
               <div className="overflow-auto rounded-lg border border-white/10 bg-black/20 p-4"><div style={{ width: Math.round(exportPreset.width * Math.min(1, 640 / exportPreset.width, 760 / exportPreset.height)), height: Math.round(exportPreset.height * Math.min(1, 640 / exportPreset.width, 760 / exportPreset.height)), position: "relative" }}><div style={{ position: "absolute", top: 0, left: 0, width: exportPreset.width, height: exportPreset.height, transform: `scale(${Math.min(1, 640 / exportPreset.width, 760 / exportPreset.height)})`, transformOrigin: "top left" }}><div ref={cardRef} style={{ width: exportPreset.width, height: exportPreset.height }}><SocialCardFrameProvider platform={exportPlatform}><ClinicalQuizCard presentation={presentation} template={template} variant={cardVariant === "answer" ? "answer" : "question"} question={activeQuestion.question} options={options} media={cardVariant === "question" || cardVariant === "combined" ? media : { kind: "none" }} correctAnswer={correctAnswer} explanation={activeQuestion.explanation} title={cardLabel} footerHost={presentation.publicHost} answerContextLabel="CLINICAL QUIZ" answerFooterMessage="Follow for clinical learning" /></SocialCardFrameProvider></div></div></div></div>
@@ -424,6 +642,14 @@ export default function QuestionBankSocialCardGenerator() {
           </section>
         </aside>
       </main>
+      <SourceQuestionEditor
+        open={sourceEditorOpen}
+        question={sourceEditorQuestion}
+        folders={foldersQuery.data ?? []}
+        isSaving={createQuestionMutation.isPending || updateQuestionMutation.isPending}
+        onOpenChange={setSourceEditorOpen}
+        onSave={saveSourceQuestion}
+      />
     </div>
   );
 }
