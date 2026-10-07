@@ -76,6 +76,16 @@ describe("Teach participant route interaction", () => {
     const puzzleSubmit = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Submit puzzle order")) as HTMLButtonElement;
     await act(async () => puzzleSubmit.click());
     expect(mocks.submit).toHaveBeenLastCalledWith(expect.objectContaining({ questionId: 7, responsePayload: expect.objectContaining({ order: expect.any(Array) }) }));
+    await act(async () => { mocks.socket.emit({ type: "question_started", questionIndex: 3, totalQuestions: 5, timeLimitSeconds: 20, question: { id: 8, question: "Which valve is left-sided?", interactionType: "multiple_choice", points: 100, options: JSON.stringify(["Mitral", "Tricuspid"]), mediaUrl: null, mediaType: null } }); });
+    const multipleChoice = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Mitral")) as HTMLButtonElement;
+    await act(async () => multipleChoice.click());
+    expect(mocks.submit).toHaveBeenLastCalledWith(expect.objectContaining({ questionId: 8, selectedAnswer: 0 }));
+    expect(mocks.submit.mock.calls.at(-1)?.[0]).not.toHaveProperty("responsePayload");
+    await act(async () => { mocks.socket.emit({ type: "question_started", questionIndex: 4, totalQuestions: 5, timeLimitSeconds: 20, question: { id: 9, question: "The mitral valve has two leaflets.", interactionType: "true_false", points: 100, options: JSON.stringify(["True", "False"]), mediaUrl: null, mediaType: null } }); });
+    const trueFalse = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("False")) as HTMLButtonElement;
+    await act(async () => trueFalse.click());
+    expect(mocks.submit).toHaveBeenLastCalledWith(expect.objectContaining({ questionId: 9, selectedAnswer: 1 }));
+    expect(mocks.submit.mock.calls.at(-1)?.[0]).not.toHaveProperty("responsePayload");
     await act(async () => { root.unmount(); await new Promise((resolve) => setTimeout(resolve, 0)); });
   });
 });

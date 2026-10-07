@@ -30,11 +30,11 @@
 - [x] Add mixed interactive game slides: multiple choice, true/false, free-word word cloud, hotspot, and puzzle interactions.
 - [x] Build teacher game authoring with ordered/rotatable slides and question-level image, video URL, and GIF media controls.
 - [x] Build participant QR/PIN joining, live answer submission, teacher presentation controls, and real-time group results.
-- [ ] Add end-to-end regression coverage for session joining, question progression, scoring, media, and response aggregation.
+- [x] Add end-to-end regression coverage for session joining, question progression, scoring, media, and response aggregation. The focused flow uses real WebSockets plus the mounted host and participant routes to cover PIN joining, start/reveal/advance/end controls, scored multiple-choice and true/false answers, word cloud aggregation, hotspot and puzzle responses, image/GIF media, and live leaderboard/results delivery.
 - [ ] Select and configure an education-appropriate GIF search provider for Teach game authoring.
 - [ ] Activate the deferred GIPHY search integration after the user supplies a GIPHY API key; retain direct GIF URL support in the meantime.
 - [x] Update the reused live host and player screens with Teach branding, Teach navigation, and no admin-only presentation assumptions.
-- [ ] Add interaction-level regression coverage for Teach host/player route navigation, QR/PIN joining, question progression, and collaborative results across all interactive slide types.
+- [x] Add interaction-level regression coverage for Teach host/player route navigation, QR/PIN joining, question progression, and collaborative results across all interactive slide types. The mounted host asserts the generated QR launch route, the participant mounts and joins by PIN, and real WebSocket coverage verifies question start, response-progress, and answer reveal synchronization for hotspot, word cloud, puzzle, multiple-choice, and true-false slides without revealing choice keys before the host reveal.
 - [ ] Add end-to-end regression coverage for session joining, scoring, media rendering, and teacher presentation controls on the real Teach routes.
 - [x] Add mounted Teach host-route interaction tests for branding, teacher controls, question progression, and collaborative result rendering.
 - [x] Extend the mounted Teach host-route suite to cover Reveal Answers, Next, and End session controls.

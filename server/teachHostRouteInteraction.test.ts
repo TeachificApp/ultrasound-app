@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: 77, name: "Teach Educator" } }) }));
 vi.mock("wouter", () => ({ useRoute: (pattern: string) => [pattern === "/teach/games/host/:sessionId", pattern === "/teach/games/host/:sessionId" ? { sessionId: "101" } : null] }));
-vi.mock("qrcode.react", () => ({ QRCodeSVG: () => React.createElement("div", { "data-testid": "qr-code" }) }));
+vi.mock("qrcode.react", () => ({ QRCodeSVG: ({ value }: { value: string }) => React.createElement("div", { "data-testid": "qr-code", "data-value": value }) }));
 vi.mock("sonner", () => ({ toast: vi.fn() }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
@@ -72,6 +72,7 @@ describe("Teach host route interaction", () => {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5)); });
     expect(container.textContent).toContain("Teach Live Game Host");
     expect(container.textContent).toContain("TEACH1");
+    expect(container.querySelector('[data-testid="qr-code"]')?.getAttribute("data-value")).toBe("https://learn.allaboutultrasound.com/quiz/TEACH1");
     const start = [...container.querySelectorAll("button")].find((button) => button.textContent?.includes("Start Quiz")) as HTMLButtonElement;
     await act(async () => start.click());
     expect(mocks.startSession).toHaveBeenCalledWith({ sessionId: 101 });

@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { aggregateWordCloud, evaluateTeachResponse } from "./lib/teachGameInteractions";
 
 describe("Teach live game interactions", () => {
+  it("scores multiple-choice and true-false slides through the shared live-response path", () => {
+    expect(evaluateTeachResponse({ interactionType: "multiple_choice", selectedAnswer: 2, correctAnswer: 2 })).toBe(true);
+    expect(evaluateTeachResponse({ interactionType: "multiple_choice", selectedAnswer: 1, correctAnswer: 2 })).toBe(false);
+    expect(evaluateTeachResponse({ interactionType: "true_false", selectedAnswer: 0, correctAnswer: 0 })).toBe(true);
+    expect(evaluateTeachResponse({ interactionType: "true_false", selectedAnswer: 1, correctAnswer: 0 })).toBe(false);
+  });
+
   it("scores a point-and-click hotspot only inside its configured target region", () => {
     const interactionConfig = JSON.stringify({ targetRegions: [{ x: 35, y: 20, width: 30, height: 40 }] });
     expect(evaluateTeachResponse({ interactionType: "hotspot", selectedAnswer: -1, correctAnswer: -1, interactionConfig, responsePayload: { hotspot: { x: 50, y: 40 } } })).toBe(true);
