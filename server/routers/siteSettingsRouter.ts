@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
-import { getDb } from "../db";
-import { siteSettings, platformSettings } from "../../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { getDb, getUserRoles } from "../db";
+import { siteSettings, platformSettings, mediaAssets, mediaVersions } from "../../drizzle/schema";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 // ── Key-value helpers for site_settings table (used for pixel IDs) ───────────
 
@@ -30,6 +30,13 @@ async function upsertSetting(key: string, value: string | null, userId: number):
       .values({ settingKey: key, settingValue: value, updatedAt: now, updatedBy: userId })
       .onDuplicateKeyUpdate({ set: { settingValue: value, updatedAt: now, updatedBy: userId } });
   }
+}
+
+async function assertEffectivePlatformAdmin(ctx: { user: { id: number; role: string } }) {
+  if (ctx.user.role === "admin") return;
+  const roles = await getUserRoles(ctx.user.id);
+  if (roles.includes("platform_admin") || roles.includes("platform_owner")) return;
+  throw new TRPCError({ code: "FORBIDDEN", message: "Platform admin access required" });
 }
 
 export const siteSettingsRouter = router({
@@ -154,6 +161,72 @@ export const siteSettingsRouter = router({
           },
         });
 
+      return { success: true };
+    }),
+
+  /** Platform-admin default Media Repository audio for every new MP4 card export. */
+  getDefaultMp4Audio: protectedProcedure.query(async ({ ctx }) => {
+    await assertEffectivePlatformAdmin(ctx);
+    const db = await getDb();
+    if (!db) return null;
+    const [settings] = await db
+      .select({ assetId: platformSettings.defaultMp4AudioAssetId })
+      .from(platformSettings)
+      .where(eq(platformSettings.id, 1))
+      .limit(1);
+    if (!settings?.assetId) return null;
+
+    const [asset] = await db
+      .select({ id: mediaAssets.id, title: mediaAssets.title })
+      .from(mediaAssets)
+      .where(and(
+        eq(mediaAssets.id, settings.assetId),
+        eq(mediaAssets.mediaType, "audio"),
+        isNull(mediaAssets.deletedAt),
+      ))
+      .limit(1);
+    if (!asset) return null;
+    const [version] = await db
+      .select({ url: mediaVersions.s3Url })
+      .from(mediaVersions)
+      .where(eq(mediaVersions.assetId, asset.id))
+      .orderBy(desc(mediaVersions.versionNumber))
+      .limit(1);
+    if (!version?.url) return null;
+    return { assetId: asset.id, title: asset.title, url: version.url };
+  }),
+
+  /** Select or clear the platform-wide default Media Repository audio for MP4 card exports. */
+  updateDefaultMp4Audio: protectedProcedure
+    .input(z.object({ assetId: z.number().int().positive().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertEffectivePlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      if (input.assetId) {
+        const [asset] = await db
+          .select({ id: mediaAssets.id })
+          .from(mediaAssets)
+          .where(and(
+            eq(mediaAssets.id, input.assetId),
+            eq(mediaAssets.mediaType, "audio"),
+            isNull(mediaAssets.deletedAt),
+          ))
+          .limit(1);
+        if (!asset) throw new TRPCError({ code: "NOT_FOUND", message: "Choose an available audio file from the Media Repository." });
+        const [version] = await db
+          .select({ id: mediaVersions.id })
+          .from(mediaVersions)
+          .where(eq(mediaVersions.assetId, asset.id))
+          .orderBy(desc(mediaVersions.versionNumber))
+          .limit(1);
+        if (!version) throw new TRPCError({ code: "BAD_REQUEST", message: "The selected audio file has no playable version." });
+      }
+
+      await db.insert(platformSettings)
+        .values({ id: 1, defaultMp4AudioAssetId: input.assetId })
+        .onDuplicateKeyUpdate({ set: { defaultMp4AudioAssetId: input.assetId } });
       return { success: true };
     }),
 });

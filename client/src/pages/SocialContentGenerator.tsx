@@ -30,6 +30,7 @@ import {
   exportSocialCard,
   renderSocialCard,
   SocialExportControls,
+  useDefaultMp4Audio,
   type CardMotion,
   type SocialExportFormat,
   type SocialMusicOption,
@@ -801,6 +802,7 @@ export default function SocialContentGenerator() {
   const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
   const [mp4Sequence, setMp4Sequence] = useState<"social" | "combined">("social");
   const [selectedMusic, setSelectedMusic] = useState<SocialMusicOption | null>(null);
+  useDefaultMp4Audio(presentation.brand, selectedMusic, setSelectedMusic);
   const [imageStyleHint, setImageStyleHint] = useState("");
   const [items, setItems] = useState<GeneratedItem[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);

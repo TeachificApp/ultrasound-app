@@ -4683,6 +4683,9 @@ export const platformSettings = mysqlTable("platform_settings", {
   // When a request hostname doesn't match any known brand domain, use this brand as fallback.
   // Valid values: 'aaus' | 'iheartecho' (defaults to 'aaus' if not set)
   defaultBrand: varchar("default_brand", { length: 32 }).default("aaus"),
+  // Media Repository audio chosen by a platform admin as the default background track for MP4 card exports.
+  // NULL leaves every card generator on its per-export No music setting until an admin chooses a track.
+  defaultMp4AudioAssetId: int("default_mp4_audio_asset_id"),
   // ── Google Drive CME integration ──
   // OAuth credentials for saving CME PDFs to a shared Google Drive folder
   cmeDriveClientId: varchar("cme_drive_client_id", { length: 500 }),

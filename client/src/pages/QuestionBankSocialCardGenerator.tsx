@@ -16,6 +16,7 @@ import {
   DEFAULT_SOCIAL_EXPORT_PLATFORM,
   exportSocialCard,
   SocialExportControls,
+  useDefaultMp4Audio,
   type SocialMusicOption,
   type SocialExportFormat,
   type SocialExportPlatform,
@@ -316,6 +317,7 @@ export default function QuestionBankSocialCardGenerator() {
   const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
   const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
   const [selectedMusic, setSelectedMusic] = useState<SocialMusicOption | null>(null);
+  useDefaultMp4Audio(presentation.brand, selectedMusic, setSelectedMusic);
   const [zoomQuestionImage, setZoomQuestionImage] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);

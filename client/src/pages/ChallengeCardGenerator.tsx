@@ -25,6 +25,7 @@ import {
   exportSocialCard,
   renderSocialCard,
   SocialExportControls,
+  useDefaultMp4Audio,
   type CardMotion,
   type SocialExportFormat,
   type SocialMusicOption,
@@ -1226,6 +1227,7 @@ export default function ChallengeCardGenerator() {
   const [exportPlatform, setExportPlatform] = useState<SocialExportPlatform>(DEFAULT_SOCIAL_EXPORT_PLATFORM);
   const [exportFormat, setExportFormat] = useState<SocialExportFormat>("png");
   const [selectedMusic, setSelectedMusic] = useState<SocialMusicOption | null>(null);
+  useDefaultMp4Audio(presentation.brand, selectedMusic, setSelectedMusic);
   const musicAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "audio", page: 1, pageSize: 50 });
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
     .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: asset.currentVersion?.s3Url, source: "media_repository" as const }))

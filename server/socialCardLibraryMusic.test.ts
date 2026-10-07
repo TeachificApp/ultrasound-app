@@ -11,6 +11,9 @@ const router = readFileSync(`${root}/server/routers/quizCardLibraryRouter.ts`, "
 const questionBankRouter = readFileSync(`${root}/server/routers/questionBankRouter.ts`, "utf8");
 const migration = readFileSync(`${root}/drizzle/0072_quiz_card_library.sql`, "utf8");
 const serverEntry = readFileSync(`${root}/server/_core/index.ts`, "utf8");
+const siteSettings = readFileSync(`${root}/server/routers/siteSettingsRouter.ts`, "utf8");
+const platformSchema = readFileSync(`${root}/drizzle/schema.ts`, "utf8");
+const defaultMusicMigration = readFileSync(`${root}/drizzle/0096_default_mp4_audio_asset.sql`, "utf8");
 
 describe("card music, combined exports, and Quiz Card Library", () => {
   it("offers direct audio upload in the shared exporter for each brand", () => {
@@ -49,6 +52,20 @@ describe("card music, combined exports, and Quiz Card Library", () => {
     expect(exporter).toMatch(/musicBlob\s*\? await musicBlob\.arrayBuffer\(\)/);
     expect(exporter).toContain("The selected ${label} could not be embedded in this MP4");
     for (const page of [quiz, social, challenge]) expect(page).toContain("musicBlob: selectedMusic?.localBlob");
+  });
+
+  it("persists one administrator-selected Media Repository audio default across every MP4 card generator", () => {
+    expect(platformSchema).toContain('defaultMp4AudioAssetId: int("default_mp4_audio_asset_id")');
+    expect(defaultMusicMigration).toContain("ADD COLUMN `default_mp4_audio_asset_id` INT NULL");
+    expect(siteSettings).toContain("getDefaultMp4Audio: protectedProcedure");
+    expect(siteSettings).toContain("updateDefaultMp4Audio: protectedProcedure");
+    expect(siteSettings).toContain("assertEffectivePlatformAdmin");
+    expect(siteSettings).toContain('eq(mediaAssets.mediaType, "audio")');
+    expect(siteSettings).toContain("defaultMp4AudioAssetId: input.assetId");
+    expect(exporter).toContain("export function useDefaultMp4Audio");
+    expect(exporter).toContain("Use as default for all MP4s");
+    expect(exporter).toContain("Generate, Upload, or No music overrides it for this export.");
+    for (const page of [quiz, social, challenge]) expect(page).toContain("useDefaultMp4Audio(presentation.brand, selectedMusic, setSelectedMusic)");
   });
 
   it("renders a layered modern instrumental mix rather than a single oscillator beat", () => {
