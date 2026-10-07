@@ -147,7 +147,7 @@
 - [x] Repair the learner content-access page runtime error “Can’t find variable: cn” without changing enrollment, entitlement, or content data.
 - [x] Repair the authorized RPhS quiz launch path that currently shows “Quiz not found,” while retaining standalone quiz non-discovery rules.
 - [x] Restore the user-confirmed Published status for RPhS Test & Learn Quiz after its unexpected reversal to Draft, without enabling any public discovery surface.
-- [ ] Trace and repair the RPhS publish control or persistence path so administrator-selected Published status remains active and the protected learner launch recognizes it.
+- [x] Trace and repair the RPhS publish control or persistence path so administrator-selected Published status remains active and the protected learner launch recognizes it. General Quiz Creator settings saves now exclude the stale publication field, while the dedicated publish control updates the active editor snapshot; read-only live MySQL verification confirmed RPhS Test & Learn Quiz remains `published` with enrolled-only access.
 - [ ] Trace and repair the deployment handoff so approved project updates reach the Railway-hosted live site and the live version can be verified.
 - [x] Republish the current workspace through the built-in hosted deployment at the user’s request.
 - [x] Allow authenticated administrators to preview any standalone quiz without a learner module assignment or widget token, while retaining learner module/widget-only restrictions.

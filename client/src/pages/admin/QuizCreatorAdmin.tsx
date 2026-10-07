@@ -1752,6 +1752,24 @@ function QuizEditor({ quizId }: { quizId: number }) {
   const { quiz, questions } = data;
   const assignments = data.assignments ?? [];
   const existingQuestionIds = questions.map(({ qb }: any) => qb.id);
+  const saveSettings = () => {
+    if (!settings) return;
+    // Publication is controlled by the explicit header action below. Keeping it
+    // out of a general settings save prevents a stale editor snapshot from
+    // silently reverting a quiz that was just published.
+    const { status: _status, id: _settingsId, ...editableSettings } = settings;
+    updateMutation.mutate({ id: quiz.id, ...editableSettings });
+  };
+  const updatePublicationStatus = (status: "draft" | "published") => {
+    updateMutation.mutate(
+      { id: quiz.id, status },
+      {
+        onSuccess: () => {
+          setSettings((current: any) => current ? { ...current, status } : current);
+        },
+      },
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -1797,7 +1815,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
             variant={quiz.status === "published" ? "outline" : "default"}
             disabled={updateMutation.isPending}
             className={quiz.status === "published" ? "border-gray-300 text-gray-700 hover:bg-gray-50" : "bg-teal-600 hover:bg-teal-700 text-white"}
-            onClick={() => updateMutation.mutate({ id: quiz.id, status: quiz.status === "published" ? "draft" : "published" })}
+            onClick={() => updatePublicationStatus(quiz.status === "published" ? "draft" : "published")}
           >
             {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
             {quiz.status === "published" ? "Unpublish" : "Publish for modules & widgets"}
@@ -2177,7 +2195,7 @@ function QuizEditor({ quizId }: { quizId: number }) {
                 </Card>
                 <div className="md:col-span-2 flex justify-end">
                   <Button
-                    onClick={() => updateMutation.mutate({ id: quiz.id, ...settings })}
+                    onClick={saveSettings}
                     disabled={updateMutation.isPending}
                     className="bg-teal-600 hover:bg-teal-700"
                   >
