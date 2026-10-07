@@ -48,6 +48,17 @@ describe("Question Bank social-card generation", () => {
     expect(questionRouter).toContain("questionVideoUrl: z.string().nullable().optional()");
   });
 
+  it("keeps source text and saved-media editing visible after a question is selected", () => {
+    const page = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+
+    expect(page).toContain("New question + media");
+    expect(page).toContain('aria-label="Selected source editing controls"');
+    expect(page).toContain("Edit text, choices & saved media");
+    expect(page).toContain("Edit question text & media");
+    expect(page).toContain("Card-only media override");
+    expect(page).toContain("Saved source media becomes the default for future Quiz Cards and native quizzes.");
+  });
+
   it("retains an allowlisted selected brand for approved media uploads", () => {
     const uploadClient = readProjectFile("client/src/lib/mediaRepoUpload.ts");
     const uploadServer = readProjectFile("server/routes/uploadMediaRepo.ts");
