@@ -79,6 +79,13 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("drawZoomedCardImage");
     expect(exporter).toContain("imageZoomStartSeconds");
     expect(exporter).toContain("CLINICAL IMAGE REVIEW");
+    expect(exporter).toContain("const IMAGE_QUESTION_HOLD_SECONDS = 4");
+    expect(exporter).toContain("const IMAGE_ZOOM_HOLD_SECONDS = 7");
+    expect(exporter).toContain("const IMAGE_OPTION_STAGGER_SECONDS = 1");
+    expect(exporter).toContain("imageZoomStartSeconds = hasImageZoom ? IMAGE_QUESTION_HOLD_SECONDS");
+    expect(exporter).toContain("imageZoomHoldEndSeconds = hasImageZoom ? imageZoomEndSeconds + IMAGE_ZOOM_HOLD_SECONDS");
+    expect(exporter).toContain("? imageZoomHoldEndSeconds + 0.25");
+    expect(exporter).toContain("imageZoomHoldEndSeconds > 0 && elapsed >= timeline.imageZoomStartSeconds");
     expect(exporter).toContain("const boundsScaleX = width / Math.max(1, cardBounds.width)");
     expect(exporter).toContain("const boundsScaleY = height / Math.max(1, cardBounds.height)");
     expect(exporter).toContain("mediaBounds.width * boundsScaleX");

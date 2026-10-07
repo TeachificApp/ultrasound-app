@@ -64,6 +64,13 @@ const FRAME_RATE = 12;
 const OUTRO_HOLD_SECONDS = 10;
 const MOTION_DURATION_SECONDS = 20;
 const OUTRO_START_SECONDS = MOTION_DURATION_SECONDS - OUTRO_HOLD_SECONDS;
+// Quiz Card clinical-image review pacing: let viewers read the question, then
+// inspect the fully magnified image before answer choices begin entering.
+const IMAGE_QUESTION_HOLD_SECONDS = 4;
+const IMAGE_ZOOM_ANIMATION_SECONDS = 0.75;
+const IMAGE_ZOOM_HOLD_SECONDS = 7;
+const IMAGE_OPTION_STAGGER_SECONDS = 1;
+const IMAGE_OPTION_ANIMATION_SECONDS = 0.7;
 // The fourth combined-question option completes at 4.11 seconds. The answer
 // deliberately waits three full seconds so viewers can consider every option.
 const COMBINED_ANSWER_REVEAL_SECONDS = 7.11;
@@ -79,7 +86,10 @@ type MotionTimeline = {
   videoDurationSeconds: number;
   imageZoomStartSeconds: number;
   imageZoomEndSeconds: number;
+  imageZoomHoldEndSeconds: number;
   optionStartSeconds: number;
+  optionStaggerSeconds: number;
+  optionAnimationSeconds: number;
   answerRevealSeconds: number;
 };
 
@@ -236,19 +246,22 @@ function motionTimeline(motion: CardMotion, video: HTMLVideoElement | null): Mot
     ? clamp(video.duration, 0, 90)
     : 0;
   const hasImageZoom = motion.kind === "combined" && motion.zoomQuestionImage;
-  const imageZoomStartSeconds = hasImageZoom ? 1.25 : 0;
-  const imageZoomEndSeconds = hasImageZoom ? 4.25 : 0;
+  const imageZoomStartSeconds = hasImageZoom ? IMAGE_QUESTION_HOLD_SECONDS : 0;
+  const imageZoomEndSeconds = hasImageZoom ? imageZoomStartSeconds + IMAGE_ZOOM_ANIMATION_SECONDS : 0;
+  const imageZoomHoldEndSeconds = hasImageZoom ? imageZoomEndSeconds + IMAGE_ZOOM_HOLD_SECONDS : 0;
+  const optionStaggerSeconds = hasImageZoom ? IMAGE_OPTION_STAGGER_SECONDS : 0.68;
+  const optionAnimationSeconds = hasImageZoom ? IMAGE_OPTION_ANIMATION_SECONDS : 0.42;
   const optionStartSeconds = videoDurationSeconds > 0
     ? videoDurationSeconds
-    : imageZoomEndSeconds > 0
-      ? imageZoomEndSeconds + 0.3
+    : imageZoomHoldEndSeconds > 0
+      ? imageZoomHoldEndSeconds + 0.25
       : 1.65;
   const answerRevealSeconds = videoDurationSeconds > 0
     ? videoDurationSeconds + 3
-    : imageZoomEndSeconds > 0
-      // Four staggered options complete 2.46 seconds after their first entrance;
+    : imageZoomHoldEndSeconds > 0
+      // Four slowly staggered options complete 3.7 seconds after their first entrance;
       // reserve the requested three seconds before revealing the answer.
-      ? optionStartSeconds + 5.46
+      ? optionStartSeconds + 6.7
       : COMBINED_ANSWER_REVEAL_SECONDS;
   // Hold the completed question/options for three seconds before revealing the answer,
   // and keep the answer visible for at least three seconds before the 10-second outro.
@@ -263,7 +276,10 @@ function motionTimeline(motion: CardMotion, video: HTMLVideoElement | null): Mot
     videoDurationSeconds,
     imageZoomStartSeconds,
     imageZoomEndSeconds,
+    imageZoomHoldEndSeconds,
     optionStartSeconds,
+    optionStaggerSeconds,
+    optionAnimationSeconds,
     answerRevealSeconds,
   };
 }
@@ -453,8 +469,10 @@ function drawMotionPanel(
     const itemHeight = Math.max(54, Math.round(62 * scaled));
     const itemGap = Math.max(11, Math.round(13 * scaled));
     motion.options.slice(0, 4).forEach((option, index) => {
-      const start = (motion.kind === "combined" ? timeline?.optionStartSeconds ?? 1.65 : 1.65) + index * 0.68;
-      const progress = easeOutBack((elapsed - start) / 0.42);
+      const isCombined = motion.kind === "combined";
+      const start = (isCombined ? timeline?.optionStartSeconds ?? 1.65 : 1.65)
+        + index * (isCombined ? timeline?.optionStaggerSeconds ?? 0.68 : 0.68);
+      const progress = easeOutBack((elapsed - start) / (isCombined ? timeline?.optionAnimationSeconds ?? 0.42 : 0.42));
       if (progress <= 0) return;
       const itemY = optionTop + index * (itemHeight + itemGap);
       const visibleProgress = clamp(progress, 0, 1);
@@ -593,7 +611,10 @@ function drawMotionFrame(
     videoDurationSeconds: 0,
     imageZoomStartSeconds: 0,
     imageZoomEndSeconds: 0,
+    imageZoomHoldEndSeconds: 0,
     optionStartSeconds: 1.65,
+    optionStaggerSeconds: 0.68,
+    optionAnimationSeconds: 0.42,
     answerRevealSeconds: COMBINED_ANSWER_REVEAL_SECONDS,
   },
 ) {
@@ -604,11 +625,15 @@ function drawMotionFrame(
       drawLiveCardVideo(context, card, video, targetWidth, targetHeight);
       return;
     }
-    if (timeline.imageZoomEndSeconds > 0 && elapsed >= timeline.imageZoomStartSeconds && elapsed < timeline.imageZoomEndSeconds) {
+    if (timeline.imageZoomHoldEndSeconds > 0 && elapsed >= timeline.imageZoomStartSeconds && elapsed < timeline.imageZoomHoldEndSeconds) {
       drawZoomedCardImage(
         context,
         card,
-        (elapsed - timeline.imageZoomStartSeconds) / (timeline.imageZoomEndSeconds - timeline.imageZoomStartSeconds),
+        clamp(
+          (elapsed - timeline.imageZoomStartSeconds) / (timeline.imageZoomEndSeconds - timeline.imageZoomStartSeconds),
+          0,
+          1,
+        ),
         targetWidth,
         targetHeight,
       );
