@@ -1112,6 +1112,19 @@ async function startServer() {
   // Initialize SonoQuiz WebSocket hub BEFORE server.listen so it binds to the same HTTP server
   initSonoQuizHub(server);
 
+  // Railway can lag the additive 0064 SSO session-binding migration. Reconcile
+  // the token column before cross-domain SSO exchange requests can read it.
+  try {
+    const db = await getDb();
+    const { ensureSsoTokenSessionSchema } = await import("../lib/ensureSsoTokenSessionSchema");
+    const result = await ensureSsoTokenSessionSchema(db);
+    if (result.error) {
+      console.error("[Startup] ensureSsoTokenSessionSchema incomplete:", result.error);
+    }
+  } catch (err) {
+    console.error("[Startup] ensureSsoTokenSessionSchema error:", err);
+  }
+
   // Railway can lag the additive 0066 IP-location migration. Reconcile the
   // operational log fields before a learner access request can write a row.
   try {
