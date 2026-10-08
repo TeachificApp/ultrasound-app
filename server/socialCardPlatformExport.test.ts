@@ -74,6 +74,8 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("motion.musicUrl");
     expect(exporter).toContain("outroProgress");
     expect(exporter).toContain('"question" | "answer" | "combined" | "social"');
+    expect(exporter).toContain("MAX_MP4_EXPORT_SECONDS = 60");
+    expect(exporter).toContain("MAX_COMBINED_SOURCE_VIDEO_SECONDS");
     expect(exporter).toContain("OUTRO_HOLD_SECONDS = 10");
     expect(exporter).toContain("COMBINED_ANSWER_REVEAL_SECONDS = 7.11");
     expect(exporter).toContain("motion.outroHost");
