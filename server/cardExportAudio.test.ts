@@ -53,6 +53,8 @@ describe("card export audio proxy", () => {
     expect(route).toContain('{ name: "audio", maxCount: 1 }');
     expect(route).toContain("const assetId = Number(req.body?.assetId)");
     expect(route).toContain("getStoredAudio(assetId)");
+    expect(route).toContain("CARD_EXPORT_FRAME_RATE");
+    expect(route).toContain('"-vf", `fps=${CARD_EXPORT_FRAME_RATE}`');
     expect(route).toContain('"-c:v", "copy", "-c:a", "aac"');
     expect(route).toContain('"-stream_loop", "-1"');
     expect(route).toContain("MAX_VIDEO_DURATION_SECONDS");

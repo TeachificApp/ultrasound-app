@@ -19,6 +19,7 @@ const MAX_VIDEO_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 32 * 1024 * 1024;
 const MAX_VIDEO_DURATION_SECONDS = 180;
 const FFMPEG_TIMEOUT_MS = 180_000;
+const CARD_EXPORT_FRAME_RATE = 30;
 const ALLOWED_MUX_AUDIO_MIMES = new Set([
   "audio/mpeg",
   "audio/mp4",
@@ -238,8 +239,10 @@ async function transcodeVideoToH264(inputPath: string, outputPath: string): Prom
     execFile(ffmpegBinary(), [
       "-hide_banner", "-loglevel", "error", "-y",
       "-i", inputPath,
+      "-vf", `fps=${CARD_EXPORT_FRAME_RATE}`,
       "-c:v", "libx264", "-preset", "fast", "-crf", "20",
-      "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+      "-pix_fmt", "yuv420p", "-r", String(CARD_EXPORT_FRAME_RATE), "-fps_mode", "cfr",
+      "-movflags", "+faststart",
       "-an", outputPath,
     ], { timeout: FFMPEG_TIMEOUT_MS, maxBuffer: 1_000_000 }, (error, _stdout, stderr) => {
       if (error) {
