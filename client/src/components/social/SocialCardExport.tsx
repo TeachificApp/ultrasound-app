@@ -792,22 +792,35 @@ function evenExportDimension(value: number): number {
 }
 
 type CardVideoEncodeProfile = {
-  quality: "low" | "medium" | "high";
-  hardwareAcceleration: "prefer-software" | "no-preference";
+  quality: "medium";
+  hardwareAcceleration: "prefer-software";
 };
 
-function cardVideoEncodeProfiles(totalSeconds: number): CardVideoEncodeProfile[] {
-  if (totalSeconds > 28) {
-    return [
-      { quality: "medium", hardwareAcceleration: "prefer-software" },
-      { quality: "low", hardwareAcceleration: "prefer-software" },
-      { quality: "medium", hardwareAcceleration: "no-preference" },
-    ];
-  }
-  return [
-    { quality: "medium", hardwareAcceleration: "prefer-software" },
-    { quality: "high", hardwareAcceleration: "no-preference" },
-  ];
+type FrameLoopPacing = "fast" | "realtime";
+
+function withExportTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function shouldPreferMediaRecorderRecording(ctx: TimelineRenderContext): boolean {
+  return ctx.timeline.totalSeconds > 28
+    || (ctx.motion.kind === "combined" && Boolean(ctx.motion.zoomQuestionImage));
+}
+
+function mediaRecorderTimeoutMs(totalSeconds: number): number {
+  return Math.ceil(totalSeconds * 1000) + 60_000;
 }
 
 function isVideoEncodingFailure(error: unknown): boolean {
@@ -854,6 +867,7 @@ async function drawTimelineFrame(ctx: TimelineRenderContext, elapsed: number) {
 async function runTimelineFrameLoop(
   ctx: TimelineRenderContext,
   onFrame: (elapsed: number) => Promise<void>,
+  pacing: FrameLoopPacing,
 ) {
   if (ctx.motionVideo) await ctx.motionVideo.play().catch(() => undefined);
   const frames = Math.ceil(ctx.timeline.totalSeconds * FRAME_RATE);
@@ -861,7 +875,11 @@ async function runTimelineFrameLoop(
     const elapsed = frame / FRAME_RATE;
     await drawTimelineFrame(ctx, elapsed);
     await onFrame(elapsed);
-    await waitForMotionFrame();
+    if (pacing === "realtime") {
+      await waitForMotionFrame();
+    } else if (ctx.motionVideo && elapsed < ctx.timeline.videoDurationSeconds) {
+      await waitForMotionFrame();
+    }
   }
 }
 
@@ -883,7 +901,7 @@ async function renderTimelineWithWebCodecs(
     await runTimelineFrameLoop(ctx, async (elapsed) => {
       const frameIndex = Math.round(elapsed * FRAME_RATE);
       await source.add(elapsed, 1 / FRAME_RATE, frameIndex % (FRAME_RATE * 2) === 0 ? { keyFrame: true } : undefined);
-    });
+    }, "fast");
     await output.finalize();
     const buffer = output.target.buffer;
     if (!buffer) throw new Error("MP4 export did not produce a file.");
@@ -907,11 +925,18 @@ async function renderTimelineWithMediaRecorder(ctx: TimelineRenderContext): Prom
     recorder.onerror = () => reject(new Error("Video recording failed while building the MP4."));
     recorder.onstop = () => resolve();
   });
-  recorder.start();
+  recorder.start(1000);
   try {
-    await runTimelineFrameLoop(ctx, async () => undefined);
-    recorder.stop();
-    await stopped;
+    await runTimelineFrameLoop(ctx, async () => undefined, "realtime");
+    if (recorder.state === "recording") {
+      recorder.requestData();
+      recorder.stop();
+    }
+    await withExportTimeout(
+      stopped,
+      mediaRecorderTimeoutMs(ctx.timeline.totalSeconds),
+      "Video recording timed out while building the MP4.",
+    );
   } finally {
     stream.getTracks().forEach((track) => track.stop());
   }
@@ -921,20 +946,25 @@ async function renderTimelineWithMediaRecorder(ctx: TimelineRenderContext): Prom
 }
 
 async function renderCardTimelineVideo(ctx: TimelineRenderContext): Promise<Blob> {
-  const profiles = cardVideoEncodeProfiles(ctx.timeline.totalSeconds);
-  let lastError: unknown = null;
-  for (const profile of profiles) {
-    try {
-      return await renderTimelineWithWebCodecs(ctx, profile);
-    } catch (error) {
-      lastError = error;
-      if (!isVideoEncodingFailure(error)) throw error;
-    }
+  const recorderMime = pickMediaRecorderMimeType();
+  const profile: CardVideoEncodeProfile = { quality: "medium", hardwareAcceleration: "prefer-software" };
+
+  if (shouldPreferMediaRecorderRecording(ctx) && recorderMime) {
+    return renderTimelineWithMediaRecorder(ctx);
   }
+
   try {
-    return await renderTimelineWithMediaRecorder(ctx);
-  } catch (recorderError) {
-    throw normalizeMp4ExportError(lastError ?? recorderError, "video");
+    return await withExportTimeout(
+      renderTimelineWithWebCodecs(ctx, profile),
+      120_000,
+      "Video encoding timed out while building the MP4.",
+    );
+  } catch (error) {
+    if (!recorderMime) throw normalizeMp4ExportError(error, "video");
+    const retry = isVideoEncodingFailure(error)
+      || (error instanceof Error && error.message.includes("timed out"));
+    if (!retry) throw normalizeMp4ExportError(error, "video");
+    return renderTimelineWithMediaRecorder(ctx);
   }
 }
 
@@ -980,6 +1010,7 @@ async function muxMp4WithServerAudio(
     method: "POST",
     credentials: "same-origin",
     body: formData,
+    signal: AbortSignal.timeout(180_000),
   });
   if (!response.ok) {
     let message = "The selected audio could not be attached to this MP4.";
