@@ -49,7 +49,8 @@ describe("card export audio proxy", () => {
 
     expect(route).toContain('router.post("/api/card-export-audio/mux"');
     expect(route).toContain("authenticatePlatformMediaAdmin(req)");
-    expect(route).toContain('uploadMuxVideo.single("video")');
+    expect(route).toContain('uploadMuxPayload');
+    expect(route).toContain('{ name: "audio", maxCount: 1 }');
     expect(route).toContain("const assetId = Number(req.body?.assetId)");
     expect(route).toContain("getStoredAudio(assetId)");
     expect(route).toContain('"-c:v", "copy", "-c:a", "aac"');
@@ -58,13 +59,17 @@ describe("card export audio proxy", () => {
     expect(route).toContain("fs.rm(workDir, { recursive: true, force: true }");
     expect(nixpacks).toContain('nixPkgs = ["nodejs_22", "pnpm", "ffmpeg"]');
 
-    expect(exporter).toContain("supportsAacAudioEncoding");
-    expect(exporter).toContain("muxMp4WithRepositoryAudio");
+    expect(exporter).toContain("muxMp4WithServerAudio");
     expect(exporter).toContain('fetch("/api/card-export-audio/mux"');
     expect(exporter).toContain("motion.musicAssetId");
     expect(exporter).toContain("needsServerAudioMux");
+    expect(exporter).toContain("normalizeMp4ExportError");
+    expect(exporter).not.toContain("addMusicTrack(output");
     expect(exporter).toContain("assetId?: number");
     expect(exporter).not.toContain('formData.append("audioUrl"');
+    expect(exporter).toContain('formData.append("audio"');
+    expect(route).toContain("ALLOWED_MUX_AUDIO_MIMES");
+    expect(route).toContain("isH264VideoCodec");
     for (const page of [social, challenge, quiz]) {
       expect(page).toContain("assetId: asset.id");
       expect(page).toContain("musicAssetId: selectedMusic?.assetId");

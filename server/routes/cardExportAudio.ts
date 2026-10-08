@@ -19,13 +19,32 @@ const MAX_VIDEO_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 32 * 1024 * 1024;
 const MAX_VIDEO_DURATION_SECONDS = 180;
 const FFMPEG_TIMEOUT_MS = 90_000;
-const uploadMuxVideo = multer({
+const ALLOWED_MUX_AUDIO_MIMES = new Set([
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/aac",
+  "audio/x-m4a",
+  "audio/wav",
+  "audio/webm",
+  "audio/ogg",
+  "application/octet-stream",
+]);
+
+const uploadMuxPayload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_VIDEO_UPLOAD_BYTES, files: 1 },
-  fileFilter: (_req, file, callback) => {
-    callback(null, file.mimetype === "video/mp4");
-  },
-});
+  limits: { fileSize: MAX_VIDEO_UPLOAD_BYTES + MAX_AUDIO_BYTES },
+}).fields([
+  { name: "video", maxCount: 1 },
+  { name: "audio", maxCount: 1 },
+]);
+
+function ffmpegBinary() {
+  return process.env.FFMPEG_PATH?.trim() || "ffmpeg";
+}
+
+function ffprobeBinary() {
+  return process.env.FFPROBE_PATH?.trim() || "ffprobe";
+}
 
 let r2Client: S3Client | null = null;
 
@@ -179,8 +198,13 @@ async function downloadStoredAudio(stored: StoredAudio, destination: string): Pr
   await writeLimitedStream(Readable.fromWeb(upstream.body as never), destination, MAX_AUDIO_BYTES);
 }
 
+function isH264VideoCodec(codecName: string | undefined): boolean {
+  const normalized = (codecName ?? "").toLowerCase();
+  return normalized === "h264" || normalized === "avc1" || normalized.startsWith("avc");
+}
+
 async function validateBrowserMp4(videoPath: string): Promise<void> {
-  const { stdout } = await execFileAsync("ffprobe", [
+  const { stdout } = await execFileAsync(ffprobeBinary(), [
     "-v", "error",
     "-show_entries", "format=duration:stream=codec_type,codec_name",
     "-of", "json",
@@ -189,14 +213,14 @@ async function validateBrowserMp4(videoPath: string): Promise<void> {
   const probe = JSON.parse(stdout) as { format?: { duration?: string }; streams?: Array<{ codec_type?: string; codec_name?: string }> };
   const duration = Number(probe.format?.duration ?? 0);
   const video = probe.streams?.find((stream) => stream.codec_type === "video");
-  if (!video || video.codec_name !== "h264" || !Number.isFinite(duration) || duration <= 0 || duration > MAX_VIDEO_DURATION_SECONDS) {
+  if (!video || !isH264VideoCodec(video.codec_name) || !Number.isFinite(duration) || duration <= 0 || duration > MAX_VIDEO_DURATION_SECONDS) {
     throw new Error("The generated MP4 could not be validated for audio export.");
   }
 }
 
 async function muxWithFfmpeg(videoPath: string, audioPath: string, outputPath: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const process = execFile("ffmpeg", [
+    const process = execFile(ffmpegBinary(), [
       "-hide_banner", "-loglevel", "error", "-y",
       "-i", videoPath,
       "-stream_loop", "-1", "-i", audioPath,
@@ -253,42 +277,55 @@ router.get("/api/card-export-audio/:assetId", async (req: Request, res: Response
 });
 
 /**
- * Reliably adds AAC audio to the browser-rendered H.264 MP4 when the active
- * browser cannot expose an AAC AudioEncoder. The route accepts only a Media
- * Repository asset ID (never an arbitrary source URL) and is Platform-Admin-only.
+ * Reliably adds AAC audio to the browser-rendered H.264 MP4. Accepts either a
+ * verified Media Repository asset ID or a same-session audio upload from the
+ * card generator (Platform Admin only). Never fetches arbitrary remote URLs.
  */
-router.post("/api/card-export-audio/mux", uploadMuxVideo.single("video"), async (req: Request, res: Response) => {
+router.post("/api/card-export-audio/mux", uploadMuxPayload, async (req: Request, res: Response) => {
   const user = await authenticatePlatformMediaAdmin(req);
   if (!user) {
     res.status(401).json({ error: "Platform admin authentication is required." });
     return;
   }
 
+  const files = req.files as { video?: Express.Multer.File[]; audio?: Express.Multer.File[] } | undefined;
+  const videoFile = files?.video?.[0];
+  const audioFile = files?.audio?.[0];
   const assetId = Number(req.body?.assetId);
-  if (!Number.isSafeInteger(assetId) || assetId <= 0) {
-    res.status(400).json({ error: "A valid Media Repository audio asset ID is required." });
+
+  if (!videoFile || videoFile.size <= 0 || videoFile.size > MAX_VIDEO_UPLOAD_BYTES) {
+    res.status(400).json({ error: "A generated MP4 video is required." });
     return;
   }
-  if (!req.file || req.file.mimetype !== "video/mp4" || req.file.size <= 0) {
-    res.status(400).json({ error: "A generated MP4 video is required." });
+  const hasAssetId = Number.isSafeInteger(assetId) && assetId > 0;
+  const hasUploadAudio = Boolean(audioFile && audioFile.size > 0 && audioFile.size <= MAX_AUDIO_BYTES);
+  if (!hasAssetId && !hasUploadAudio) {
+    res.status(400).json({ error: "Provide a Media Repository audio asset ID or an audio upload for muxing." });
+    return;
+  }
+  if (hasUploadAudio && audioFile && !ALLOWED_MUX_AUDIO_MIMES.has(audioFile.mimetype)) {
+    res.status(400).json({ error: "Unsupported audio format for MP4 export." });
     return;
   }
 
   let workDir: string | null = null;
   try {
-    const stored = await getStoredAudio(assetId);
-    if (!stored) {
-      res.status(404).json({ error: "Audio asset not found." });
-      return;
-    }
-
     workDir = await fs.mkdtemp(path.join(tmpdir(), "card-audio-mux-"));
     const videoPath = path.join(workDir, "card.mp4");
     const audioPath = path.join(workDir, "track.audio");
     const outputPath = path.join(workDir, "card-with-audio.mp4");
-    await fs.writeFile(videoPath, req.file.buffer, { flag: "wx" });
+    await fs.writeFile(videoPath, videoFile.buffer, { flag: "wx" });
     await validateBrowserMp4(videoPath);
-    await downloadStoredAudio(stored, audioPath);
+    if (hasAssetId) {
+      const stored = await getStoredAudio(assetId);
+      if (!stored) {
+        res.status(404).json({ error: "Audio asset not found." });
+        return;
+      }
+      await downloadStoredAudio(stored, audioPath);
+    } else {
+      await fs.writeFile(audioPath, audioFile!.buffer, { flag: "wx" });
+    }
     await muxWithFfmpeg(videoPath, audioPath, outputPath);
     const muxedVideo = await fs.readFile(outputPath);
     if (muxedVideo.length === 0 || muxedVideo.length > MAX_VIDEO_UPLOAD_BYTES + MAX_AUDIO_BYTES) {
