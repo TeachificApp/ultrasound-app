@@ -1,6 +1,6 @@
 import { getStripeClient } from "../lib/stripeClient";
 import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
-import { resolveCheckoutTerms } from "./checkoutTermsHelper";
+import { checkoutPlatformTermsSelection, resolveCheckoutTerms } from "./checkoutTermsHelper";
 /**
  * webinarRouter.ts — Live & prerecorded webinars with discussions
  */
@@ -550,7 +550,7 @@ export const webinarSessionRouter = router({
         return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: subtitle, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: null, brand: webinar.brand ?? "all_about_ultrasound" };
       }
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select().from(platformSettings).limit(1);
+      const [settings] = await db.select(checkoutPlatformTermsSelection).from(platformSettings).limit(1);
       const webTerms = resolveCheckoutTerms(webinar, settings);
       const stripe = getStripeClient();
       let discounts: Array<{ promotion_code: string }> | undefined;

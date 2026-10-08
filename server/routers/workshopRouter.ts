@@ -1,5 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
-import { resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
+import { checkoutPlatformTermsSelection, resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
 import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
 import { buildWorkshopCheckoutIdempotencyKey, resolveWorkshopCheckoutPrice, workshopDollarsToCents } from "../../shared/workshopPricing";
 import { isScheduledDeadlineOpen, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "../../shared/platformTime";
@@ -590,7 +590,7 @@ export const workshopLearnerRouter = router({
       }
 
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select().from(platformSettings).limit(1);
+      const [settings] = await db.select(checkoutPlatformTermsSelection).from(platformSettings).limit(1);
       const workshopTerms = resolveCheckoutTerms(workshop, settings);
 
       // Verify still on sale (includes capacity check)

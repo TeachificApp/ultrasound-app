@@ -1,3 +1,5 @@
+import { platformSettings } from "../../drizzle/schema";
+
 /**
  * Shared helper for resolving checkout terms checkbox text.
  *
@@ -38,6 +40,21 @@ export interface ResolvedCheckoutTerms {
   /** @deprecated use checkoutTermsLink2Url — kept for backward compat */
   privacyUrl: string;
 }
+
+/**
+ * Checkout only needs these legal-text fields. Do not select the entire
+ * platform_settings row on a public purchase path: unrelated admin-only
+ * integration columns must never be able to take checkout offline.
+ */
+export const checkoutPlatformTermsSelection = {
+  checkoutTermsText: platformSettings.checkoutTermsText,
+  checkoutTermsLinkText1: platformSettings.checkoutTermsLinkText1,
+  checkoutTermsLinkUrl1: platformSettings.checkoutTermsLinkUrl1,
+  checkoutTermsLinkText2: platformSettings.checkoutTermsLinkText2,
+  checkoutTermsLinkUrl2: platformSettings.checkoutTermsLinkUrl2,
+  termsUrl: platformSettings.termsUrl,
+  privacyUrl: platformSettings.privacyUrl,
+};
 
 const DEFAULT_TERMS_TEXT = "I have reviewed and agree to the";
 const DEFAULT_LINK1_TEXT = "Terms of Service";

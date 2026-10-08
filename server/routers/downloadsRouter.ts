@@ -614,7 +614,7 @@ export const downloadsLearnerRouter = router({
         if (existing) throw new TRPCError({ code: "CONFLICT", message: "You already own this product." });
       }
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select().from(platformSettings).limit(1);
+      const [settings] = await db.select(checkoutPlatformTermsSelection).from(platformSettings).limit(1);
       const dlTerms = resolveCheckoutTerms(product, settings);
       const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.create({
@@ -2161,9 +2161,9 @@ Make ALL content specific and compelling based on the product title and descript
       const [existing] = await db.select().from(digitalPurchases)
         .where(and(eq(digitalPurchases.userId, ctx.user.id), eq(digitalPurchases.productId, product.id))).limit(1);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You already own this product." });
-      // Fetch platform settings for terms/privacy URLs
+      // Fetch only the legal checkout fields needed for this public purchase path.
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select().from(platformSettings).limit(1);
+      const [settings] = await db.select(checkoutPlatformTermsSelection).from(platformSettings).limit(1);
       const dl2Terms = resolveCheckoutTerms(product, settings);
       const stripe = getStripeClient();
       const session = await stripe.checkout.sessions.create({

@@ -45,7 +45,7 @@ import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { toCheckoutAmountCents } from "../lib/paymentState";
 import { isCachedStripePriceCompatible, shouldInvalidateCourseStripeCache } from "../lib/stripePriceCache";
-import { resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
+import { checkoutPlatformTermsSelection, resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
 import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import { resolveCohortRecordingPlayback } from "../lib/cohortRecordingPlayback";
@@ -5111,7 +5111,7 @@ export const lmsLearnerRouter = router({
       if (["draft", "archived", "private"].includes(course.status)) throw new TRPCError({ code: "NOT_FOUND" });
 
       // Fetch org-level legal URLs and checkout terms from platform_settings
-      const [orgSettings] = await db.select().from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
+      const [orgSettings] = await db.select(checkoutPlatformTermsSelection).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
 
       const stripe = getStripeClient();
 

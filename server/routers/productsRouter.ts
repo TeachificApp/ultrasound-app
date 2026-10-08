@@ -177,12 +177,12 @@ export const productsLearnerRouter = router({
           }).onDuplicateKeyUpdate({ set: { userId } }).catch(() => {});
         }
         const { platformSettings: ps1 } = await import("../../drizzle/schema");
-        const [freeSettings1] = await db.select().from(ps1).limit(1);
+        const [freeSettings1] = await db.select(checkoutPlatformTermsSelection).from(ps1).limit(1);
         const freeTerms1 = resolveCheckoutTerms(product, freeSettings1);
         return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", ...freeTerms1, productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null };
       }
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select().from(platformSettings).limit(1);
+      const [settings] = await db.select(checkoutPlatformTermsSelection).from(platformSettings).limit(1);
       const prodTerms1 = resolveCheckoutTerms(product, settings);
       const stripe = getStripeClient();
       const shippingOpts = product.requiresShipping
@@ -1282,7 +1282,7 @@ Make ALL content specific and compelling based on the product title and descript
         return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", ...resolveCheckoutTerms(product, null), productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null };
       }
       const { platformSettings } = await import("../../drizzle/schema");
-      const [settings] = await db.select().from(platformSettings).limit(1);
+      const [settings] = await db.select(checkoutPlatformTermsSelection).from(platformSettings).limit(1);
       const prodTerms2 = resolveCheckoutTerms(product, settings);
       const stripe = getStripeClient();
       const shippingOpts = product.requiresShipping
