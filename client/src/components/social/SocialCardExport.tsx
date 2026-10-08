@@ -910,8 +910,11 @@ export async function renderSocialCardAsMp4(
 
     const hasMusic = Boolean(motion.musicUrl || motion.musicBlob);
     const canEncodeAac = !hasMusic || await supportsAacAudioEncoding();
-    const needsServerAudioMux = hasMusic && !canEncodeAac;
-    if (needsServerAudioMux && !motion.musicAssetId) {
+    // The default, uploaded, generated, and Media Repository tracks are all
+    // trusted assets. Use FFmpeg for each of them rather than trusting a browser
+    // AAC capability probe that can pass but still fail during MediaBunny setup.
+    const needsServerAudioMux = hasMusic && Boolean(motion.musicAssetId);
+    if (hasMusic && !needsServerAudioMux && !canEncodeAac) {
       throw new Error("This browser cannot encode AAC audio for MP4. Select a Media Repository, uploaded, or AI-generated track and try again.");
     }
 
@@ -938,9 +941,9 @@ export async function renderSocialCardAsMp4(
       const buffer = output.target.buffer;
       if (!buffer) throw new Error("MP4 export did not produce a file.");
       const renderedMp4 = new Blob([buffer], { type: "video/mp4" });
-      // Chromium installations commonly expose H.264 video encoding but not AAC
-      // audio encoding. Keep the established browser renderer for frames, then
-      // request server-side AAC muxing only with a verified repository asset ID.
+      // Keep the established browser renderer for frames and request server-side
+      // AAC muxing for every verified repository asset. This avoids browser AAC
+      // encoder differences while retaining the existing 30fps H.264 timeline.
       return needsServerAudioMux
         ? muxMp4WithRepositoryAudio(renderedMp4, motion.musicAssetId!)
         : renderedMp4;
