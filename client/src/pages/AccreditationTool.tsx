@@ -36,6 +36,7 @@ import CaseMixSubmission from "./CaseMixSubmission";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import { Link } from "wouter";
+import { DiyAccreditationByline } from "@/components/DiyAccreditationBrandAttribution";
 
 const BRAND = "#189aa1";
 const MODALITIES = ["Abdominal", "Vascular", "OB/Gyn", "MSK", "POCUS", "Thyroid", "Breast", "Renal", "Fetal Echo", "Other"] as const;
@@ -2622,6 +2623,7 @@ export default function AccreditationTool() {
               <h1 className="text-2xl font-black text-white leading-tight" style={{ fontFamily: "Merriweather, serif" }}>
                 DIY Accreditation Tool™
               </h1>
+              <DiyAccreditationByline variant="hero" className="text-xs text-white/55 mt-1" />
               <p className="text-white/70 text-sm mt-1 max-w-xl">
                 Quality reviews, peer review tracking, policy creation, and appropriate use monitoring — everything you need to prepare for IAC accreditation.
               </p>
