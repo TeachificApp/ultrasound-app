@@ -65,6 +65,9 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("drawMotionFrame");
     expect(exporter).toContain("MOTION_DURATION_SECONDS = 20");
     expect(exporter).toContain("renderTimelineWithMediaRecorder");
+    expect(exporter).toContain("requestCanvasCaptureFrame");
+    expect(exporter).toContain("captureStream(0)");
+    expect(exporter).toContain("frameRate: FRAME_RATE");
     expect(exporter).toContain("shouldPreferMediaRecorderRecording");
     expect(exporter).toContain("withExportTimeout");
     expect(exporter).toContain("muxMp4WithServerAudio");

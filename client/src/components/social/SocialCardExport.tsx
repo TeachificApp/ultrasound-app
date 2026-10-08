@@ -786,6 +786,15 @@ function waitForMotionFrame() {
   return new Promise<void>((resolve) => window.setTimeout(resolve, Math.round(1000 / FRAME_RATE)));
 }
 
+function waitForCanvasPaint() {
+  return new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+function requestCanvasCaptureFrame(stream: MediaStream) {
+  const track = stream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void };
+  track.requestFrame?.();
+}
+
 function evenExportDimension(value: number): number {
   const rounded = Math.max(2, Math.round(value));
   return rounded % 2 === 0 ? rounded : rounded - 1;
@@ -868,6 +877,7 @@ async function runTimelineFrameLoop(
   ctx: TimelineRenderContext,
   onFrame: (elapsed: number) => Promise<void>,
   pacing: FrameLoopPacing,
+  captureStream?: MediaStream | null,
 ) {
   if (ctx.motionVideo) await ctx.motionVideo.play().catch(() => undefined);
   const frames = Math.ceil(ctx.timeline.totalSeconds * FRAME_RATE);
@@ -875,6 +885,10 @@ async function runTimelineFrameLoop(
     const elapsed = frame / FRAME_RATE;
     await drawTimelineFrame(ctx, elapsed);
     await onFrame(elapsed);
+    if (captureStream) {
+      await waitForCanvasPaint();
+      requestCanvasCaptureFrame(captureStream);
+    }
     if (pacing === "realtime") {
       await waitForMotionFrame();
     } else if (ctx.motionVideo && elapsed < ctx.timeline.videoDurationSeconds) {
@@ -895,7 +909,7 @@ async function renderTimelineWithWebCodecs(
     hardwareAcceleration: profile.hardwareAcceleration,
     transform: { alpha: "discard" },
   });
-  output.addVideoTrack(source);
+  output.addVideoTrack(source, { frameRate: FRAME_RATE });
   await output.start();
   try {
     await runTimelineFrameLoop(ctx, async (elapsed) => {
@@ -915,8 +929,9 @@ async function renderTimelineWithWebCodecs(
 async function renderTimelineWithMediaRecorder(ctx: TimelineRenderContext): Promise<Blob> {
   const mimeType = pickMediaRecorderMimeType();
   if (!mimeType) throw new Error("This browser cannot record the card animation for MP4 export.");
-  const stream = ctx.canvas.captureStream(FRAME_RATE);
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
+  // Manual capture (0 fps arg) + requestFrame() each draw — fixed 30fps sampling.
+  const stream = ctx.canvas.captureStream(0);
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (event) => {
     if (event.data.size > 0) chunks.push(event.data);
@@ -927,7 +942,7 @@ async function renderTimelineWithMediaRecorder(ctx: TimelineRenderContext): Prom
   });
   recorder.start(1000);
   try {
-    await runTimelineFrameLoop(ctx, async () => undefined, "realtime");
+    await runTimelineFrameLoop(ctx, async () => undefined, "realtime", stream);
     if (recorder.state === "recording") {
       recorder.requestData();
       recorder.stop();
@@ -948,15 +963,13 @@ async function renderTimelineWithMediaRecorder(ctx: TimelineRenderContext): Prom
 async function renderCardTimelineVideo(ctx: TimelineRenderContext): Promise<Blob> {
   const recorderMime = pickMediaRecorderMimeType();
   const profile: CardVideoEncodeProfile = { quality: "medium", hardwareAcceleration: "prefer-software" };
-
-  if (shouldPreferMediaRecorderRecording(ctx) && recorderMime) {
-    return renderTimelineWithMediaRecorder(ctx);
-  }
+  const encodeTimeoutMs = shouldPreferMediaRecorderRecording(ctx) ? 180_000 : 120_000;
 
   try {
+    // WebCodecs encodes every frame at FRAME_RATE without realtime waits — smoothest MP4.
     return await withExportTimeout(
       renderTimelineWithWebCodecs(ctx, profile),
-      120_000,
+      encodeTimeoutMs,
       "Video encoding timed out while building the MP4.",
     );
   } catch (error) {
