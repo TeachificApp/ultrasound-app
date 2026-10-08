@@ -41,4 +41,12 @@ describe("public checkout Platform Settings isolation", () => {
     expect(workshop).toContain("db.select(checkoutPlatformTermsSelection).from(platformSettings)");
     expect(workshop).not.toContain("db.select().from(platformSettings).limit(1)");
   });
+
+  it("keeps bundle checkout independent of Platform Settings", () => {
+    const bundleCheckout = source("server/routers/bundleRouter.ts");
+
+    expect(bundleCheckout).toContain("createCheckout: publicProcedure");
+    expect(bundleCheckout).toContain("STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT");
+    expect(bundleCheckout).not.toContain("platformSettings");
+  });
 });
