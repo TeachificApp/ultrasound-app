@@ -69,6 +69,9 @@ describe("card export audio proxy", () => {
     expect(exporter).not.toContain('formData.append("audioUrl"');
     expect(exporter).toContain('formData.append("audio"');
     expect(route).toContain("ALLOWED_MUX_AUDIO_MIMES");
+    expect(route).toContain("ALLOWED_MUX_VIDEO_MIMES");
+    expect(route).toContain("transcodeVideoToH264");
+    expect(route).toContain("ensureH264Mp4");
     expect(route).toContain("isH264VideoCodec");
     for (const page of [social, challenge, quiz]) {
       expect(page).toContain("assetId: asset.id");

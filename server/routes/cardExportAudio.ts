@@ -29,6 +29,11 @@ const ALLOWED_MUX_AUDIO_MIMES = new Set([
   "audio/ogg",
   "application/octet-stream",
 ]);
+const ALLOWED_MUX_VIDEO_MIMES = new Set([
+  "video/mp4",
+  "video/webm",
+  "application/octet-stream",
+]);
 
 const uploadMuxPayload = multer({
   storage: multer.memoryStorage(),
@@ -203,7 +208,12 @@ function isH264VideoCodec(codecName: string | undefined): boolean {
   return normalized === "h264" || normalized === "avc1" || normalized.startsWith("avc");
 }
 
-async function validateBrowserMp4(videoPath: string): Promise<void> {
+type VideoProbe = {
+  duration: number;
+  videoCodec?: string;
+};
+
+async function probeVideoFile(videoPath: string): Promise<VideoProbe> {
   const { stdout } = await execFileAsync(ffprobeBinary(), [
     "-v", "error",
     "-show_entries", "format=duration:stream=codec_type,codec_name",
@@ -213,9 +223,41 @@ async function validateBrowserMp4(videoPath: string): Promise<void> {
   const probe = JSON.parse(stdout) as { format?: { duration?: string }; streams?: Array<{ codec_type?: string; codec_name?: string }> };
   const duration = Number(probe.format?.duration ?? 0);
   const video = probe.streams?.find((stream) => stream.codec_type === "video");
-  if (!video || !isH264VideoCodec(video.codec_name) || !Number.isFinite(duration) || duration <= 0 || duration > MAX_VIDEO_DURATION_SECONDS) {
+  return { duration, videoCodec: video?.codec_name };
+}
+
+async function validateBrowserMp4(videoPath: string): Promise<void> {
+  const { duration, videoCodec } = await probeVideoFile(videoPath);
+  if (!isH264VideoCodec(videoCodec) || !Number.isFinite(duration) || duration <= 0 || duration > MAX_VIDEO_DURATION_SECONDS) {
     throw new Error("The generated MP4 could not be validated for audio export.");
   }
+}
+
+async function transcodeVideoToH264(inputPath: string, outputPath: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    execFile(ffmpegBinary(), [
+      "-hide_banner", "-loglevel", "error", "-y",
+      "-i", inputPath,
+      "-c:v", "libx264", "-preset", "fast", "-crf", "20",
+      "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+      "-an", outputPath,
+    ], { timeout: FFMPEG_TIMEOUT_MS, maxBuffer: 1_000_000 }, (error, _stdout, stderr) => {
+      if (error) {
+        console.error("[card-export-audio] FFmpeg transcode failed", String(stderr ?? "").slice(0, 1000));
+        reject(new Error("The recorded card video could not be prepared for export."));
+        return;
+      }
+      resolve();
+    }).on("error", () => reject(new Error("The MP4 audio service is temporarily unavailable.")));
+  });
+}
+
+async function ensureH264Mp4(videoPath: string, workDir: string): Promise<string> {
+  const { videoCodec } = await probeVideoFile(videoPath);
+  if (isH264VideoCodec(videoCodec)) return videoPath;
+  const outputPath = path.join(workDir, "card-h264.mp4");
+  await transcodeVideoToH264(videoPath, outputPath);
+  return outputPath;
 }
 
 async function muxWithFfmpeg(videoPath: string, audioPath: string, outputPath: string): Promise<void> {
@@ -297,12 +339,13 @@ router.post("/api/card-export-audio/mux", uploadMuxPayload, async (req: Request,
     res.status(400).json({ error: "A generated MP4 video is required." });
     return;
   }
-  const hasAssetId = Number.isSafeInteger(assetId) && assetId > 0;
-  const hasUploadAudio = Boolean(audioFile && audioFile.size > 0 && audioFile.size <= MAX_AUDIO_BYTES);
-  if (!hasAssetId && !hasUploadAudio) {
-    res.status(400).json({ error: "Provide a Media Repository audio asset ID or an audio upload for muxing." });
+  if (!ALLOWED_MUX_VIDEO_MIMES.has(videoFile.mimetype)) {
+    res.status(400).json({ error: "Unsupported video format for MP4 export." });
     return;
   }
+  const hasAssetId = Number.isSafeInteger(assetId) && assetId > 0;
+  const hasUploadAudio = Boolean(audioFile && audioFile.size > 0 && audioFile.size <= MAX_AUDIO_BYTES);
+  const videoOnlyTranscode = !hasAssetId && !hasUploadAudio;
   if (hasUploadAudio && audioFile && !ALLOWED_MUX_AUDIO_MIMES.has(audioFile.mimetype)) {
     res.status(400).json({ error: "Unsupported audio format for MP4 export." });
     return;
@@ -311,23 +354,30 @@ router.post("/api/card-export-audio/mux", uploadMuxPayload, async (req: Request,
   let workDir: string | null = null;
   try {
     workDir = await fs.mkdtemp(path.join(tmpdir(), "card-audio-mux-"));
-    const videoPath = path.join(workDir, "card.mp4");
+    const videoExt = videoFile.mimetype.includes("webm") ? "webm" : "mp4";
+    const videoPath = path.join(workDir, `card.${videoExt}`);
     const audioPath = path.join(workDir, "track.audio");
     const outputPath = path.join(workDir, "card-with-audio.mp4");
     await fs.writeFile(videoPath, videoFile.buffer, { flag: "wx" });
-    await validateBrowserMp4(videoPath);
-    if (hasAssetId) {
-      const stored = await getStoredAudio(assetId);
-      if (!stored) {
-        res.status(404).json({ error: "Audio asset not found." });
-        return;
-      }
-      await downloadStoredAudio(stored, audioPath);
+    const h264VideoPath = await ensureH264Mp4(videoPath, workDir);
+    await validateBrowserMp4(h264VideoPath);
+    let muxedVideo: Buffer;
+    if (videoOnlyTranscode) {
+      muxedVideo = await fs.readFile(h264VideoPath);
     } else {
-      await fs.writeFile(audioPath, audioFile!.buffer, { flag: "wx" });
+      if (hasAssetId) {
+        const stored = await getStoredAudio(assetId);
+        if (!stored) {
+          res.status(404).json({ error: "Audio asset not found." });
+          return;
+        }
+        await downloadStoredAudio(stored, audioPath);
+      } else {
+        await fs.writeFile(audioPath, audioFile!.buffer, { flag: "wx" });
+      }
+      await muxWithFfmpeg(h264VideoPath, audioPath, outputPath);
+      muxedVideo = await fs.readFile(outputPath);
     }
-    await muxWithFfmpeg(videoPath, audioPath, outputPath);
-    const muxedVideo = await fs.readFile(outputPath);
     if (muxedVideo.length === 0 || muxedVideo.length > MAX_VIDEO_UPLOAD_BYTES + MAX_AUDIO_BYTES) {
       throw new Error("The MP4 audio export did not produce a usable file.");
     }

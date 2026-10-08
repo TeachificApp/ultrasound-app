@@ -786,6 +786,158 @@ function waitForMotionFrame() {
   return new Promise<void>((resolve) => window.setTimeout(resolve, Math.round(1000 / FRAME_RATE)));
 }
 
+function evenExportDimension(value: number): number {
+  const rounded = Math.max(2, Math.round(value));
+  return rounded % 2 === 0 ? rounded : rounded - 1;
+}
+
+type CardVideoEncodeProfile = {
+  quality: "low" | "medium" | "high";
+  hardwareAcceleration: "prefer-software" | "no-preference";
+};
+
+function cardVideoEncodeProfiles(totalSeconds: number): CardVideoEncodeProfile[] {
+  if (totalSeconds > 28) {
+    return [
+      { quality: "medium", hardwareAcceleration: "prefer-software" },
+      { quality: "low", hardwareAcceleration: "prefer-software" },
+      { quality: "medium", hardwareAcceleration: "no-preference" },
+    ];
+  }
+  return [
+    { quality: "medium", hardwareAcceleration: "prefer-software" },
+    { quality: "high", hardwareAcceleration: "no-preference" },
+  ];
+}
+
+function isVideoEncodingFailure(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message === "Encoding error" || message.includes("Encoding error");
+}
+
+function pickMediaRecorderMimeType(): string | null {
+  const candidates = [
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+    "video/mp4",
+  ];
+  return candidates.find((type) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) ?? null;
+}
+
+type TimelineRenderContext = {
+  canvas: HTMLCanvasElement;
+  context: CanvasRenderingContext2D;
+  card: RenderedCard;
+  motion: CardMotion;
+  targetWidth: number;
+  targetHeight: number;
+  logo: HTMLImageElement | null;
+  motionVideo: HTMLVideoElement | null;
+  timeline: MotionTimeline;
+};
+
+async function drawTimelineFrame(ctx: TimelineRenderContext, elapsed: number) {
+  drawMotionFrame(
+    ctx.context,
+    ctx.card,
+    ctx.motion,
+    elapsed,
+    ctx.targetWidth,
+    ctx.targetHeight,
+    ctx.logo,
+    ctx.motionVideo,
+    ctx.timeline,
+  );
+}
+
+async function runTimelineFrameLoop(
+  ctx: TimelineRenderContext,
+  onFrame: (elapsed: number) => Promise<void>,
+) {
+  if (ctx.motionVideo) await ctx.motionVideo.play().catch(() => undefined);
+  const frames = Math.ceil(ctx.timeline.totalSeconds * FRAME_RATE);
+  for (let frame = 0; frame < frames; frame += 1) {
+    const elapsed = frame / FRAME_RATE;
+    await drawTimelineFrame(ctx, elapsed);
+    await onFrame(elapsed);
+    await waitForMotionFrame();
+  }
+}
+
+async function renderTimelineWithWebCodecs(
+  ctx: TimelineRenderContext,
+  profile: CardVideoEncodeProfile,
+): Promise<Blob> {
+  const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
+  const source = new CanvasSource(ctx.canvas, {
+    codec: "avc",
+    quality: new Quality(profile.quality),
+    keyFrameInterval: 2,
+    hardwareAcceleration: profile.hardwareAcceleration,
+    transform: { alpha: "discard" },
+  });
+  output.addVideoTrack(source);
+  await output.start();
+  try {
+    await runTimelineFrameLoop(ctx, async (elapsed) => {
+      const frameIndex = Math.round(elapsed * FRAME_RATE);
+      await source.add(elapsed, 1 / FRAME_RATE, frameIndex % (FRAME_RATE * 2) === 0 ? { keyFrame: true } : undefined);
+    });
+    await output.finalize();
+    const buffer = output.target.buffer;
+    if (!buffer) throw new Error("MP4 export did not produce a file.");
+    return new Blob([buffer], { type: "video/mp4" });
+  } catch (error) {
+    await output.cancel().catch(() => undefined);
+    throw error;
+  }
+}
+
+async function renderTimelineWithMediaRecorder(ctx: TimelineRenderContext): Promise<Blob> {
+  const mimeType = pickMediaRecorderMimeType();
+  if (!mimeType) throw new Error("This browser cannot record the card animation for MP4 export.");
+  const stream = ctx.canvas.captureStream(FRAME_RATE);
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 6_000_000 });
+  const chunks: Blob[] = [];
+  recorder.ondataavailable = (event) => {
+    if (event.data.size > 0) chunks.push(event.data);
+  };
+  const stopped = new Promise<void>((resolve, reject) => {
+    recorder.onerror = () => reject(new Error("Video recording failed while building the MP4."));
+    recorder.onstop = () => resolve();
+  });
+  recorder.start();
+  try {
+    await runTimelineFrameLoop(ctx, async () => undefined);
+    recorder.stop();
+    await stopped;
+  } finally {
+    stream.getTracks().forEach((track) => track.stop());
+  }
+  const blob = new Blob(chunks, { type: mimeType });
+  if (!blob.size) throw new Error("Video recording did not produce a file.");
+  return blob;
+}
+
+async function renderCardTimelineVideo(ctx: TimelineRenderContext): Promise<Blob> {
+  const profiles = cardVideoEncodeProfiles(ctx.timeline.totalSeconds);
+  let lastError: unknown = null;
+  for (const profile of profiles) {
+    try {
+      return await renderTimelineWithWebCodecs(ctx, profile);
+    } catch (error) {
+      lastError = error;
+      if (!isVideoEncodingFailure(error)) throw error;
+    }
+  }
+  try {
+    return await renderTimelineWithMediaRecorder(ctx);
+  } catch (recorderError) {
+    throw normalizeMp4ExportError(lastError ?? recorderError, "video");
+  }
+}
+
 function normalizeMp4ExportError(error: unknown, phase: "video" | "audio-mux"): Error {
   const message = error instanceof Error ? error.message : String(error);
   if (message === "Encoding error" || message.includes("Encoding error")) {
@@ -820,7 +972,8 @@ async function muxMp4WithServerAudio(
   input: { assetId?: number | null; audioBlob?: Blob | null },
 ): Promise<Blob> {
   const formData = new FormData();
-  formData.append("video", video, "card.mp4");
+  const videoName = video.type.includes("webm") ? "card.webm" : "card.mp4";
+  formData.append("video", video, videoName);
   if (input.assetId) formData.append("assetId", String(input.assetId));
   if (input.audioBlob) formData.append("audio", input.audioBlob, "card-track.audio");
   const response = await fetch("/api/card-export-audio/mux", {
@@ -881,9 +1034,11 @@ export async function renderSocialCardAsMp4(
     cardToBitmap(cardElement),
   ]);
   try {
+    const targetWidth = evenExportDimension(preset.width);
+    const targetHeight = evenExportDimension(preset.height);
     const canvas = document.createElement("canvas");
-    canvas.width = preset.width;
-    canvas.height = preset.height;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas video export is not supported in this browser.");
 
@@ -892,34 +1047,31 @@ export async function renderSocialCardAsMp4(
     // generic MediaBunny "Encoding error" even when AAC probes report support.
     const needsServerAudioMux = hasMusic;
 
-    const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
-    const source = new CanvasSource(canvas, { codec: "avc", bitrate: new Quality("high") });
-    output.addVideoTrack(source);
     const timeline = motionTimeline(motion, motionVideo);
     const logo = await loadMotionLogo(motion.logoUrl);
     let muxAudioBlob: Blob | null = null;
     if (needsServerAudioMux && !motion.musicAssetId) {
       muxAudioBlob = await resolveMuxAudioBlob(motion);
     }
-    let videoRendered = false;
-    await output.start();
+    const timelineContext: TimelineRenderContext = {
+      canvas,
+      context,
+      card,
+      motion,
+      targetWidth,
+      targetHeight,
+      logo,
+      motionVideo,
+      timeline,
+    };
     try {
-      if (motionVideo) await motionVideo.play().catch(() => undefined);
-      const frames = Math.ceil(timeline.totalSeconds * FRAME_RATE);
-      for (let frame = 0; frame < frames; frame += 1) {
-        const elapsed = frame / FRAME_RATE;
-        drawMotionFrame(context, card, motion, elapsed, preset.width, preset.height, logo, motionVideo, timeline);
-        await source.add(elapsed, 1 / FRAME_RATE);
-        if (motionVideo && elapsed < timeline.videoDurationSeconds) await waitForMotionFrame();
+      const renderedVideo = await renderCardTimelineVideo(timelineContext);
+      if (!needsServerAudioMux) {
+        if (renderedVideo.type.includes("video/mp4")) return renderedVideo;
+        return await muxMp4WithServerAudio(renderedVideo, {});
       }
-      await output.finalize();
-      videoRendered = true;
-      const buffer = output.target.buffer;
-      if (!buffer) throw new Error("MP4 export did not produce a file.");
-      const renderedMp4 = new Blob([buffer], { type: "video/mp4" });
-      if (!needsServerAudioMux) return renderedMp4;
       try {
-        return await muxMp4WithServerAudio(renderedMp4, {
+        return await muxMp4WithServerAudio(renderedVideo, {
           assetId: motion.musicAssetId,
           audioBlob: muxAudioBlob,
         });
@@ -927,8 +1079,7 @@ export async function renderSocialCardAsMp4(
         throw normalizeMp4ExportError(error, "audio-mux");
       }
     } catch (error) {
-      await output.cancel().catch(() => undefined);
-      throw normalizeMp4ExportError(error, videoRendered ? "audio-mux" : "video");
+      throw normalizeMp4ExportError(error, "video");
     }
   } finally {
     card.image.close();
