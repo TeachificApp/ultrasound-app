@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "pnpm install && pnpm build"
+buildCommand = "rm -rf dist && pnpm install && pnpm build"
 # Release trigger: rebuild the browser bundle for the included-items embed resize repair.
 # Deployment trigger: rebuild the reconciled Study Group repair revision after the
 # GitHub merge was skipped as having no watched-file delta on September 22, 2026.
