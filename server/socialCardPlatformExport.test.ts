@@ -64,7 +64,8 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("CORRECT ANSWER");
     expect(exporter).toContain("drawMotionFrame");
     expect(exporter).toContain("MOTION_DURATION_SECONDS = 20");
-    expect(exporter).toContain("AudioBufferSource");
+    expect(exporter).toContain("renderTimelineWithMediaRecorder");
+    expect(exporter).toContain("muxMp4WithServerAudio");
     expect(exporter).toContain("motion.musicUrl");
     expect(exporter).toContain("outroProgress");
     expect(exporter).toContain('"question" | "answer" | "combined" | "social"');
