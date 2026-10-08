@@ -18,7 +18,7 @@ const execFileAsync = promisify(execFile);
 const MAX_VIDEO_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 32 * 1024 * 1024;
 const MAX_VIDEO_DURATION_SECONDS = 180;
-const FFMPEG_TIMEOUT_MS = 90_000;
+const FFMPEG_TIMEOUT_MS = 180_000;
 const ALLOWED_MUX_AUDIO_MIMES = new Set([
   "audio/mpeg",
   "audio/mp4",
