@@ -65,9 +65,14 @@ const SOURCE_WIDTH = 1080;
 // Use a standard social-video frame rate. TikTok accepts 23–60 fps; 30 fps
 // keeps all generated Social, Challenge, and Quiz Card MP4s smooth and native.
 const FRAME_RATE = 30;
+/** Hard cap for every social / quiz / challenge card MP4 (Reels, Stories, etc.). */
+const MAX_MP4_EXPORT_SECONDS = 60;
 const OUTRO_HOLD_SECONDS = 10;
+const MAX_MP4_CONTENT_SECONDS = MAX_MP4_EXPORT_SECONDS - OUTRO_HOLD_SECONDS;
 const MOTION_DURATION_SECONDS = 20;
 const OUTRO_START_SECONDS = MOTION_DURATION_SECONDS - OUTRO_HOLD_SECONDS;
+/** Combined cards with source video: content ends at video + 6s before the outro. */
+const MAX_COMBINED_SOURCE_VIDEO_SECONDS = MAX_MP4_CONTENT_SECONDS - 6;
 // Quiz Card clinical-image review pacing: let viewers read the question, then
 // inspect the fully magnified image before answer choices begin entering.
 const IMAGE_QUESTION_HOLD_SECONDS = 7;
@@ -287,7 +292,7 @@ async function cardToBitmap(cardElement: HTMLElement): Promise<RenderedCard> {
 
 function motionTimeline(motion: CardMotion, video: HTMLVideoElement | null): MotionTimeline {
   const videoDurationSeconds = motion.kind === "combined" && video && Number.isFinite(video.duration)
-    ? clamp(video.duration, 0, 90)
+    ? clamp(video.duration, 0, MAX_COMBINED_SOURCE_VIDEO_SECONDS)
     : 0;
   const hasImageZoom = motion.kind === "combined" && motion.zoomQuestionImage;
   const imageZoomStartSeconds = hasImageZoom ? IMAGE_QUESTION_HOLD_SECONDS : 0;
@@ -309,14 +314,16 @@ function motionTimeline(motion: CardMotion, video: HTMLVideoElement | null): Mot
       : COMBINED_ANSWER_REVEAL_SECONDS;
   // Hold the completed question/options for three seconds before revealing the answer,
   // and keep the answer visible for at least three seconds before the 10-second outro.
-  const contentEndSeconds = videoDurationSeconds > 0
+  const rawContentEndSeconds = videoDurationSeconds > 0
     ? Math.max(OUTRO_START_SECONDS, videoDurationSeconds + 6)
     : imageZoomEndSeconds > 0
       ? Math.max(OUTRO_START_SECONDS, answerRevealSeconds + 3)
     : OUTRO_START_SECONDS;
+  const contentEndSeconds = Math.min(rawContentEndSeconds, MAX_MP4_CONTENT_SECONDS);
+  const totalSeconds = Math.min(contentEndSeconds + OUTRO_HOLD_SECONDS, MAX_MP4_EXPORT_SECONDS);
   return {
     contentEndSeconds,
-    totalSeconds: contentEndSeconds + OUTRO_HOLD_SECONDS,
+    totalSeconds,
     videoDurationSeconds,
     imageZoomStartSeconds,
     imageZoomEndSeconds,
