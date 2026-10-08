@@ -364,7 +364,7 @@ export default function QuestionBankSocialCardGenerator() {
   const cardLabel = useMemo(() => customCardLabel.trim() || (includeSourceFolderLabel ? sourceFolderLabel : undefined), [customCardLabel, includeSourceFolderLabel, sourceFolderLabel]);
   const caption = useMemo(() => buildSocialCaption(activeQuestion, presentation, cardLabel), [activeQuestion, cardLabel, presentation]);
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
-    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: getCardExportAudioUrl(asset.id), source: "media_repository" as const }))
+    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: getCardExportAudioUrl(asset.id), assetId: asset.id, source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
   const exportPreset = useMemo(() => getSocialExportPreset(exportPlatform), [exportPlatform]);
   const hasVideoMedia = media.kind === "video";
@@ -542,10 +542,10 @@ export default function QuestionBankSocialCardGenerator() {
         format: exportFormat,
         filenameStem: fileStemFor(activeQuestion, cardVariant),
         motion: cardVariant === "answer"
-          ? { kind: "answer", title: activeQuestion.question, options, detail: "Review the question", answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl }
+          ? { kind: "answer", title: activeQuestion.question, options, detail: "Review the question", answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicAssetId: selectedMusic?.assetId, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl }
           : cardVariant === "combined"
-            ? { kind: "combined", title: activeQuestion.question, options, answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl, zoomQuestionImage: canZoomQuestionImage && zoomQuestionImage }
-            : { kind: "question", title: activeQuestion.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl },
+            ? { kind: "combined", title: activeQuestion.question, options, answer: correctAnswer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicAssetId: selectedMusic?.assetId, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl, zoomQuestionImage: canZoomQuestionImage && zoomQuestionImage }
+            : { kind: "question", title: activeQuestion.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicAssetId: selectedMusic?.assetId, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl },
       });
       toast.success(`${exportFormat.toUpperCase()} export is ready.`, { description: filename });
     } catch (error: any) {
@@ -553,7 +553,7 @@ export default function QuestionBankSocialCardGenerator() {
     } finally {
       setExporting(null);
     }
-  }, [activeQuestion, canZoomQuestionImage, cardVariant, correctAnswer, exportFormat, exportPlatform, hasVideoMedia, media, options, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url, zoomQuestionImage]);
+  }, [activeQuestion, canZoomQuestionImage, cardVariant, correctAnswer, exportFormat, exportPlatform, hasVideoMedia, media, options, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.assetId, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url, zoomQuestionImage]);
 
   const saveToLibrary = useCallback(() => {
     if (!activeQuestion) return;

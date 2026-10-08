@@ -38,4 +38,36 @@ describe("card export audio proxy", () => {
       expect(page).toContain("url: getCardExportAudioUrl(asset.id)");
     }
   });
+
+  it("uses a trusted asset ID for AAC muxing when the browser cannot encode AAC", () => {
+    const route = readProjectFile("server/routes/cardExportAudio.ts");
+    const exporter = readProjectFile("client/src/components/social/SocialCardExport.tsx");
+    const nixpacks = readProjectFile("nixpacks.toml");
+    const social = readProjectFile("client/src/pages/SocialContentGenerator.tsx");
+    const challenge = readProjectFile("client/src/pages/ChallengeCardGenerator.tsx");
+    const quiz = readProjectFile("client/src/pages/QuestionBankSocialCardGenerator.tsx");
+
+    expect(route).toContain('router.post("/api/card-export-audio/mux"');
+    expect(route).toContain("authenticatePlatformMediaAdmin(req)");
+    expect(route).toContain('uploadMuxVideo.single("video")');
+    expect(route).toContain("const assetId = Number(req.body?.assetId)");
+    expect(route).toContain("getStoredAudio(assetId)");
+    expect(route).toContain('"-c:v", "copy", "-c:a", "aac"');
+    expect(route).toContain('"-stream_loop", "-1"');
+    expect(route).toContain("MAX_VIDEO_DURATION_SECONDS");
+    expect(route).toContain("fs.rm(workDir, { recursive: true, force: true }");
+    expect(nixpacks).toContain('nixPkgs = ["nodejs_22", "pnpm", "ffmpeg"]');
+
+    expect(exporter).toContain("supportsAacAudioEncoding");
+    expect(exporter).toContain("muxMp4WithRepositoryAudio");
+    expect(exporter).toContain('fetch("/api/card-export-audio/mux"');
+    expect(exporter).toContain("motion.musicAssetId");
+    expect(exporter).toContain("needsServerAudioMux");
+    expect(exporter).toContain("assetId?: number");
+    expect(exporter).not.toContain('formData.append("audioUrl"');
+    for (const page of [social, challenge, quiz]) {
+      expect(page).toContain("assetId: asset.id");
+      expect(page).toContain("musicAssetId: selectedMusic?.assetId");
+    }
+  });
 });

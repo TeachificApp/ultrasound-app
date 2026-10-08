@@ -34,6 +34,8 @@ export type CardMotion = {
   /** Website shown on the final brand screen; cards choose their approved destination. */
   outroHost?: string;
   musicUrl?: string | null;
+  /** Trusted Media Repository audio asset used by the server AAC mux fallback. */
+  musicAssetId?: number | null;
   /** Browser-local audio retained for a newly generated/uploaded track. */
   musicBlob?: Blob | null;
   musicTitle?: string | null;
@@ -99,6 +101,8 @@ export type SocialMusicOption = {
   id: string;
   title: string;
   url: string;
+  /** Durable Media Repository reference. Never infer a server fetch from a raw URL. */
+  assetId?: number;
   source: "media_repository" | "openverse" | "ai_generated";
   creator?: string;
   attribution?: string;
@@ -138,6 +142,7 @@ export function useDefaultMp4Audio(
         id: `media:${defaultAudio.data.assetId}`,
         title: defaultAudio.data.title,
         url: getCardExportAudioUrl(defaultAudio.data.assetId),
+        assetId: defaultAudio.data.assetId,
         source: "media_repository",
       });
     }
@@ -781,6 +786,48 @@ function waitForMotionFrame() {
   return new Promise<void>((resolve) => window.setTimeout(resolve, Math.round(1000 / FRAME_RATE)));
 }
 
+async function supportsAacAudioEncoding(): Promise<boolean> {
+  const AudioEncoderCtor = (window as any).AudioEncoder;
+  if (!AudioEncoderCtor?.isConfigSupported) return false;
+  try {
+    const result = await AudioEncoderCtor.isConfigSupported({
+      codec: "aac",
+      sampleRate: 44_100,
+      numberOfChannels: 2,
+      bitrate: 192_000,
+    });
+    return Boolean(result?.supported);
+  } catch {
+    return false;
+  }
+}
+
+async function muxMp4WithRepositoryAudio(video: Blob, assetId: number): Promise<Blob> {
+  const formData = new FormData();
+  formData.append("video", video, "card.mp4");
+  formData.append("assetId", String(assetId));
+  const response = await fetch("/api/card-export-audio/mux", {
+    method: "POST",
+    credentials: "same-origin",
+    body: formData,
+  });
+  if (!response.ok) {
+    let message = "The selected audio could not be attached to this MP4.";
+    try {
+      const body = await response.json();
+      if (typeof body?.error === "string") message = body.error;
+    } catch {
+      // Preserve the safe, actionable fallback message when an intermediary returns HTML.
+    }
+    throw new Error(message);
+  }
+  const muxed = await response.blob();
+  if (!muxed.size || !muxed.type.includes("video/mp4")) {
+    throw new Error("The MP4 audio service returned an invalid video file.");
+  }
+  return muxed;
+}
+
 async function addMusicTrack(
   output: Output,
   musicUrl: string | null | undefined,
@@ -861,13 +908,20 @@ export async function renderSocialCardAsMp4(
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas video export is not supported in this browser.");
 
+    const hasMusic = Boolean(motion.musicUrl || motion.musicBlob);
+    const canEncodeAac = !hasMusic || await supportsAacAudioEncoding();
+    const needsServerAudioMux = hasMusic && !canEncodeAac;
+    if (needsServerAudioMux && !motion.musicAssetId) {
+      throw new Error("This browser cannot encode AAC audio for MP4. Select a Media Repository, uploaded, or AI-generated track and try again.");
+    }
+
     const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
     const source = new CanvasSource(canvas, { codec: "avc", bitrate: new Quality("high") });
     output.addVideoTrack(source);
     const timeline = motionTimeline(motion, motionVideo);
     const [logo, music] = await Promise.all([
       loadMotionLogo(motion.logoUrl),
-      addMusicTrack(output, motion.musicUrl, motion.musicBlob, timeline.totalSeconds),
+      needsServerAudioMux ? Promise.resolve(null) : addMusicTrack(output, motion.musicUrl, motion.musicBlob, timeline.totalSeconds),
     ]);
     await output.start();
     try {
@@ -883,7 +937,13 @@ export async function renderSocialCardAsMp4(
       await output.finalize();
       const buffer = output.target.buffer;
       if (!buffer) throw new Error("MP4 export did not produce a file.");
-      return new Blob([buffer], { type: "video/mp4" });
+      const renderedMp4 = new Blob([buffer], { type: "video/mp4" });
+      // Chromium installations commonly expose H.264 video encoding but not AAC
+      // audio encoding. Keep the established browser renderer for frames, then
+      // request server-side AAC muxing only with a verified repository asset ID.
+      return needsServerAudioMux
+        ? muxMp4WithRepositoryAudio(renderedMp4, motion.musicAssetId!)
+        : renderedMp4;
     } catch (error) {
       await output.cancel().catch(() => undefined);
       throw error;
@@ -1027,6 +1087,7 @@ export function SocialExportControls({
         id: `media:${uploaded.assetId}`,
         title: file.name.replace(/\.[^.]+$/, ""),
         url: getCardExportAudioUrl(uploaded.assetId),
+        assetId: uploaded.assetId,
         source: "media_repository",
         localBlob: file,
       });
@@ -1061,6 +1122,7 @@ export function SocialExportControls({
         id: `ai:${uploaded.assetId}`,
         title: `AI loop · ${composition.plan.title}`,
         url: getCardExportAudioUrl(uploaded.assetId),
+        assetId: uploaded.assetId,
         source: "ai_generated",
         localBlob: wav,
       });

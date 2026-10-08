@@ -988,6 +988,7 @@ function CategorySection({
   exportPlatform,
   exportFormat,
   musicUrl,
+  musicAssetId,
   musicBlob,
   musicTitle,
 }: {
@@ -1001,6 +1002,7 @@ function CategorySection({
   exportPlatform: SocialExportPlatform;
   exportFormat: SocialExportFormat;
   musicUrl?: string | null;
+  musicAssetId?: number | null;
   musicBlob?: Blob | null;
   musicTitle?: string | null;
 }) {
@@ -1029,9 +1031,9 @@ function CategorySection({
   const explanationText = q.explanation ? stripHtml(q.explanation) : null;
   const contextLabel = q.category?.trim() || category;
   const questionVideoUrl = q.videoUrl ?? (/\.(mp4|webm|mov)(?:[?#].*)?$/i.test(q.imageUrl ?? "") ? q.imageUrl : null);
-  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle, questionVideoUrl };
-  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle, questionVideoUrl };
-  const combinedMotion: CardMotion = { kind: "combined", title: q.question, options, answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicBlob, musicTitle, questionVideoUrl };
+  const questionMotion: CardMotion = { kind: "question", title: q.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicAssetId, musicBlob, musicTitle, questionVideoUrl };
+  const answerMotion: CardMotion = { kind: "answer", title: q.question, options, detail: "Review the question", answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicAssetId, musicBlob, musicTitle, questionVideoUrl };
+  const combinedMotion: CardMotion = { kind: "combined", title: q.question, options, answer: answerText, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.appHost, musicUrl, musicAssetId, musicBlob, musicTitle, questionVideoUrl };
   const downloadCombined = async () => {
     if (!combinedRef.current) return;
     setCombinedLoading(true);
@@ -1231,7 +1233,7 @@ export default function ChallengeCardGenerator() {
   useDefaultMp4Audio(presentation.brand, selectedMusic, setSelectedMusic);
   const musicAssets = trpc.mediaRepo.listAssets.useQuery({ brand: presentation.brand, mediaType: "audio", page: 1, pageSize: 50 });
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
-    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: getCardExportAudioUrl(asset.id), source: "media_repository" as const }))
+    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: getCardExportAudioUrl(asset.id), assetId: asset.id, source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
   const hasVideoMedia = useMemo(() => Boolean(data?.some((item: any) => item.questions?.some((question: QuestionItem) => question.videoUrl || /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(question.imageUrl ?? "")))), [data]);
   useEffect(() => {
@@ -1268,8 +1270,8 @@ export default function ChallengeCardGenerator() {
           ? `${letters[question.correctAnswer]}. ${stripHtml(options[question.correctAnswer] ?? "")}`
           : question.reviewAnswer ? stripHtml(question.reviewAnswer) : null;
         const motion: CardMotion = type === "questions"
-          ? { kind: "question", title: question.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
-          : { kind: "answer", title: question.question, options, detail: "Review the question", answer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title };
+          ? { kind: "question", title: question.question, options, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, musicUrl: selectedMusic?.url, musicAssetId: selectedMusic?.assetId, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title }
+          : { kind: "answer", title: question.question, options, detail: "Review the question", answer, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, musicUrl: selectedMusic?.url, musicAssetId: selectedMusic?.assetId, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title };
         const file = await handle.renderPlatform(exportPlatform, exportFormat, motion);
         folder.file(`${cat.replace(/\s+/g, "-")}-${type === "questions" ? "question" : "answer"}.${exportFormat}`, await file.arrayBuffer());
       }
@@ -1281,7 +1283,7 @@ export default function ChallengeCardGenerator() {
     } finally {
       setBatchLoading(null);
     }
-  }, [data, exportFormat, exportPlatform, presentation.accentColor, presentation.brand, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, selectedDate, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
+  }, [data, exportFormat, exportPlatform, presentation.accentColor, presentation.brand, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, selectedDate, selectedMusic?.assetId, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
 
   // Navigation helpers
   const dates = availableDates ?? [today];
@@ -1515,6 +1517,7 @@ export default function ChallengeCardGenerator() {
                   exportPlatform={exportPlatform}
                   exportFormat={exportFormat}
                   musicUrl={selectedMusic?.url}
+                  musicAssetId={selectedMusic?.assetId}
                   musicBlob={selectedMusic?.localBlob}
                   musicTitle={selectedMusic?.title}
                   onQuestionRef={(cat, h) => { questionRefs.current[cat] = h; }}

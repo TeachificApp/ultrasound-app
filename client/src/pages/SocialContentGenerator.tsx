@@ -825,7 +825,7 @@ export default function SocialContentGenerator() {
     setCategory((current) => brandCategories.includes(current as never) ? current : brandCategories[0]);
   }, [brandCategories]);
   const musicOptions = useMemo<SocialMusicOption[]>(() => (musicAssets.data?.assets ?? [])
-    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: getCardExportAudioUrl(asset.id), source: "media_repository" as const }))
+    .map((asset: any) => ({ id: `media:${asset.id}`, title: asset.title, url: getCardExportAudioUrl(asset.id), assetId: asset.id, source: "media_repository" as const }))
     .filter((asset: SocialMusicOption) => Boolean(asset.url)), [musicAssets.data?.assets]);
   const hasVideoItem = useMemo(() => items.some(hasSocialPostVideo), [items]);
   const handleBrandChange = useCallback((brand: "aaus" | "iheartecho") => {
@@ -1019,10 +1019,10 @@ export default function SocialContentGenerator() {
   const buildExportMotion = useCallback((item: GeneratedItem): CardMotion => {
     const questionVideoUrl = hasSocialPostVideo(item) ? resolveSocialPostImageUrl(item, presentation) ?? item.imageUrl ?? null : null;
     return mp4Sequence === "combined"
-      ? { kind: "combined", title: item.headline, options: [], answer: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl }
-      : { kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl };
+      ? { kind: "combined", title: item.headline, options: [], answer: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicAssetId: selectedMusic?.assetId, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl }
+      : { kind: "social", title: item.headline, detail: item.body, brandName: presentation.displayName, accentColor: presentation.accentColor, logoUrl: presentation.outroLogoUrl, logoShape: presentation.outroLogoShape, outroHost: presentation.publicHost, musicUrl: selectedMusic?.url, musicAssetId: selectedMusic?.assetId, musicBlob: selectedMusic?.localBlob, musicTitle: selectedMusic?.title, questionVideoUrl };
   },
-  [mp4Sequence, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
+  [mp4Sequence, presentation.accentColor, presentation.displayName, presentation.outroLogoShape, presentation.outroLogoUrl, presentation.publicHost, selectedMusic?.assetId, selectedMusic?.localBlob, selectedMusic?.title, selectedMusic?.url]);
 
   const toggleSavedPostSelection = useCallback((id: number) => {
     setSelectedSavedPostIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
