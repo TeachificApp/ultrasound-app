@@ -68,8 +68,22 @@ export function resolveScheduledCountdownTarget(value: string | Date, timeZone =
 /** True when value parses to a finite epoch (rejects Invalid Date / zero dates). */
 export function isValidInstant(value: unknown): value is Date | string | number {
   if (value == null || value === "") return false;
-  const t = new Date(value as Date | string | number).getTime();
+  const t = parseDbUtcTimestamp(value).getTime();
   return Number.isFinite(t);
+}
+
+/**
+ * Parse a MySQL TIMESTAMP/DATETIME value from the database as a UTC instant.
+ * Zone-less strings from raw SQL (`YYYY-MM-DD HH:mm:ss`) are UTC — not browser local.
+ */
+export function parseDbUtcTimestamp(value: unknown): Date {
+  if (value instanceof Date) return value;
+  if (value == null || value === "") return new Date(NaN);
+  const raw = String(value).trim();
+  if (!raw || raw.startsWith("0000-00-00")) return new Date(NaN);
+  if (/[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw)) return new Date(raw);
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  return new Date(`${normalized}Z`);
 }
 
 export function formatInTimeZone(
@@ -78,7 +92,20 @@ export function formatInTimeZone(
   timeZone = PLATFORM_TIMEZONE,
 ): string {
   if (!isValidInstant(value)) return "—";
-  return new Intl.DateTimeFormat("en-US", { ...options, timeZone }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-US", { ...options, timeZone }).format(parseDbUtcTimestamp(value));
+}
+
+/** Admin-facing date/time in platform Eastern time with an " ET" suffix. */
+export function formatPlatformDateTimeEt(value: Date | string | null | undefined): string {
+  if (!isValidInstant(value)) return "—";
+  return `${formatInTimeZone(value, {
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }, PLATFORM_TIMEZONE)} ET`;
 }
 
 /** Formats a stored UTC instant for a `datetime-local` or date-only administrator input. */

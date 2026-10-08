@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatScheduledInput, isInstantExpired, isScheduledDeadlineOpen, isValidInstant, parseScheduledTimestamp, formatInTimeZone } from "../shared/platformTime";
+import { formatPlatformDateTimeEt, formatScheduledInput, isInstantExpired, isScheduledDeadlineOpen, isValidInstant, parseDbUtcTimestamp, parseScheduledTimestamp, formatInTimeZone } from "../shared/platformTime";
 
 describe("platform scheduled timestamps", () => {
   it("treats a date-only enrollment close as 11:59:59.999 PM Eastern", () => {
@@ -35,5 +35,12 @@ describe("platform scheduled timestamps", () => {
     expect(isValidInstant(null)).toBe(false);
     expect(formatInTimeZone("not-a-date", { year: "numeric" })).toBe("—");
     expect(formatInTimeZone("2026-08-18T12:00:00.000Z", { month: "short", day: "numeric", year: "numeric" })).toMatch(/Aug/);
+  });
+
+  it("parses zone-less MySQL UTC datetimes and formats them in Eastern time", () => {
+    // 16:44 UTC during EDT → 12:44 PM Eastern
+    expect(parseDbUtcTimestamp("2026-09-09 16:44:00").toISOString()).toBe("2026-09-09T16:44:00.000Z");
+    expect(formatPlatformDateTimeEt("2026-09-09 16:44:00")).toMatch(/12:44 PM ET/);
+    expect(formatPlatformDateTimeEt("2026-09-09T16:44:00.000Z")).toMatch(/12:44 PM ET/);
   });
 });
