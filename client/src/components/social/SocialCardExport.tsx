@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { saveAs } from "file-saver";
-import { AudioBufferSource, BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from "mediabunny";
+import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality } from "mediabunny";
 import { Headphones, Loader2, Search, Sparkles, Upload } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { uploadFileToMediaRepository } from "@/lib/mediaRepoUpload";
@@ -786,26 +786,43 @@ function waitForMotionFrame() {
   return new Promise<void>((resolve) => window.setTimeout(resolve, Math.round(1000 / FRAME_RATE)));
 }
 
-async function supportsAacAudioEncoding(): Promise<boolean> {
-  const AudioEncoderCtor = (window as any).AudioEncoder;
-  if (!AudioEncoderCtor?.isConfigSupported) return false;
-  try {
-    const result = await AudioEncoderCtor.isConfigSupported({
-      codec: "aac",
-      sampleRate: 44_100,
-      numberOfChannels: 2,
-      bitrate: 192_000,
-    });
-    return Boolean(result?.supported);
-  } catch {
-    return false;
+function normalizeMp4ExportError(error: unknown, phase: "video" | "audio-mux"): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message === "Encoding error" || message.includes("Encoding error")) {
+    return new Error(phase === "video"
+      ? "Video encoding failed while building the MP4. Try a shorter variant (Question only), turn off image magnify, or choose a smaller platform size."
+      : "The MP4 finished rendering, but background music could not be attached. Re-upload the track or choose a Media Repository audio file, then try again.");
   }
+  return error instanceof Error ? error : new Error(message || "MP4 export failed.");
 }
 
-async function muxMp4WithRepositoryAudio(video: Blob, assetId: number): Promise<Blob> {
+async function resolveMuxAudioBlob(motion: CardMotion): Promise<Blob | null> {
+  if (motion.musicBlob) return motion.musicBlob;
+  if (!motion.musicUrl) return null;
+  let sameOrigin = false;
+  try {
+    sameOrigin = new URL(motion.musicUrl, window.location.origin).origin === window.location.origin;
+  } catch {
+    throw new Error("The selected audio URL is invalid.");
+  }
+  const response = await fetch(
+    motion.musicUrl,
+    sameOrigin ? { credentials: "same-origin" } : { mode: "cors" },
+  );
+  if (!response.ok) throw new Error(`Audio preview returned HTTP ${response.status}.`);
+  const blob = await response.blob();
+  if (!blob.size) throw new Error("The selected audio file is empty.");
+  return blob;
+}
+
+async function muxMp4WithServerAudio(
+  video: Blob,
+  input: { assetId?: number | null; audioBlob?: Blob | null },
+): Promise<Blob> {
   const formData = new FormData();
   formData.append("video", video, "card.mp4");
-  formData.append("assetId", String(assetId));
+  if (input.assetId) formData.append("assetId", String(input.assetId));
+  if (input.audioBlob) formData.append("audio", input.audioBlob, "card-track.audio");
   const response = await fetch("/api/card-export-audio/mux", {
     method: "POST",
     credentials: "same-origin",
@@ -826,44 +843,6 @@ async function muxMp4WithRepositoryAudio(video: Blob, assetId: number): Promise<
     throw new Error("The MP4 audio service returned an invalid video file.");
   }
   return muxed;
-}
-
-async function addMusicTrack(
-  output: Output,
-  musicUrl: string | null | undefined,
-  musicBlob?: Blob | null,
-  maxDurationSeconds = MOTION_DURATION_SECONDS,
-): Promise<{ source: AudioBufferSource; buffer: AudioBuffer } | null> {
-  if (!musicUrl && !musicBlob) return null;
-  try {
-    const bytes = musicBlob
-      ? await musicBlob.arrayBuffer()
-      : await (async () => {
-        const response = await fetch(musicUrl!, { mode: "cors" });
-        if (!response.ok) throw new Error(`Audio source returned ${response.status}.`);
-        return response.arrayBuffer();
-      })();
-    const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextCtor) throw new Error("This browser cannot decode audio for MP4 export.");
-    const audioContext = new AudioContextCtor();
-    const decoded = await audioContext.decodeAudioData(bytes.slice(0));
-    const frames = Math.min(decoded.length, Math.floor(decoded.sampleRate * maxDurationSeconds));
-    const clip = audioContext.createBuffer(decoded.numberOfChannels, frames, decoded.sampleRate);
-    for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) {
-      clip.copyToChannel(decoded.getChannelData(channel).slice(0, frames), channel);
-    }
-    await audioContext.close?.();
-    const source = new AudioBufferSource({ codec: "aac", quality: new Quality("medium") });
-    output.addAudioTrack(source);
-    return { source, buffer: clip };
-  } catch (error) {
-    const label = motionMusicLabel(musicUrl);
-    throw new Error(`The selected ${label} could not be embedded in this MP4. Try generating the AI loop again, or choose an audio file that this browser can decode.`);
-  }
-}
-
-function motionMusicLabel(musicUrl: string | null | undefined) {
-  return musicUrl?.includes("openverse") ? "CC0 track" : "music track";
 }
 
 async function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
@@ -909,23 +888,20 @@ export async function renderSocialCardAsMp4(
     if (!context) throw new Error("Canvas video export is not supported in this browser.");
 
     const hasMusic = Boolean(motion.musicUrl || motion.musicBlob);
-    const canEncodeAac = !hasMusic || await supportsAacAudioEncoding();
-    // The default, uploaded, generated, and Media Repository tracks are all
-    // trusted assets. Use FFmpeg for each of them rather than trusting a browser
-    // AAC capability probe that can pass but still fail during MediaBunny setup.
-    const needsServerAudioMux = hasMusic && Boolean(motion.musicAssetId);
-    if (hasMusic && !needsServerAudioMux && !canEncodeAac) {
-      throw new Error("This browser cannot encode AAC audio for MP4. Select a Media Repository, uploaded, or AI-generated track and try again.");
-    }
+    // Never embed music through the browser AAC encoder — it often fails with a
+    // generic MediaBunny "Encoding error" even when AAC probes report support.
+    const needsServerAudioMux = hasMusic;
 
     const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
     const source = new CanvasSource(canvas, { codec: "avc", bitrate: new Quality("high") });
     output.addVideoTrack(source);
     const timeline = motionTimeline(motion, motionVideo);
-    const [logo, music] = await Promise.all([
-      loadMotionLogo(motion.logoUrl),
-      needsServerAudioMux ? Promise.resolve(null) : addMusicTrack(output, motion.musicUrl, motion.musicBlob, timeline.totalSeconds),
-    ]);
+    const logo = await loadMotionLogo(motion.logoUrl);
+    let muxAudioBlob: Blob | null = null;
+    if (needsServerAudioMux && !motion.musicAssetId) {
+      muxAudioBlob = await resolveMuxAudioBlob(motion);
+    }
+    let videoRendered = false;
     await output.start();
     try {
       if (motionVideo) await motionVideo.play().catch(() => undefined);
@@ -936,20 +912,23 @@ export async function renderSocialCardAsMp4(
         await source.add(elapsed, 1 / FRAME_RATE);
         if (motionVideo && elapsed < timeline.videoDurationSeconds) await waitForMotionFrame();
       }
-      if (music) await music.source.add(music.buffer);
       await output.finalize();
+      videoRendered = true;
       const buffer = output.target.buffer;
       if (!buffer) throw new Error("MP4 export did not produce a file.");
       const renderedMp4 = new Blob([buffer], { type: "video/mp4" });
-      // Keep the established browser renderer for frames and request server-side
-      // AAC muxing for every verified repository asset. This avoids browser AAC
-      // encoder differences while retaining the existing 30fps H.264 timeline.
-      return needsServerAudioMux
-        ? muxMp4WithRepositoryAudio(renderedMp4, motion.musicAssetId!)
-        : renderedMp4;
+      if (!needsServerAudioMux) return renderedMp4;
+      try {
+        return await muxMp4WithServerAudio(renderedMp4, {
+          assetId: motion.musicAssetId,
+          audioBlob: muxAudioBlob,
+        });
+      } catch (error) {
+        throw normalizeMp4ExportError(error, "audio-mux");
+      }
     } catch (error) {
       await output.cancel().catch(() => undefined);
-      throw error;
+      throw normalizeMp4ExportError(error, videoRendered ? "audio-mux" : "video");
     }
   } finally {
     card.image.close();
