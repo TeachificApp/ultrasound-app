@@ -34,6 +34,7 @@ import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
+import { getCohortRecordingWatchStatus } from "@/lib/cohortRecordingStatus";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -931,6 +932,10 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
   const [discBody, setDiscBody] = useState("");
   const [discMedia, setDiscMedia] = useState<{ url: string; mimeType: string; fileName: string }[]>([]);
   const [discUploading, setDiscUploading] = useState(false);
+  const { data: recordingProgress } = trpc.lmsLearner.getCohortRecordingProgress.useQuery(
+    { courseId },
+    { enabled: cohortTab === "replays" && courseId > 0 },
+  );
   const { data: discData, refetch: refetchDisc } = trpc.lmsLearner.getCohortDiscussions.useQuery(
     { courseId },
     { enabled: cohortTab === "discussions" }
@@ -1139,7 +1144,14 @@ function CohortDashboardTab({ courseId, cohortData, isLoading }: { courseId: num
             </CardContent></Card>
           ) : (
             <div className="space-y-4">
-              {recordings.map((rec: any) => <CohortRecordingCard key={rec.id} recording={rec} courseId={courseId} />)}
+              {recordings.map((rec: any) => (
+                <CohortRecordingCard
+                  key={rec.id}
+                  recording={rec}
+                  courseId={courseId}
+                  progress={recordingProgress?.[rec.id]}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -1400,17 +1412,22 @@ function useRecordingThumb(recording: any): string | null {
   return null;
 }
 
-function CohortRecordingCard({ recording, courseId }: { recording: any; courseId: number }) {
+function CohortRecordingCard({ recording, courseId, progress }: { recording: any; courseId: number; progress?: any }) {
   const durationMins = recording.durationSeconds ? Math.round(recording.durationSeconds / 60) : null;
   const thumbSrc = useRecordingThumb(recording);
   const isDirectVideo = getRecordingAutoThumb(recording.videoUrl)?.startsWith("__video__") ?? false;
   const directVideoUrl = isDirectVideo ? recording.videoUrl : null;
   const hasPlayableVideo = Boolean(recording.videoUrl?.trim());
+  const { watched, isNew } = getCohortRecordingWatchStatus(recording, progress);
   const [imgErr, setImgErr] = React.useState(false);
   const card = (
       <Card className={`border bg-white transition-all overflow-hidden ${
         hasPlayableVideo
-          ? "border-gray-200 hover:border-teal-300 hover:shadow-md cursor-pointer group"
+          ? watched
+            ? "border-emerald-200 hover:border-emerald-300 hover:shadow-md cursor-pointer group"
+            : isNew
+              ? "border-amber-300 ring-1 ring-amber-100 hover:border-amber-400 hover:shadow-md cursor-pointer group"
+              : "border-gray-200 hover:border-teal-300 hover:shadow-md cursor-pointer group"
           : "border-dashed border-amber-300 bg-amber-50/30"
       }`}>
         <CardContent className="p-4">
@@ -1434,9 +1451,21 @@ function CohortRecordingCard({ recording, courseId }: { recording: any; courseId
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <h3 className={`font-semibold text-gray-900 text-sm leading-tight transition-colors ${hasPlayableVideo ? "group-hover:text-teal-700" : ""}`}>{recording.title}</h3>
-                <Badge className={`text-xs flex-shrink-0 ${hasPlayableVideo ? "bg-teal-100 text-teal-700 border-teal-200" : "bg-amber-100 text-amber-800 border-amber-200"}`}>
-                  {hasPlayableVideo ? "Recording" : "Preparing"}
-                </Badge>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {isNew && (
+                    <Badge className="bg-amber-500 text-white border-amber-500 text-xs">
+                      New
+                    </Badge>
+                  )}
+                  {watched && (
+                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Watched
+                    </Badge>
+                  )}
+                  <Badge className={`text-xs ${hasPlayableVideo ? "bg-teal-100 text-teal-700 border-teal-200" : "bg-amber-100 text-amber-800 border-amber-200"}`}>
+                    {hasPlayableVideo ? "Recording" : "Preparing"}
+                  </Badge>
+                </div>
               </div>
               {recording.description && <p className="text-gray-500 text-xs mt-1 line-clamp-2">{recording.description}</p>}
               <div className="flex items-center gap-3 mt-1.5 flex-wrap">
@@ -1448,8 +1477,9 @@ function CohortRecordingCard({ recording, courseId }: { recording: any; courseId
                 )}
               </div>
               {hasPlayableVideo ? (
-                <p className="mt-2 text-xs text-teal-600 font-medium flex items-center gap-1 group-hover:gap-2 transition-all">
-                  <PlayCircle className="w-3.5 h-3.5" /> Watch Recording
+                <p className={`mt-2 text-xs font-medium flex items-center gap-1 group-hover:gap-2 transition-all ${watched ? "text-emerald-700" : isNew ? "text-amber-700" : "text-teal-600"}`}>
+                  {watched ? <CheckCircle2 className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
+                  {watched ? "Watched — watch again" : isNew ? "New recording — watch now" : "Watch Recording"}
                 </p>
               ) : (
                 <p className="mt-2 text-xs text-amber-700 font-medium flex items-center gap-1">
