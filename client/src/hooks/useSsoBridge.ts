@@ -1,13 +1,14 @@
 /**
  * useSsoBridge — Redirect-based cross-domain SSO fallback
  *
- * When the user is not logged in on a client domain (e.g. app.iheartecho.com or
- * app.allaboutultrasound.com), redirect to learn.allaboutultrasound.com (or
+ * When a deliberately initiated cross-domain session recovery includes
+ * ?sso_bridge=1, redirect to learn.allaboutultrasound.com (or
  * app.allaboutultrasound.com) /api/sso/bridge which reads an existing session
  * cookie and returns with ?sso=TOKEN.
  *
- * NEVER runs on auth pages (/login, /magic-link, etc.) — the user is actively
- * signing in and the bridge would hijack magic-link / password flows.
+ * It must never run for an anonymous public-page visit. Public browsing stays
+ * public; only an explicit sign-in or protected-action flow can request session
+ * recovery. It also NEVER runs on auth pages (/login, /magic-link, etc.).
  */
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -33,6 +34,8 @@ const AUTH_PATH_PREFIXES = [
   "/reset-password",
   "/verify-email",
 ];
+
+const SSO_BRIDGE_OPT_IN_PARAM = "sso_bridge";
 
 function isAuthPage(): boolean {
   const path = window.location.pathname;
@@ -83,6 +86,11 @@ export function useSsoBridge() {
     if (isAuthPage()) return;
 
     const params = new URLSearchParams(window.location.search);
+
+    // Do not redirect an anonymous visitor away from a public page. The normal
+    // cross-domain broadcaster handles signed-in visitors; this fallback is
+    // reserved for a future protected flow that deliberately requests recovery.
+    if (params.get(SSO_BRIDGE_OPT_IN_PARAM) !== "1") return;
 
     // Magic-link / SSO exchange just set cookies — do not redirect to bridge
     if (params.get("auth_pending") === "1") return;

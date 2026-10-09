@@ -7,6 +7,12 @@ const consumerSource = readFileSync(resolve(process.cwd(), "client/src/hooks/use
 const routeSource = readFileSync(resolve(process.cwd(), "server/routes/ssoAuto.ts"), "utf8");
 
 describe("cross-domain SSO bridge fallback", () => {
+  it("does not redirect anonymous visitors away from public pages", () => {
+    expect(bridgeSource).toContain('const SSO_BRIDGE_OPT_IN_PARAM = "sso_bridge";');
+    expect(bridgeSource).toContain('if (params.get(SSO_BRIDGE_OPT_IN_PARAM) !== "1") return;');
+    expect(bridgeSource).toContain("Public browsing stays\n * public");
+  });
+
   it("preserves the attempted bridge index on its return URL for iHeartEcho fallback", () => {
     expect(bridgeSource).toContain("function getBridgeReturnUrlWithAttempt(tryIndex: number)");
     expect(bridgeSource).toContain('returnUrl.searchParams.set("bridge_try", String(tryIndex));');
