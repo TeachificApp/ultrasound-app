@@ -46,7 +46,8 @@ describe("public checkout Platform Settings isolation", () => {
     const bundleCheckout = source("server/routers/bundleRouter.ts");
 
     expect(bundleCheckout).toContain("createCheckout: publicProcedure");
-    expect(bundleCheckout).toContain("STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT");
+    expect(bundleCheckout).toContain("STANDARD_STRIPE_CHECKOUT_OPTIONS");
+    expect(bundleCheckout).not.toContain("STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT");
     expect(bundleCheckout).not.toContain("platformSettings");
   });
 });

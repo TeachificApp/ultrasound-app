@@ -1,5 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
-import { resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
+import { resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_OPTIONS } from "./checkoutTermsHelper";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, sql, asc, or, like, gte, lte, count } from "drizzle-orm";
@@ -336,7 +336,7 @@ export const downloadsLearnerRouter = router({
         mode: "payment",
         customer_email: userEmail,
         client_reference_id: userId ? userId.toString() : undefined,
-        ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+        ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
         custom_text: DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT,
         ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         line_items: isUpgradeBumpDl

@@ -1,6 +1,6 @@
 import { getStripeClient } from "../lib/stripeClient";
 import { isPromotionCodeEligibleForTarget } from "../lib/couponCheckoutEligibility";
-import { STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
+import { STANDARD_STRIPE_CHECKOUT_OPTIONS } from "./checkoutTermsHelper";
 /**
  * bundleRouter.ts — Bundles: sell multiple items as one package
  */
@@ -356,7 +356,7 @@ export const bundleLearnerRouter = router({
         mode: isSubscription ? "subscription" : "payment",
         customer_email: userEmail,
         client_reference_id: userId ? userId.toString() : undefined,
-        ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+        ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
         ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         ...(bundle.collectShippingAddress ? { shipping_address_collection: { allowed_countries: ["US", "CA", "GB", "AU", "NZ", "IE"] } } : {}),
         metadata: {

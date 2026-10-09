@@ -45,7 +45,7 @@ import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import { toCheckoutAmountCents } from "../lib/paymentState";
 import { isCachedStripePriceCompatible, shouldInvalidateCourseStripeCache } from "../lib/stripePriceCache";
-import { checkoutPlatformTermsSelection, resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
+import { checkoutPlatformTermsSelection, resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_OPTIONS } from "./checkoutTermsHelper";
 import { enrichCohortResources } from "../lib/cohortResources";
 import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import { resolveCohortRecordingPlayback } from "../lib/cohortRecordingPlayback";
@@ -3350,7 +3350,7 @@ export const lmsLearnerRouter = router({
         session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
-          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+          ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
           ...promoOpts,
           line_items: isUpgradeBump
             ? [orderBumpCheckout!.lineItem]
@@ -3396,7 +3396,7 @@ export const lmsLearnerRouter = router({
         session = await stripe.checkout.sessions.create({
           mode: "subscription",
           customer_email: ctx.user.email ?? undefined,
-          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+          ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
           ...promoOpts,
           line_items: [{ price: stripePriceId, quantity: 1 }, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
@@ -3453,7 +3453,7 @@ export const lmsLearnerRouter = router({
         session = await stripe.checkout.sessions.create({
           mode: hasInstallments ? "subscription" : "payment",
           customer_email: ctx.user.email ?? undefined,
-          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+          ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
           ...promoOpts,
           line_items: [...lineItems, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
@@ -3676,7 +3676,7 @@ export const lmsLearnerRouter = router({
         session = await stripe.checkout.sessions.create({
           mode: "payment",
           customer_email: input.email,
-          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+          ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
           ...promoOpts,
           line_items: isUpgradeBump2
             ? [orderBumpCheckout!.lineItem]
@@ -3701,7 +3701,7 @@ export const lmsLearnerRouter = router({
         session = await stripe.checkout.sessions.create({
           mode: "subscription",
           customer_email: input.email,
-          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+          ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
           ...promoOpts,
           line_items: [{ price: stripePriceId, quantity: 1 }, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
           success_url: successUrl, cancel_url: cancelUrl,
@@ -3772,7 +3772,7 @@ export const lmsLearnerRouter = router({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
           client_reference_id: ctx.user.id.toString(),
-          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+          ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
           line_items: [{ price_data: { currency: course.currency ?? "usd", product_data: { name: course.title, images: course.coverImageUrl ? [course.coverImageUrl] : undefined }, unit_amount: Math.round(Number(course.price) * 100) }, quantity: 1 }],
           metadata: { type: "lms_course", course_id: course.id.toString(), user_id: ctx.user.id.toString(), customer_email: ctx.user.email ?? "", source: "upgrade_prompt" },
@@ -3799,7 +3799,7 @@ export const lmsLearnerRouter = router({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
           client_reference_id: ctx.user.id.toString(),
-          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+          ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
           custom_text: DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT,
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
           line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: resolveUpgradeProductCheckoutCents(product.price) }, quantity: 1 }],
@@ -3824,7 +3824,7 @@ export const lmsLearnerRouter = router({
           mode: "payment",
           customer_email: ctx.user.email ?? undefined,
           client_reference_id: ctx.user.id.toString(),
-          ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+          ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
           ...(discounts ? { discounts } : { allow_promotion_codes: true }),
           shipping_address_collection: { allowed_countries: allowedCountries as any },
           line_items: [{ price_data: { currency: product.currency, product_data: { name: product.title, images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined }, unit_amount: resolveUpgradeProductCheckoutCents(product.price) }, quantity: 1 }],

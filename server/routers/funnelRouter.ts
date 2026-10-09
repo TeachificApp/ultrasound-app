@@ -16,7 +16,7 @@ import { isScheduledDeadlineOpen } from "../../shared/platformTime";
 import { hasFiniteWorkshopCapacity } from "../../shared/workshopAvailability";
 import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import { DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT } from "../../shared/digitalDownloadLicense";
-import { STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT } from "./checkoutTermsHelper";
+import { STANDARD_STRIPE_CHECKOUT_OPTIONS } from "./checkoutTermsHelper";
 
 /** Pick the next purchasable workshop instance for direct-checkout redirects. */
 function pickWorkshopCheckoutInstance(instances: Array<{
@@ -2039,7 +2039,7 @@ export const funnelPublicRouter = router({
         : `${input.origin}`;
       const sessionParams: any = {
         mode: checkoutMode,
-        ...STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT,
+        ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
         allow_promotion_codes: true,
         line_items: [directLineItem ?? {
           price_data: {

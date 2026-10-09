@@ -7,7 +7,7 @@ const readProjectFile = (path: string) =>
   readFileSync(resolve(projectRoot, path), "utf8");
 
 describe("hosted checkout terms and bundle pricing", () => {
-  it("requires Stripe terms consent for every hosted consumer checkout path", () => {
+  it("keeps hosted consumer checkouts independent of Stripe Dashboard terms configuration", () => {
     const helper = readProjectFile("server/routers/checkoutTermsHelper.ts");
     const hostedRouters = [
       "server/routers/lmsRouter.ts",
@@ -20,9 +20,12 @@ describe("hosted checkout terms and bundle pricing", () => {
       "server/routers/workshopRouter.ts",
     ].map(readProjectFile);
 
-    expect(helper).toContain('terms_of_service: "required"');
+    expect(helper).toContain("STANDARD_STRIPE_CHECKOUT_OPTIONS");
+    expect(helper).not.toMatch(/consent_collection\s*:/);
+    expect(helper).not.toMatch(/terms_of_service\s*:/);
     hostedRouters.forEach(source => {
-      expect(source).toContain("STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT");
+      expect(source).toContain("STANDARD_STRIPE_CHECKOUT_OPTIONS");
+      expect(source).not.toContain("STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT");
     });
   });
 

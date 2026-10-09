@@ -62,10 +62,16 @@ const DEFAULT_LINK1_URL = "https://www.allaboutultrasound.com/terms";
 const DEFAULT_LINK2_TEXT = "Privacy Policy";
 const DEFAULT_LINK2_URL = "https://www.allaboutultrasound.com/privacy-policy.html";
 
-/** Applied to hosted Stripe sessions; embedded checkout already gates payment behind resolved terms. */
-export const STANDARD_STRIPE_CHECKOUT_TERMS_CONSENT = {
-  consent_collection: { terms_of_service: "required" as const },
-};
+/**
+ * Shared options for hosted Stripe sessions.
+ *
+ * Stripe rejects a session that requires its Terms consent checkbox until the
+ * Stripe Dashboard itself has a public Terms URL configured. Our site and
+ * embedded checkouts retain their own Terms/Privacy links through
+ * `resolveCheckoutTerms`; do not send a dashboard-dependent consent option
+ * here, because it prevents payment from opening at all.
+ */
+export const STANDARD_STRIPE_CHECKOUT_OPTIONS = {};
 
 /**
  * Resolve the checkout terms for a specific product checkout.
