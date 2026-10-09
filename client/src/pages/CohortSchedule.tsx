@@ -17,6 +17,7 @@ import { isSessionOnCalendarDay } from "@shared/cohortSessionDates";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import RichTextEditor, { RichTextDisplay } from "@/components/RichTextEditor";
 import { Link, useParams, useLocation, useSearch } from "wouter";
+import { getCohortRecordingWatchStatus } from "@/lib/cohortRecordingStatus";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -499,6 +500,10 @@ export default function CohortSchedule() {
   const [discUploading, setDiscUploading] = useState(false);
   const initialTab = urlParams.get("tab") ?? "sessions";
   const [activeTab, setActiveTab] = useState(initialTab);
+  const { data: recordingProgress } = trpc.lmsLearner.getCohortRecordingProgress.useQuery(
+    { courseId: id },
+    { enabled: activeTab === "replays" && !!user && id > 0 },
+  );
   const { data: discData, refetch: refetchDisc } = trpc.lmsLearner.getCohortDiscussions.useQuery(
     { courseId: id },
     { enabled: activeTab === "discussions" && !!user && id > 0 }
@@ -606,6 +611,9 @@ export default function CohortSchedule() {
   const noDeadlineAssignments = assignments.filter((a: any) => !a.dueDate);
   const submissionMap: Record<number, any> = {};
   (mySubmissions ?? []).forEach((s: any) => { submissionMap[s.assignmentId] = s; });
+  const newRecordingCount = (recordings ?? []).filter((recording: any) =>
+    getCohortRecordingWatchStatus(recording, recordingProgress?.[recording.id]).isNew,
+  ).length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -696,6 +704,9 @@ export default function CohortSchedule() {
               Replays
               {(recordings ?? []).length > 0 && (
                 <Badge className="ml-1 bg-teal-500 text-white text-xs px-1.5 py-0">{recordings.length}</Badge>
+              )}
+              {newRecordingCount > 0 && (
+                <Badge className="bg-amber-500 text-white border-amber-500 text-xs px-1.5 py-0">{newRecordingCount} New</Badge>
               )}
             </TabsTrigger>}
             <TabsTrigger value="resources" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
@@ -836,13 +847,13 @@ export default function CohortSchedule() {
                 {replayView === "grid" ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {recordings.map((rec: any) => (
-                      <RecordingGridCard key={rec.id} recording={rec} courseId={id} />
+                      <RecordingGridCard key={rec.id} recording={rec} courseId={id} progress={recordingProgress?.[rec.id]} />
                     ))}
                   </div>
                 ) : (
                   <div className="space-y-2">
                     {recordings.map((rec: any) => (
-                      <RecordingListRow key={rec.id} recording={rec} courseId={id} />
+                      <RecordingListRow key={rec.id} recording={rec} courseId={id} progress={recordingProgress?.[rec.id]} />
                     ))}
                   </div>
                 )}
@@ -1264,11 +1275,14 @@ function getVideoEmbedUrl(url: string): { type: "iframe" | "video"; src: string 
 }
 
 /** Grid card — thumbnail + title + progress, links to player page */
-function RecordingGridCard({ recording, courseId }: { recording: any; courseId: number }) {
+function RecordingGridCard({ recording, courseId, progress }: { recording: any; courseId: number; progress?: any }) {
   const durationMins = recording.durationSeconds ? Math.round(recording.durationSeconds / 60) : null;
+  const { watched, isNew } = getCohortRecordingWatchStatus(recording, progress);
   return (
     <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
-      <Card className="border border-gray-200 bg-white hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group overflow-hidden">
+      <Card className={`border bg-white hover:shadow-md transition-all cursor-pointer group overflow-hidden ${
+        watched ? "border-emerald-200 hover:border-emerald-300" : isNew ? "border-amber-300 ring-1 ring-amber-100 hover:border-amber-400" : "border-gray-200 hover:border-teal-300"
+      }`}>
         {/* Thumbnail — absolute-positioned to fill aspect-video container correctly */}
         <div className="w-full aspect-video bg-gradient-to-br from-teal-50 to-teal-100 relative overflow-hidden">
           <div className="absolute inset-0">
@@ -1286,6 +1300,8 @@ function RecordingGridCard({ recording, courseId }: { recording: any; courseId: 
               {fmtDuration(durationMins)}
             </div>
           )}
+          {isNew && <Badge className="absolute top-2 left-2 bg-amber-500 text-white border-amber-500 text-xs">New</Badge>}
+          {watched && <Badge className="absolute top-2 left-2 bg-emerald-100 text-emerald-800 border-emerald-200 text-xs gap-1"><CheckCircle2 className="w-3 h-3" /> Watched</Badge>}
         </div>
         <CardContent className="p-3">
           <h3 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2 group-hover:text-teal-700 transition-colors">
@@ -1312,11 +1328,14 @@ function RecordingGridCard({ recording, courseId }: { recording: any; courseId: 
 }
 
 /** List row — compact single-line row, links to player page */
-function RecordingListRow({ recording, courseId }: { recording: any; courseId: number }) {
+function RecordingListRow({ recording, courseId, progress }: { recording: any; courseId: number; progress?: any }) {
   const durationMins = recording.durationSeconds ? Math.round(recording.durationSeconds / 60) : null;
+  const { watched, isNew } = getCohortRecordingWatchStatus(recording, progress);
   return (
     <Link href={`/cohort/${courseId}/replay/${recording.id}`}>
-      <div className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-teal-300 hover:bg-teal-50/30 transition-all cursor-pointer group">
+      <div className={`flex items-center gap-3 p-3 bg-white border rounded-lg hover:bg-teal-50/30 transition-all cursor-pointer group ${
+        watched ? "border-emerald-200 hover:border-emerald-300" : isNew ? "border-amber-300 bg-amber-50/30 hover:border-amber-400" : "border-gray-200 hover:border-teal-300"
+      }`}>
         {/* Thumbnail — 16:9 aspect box, absolute-positioned fill */}
         <div className="w-16 aspect-video rounded-lg bg-teal-100 flex-shrink-0 overflow-hidden relative">
           <div className="absolute inset-0">
@@ -1327,7 +1346,11 @@ function RecordingListRow({ recording, courseId }: { recording: any; courseId: n
           </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-gray-900 text-sm truncate group-hover:text-teal-700 transition-colors">{recording.title}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="font-medium text-gray-900 text-sm truncate group-hover:text-teal-700 transition-colors">{recording.title}</p>
+            {isNew && <Badge className="bg-amber-500 text-white border-amber-500 text-xs flex-shrink-0">New</Badge>}
+            {watched && <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-xs gap-1 flex-shrink-0"><CheckCircle2 className="w-3 h-3" /> Watched</Badge>}
+          </div>
           <div className="flex items-center gap-2 flex-wrap mt-0.5">
             {recording.linkedSessionTitle && (
               <span className="text-teal-600 text-xs font-medium flex items-center gap-0.5 truncate max-w-[180px]">

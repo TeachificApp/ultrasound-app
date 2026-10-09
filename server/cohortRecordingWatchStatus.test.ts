@@ -48,4 +48,15 @@ describe("cohort recording watch status", () => {
     expect(source).toContain("New recording — watch now");
     expect(source).toContain("Watched — watch again");
   });
+
+  it("shows the same labels in the compact Cohort Schedule replay list", () => {
+    const source = readFileSync(resolve(process.cwd(), "client/src/pages/CohortSchedule.tsx"), "utf8");
+
+    expect(source).toContain("trpc.lmsLearner.getCohortRecordingProgress.useQuery");
+    expect(source).toContain("newRecordingCount");
+    expect(source).toContain("<RecordingGridCard key={rec.id} recording={rec} courseId={id} progress={recordingProgress?.[rec.id]} />");
+    expect(source).toContain("<RecordingListRow key={rec.id} recording={rec} courseId={id} progress={recordingProgress?.[rec.id]} />");
+    expect(source).toContain("Watched</Badge>");
+    expect(source).toContain("New</Badge>");
+  });
 });
