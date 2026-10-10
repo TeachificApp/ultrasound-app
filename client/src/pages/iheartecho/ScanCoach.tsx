@@ -8,7 +8,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useSearch, Link } from "wouter";
 import Layout from "@/components/Layout";
 import BackToEchoAssist from "@/components/BackToEchoAssist";
-import { Scan, Heart, Info, Eye, AlertTriangle, ChevronRight, Zap, Clock, Activity, TrendingUp, CheckCircle2, XCircle, Wind, Stethoscope, Baby, Users, Wind as WindIcon, Microscope, Crown } from "lucide-react";
+import { Scan, Heart, Info, Eye, AlertTriangle, ChevronRight, Zap, Clock, Activity, TrendingUp, CheckCircle2, XCircle, Wind, Stethoscope, Baby, Users, Wind as WindIcon, Microscope, Crown, ChevronDown } from "lucide-react";
 import PedCHDCoach from "@/components/PedCHDCoach";
 import FetalCHDCoach from "@/components/FetalCHDCoach";
 import { HOCMScanCoachContent } from "@/pages/iheartecho/HOCMScanCoach";
@@ -581,36 +581,59 @@ const fetalViews = [
   },
 ];
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function TTEViewCard({ view, isSelected, onClick }: { view: typeof tteViews[0]; isSelected: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full text-left px-3 py-2.5 rounded-lg transition-all flex items-center gap-2"
-      style={isSelected ? { background: view.color, color: "white" } : { color: "#475569" }}
-    >
-      <span className="text-xs font-mono font-bold w-14 shrink-0"
-        style={isSelected ? { color: "rgba(255,255,255,0.85)" } : { color: view.color }}>
-        {view.abbr}
-      </span>
-      <span className="text-xs leading-tight">{view.name}</span>
-    </button>
-  );
-}
+// ─── Compact selectors ─────────────────────────────────────────────────────────
+type SelectorOption = { value: string; label: string; meta?: string };
 
-function FetalViewCard({ view, isSelected, onClick }: { view: typeof fetalViews[0]; isSelected: boolean; onClick: () => void }) {
+function CollapsibleSelector({
+  selectorId,
+  title,
+  supportingText,
+  currentLabel,
+  value,
+  options,
+  onValueChange,
+  children,
+}: {
+  selectorId: string;
+  title: string;
+  supportingText: string;
+  currentLabel: string;
+  value: string;
+  options: SelectorOption[];
+  onValueChange: (value: string) => void;
+  children?: React.ReactNode;
+}) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full text-left px-3 py-2.5 rounded-lg transition-all flex items-center gap-2"
-      style={isSelected ? { background: view.color, color: "white" } : { color: "#475569" }}
-    >
-      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
-        style={isSelected ? { background: "rgba(255,255,255,0.25)", color: "white" } : { background: view.color + "20", color: view.color }}>
-        {view.step}
-      </span>
-      <span className="text-xs leading-tight">{view.name}</span>
-    </button>
+    <details className="group overflow-hidden rounded-xl border border-[#189aa1]/25 bg-white shadow-sm">
+      <summary className="flex min-h-16 cursor-pointer list-none items-center gap-3 px-4 py-3 text-left hover:bg-[#f0fbfc] [&::-webkit-details-marker]:hidden">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-[#189aa1]/10">
+          <Scan className="h-5 w-5 text-[#189aa1]" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#189aa1]">{title}</p>
+          <p className="truncate text-sm font-bold text-gray-800">{currentLabel}</p>
+          <p className="text-xs text-gray-500">{supportingText}</p>
+        </div>
+        <ChevronDown className="h-5 w-5 flex-shrink-0 text-gray-500 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+      </summary>
+      <div className="border-t border-[#189aa1]/15 bg-[#f8fcfc] p-3">
+        <label htmlFor={selectorId} className="sr-only">{title}</label>
+        <select
+          id={selectorId}
+          aria-label={title}
+          value={value}
+          onChange={(event) => onValueChange(event.target.value)}
+          className="min-h-11 w-full rounded-lg border border-[#189aa1]/30 bg-white px-3 text-sm font-semibold text-gray-800 outline-none transition focus:border-[#189aa1] focus:ring-2 focus:ring-[#189aa1]/20"
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}{option.meta ? ` — ${option.meta}` : ""}
+            </option>
+          ))}
+        </select>
+        {children ? <div className="mt-3">{children}</div> : null}
+      </div>
+    </details>
   );
 }
 
@@ -1245,7 +1268,7 @@ export default function ScanCoach() {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
 
-        {/* Module Card Grid — hidden in editor preview mode */}
+        {/* Compact specialty selector — intentionally closed by default on desktop and mobile. */}
         {!_isPreviewMode && (() => {
           const tabNavMap: Record<string, { path: string; label: string }> = {
             tte: { path: "/tte", label: "TTE Navigator" },
@@ -1261,10 +1284,8 @@ export default function ScanCoach() {
             ice: { path: "/ice", label: "ICE Navigator" },
           };
           const tabMeta: Array<{ key: typeof activeTab; label: string; shortLabel: string; icon: React.ElementType; views: number; premium?: boolean }> = [
-            // ── Free tabs ──
             { key: "tte",      label: "Adult TTE",          shortLabel: "Adult TTE",         icon: Stethoscope, views: 10 },
             { key: "strain",   label: "Strain",             shortLabel: "Strain",            icon: Activity,    views: 4  },
-            // ── Premium tabs ──
             { key: "chd",      label: "Pediatric CHD",      shortLabel: "Pediatric CHD",     icon: Users,       views: 14, premium: true },
             { key: "fetal",    label: "Fetal Echo",         shortLabel: "Fetal Echo",        icon: Baby,        views: 13, premium: true },
             { key: "tee",      label: "TEE",                shortLabel: "TEE",               icon: Microscope,  views: 13, premium: true },
@@ -1275,46 +1296,27 @@ export default function ScanCoach() {
             { key: "diastolic",label: "Diastolic Function", shortLabel: "Diastolic",         icon: Wind,        views: 7,  premium: true },
             { key: "pulm",     label: "Pulmonary HTN & PE", shortLabel: "Pulm HTN & PE",     icon: Wind,        views: 8,  premium: true },
           ];
+          const activeModule = tabMeta.find((module) => module.key === activeTab) ?? tabMeta[0];
           const nav = tabNavMap[activeTab];
           return (
             <div className="mb-6">
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-4">
-                {tabMeta.map(({ key, label, icon: Icon, views, premium }) => {
-                  const isActive = activeTab === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setActiveTab(key)}
-                      className="relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center cursor-pointer"
-                      style={isActive
-                        ? { background: "#189aa1", borderColor: "#189aa1", color: "white" }
-                        : { background: "white", borderColor: "#e2e8f0", color: "#374151" }}
-                    >
-                      {premium && (
-                        <span className="absolute top-1.5 right-1.5 flex items-center justify-center w-4 h-4 rounded-full" style={{ background: isActive ? "rgba(255,255,255,0.25)" : "#fef3c7" }}>
-                          <Crown className="w-2.5 h-2.5" style={{ color: isActive ? "white" : "#d97706" }} />
-                        </span>
-                      )}
-                      <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={isActive
-                          ? { background: "rgba(255,255,255,0.2)" }
-                          : { background: "#189aa1" + "15" }}
-                      >
-                        <Icon className="w-5 h-5" style={{ color: isActive ? "white" : "#189aa1" }} />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold leading-tight" style={{ color: isActive ? "white" : "#1f2937" }}>{label}</div>
-                        <div className="text-[10px] mt-0.5" style={{ color: isActive ? "rgba(255,255,255,0.8)" : "#9ca3af" }}>{views} views</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              <CollapsibleSelector
+                selectorId="scancoach-specialty-selector"
+                title="ScanCoach specialty selector"
+                supportingText="Choose a specialty without covering the clinical guide."
+                currentLabel={activeModule?.label ?? "Choose a specialty"}
+                value={activeTab}
+                options={tabMeta.map((module) => ({
+                  value: module.key,
+                  label: module.label,
+                  meta: module.premium ? "Premium" : "Included",
+                }))}
+                onValueChange={(nextTab) => setActiveTab(nextTab as typeof activeTab)}
+              />
               {nav && (
-                <div className="flex justify-end">
+                <div className="mt-3 flex justify-end">
                   <Link href={nav.path}>
-                    <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold border transition-all hover:bg-[#189aa1]/5 cursor-pointer" style={{ borderColor: "#189aa1" + "40", color: "#189aa1" }}>
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-xs font-semibold transition-all hover:bg-[#189aa1]/5 cursor-pointer" style={{ borderColor: "#189aa1" + "40", color: "#189aa1" }}>
                       Go to {nav.label} <Stethoscope className="w-3.5 h-3.5" />
                     </span>
                   </Link>
@@ -1328,9 +1330,24 @@ export default function ScanCoach() {
         {activeTab === "tte" && (
           <BlurredOverlay type="login" featureName="Adult TTE ScanCoach" disabled={loading || isAuthenticated}><div>
 
-           <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-start">
-            {/* Detail panel — order-first on mobile so it appears at top */}
-            <div ref={tteDetailRef} className="lg:col-span-3 lg:order-2 order-1 space-y-4">
+           <div className="space-y-5">
+            <CollapsibleSelector
+              selectorId="tte-view-selector"
+              title="TTE view selector"
+              supportingText="10 standard acoustic windows"
+              currentLabel={selectedTTEMerged.name}
+              value={selectedTTE.id}
+              options={tteViews.map((view) => ({ value: view.id, label: `${view.abbr} — ${view.name}` }))}
+              onValueChange={(viewId) => {
+                const nextView = tteViews.find((view) => view.id === viewId);
+                if (nextView) {
+                  scrollOnTteChange.current = true;
+                  setSelectedTTE(nextView);
+                }
+              }}
+            />
+            {/* Clinical detail follows the selector on every viewport. */}
+            <div ref={tteDetailRef} className="space-y-4">
               {/* Header */}
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b" style={{ borderColor: selectedTTEMerged.color + "30", background: selectedTTEMerged.color + "08" }}>
@@ -1457,21 +1474,7 @@ export default function ScanCoach() {
                 <BillingCodesCard billing={TTE_BILLING[selectedTTEMerged.id]} accentColor={selectedTTEMerged.color} />
               )}
             </div>
-            {/* View list sidebar — sticky on desktop, above content on mobile */}
-            <div className="lg:col-span-1 lg:order-1 order-2 lg:sticky lg:top-4">
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>TTE Views</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">10 standard acoustic windows</p>
-                </div>
-                <div className="p-3 space-y-1 max-h-[calc(100vh-180px)] overflow-y-auto">
-                  {tteViews.map(v => (
-                    <TTEViewCard key={v.id} view={v} isSelected={selectedTTEMerged.id === v.id} onClick={() => setSelectedTTE(v)} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>{/* end TTE grid */}
+          </div>{/* end TTE selector and clinical detail */}
           {/* ─── ACUTE vs CHRONIC MR SECTION (collapsible, below TTE grid) ─── */}
           <div className="mt-6 space-y-4">
             {/* Section Header — clickable toggle */}
@@ -1980,9 +1983,26 @@ export default function ScanCoach() {
           !loading && !isAuthenticated
             ? <BlurredOverlay type="login" featureName="Fetal Echo ScanCoach">
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-start">
-            {/* Fetal detail panel — order-first on mobile so it appears at top */}
-            <div ref={fetalDetailRef} className="lg:col-span-3 lg:order-2 order-1 space-y-4">
+          <div className="space-y-5">
+            <CollapsibleSelector
+              selectorId="fetal-view-selector"
+              title="Fetal Echo view selector"
+              supportingText="13-view sweep sequence"
+              currentLabel={`${selectedFetal.step}. ${selectedFetal.name}`}
+              value={selectedFetal.id}
+              options={fetalViews.map((view) => ({ value: view.id, label: `${view.step}. ${view.name}` }))}
+              onValueChange={(viewId) => {
+                const nextView = fetalViews.find((view) => view.id === viewId);
+                if (nextView) {
+                  scrollOnFetalChange.current = true;
+                  setSelectedFetal(nextView);
+                }
+              }}
+            >
+              <img src={CDN.sweep} alt="Fetal echo sweep overview" className="max-h-32 w-full rounded-lg bg-gray-900 object-contain" />
+            </CollapsibleSelector>
+            {/* Clinical detail follows the selector on every viewport. */}
+            <div ref={fetalDetailRef} className="space-y-4">
               {/* Header */}
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b" style={{ borderColor: selectedFetal.color + "30", background: selectedFetal.color + "08" }}>
@@ -2117,24 +2137,6 @@ export default function ScanCoach() {
                 Clinical images © All About Ultrasound, Inc. / iHeartEcho™. Educational use only.
               </div>
             </div>
-            {/* View list sidebar — sticky on desktop */}
-            <div className="lg:col-span-1 lg:order-1 order-2 lg:sticky lg:top-4">
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Fetal Echo Views</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">13-view sweep sequence</p>
-                </div>
-                {/* Sweep overview image */}
-                <div className="p-2">
-                  <img src={CDN.sweep} alt="Fetal echo sweep overview" className="w-full rounded-lg object-contain bg-gray-900" style={{ maxHeight: "100px" }} />
-                </div>
-                <div className="p-3 space-y-1 max-h-[calc(100vh-300px)] overflow-y-auto">
-                  {fetalViews.map(v => (
-                    <FetalViewCard key={v.id} view={v} isSelected={selectedFetal.id === v.id} onClick={() => setSelectedFetal(v)} />
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
               </BlurredOverlay>
               : !loading && !isPremium
@@ -2147,9 +2149,26 @@ export default function ScanCoach() {
               </BlurredOverlay>
               : <>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-start">
-            {/* Fetal detail panel — order-first on mobile so it appears at top */}
-            <div ref={fetalDetailRef} className="lg:col-span-3 lg:order-2 order-1 space-y-4">
+          <div className="space-y-5">
+            <CollapsibleSelector
+              selectorId="fetal-view-selector"
+              title="Fetal Echo view selector"
+              supportingText="13-view sweep sequence"
+              currentLabel={`${selectedFetal.step}. ${selectedFetal.name}`}
+              value={selectedFetal.id}
+              options={fetalViews.map((view) => ({ value: view.id, label: `${view.step}. ${view.name}` }))}
+              onValueChange={(viewId) => {
+                const nextView = fetalViews.find((view) => view.id === viewId);
+                if (nextView) {
+                  scrollOnFetalChange.current = true;
+                  setSelectedFetal(nextView);
+                }
+              }}
+            >
+              <img src={CDN.sweep} alt="Fetal echo sweep overview" className="max-h-32 w-full rounded-lg bg-gray-900 object-contain" />
+            </CollapsibleSelector>
+            {/* Clinical detail follows the selector on every viewport. */}
+            <div ref={fetalDetailRef} className="space-y-4">
               {/* Header */}
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b" style={{ borderColor: selectedFetal.color + "30", background: selectedFetal.color + "08" }}>
@@ -2278,24 +2297,6 @@ export default function ScanCoach() {
               {/* Copyright */}
               <div className="text-xs text-gray-400 text-center py-2">
                 Clinical images © All About Ultrasound, Inc. / iHeartEcho™. Educational use only.
-              </div>
-            </div>
-            {/* View list sidebar — sticky on desktop */}
-            <div className="lg:col-span-1 lg:order-1 order-2 lg:sticky lg:top-4">
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <h3 className="font-bold text-sm text-gray-700" style={{ fontFamily: "Merriweather, serif" }}>Fetal Echo Views</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">13-view sweep sequence</p>
-                </div>
-                {/* Sweep overview image */}
-                <div className="p-2">
-                  <img src={CDN.sweep} alt="Fetal echo sweep overview" className="w-full rounded-lg object-contain bg-gray-900" style={{ maxHeight: "100px" }} />
-                </div>
-                <div className="p-3 space-y-1 max-h-[calc(100vh-300px)] overflow-y-auto">
-                  {fetalViews.map(v => (
-                    <FetalViewCard key={v.id} view={v} isSelected={selectedFetal.id === v.id} onClick={() => setSelectedFetal(v)} />
-                  ))}
-                </div>
               </div>
             </div>
           </div>
