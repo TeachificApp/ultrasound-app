@@ -11,11 +11,12 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Loader2, Heart, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { buildPasswordSetupSubmission } from "@shared/passwordSetupSubmission";
-
-const LOGO = import.meta.env.VITE_APP_LOGO as string;
+import { getAuthPageBrandName, getAuthPageLogoUrl } from "@/lib/authPageBrand";
 
 export default function ResetPassword() {
   const token = new URLSearchParams(window.location.search).get("token") ?? "";
+  const brandName = getAuthPageBrandName();
+  const logo = getAuthPageLogoUrl();
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -54,8 +55,8 @@ export default function ResetPassword() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex items-center gap-3 mb-10">
-          <img src={LOGO || "https://private-us-east-1.manuscdn.com/user_upload_by_module/session_file/310519663401463434/tMerpTNEMefRhZwO.png?Expires=1804389585&Signature=WUUmbeKd6gRL-5YievLbV1CH3uu0nlv-Re4ouPNZeR8Uaa5fZGvIpyzCfN4GeYzdNVN-L2Dfhpb6wP3tKMLML8tU2MU77LZNA0Db1Qt~FgBKmBrDM8f98IhyhaIIh3mcPdLcoP5aezbNBOluLkAKxGF1onaa3LNS33jvn6RdWOARg3rQF-iGyCG8t~MaJrqXCHCHnEQWkv8ww0KFZrIE6cKq-EgnS6NZ6Ugc~9fSwQmMSgxfKiJuZdqcca1LwferRwRh3oNdounneCfHfE~QI00U4T7~b0DybwkrOKG0VWDKwXiSGd2AgO7up05Jcgsq7v8V58dmlV9XRRUqXN~soA__&Key-Pair-Id=K2HSFNDJXOU9YS"} alt="All About Ultrasound™" className="w-10 h-10 object-contain" />
-          <div className="text-xl font-black" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>All About Ultrasound™</div>
+          <img src={logo} alt={`${brandName} logo`} className="w-10 h-10 object-contain" />
+          <div className="text-xl font-black" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>{brandName}</div>
         </div>
 
         {done ? (
@@ -78,7 +79,7 @@ export default function ResetPassword() {
         ) : (
           <>
             <h2 className="text-2xl font-black mb-2" style={{ fontFamily: "Merriweather, serif", color: "#0e1e2e" }}>Set new password</h2>
-            <p className="text-sm text-gray-500 mb-8">Choose a strong password for your All About Ultrasound™ account.</p>
+            <p className="text-sm text-gray-500 mb-8">Choose a strong password for your {brandName} account.</p>
 
             {!token && (
               <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">

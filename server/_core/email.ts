@@ -115,7 +115,7 @@ export function emailWrapper(
                 ${footerContext} ${bc.displayName}.
               </p>
               <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
-                All sales are final. &bull; <a href="https://app.allaboutultrasound.com/terms" style="color:${bc.primaryColor};text-decoration:underline;" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                All sales are final. &bull; <a href="${bc.appUrl}/terms" style="color:${bc.primaryColor};text-decoration:underline;" target="_blank" rel="noopener noreferrer">Terms of Service</a>
               </p>
             </td>
           </tr>

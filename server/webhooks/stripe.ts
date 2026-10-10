@@ -33,6 +33,7 @@ import { BRAND_PREMIUM_TRIAL_DAYS, hasBrandMembershipTrial, isBrandMembershipTri
 import { grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 import { persistLmsSubscriptionInvoice } from "../lib/lmsSubscriptionReconciliation";
 import { grantBundle } from "../lib/membershipFulfillment";
+import { getBrandDisplayConfig } from "@shared/brands";
 
 // Stripe webhook secret — optional but strongly recommended in production.
 // Resolve at request time so a rotated secret takes effect without a module reload.
@@ -1021,8 +1022,9 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
   // \u2500\u2500 Welcome / set-password email for new accounts \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   if (isNewUser && resetToken && customerEmail) {
     try {
-      const baseUrl = "https://app.allaboutultrasound.com";
-      const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
+      const brandMode = brand === "iheartecho" ? "iheartecho" : "aaus";
+      const baseUrl = getBrandDisplayConfig(brandMode).appUrl;
+      const setPasswordUrl = `${baseUrl}/reset-password?token=${resetToken}`;
       const firstName = (customerName || customerEmail).split(" ")[0] || "there";
       let accessTokenForEmail: string | null = null;
       try {
@@ -1035,7 +1037,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
       const emailContent = buildPasswordResetEmail({
         firstName,
         resetUrl: setPasswordUrl,
-        brandMode: brand === "iheartecho" ? "iheartecho" : "aaus",
+        brandMode,
         purpose: "welcome",
         expiresInLabel: "7 days",
       });
@@ -1052,7 +1054,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
         to: { name: customerName || firstName, email: customerEmail },
         subject: `Your ${brandLabel} Premium Membership is ready`,
         htmlBody: enhancedBody,
-        previewText: `Access your ${brandLabel} premium membership on All About Ultrasound`,
+        previewText: `Access your ${brandLabel} premium membership on ${getBrandDisplayConfig(brandMode).shortName}`,
       });
       console.log(`[Stripe] Brand membership: welcome email sent to new user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
@@ -1061,7 +1063,8 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
   } else if (customerEmail) {
     // Existing user — send a purchase confirmation email with access link
     try {
-      const baseUrl = "https://app.allaboutultrasound.com";
+      const brandMode = brand === "iheartecho" ? "iheartecho" : "aaus";
+      const baseUrl = getBrandDisplayConfig(brandMode).appUrl;
       const firstName = (customerName || customerEmail).split(" ")[0] || "there";
       let accessToken: string | null = null;
       try { accessToken = await getOrCreateAccessToken(userId); } catch { /* non-fatal */ }
@@ -1083,12 +1086,12 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
           <p style="margin:0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
         </div>
         <p style="margin:16px 0 0;font-size:13px;color:#64748b;">If you have any questions, reply to this email or contact support.</p>
-      `, brand === "iheartecho" ? "iheartecho" : "aaus");
+      `, brandMode);
       await sendEmail({
         to: { name: customerName || firstName, email: customerEmail },
         subject: `Your ${planLabel} is ready`,
         htmlBody,
-        previewText: `Access your ${planLabel} on All About Ultrasound`,
+        previewText: `Access your ${planLabel} on ${getBrandDisplayConfig(brandMode).shortName}`,
       });
       console.log(`[Stripe] Brand membership: access email sent to existing user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
