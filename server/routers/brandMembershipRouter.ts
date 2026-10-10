@@ -16,9 +16,10 @@ import { STANDARD_STRIPE_CHECKOUT_OPTIONS } from "./checkoutTermsHelper";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
+import { getDb, getUserByEmail } from "../db";
 import { brandMemberships } from "../../drizzle/schema";
 import { and, eq, desc, inArray } from "drizzle-orm";
+import { createHash } from "crypto";
 import type { Brand } from "../../shared/brands";
 import { BRAND_PREMIUM_TRIAL_DAYS, hasPriorStripeBrandMembership } from "../lib/brandMembershipTrial";
 
@@ -221,6 +222,116 @@ async function buildDualAnnualLineItem(stripe: StripeClient) {
   };
 }
 
+type GuestBrandCheckoutInput = {
+  email: string;
+  name: string;
+  origin: string;
+  interval: "monthly" | "annual";
+  promoCode?: string;
+};
+
+/**
+ * Creates a hosted Stripe Checkout Session without requiring a platform login.
+ * We deliberately do not provision a local account before a payment completes:
+ * the webhook resolves an existing account or creates one from the verified
+ * Stripe checkout email, then delivers an access / set-password email.
+ */
+async function createGuestBrandCheckoutSession(
+  ctx: { brand: Brand },
+  input: GuestBrandCheckoutInput,
+  kind: "single" | "dual",
+) {
+  assertStripeConfigured();
+  const stripe = getStripeClient();
+  const email = input.email.trim().toLowerCase();
+  const name = input.name.trim();
+  const existingUser = await getUserByEmail(email);
+  const existingUserId = existingUser?.id ?? null;
+  const isTrialEligible = existingUserId
+    ? await isEligibleForBrandPremiumTrial(existingUserId)
+    : true;
+
+  let discounts: Array<{ promotion_code: string }> | undefined;
+  if (input.promoCode) {
+    try {
+      const promoCodes = await stripe.promotionCodes.list({
+        code: input.promoCode.toUpperCase(),
+        active: true,
+        limit: 1,
+      });
+      if (promoCodes.data[0]) discounts = [{ promotion_code: promoCodes.data[0].id }];
+    } catch { /* Stripe will still accept a checkout without an invalid promo code. */ }
+  }
+  const promoOpts = discounts ? { discounts } : { allow_promotion_codes: true };
+  const userMetadata = existingUserId ? { user_id: String(existingUserId) } : {};
+  const intervalLabel = input.interval === "annual" ? "Annual" : "Monthly";
+  const idempotencyIdentity = createHash("sha256").update(email).digest("hex").slice(0, 24);
+  const date = new Date().toISOString().slice(0, 10);
+
+  if (kind === "single") {
+    const brand = ctx.brand;
+    const productConfig = BRAND_PRODUCTS[brand];
+    const lineItem = await buildBrandRecurringLineItem(stripe, productConfig, brand, input.interval);
+    const metadata = {
+      ...userMetadata,
+      customer_email: email,
+      customer_name: name,
+      brand,
+      type: "brand_membership_upgrade",
+      interval: input.interval,
+      ...(isTrialEligible ? { trial_days: String(BRAND_PREMIUM_TRIAL_DAYS) } : {}),
+    };
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      customer_email: email,
+      ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
+      ...promoOpts,
+      line_items: [lineItem],
+      subscription_data: {
+        description: `${productConfig.name} — ${intervalLabel} Subscription — Initial`,
+        ...(isTrialEligible ? { trial_period_days: BRAND_PREMIUM_TRIAL_DAYS } : {}),
+        metadata,
+      },
+      success_url: `${input.origin}/upgrade-success?brand=${brand}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${input.origin}/premium`,
+      ...(existingUserId ? { client_reference_id: String(existingUserId) } : {}),
+      metadata,
+    }, { idempotencyKey: `guest-brand-${brand}-${input.interval}-${idempotencyIdentity}-${date}` });
+    if (!session.url) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
+    return { checkoutUrl: session.url, trialDays: isTrialEligible ? BRAND_PREMIUM_TRIAL_DAYS : 0 };
+  }
+
+  const lineItem = input.interval === "annual"
+    ? await buildDualAnnualLineItem(stripe)
+    : await buildDualMonthlyLineItem(stripe);
+  const metadata = {
+    ...userMetadata,
+    customer_email: email,
+    customer_name: name,
+    type: "dual_membership",
+    interval: input.interval,
+    ...(isTrialEligible ? { trial_days: String(BRAND_PREMIUM_TRIAL_DAYS) } : {}),
+  };
+  const session = await stripe.checkout.sessions.create({
+    mode: "subscription",
+    customer_email: email,
+    ...STANDARD_STRIPE_CHECKOUT_OPTIONS,
+    ...promoOpts,
+    line_items: [lineItem],
+    subscription_data: {
+      description: `${DUAL_MEMBERSHIP_PRODUCT.name} — ${intervalLabel} Subscription — Initial`,
+      ...(isTrialEligible ? { trial_period_days: BRAND_PREMIUM_TRIAL_DAYS } : {}),
+      metadata,
+    },
+    success_url: `${input.origin}/upgrade-success?dual=1&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${input.origin}/premium`,
+    ...(existingUserId ? { client_reference_id: String(existingUserId) } : {}),
+    metadata,
+  }, { idempotencyKey: `guest-dual-${input.interval}-${idempotencyIdentity}-${date}` });
+  if (!session.url) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create checkout session" });
+  return { checkoutUrl: session.url, trialDays: isTrialEligible ? BRAND_PREMIUM_TRIAL_DAYS : 0 };
+}
+
 export const brandMembershipRouter = router({
   /**
    * Get the current user's brand membership status for the detected brand.
@@ -261,6 +372,28 @@ export const brandMembershipRouter = router({
       source: membership.source,
     };
   }),
+
+  /**
+   * Public app Premium checkout. The buyer supplies their intended account
+   * email before Stripe opens; checkout completion creates or links that
+   * account and delivers access by email. No pre-existing sign-in is required.
+   */
+  createGuestCheckout: publicProcedure
+    .input(z.object({
+      name: z.string().trim().min(1).max(200),
+      email: z.string().trim().email(),
+      origin: z.string().url(),
+      plan: z.enum(["single", "dual"]),
+      interval: z.enum(["monthly", "annual"]),
+      promoCode: z.string().trim().max(100).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await createGuestBrandCheckoutSession(ctx, input, input.plan);
+      } catch (err) {
+        wrapStripeCheckoutError(err);
+      }
+    }),
 
   /**
    * Create a Stripe Checkout session for brand premium upgrade.

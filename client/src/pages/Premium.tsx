@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import Layout from "@/components/Layout";
@@ -131,6 +132,11 @@ export default function Premium() {
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState<string | null>(null);
+  const [guestCheckoutOpen, setGuestCheckoutOpen] = useState(false);
+  const [guestName, setGuestName] = useState("");
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestPlan, setGuestPlan] = useState<"single" | "dual">("single");
+  const [guestInterval, setGuestInterval] = useState<"monthly" | "annual">("annual");
 
   // Team inquiry form state
   const [teamFormOpen, setTeamFormOpen] = useState(false);
@@ -214,6 +220,20 @@ export default function Premium() {
     onError: handleCheckoutError,
   });
 
+  const guestCheckout = trpc.brandMembership.createGuestCheckout.useMutation({
+    onSuccess: (data) => {
+      setGuestCheckoutOpen(false);
+      if (data.checkoutUrl) {
+        // A top-level navigation is more reliable than a delayed pop-up after
+        // submitting the identity form, especially on mobile browsers.
+        window.location.assign(data.checkoutUrl);
+      } else {
+        toast.error("Checkout failed — no payment URL returned. Please try again.");
+      }
+    },
+    onError: handleCheckoutError,
+  });
+
   const checkAndSync = trpc.premium.checkAndSync.useMutation({
     onSuccess: (data) => {
       setSyncMessage(data.message);
@@ -245,6 +265,27 @@ export default function Premium() {
   const loading = authLoading || statusLoading;
   const { runGuarded, isGuarded } = useCheckoutClickGuard();
 
+  const openGuestCheckout = (plan: "single" | "dual", interval: "monthly" | "annual") => {
+    setGuestPlan(plan);
+    setGuestInterval(interval);
+    setGuestName("");
+    setGuestEmail("");
+    setGuestCheckoutOpen(true);
+  };
+
+  const submitGuestCheckout = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!guestName.trim() || !guestEmail.trim()) return;
+    guestCheckout.mutate({
+      name: guestName.trim(),
+      email: guestEmail.trim(),
+      plan: guestPlan,
+      interval: guestInterval,
+      origin: window.location.origin,
+      promoCode: promoCode ?? undefined,
+    });
+  };
+
   // ─── CTA button helper ─────────────────────────────────────────────────────
   function CheckoutBtn({
     label, onPay, isPending, variant = "teal",
@@ -275,13 +316,29 @@ export default function Premium() {
     );
   }
 
-  function SignInBtn() {
+  function GuestCheckoutBtn({
+    label,
+    plan,
+    interval,
+    variant = "teal",
+  }: {
+    label: string;
+    plan: "single" | "dual";
+    interval: "monthly" | "annual";
+    variant?: "teal" | "amber";
+  }) {
+    const style = variant === "amber"
+      ? { background: "linear-gradient(90deg, #189aa1, #f59e0b)" }
+      : undefined;
     return (
-      <a href="/login">
-        <Button className="flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-normal rounded-xl bg-[#189aa1] px-3 py-2.5 text-center text-sm font-bold leading-tight text-white hover:bg-[#147a80]">
-          Sign In to Get Started
-        </Button>
-      </a>
+      <Button
+        onClick={() => runGuarded(() => openGuestCheckout(plan, interval))}
+        disabled={isGuarded || guestCheckout.isPending}
+        className="flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-normal rounded-xl bg-[#189aa1] px-3 py-2.5 text-center text-sm font-bold leading-tight text-white hover:bg-[#147a80]"
+        style={style}
+      >
+        <Crown className="h-4 w-4 shrink-0" />{label}
+      </Button>
     );
   }
 
@@ -342,12 +399,14 @@ export default function Premium() {
                     <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
                   </Button>
                 ) : (
-                  <a href="/login">
-                    <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-8 py-2.5 text-sm rounded-xl w-full sm:w-auto">
-                      Sign In to Get Started
-                      <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                    </Button>
-                  </a>
+                  <Button
+                    onClick={() => runGuarded(() => openGuestCheckout("single", "annual"))}
+                    disabled={isGuarded || guestCheckout.isPending}
+                    className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-8 py-2.5 text-sm rounded-xl w-full sm:w-auto"
+                  >
+                    {PREMIUM_TRIAL_CTA} — then $99.97/yr
+                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                  </Button>
                 )}
               </div>
             )}
@@ -387,7 +446,11 @@ export default function Premium() {
                       variant="teal"
                     />
                   ) : (
-                    <SignInBtn />
+                    <GuestCheckoutBtn
+                      label={`${PREMIUM_TRIAL_CTA} — then $99.97/yr`}
+                      plan="single"
+                      interval="annual"
+                    />
                   )}
                 </div>
               </div>
@@ -416,7 +479,11 @@ export default function Premium() {
                       variant="teal"
                     />
                   ) : (
-                    <SignInBtn />
+                    <GuestCheckoutBtn
+                      label={`${PREMIUM_TRIAL_CTA} — then $9.97/mo`}
+                      plan="single"
+                      interval="monthly"
+                    />
                   )}
                 </div>
               </div>
@@ -439,14 +506,19 @@ export default function Premium() {
                       Checking…
                     </div>
                   ) : user ? (
-                    <CheckoutBtn
+                  <CheckoutBtn
                       label={`${PREMIUM_TRIAL_CTA} — then $12.99/mo`}
                       onPay={() => dualMonthly.mutate({ origin: window.location.origin })}
                       isPending={dualMonthly.isPending}
                       variant="amber"
                     />
                   ) : (
-                    <SignInBtn />
+                    <GuestCheckoutBtn
+                      label={`${PREMIUM_TRIAL_CTA} — then $12.99/mo`}
+                      plan="dual"
+                      interval="monthly"
+                      variant="amber"
+                    />
                   )}
                 </div>
               </div>
@@ -491,12 +563,12 @@ export default function Premium() {
                       )}
                     </Button>
                   ) : (
-                    <a href="/login">
-                      <Button className="flex min-h-12 w-full items-center justify-center gap-1.5 whitespace-normal rounded-xl px-3 py-2.5 text-center text-sm font-bold leading-tight text-white"
-                        style={{ background: "linear-gradient(90deg, #189aa1, #f59e0b)" }}>
-                        Sign In to Get Started
-                      </Button>
-                    </a>
+                    <GuestCheckoutBtn
+                      label={`${PREMIUM_TRIAL_CTA} — Both Apps $147/yr`}
+                      plan="dual"
+                      interval="annual"
+                      variant="amber"
+                    />
                   )}
                 </div>
               </div>
@@ -733,12 +805,14 @@ export default function Premium() {
                   </Button>
                 </div>
               ) : (
-                <a href="/login">
-                  <Button className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-10 py-3 text-base rounded-xl">
-                    Sign In to Get Started
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </a>
+                <Button
+                  onClick={() => runGuarded(() => openGuestCheckout("single", "annual"))}
+                  disabled={isGuarded || guestCheckout.isPending}
+                  className="bg-[#189aa1] hover:bg-[#147a80] text-white font-bold px-10 py-3 text-base rounded-xl"
+                >
+                  {PREMIUM_TRIAL_CTA} — then $99.97/yr
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
               )}
             </div>
             <p className="text-gray-400 text-xs">
@@ -747,6 +821,65 @@ export default function Premium() {
           </div>
         )}
       </div>
+
+      <Dialog open={guestCheckoutOpen} onOpenChange={setGuestCheckoutOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#0e4a50]">Start Premium — no sign-in required</DialogTitle>
+            <DialogDescription>
+              {guestPlan === "dual"
+                ? `Enter the email you want to use for UltrasoundAssist™ and EchoAssist™ access. ${PREMIUM_TRIAL_LABEL} is included for eligible new members.`
+                : `Enter the email you want to use for ${appName} access. ${PREMIUM_TRIAL_LABEL} is included for eligible new members.`}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitGuestCheckout} className="mt-2 space-y-4">
+            <div className="space-y-1">
+              <label htmlFor="premium-guest-name" className="text-sm font-medium text-gray-700">
+                Full name <span className="text-red-500">*</span>
+              </label>
+              <Input
+                id="premium-guest-name"
+                autoFocus
+                value={guestName}
+                onChange={(event) => setGuestName(event.target.value)}
+                placeholder="Jane Smith"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="premium-guest-email" className="text-sm font-medium text-gray-700">
+                Email address <span className="text-red-500">*</span>
+              </label>
+              <Input
+                id="premium-guest-email"
+                type="email"
+                autoComplete="email"
+                value={guestEmail}
+                onChange={(event) => setGuestEmail(event.target.value)}
+                placeholder="jane@example.com"
+                required
+              />
+            </div>
+            <div className="rounded-lg border border-[#189aa1]/20 bg-[#f0fbfc] px-3 py-2.5 text-xs leading-relaxed text-slate-600">
+              We use this email for your payment and access. After checkout, we securely create or link your account and email your private access instructions. You do not need to sign in first.
+            </div>
+            <Button
+              type="submit"
+              disabled={guestCheckout.isPending || !guestName.trim() || !guestEmail.trim()}
+              className="w-full bg-[#189aa1] font-bold text-white hover:bg-[#147a80]"
+            >
+              {guestCheckout.isPending ? (
+                <><div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Preparing secure checkout…</>
+              ) : (
+                <><Shield className="mr-2 h-4 w-4" />Continue to secure checkout</>
+              )}
+            </Button>
+            <p className="text-center text-xs text-gray-400">
+              Already have an account? <a href="/login" className="font-medium text-[#189aa1] hover:underline">Sign in instead</a>.
+            </p>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
