@@ -9,7 +9,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import {
   Activity, Baby, Scan, TrendingUp, BookOpen, Crown, Lock,
-  Stethoscope, Brain, Bone, Circle, Zap, Search, Syringe, Calculator
+  Stethoscope, Brain, Bone, Circle, Zap, Search, Syringe, Calculator, ChevronDown
 } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
 import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
@@ -257,8 +257,59 @@ export default function UltrasoundAssistHub() {
         </div>
       </div>
 
+      {/* Mobile topic selector: keep the complete Assist catalogue available
+          without forcing learners to scroll past the full card grid first. */}
+      <div className="container py-4 md:hidden">
+        <details className="group overflow-hidden rounded-xl border border-[#189aa1]/25 bg-white shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 text-left hover:bg-[#f0fbfc] [&::-webkit-details-marker]:hidden">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: "#189aa115" }}>
+              <Stethoscope className="h-5 w-5 text-[#189aa1]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#189aa1]">UltrasoundAssist™ topics</p>
+              <p className="text-sm font-bold text-gray-800">Choose a protocol, ScanCoach, or Navigator</p>
+            </div>
+            <ChevronDown className="h-5 w-5 flex-shrink-0 text-gray-500 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <nav aria-label="UltrasoundAssist topics" className="border-t border-[#189aa1]/15 bg-[#f8fcfc] p-2">
+            <div className="grid grid-cols-1 gap-1">
+              {specialties.map((spec) => {
+                const Icon = spec.icon;
+                const navLocked = !spec.navigatorFree && !isPremium;
+                return navLocked ? (
+                  <button
+                    key={spec.path}
+                    type="button"
+                    onClick={() => setUpgradeModal({ title: spec.title, type: "navigator" })}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white"
+                  >
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-[#189aa1]/10">
+                      <Icon className="h-4 w-4 text-[#189aa1]" />
+                    </div>
+                    <span className="min-w-0 flex-1 text-sm font-semibold text-gray-800">{spec.title}</span>
+                    <span className="flex-shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700"><Crown className="mr-0.5 inline h-3 w-3" />Premium</span>
+                  </button>
+                ) : (
+                  <Link
+                    key={spec.path}
+                    href={spec.path}
+                    className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white"
+                  >
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-[#189aa1]/10">
+                      <Icon className="h-4 w-4 text-[#189aa1]" />
+                    </div>
+                    <span className="min-w-0 flex-1 text-sm font-semibold text-gray-800">{spec.title}</span>
+                    <span className="flex-shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Available</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        </details>
+      </div>
+
       {/* Unified Specialty Grid */}
-      <div className="container py-8">
+      <div className="container hidden py-8 md:block">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {specialties.map((spec, i) => {
             const Icon = spec.icon;

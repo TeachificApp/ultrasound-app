@@ -11,7 +11,7 @@ import { Link } from "wouter";
 import Layout from "@/components/Layout";
 import {
   Stethoscope, Microscope, Zap, Users, Baby, Heart,
-  Cpu, BarChart3, ArrowRight, Droplets, Activity, Wind, Crown, Lock, Shield, Radio, BookOpen, CircuitBoard
+  Cpu, BarChart3, ArrowRight, Droplets, Activity, Wind, Crown, Lock, Shield, Radio, BookOpen, CircuitBoard, ChevronDown
 } from "lucide-react";
 import { usePremium } from "@/hooks/usePremium";
 import { PREMIUM_TRIAL_CTA, PREMIUM_TRIAL_NOTICE } from "@/lib/premiumTrial";
@@ -112,8 +112,44 @@ export default function EchoAssistHub() {
         </div>
       </div>
 
+      {/* Mobile topic selector: keep the full specialty catalogue available
+          without placing twelve large cards before the clinical content. */}
+      <div className="container py-4 md:hidden">
+        <details className="group overflow-hidden rounded-xl border border-[#189aa1]/25 bg-white shadow-sm">
+          <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 text-left hover:bg-[#f0fbfc] [&::-webkit-details-marker]:hidden">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg" style={{ background: BRAND + "15" }}>
+              <Stethoscope className="h-5 w-5" style={{ color: BRAND }} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: BRAND }}>EchoAssist™ topics</p>
+              <p className="text-sm font-bold text-gray-800">Choose a protocol, ScanCoach, or Navigator</p>
+            </div>
+            <ChevronDown className="h-5 w-5 flex-shrink-0 text-gray-500 transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <nav aria-label="EchoAssist topics" className="border-t border-[#189aa1]/15 bg-[#f8fcfc] p-2">
+            <div className="grid grid-cols-1 gap-1">
+              {specialties.map(({ path, icon: Icon, title, badge, free }) => (
+                <Link
+                  key={path}
+                  href={path}
+                  className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white"
+                >
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md" style={{ background: BRAND + "14" }}>
+                    <Icon className="h-4 w-4" style={{ color: BRAND }} />
+                  </div>
+                  <span className="min-w-0 flex-1 text-sm font-semibold text-gray-800">{title}</span>
+                  <span className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${free ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                    {free ? "Free" : <><Crown className="mr-0.5 inline h-3 w-3" />Premium</>}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </nav>
+        </details>
+      </div>
+
       {/* Specialty Grid */}
-      <div className="container py-8">
+      <div className="container hidden py-8 md:block">
         {/* Free section */}
         <div className="mb-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
