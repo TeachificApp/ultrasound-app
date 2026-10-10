@@ -1658,6 +1658,11 @@ function MarketingSiteRouter() {
     <Suspense fallback={pageFallback}>
       <Switch>
         <Route path="/login" component={Login} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/magic-link" component={MagicLinkRequest} />
+        <Route path="/auth/magic" component={MagicLinkCallback} />
+        <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/admin/marketing-site">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSiteAdmin /></RoleGuard>}</Route>
         <Route component={PublicMarketingSitePage} />
       </Switch>
@@ -1676,6 +1681,15 @@ function PublicWebsiteRouter() {
   return (
     <Suspense fallback={pageFallback}>
       <Switch>
+        {/* Password and magic-link flows must resolve before the marketing
+            catch-all so account setup works from either public brand domain. */}
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={Register} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/magic-link" component={MagicLinkRequest} />
+        <Route path="/auth/magic" component={MagicLinkCallback} />
+        <Route path="/auth/access" component={AccessLinkCallback} />
         {/* Public funnels share the `.net` marketing host but must take precedence
             over the editable site catch-all, otherwise every funnel slug renders
             the marketing site's 404 page. */}

@@ -147,6 +147,20 @@ export async function createContext(
     brandMode = detectBrandMode(hostname, defaultBrand);
   }
 
+  // Brand memberships are the source of truth for app Premium access. A
+  // single-brand subscription must unlock only its own app; dual subscriptions
+  // have paid membership rows for both brands. Preserve the old user-level
+  // flag solely for accounts that predate brand membership rows.
+  if (user && !user.isCron && user.role !== "admin") {
+    const { resolveAppPremiumEntitlement } = await import("../lib/appPremiumEntitlement");
+    const resolvedPremium = await resolveAppPremiumEntitlement({
+      userId: user.id,
+      brand,
+      legacyIsPremium: user.isPremium === true,
+    });
+    user = { ...user, isPremium: resolvedPremium };
+  }
+
   return {
     req: opts.req,
     res: opts.res,

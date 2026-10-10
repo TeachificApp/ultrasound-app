@@ -20,6 +20,7 @@ import { getUserByEmail, getUserById, setPremiumStatus } from "../db";
 import { getDb } from "../db";
 import { brandMemberships } from "../../drizzle/schema";
 import { and, eq, inArray } from "drizzle-orm";
+import { resolveAppPremiumEntitlement } from "../lib/appPremiumEntitlement";
 
 /**
  * Check if a user has active premium via brandMemberships table (Stripe-based).
@@ -94,9 +95,11 @@ export const premiumRouter = router({
         manageUrl: "/premium",
       };
     }
-    // Check brandMemberships (Stripe-based)
-    const hasBrandPremium = await checkStripePremiumByUserId(ctx.user.id, ctx.brand ?? "aaus");
-    const isPremium = hasBrandPremium || user.isPremium;
+    const isPremium = await resolveAppPremiumEntitlement({
+      userId: ctx.user.id,
+      brand: ctx.brand ?? "aaus",
+      legacyIsPremium: user.isPremium === true,
+    });
     return {
       isPremium,
       premiumGrantedAt: user.premiumGrantedAt ?? null,
@@ -117,28 +120,15 @@ export const premiumRouter = router({
     if (!user.email) {
       return { isPremium: false, changed: false, message: "No email on account" };
     }
-    // If already premium in DB, confirm it
-    if (user.isPremium) {
-      return {
-        isPremium: true,
-        changed: false,
-        message: "Premium access is active",
-      };
-    }
-    // Check brandMemberships (Stripe-based)
-    const hasPremium = await checkStripePremiumByUserId(ctx.user.id, ctx.brand ?? "aaus");
-    const changed = hasPremium !== user.isPremium;
-    if (changed && hasPremium) {
-      await setPremiumStatus(user.id, true, "stripe");
-    }
+    const hasPremium = await resolveAppPremiumEntitlement({
+      userId: ctx.user.id,
+      brand: ctx.brand ?? "aaus",
+      legacyIsPremium: user.isPremium === true,
+    });
     return {
       isPremium: hasPremium,
-      changed,
-      message: changed
-        ? hasPremium
-          ? "Premium access granted — welcome!"
-          : "Premium access has been removed"
-        : hasPremium
+      changed: false,
+      message: hasPremium
         ? "Premium access is active"
         : "No active premium membership found. Visit /premium to subscribe.",
     };

@@ -305,8 +305,18 @@ export async function setPremiumStatus(
 
 export async function updateUserPassword(userId: number, newHash: string): Promise<void> {
   const db = await getDb();
-  if (!db) return;
+  if (!db) throw new Error("Database unavailable while saving the password");
   await db.update(users).set({ passwordHash: newHash }).where(eq(users.id, userId));
+  // Do not report a completed reset unless the exact hashed credential is
+  // readable from the same production database afterward.
+  const [saved] = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (saved?.passwordHash !== newHash) {
+    throw new Error("Password could not be verified after saving");
+  }
 }
 
 export async function setPendingEmail(

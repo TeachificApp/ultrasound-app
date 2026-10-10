@@ -248,30 +248,16 @@ export const appRouter = router({
           }
         }
       }
-      // Derive isPremium from both the DB flag and role-based premium access
+      // ctx.user.isPremium is resolved by the request context from the current
+      // app's subscription. Roles remain an explicit internal-access override.
       const PREMIUM_ROLES = new Set(["premium_user", "diy_user", "diy_admin", "platform_admin", "platform_owner"]);
       const isPremiumByRole = roles.some(r => PREMIUM_ROLES.has(r));
-      const isPremium = (fullUser?.isPremium ?? false) || isPremiumByRole;
-      // Check brand-specific premium membership
-      let brandPremium = false;
-      try {
-        const { brandMemberships } = await import("../drizzle/schema");
-        const { and, eq } = await import("drizzle-orm");
-        const brandDb = await (await import("./db")).getDb();
-        if (brandDb) {
-          const brand = opts.ctx.brand;
-          const { inArray } = await import("drizzle-orm");
-          const [membership] = await brandDb.select().from(brandMemberships)
-            .where(and(
-              eq(brandMemberships.userId, opts.ctx.user.id),
-              eq(brandMemberships.brand, brand),
-              inArray(brandMemberships.tier, ["premium", "lifetime"]),
-              eq(brandMemberships.status, "active")
-            ))
-            .limit(1);
-          brandPremium = !!membership;
-        }
-      } catch { /* ignore brand membership check failures */ }
+      const { resolveExplicitBrandPremium } = await import("./lib/appPremiumEntitlement");
+      const brandPremium = await resolveExplicitBrandPremium({
+        userId: opts.ctx.user.id,
+        brand: opts.ctx.brand,
+      });
+      const isPremium = opts.ctx.user.isPremium === true || isPremiumByRole;
       // Include demo mode metadata if active
       let demoModeInfo: { demoMode: true; realAdminId: number; realAdminName: string | null } | { demoMode: false } = { demoMode: false };
       if (opts.ctx.demoMode && opts.ctx.realAdminId) {
@@ -288,7 +274,7 @@ export const appRouter = router({
         lastName: fullUser?.lastName ?? (opts.ctx.user as any).lastName ?? null,
         pendingEmail: fullUser?.pendingEmail ?? null,
         appRoles: roles,
-        isPremium: isPremium || brandPremium,
+        isPremium,
         brandPremium,
         brand: opts.ctx.brand,
         communityRole: fullUser?.communityRole ?? "member",
