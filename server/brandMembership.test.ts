@@ -40,6 +40,10 @@ describe("Brand Mode Detection", () => {
     expect(detectBrandMode("learn.allaboutultrasound.com")).toBe("combined");
   });
 
+  it("returns 'combined' mode for learn.iheartecho.com", () => {
+    expect(detectBrandMode("learn.iheartecho.com")).toBe("combined");
+  });
+
   it("returns 'combined' mode for members.allaboutultrasound.com", () => {
     expect(detectBrandMode("members.allaboutultrasound.com")).toBe("combined");
   });
@@ -70,9 +74,9 @@ describe("Brand Display Config", () => {
 
   it("returns combined config for combined mode", () => {
     const config = getBrandDisplayConfig("combined");
-    expect(config.displayName).toContain("All About Ultrasound");
+    expect(config.displayName).toContain("All About Ultrasound™");
     expect(config.displayName).toContain("iHeartEcho™");
-    expect(config.senderName).toContain("All About Ultrasound");
+    expect(config.senderName).toBe("All About Ultrasound™ | iHeartEcho™");
   });
 });
 

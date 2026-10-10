@@ -70,6 +70,38 @@ describe("email provider config", () => {
     expect(sender.email).toBe("smtp@example.com");
     expect(sender.name).toBe("SMTP Sender");
   });
+
+  it("uses the requested iHeartEcho sender name instead of a global provider name", () => {
+    process.env.EMAIL_PROVIDER = "sendgrid";
+    process.env.SENDGRID_API_KEY = "SG.test";
+    process.env.SENDGRID_FROM_EMAIL = "transactional@example.com";
+    process.env.SENDGRID_FROM_NAME = "All About Ultrasound™";
+
+    const sender = resolveEmailSender({ brandMode: "iheartecho" });
+
+    expect(sender.email).toBe("transactional@example.com");
+    expect(sender.name).toBe("iHeartEcho™");
+  });
+
+  it("uses the combined sender name for Learn email on either Learn domain", () => {
+    process.env.EMAIL_PROVIDER = "sendgrid";
+    process.env.SENDGRID_API_KEY = "SG.test";
+    process.env.SENDGRID_FROM_NAME = "All About Ultrasound™";
+
+    const sender = resolveEmailSender({ brandMode: "combined" });
+
+    expect(sender.name).toBe("All About Ultrasound™ | iHeartEcho™");
+  });
+
+  it("keeps an explicit campaign sender name as the final override", () => {
+    process.env.EMAIL_PROVIDER = "sendgrid";
+    process.env.SENDGRID_API_KEY = "SG.test";
+    process.env.SENDGRID_FROM_NAME = "All About Ultrasound™";
+
+    const sender = resolveEmailSender({ brandMode: "iheartecho", fromName: "iHeartEcho CME Team" });
+
+    expect(sender.name).toBe("iHeartEcho CME Team");
+  });
 });
 
 describe("sendTransactionalEmail", () => {
@@ -104,6 +136,30 @@ describe("sendTransactionalEmail", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.sendgrid.com/v3/mail/send");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer SG.test-key");
+  });
+
+  it("sends iHeartEcho account email with the iHeartEcho mailbox display name", async () => {
+    process.env.EMAIL_PROVIDER = "sendgrid";
+    process.env.SENDGRID_API_KEY = "SG.test-key";
+    process.env.SENDGRID_FROM_EMAIL = "noreply@example.com";
+    process.env.SENDGRID_FROM_NAME = "All About Ultrasound™";
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" });
+    global.fetch = fetchMock as typeof fetch;
+
+    const ok = await sendTransactionalEmail({
+      to: { name: "User", email: "user@example.com" },
+      subject: "Reset your iHeartEcho™ password",
+      htmlBody: "<p>Reset your password</p>",
+      brandMode: "iheartecho",
+      transactional: true,
+    });
+
+    expect(ok).toBe(true);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(init.body));
+    expect(payload.from.name).toBe("iHeartEcho™");
+    expect(payload.reply_to.name).toBe("iHeartEcho™");
   });
 
   it("posts to SMTP.com when provider is smtpcom", async () => {

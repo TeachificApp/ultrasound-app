@@ -40,6 +40,9 @@ export function detectBrandFromHostname(hostname: string): Brand {
 /** Detect the brand mode from hostname (for visual branding/messaging) */
 export function detectBrandMode(hostname: string, defaultBrand: Brand = "aaus"): BrandMode {
   const h = hostname.toLowerCase();
+  // Learn is a shared education experience regardless of the brand domain used
+  // to enter it, so security and transactional mail use the combined identity.
+  if (h.startsWith("learn.")) return "combined";
   if (h.includes("iheartecho")) return "iheartecho";
   if (h.includes("learn.") || h.includes("members.") || h.includes("member.")) return "combined";
   // For known AAUS domains, always return "aaus"
@@ -100,11 +103,11 @@ export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
     case "combined":
       return {
         brandMode: "combined",
-        displayName: "All About Ultrasound | iHeartEcho™",
-        shortName: "All About Ultrasound",
+        displayName: "All About Ultrasound™ | iHeartEcho™",
+        shortName: "All About Ultrasound™ | iHeartEcho™",
         tagline: "Ultrasound Clinical Intelligence",
         senderEmail: "noreply@allaboutultrasound.com",
-        senderName: "All About Ultrasound | iHeartEcho™",
+        senderName: "All About Ultrasound™ | iHeartEcho™",
         supportEmail: "support@allaboutultrasound.com",
         websiteUrl: "https://www.allaboutultrasound.com",
         appUrl: "https://app.allaboutultrasound.com",

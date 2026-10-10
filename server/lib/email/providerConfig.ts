@@ -65,9 +65,15 @@ export function resolveEmailSender(opts: {
       ? process.env.SMTPCOM_FROM_NAME || process.env.SENDGRID_FROM_NAME || brandConfig.senderName
       : process.env.SENDGRID_FROM_NAME || brandConfig.senderName;
 
+  // Provider-level names identify the sending infrastructure, not the product
+  // the member interacted with. When a caller has selected a brand, its display
+  // name must be visible in the recipient's mailbox. An explicit campaign
+  // `fromName` remains the only override.
+  const senderName = opts.fromName || (opts.brandMode ? brandConfig.senderName : defaultName);
+
   return {
     email: opts.fromEmail || defaultEmail,
-    name: opts.fromName || defaultName,
+    name: senderName,
   };
 }
 
