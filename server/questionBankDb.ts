@@ -1,10 +1,13 @@
 import { eq, and, asc, desc, sql, isNull, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { questionBankFolders, questionBankItems } from "../drizzle/schema";
+import { resolveApplicationDatabaseUrl } from "./lib/databaseUrl";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 function getDb() {
-  if (!_db) _db = drizzle(process.env.DATABASE_URL as string);
+  const databaseUrl = resolveApplicationDatabaseUrl();
+  if (!databaseUrl) throw new Error("Application database is not configured");
+  if (!_db) _db = drizzle(databaseUrl);
   return _db;
 }
 const db = new Proxy({} as ReturnType<typeof drizzle>, {

@@ -16,11 +16,14 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { sql, eq, and, isNull, or } from "drizzle-orm";
 import { orderBumps, orderBumpConversions, lmsPricingOptions } from "../../drizzle/schema";
+import { resolveApplicationDatabaseUrl } from "../lib/databaseUrl";
 
 // Helper to get DB
 async function getDb() {
   const { drizzle } = await import("drizzle-orm/mysql2");
-  return drizzle(process.env.DATABASE_URL!);
+  const databaseUrl = resolveApplicationDatabaseUrl();
+  if (!databaseUrl) throw new Error("Application database is not configured");
+  return drizzle(databaseUrl);
 }
 
 // ─── Admin Router ────────────────────────────────────────────────────────────

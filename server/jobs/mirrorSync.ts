@@ -1,7 +1,6 @@
 /**
  * mirrorSync.ts
- * Continuous mirror sync job that keeps Railway MySQL and Cloudflare R2
- * in sync with the primary Manus database and S3 storage.
+ * Retired legacy mirror synchronizer.
  *
  * DB Sync: Runs mysqldump from Manus TiDB → imports into Railway MySQL.
  * Media Sync: Scans DB for media URLs, downloads from Manus CDN, uploads to R2.
@@ -18,14 +17,11 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import https from "https";
 import http from "http";
-import { isRailwayPrimaryHost } from "../lib/storageBackend";
 import { needsScormExtraction } from "../lib/scormPackage";
 
 const execAsync = promisify(exec);
 
 // ── Configuration ──────────────────────────────────────────────────────────────
-
-const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 // Manus CDN base path (files are stored under this prefix)
 const MANUS_CDN_BASE =
@@ -75,9 +71,9 @@ export function shouldPreserveScormExtractionState(status: string | null | undef
   return status === "pending" || status === "processing" || status === "done" || status === "failed";
 }
 
-/** Railway is the live application database; full table replacement is opt-in only. */
-export function shouldRunLegacyRailwayDatabaseMirror(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.ENABLE_LEGACY_RAILWAY_DB_MIRROR === "true";
+/** Railway MySQL is the sole production database; legacy replacement is retired. */
+export function shouldRunLegacyRailwayDatabaseMirror(_env: NodeJS.ProcessEnv = process.env): boolean {
+  return false;
 }
 
 export function shouldNormalizeMirroredNonScormRecord(params: {
@@ -445,52 +441,15 @@ async function syncMedia(): Promise<SyncResult["mediaSync"]> {
 // ── Main Sync Runner ───────────────────────────────────────────────────────────
 
 export async function runMirrorSync(): Promise<SyncResult> {
-  if (syncRunning) {
-    console.log("[MirrorSync] Sync already in progress, skipping");
-    return lastSyncResult || {
-      startedAt: new Date(),
-      completedAt: new Date(),
-      dbSync: { success: false, tablesImported: 0, error: "Already running" },
-      mediaSync: { success: false, uploaded: 0, skipped: 0, failed: 0, error: "Already running" },
-    };
-  }
-
-  syncRunning = true;
   const startedAt = new Date();
-  console.log(`[MirrorSync] Starting mirror sync at ${startedAt.toISOString()}`);
-
-  try {
-    // The previous default replaced every Railway table with a Manus dump. That
-    // creates production outages and overwrites live extraction progress, so it
-    // is now an explicit legacy-only opt-in rather than a scheduled default.
-    const dbSync = shouldRunLegacyRailwayDatabaseMirror()
-      ? await syncDatabase()
-      : {
-          success: true,
-          tablesImported: 0,
-          error: "Skipped: Railway database replacement is disabled; live data is preserved",
-        };
-    const mediaSync = await syncMedia();
-
-    const completedAt = new Date();
-    const duration = ((completedAt.getTime() - startedAt.getTime()) / 1000).toFixed(1);
-    console.log(`[MirrorSync] Sync completed in ${duration}s`);
-
-    lastSyncResult = { startedAt, completedAt, dbSync, mediaSync };
-    return lastSyncResult;
-  } catch (err: any) {
-    console.error("[MirrorSync] Sync failed:", err);
-    const result: SyncResult = {
-      startedAt,
-      completedAt: new Date(),
-      dbSync: { success: false, tablesImported: 0, error: err.message },
-      mediaSync: { success: false, uploaded: 0, skipped: 0, failed: 0, error: err.message },
-    };
-    lastSyncResult = result;
-    return result;
-  } finally {
-    syncRunning = false;
-  }
+  const result: SyncResult = {
+    startedAt,
+    completedAt: new Date(),
+    dbSync: { success: true, tablesImported: 0, error: "Retired: Railway MySQL is the sole production database" },
+    mediaSync: { success: true, uploaded: 0, skipped: 0, failed: 0, error: "Retired: no legacy media mirror is permitted" },
+  };
+  lastSyncResult = result;
+  return result;
 }
 
 export function getLastSyncResult(): SyncResult | null {
@@ -509,37 +468,7 @@ export function startMirrorSync() {
   if (mirrorSyncStarted) return;
   mirrorSyncStarted = true;
 
-  // Railway is the live host — no need to mirror Manus → Railway
-  if (isRailwayPrimaryHost()) {
-    console.log("[MirrorSync] Railway is primary host, mirror sync disabled");
-    return;
-  }
-
-  // Check if Railway/R2 credentials are configured
-  const hasRailway = !!getRailwayUrl();
-  const hasR2 = !!process.env.CF_R2_ACCOUNT_ID && !!process.env.CF_R2_ACCESS_KEY_ID;
-
-  if (!hasRailway && !hasR2) {
-    console.log("[MirrorSync] No Railway/R2 credentials configured, mirror sync disabled");
-    return;
-  }
-
-  console.log(
-    `[MirrorSync] Media mirror enabled (Railway: ${hasRailway ? "✓" : "✗"}, R2: ${hasR2 ? "✓" : "✗"}, DB replacement: ${shouldRunLegacyRailwayDatabaseMirror() ? "legacy opt-in" : "disabled"}). Interval: ${SYNC_INTERVAL_MS / 3600000}h`
-  );
-
-  // Run first sync after a 10-minute delay to avoid competing with other
-  // background jobs at startup and to let the server fully warm up.
-  setTimeout(() => {
-    runMirrorSync().catch((err) =>
-      console.error("[MirrorSync] Initial sync failed:", err)
-    );
-  }, 10 * 60 * 1000);
-
-  // Then run on interval
-  setInterval(() => {
-    runMirrorSync().catch((err) =>
-      console.error("[MirrorSync] Periodic sync failed:", err)
-    );
-  }, SYNC_INTERVAL_MS);
+  // Railway MySQL is the sole live database. No legacy database or media mirror
+  // may run from an application process.
+  console.log("[MirrorSync] Legacy mirror retired; Railway MySQL is the sole production database");
 }

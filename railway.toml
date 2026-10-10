@@ -25,5 +25,6 @@ restartPolicyMaxRetries = 3
 
 [deploy.env]
 NODE_ENV = "production"
+RAILWAY_PRIMARY = "true"
 AUTH_BACKEND = "local"
 STORAGE_BACKEND = "r2"

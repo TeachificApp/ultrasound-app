@@ -18,9 +18,9 @@ describe("Railway SCORM state preservation", () => {
     expect(shouldPreserveScormExtractionState(null)).toBe(false);
   });
 
-  it("keeps destructive Railway database replacement disabled unless explicitly opted in", () => {
+  it("keeps destructive legacy database replacement permanently disabled", () => {
     expect(shouldRunLegacyRailwayDatabaseMirror({} as NodeJS.ProcessEnv)).toBe(false);
-    expect(shouldRunLegacyRailwayDatabaseMirror({ ENABLE_LEGACY_RAILWAY_DB_MIRROR: "true" } as NodeJS.ProcessEnv)).toBe(true);
+    expect(shouldRunLegacyRailwayDatabaseMirror({ ENABLE_LEGACY_RAILWAY_DB_MIRROR: "true" } as NodeJS.ProcessEnv)).toBe(false);
   });
 
   it("normalizes ordinary mirrored documents while preserving quiz archives", () => {

@@ -1,5 +1,6 @@
 import { resolvePlatformAdminEmail } from "../../shared/platformAdminEmail";
 import { resolveForgeApiKey, resolveForgeApiUrl } from "../lib/openAiConfig";
+import { resolveApplicationDatabaseUrl } from "../lib/databaseUrl";
 
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? process.env.APP_ID ?? "ultrasound-app",
@@ -10,7 +11,7 @@ export const ENV = {
   canonicalRootDomain: process.env.CANONICAL_ROOT_DOMAIN ?? "",
   iheCanonicalRootDomain: process.env.IHE_CANONICAL_ROOT_DOMAIN ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
-  databaseUrl: process.env.DATABASE_URL ?? "",
+  databaseUrl: resolveApplicationDatabaseUrl() ?? "",
   authBackend: process.env.AUTH_BACKEND ?? "manus",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",

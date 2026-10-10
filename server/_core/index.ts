@@ -56,7 +56,6 @@ import { backfillAllContacts } from "../lib/emailListHelper";
 import { getDb } from "../db";
 import { sql as drizzleSql } from "drizzle-orm";
 import { initSonoQuizHub } from "../sonoQuizHub";
-import { startMirrorSync } from "../jobs/mirrorSync";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
 import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes/scormExtractor";
 import { healStuckScormVersions } from "../scheduled/scormHealthCheck";
@@ -1149,8 +1148,6 @@ async function startServer() {
     startEmailCampaignScheduler();
     // Start the Media Repository purge cron (hard-deletes assets soft-deleted > 30 days ago)
     startMediaPurgeCron();
-    // Start the Railway/R2 mirror sync (syncs DB and media every 6 hours)
-    startMirrorSync();
     // Start the Account Sharing Monitor (detects multi-IP abuse every 30 min)
     startSharingMonitor();
     // Backfill all existing users into the "All Contacts" email list (safe to run on every startup)

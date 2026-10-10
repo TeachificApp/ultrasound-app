@@ -6,6 +6,8 @@
  * - `auto` (default): R2 when fully configured, otherwise Forge
  */
 
+import { isRailwayMysqlUrl, resolveApplicationDatabaseUrl } from "./databaseUrl";
+
 export type StorageBackend = "r2" | "forge";
 
 function hasR2Credentials(): boolean {
@@ -62,8 +64,7 @@ export function resolveStorageBackend(): StorageBackend {
 export function isRailwayPrimaryHost(): boolean {
   if (process.env.RAILWAY_PRIMARY === "true") return true;
 
-  const dbUrl = process.env.DATABASE_URL ?? "";
-  if (dbUrl.includes(".rlwy.net") || dbUrl.includes("railway.internal")) return true;
+  if (isRailwayMysqlUrl(resolveApplicationDatabaseUrl())) return true;
 
   // Railway sets RAILWAY_ENVIRONMENT in production deployments
   if (process.env.RAILWAY_ENVIRONMENT === "production" && process.env.RAILWAY_PRIMARY !== "false") {
