@@ -1155,6 +1155,15 @@ function IHeartEchoRouter() {
         <Route path="/report" component={ReportBuilder} />
         <Route path="/guidelines-assist" component={GuidelinesAssist} />
 
+        {/* Legacy/previously cached AAUS menu paths must remain useful when
+            opened on the iHeartEcho host. These aliases preserve iHeartEcho
+            content rather than loading AAUS clinical tools. */}
+        <Route path="/clinical" component={EchoAssistHub} />
+        <Route path="/ultrasound-assist" component={EchoAssistHub} />
+        <Route path="/calculators" component={EchoAssist} />
+        <Route path="/clinical-intelligence" component={GuidelinesAssist} />
+        <Route path="/clinical-intel" component={GuidelinesAssist} />
+
         {/* ── Echo Navigators ────────────────────────────────────────── */}
         <Route path="/tte">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><TTENavigator /></RoleGuard>}</Route>
         <Route path="/tee">{() => <RoleGuard roles={["user", "premium_user", "diy_user", "diy_admin"]}><TEENavigator /></RoleGuard>}</Route>

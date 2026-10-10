@@ -25,6 +25,7 @@ export interface NavGroup {
 }
 
 export interface BrandNavConfig {
+  brand: Brand;
   navGroups: NavGroup[];
   hiddenNavItems: NavItem[];
   logoUrl: string;
@@ -266,6 +267,7 @@ const IHE_HIDDEN_NAV: NavItem[] = [
 export function getBrandNavConfig(brand: Brand): BrandNavConfig {
   if (brand === "iheartecho") {
     return {
+      brand: "iheartecho",
       navGroups: IHE_NAV_GROUPS,
       hiddenNavItems: IHE_HIDDEN_NAV,
       logoUrl: IHE_BRAND_LOGO_URL,
@@ -277,6 +279,7 @@ export function getBrandNavConfig(brand: Brand): BrandNavConfig {
     };
   }
   return {
+    brand: "aaus",
     navGroups: AAUS_NAV_GROUPS,
     hiddenNavItems: AAUS_HIDDEN_NAV,
     logoUrl: AAUS_BRAND_LOGO_URL,
