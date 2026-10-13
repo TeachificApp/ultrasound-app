@@ -51,6 +51,8 @@ import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/dra
 import { resolveCohortRecordingPlayback } from "../lib/cohortRecordingPlayback";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
+import { daysSinceEnrollment, isLessonDripOutExpired } from "../lib/lessonDripAccess";
+import { refreshLearnerLmsAccessFromStripe } from "../lib/lmsSubscriptionReconciliation";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import { countRenderedWords, extendFullLessonDraft, fullLessonWordsRemaining, isCompleteFullLesson, MIN_FULL_LESSON_WORDS, TARGET_FULL_LESSON_WORDS } from "../lib/lessonContentGeneration";
 import {
@@ -2183,6 +2185,9 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (ctx.user.role !== "admin" && process.env.STRIPE_SECRET_KEY) {
+        await refreshLearnerLmsAccessFromStripe(db as any, getStripeClient(), ctx.user.id);
+      }
       // Check enrollment first — must happen before isAdminPreview check (expiry-aware)
       const { resolveEnrollmentByCourseSlug } = await import("../lib/enrollmentAccess");
       const enrollmentAccess = await resolveEnrollmentByCourseSlug(db as any, ctx.user.id, input.slug);
@@ -2326,7 +2331,15 @@ export const lmsLearnerRouter = router({
         if (section) resolvedCourseId = section.courseId;
       }
             if (!resolvedCourseId) throw new TRPCError({ code: "NOT_FOUND" });
+      const [courseForDrip] = await db
+        .select({ isDrip: lmsCourses.isDrip })
+        .from(lmsCourses)
+        .where(eq(lmsCourses.id, resolvedCourseId))
+        .limit(1);
       const isAdmin = ctx.user.role === "admin";
+      if (!isAdmin && process.env.STRIPE_SECRET_KEY) {
+        await refreshLearnerLmsAccessFromStripe(db as any, getStripeClient(), ctx.user.id);
+      }
       // Block draft lessons from non-admin learners
       if (!isAdmin && lesson.lessonStatus === "draft") {
         throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
@@ -2346,10 +2359,16 @@ export const lmsLearnerRouter = router({
         if ((lesson as any).dripDate && Date.now() < new Date((lesson as any).dripDate).getTime()) {
           throw new TRPCError({ code: "FORBIDDEN", message: "This lesson is not available yet" });
         }
-        // Block expired lessons (drip-out): lesson is unavailable after dripOutDays from enrollment
-        if ((lesson as any).dripOutDays != null && enrollment?.enrolledAt) {
-          const daysSinceEnroll = Math.floor((Date.now() - new Date(enrollment.enrolledAt).getTime()) / 86400000);
-          if (daysSinceEnroll >= (lesson as any).dripOutDays) {
+        // Drip-out only when course drip schedule is enabled (matches CoursePlayer sidebar).
+        if (enrollment?.enrolledAt) {
+          const daysSinceEnroll = daysSinceEnrollment(enrollment.enrolledAt);
+          if (
+            isLessonDripOutExpired({
+              courseIsDrip: Boolean(courseForDrip?.isDrip),
+              dripOutDays: (lesson as { dripOutDays?: number | null }).dripOutDays,
+              daysSinceEnroll,
+            })
+          ) {
             throw new TRPCError({ code: "FORBIDDEN", message: "This lesson is no longer available" });
           }
         }
