@@ -70,7 +70,9 @@ import { notifyOwner } from "../_core/notification";
 import {
   getLmsSubscriptionInvoicesForUser,
   reconcileLmsSubscriptionBilling,
+  refreshLearnerLmsAccessFromStripe,
 } from "../lib/lmsSubscriptionReconciliation";
+import { lmsCourseVisibleInMyContentCondition } from "../lib/lmsCourseVisibility";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -142,6 +144,10 @@ export const dashboardRouter = router({
   getMyContent: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+    if (process.env.STRIPE_SECRET_KEY) {
+      await refreshLearnerLmsAccessFromStripe(db, getStripeClient(), ctx.user.id);
+    }
 
     // 1. LMS enrollments (courses + quiz-type courses)
     const enrollments = await db
@@ -518,7 +524,7 @@ export const dashboardRouter = router({
               status: lmsCourses.status,
             })
             .from(lmsCourses)
-            .where(and(eq(lmsCourses.id, item.itemId), eq(lmsCourses.status, "published")))
+            .where(and(eq(lmsCourses.id, item.itemId), lmsCourseVisibleInMyContentCondition()))
             .limit(1);
 
           if (!course) continue;
@@ -672,7 +678,7 @@ export const dashboardRouter = router({
               status: lmsCourses.status,
             })
             .from(lmsCourses)
-            .where(and(eq(lmsCourses.id, item.itemId), eq(lmsCourses.status, "published")))
+            .where(and(eq(lmsCourses.id, item.itemId), lmsCourseVisibleInMyContentCondition()))
             .limit(1);
 
           if (!course) continue;
