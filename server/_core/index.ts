@@ -214,11 +214,27 @@ async function startServer() {
     res.json({ version: "2026-10-08-card-audio-mux", deployedAt: new Date().toISOString(), spaRegex: "^/(?!media/|api/|manus-storage/).*" });
   });
   // Temporary debug endpoint to diagnose Railway DB connection
-  app.get("/api/debug/db-status", async (_req, res) => {
+  app.get("/api/debug/db-status", async (req, res) => {
+    const { denyUnlessDebugAuthorized } = await import("../lib/debugRouteGuard");
+    if (denyUnlessDebugAuthorized(req, res)) return;
     const { getDb } = await import("../db");
-    const hasDbUrl = !!process.env.DATABASE_URL;
+    const { isRailwayMysqlUrl, resolveApplicationDatabaseUrl } = await import("../lib/databaseUrl");
+    const resolved = resolveApplicationDatabaseUrl();
     const db = await getDb();
-    res.json({ hasDbUrl, dbConnected: !!db });
+    let host = "";
+    if (resolved) {
+      try {
+        host = new URL(resolved.replace(/^mysql:\/\//, "http://")).hostname;
+      } catch {
+        host = "(unparseable)";
+      }
+    }
+    res.json({
+      dbConnected: !!db,
+      resolvedHost: host,
+      isRailwayMysql: isRailwayMysqlUrl(resolved),
+      railwayPrimary: process.env.RAILWAY_PRIMARY === "true",
+    });
   });
   // Temporary debug endpoint to diagnose email provider configuration
   app.get("/api/debug/email-status", async (req, res) => {
