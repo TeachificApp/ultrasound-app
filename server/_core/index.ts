@@ -94,6 +94,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  const { logProductionDatabaseConfigurationWarnings } = await import("../lib/productionDatabaseGuard");
+  logProductionDatabaseConfigurationWarnings();
+
   const app = express();
   // Trust the reverse proxy so req.protocol reflects HTTPS and SameSite=None;Secure cookies work
   app.set("trust proxy", 1);

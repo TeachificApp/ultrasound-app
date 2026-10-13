@@ -19,7 +19,7 @@ describe("learner My Content access repair", () => {
     const dashboard = readProjectFile("server/routers/dashboardRouter.ts");
     const reconciliation = readProjectFile("server/lib/lmsSubscriptionReconciliation.ts");
 
-    expect(dashboard).toContain("refreshLearnerLmsAccessFromStripe");
+    expect(dashboard).toContain("maybeRefreshLearnerLmsAccessFromStripe");
     expect(reconciliation).toContain("repairMissingLmsEnrollmentsFromPaidOrdersForUser");
     expect(reconciliation).toContain("syncLmsEnrollmentExpiryFromStripeForUser");
   });

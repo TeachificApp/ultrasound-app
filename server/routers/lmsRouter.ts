@@ -52,7 +52,7 @@ import { resolveCohortRecordingPlayback } from "../lib/cohortRecordingPlayback";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
 import { daysSinceEnrollment, isLessonDripOutExpired } from "../lib/lessonDripAccess";
-import { refreshLearnerLmsAccessFromStripe } from "../lib/lmsSubscriptionReconciliation";
+import { maybeRefreshLearnerLmsAccessFromStripe } from "../lib/learnerLmsAccessRefresh";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import { countRenderedWords, extendFullLessonDraft, fullLessonWordsRemaining, isCompleteFullLesson, MIN_FULL_LESSON_WORDS, TARGET_FULL_LESSON_WORDS } from "../lib/lessonContentGeneration";
 import {
@@ -2185,9 +2185,7 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
-      if (ctx.user.role !== "admin" && process.env.STRIPE_SECRET_KEY) {
-        await refreshLearnerLmsAccessFromStripe(db as any, getStripeClient(), ctx.user.id);
-      }
+      await maybeRefreshLearnerLmsAccessFromStripe(db as any, ctx.user.id, { role: ctx.user.role });
       // Check enrollment first — must happen before isAdminPreview check (expiry-aware)
       const { resolveEnrollmentByCourseSlug } = await import("../lib/enrollmentAccess");
       const enrollmentAccess = await resolveEnrollmentByCourseSlug(db as any, ctx.user.id, input.slug);
@@ -2337,9 +2335,7 @@ export const lmsLearnerRouter = router({
         .where(eq(lmsCourses.id, resolvedCourseId))
         .limit(1);
       const isAdmin = ctx.user.role === "admin";
-      if (!isAdmin && process.env.STRIPE_SECRET_KEY) {
-        await refreshLearnerLmsAccessFromStripe(db as any, getStripeClient(), ctx.user.id);
-      }
+      await maybeRefreshLearnerLmsAccessFromStripe(db as any, ctx.user.id, { role: ctx.user.role });
       // Block draft lessons from non-admin learners
       if (!isAdmin && lesson.lessonStatus === "draft") {
         throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
@@ -4243,6 +4239,8 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.slug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await maybeRefreshLearnerLmsAccessFromStripe(db as any, ctx.user.id, { role: ctx.user.role });
 
       // Resolve enrollment the same way as dashboard My Content (user + course slug join).
       const { resolveEnrollmentByCourseSlug } = await import("../lib/enrollmentAccess");

@@ -42,6 +42,6 @@ describe("getLesson drip-out wiring", () => {
 
   it("refreshes Stripe LMS access before course player and lesson load", () => {
     const lmsRouter = readProjectFile("server/routers/lmsRouter.ts");
-    expect(lmsRouter).toContain("refreshLearnerLmsAccessFromStripe");
+    expect(lmsRouter).toContain("maybeRefreshLearnerLmsAccessFromStripe");
   });
 });
