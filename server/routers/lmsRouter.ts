@@ -49,7 +49,6 @@ import { checkoutPlatformTermsSelection, resolveCheckoutTerms, STANDARD_STRIPE_C
 import { enrichCohortResources } from "../lib/cohortResources";
 import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import { resolveCohortRecordingPlayback } from "../lib/cohortRecordingPlayback";
-import { resolveLessonEmbedUrl, resolveLessonVideoBlocks } from "../lib/lessonVideoPlayback";
 import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
 import { daysSinceEnrollment, isLessonDripOutExpired } from "../lib/lessonDripAccess";
@@ -2430,26 +2429,7 @@ export const lmsLearnerRouter = router({
         }
       }
 
-      // Legacy Thinkific video proxies return an HTML document instead of a browser-embeddable
-      // player. Resolve them only in the authenticated learner payload; the original authoring
-      // values remain intact in MySQL and continue to work in administrator previews.
-      const [courseTheme] = await db.select({ primaryColor: lmsCourses.primaryColor })
-        .from(lmsCourses)
-        .where(eq(lmsCourses.id, resolvedCourseId))
-        .limit(1);
-      const primaryColor = courseTheme?.primaryColor ?? "#179ca3";
-      const [resolvedEmbedUrl, resolvedContentBlocks] = await Promise.all([
-        resolveLessonEmbedUrl({ sourceUrl: lesson.embedUrl, primaryColor }),
-        resolveLessonVideoBlocks({ contentBlocks: lesson.contentBlocks, primaryColor }),
-      ]);
-
-      return {
-        ...lesson,
-        embedUrl: resolvedEmbedUrl,
-        contentBlocks: resolvedContentBlocks,
-        quiz,
-        linkedMediaAsset: await loadLinkedLessonMediaAsset(db as any, lesson.mediaAssetId),
-      };
+      return { ...lesson, quiz, linkedMediaAsset: await loadLinkedLessonMediaAsset(db as any, lesson.mediaAssetId) };
     }),
 
   /** Record that a learner opened a lesson (for prerequisite gates that unlock on view). */

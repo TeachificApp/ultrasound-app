@@ -306,12 +306,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const trimmedEmbedUrl = d.embedUrl ? applyVideoTrim(d.embedUrl, trimStart, trimEnd) : "";
       return (
         <div className="py-4 sm:py-6"><CC>
-          {d.playbackUnavailable ? (
-            <div className="w-full min-h-48 rounded-lg border border-amber-200 bg-amber-50 px-6 py-8 text-center flex flex-col items-center justify-center gap-2">
-              <p className="font-semibold text-amber-900">This video is being prepared for secure playback.</p>
-              <p className="text-sm text-amber-800">Please refresh in a moment. Your course access remains active.</p>
-            </div>
-          ) : d.embedUrl ? (
+          {d.embedUrl ? (
             isDirectVideo ? (
               <div className="mx-auto overflow-hidden shadow" style={containerStyle}>
                 <style>{`.${videoId} { accent-color: ${videoAccent}; } .${videoId}::-webkit-media-controls-play-button { filter: none; } .${videoId}::-webkit-media-controls-timeline { accent-color: ${videoAccent}; }`}</style>
