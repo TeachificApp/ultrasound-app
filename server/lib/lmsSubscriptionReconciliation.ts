@@ -1,4 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
+import type { MySql2Database } from "drizzle-orm/mysql2";
+import type * as schema from "../../drizzle/schema";
 import {
   lmsCourses,
   lmsEnrollments,
@@ -6,6 +8,8 @@ import {
   lmsSubscriptionInvoices,
   users,
 } from "../../drizzle/schema";
+import { fetchStripeSubscriptionDetails } from "./lmsCheckoutFulfillment";
+import { hasCourseEnrollmentAccess, resolveEnrollmentForCourse } from "./enrollmentAccess";
 
 /**
  * The platform stores the initial Checkout payment in lms_orders. Every later
@@ -283,6 +287,127 @@ export async function reconcileLmsSubscriptionBilling(
   }
 
   return summary;
+}
+
+/** Extend `access_expires_at` from live Stripe when webhooks or reconciliation lagged. */
+export async function syncLmsEnrollmentExpiryFromStripeForUser(
+  db: MySql2Database<typeof schema>,
+  stripe: StripeReconciliationClient,
+  userId: number,
+): Promise<number> {
+  const enrollments = await db
+    .select({
+      id: lmsEnrollments.id,
+      stripeSubscriptionId: lmsEnrollments.stripeSubscriptionId,
+      accessExpiresAt: lmsEnrollments.accessExpiresAt,
+    })
+    .from(lmsEnrollments)
+    .where(and(eq(lmsEnrollments.userId, userId), isNotNull(lmsEnrollments.stripeSubscriptionId)));
+
+  let updated = 0;
+  for (const enrollment of enrollments) {
+    if (!enrollment.stripeSubscriptionId) continue;
+    try {
+      const subscription = await stripe.subscriptions.retrieve(enrollment.stripeSubscriptionId);
+      const status = subscription.status ?? "";
+      if (status !== "active" && status !== "trialing") continue;
+      const periodEnd = subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000)
+        : null;
+      if (!periodEnd) continue;
+      const currentMs = enrollment.accessExpiresAt
+        ? new Date(enrollment.accessExpiresAt).getTime()
+        : 0;
+      if (periodEnd.getTime() <= currentMs + 60_000) continue;
+      await db.update(lmsEnrollments)
+        .set({ accessExpiresAt: periodEnd })
+        .where(eq(lmsEnrollments.id, enrollment.id));
+      updated += 1;
+    } catch (error) {
+      console.warn(
+        `[LMS billing] Could not sync enrollment ${enrollment.id} expiry from Stripe:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+  return updated;
+}
+
+/**
+ * Paid LMS orders should always have an active enrollment row. Repairs missing or
+ * expired enrollments when Stripe subscription billing is current.
+ */
+export async function repairMissingLmsEnrollmentsFromPaidOrdersForUser(
+  db: MySql2Database<typeof schema>,
+  userId: number,
+): Promise<number> {
+  const orders = await db
+    .select({
+      id: lmsOrders.id,
+      courseId: lmsOrders.courseId,
+      stripeSubscriptionId: lmsOrders.stripeSubscriptionId,
+    })
+    .from(lmsOrders)
+    .where(and(eq(lmsOrders.userId, userId), eq(lmsOrders.status, "paid")));
+
+  let repaired = 0;
+  for (const order of orders) {
+    const existing = await resolveEnrollmentForCourse(db, userId, order.courseId);
+    if (existing && hasCourseEnrollmentAccess(existing)) continue;
+
+    let accessExpiresAt: Date | null = null;
+    const stripeSubscriptionId = order.stripeSubscriptionId;
+    if (stripeSubscriptionId) {
+      const details = await fetchStripeSubscriptionDetails(stripeSubscriptionId);
+      accessExpiresAt = details.accessExpiresAt;
+    }
+
+    if (existing) {
+      await db.update(lmsEnrollments)
+        .set({
+          enrollmentType: "full",
+          orderId: order.id,
+          accessExpiresAt,
+          stripeSubscriptionId: stripeSubscriptionId ?? undefined,
+          source: "stripe",
+        })
+        .where(eq(lmsEnrollments.id, existing.id));
+    } else {
+      await db.insert(lmsEnrollments).values({
+        userId,
+        courseId: order.courseId,
+        orderId: order.id,
+        enrollmentType: "full",
+        accessExpiresAt,
+        stripeSubscriptionId,
+        source: "stripe",
+      });
+    }
+    repaired += 1;
+  }
+  return repaired;
+}
+
+export async function refreshLearnerLmsAccessFromStripe(
+  db: MySql2Database<typeof schema>,
+  stripe: StripeReconciliationClient,
+  userId: number,
+): Promise<void> {
+  try {
+    await reconcileLmsSubscriptionBilling(db, stripe, { userId });
+  } catch (error) {
+    console.warn(`[Dashboard] LMS subscription reference reconciliation failed for user ${userId}:`, error);
+  }
+  try {
+    await repairMissingLmsEnrollmentsFromPaidOrdersForUser(db, userId);
+  } catch (error) {
+    console.warn(`[Dashboard] LMS enrollment repair failed for user ${userId}:`, error);
+  }
+  try {
+    await syncLmsEnrollmentExpiryFromStripeForUser(db, stripe, userId);
+  } catch (error) {
+    console.warn(`[Dashboard] LMS enrollment expiry sync failed for user ${userId}:`, error);
+  }
 }
 
 export async function getLmsSubscriptionInvoicesForUser(db: any, userId: number) {

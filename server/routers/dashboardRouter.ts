@@ -67,10 +67,9 @@ import { restoreMissingCourseCertificate } from "./lmsHelpers";
 import { isEnrollmentCompleted } from "../lib/enrollmentAccess";
 import { isActiveBrandPremiumTrialSubscription } from "../lib/brandMembershipTrial";
 import { notifyOwner } from "../_core/notification";
-import {
-  getLmsSubscriptionInvoicesForUser,
-  reconcileLmsSubscriptionBilling,
-} from "../lib/lmsSubscriptionReconciliation";
+import { getLmsSubscriptionInvoicesForUser } from "../lib/lmsSubscriptionReconciliation";
+import { lmsCourseVisibleInMyContentCondition } from "../lib/lmsCourseVisibility";
+import { maybeRefreshLearnerLmsAccessFromStripe } from "../lib/learnerLmsAccessRefresh";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -142,6 +141,8 @@ export const dashboardRouter = router({
   getMyContent: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+    await maybeRefreshLearnerLmsAccessFromStripe(db, ctx.user.id, { role: ctx.user.role });
 
     // 1. LMS enrollments (courses + quiz-type courses)
     const enrollments = await db
@@ -518,7 +519,7 @@ export const dashboardRouter = router({
               status: lmsCourses.status,
             })
             .from(lmsCourses)
-            .where(and(eq(lmsCourses.id, item.itemId), eq(lmsCourses.status, "published")))
+            .where(and(eq(lmsCourses.id, item.itemId), lmsCourseVisibleInMyContentCondition()))
             .limit(1);
 
           if (!course) continue;
@@ -672,7 +673,7 @@ export const dashboardRouter = router({
               status: lmsCourses.status,
             })
             .from(lmsCourses)
-            .where(and(eq(lmsCourses.id, item.itemId), eq(lmsCourses.status, "published")))
+            .where(and(eq(lmsCourses.id, item.itemId), lmsCourseVisibleInMyContentCondition()))
             .limit(1);
 
           if (!course) continue;
@@ -838,11 +839,7 @@ export const dashboardRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-    try {
-      await reconcileLmsSubscriptionBilling(db, getStripeClient(), { userId: ctx.user.id });
-    } catch (error) {
-      console.warn(`[Dashboard] LMS subscription reference reconciliation failed for user ${ctx.user.id}:`, error);
-    }
+    await maybeRefreshLearnerLmsAccessFromStripe(db, ctx.user.id, { role: ctx.user.role });
 
     // Fetch all brand memberships for this user
     const memberships = await db
@@ -1095,11 +1092,7 @@ export const dashboardRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      try {
-        await reconcileLmsSubscriptionBilling(db, getStripeClient(), { userId: ctx.user.id });
-      } catch (error) {
-        console.warn(`[Dashboard] LMS cancellation reference reconciliation failed for user ${ctx.user.id}:`, error);
-      }
+      await maybeRefreshLearnerLmsAccessFromStripe(db, ctx.user.id, { role: ctx.user.role });
 
       // Verify ownership — student can only cancel their own orders
       const [order] = await db
@@ -1457,13 +1450,7 @@ export const dashboardRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const userId = ctx.user.id;
 
-    // Keep course renewals visible even if an old Stripe webhook was missed or a
-    // legacy stored subscription ID needs safe recovery from Stripe.
-    try {
-      await reconcileLmsSubscriptionBilling(db, getStripeClient(), { userId });
-    } catch (error) {
-      console.warn(`[Dashboard] LMS recurring billing reconciliation failed for user ${userId}:`, error);
-    }
+    await maybeRefreshLearnerLmsAccessFromStripe(db, userId, { role: ctx.user.role });
 
     // 1. Funnel / embedded-checkout purchases (one-time)
     const funnelRows = await db
