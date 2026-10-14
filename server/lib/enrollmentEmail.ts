@@ -103,7 +103,6 @@ async function deliverEmail(opts: {
   payee?: { name: string; email: string } | null;
   /** When true, BCC admin and send duplicate to payee if provided. */
   forPurchase?: boolean;
-  explicitAccessEmailConsent?: boolean;
 }): Promise<boolean> {
   const recipientEmails = [opts.to.email, opts.payee?.email].filter(Boolean) as string[];
   for (const email of recipientEmails) {
@@ -120,8 +119,6 @@ async function deliverEmail(opts: {
     subject: opts.subject,
     htmlBody: opts.htmlBody,
     fromName: LMS_FROM_NAME,
-    accessGrantEmail: true,
-    explicitAccessEmailConsent: opts.explicitAccessEmailConsent,
     ...(opts.forPurchase
       ? { purchaseAccess: { payee: opts.payee ?? null }, transactional: true }
       : {}),
@@ -142,7 +139,6 @@ export async function sendEnrollmentEmail(opts: {
   setPasswordUrl?: string | null;
   payee?: { name: string; email: string } | null;
   forPurchase?: boolean;
-  explicitAccessEmailConsent?: boolean;
 }): Promise<boolean> {
   const { formatCmeCreditLabel } = await import("../../shared/cmeCreditLabel");
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
@@ -194,7 +190,6 @@ export async function sendEnrollmentEmail(opts: {
     htmlBody,
     payee: opts.payee,
     forPurchase: opts.forPurchase,
-    explicitAccessEmailConsent: opts.explicitAccessEmailConsent,
   });
 }
 
@@ -278,7 +273,6 @@ export async function sendDownloadAccessEmail(opts: {
   accessToken?: string | null;
   payee?: { name: string; email: string } | null;
   forPurchase?: boolean;
-  explicitAccessEmailConsent?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your download is ready: "${opts.productTitle}"`;
@@ -314,7 +308,6 @@ export async function sendDownloadAccessEmail(opts: {
     htmlBody,
     payee: opts.payee,
     forPurchase: opts.forPurchase,
-    explicitAccessEmailConsent: opts.explicitAccessEmailConsent,
   });
 }
 
@@ -331,7 +324,6 @@ export async function sendBundleAccessEmail(opts: {
   accessToken?: string | null;
   payee?: { name: string; email: string } | null;
   forPurchase?: boolean;
-  explicitAccessEmailConsent?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `You've been granted access to "${opts.bundleTitle}"`;
@@ -367,7 +359,6 @@ export async function sendBundleAccessEmail(opts: {
     htmlBody,
     payee: opts.payee,
     forPurchase: opts.forPurchase,
-    explicitAccessEmailConsent: opts.explicitAccessEmailConsent,
   });
 }
 
@@ -384,7 +375,6 @@ export async function sendQuizAccessEmail(opts: {
   setPasswordUrl?: string | null;
   payee?: { name: string; email: string } | null;
   forPurchase?: boolean;
-  explicitAccessEmailConsent?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your access to "${opts.quizTitle}" is ready 🎯`;
@@ -430,6 +420,5 @@ export async function sendQuizAccessEmail(opts: {
     htmlBody,
     payee: opts.payee,
     forPurchase: opts.forPurchase,
-    explicitAccessEmailConsent: opts.explicitAccessEmailConsent,
   });
 }

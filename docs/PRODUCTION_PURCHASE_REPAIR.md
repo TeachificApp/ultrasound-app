@@ -4,18 +4,6 @@ Use **Platform Admin → Users → [student] → Subscriptions → Stripe purcha
 
 Requires production `DATABASE_URL` (Railway MySQL) and `STRIPE_SECRET_KEY` on the app service.
 
-## Access emails (consent gate)
-
-Automatic enrollment / purchase access emails are **off** unless Railway has:
-
-`ALLOW_AUTOMATIC_ACCESS_GRANT_EMAILS=true`
-
-While that variable is unset, Stripe webhooks and reconcile flows still grant access in MySQL but **do not email** learners. To email:
-
-- Use **Resend enrollment email** on a specific enrollment, or  
-- **Repair Access** with “Resend access emails” checked, or  
-- Set the env var when templates and dates are verified.
-
 ## Before you start
 
 1. Confirm the app uses Railway MySQL (`RAILWAY_MYSQL_URL` / `DATABASE_URL`) — not a stale TiDB URL.

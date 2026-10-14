@@ -1401,7 +1401,6 @@ export const lmsCohortAdminRouter = router({
               customSubject: settings?.enrollmentEmailSubject,
               customIntro: settings?.enrollmentEmailIntro,
               accessToken,
-              explicitAccessEmailConsent: true,
             });
           } catch (e) {
             console.error("[cohort-welcome-email] Failed to send:", e);

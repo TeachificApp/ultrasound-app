@@ -3641,11 +3641,7 @@ export const adminUserRouter = router({
 
   /** Clear SendGrid blocks, fix openId, regenerate access token, resend all enrollment emails. */
   repairUserAccess: protectedProcedure
-    .input(z.object({
-      userId: z.number().int().positive(),
-      /** When true, resend enrollment/access emails (requires explicit admin consent). */
-      resendAccessEmails: z.boolean().optional(),
-    }))
+    .input(z.object({ userId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
@@ -3663,9 +3659,7 @@ export const adminUserRouter = router({
 
       const { repairUserAccess } = await import("../lib/repairUserAccess");
       try {
-        return await repairUserAccess(user.email, {
-          resendEnrollment: input.resendAccessEmails === true,
-        });
+        return await repairUserAccess(user.email);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Repair failed";
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
@@ -3722,7 +3716,6 @@ export const adminUserRouter = router({
           customSubject: settings?.enrollmentEmailSubject,
           customIntro: settings?.enrollmentEmailIntro,
           accessToken,
-          explicitAccessEmailConsent: true,
         });
       } else if (courseType === "quiz") {
         sent = await sendQuizAccessEmail({
@@ -3732,7 +3725,6 @@ export const adminUserRouter = router({
           customSubject: settings?.enrollmentEmailSubject,
           customIntro: settings?.enrollmentEmailIntro,
           accessToken,
-          explicitAccessEmailConsent: true,
         });
       } else {
         sent = await sendEnrollmentEmail({
@@ -3742,7 +3734,6 @@ export const adminUserRouter = router({
           customSubject: settings?.enrollmentEmailSubject,
           customIntro: settings?.enrollmentEmailIntro,
           accessToken,
-          explicitAccessEmailConsent: true,
         });
       }
 

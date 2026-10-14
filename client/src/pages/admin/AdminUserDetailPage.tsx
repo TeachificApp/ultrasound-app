@@ -228,13 +228,10 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: (res) => toast.success(`Password reset email sent to ${res.email}`),
     onError: (e) => toast.error(e.message),
   });
-  const [repairResendEmails, setRepairResendEmails] = useState(false);
   const repairUserAccess = trpc.adminUser.repairUserAccess.useMutation({
     onSuccess: (res) =>
       toast.success(
-        res.enrollmentEmailsSent > 0
-          ? `Access repaired for ${res.email} — ${res.enrollmentEmailsSent} access email(s) sent.`
-          : `Access repaired for ${res.email} (login/token fixed; no access emails sent).`,
+        `Access repaired for ${res.email} — ${res.enrollmentEmailsSent} enrollment email(s) sent.`,
       ),
     onError: (e) => toast.error(e.message),
   });
@@ -308,26 +305,16 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => repairUserAccess.mutate({
-                    userId,
-                    resendAccessEmails: repairResendEmails,
-                  })}
+                  onClick={() => repairUserAccess.mutate({ userId })}
                   disabled={repairUserAccess.isPending}
                   className="gap-1.5 text-teal-800 border-teal-300 hover:bg-teal-50"
-                  title="Clear email blocks, fix login identity, regenerate access link. Access emails only if checkbox below is checked."
+                  title="Clear email blocks, fix login identity, regenerate access link, and resend enrollment emails"
                 >
                   {repairUserAccess.isPending
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     : <ShieldCheck className="w-3.5 h-3.5" />}
                   Repair Access
                 </Button>
-                <label className="flex items-center gap-2 text-xs text-gray-600 mt-2">
-                  <Checkbox
-                    checked={repairResendEmails}
-                    onCheckedChange={(v) => setRepairResendEmails(!!v)}
-                  />
-                  Also resend access emails (explicit consent)
-                </label>
                 <Button
                   size="sm"
                   variant="outline"
@@ -2168,7 +2155,6 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
             <p className="text-xs text-slate-500 mt-1 max-w-2xl">
               Compare Railway MySQL to Stripe, then reconcile by product type. Refunds and cancelling duplicate
               charges are done in Stripe Dashboard — this app grants access and links subscription IDs.
-              Automatic access emails are suppressed unless <code className="text-[10px]">ALLOW_AUTOMATIC_ACCESS_GRANT_EMAILS=true</code> on Railway.
             </p>
           </div>
           <Button

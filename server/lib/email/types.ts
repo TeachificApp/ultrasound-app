@@ -54,10 +54,6 @@ export interface SendEmailOptions {
   purchaseAccess?: {
     payee?: EmailRecipient | null;
   };
-  /** Enrollment, download, membership welcome, or other access-grant message (not magic-link auth). */
-  accessGrantEmail?: boolean;
-  /** Admin explicitly requested this send (Resend access, manual enroll with email, etc.). */
-  explicitAccessEmailConsent?: boolean;
 }
 
 export type EmailProviderId = "sendgrid" | "smtpcom";
