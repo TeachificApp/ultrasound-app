@@ -2810,19 +2810,21 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
   // ── Log the event ─────────────────────────────────────────────────────────────
   try {
     if (logDb) {
+      const { ensureWebhookEventsTable } = await import("../lib/webhookEventsTable");
+      await ensureWebhookEventsTable(logDb as any);
       await logDb.insert(webhookEvents).values({
         source: "stripe",
         stripeEventId: eventId ?? null,
         resource: eventType.split(".")[0] ?? "checkout",
         action: eventType.split(".").slice(1).join(".") ?? eventType,
         email: undefined,
-        outcome: "ignored",
+        outcome: "received",
         message: `Stripe event received: ${eventType} (${eventId})`,
         rawPayload: rawBody,
       });
     }
   } catch (err) {
-    console.warn("[Stripe] Failed to log webhook event:", err);
+    console.error("[Stripe] Failed to log webhook event to MySQL (check webhookEvents table):", err);
   }
 
   try {

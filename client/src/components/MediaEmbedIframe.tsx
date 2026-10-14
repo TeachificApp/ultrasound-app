@@ -33,8 +33,7 @@ export function MediaEmbedIframe({
 }: MediaEmbedIframeProps) {
   const { user } = useAuth();
   const parsed = useMemo(() => (src.startsWith("/") ? parseMediaRepoUrl(src) : null), [src]);
-  // Display blocks on Manus used /embed; both /embed and /scorm need signed SCORM playback.
-  const isScormPath = parsed?.path === "scorm" || parsed?.path === "embed";
+  const isScormPath = parsed?.path === "scorm";
 
   const { data: scormData, isLoading: scormLoading, isError: scormError } =
     trpc.mediaRepo.getScormZipUrl.useQuery(
@@ -44,7 +43,7 @@ export function MediaEmbedIframe({
 
   const { data: embedData, isLoading: embedLoading, isError: embedError } =
     trpc.mediaRepo.getMediaEmbedUrl.useQuery(
-      { slug: parsed!.slug, courseId, path: parsed!.path },
+      { slug: parsed!.slug, courseId, path: parsed!.path ?? "embed" },
       { enabled: !!parsed && !isScormPath && !!user }
     );
 

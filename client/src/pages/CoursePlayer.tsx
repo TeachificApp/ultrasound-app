@@ -39,6 +39,7 @@ import {
   isInteractiveMediaPackage,
   resolveLessonMediaScormUrl,
 } from "@shared/mediaRepoDisplay";
+import { isMediaRepoEmbedUrl } from "@/lib/mediaEmbedUrl";
 
 import LessonCommentSection from "@/components/LessonCommentSection";
 import CertificatePreviewBlock from "@/components/CertificatePreviewBlock";
@@ -2071,8 +2072,7 @@ export default function CoursePlayer() {
   const showLessonLevelScorm = !!lessonMediaRepoScormSrc && !hasScormContentBlock;
   const lessonExternalEmbedUrl = useMemo(() => {
     if (!lessonData?.embedUrl || lessonMediaRepoScormSrc) return null;
-    const isMediaRepo = lessonData.embedUrl.includes("/api/media/") || lessonData.embedUrl.includes("/media/");
-    return isMediaRepo ? null : lessonData.embedUrl;
+    return lessonData.embedUrl;
   }, [lessonData, lessonMediaRepoScormSrc]);
 
   const handleMarkComplete = async () => {
@@ -3151,14 +3151,25 @@ export default function CoursePlayer() {
                   {lessonExternalEmbedUrl && contentBlocks.length === 0 && !showLessonLevelScorm && (
                     <div className="mb-5">
                       <div className="bg-black rounded-xl overflow-hidden shadow-lg ring-1 ring-gray-200 aspect-video">
-                        <iframe
-                          src={lessonExternalEmbedUrl.startsWith("/") ? `${window.location.origin}${lessonExternalEmbedUrl}` : lessonExternalEmbedUrl}
-                          className="w-full h-full"
-                          allowFullScreen
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                          title={lessonData.title}
-                          style={{ border: "none" }}
-                        />
+                        {isMediaRepoEmbedUrl(lessonExternalEmbedUrl.split("?")[0] ?? lessonExternalEmbedUrl) ? (
+                          <MediaEmbedIframe
+                            src={lessonExternalEmbedUrl.split("?")[0] ?? lessonExternalEmbedUrl}
+                            courseId={data?.course?.id}
+                            title={lessonData.title}
+                            className="w-full h-full"
+                            style={{ border: "none", minHeight: "100%" }}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                          />
+                        ) : (
+                          <iframe
+                            src={lessonExternalEmbedUrl.startsWith("/") ? `${window.location.origin}${lessonExternalEmbedUrl}` : lessonExternalEmbedUrl}
+                            className="w-full h-full"
+                            allowFullScreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            title={lessonData.title}
+                            style={{ border: "none" }}
+                          />
+                        )}
                       </div>
                     </div>
                   )}
