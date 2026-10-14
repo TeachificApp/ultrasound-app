@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { STUDENT_DASHBOARD_PATH, resolveStudentDashboardHref } from "@shared/studentDashboardUrls";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
-import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
+import { calendarDateKeyInTimeZone, formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
 import { getCohortRecordingWatchStatus } from "@/lib/cohortRecordingStatus";
 
@@ -1624,13 +1624,13 @@ function CohortCalendarTab({ cohortData, isLoading }: { cohortData: any; isLoadi
   };
 
   sessions.forEach((s: any) => {
-    const key = formatInTimeZone(s.sessionDate, { year: "numeric", month: "2-digit", day: "2-digit" }, PLATFORM_TIMEZONE);
-    addEvent(key, { type: "session", id: s.id, title: s.title, ts: s.sessionDate, durationMinutes: s.durationMinutes ?? 60, meetingUrl: s.meetingUrl, description: s.description ?? "" });
+    const key = calendarDateKeyInTimeZone(s.sessionDate, PLATFORM_TIMEZONE);
+    if (key) addEvent(key, { type: "session", id: s.id, title: s.title, ts: s.sessionDate, durationMinutes: s.durationMinutes ?? 60, meetingUrl: s.meetingUrl, description: s.description ?? "" });
   });
   assignments.forEach((a: any) => {
     if (!a.dueDate) return;
-    const key = formatInTimeZone(a.dueDate, { year: "numeric", month: "2-digit", day: "2-digit" }, PLATFORM_TIMEZONE);
-    addEvent(key, { type: "assignment", id: a.id, title: a.title, ts: a.dueDate, description: a.description ?? "" });
+    const key = calendarDateKeyInTimeZone(a.dueDate, PLATFORM_TIMEZONE);
+    if (key) addEvent(key, { type: "assignment", id: a.id, title: a.title, ts: a.dueDate, description: a.description ?? "" });
   });
 
   // Calendar grid
@@ -1644,7 +1644,7 @@ function CohortCalendarTab({ cohortData, isLoading }: { cohortData: any; isLoadi
   const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
   const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
 
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const todayKey = calendarDateKeyInTimeZone(today, PLATFORM_TIMEZONE);
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-6">
