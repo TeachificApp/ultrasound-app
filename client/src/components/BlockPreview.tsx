@@ -23,7 +23,7 @@ import {
   mediaRepoDownloadUrl,
   resolveScormEmbedSlug,
 } from "@shared/mediaRepoDisplay";
-import { isMediaRepoScormViewerPath, parseMediaRepoUrl } from "@/lib/mediaEmbedUrl";
+import { parseMediaRepoUrl } from "@/lib/mediaEmbedUrl";
 import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
 
 function assetUrl(url?: string | null): string {
@@ -1331,10 +1331,8 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
       const embedTitle = d.title ?? "Embedded Content";
       const url = urlEmbedSrc || d.url || "";
       const mediaRepoParsed = url.startsWith("/") ? parseMediaRepoUrl(url) : null;
-      const useSignedMediaEmbed = !!mediaRepoParsed && isMediaRepoScormViewerPath(url);
-      const mediaEmbedSrc = useSignedMediaEmbed && mediaRepoParsed
-        ? mediaRepoScormUrl(mediaRepoParsed.slug)
-        : "";
+      const useSignedMediaEmbed = !!mediaRepoParsed;
+      const mediaEmbedSrc = mediaRepoParsed ? (url.split("?")[0] ?? url) : "";
       const urlAlign = d.align ?? "center";
       const urlJustify = urlAlign === "left" ? "flex-start" : urlAlign === "right" ? "flex-end" : "center";
       const urlMaxWidth = d.maxWidth ?? "100%";

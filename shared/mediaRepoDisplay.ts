@@ -105,13 +105,19 @@ export function resolveLessonMediaScormUrl(
     return mediaRepoScormUrl(slug);
   }
 
-  if (lesson.type === "embed") {
-    return mediaRepoScormUrl(slug);
+  // `/api/media/:slug/embed` is the HTML/video viewer — not the SCORM player.
+  if (
+    lesson.embedUrl &&
+    (lesson.embedUrl.includes("/api/media/") || lesson.embedUrl.includes("/media/")) &&
+    /\/embed\/?(\?|$)/.test(lesson.embedUrl.split("?")[0] ?? "")
+  ) {
+    return null;
   }
 
   if (
     lesson.embedUrl &&
-    (lesson.embedUrl.includes("/api/media/") || lesson.embedUrl.includes("/media/"))
+    (lesson.embedUrl.includes("/api/media/") || lesson.embedUrl.includes("/media/")) &&
+    /\/scorm\/?(\?|$)/.test(lesson.embedUrl.split("?")[0] ?? "")
   ) {
     return mediaRepoScormUrl(slug);
   }

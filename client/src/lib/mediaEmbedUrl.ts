@@ -9,11 +9,16 @@ export function parseMediaRepoUrl(
   return { slug: decodeURIComponent(match[1]), path };
 }
 
-/** True when a media-repo URL should use the SCORM viewer (display blocks), not /download. */
+/** True when a media-repo URL should use the SCORM player route (/scorm/), not /embed. */
 export function isMediaRepoScormViewerPath(url: string): boolean {
   const parsed = parseMediaRepoUrl(url);
   if (!parsed) return false;
-  return parsed.path === "scorm" || parsed.path === "embed";
+  return parsed.path === "scorm";
+}
+
+/** Media-repo URLs that need signed ?access= tokens (embed, download, or scorm). */
+export function isMediaRepoSignedServePath(url: string): boolean {
+  return parseMediaRepoUrl(url) != null;
 }
 
 export function isMediaRepoEmbedUrl(url: string): boolean {

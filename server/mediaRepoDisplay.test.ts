@@ -38,11 +38,11 @@ describe("resolveLessonMediaScormUrl", () => {
     expect(url).toBeNull();
   });
 
-  it("treats embed-type lessons with media repo URLs as SCORM", () => {
+  it("does not route media repo /embed viewer URLs through the SCORM player", () => {
     const url = resolveLessonMediaScormUrl(
       { type: "embed", embedUrl: "/api/media/my-package/embed", content: null },
       null,
     );
-    expect(url).toBe("/api/media/my-package/scorm/");
+    expect(url).toBeNull();
   });
 });
