@@ -37,6 +37,12 @@ export interface SendEmailOptions {
   transactional?: boolean;
   /** Optional file attachments */
   attachments?: EmailAttachment[];
+  cc?: EmailRecipient[];
+  bcc?: EmailRecipient[];
+  /** Routes secure learner access plus token-free payer/admin purchase receipts. */
+  purchaseAccess?: {
+    payee?: EmailRecipient | null;
+  };
   /**
    * Non-PII campaign identifier forwarded to SendGrid as a custom argument.
    * It associates Event Webhook delivery outcomes with the originating

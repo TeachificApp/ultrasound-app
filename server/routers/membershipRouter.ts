@@ -990,6 +990,7 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
         user_id: input.recipientEmail ? "" : (userId ? userId.toString() : "0"),
         customer_email: userEmail ?? "",
         payer_email: userEmail ?? "",
+        payer_name: userName ?? "",
         customer_name: input.recipientName ?? userName ?? "",
         recipient_email: input.recipientEmail?.toLowerCase() ?? "",
         recipient_name: input.recipientName ?? "",

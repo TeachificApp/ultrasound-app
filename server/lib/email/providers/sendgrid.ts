@@ -15,6 +15,8 @@ export async function sendViaSendGrid(
     personalizations: [
       {
         to: [{ name: opts.to.name, email: opts.to.email }],
+        ...(opts.cc?.length ? { cc: opts.cc.map((r) => ({ name: r.name, email: r.email })) } : {}),
+        ...(opts.bcc?.length ? { bcc: opts.bcc.map((r) => ({ name: r.name, email: r.email })) } : {}),
         subject: opts.subject,
         ...(opts.campaignId
           ? { custom_args: { campaignId: String(opts.campaignId) } }

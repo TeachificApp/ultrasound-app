@@ -81,6 +81,32 @@ describe("purchase recipient and cancellation safeguards", () => {
     expect(stripe).toContain('notificationType: "physical_order"');
     expect(stripe).toContain("resolveCheckoutRecipientUser(session, meta)");
     expect(stripe).toContain("sendPurchaseAccessEmail");
+    expect(stripe).toContain("deliverFunnelPurchaseAccessEmail");
+  });
+
+  it("keeps bearer access links with the learner and sends token-free payer/admin receipts", () => {
+    const delivery = source("./lib/purchaseAccessEmailDelivery.ts");
+    expect(delivery).toContain("Purchase receipts deliberately contain no copied email body");
+    expect(delivery).toContain("buildTokenFreeReceipt");
+    expect(delivery).toContain("Only the learner receives the message containing the bearer access link");
+    expect(delivery).toContain("PURCHASE_ACCESS_ADMIN_EMAIL");
+  });
+
+  it("keeps funnel setup in the single idempotent purchase email", () => {
+    const stripe = source("./webhooks/stripe.ts");
+    const funnelHelper = source("./lib/funnelPurchaseAccessEmail.ts");
+    expect(stripe).toContain("newUserResetToken");
+    expect(stripe).toContain("setPasswordUrl: newUserResetToken");
+    expect(stripe).not.toContain("sent welcome email with access token");
+    expect(funnelHelper).toContain("setPasswordUrl?: string | null");
+  });
+
+  it("retains payer identity separately from membership learner identity", () => {
+    const membership = source("./lib/membershipFulfillment.ts");
+    const router = source("./routers/membershipRouter.ts");
+    expect(membership).toContain("payerEmail?: string | null");
+    expect(membership).toContain("payerEmail: ctx.payerEmail");
+    expect(router).toContain("payer_name: userName ??");
   });
 
   it("holds automatic workshop registration emails until the owner approves the dated content", () => {

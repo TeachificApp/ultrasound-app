@@ -54,20 +54,27 @@ async function deliverEmail(opts: {
   to: { name: string; email: string };
   subject: string;
   htmlBody: string;
-  /** Learn purchase messages use the shared Learn sender identity. */
   brandMode?: BrandMode;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
-  try {
-    const { ensureTransactionalEmailDelivery } = await import("./ensureTransactionalEmailDelivery");
-    await ensureTransactionalEmailDelivery(opts.to.email);
-  } catch (err) {
-    console.warn("[enrollmentEmail] Suppression clear failed (non-fatal):", err);
+  const recipientEmails = [opts.to.email, opts.payee?.email].filter(Boolean) as string[];
+  for (const email of recipientEmails) {
+    try {
+      const { ensureTransactionalEmailDelivery } = await import("./ensureTransactionalEmailDelivery");
+      await ensureTransactionalEmailDelivery(email);
+    } catch (err) {
+      console.warn("[enrollmentEmail] Suppression clear failed (non-fatal):", err);
+    }
   }
   return sendEmail({
     to: opts.to,
     subject: opts.subject,
     htmlBody: opts.htmlBody,
     brandMode: opts.brandMode ?? "combined",
+    ...(opts.forPurchase
+      ? { purchaseAccess: { payee: opts.payee ?? null }, transactional: true }
+      : {}),
   });
 }
 
@@ -77,6 +84,15 @@ function accessCtaWithFallback(url: string, label: string): string {
       If the button is not visible or does not work, use this direct access link:<br />
       <a href="${url}" style="color:${brandColor};font-weight:700;word-break:break-word;">${label}</a>
     </p>`;
+}
+
+function passwordSetupCta(setPasswordUrl?: string | null): string {
+  if (!setPasswordUrl) return "";
+  return `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:0 0 24px;">
+    <p style="margin:0 0 8px;font-size:14px;color:#9a3412;font-weight:600;">Set your password to keep access</p>
+    <p style="margin:0 0 12px;font-size:13px;color:#7c2d12;line-height:1.5;">Your account was created automatically. Set a password so you can sign in again anytime.</p>
+    <a href="${setPasswordUrl}" style="display:inline-block;background:#ea580c;color:#ffffff;font-weight:600;font-size:13px;padding:10px 20px;border-radius:6px;text-decoration:none;">Set My Password</a>
+  </div>`;
 }
 
 
@@ -92,8 +108,9 @@ export async function sendEnrollmentEmail(opts: {
   accessToken?: string | null;
   /** For new guest accounts: URL to set a permanent password */
   setPasswordUrl?: string | null;
-  /** Content brand controls the learner-domain URL; Learn email identity stays combined. */
   brand?: Brand;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const { formatCmeCreditLabel } = await import("../../shared/cmeCreditLabel");
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
@@ -108,13 +125,7 @@ export async function sendEnrollmentEmail(opts: {
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
     : "";
-  const setPasswordHtml = opts.setPasswordUrl
-    ? `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;font-size:14px;color:#9a3412;font-weight:600;">⚠️ Set your password to keep access</p>
-      <p style="margin:0 0 12px;font-size:13px;color:#7c2d12;line-height:1.5;">Your account was created automatically. Set a password so you can log back in anytime.</p>
-      <a href="${opts.setPasswordUrl}" style="display:inline-block;background:#ea580c;color:#ffffff;font-weight:600;font-size:13px;padding:10px 20px;border-radius:6px;text-decoration:none;">Set My Password</a>
-    </div>`
-    : "";
+  const setPasswordHtml = passwordSetupCta(opts.setPasswordUrl);
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
       Welcome, ${firstName}! 🎉
@@ -140,7 +151,14 @@ export async function sendEnrollmentEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
-  return deliverEmail({ to: opts.to, subject, htmlBody, brandMode: "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    brandMode: "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
 // ─── Convenience wrapper: send enrollment email by userId + courseId ─────────
@@ -223,7 +241,11 @@ export async function sendDownloadAccessEmail(opts: {
   customIntro?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
+  /** For new guest accounts: URL to set a permanent password */
+  setPasswordUrl?: string | null;
   brand?: Brand;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your download is ready: "${opts.productTitle}"`;
@@ -241,6 +263,7 @@ export async function sendDownloadAccessEmail(opts: {
       You've been granted access to <strong style="color:${brandDark};">${opts.productTitle}</strong>.
     </p>
     ${introHtml}
+    ${passwordSetupCta(opts.setPasswordUrl)}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">Accessing your files:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
@@ -254,7 +277,14 @@ export async function sendDownloadAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
-  return deliverEmail({ to: opts.to, subject, htmlBody, brandMode: "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    brandMode: "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
 // ─── Bundle Access Email ──────────────────────────────────────────────────────
@@ -268,7 +298,11 @@ export async function sendBundleAccessEmail(opts: {
   destinationUrl?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
+  /** For new guest accounts: URL to set a permanent password */
+  setPasswordUrl?: string | null;
   brand?: Brand;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `You've been granted access to "${opts.bundleTitle}"`;
@@ -286,6 +320,7 @@ export async function sendBundleAccessEmail(opts: {
       You've been granted access to the <strong style="color:${brandDark};">${opts.bundleTitle}</strong> bundle.
     </p>
     ${introHtml}
+    ${passwordSetupCta(opts.setPasswordUrl)}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">What's included:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
@@ -299,7 +334,14 @@ export async function sendBundleAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
-  return deliverEmail({ to: opts.to, subject, htmlBody, brandMode: "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    brandMode: "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
 // ─── Quiz Access Email ────────────────────────────────────────────────────────
@@ -314,6 +356,8 @@ export async function sendQuizAccessEmail(opts: {
   /** For new guest accounts: URL to set a permanent password */
   setPasswordUrl?: string | null;
   brand?: Brand;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your access to "${opts.quizTitle}" is ready 🎯`;
@@ -325,13 +369,7 @@ export async function sendQuizAccessEmail(opts: {
   const introHtml = opts.customIntro
     ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${opts.customIntro}</div>`
     : "";
-  const setPasswordHtml = opts.setPasswordUrl
-    ? `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:0 0 24px;">
-      <p style="margin:0 0 8px;font-size:14px;color:#9a3412;font-weight:600;">⚠️ Set your password to keep access</p>
-      <p style="margin:0 0 12px;font-size:13px;color:#7c2d12;line-height:1.5;">Your account was created automatically. Set a password so you can log back in anytime.</p>
-      <a href="${opts.setPasswordUrl}" style="display:inline-block;background:#ea580c;color:#ffffff;font-weight:600;font-size:13px;padding:10px 20px;border-radius:6px;text-decoration:none;">Set My Password</a>
-    </div>`
-    : "";
+  const setPasswordHtml = passwordSetupCta(opts.setPasswordUrl);
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
       Hi ${firstName}, your access is ready! 🎯
@@ -354,7 +392,14 @@ export async function sendQuizAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
-  return deliverEmail({ to: opts.to, subject, htmlBody, brandMode: "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    brandMode: "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
 
@@ -367,9 +412,13 @@ export async function sendPurchaseAccessEmail(opts: {
   accessLabel: string;
   destinationUrl: string;
   accessToken?: string | null;
+  /** For new guest accounts: URL to set a permanent password */
+  setPasswordUrl?: string | null;
   brand?: Brand;
   brandMode?: BrandMode;
   detailsHtml?: string;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const brand = opts.brand ?? "aaus";
   const name = opts.to.name.split(" ")[0] || opts.to.name || "there";
@@ -378,8 +427,16 @@ export async function sendPurchaseAccessEmail(opts: {
     <h2 style="margin:0 0 12px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">${opts.heading}</h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Hi ${name}, ${opts.intro}</p>
     ${opts.detailsHtml ?? ""}
+    ${passwordSetupCta(opts.setPasswordUrl)}
     ${accessCtaWithFallback(accessUrl, opts.accessLabel)}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">If you have questions, reply to this email or contact support.</p>
   `, opts.brandMode ?? "combined");
-  return deliverEmail({ to: opts.to, subject: opts.subject, htmlBody, brandMode: opts.brandMode ?? "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject: opts.subject,
+    htmlBody,
+    brandMode: opts.brandMode ?? "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase ?? true,
+  });
 }

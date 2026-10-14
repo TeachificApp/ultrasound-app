@@ -45,6 +45,22 @@ export async function sendViaSmtpCom(
           ...(opts.to.name ? { name: opts.to.name } : {}),
         },
       ],
+      ...(opts.cc?.length
+        ? {
+            cc: opts.cc.map((r) => ({
+              address: r.email,
+              ...(r.name ? { name: r.name } : {}),
+            })),
+          }
+        : {}),
+      ...(opts.bcc?.length
+        ? {
+            bcc: opts.bcc.map((r) => ({
+              address: r.email,
+              ...(r.name ? { name: r.name } : {}),
+            })),
+          }
+        : {}),
     },
     body: {
       parts: [
