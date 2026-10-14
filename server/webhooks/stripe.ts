@@ -18,7 +18,7 @@ import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { handleStudyGroupCheckoutCompleted, handleStudyGroupSubscriptionLifecycle } from "../routers/studyGroupsRouter";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -31,7 +31,6 @@ import { buildPersistentAccessUrl, sendBundleAccessEmail, sendPurchaseAccessEmai
 import { sendPurchaseNotificationOnce } from "../lib/purchaseNotificationDelivery";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
 import { BRAND_PREMIUM_TRIAL_DAYS, hasBrandMembershipTrial, isBrandMembershipTrialCheckout } from "../lib/brandMembershipTrial";
-import { grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 import { persistLmsSubscriptionInvoice } from "../lib/lmsSubscriptionReconciliation";
 import { grantBundle } from "../lib/membershipFulfillment";
 import { getBrandDisplayConfig } from "@shared/brands";
@@ -662,42 +661,32 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
 async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.type !== "workshop") return;
-  const workshopId = meta.workshop_id ? parseInt(meta.workshop_id, 10) : null;
-  const instanceId = meta.instance_id ? parseInt(meta.instance_id, 10) : null;
-  if (!workshopId || !instanceId) return;
   const db = await getDb();
   if (!db) return;
-  const recipient = await resolveCheckoutRecipientUser(session, meta);
-  const userId = recipient?.user.id ?? (meta.user_id ? parseInt(meta.user_id, 10) : null);
-  if (!userId) {
-    await notifyOwner({ title: "⚠️ Workshop purchase needs review", content: `Checkout ${session.id} for workshop #${workshopId} has no resolvable recipient account.` });
+  const { fulfillWorkshopCheckoutFromStripeSession } = await import("../lib/workshopCheckoutFulfillment");
+  const fulfillment = await fulfillWorkshopCheckoutFromStripeSession(db, session);
+  if (!fulfillment.success || !fulfillment.userId || !fulfillment.workshopId || !fulfillment.instanceId) {
+    await notifyOwner({ title: "⚠️ Workshop purchase needs review", content: `Checkout ${session.id} could not be matched to a workshop learner (${fulfillment.error ?? "unknown error"}).` });
     return;
   }
+  const { userId, workshopId, instanceId } = fulfillment;
+  const recipient = getCheckoutRecipient(session, meta);
   const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, brand: workshops.brand, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
     .from(workshops).where(eq(workshops.id, workshopId)).limit(1);
   const [instance] = await db.select({ title: workshopInstances.title, status: workshopInstances.status, confirmationEmailApproved: workshopInstances.confirmationEmailApproved, confirmationEmailSubject: workshopInstances.confirmationEmailSubject, confirmationEmailHeading: workshopInstances.confirmationEmailHeading, confirmationEmailIntro: workshopInstances.confirmationEmailIntro, confirmationEmailDetails: workshopInstances.confirmationEmailDetails })
     .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
   if (!workshop || !instance) return;
-  const [existing] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)
-    .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.instanceId, instanceId), eq(workshopEnrollments.stripeSessionId, session.id as string))).limit(1);
-  if (!existing) {
-    await db.insert(workshopEnrollments).values({
-      workshopId, instanceId, userId, stripeSessionId: session.id as string,
-      amountPaid: (session.amount_total as number) ?? 0,
-      currency: (session.currency as string) ?? "usd", status: "active",
-      accessLevel: instance.status === "presale" ? "presale" : "full", accessGrantedAt: new Date(),
-    });
-    await grantScheduledContentAccess(db, { userId, sourceType: "workshop_instance", sourceId: instanceId });
+  if (fulfillment.created) {
     await notifyOwner({ title: "🏫 New Workshop Enrollment", content: `User ID ${userId} enrolled in "${workshop.title}".` });
   }
-  const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
+  const email = fulfillment.recipientEmail ?? recipient.email;
   if (email && workshop.welcomeEmailEnabled !== false && isWorkshopConfirmationReady(instance)) {
     const brand = platformBrand(workshop.brand);
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "workshop_registration",
       send: async () => sendPurchaseAccessEmail({
-        to: { name: recipient?.name || email.split("@")[0], email },
+        to: { name: (fulfillment.recipientName ?? recipient.name) || email.split("@")[0], email },
         subject: instance.confirmationEmailSubject?.trim() || workshop.welcomeEmailSubject || `You're registered: ${workshop.title}`,
         heading: instance.confirmationEmailHeading?.trim() || "Your workshop registration is confirmed",
         intro: instance.confirmationEmailIntro?.trim() || `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
