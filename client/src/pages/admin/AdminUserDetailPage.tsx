@@ -1964,6 +1964,43 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   const [grantSubNotify, setGrantSubNotify] = useState(true);
   const [revokeSubNotify, setRevokeSubNotify] = useState(true);
   const [revokeNativeSubNotify, setRevokeNativeSubNotify] = useState(true);
+  const [repairStripeId, setRepairStripeId] = useState("");
+  const [repairKind, setRepairKind] = useState<"membership" | "lms" | "workshop">("membership");
+  const [lmsLinkOnly, setLmsLinkOnly] = useState(false);
+  const [lmsCourseId, setLmsCourseId] = useState("");
+  const [dupKeepSubId, setDupKeepSubId] = useState("");
+  const [dupCustomerId, setDupCustomerId] = useState("");
+
+  const { data: stripeRepairSnap, refetch: refetchStripeRepair, isFetching: stripeRepairLoading } =
+    trpc.adminUser.getStripeRepairSnapshot.useQuery({ userId }, { staleTime: 60_000 });
+
+  const reconcileLmsCheckout = trpc.lmsEnrollmentAdmin.reconcileStripeLmsCheckout.useMutation({
+    onSuccess: (res) => {
+      toast.success(`LMS reconcile OK: ${res.notes?.join("; ") || "done"}`);
+      refetch();
+      refetchStripeRepair();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const reconcileWorkshopCheckout = trpc.workshopAdmin.reconcileStripeWorkshopCheckout.useMutation({
+    onSuccess: (res) => {
+      toast.success(`Workshop enroll ${res.created ? "created" : "already present"} (instance ${res.instanceId})`);
+      refetch();
+      refetchStripeRepair();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const flagDuplicateSubs = trpc.membership.cancelDuplicateStripeSubscriptions.useMutation({
+    onSuccess: (res) => {
+      const n = res.cancelled?.length ?? 0;
+      toast.success(
+        n > 0
+          ? `Flagged ${n} duplicate subscription(s) — admin email sent. Cancel extras in Stripe Dashboard.`
+          : "No duplicate active subscriptions found for that customer/price.",
+      );
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const grantMembership = trpc.adminUser.grantBrandMembership.useMutation({
     onSuccess: () => { toast.success("App access granted."); refetch(); setGrantOpen(false); },
@@ -2047,8 +2084,203 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
     byBrand[b].push(m);
   }
 
+  const runStripeRepair = () => {
+    const id = repairStripeId.trim();
+    if (!id) {
+      toast.error("Enter a Stripe cs_… or sub_… id");
+      return;
+    }
+    const email = data.user?.email ?? undefined;
+    if (repairKind === "membership") {
+      if (id.startsWith("sub_")) {
+        addSubscription.mutate({
+          stripeSubscriptionId: id,
+          email,
+          userId,
+          planId: addSubPlanId && addSubPlanId !== "auto" ? parseInt(addSubPlanId, 10) : undefined,
+        });
+      } else if (id.startsWith("cs_")) {
+        addSubscription.mutate({
+          stripeCheckoutSessionId: id,
+          email,
+          userId,
+          planId: addSubPlanId && addSubPlanId !== "auto" ? parseInt(addSubPlanId, 10) : undefined,
+        });
+      } else {
+        toast.error("Membership repair expects sub_… or cs_…");
+      }
+      return;
+    }
+    if (repairKind === "lms") {
+      const courseIdNum = lmsCourseId.trim() ? parseInt(lmsCourseId, 10) : undefined;
+      if (id.startsWith("cs_")) {
+        reconcileLmsCheckout.mutate({
+          stripeCheckoutSessionId: id,
+          email,
+          userId,
+          courseId: courseIdNum,
+          linkOnly: lmsLinkOnly,
+        });
+      } else if (id.startsWith("sub_")) {
+        reconcileLmsCheckout.mutate({
+          stripeSubscriptionId: id,
+          email,
+          userId,
+          courseId: courseIdNum,
+          linkOnly: lmsLinkOnly,
+        });
+      } else {
+        toast.error("LMS repair expects sub_… or cs_…");
+      }
+      return;
+    }
+    if (!id.startsWith("cs_")) {
+      toast.error("Workshop repair expects a paid checkout session cs_…");
+      return;
+    }
+    reconcileWorkshopCheckout.mutate({
+      stripeCheckoutSessionId: id,
+      userId,
+      email,
+    });
+  };
+
   return (
     <div className="space-y-8">
+      {/* ── Stripe purchase repair (production ops) ── */}
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">Stripe purchase repair</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+              Compare Railway MySQL to Stripe, then reconcile by product type. Refunds and cancelling duplicate
+              charges are done in Stripe Dashboard — this app grants access and links subscription IDs.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => refetchStripeRepair()}
+            disabled={stripeRepairLoading}
+            className="text-xs"
+          >
+            {stripeRepairLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+            Refresh Stripe snapshot
+          </Button>
+        </div>
+        {stripeRepairSnap?.suggestedActions?.length ? (
+          <ul className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3 list-disc pl-5 space-y-1">
+            {stripeRepairSnap.suggestedActions.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        ) : null}
+        {stripeRepairSnap?.stripe.duplicateSubscriptionIds?.length ? (
+          <p className="text-xs text-red-700 font-medium">
+            Possible duplicate active subs: {stripeRepairSnap.stripe.duplicateSubscriptionIds.join(", ")}
+          </p>
+        ) : null}
+        <div className="grid md:grid-cols-2 gap-4 text-xs">
+          <div className="bg-white rounded-lg border p-3 space-y-1 max-h-40 overflow-y-auto">
+            <p className="font-semibold text-slate-700">Stripe subscriptions</p>
+            {(stripeRepairSnap?.stripe.subscriptions ?? []).length === 0 ? (
+              <p className="text-slate-400">None loaded — check STRIPE_SECRET_KEY or customer email.</p>
+            ) : (
+              stripeRepairSnap!.stripe.subscriptions.map((s) => (
+                <p key={s.id} className="font-mono text-[10px] text-slate-600">
+                  {s.id} · {s.status} · {s.productName ?? s.priceId ?? "—"}
+                </p>
+              ))
+            )}
+          </div>
+          <div className="bg-white rounded-lg border p-3 space-y-1 max-h-40 overflow-y-auto">
+            <p className="font-semibold text-slate-700">Recent checkout sessions</p>
+            {(stripeRepairSnap?.stripe.recentCheckoutSessions ?? []).length === 0 ? (
+              <p className="text-slate-400">No sessions for Stripe customer(s) on this email.</p>
+            ) : (
+              stripeRepairSnap!.stripe.recentCheckoutSessions.map((s) => (
+                <p key={s.id} className="font-mono text-[10px] text-slate-600">
+                  {s.id} · {s.metadataType ?? s.mode} · {s.paymentStatus}
+                </p>
+              ))
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="space-y-1 min-w-[140px]">
+            <Label className="text-xs">Product type</Label>
+            <Select value={repairKind} onValueChange={(v) => setRepairKind(v as typeof repairKind)}>
+              <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="membership">Membership / standing sub</SelectItem>
+                <SelectItem value="lms">LMS course / quiz</SelectItem>
+                <SelectItem value="workshop">Workshop</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1 flex-1 min-w-[200px]">
+            <Label className="text-xs">Stripe ID (cs_… or sub_…)</Label>
+            <Input
+              className="font-mono text-xs h-9"
+              placeholder="cs_… or sub_…"
+              value={repairStripeId}
+              onChange={(e) => setRepairStripeId(e.target.value.trim())}
+            />
+          </div>
+          {repairKind === "lms" && (
+            <>
+              <div className="space-y-1 w-28">
+                <Label className="text-xs">Course ID</Label>
+                <Input
+                  className="text-xs h-9"
+                  placeholder="optional"
+                  value={lmsCourseId}
+                  onChange={(e) => setLmsCourseId(e.target.value)}
+                />
+              </div>
+              <label className="flex items-center gap-2 text-xs text-slate-600 pb-1">
+                <Checkbox checked={lmsLinkOnly} onCheckedChange={(v) => setLmsLinkOnly(!!v)} />
+                Link Stripe only (no new enroll email)
+              </label>
+            </>
+          )}
+          <Button
+            size="sm"
+            className="bg-slate-800 hover:bg-slate-900 text-white h-9"
+            onClick={runStripeRepair}
+            disabled={
+              reconcileLmsCheckout.isPending
+              || reconcileWorkshopCheckout.isPending
+              || addSubscription.isPending
+            }
+          >
+            Run reconcile
+          </Button>
+        </div>
+        <div className="border-t border-slate-200 pt-3 flex flex-wrap gap-3 items-end">
+          <div className="space-y-1">
+            <Label className="text-xs">Duplicate subs — keep sub_…</Label>
+            <Input className="font-mono text-xs h-9 w-56" value={dupKeepSubId} onChange={(e) => setDupKeepSubId(e.target.value.trim())} placeholder="sub_… to keep" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Stripe customer cus_…</Label>
+            <Input className="font-mono text-xs h-9 w-56" value={dupCustomerId} onChange={(e) => setDupCustomerId(e.target.value.trim())} placeholder="cus_…" />
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-9 text-xs border-red-200 text-red-700"
+            disabled={!dupKeepSubId || !dupCustomerId || flagDuplicateSubs.isPending}
+            onClick={() => flagDuplicateSubs.mutate({
+              keepSubscriptionId: dupKeepSubId,
+              stripeCustomerId: dupCustomerId,
+            })}
+          >
+            Flag duplicate subscriptions
+          </Button>
+        </div>
+      </div>
+
       {/* ── Apps Section ── */}
       <div>
         <SectionHeader

@@ -529,7 +529,13 @@ export const embeddedCheckoutRouter = router({
             loginUrl: autoLoginUrl,
             brandMode: brandMode as any,
           });
-          await sendEmail({ to: { name: customerName || firstName, email: input.email }, subject, htmlBody, previewText });
+          const { withPurchaseAccessRecipients } = await import("../lib/purchaseAccessEmailDelivery");
+          await sendEmail(await withPurchaseAccessRecipients({
+            to: { name: customerName || firstName, email: input.email },
+            subject,
+            htmlBody,
+            previewText,
+          }, { userId, checkoutEmail: input.email, checkoutName: customerName }));
           console.log(`[FreeOrder] Confirmation email sent to ${input.email} (auto-login: ${userId ? 'yes' : 'no'})`);
         } catch (err) {
           console.error(`[FreeOrder] Failed to send confirmation email:`, err);

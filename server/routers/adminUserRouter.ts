@@ -3628,6 +3628,17 @@ export const adminUserRouter = router({
       return { success: true, email: user.email };
     }),
 
+  /** Stripe vs DB snapshot for platform-admin purchase repair (membership, LMS, workshop). */
+  getStripeRepairSnapshot: protectedProcedure
+    .input(z.object({ userId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const { buildAdminStripeRepairSnapshot } = await import("../lib/adminStripeRepairSnapshot");
+      return buildAdminStripeRepairSnapshot(db, input.userId);
+    }),
+
   /** Clear SendGrid blocks, fix openId, regenerate access token, resend all enrollment emails. */
   repairUserAccess: protectedProcedure
     .input(z.object({ userId: z.number().int().positive() }))

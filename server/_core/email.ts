@@ -53,10 +53,18 @@ async function _logEmailSend(to: EmailRecipient, subject: string, status: "sent"
   }
 }
 
-export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
+async function deliverSingleEmail(opts: SendEmailOptions): Promise<boolean> {
   const sent = await sendTransactionalEmail(opts);
   _logEmailSend(opts.to, opts.subject, sent ? "sent" : "failed").catch(() => {});
   return sent;
+}
+
+export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
+  if (opts.purchaseAccess !== undefined) {
+    const { deliverPurchaseAccessEmail } = await import("../lib/purchaseAccessEmailDelivery");
+    return deliverPurchaseAccessEmail(opts, deliverSingleEmail);
+  }
+  return deliverSingleEmail(opts);
 }
 
 // Legacy block removed — provider dispatch lives in server/lib/email/

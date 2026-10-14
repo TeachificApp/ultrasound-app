@@ -54,20 +54,27 @@ async function deliverEmail(opts: {
   to: { name: string; email: string };
   subject: string;
   htmlBody: string;
-  /** Learn purchase messages use the shared Learn sender identity. */
   brandMode?: BrandMode;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
-  try {
-    const { ensureTransactionalEmailDelivery } = await import("./ensureTransactionalEmailDelivery");
-    await ensureTransactionalEmailDelivery(opts.to.email);
-  } catch (err) {
-    console.warn("[enrollmentEmail] Suppression clear failed (non-fatal):", err);
+  const recipientEmails = [opts.to.email, opts.payee?.email].filter(Boolean) as string[];
+  for (const email of recipientEmails) {
+    try {
+      const { ensureTransactionalEmailDelivery } = await import("./ensureTransactionalEmailDelivery");
+      await ensureTransactionalEmailDelivery(email);
+    } catch (err) {
+      console.warn("[enrollmentEmail] Suppression clear failed (non-fatal):", err);
+    }
   }
   return sendEmail({
     to: opts.to,
     subject: opts.subject,
     htmlBody: opts.htmlBody,
     brandMode: opts.brandMode ?? "combined",
+    ...(opts.forPurchase
+      ? { purchaseAccess: { payee: opts.payee ?? null }, transactional: true }
+      : {}),
   });
 }
 
@@ -88,12 +95,11 @@ export async function sendEnrollmentEmail(opts: {
   creditHours?: string | null;
   customSubject?: string | null;
   customIntro?: string | null;
-  /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
-  /** For new guest accounts: URL to set a permanent password */
   setPasswordUrl?: string | null;
-  /** Content brand controls the learner-domain URL; Learn email identity stays combined. */
   brand?: Brand;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const { formatCmeCreditLabel } = await import("../../shared/cmeCreditLabel");
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
@@ -101,7 +107,6 @@ export async function sendEnrollmentEmail(opts: {
   const subject = opts.customSubject || (creditLabel
     ? `Welcome to "${opts.courseTitle}" — ${creditLabel} 🎉`
     : `Welcome to "${opts.courseTitle}" 🎉`);
-  // Link directly to the course player so the user lands in the course immediately after sign-in.
   const learnerBrand = opts.brand ?? "aaus";
   const courseDestination = `${learnOriginForBrand(learnerBrand)}/courses/${opts.courseSlug}/player`;
   const courseUrl = buildAccessUrl(courseDestination, opts.accessToken, learnerBrand);
@@ -140,22 +145,20 @@ export async function sendEnrollmentEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
-  return deliverEmail({ to: opts.to, subject, htmlBody, brandMode: "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    brandMode: "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
-// ─── Convenience wrapper: send enrollment email by userId + courseId ─────────
-/**
- * Looks up the user and course, checks the per-course `sendEnrollmentEmail` flag
- * and the platform-level `enrollmentEmailEnabled` flag, then sends the email.
- * This is the preferred call site for all free/admin enrollment paths so the
- * flag is respected consistently across every code path.
- *
- * Returns true if the email was sent, false if skipped or failed.
- */
 export async function sendEnrollmentEmailForUser(opts: {
   userId: number;
   courseId: number;
-  db?: any; // optional — will call getDb() if not provided
+  db?: any;
 }): Promise<boolean> {
   try {
     const { getDb, getOrCreateAccessToken } = await import("../db");
@@ -164,7 +167,6 @@ export async function sendEnrollmentEmailForUser(opts: {
     const db = opts.db ?? await getDb();
     if (!db) return false;
 
-    // Fetch course flag
     const [course] = await db
       .select({
         title: lmsCourses.title,
@@ -179,7 +181,6 @@ export async function sendEnrollmentEmailForUser(opts: {
     if (!course) return false;
     if (course.sendEnrollmentEmail === false) return false;
 
-    // Fetch platform flag
     try {
       const [platformRow] = await db
         .select({ enrollmentEmailEnabled: platformSettings.enrollmentEmailEnabled })
@@ -188,7 +189,6 @@ export async function sendEnrollmentEmailForUser(opts: {
       if (platformRow?.enrollmentEmailEnabled === false) return false;
     } catch { /* non-fatal */ }
 
-    // Fetch user
     const [user] = await db
       .select({ name: users.name, email: users.email })
       .from(users)
@@ -196,7 +196,6 @@ export async function sendEnrollmentEmailForUser(opts: {
       .limit(1);
     if (!user?.email) return false;
 
-    // Get access token
     let accessToken: string | null = null;
     try { accessToken = await getOrCreateAccessToken(opts.userId); } catch { /* optional */ }
 
@@ -214,16 +213,16 @@ export async function sendEnrollmentEmailForUser(opts: {
   }
 }
 
-// ─── Digital Download Access Email ───────────────────────────────────────────
 export async function sendDownloadAccessEmail(opts: {
   to: { name: string; email: string };
   productTitle: string;
   productSlug: string;
   customSubject?: string | null;
   customIntro?: string | null;
-  /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
   brand?: Brand;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your download is ready: "${opts.productTitle}"`;
@@ -254,21 +253,27 @@ export async function sendDownloadAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
-  return deliverEmail({ to: opts.to, subject, htmlBody, brandMode: "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    brandMode: "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
-// ─── Bundle Access Email ──────────────────────────────────────────────────────
 export async function sendBundleAccessEmail(opts: {
   to: { name: string; email: string };
   bundleTitle: string;
   bundleSlug: string;
   customSubject?: string | null;
   customIntro?: string | null;
-  /** Optional canonical bundle URL; legacy digital bundles retain their app route. */
   destinationUrl?: string | null;
-  /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
   brand?: Brand;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `You've been granted access to "${opts.bundleTitle}"`;
@@ -299,21 +304,27 @@ export async function sendBundleAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
-  return deliverEmail({ to: opts.to, subject, htmlBody, brandMode: "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    brandMode: "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
-// ─── Quiz Access Email ────────────────────────────────────────────────────────
 export async function sendQuizAccessEmail(opts: {
   to: { name: string; email: string };
   quizTitle: string;
   courseSlug?: string | null;
   customSubject?: string | null;
   customIntro?: string | null;
-  /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
-  /** For new guest accounts: URL to set a permanent password */
   setPasswordUrl?: string | null;
   brand?: Brand;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your access to "${opts.quizTitle}" is ready 🎯`;
@@ -354,11 +365,16 @@ export async function sendQuizAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
-  return deliverEmail({ to: opts.to, subject, htmlBody, brandMode: "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    brandMode: "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
-
-/** Sends a reusable confirmation/access message for purchased content. */
 export async function sendPurchaseAccessEmail(opts: {
   to: { name: string; email: string };
   subject: string;
@@ -370,6 +386,8 @@ export async function sendPurchaseAccessEmail(opts: {
   brand?: Brand;
   brandMode?: BrandMode;
   detailsHtml?: string;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const brand = opts.brand ?? "aaus";
   const name = opts.to.name.split(" ")[0] || opts.to.name || "there";
@@ -381,5 +399,12 @@ export async function sendPurchaseAccessEmail(opts: {
     ${accessCtaWithFallback(accessUrl, opts.accessLabel)}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">If you have questions, reply to this email or contact support.</p>
   `, opts.brandMode ?? "combined");
-  return deliverEmail({ to: opts.to, subject: opts.subject, htmlBody, brandMode: opts.brandMode ?? "combined" });
+  return deliverEmail({
+    to: opts.to,
+    subject: opts.subject,
+    htmlBody,
+    brandMode: opts.brandMode ?? "combined",
+    payee: opts.payee,
+    forPurchase: opts.forPurchase ?? true,
+  });
 }

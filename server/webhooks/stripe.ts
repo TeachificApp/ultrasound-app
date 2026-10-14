@@ -48,6 +48,15 @@ function getCheckoutRecipient(session: Record<string, unknown>, meta: Record<str
   };
 }
 
+function getCheckoutPayer(session: Record<string, unknown>, meta: Record<string, string>): { email: string | null; name: string | null } {
+  const details = (session.customer_details ?? {}) as Record<string, unknown>;
+  const stringValue = (value: unknown): string | null => typeof value === "string" && value.trim() ? value.trim() : null;
+  return {
+    email: stringValue(meta.payer_email) ?? stringValue(session.customer_email) ?? stringValue(details.email) ?? stringValue(meta.customer_email),
+    name: stringValue(meta.customer_name) ?? stringValue(details.name),
+  };
+}
+
 function platformBrand(value: string | null | undefined): "aaus" | "iheartecho" {
   return value === "iheartecho" ? "iheartecho" : "aaus";
 }
@@ -81,11 +90,20 @@ async function resolveCheckoutRecipientUser(session: Record<string, unknown>, me
   return { ...recipient, user: resolved.user, isNew: resolved.isNew };
 }
 
-async function deliverDownloadAccessOnce(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, checkoutSessionId: string | null | undefined, userId: number, productId: number) {
+async function deliverDownloadAccessOnce(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  checkoutSessionId: string | null | undefined,
+  userId: number,
+  productId: number,
+  payee?: { email?: string | null; name?: string | null },
+) {
   return sendPurchaseNotificationOnce(db, {
     checkoutSessionId,
     notificationType: "download_access",
-    send: () => sendPurchaseConfirmationEmail(userId, productId),
+    send: () => sendPurchaseConfirmationEmail(userId, productId, {
+      payeeEmail: payee?.email,
+      payeeName: payee?.name,
+    }),
   });
 }
 
@@ -379,6 +397,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
   let userId = resolvedRecipient?.user.id ?? (checkoutRecipient.email ? null : (meta.user_id ? parseInt(meta.user_id) : null));
   const customerEmail = checkoutRecipient.email;
   const customerName = resolvedRecipient?.user.name ?? checkoutRecipient.name;
+  const payer = getCheckoutPayer(session, meta);
 
   if (!userId) {
     console.warn(`[Stripe] Digital download checkout: no userId and could not resolve from email. Session: ${session.id}`);
@@ -407,7 +426,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       }
       console.log(`[Stripe] Digital download payment already reconciled: ${paymentIntentId}`);
       if (existingPayment.userId === userId) {
-        const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId);
+        const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer);
         if (delivery.attempted && !delivery.delivered) {
           await notifyOwner({ title: "⚠️ Download access email failed", content: `Checkout ${session.id} granted a download entitlement but its access email could not be sent.` });
         }
@@ -432,7 +451,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       stripePaymentIntentId: (session.payment_intent as string) ?? null,
       message: `Checkout completed but user already owns download product ${productId}`,
     });
-    const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId);
+    const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer);
     const deliverySucceeded = delivery.delivered;
     try {
       const { logPurchaseActivity } = await import("../lib/downloadAccess");
@@ -527,7 +546,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     });
   } catch (_e) { /* non-blocking */ }
   // Send one session-idempotent purchase confirmation with the file links.
-  const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId);
+  const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer);
   const deliverySucceeded = delivery.delivered;
   if (delivery.attempted && !delivery.delivered) {
     await notifyOwner({ title: "⚠️ Download access email failed", content: `Checkout ${session.id} recorded a download purchase but its access email could not be sent.` });
@@ -667,44 +686,75 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
   if (!workshopId || !instanceId) return;
   const db = await getDb();
   if (!db) return;
+
   const recipient = await resolveCheckoutRecipientUser(session, meta);
-  const userId = recipient?.user.id ?? (meta.user_id ? parseInt(meta.user_id, 10) : null);
-  if (!userId) {
-    await notifyOwner({ title: "⚠️ Workshop purchase needs review", content: `Checkout ${session.id} for workshop #${workshopId} has no resolvable recipient account.` });
+  const sessionRecord = { ...session, metadata: { ...meta } } as Record<string, unknown>;
+  const enrichedMeta = sessionRecord.metadata as Record<string, string>;
+  if (recipient?.user.id) enrichedMeta.user_id = String(recipient.user.id);
+  if (recipient?.email) enrichedMeta.customer_email = recipient.email;
+
+  const { fulfillWorkshopCheckoutFromStripeSession } = await import("../lib/workshopCheckoutFulfillment");
+  const fulfillment = await fulfillWorkshopCheckoutFromStripeSession(db as any, sessionRecord);
+  if (!fulfillment.success) {
+    console.warn("[Stripe] Workshop checkout fulfillment skipped:", fulfillment.error, meta.customer_email ?? "");
+    if (!fulfillment.userId) {
+      await notifyOwner({ title: "⚠️ Workshop purchase needs review", content: `Checkout ${session.id} for workshop #${workshopId} has no resolvable recipient account.` });
+    }
     return;
   }
+  const userId = fulfillment.userId!;
+  const { created } = fulfillment;
+
   const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, brand: workshops.brand, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
     .from(workshops).where(eq(workshops.id, workshopId)).limit(1);
   const [instance] = await db.select({ title: workshopInstances.title, status: workshopInstances.status, confirmationEmailApproved: workshopInstances.confirmationEmailApproved, confirmationEmailSubject: workshopInstances.confirmationEmailSubject, confirmationEmailHeading: workshopInstances.confirmationEmailHeading, confirmationEmailIntro: workshopInstances.confirmationEmailIntro, confirmationEmailDetails: workshopInstances.confirmationEmailDetails })
     .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
   if (!workshop || !instance) return;
-  const [existing] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)
-    .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.instanceId, instanceId), eq(workshopEnrollments.stripeSessionId, session.id as string))).limit(1);
-  if (!existing) {
-    await db.insert(workshopEnrollments).values({
-      workshopId, instanceId, userId, stripeSessionId: session.id as string,
-      amountPaid: (session.amount_total as number) ?? 0,
-      currency: (session.currency as string) ?? "usd", status: "active",
-      accessLevel: instance.status === "presale" ? "presale" : "full", accessGrantedAt: new Date(),
-    });
-    await grantScheduledContentAccess(db, { userId, sourceType: "workshop_instance", sourceId: instanceId });
+
+  if (created) {
     await notifyOwner({ title: "🏫 New Workshop Enrollment", content: `User ID ${userId} enrolled in "${workshop.title}".` });
+    try {
+      const { recordRevenueShareFromCompletedCheckout } = await import("../lib/revenueShareEngine");
+      await recordRevenueShareFromCompletedCheckout({
+        session,
+        courseId: workshopId,
+        courseTitle: workshop.title,
+      });
+    } catch (rsErr) {
+      console.error("[RevenueShare] Workshop transfer error:", rsErr);
+    }
   }
+
   const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
+  const payer = getCheckoutPayer(session, meta);
+
   if (email && workshop.welcomeEmailEnabled !== false && isWorkshopConfirmationReady(instance)) {
     const brand = platformBrand(workshop.brand);
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "workshop_registration",
-      send: async () => sendPurchaseAccessEmail({
-        to: { name: recipient?.name || email.split("@")[0], email },
-        subject: instance.confirmationEmailSubject?.trim() || workshop.welcomeEmailSubject || `You're registered: ${workshop.title}`,
-        heading: instance.confirmationEmailHeading?.trim() || "Your workshop registration is confirmed",
-        intro: instance.confirmationEmailIntro?.trim() || `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
-        accessLabel: "View Workshop Details",
-        destinationUrl: `${learnOriginForPurchaseBrand(brand)}/workshops/${workshop.slug}`,
-        accessToken: await getOrCreateAccessToken(userId), brand, brandMode: "combined", detailsHtml: instance.confirmationEmailDetails!,
-      }),
+      send: async () => {
+        const { resolvePurchaseEmailTargets } = await import("../lib/purchaseAccessEmailDelivery");
+        const { to, payee } = await resolvePurchaseEmailTargets({
+          userId,
+          checkoutEmail: payer.email,
+          checkoutName: payer.name,
+        });
+        return sendPurchaseAccessEmail({
+          to: { name: recipient?.name || to.name || email.split("@")[0], email: to.email || email },
+          payee,
+          forPurchase: true,
+          subject: instance.confirmationEmailSubject?.trim() || workshop.welcomeEmailSubject || `You're registered: ${workshop.title}`,
+          heading: instance.confirmationEmailHeading?.trim() || "Your workshop registration is confirmed",
+          intro: instance.confirmationEmailIntro?.trim() || `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
+          accessLabel: "View Workshop Details",
+          destinationUrl: `${learnOriginForPurchaseBrand(brand)}/workshops/${workshop.slug}`,
+          accessToken: await getOrCreateAccessToken(userId),
+          brand,
+          brandMode: "combined",
+          detailsHtml: instance.confirmationEmailDetails!,
+        });
+      },
     });
     if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Workshop confirmation email failed", content: `Checkout ${session.id} registered the learner for "${workshop.title}", but its confirmation email could not be sent.` });
   } else if (email && workshop.welcomeEmailEnabled !== false) {

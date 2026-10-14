@@ -18,6 +18,10 @@ export interface EmailAttachment {
 
 export interface SendEmailOptions {
   to: EmailRecipient;
+  /** Additional visible recipients (same message). */
+  cc?: EmailRecipient[];
+  /** Hidden copies (e.g. purchase admin notifications). */
+  bcc?: EmailRecipient[];
   subject: string;
   htmlBody: string;
   previewText?: string;
@@ -43,6 +47,13 @@ export interface SendEmailOptions {
    * platform campaign without transmitting recipient identity as metadata.
    */
   campaignId?: number;
+  /**
+   * Purchase/access grant: BCC admin@allaboutultrasound.com and optionally send a
+   * duplicate to the payee when their email differs from `to` (the learner).
+   */
+  purchaseAccess?: {
+    payee?: EmailRecipient | null;
+  };
 }
 
 export type EmailProviderId = "sendgrid" | "smtpcom";

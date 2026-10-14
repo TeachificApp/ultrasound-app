@@ -5546,11 +5546,31 @@ export const lmsLearnerRouter = router({
               console.error("[CheckoutStatus] Webinar fallback fulfillment error:", err);
             }
           }
+          if (meta.type === "workshop") {
+            try {
+              const { fulfillWorkshopCheckoutFromStripeSession } = await import("../lib/workshopCheckoutFulfillment");
+              const workshopResult = await fulfillWorkshopCheckoutFromStripeSession(
+                db as any,
+                session as unknown as Record<string, unknown>,
+              );
+              if (workshopResult.success && workshopResult.created) {
+                console.log(
+                  `[CheckoutStatus] Workshop fallback fulfilled: user ${workshopResult.userId}, instance ${workshopResult.instanceId}`,
+                );
+              }
+            } catch (err) {
+              console.error("[CheckoutStatus] Workshop fallback fulfillment error:", err);
+            }
+          }
         }
       }
 
       let courseSlug: string | null = meta.course_slug ?? null;
-      let contentType: string = meta.trigger_order_type ?? "course";
+      let contentType: string = meta.type === "workshop"
+        ? "workshop"
+        : meta.type === "webinar"
+          ? "webinar"
+          : meta.trigger_order_type ?? "course";
       if (meta.course_id) {
         const db = await getDb();
         if (db) {
