@@ -229,6 +229,7 @@ export const lmsEnrollmentAdminRouter = router({
               customSubject: settings?.enrollmentEmailSubject,
               customIntro: settings?.enrollmentEmailIntro,
               accessToken,
+              explicitAccessEmailConsent: true,
             });
           } else {
             await sendEnrollmentEmail({
@@ -238,6 +239,7 @@ export const lmsEnrollmentAdminRouter = router({
               customSubject: settings?.enrollmentEmailSubject,
               customIntro: settings?.enrollmentEmailIntro,
               accessToken,
+              explicitAccessEmailConsent: true,
             });
           }
         } catch (e) {
@@ -1847,6 +1849,7 @@ CRITICAL REQUIREMENTS:
               customSubject: settings?.enrollmentEmailSubject,
               customIntro: settings?.enrollmentEmailIntro,
               accessToken: accessToken2,
+              explicitAccessEmailConsent: true,
             });
           } else {
             await sendEnrollmentEmail({
@@ -1856,6 +1859,7 @@ CRITICAL REQUIREMENTS:
               customSubject: settings?.enrollmentEmailSubject,
               customIntro: settings?.enrollmentEmailIntro,
               accessToken: accessToken2,
+              explicitAccessEmailConsent: true,
             });
           }
         } catch (e) {

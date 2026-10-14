@@ -40,7 +40,7 @@ export async function repairUserAccess(
   const accessToken = await regenerateAccessToken(user.id);
 
   let enrollmentEmailsSent = 0;
-  const resendEnrollment = options.resendEnrollment !== false;
+  const resendEnrollment = options.resendEnrollment === true;
   if (resendEnrollment) {
     const diagnosis = await diagnoseUserAccess(db, normalized, accessToken);
     for (const enrollment of diagnosis.enrollments) {

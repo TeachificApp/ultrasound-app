@@ -60,6 +60,14 @@ async function deliverSingleEmail(opts: SendEmailOptions): Promise<boolean> {
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
+  const { shouldSendAccessGrantEmail } = await import("../lib/accessEmailConsent");
+  if (!shouldSendAccessGrantEmail(opts)) {
+    console.warn(
+      `[email] Suppressed access-grant email to ${opts.to.email} (subject: ${opts.subject}). ` +
+        "Set ALLOW_AUTOMATIC_ACCESS_GRANT_EMAILS=true or use explicit admin send.",
+    );
+    return false;
+  }
   if (opts.purchaseAccess !== undefined) {
     const { deliverPurchaseAccessEmail } = await import("../lib/purchaseAccessEmailDelivery");
     return deliverPurchaseAccessEmail(opts, deliverSingleEmail);

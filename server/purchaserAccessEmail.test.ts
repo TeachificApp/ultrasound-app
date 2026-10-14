@@ -11,7 +11,10 @@ import { sendEnrollmentEmail } from "./lib/enrollmentEmail";
 describe("purchaser access email CTA", () => {
   const accessUrl = "https://learn.allaboutultrasound.com/api/auth/auto-login?token=test-token";
 
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    process.env.ALLOW_AUTOMATIC_ACCESS_GRANT_EMAILS = "true";
+    vi.clearAllMocks();
+  });
 
   it("uses Gmail-safe solid button markup with an explicit href", () => {
     const html = buildTransactionalEmailCta({ href: accessUrl, label: "Access Your Purchase", color: "#189aa1" });

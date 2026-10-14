@@ -8,6 +8,7 @@ describe("repairUserAccess wiring", () => {
     expect(source).toContain("export async function repairUserAccess");
     expect(source).toContain("clearSendGridSuppressionLists");
     expect(source).toContain("regenerateAccessToken");
+    expect(source).toContain("resendEnrollment === true");
   });
 
   it("exposes adminUser.repairUserAccess for platform admins", async () => {

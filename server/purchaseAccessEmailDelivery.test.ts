@@ -14,7 +14,10 @@ import {
 } from "./lib/purchaseAccessEmailDelivery";
 
 describe("purchase access email delivery", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    process.env.ALLOW_AUTOMATIC_ACCESS_GRANT_EMAILS = "true";
+    vi.clearAllMocks();
+  });
 
   it("detects equal emails case-insensitively", () => {
     expect(emailsEqual("A@Example.com", "a@example.com")).toBe(true);
