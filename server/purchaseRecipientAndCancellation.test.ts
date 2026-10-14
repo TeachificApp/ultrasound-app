@@ -25,15 +25,23 @@ describe("purchase recipient and cancellation safeguards", () => {
     expect(resolveDashboardSubscriptionCancelledAt(null, past)).toBeNull();
   });
 
-  it("supports recipient access without replacing Stripe payer details", () => {
+  it("collects recipient access on the payment page without a separate checkout step", () => {
     const checkout = source("../client/src/pages/Checkout.tsx");
     const workshopCheckout = source("../client/src/pages/WorkshopCheckout.tsx");
     const lms = source("./routers/lmsRouter.ts");
     const fulfillment = source("./lib/lmsCheckoutFulfillment.ts");
     const membershipFulfillment = source("./lib/membershipFulfillment.ts");
 
-    expect(checkout).toContain("Register or give access to someone else");
-    expect(workshopCheckout).toContain("Register another learner");
+    expect(checkout).toContain("Will the learner use the same name and email as the payer?");
+    expect(workshopCheckout).toContain("Will the learner use the same name and email as the payer?");
+    expect(checkout).toContain("Yes, same learner");
+    expect(checkout).toContain("No, another learner");
+    expect(workshopCheckout).toContain("Yes, same learner");
+    expect(workshopCheckout).toContain("No, another learner");
+    expect(checkout).not.toContain("Continue to secure payment");
+    expect(workshopCheckout).not.toContain("Continue to payment");
+    expect(checkout).not.toContain("checkoutDetailsSubmitted");
+    expect(workshopCheckout).not.toContain("checkoutDetailsSubmitted");
     expect(lms).toContain("recipientEmail: z.string().trim().email()");
     expect(lms).toContain("recipient_email");
     expect(fulfillment).toContain("meta.recipient_email ||");

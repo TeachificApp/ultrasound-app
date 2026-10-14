@@ -21,7 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Lock, ArrowLeft, AlertCircle, Bell, CheckCircle2, ShieldCheck, ArrowRight,
+  Lock, ArrowLeft, AlertCircle, Bell, CheckCircle2, ShieldCheck,
 } from "lucide-react";
 import { formatWorkshopDollars } from "../../../shared/workshopPricing";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
@@ -57,11 +57,13 @@ export default function WorkshopCheckout() {
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
-  const [purchaseForRecipient, setPurchaseForRecipient] = useState(false);
-  const [recipientName, setRecipientName] = useState("");
-  const [recipientEmail, setRecipientEmail] = useState("");
-  const [checkoutDetailsSubmitted, setCheckoutDetailsSubmitted] = useState(false);
+  // Stripe collects the payer; learner access is confirmed alongside payment.
+  const [learnerIsPayee, setLearnerIsPayee] = useState(true);
+  const [learnerName, setLearnerName] = useState("");
+  const [learnerEmail, setLearnerEmail] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [activeSessionKey, setActiveSessionKey] = useState<string | null>(null);
+  const activeSessionKeyRef = useRef<string | null>(null);
   const [freeSuccess, setFreeSuccess] = useState(false);
   const [sessionMeta, setSessionMeta] = useState<{
     workshopTitle: string;
@@ -83,68 +85,45 @@ export default function WorkshopCheckout() {
     availabilityStatus?: "waitlist" | "enrollment_closed";
   } | null>(null);
 
-  const createSession = trpc.workshopLearner.createEmbeddedCheckoutSession.useMutation({
-    onSuccess: (data) => {
-      const { clientSecret: cs, free, ...meta } = data;
-      setSessionMeta({ ...meta, free });
-      if (free) {
-        setFreeSuccess(true);
-      } else {
-        setClientSecret(cs);
-      }
-    },
-  });
-
-  const sessionStarted = useRef(false);
+  const createSession = trpc.workshopLearner.createEmbeddedCheckoutSession.useMutation();
+  const hasValidLearnerDetails = learnerIsPayee || (learnerName.trim().length > 1 && /^\S+@\S+\.\S+$/.test(learnerEmail.trim()));
+  const checkoutSessionKey = [slug ?? "", searchParams.instanceId ?? "", learnerIsPayee ? "payer" : `${learnerName.trim()}|${learnerEmail.trim().toLowerCase()}`].join(":");
+  const invalidateEmbeddedSession = () => {
+    activeSessionKeyRef.current = null;
+    setActiveSessionKey(null);
+    setClientSecret(null);
+    setSessionMeta(null);
+    setFreeSuccess(false);
+  };
   useEffect(() => {
-    if (!slug || !searchParams.instanceId || !checkoutDetailsSubmitted || sessionStarted.current) return;
-    sessionStarted.current = true;
-    createSession.mutate({
-      workshopSlug: slug,
-      instanceId: searchParams.instanceId,
-      origin: window.location.origin,
-      ...(purchaseForRecipient && recipientEmail.trim()
-        ? { recipientName: recipientName.trim() || undefined, recipientEmail: recipientEmail.trim().toLowerCase() }
-        : {}),
-    });
-  }, [slug, searchParams.instanceId, checkoutDetailsSubmitted, purchaseForRecipient, recipientName, recipientEmail]);
+    if (!slug || !searchParams.instanceId || !hasValidLearnerDetails || activeSessionKey === checkoutSessionKey || activeSessionKeyRef.current === checkoutSessionKey) return;
+    const timeout = window.setTimeout(() => {
+      activeSessionKeyRef.current = checkoutSessionKey;
+      setActiveSessionKey(checkoutSessionKey);
+      setClientSecret(null);
+      setSessionMeta(null);
+      setFreeSuccess(false);
+      createSession.mutate({
+        workshopSlug: slug,
+        instanceId: searchParams.instanceId,
+        origin: window.location.origin,
+        ...(!learnerIsPayee ? { recipientName: learnerName.trim(), recipientEmail: learnerEmail.trim().toLowerCase() } : {}),
+      }, { onSuccess: (data) => {
+        if (activeSessionKeyRef.current !== checkoutSessionKey) return;
+        const { clientSecret: cs, free, ...meta } = data;
+        setSessionMeta({ ...meta, free });
+        if (free) setFreeSuccess(true);
+        else setClientSecret(cs);
+      }});
+    }, learnerIsPayee ? 0 : 350);
+    return () => window.clearTimeout(timeout);
+  }, [slug, searchParams.instanceId, learnerIsPayee, learnerName, learnerEmail, hasValidLearnerDetails, checkoutSessionKey, activeSessionKey]);
 
   const primary = sessionMeta?.primaryColor ?? "#189aa1";
   const stripeOptions = useMemo(() => (clientSecret ? { clientSecret } : undefined), [clientSecret]);
 
   const backHref = `/workshops/${slug}`;
 
-  if (!checkoutDetailsSubmitted) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-teal-100 p-7 max-w-xl w-full">
-          <h1 className="text-2xl font-semibold text-gray-900">Workshop registration</h1>
-          <p className="mt-2 text-sm leading-relaxed text-gray-600">Securely register yourself or enter a learner’s details when your organization is paying for their workshop seat.</p>
-          <div className="mt-6 rounded-xl border border-teal-100 bg-teal-50/60 p-4">
-            <div className="flex items-start gap-3">
-              <Checkbox id="workshop-recipient" checked={purchaseForRecipient} onCheckedChange={(checked) => setPurchaseForRecipient(Boolean(checked))} className="mt-0.5" />
-              <label htmlFor="workshop-recipient" className="cursor-pointer text-sm text-teal-950">
-                <span className="font-semibold">Register another learner</span>
-                <span className="mt-1 block text-xs leading-relaxed text-teal-800">The registrant will receive the workshop confirmation and access details.</span>
-              </label>
-            </div>
-            {purchaseForRecipient && (
-              <div className="mt-4 grid gap-3">
-                <Input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} placeholder="Registrant name (optional)" autoComplete="name" />
-                <Input value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="Registrant email" type="email" autoComplete="email" />
-              </div>
-            )}
-          </div>
-          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Link href={backHref}><Button variant="outline">Back to Workshop</Button></Link>
-            <Button className="text-white bg-[#189aa1] hover:bg-[#147a80]" disabled={purchaseForRecipient && !/^\S+@\S+\.\S+$/.test(recipientEmail.trim())} onClick={() => setCheckoutDetailsSubmitted(true)}>
-              Continue to payment <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Restricted workshop instances never receive a Stripe client secret. Keep users
   // on a clear availability screen so Waitlist capture and closed enrollment cannot
@@ -283,8 +262,31 @@ export default function WorkshopCheckout() {
 
         </div>
 
-        {/* Right — Terms agreement + Stripe embedded checkout */}
+        {/* Right — learner assignment, terms, and embedded Stripe checkout */}
         <div className="space-y-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <h3 className="text-base font-semibold text-gray-900">Learner access</h3>
+            <p className="mt-1 text-sm text-gray-500">Will the learner use the same name and email as the payer?</p>
+            <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Learner and payer relationship">
+              <button type="button" aria-pressed={learnerIsPayee} onClick={() => { if (!learnerIsPayee) { setLearnerIsPayee(true); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Yes, same learner</button>
+              <button type="button" aria-pressed={!learnerIsPayee} onClick={() => { if (learnerIsPayee) { setLearnerIsPayee(false); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${!learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>No, another learner</button>
+            </div>
+            {!learnerIsPayee && (
+              <div className="mt-4 grid gap-3">
+                <Input value={learnerName} onChange={(event) => { setLearnerName(event.target.value); invalidateEmbeddedSession(); }} placeholder="Learner full name" autoComplete="name" required />
+                <Input value={learnerEmail} onChange={(event) => { setLearnerEmail(event.target.value); invalidateEmbeddedSession(); }} placeholder="Learner email" type="email" autoComplete="email" required />
+                <p className="text-xs leading-relaxed text-gray-500">The payer receives the Stripe receipt. The learner receives workshop registration details and access.</p>
+              </div>
+            )}
+          </div>
+          {!hasValidLearnerDetails ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+              <ShieldCheck className="mx-auto h-10 w-10" style={{ color: primary }} />
+              <h4 className="mt-4 text-base font-semibold text-gray-900">Add the learner’s details</h4>
+              <p className="mt-2 text-sm text-gray-500">Enter the learner’s full name and email above to load secure payment.</p>
+            </div>
+          ) : (
+            <>
           {/* Terms agreement card — above Stripe embed */}
           {sessionMeta && !sessionMeta.free && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
@@ -351,6 +353,8 @@ export default function WorkshopCheckout() {
               </div>
             ) : null}
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>
