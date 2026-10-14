@@ -498,13 +498,14 @@ async function sendMembershipWelcomeEmail(opts: {
     });
     const subject = `Your ${opts.planTitle} membership is ready`;
     const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
-    return sendEmail({
+    const { withPurchaseAccessRecipients } = await import("./purchaseAccessEmailDelivery");
+    return sendEmail(await withPurchaseAccessRecipients({
       to: { name: opts.name, email: opts.email },
       subject,
       htmlBody: enhancedBody,
       previewText: `Access your ${opts.planTitle} membership on All About Ultrasound`,
       brandMode: "combined",
-    });
+    }, { userId: opts.userId, checkoutEmail: opts.email, checkoutName: opts.name }));
   }
 
   const { buildFunnelPurchaseConfirmationEmail } = await import("../_core/email");
@@ -515,13 +516,14 @@ async function sendMembershipWelcomeEmail(opts: {
     loginUrl: autoLoginUrl,
     brandMode: "aaus",
   });
-  return sendEmail({
+  const { withPurchaseAccessRecipients } = await import("./purchaseAccessEmailDelivery");
+  return sendEmail(await withPurchaseAccessRecipients({
     to: { name: opts.name, email: opts.email },
     subject: subject.replace("Purchase confirmed", `Your ${opts.planTitle} membership is active`),
     htmlBody: htmlBody.replace("</body>", `${accessNote}</body>`),
     previewText,
     brandMode: "combined",
-  });
+  }, { userId: opts.userId, checkoutEmail: opts.email, checkoutName: opts.name }));
 }
 
 /**

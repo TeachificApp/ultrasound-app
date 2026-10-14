@@ -616,9 +616,17 @@ export async function reconcileLmsCheckoutFromStripeSession(
             const setPasswordUrl = newUserResetToken
               ? `https://app.allaboutultrasound.com/auth/reset-password?token=${newUserResetToken}`
               : null;
+            const { resolvePurchaseEmailTargets } = await import("./purchaseAccessEmailDelivery");
+            const { to: learnerTo, payee } = await resolvePurchaseEmailTargets({
+              userId,
+              checkoutEmail: customerEmail,
+              checkoutName: customerName,
+            });
             if (course.type === "quiz") {
               return sendQuizAccessEmail({
-                to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
+                to: learnerTo,
+                payee,
+                forPurchase: true,
                 quizTitle: course.title,
                 courseSlug: course.slug,
                 accessToken,
@@ -627,7 +635,9 @@ export async function reconcileLmsCheckoutFromStripeSession(
               });
             }
             return sendEnrollmentEmail({
-              to: { name: customerName || customerEmail.split("@")[0], email: customerEmail },
+              to: learnerTo,
+              payee,
+              forPurchase: true,
               courseTitle: course.title,
               courseSlug: course.slug,
               accessToken,

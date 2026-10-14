@@ -81,6 +81,13 @@ describe("purchase recipient and cancellation safeguards", () => {
     expect(stripe).toContain('notificationType: "physical_order"');
     expect(stripe).toContain("resolveCheckoutRecipientUser(session, meta)");
     expect(stripe).toContain("sendPurchaseAccessEmail");
+    expect(stripe).toContain("deliverFunnelPurchaseAccessEmail");
+  });
+
+  it("BCCs admin on purchase access emails", () => {
+    const delivery = source("./lib/purchaseAccessEmailDelivery.ts");
+    expect(delivery).toContain("admin@allaboutultrasound.com");
+    expect(delivery).toContain("deliverPurchaseAccessEmail");
   });
 
   it("holds automatic workshop registration emails until the owner approves the dated content", () => {

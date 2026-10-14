@@ -2250,7 +2250,11 @@ export const downloadsCheckoutPublicRouter = router({
 });
 
 // ─── Email Helper ───────────────────────────────────────────────────────────
-export async function sendPurchaseConfirmationEmail(userId: number, productId: number): Promise<boolean> {
+export async function sendPurchaseConfirmationEmail(
+  userId: number,
+  productId: number,
+  opts?: { payeeEmail?: string | null; payeeName?: string | null },
+): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
   const user = await getUserById(userId);
@@ -2262,8 +2266,16 @@ export async function sendPurchaseConfirmationEmail(userId: number, productId: n
   let accessToken: string | null = null;
   try { accessToken = await getOrCreateAccessToken(userId); } catch { /* plain link remains safe */ }
   const brand = product.brand === "iheartecho" ? "iheartecho" : "aaus";
+  const { resolvePurchaseEmailTargets } = await import("../lib/purchaseAccessEmailDelivery");
+  const { to, payee } = await resolvePurchaseEmailTargets({
+    userId,
+    checkoutEmail: opts?.payeeEmail,
+    checkoutName: opts?.payeeName,
+  });
   const delivered = await sendDownloadAccessEmail({
-    to: { name: user.name || user.email.split("@")[0], email: user.email },
+    to,
+    payee,
+    forPurchase: true,
     productTitle: product.title,
     productSlug: product.slug,
     accessToken,

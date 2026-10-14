@@ -1,0 +1,165 @@
+import type { MySql2Database } from "drizzle-orm/mysql2";
+import type * as schema from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
+import { lmsCourses, digitalProducts, digitalBundles } from "../../drizzle/schema";
+import { getOrCreateAccessToken } from "../db";
+import {
+  sendEnrollmentEmail,
+  sendDownloadAccessEmail,
+  sendBundleAccessEmail,
+  sendQuizAccessEmail,
+  learnOriginForBrand,
+} from "./enrollmentEmail";
+import { sendPurchaseNotificationOnce } from "./purchaseNotificationDelivery";
+import { resolvePurchaseEmailTargets } from "./purchaseAccessEmailDelivery";
+import { buildFunnelPurchaseConfirmationEmail } from "../_core/email";
+import { sendEmail } from "../_core/email";
+
+type FunnelAccessEmailInput = {
+  checkoutSessionId: string;
+  userId: number;
+  learnerEmail: string;
+  learnerName?: string | null;
+  payerEmail?: string | null;
+  payerName?: string | null;
+  productName: string;
+  productType: string;
+  fulfillmentCourseId: number | null;
+  fulfillmentDownloadId: number | null;
+  fulfillmentBundleId: number | null;
+  amountCents: number;
+  brandMode?: string;
+  cardLast4?: string | null;
+  cardBrand?: string | null;
+  bumpTitles?: string;
+  bumpPrices?: string;
+};
+
+/**
+ * One idempotent access email per funnel PaymentIntent, using product-specific templates when possible.
+ */
+export async function deliverFunnelPurchaseAccessEmail(
+  db: MySql2Database<typeof schema>,
+  input: FunnelAccessEmailInput,
+): Promise<void> {
+  const notificationType = "lms_access" as const;
+  await sendPurchaseNotificationOnce(db, {
+    checkoutSessionId: input.checkoutSessionId,
+    notificationType,
+    send: async () => {
+      const { to, payee } = await resolvePurchaseEmailTargets({
+        userId: input.userId,
+        checkoutEmail: input.payerEmail ?? input.learnerEmail,
+        checkoutName: input.payerName ?? input.learnerName,
+      });
+      const accessToken = await getOrCreateAccessToken(input.userId).catch(() => null);
+
+      if (input.fulfillmentCourseId) {
+        const [course] = await db
+          .select({
+            title: lmsCourses.title,
+            slug: lmsCourses.slug,
+            type: lmsCourses.type,
+            brand: lmsCourses.brand,
+          })
+          .from(lmsCourses)
+          .where(eq(lmsCourses.id, input.fulfillmentCourseId))
+          .limit(1);
+        if (course?.slug) {
+          if (course.type === "quiz") {
+            return sendQuizAccessEmail({
+              to,
+              payee,
+              forPurchase: true,
+              quizTitle: course.title,
+              courseSlug: course.slug,
+              accessToken,
+              brand: course.brand,
+            });
+          }
+          return sendEnrollmentEmail({
+            to,
+            payee,
+            forPurchase: true,
+            courseTitle: course.title,
+            courseSlug: course.slug,
+            accessToken,
+            brand: course.brand,
+          });
+        }
+      }
+
+      if (input.fulfillmentDownloadId) {
+        const [product] = await db
+          .select({ title: digitalProducts.title, slug: digitalProducts.slug, brand: digitalProducts.brand })
+          .from(digitalProducts)
+          .where(eq(digitalProducts.id, input.fulfillmentDownloadId))
+          .limit(1);
+        if (product) {
+          const brand = product.brand === "iheartecho" ? "iheartecho" : "aaus";
+          return sendDownloadAccessEmail({
+            to,
+            payee,
+            forPurchase: true,
+            productTitle: product.title,
+            productSlug: product.slug,
+            accessToken,
+            brand,
+          });
+        }
+      }
+
+      if (input.fulfillmentBundleId) {
+        const [bundle] = await db
+          .select({ title: digitalBundles.title, slug: digitalBundles.slug })
+          .from(digitalBundles)
+          .where(eq(digitalBundles.id, input.fulfillmentBundleId))
+          .limit(1);
+        if (bundle) {
+          return sendBundleAccessEmail({
+            to,
+            payee,
+            forPurchase: true,
+            bundleTitle: bundle.title,
+            bundleSlug: bundle.slug,
+            accessToken,
+            brand: "aaus",
+          });
+        }
+      }
+
+      const brandMode = (input.brandMode === "iheartecho" ? "iheartecho" : "aaus") as "aaus" | "iheartecho";
+      const learnBase = learnOriginForBrand(brandMode);
+      const loginUrl = accessToken
+        ? `${learnBase}/auth/access?token=${accessToken}&next=${encodeURIComponent(`${learnBase}/my-dashboard`)}`
+        : `${learnBase}/my-dashboard`;
+      const bumpTitleArr = input.bumpTitles ? input.bumpTitles.split("|") : [];
+      const bumpPriceArr = input.bumpPrices ? input.bumpPrices.split("|").map(Number) : [];
+      const bumpsForEmail = bumpTitleArr.map((t, i) => ({ title: t, price: bumpPriceArr[i] ?? 0 })).filter((b) => b.title);
+      const firstName = input.learnerName?.split(" ")[0] || "there";
+      const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
+        firstName,
+        productName: input.productName,
+        amountPaid: input.amountCents,
+        orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
+        loginUrl,
+        brandMode,
+        purchaseDate: new Date(),
+        cardLast4: input.cardLast4 ?? undefined,
+        cardBrand: input.cardBrand ?? undefined,
+      });
+      const { withPurchaseAccessRecipients } = await import("./purchaseAccessEmailDelivery");
+      return sendEmail(await withPurchaseAccessRecipients({
+        to: { name: input.learnerName || firstName, email: input.learnerEmail },
+        subject,
+        htmlBody,
+        previewText,
+        brandMode: "combined",
+      }, {
+        userId: input.userId,
+        checkoutEmail: input.payerEmail ?? input.learnerEmail,
+        checkoutName: input.payerName ?? input.learnerName,
+      }));
+    },
+  });
+}

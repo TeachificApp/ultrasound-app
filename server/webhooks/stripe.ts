@@ -47,6 +47,15 @@ function getCheckoutRecipient(session: Record<string, unknown>, meta: Record<str
   };
 }
 
+function getCheckoutPayer(session: Record<string, unknown>, meta: Record<string, string>): { email: string | null; name: string | null } {
+  const details = (session.customer_details ?? {}) as Record<string, unknown>;
+  const stringValue = (value: unknown): string | null => typeof value === "string" && value.trim() ? value.trim() : null;
+  return {
+    email: stringValue(meta.payer_email) ?? stringValue(session.customer_email) ?? stringValue(details.email) ?? stringValue(meta.customer_email),
+    name: stringValue(meta.customer_name) ?? stringValue(details.name),
+  };
+}
+
 function platformBrand(value: string | null | undefined): "aaus" | "iheartecho" {
   return value === "iheartecho" ? "iheartecho" : "aaus";
 }
@@ -80,11 +89,20 @@ async function resolveCheckoutRecipientUser(session: Record<string, unknown>, me
   return { ...recipient, user: resolved.user, isNew: resolved.isNew };
 }
 
-async function deliverDownloadAccessOnce(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, checkoutSessionId: string | null | undefined, userId: number, productId: number) {
+async function deliverDownloadAccessOnce(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  checkoutSessionId: string | null | undefined,
+  userId: number,
+  productId: number,
+  payee?: { email?: string | null; name?: string | null },
+) {
   return sendPurchaseNotificationOnce(db, {
     checkoutSessionId,
     notificationType: "download_access",
-    send: () => sendPurchaseConfirmationEmail(userId, productId),
+    send: () => sendPurchaseConfirmationEmail(userId, productId, {
+      payeeEmail: payee?.email,
+      payeeName: payee?.name,
+    }),
   });
 }
 
@@ -378,6 +396,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
   let userId = resolvedRecipient?.user.id ?? (checkoutRecipient.email ? null : (meta.user_id ? parseInt(meta.user_id) : null));
   const customerEmail = checkoutRecipient.email;
   const customerName = resolvedRecipient?.user.name ?? checkoutRecipient.name;
+  const payer = getCheckoutPayer(session, meta);
 
   if (!userId) {
     console.warn(`[Stripe] Digital download checkout: no userId and could not resolve from email. Session: ${session.id}`);
@@ -406,7 +425,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       }
       console.log(`[Stripe] Digital download payment already reconciled: ${paymentIntentId}`);
       if (existingPayment.userId === userId) {
-        const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId);
+        const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer);
         if (delivery.attempted && !delivery.delivered) {
           await notifyOwner({ title: "⚠️ Download access email failed", content: `Checkout ${session.id} granted a download entitlement but its access email could not be sent.` });
         }
@@ -431,7 +450,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       stripePaymentIntentId: (session.payment_intent as string) ?? null,
       message: `Checkout completed but user already owns download product ${productId}`,
     });
-    const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId);
+    const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer);
     const deliverySucceeded = delivery.delivered;
     try {
       const { logPurchaseActivity } = await import("../lib/downloadAccess");
@@ -526,7 +545,7 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     });
   } catch (_e) { /* non-blocking */ }
   // Send one session-idempotent purchase confirmation with the file links.
-  const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId);
+  const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer);
   const deliverySucceeded = delivery.delivered;
   if (delivery.attempted && !delivery.delivered) {
     await notifyOwner({ title: "⚠️ Download access email failed", content: `Checkout ${session.id} recorded a download purchase but its access email could not be sent.` });
@@ -580,13 +599,24 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "bundle_access",
-      send: async () => sendBundleAccessEmail({
-          to: { name: recipient?.name || email.split("@")[0], email },
+      send: async () => {
+        const payer = getCheckoutPayer(session, meta);
+        const { resolvePurchaseEmailTargets } = await import("../lib/purchaseAccessEmailDelivery");
+        const { to, payee } = await resolvePurchaseEmailTargets({
+          userId,
+          checkoutEmail: payer.email,
+          checkoutName: payer.name,
+        });
+        return sendBundleAccessEmail({
+          to,
+          payee,
+          forPurchase: true,
           bundleTitle: bundle.title,
           bundleSlug: bundle.slug,
           accessToken: await getOrCreateAccessToken(userId),
           brand: platformBrand(meta.brand ?? meta.brand_mode),
-        }),
+        });
+      },
     });
     if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Bundle access email failed", content: `Checkout ${session.id} granted bundle access but its access email could not be sent.` });
   }
@@ -643,12 +673,28 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "physical_order",
-      send: async () => sendPurchaseAccessEmail({
-        to: { name: recipient?.name || email.split("@")[0], email }, subject: `Order confirmed: ${title}`,
-        heading: "Your order is confirmed", intro: `your order for <strong style="color:#0e4a50;">${title}</strong> has been received and is being processed.`,
-        accessLabel: "View My Orders", destinationUrl: `${brand === "iheartecho" ? "https://app.iheartecho.com" : "https://app.allaboutultrasound.com"}/my-orders`,
-        accessToken: await getOrCreateAccessToken(userId), brand, brandMode: brand,
-      }),
+      send: async () => {
+        const payer = getCheckoutPayer(session, meta);
+        const { resolvePurchaseEmailTargets } = await import("../lib/purchaseAccessEmailDelivery");
+        const { to, payee } = await resolvePurchaseEmailTargets({
+          userId,
+          checkoutEmail: payer.email,
+          checkoutName: payer.name,
+        });
+        return sendPurchaseAccessEmail({
+          to: { name: recipient?.name || to.name || email.split("@")[0], email: to.email || email },
+          payee,
+          forPurchase: true,
+          subject: `Order confirmed: ${title}`,
+          heading: "Your order is confirmed",
+          intro: `your order for <strong style="color:#0e4a50;">${title}</strong> has been received and is being processed.`,
+          accessLabel: "View My Orders",
+          destinationUrl: `${brand === "iheartecho" ? "https://app.iheartecho.com" : "https://app.allaboutultrasound.com"}/my-orders`,
+          accessToken: await getOrCreateAccessToken(userId),
+          brand,
+          brandMode: brand,
+        });
+      },
     });
     if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Physical order confirmation email failed", content: `Checkout ${session.id} recorded a physical product order but its confirmation email could not be sent.` });
   }
@@ -680,20 +726,34 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
     await notifyOwner({ title: "🏫 New Workshop Enrollment", content: `User ID ${userId} enrolled in "${workshop.title}".` });
   }
   const email = fulfillment.recipientEmail ?? recipient.email;
+  const payer = getCheckoutPayer(session, meta);
   if (email && workshop.welcomeEmailEnabled !== false && isWorkshopConfirmationReady(instance)) {
     const brand = platformBrand(workshop.brand);
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "workshop_registration",
-      send: async () => sendPurchaseAccessEmail({
-        to: { name: (fulfillment.recipientName ?? recipient.name) || email.split("@")[0], email },
-        subject: instance.confirmationEmailSubject?.trim() || workshop.welcomeEmailSubject || `You're registered: ${workshop.title}`,
-        heading: instance.confirmationEmailHeading?.trim() || "Your workshop registration is confirmed",
-        intro: instance.confirmationEmailIntro?.trim() || `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
-        accessLabel: "View Workshop Details",
-        destinationUrl: `${learnOriginForPurchaseBrand(brand)}/workshops/${workshop.slug}`,
-        accessToken: await getOrCreateAccessToken(userId), brand, brandMode: "combined", detailsHtml: instance.confirmationEmailDetails!,
-      }),
+      send: async () => {
+        const { resolvePurchaseEmailTargets } = await import("../lib/purchaseAccessEmailDelivery");
+        const { to, payee } = await resolvePurchaseEmailTargets({
+          userId,
+          checkoutEmail: payer.email,
+          checkoutName: payer.name,
+        });
+        return sendPurchaseAccessEmail({
+          to: { name: (fulfillment.recipientName ?? recipient.name) || to.name || email.split("@")[0], email: to.email || email },
+          payee,
+          forPurchase: true,
+          subject: instance.confirmationEmailSubject?.trim() || workshop.welcomeEmailSubject || `You're registered: ${workshop.title}`,
+          heading: instance.confirmationEmailHeading?.trim() || "Your workshop registration is confirmed",
+          intro: instance.confirmationEmailIntro?.trim() || `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
+          accessLabel: "View Workshop Details",
+          destinationUrl: `${learnOriginForPurchaseBrand(brand)}/workshops/${workshop.slug}`,
+          accessToken: await getOrCreateAccessToken(userId),
+          brand,
+          brandMode: "combined",
+          detailsHtml: instance.confirmationEmailDetails!,
+        });
+      },
     });
     if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Workshop confirmation email failed", content: `Checkout ${session.id} registered the learner for "${workshop.title}", but its confirmation email could not be sent.` });
   } else if (email && workshop.welcomeEmailEnabled !== false) {
@@ -731,15 +791,29 @@ export async function handleWebinarCheckoutCompleted(session: Record<string, unk
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "webinar_registration",
-      send: async () => sendPurchaseAccessEmail({
-        to: { name: recipient?.name || email.split("@")[0], email },
-        subject: `You're registered: ${webinar.title}`,
-        heading: "Your webinar registration is confirmed",
-        intro: `you now have access to <strong style="color:#0e4a50;">${webinar.title}</strong>.`,
-        accessLabel: "Open Webinar",
-        destinationUrl: `${learnOriginForPurchaseBrand(brand)}/webinars/${webinar.slug}`,
-        accessToken: await getOrCreateAccessToken(userId), brand, brandMode: "combined", detailsHtml,
-      }),
+      send: async () => {
+        const payer = getCheckoutPayer(session, meta);
+        const { resolvePurchaseEmailTargets } = await import("../lib/purchaseAccessEmailDelivery");
+        const { to, payee } = await resolvePurchaseEmailTargets({
+          userId,
+          checkoutEmail: payer.email,
+          checkoutName: payer.name,
+        });
+        return sendPurchaseAccessEmail({
+          to: { name: recipient?.name || to.name || email.split("@")[0], email: to.email || email },
+          payee,
+          forPurchase: true,
+          subject: `You're registered: ${webinar.title}`,
+          heading: "Your webinar registration is confirmed",
+          intro: `you now have access to <strong style="color:#0e4a50;">${webinar.title}</strong>.`,
+          accessLabel: "Open Webinar",
+          destinationUrl: `${learnOriginForPurchaseBrand(brand)}/webinars/${webinar.slug}`,
+          accessToken: await getOrCreateAccessToken(userId),
+          brand,
+          brandMode: "combined",
+          detailsHtml,
+        });
+      },
     });
     if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Webinar confirmation email failed", content: `Checkout ${session.id} registered the learner for "${webinar.title}", but its confirmation email could not be sent.` });
   }
@@ -1414,11 +1488,25 @@ async function handleCanonicalBundleCheckoutCompleted(session: Record<string, un
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "bundle_access",
-      send: async () => sendBundleAccessEmail({
-        to: { name: recipient?.name || email.split("@")[0], email }, bundleTitle: bundle.title, bundleSlug: bundle.slug,
-        destinationUrl: `${learnOriginForPurchaseBrand(brand)}/bundles/${bundle.slug}`,
-        accessToken: await getOrCreateAccessToken(userId), brand,
-      }),
+      send: async () => {
+        const payer = getCheckoutPayer(session, meta);
+        const { resolvePurchaseEmailTargets } = await import("../lib/purchaseAccessEmailDelivery");
+        const { to, payee } = await resolvePurchaseEmailTargets({
+          userId,
+          checkoutEmail: payer.email,
+          checkoutName: payer.name,
+        });
+        return sendBundleAccessEmail({
+          to,
+          payee,
+          forPurchase: true,
+          bundleTitle: bundle.title,
+          bundleSlug: bundle.slug,
+          destinationUrl: `${learnOriginForPurchaseBrand(brand)}/bundles/${bundle.slug}`,
+          accessToken: await getOrCreateAccessToken(userId),
+          brand,
+        });
+      },
     });
     if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Bundle access email failed", content: `Checkout ${session.id} granted bundle access but its access email could not be sent.` });
   }
@@ -1550,60 +1638,20 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
               </div>`
             : "";
           const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
-          await _sendEmail({
+          const { withPurchaseAccessRecipients } = await import("../lib/purchaseAccessEmailDelivery");
+          await _sendEmail(await withPurchaseAccessRecipients({
             to: { name: customerName || firstName, email: customerEmail },
             subject,
             htmlBody: enhancedBody,
             previewText: `Access your ${meta.product_name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
-          });
+            brandMode: "combined",
+          }, { userId: resolvedUserId, checkoutEmail: customerEmail, checkoutName: customerName }));
           console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${resolvedUserId}) and sent welcome email with access token`);
         } catch (emailErr) {
           console.error(`[Stripe] Failed to send welcome email to ${customerEmail}:`, emailErr);
         }
       } else {
         console.log(`[Stripe] Resolved existing account for ${customerEmail} (userId=${resolvedUserId})`);
-        // For existing users, send a purchase confirmation email with auto-login token
-        // (new users get their email in the isNew branch above)
-        try {
-          const brandMode = (meta.brand_mode as string) || "aaus";
-          const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
-          const fulfillmentDownloadIdExisting = meta.product_type === "download" && meta.product_id ? parseInt(meta.product_id) : null;
-          const fulfillmentCourseIdExisting = meta.fulfillment_course_id ? parseInt(meta.fulfillment_course_id) : (meta.product_type === "course" && meta.product_id ? parseInt(meta.product_id) : null);
-          let loginUrlExisting = `${baseUrl}/my-dashboard`;
-          if (fulfillmentCourseIdExisting) {
-            try {
-              const { lmsCourses: lc } = await import("../../drizzle/schema");
-              const [cr] = await db.select({ slug: lc.slug }).from(lc).where(eq(lc.id, fulfillmentCourseIdExisting)).limit(1);
-              if (cr?.slug) loginUrlExisting = `${baseUrl}/courses/${cr.slug}`;
-            } catch { /* keep default */ }
-          } else if (fulfillmentDownloadIdExisting) {
-            loginUrlExisting = `${baseUrl}/my-downloads`;
-          }
-          let autoLoginUrlExisting = loginUrlExisting;
-          try {
-            const token = await generateAutoLoginToken(resolvedUserId!, loginUrlExisting);
-            autoLoginUrlExisting = `${baseUrl}/api/auth/auto-login?token=${token}`;
-          } catch { /* fall back to plain URL */ }
-          const firstName = (customerName || "").split(" ")[0] || "there";
-          const bumpTitleArr = bumpTitles ? bumpTitles.split("|") : [];
-          const bumpPriceArr = bumpPrices ? bumpPrices.split("|").map(Number) : [];
-          const bumpsForEmail = bumpTitleArr.map((t, i) => ({ title: t, price: bumpPriceArr[i] ?? 0 })).filter(b => b.title);
-          const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
-            firstName,
-            productName,
-            amountPaid: amount ?? 0,
-            orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
-            loginUrl: autoLoginUrlExisting,
-            brandMode: brandMode as any,
-            purchaseDate: new Date(),
-            cardLast4,
-            cardBrand,
-          });
-          await sendEmail({ to: { name: customerName || firstName, email: customerEmail! }, subject, htmlBody, previewText });
-          console.log(`[Stripe] Purchase confirmation email sent to existing user ${customerEmail} for "${productName}"`);
-        } catch (emailErr) {
-          console.error(`[Stripe] Failed to send confirmation email to existing user ${customerEmail}:`, emailErr);
-        }
       }
     } catch (autoErr) {
       console.error(`[Stripe] Failed to auto-create account for ${customerEmail}:`, autoErr);
@@ -1880,55 +1928,30 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
     content: `Payment succeeded.\nProduct: ${productName}\nEmail: ${customerEmail}\nName: ${customerName}\nAmount: $${((amount ?? 0) / 100).toFixed(2)}\nType: ${meta.type}\nPaymentIntent: ${piId}\nUser ID: ${resolvedUserId || "guest"}${!userId && resolvedUserId ? " (auto-created)" : ""}${fulfillmentNote ? `\nFulfillment: ${fulfillmentNote}` : ""}`,
   });
 
-  // Send buyer purchase confirmation email
-  if (customerEmail) {
+  if (resolvedUserId && customerEmail) {
     try {
-      const bumpTitleArr = bumpTitles ? bumpTitles.split("|") : [];
-      const bumpPriceArr = bumpPrices ? bumpPrices.split("|").map(Number) : [];
-      const bumpsForEmail = bumpTitleArr.map((t, i) => ({ title: t, price: bumpPriceArr[i] ?? 0 })).filter(b => b.title);
-      const firstName = customerName ? customerName.split(" ")[0] : "there";
-      // Build a meaningful access URL pointing to the actual content, not the funnel page
-      const brandMode = (meta.brand_mode as string) || "aaus";
-      const baseUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
-      let loginUrl = `${baseUrl}/my-dashboard`;
-      if (fulfillmentCourseId) {
-        try {
-          const [courseRow] = await db.select({ slug: lmsCourses.slug }).from(lmsCourses).where(eq(lmsCourses.id, fulfillmentCourseId)).limit(1);
-          if (courseRow?.slug) loginUrl = `${baseUrl}/courses/${courseRow.slug}`;
-        } catch { /* keep default */ }
-      } else if (fulfillmentDownloadId) {
-        loginUrl = `${baseUrl}/my-downloads`;
-      } else if (fulfillmentBundleId) {
-        loginUrl = `${baseUrl}/my-downloads`;
-      } else if (fulfillmentBrand) {
-        loginUrl = brandMode === "iheartecho" ? "https://app.iheartecho.net/my-dashboard" : "https://app.allaboutultrasound.com/my-dashboard";
-      }
-      // Generate auto-login token so the email link logs them in automatically
-      let autoLoginUrl = loginUrl;
-      if (resolvedUserId) {
-        try {
-          const token = await generateAutoLoginToken(resolvedUserId, loginUrl);
-          autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
-        } catch (tokenErr) {
-          console.error(`[Stripe] Failed to generate auto-login token for user ${resolvedUserId}:`, tokenErr);
-          // Fall back to plain loginUrl
-        }
-      }
-      const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
-        firstName,
+      const { deliverFunnelPurchaseAccessEmail } = await import("../lib/funnelPurchaseAccessEmail");
+      await deliverFunnelPurchaseAccessEmail(db, {
+        checkoutSessionId: checkoutSessionId ?? piId,
+        userId: resolvedUserId,
+        learnerEmail: customerEmail,
+        learnerName: customerName,
+        payerEmail: meta.payer_email ?? customerEmail,
+        payerName: customerName,
         productName,
-        amountPaid: amount ?? 0,
-        orderBumps: bumpsForEmail.length > 0 ? bumpsForEmail : undefined,
-        loginUrl: autoLoginUrl,
-        brandMode: brandMode as any,
-        purchaseDate: new Date(),
+        productType,
+        fulfillmentCourseId,
+        fulfillmentDownloadId,
+        fulfillmentBundleId,
+        amountCents: amount ?? 0,
+        brandMode: meta.brand_mode,
         cardLast4,
         cardBrand,
+        bumpTitles,
+        bumpPrices,
       });
-      await sendEmail({ to: { name: customerName || firstName, email: customerEmail }, subject, htmlBody, previewText });
-      console.log(`[Stripe] Purchase confirmation email sent to ${customerEmail} for "${productName}" (auto-login: ${resolvedUserId ? 'yes' : 'no'})`);
     } catch (err) {
-      console.error(`[Stripe] Failed to send purchase confirmation email to ${customerEmail}:`, err);
+      console.error(`[Stripe] Failed to send funnel purchase access email to ${customerEmail}:`, err);
     }
   }
 }
