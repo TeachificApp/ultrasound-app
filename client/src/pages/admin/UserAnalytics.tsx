@@ -25,6 +25,7 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { formatPlatformDateTimeEt } from "@shared/platformTime";
 
 // ─── Date helpers ────────────────────────────────────────────────────────────
 function fmtDate(d: Date | null | undefined) {
@@ -32,8 +33,7 @@ function fmtDate(d: Date | null | undefined) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 function fmtDateTime(d: Date | null | undefined) {
-  if (!d) return "—";
-  return new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return formatPlatformDateTimeEt(d);
 }
 function isoDate(d: Date) {
   return d.toISOString().split("T")[0];
