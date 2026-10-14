@@ -765,46 +765,22 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
 async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.type !== "workshop") return;
-  const workshopId = meta.workshop_id ? parseInt(meta.workshop_id, 10) : null;
-  const instanceId = meta.instance_id ? parseInt(meta.instance_id, 10) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
-  if (!workshopId || !instanceId || !userId) {
-    console.warn("[Stripe] Workshop checkout missing workshopId, instanceId, or userId in metadata");
-    return;
-  }
   const db = await getDb();
   if (!db) return;
-  const [instanceAvailability] = await db.select({ status: workshopInstances.status })
-    .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
-  // Idempotency check
-  const [existing] = await db.select({ id: workshopEnrollments.id })
-    .from(workshopEnrollments)
-    .where(and(
-      eq(workshopEnrollments.userId, userId),
-      eq(workshopEnrollments.instanceId, instanceId),
-      eq(workshopEnrollments.stripeSessionId, session.id as string),
-    )).limit(1);
-  if (existing) {
+
+  const { fulfillWorkshopCheckoutFromStripeSession } = await import("../lib/workshopCheckoutFulfillment");
+  const fulfillment = await fulfillWorkshopCheckoutFromStripeSession(db as any, session);
+  if (!fulfillment.success) {
+    console.warn("[Stripe] Workshop checkout fulfillment skipped:", fulfillment.error, meta.customer_email ?? "");
+    return;
+  }
+  const { userId, workshopId, instanceId, created } = fulfillment;
+  if (!userId || !workshopId || !instanceId) return;
+  if (!created) {
     console.log(`[Stripe] Workshop enrollment already recorded: user ${userId}, instance ${instanceId}`);
     return;
   }
   const amountPaid = (session.amount_total as number) ?? 0;
-  await db.insert(workshopEnrollments).values({
-    workshopId,
-    instanceId,
-    userId,
-    stripeSessionId: session.id as string,
-    amountPaid,
-    currency: (session.currency as string) ?? "usd",
-    status: "active",
-    accessLevel: instanceAvailability?.status === "presale" ? "presale" : "full",
-    accessGrantedAt: new Date(),
-  });
-  await grantScheduledContentAccess(db, {
-    userId,
-    sourceType: "workshop_instance",
-    sourceId: instanceId,
-  });
   // Fetch workshop/instance details for notification and email
   const [workshopRow] = await db
     .select({ title: workshops.title, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })

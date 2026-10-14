@@ -718,14 +718,14 @@ export const workshopLearnerRouter = router({
           ? [orderBumpCheckout!.lineItem]
           : [primaryLineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
         metadata: {
+          ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}),
+          ...orderBumpCheckout?.metadata,
+          ...workshopShareMetadata,
           type: "workshop",
           workshop_id: workshop.id.toString(),
           instance_id: instance.id.toString(),
           user_id: userId ? userId.toString() : "",
           customer_email: userEmail ?? "",
-          ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}),
-          ...orderBumpCheckout?.metadata,
-          ...workshopShareMetadata,
         },
         payment_intent_data: { description: `${workshop.title} — Workshop Registration`, ...workshopShareIntentData },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=workshop`,

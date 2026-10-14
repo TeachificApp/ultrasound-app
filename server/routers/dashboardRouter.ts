@@ -282,7 +282,7 @@ export const dashboardRouter = router({
       })
       .from(workshopEnrollments)
       .innerJoin(workshops, eq(workshopEnrollments.workshopId, workshops.id))
-      .innerJoin(workshopInstances, eq(workshopEnrollments.instanceId, workshopInstances.id))
+      .leftJoin(workshopInstances, eq(workshopEnrollments.instanceId, workshopInstances.id))
       .where(and(eq(workshopEnrollments.userId, ctx.user.id), eq(workshopEnrollments.status, "active")))
       .orderBy(desc(workshopEnrollments.accessGrantedAt));
 
