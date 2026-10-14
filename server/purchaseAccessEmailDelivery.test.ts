@@ -32,36 +32,70 @@ describe("purchase access email delivery", () => {
     expect(withPayee.payee).toEqual({ name: "Payee Parent", email: "payee@example.com" });
   });
 
-  it("BCCs admin and sends duplicate to payee via sendEmail purchaseAccess flag", async () => {
+  it("sends the learner's tokenized message only to the learner and safe receipts to payer and admin", async () => {
+    const tokenizedUrl = "https://learn.allaboutultrasound.com/auth/access?token=private-token";
     const ok = await sendEmail({
       to: { name: "Learner", email: "learner@example.com" },
       subject: "Your course access",
-      htmlBody: "<p>Welcome</p>",
+      htmlBody: `<p><a href="${tokenizedUrl}">Access</a></p>`,
       purchaseAccess: {
         payee: { name: "Payee", email: "payee@example.com" },
       },
     });
+
     expect(ok).toBe(true);
-    expect(vi.mocked(sendTransactionalEmail)).toHaveBeenCalledTimes(2);
-    const first = vi.mocked(sendTransactionalEmail).mock.calls[0]?.[0];
-    const second = vi.mocked(sendTransactionalEmail).mock.calls[1]?.[0];
-    expect(first?.to.email).toBe("learner@example.com");
-    expect(first?.bcc?.some((r) => r.email === PURCHASE_ACCESS_ADMIN_EMAIL)).toBe(true);
-    expect(second?.to.email).toBe("payee@example.com");
-    expect(second?.bcc?.some((r) => r.email === PURCHASE_ACCESS_ADMIN_EMAIL)).toBe(true);
+    expect(vi.mocked(sendTransactionalEmail)).toHaveBeenCalledTimes(3);
+    const [learner, payee, admin] = vi.mocked(sendTransactionalEmail).mock.calls.map((call) => call[0]);
+
+    expect(learner?.to.email).toBe("learner@example.com");
+    expect(learner?.htmlBody).toContain(tokenizedUrl);
+    expect(learner?.bcc).toBeUndefined();
+
+    expect(payee?.to.email).toBe("payee@example.com");
+    expect(payee?.htmlBody).not.toContain(tokenizedUrl);
+    expect(payee?.htmlBody).toContain("does not include any sign-in or access link");
+    expect(payee?.bcc).toBeUndefined();
+
+    expect(admin?.to.email).toBe(PURCHASE_ACCESS_ADMIN_EMAIL);
+    expect(admin?.htmlBody).not.toContain(tokenizedUrl);
+    expect(admin?.htmlBody).toContain("does not include any sign-in or access link");
+    expect(admin?.bcc).toBeUndefined();
   });
 
-  it("deliverPurchaseAccessEmail skips payee duplicate when same as primary", async () => {
-    const sendOnce = vi.fn().mockResolvedValue(true);
-    await deliverPurchaseAccessEmail(
-      {
-        to: { name: "Same", email: "same@example.com" },
-        subject: "Test",
-        htmlBody: "<p>x</p>",
-        purchaseAccess: { payee: { name: "Same", email: "same@example.com" } },
-      },
-      sendOnce,
-    );
-    expect(sendOnce).toHaveBeenCalledTimes(1);
+  it("does not duplicate the learner message when payer and learner match", async () => {
+    const tokenizedUrl = "https://learn.allaboutultrasound.com/auth/access?token=private-token";
+    const ok = await sendEmail({
+      to: { name: "Same", email: "same@example.com" },
+      subject: "Test",
+      htmlBody: `<p>${tokenizedUrl}</p>`,
+      purchaseAccess: { payee: { name: "Same", email: "same@example.com" } },
+    });
+
+    expect(ok).toBe(true);
+    expect(vi.mocked(sendTransactionalEmail)).toHaveBeenCalledTimes(2);
+    const [learner, admin] = vi.mocked(sendTransactionalEmail).mock.calls.map((call) => call[0]);
+    expect(learner?.to.email).toBe("same@example.com");
+    expect(learner?.htmlBody).toContain(tokenizedUrl);
+    expect(admin?.to.email).toBe(PURCHASE_ACCESS_ADMIN_EMAIL);
+    expect(admin?.htmlBody).not.toContain(tokenizedUrl);
+  });
+
+  it("does not fail a learner delivery when a non-access receipt fails", async () => {
+    const sendOnce = vi.fn()
+      .mockResolvedValueOnce(true)
+      .mockRejectedValueOnce(new Error("payer receipt unavailable"))
+      .mockResolvedValueOnce(false);
+
+    const delivered = await deliverPurchaseAccessEmail({
+      to: { name: "Learner", email: "learner@example.com" },
+      subject: "Your course access",
+      htmlBody: "private-token",
+      purchaseAccess: { payee: { name: "Payer", email: "payer@example.com" } },
+    }, sendOnce);
+
+    expect(delivered).toBe(true);
+    expect(sendOnce).toHaveBeenCalledTimes(3);
+    expect(sendOnce.mock.calls[1]?.[0].htmlBody).not.toContain("private-token");
+    expect(sendOnce.mock.calls[2]?.[0].htmlBody).not.toContain("private-token");
   });
 });

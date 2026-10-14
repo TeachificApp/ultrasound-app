@@ -1,6 +1,6 @@
 import type { EmailRecipient, SendEmailOptions } from "./email/types";
 
-/** Receives a blind copy of every purchase / access-grant email. */
+/** Receives a token-free operational purchase receipt for every access grant. */
 export const PURCHASE_ACCESS_ADMIN_EMAIL = "admin@allaboutultrasound.com";
 
 const ADMIN_RECIPIENT: EmailRecipient = {
@@ -67,18 +67,6 @@ export async function resolvePurchaseEmailTargets(opts: {
   };
 }
 
-function mergeBcc(existing?: EmailRecipient[]): EmailRecipient[] {
-  const out: EmailRecipient[] = [];
-  const seen = new Set<string>();
-  for (const r of [...(existing ?? []), ADMIN_RECIPIENT]) {
-    const key = normalizeEmailAddress(r.email);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    out.push(r);
-  }
-  return out;
-}
-
 export type PurchaseAccessEmailOptions = SendEmailOptions & {
   purchaseAccess?: {
     payee?: EmailRecipient | null;
@@ -106,26 +94,68 @@ export async function withPurchaseAccessRecipients(
   return { ...base, purchaseAccess: {}, transactional: base.transactional ?? true };
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[character] ?? character);
+}
+
+/**
+ * Purchase receipts deliberately contain no copied email body, destination, or
+ * bearer token. A payer may be different from the enrolled learner, so an
+ * access link must never be forwarded to the payer or an operational mailbox.
+ */
+function buildTokenFreeReceipt(base: SendEmailOptions, to: EmailRecipient): SendEmailOptions {
+  const productLabel = escapeHtml(base.subject.replace(/^(your|welcome to|purchase confirmed:?)/i, "").trim() || "your purchase");
+  const recipientName = escapeHtml(to.name || "there");
+  return {
+    to,
+    subject: `Purchase confirmation — ${base.subject}`,
+    htmlBody: `<!doctype html><html><body style="margin:0;padding:24px;background:#f0fbfc;font-family:Arial,sans-serif;color:#334155;">
+      <main style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px;">
+        <h2 style="margin:0 0 16px;color:#0e4a50;">Purchase confirmed</h2>
+        <p>Hi ${recipientName},</p>
+        <p>A purchase has been completed for <strong>${productLabel}</strong>.</p>
+        <p>The enrolled learner has received their secure access instructions separately.</p>
+        <p style="margin:20px 0 0;font-size:12px;color:#64748b;">For privacy, this confirmation does not include any sign-in or access link.</p>
+      </main>
+    </body></html>`,
+    previewText: "Purchase confirmed. Secure access instructions were sent to the enrolled learner.",
+    brandMode: base.brandMode,
+    transactional: true,
+  };
+}
+
 export async function deliverPurchaseAccessEmail(
   opts: PurchaseAccessEmailOptions,
   sendOnce: (opts: SendEmailOptions) => Promise<boolean>,
 ): Promise<boolean> {
   const { purchaseAccess, ...base } = opts;
   const payee = purchaseAccess?.payee ?? null;
-  const bcc = mergeBcc(base.bcc);
   const transactional = base.transactional ?? true;
 
-  const primaryOk = await sendOnce({ ...base, bcc, transactional });
+  // Only the learner receives the message containing the bearer access link.
+  const learnerDelivered = await sendOnce({ ...base, transactional });
 
-  let payeeOk = true;
-  if (payee?.email && !emailsEqual(payee.email, base.to.email)) {
-    payeeOk = await sendOnce({
-      ...base,
-      to: payee,
-      bcc,
-      transactional,
-    });
-  }
+  // Payer and admin copies are separate, deliberately token-free confirmations.
+  // They are best-effort and must not cause a retry that resends the learner link.
+  const receiptRecipients = [
+    ...(payee && !emailsEqual(payee.email, base.to.email) ? [payee] : []),
+    ...(!emailsEqual(ADMIN_RECIPIENT.email, base.to.email) && !emailsEqual(ADMIN_RECIPIENT.email, payee?.email)
+      ? [ADMIN_RECIPIENT]
+      : []),
+  ];
+  await Promise.all(receiptRecipients.map(async (recipient) => {
+    try {
+      await sendOnce(buildTokenFreeReceipt(base, recipient));
+    } catch (error) {
+      console.error(`[purchaseAccessEmailDelivery] Receipt send failed for ${recipient.email}:`, error);
+    }
+  }));
 
-  return primaryOk && payeeOk;
+  return learnerDelivered;
 }

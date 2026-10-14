@@ -39,6 +39,8 @@ export type MembershipFulfillmentContext = {
   discountCodeId?: number | null;
   customerEmail?: string | null;
   customerName?: string | null;
+  payerEmail?: string | null;
+  payerName?: string | null;
   accessExpiresAt?: Date | null;
   stripePriceId?: string | null;
   /** Skip welcome email (e.g. when resending separately) */
@@ -459,6 +461,8 @@ async function sendMembershipWelcomeEmail(opts: {
   resetToken: string | null;
   planId: number;
   primaryCourseSlug?: string | null;
+  payerEmail?: string | null;
+  payerName?: string | null;
 }): Promise<boolean> {
   const baseUrl = "https://app.allaboutultrasound.com";
   const learnBase = "https://learn.allaboutultrasound.com";
@@ -505,7 +509,7 @@ async function sendMembershipWelcomeEmail(opts: {
       htmlBody: enhancedBody,
       previewText: `Access your ${opts.planTitle} membership on All About Ultrasound`,
       brandMode: "combined",
-    }, { userId: opts.userId, checkoutEmail: opts.email, checkoutName: opts.name }));
+    }, { userId: opts.userId, checkoutEmail: opts.payerEmail ?? opts.email, checkoutName: opts.payerName ?? opts.name }));
   }
 
   const { buildFunnelPurchaseConfirmationEmail } = await import("../_core/email");
@@ -523,7 +527,7 @@ async function sendMembershipWelcomeEmail(opts: {
     htmlBody: htmlBody.replace("</body>", `${accessNote}</body>`),
     previewText,
     brandMode: "combined",
-  }, { userId: opts.userId, checkoutEmail: opts.email, checkoutName: opts.name }));
+  }, { userId: opts.userId, checkoutEmail: opts.payerEmail ?? opts.email, checkoutName: opts.payerName ?? opts.name }));
 }
 
 /**
@@ -661,6 +665,8 @@ export async function fulfillMembershipPurchase(
           resetToken: resolved.resetToken,
           planId,
           primaryCourseSlug,
+          payerEmail: ctx.payerEmail,
+          payerName: ctx.payerName,
         }),
       });
       if (delivery.attempted && delivery.delivered) notes.push("Welcome email sent");
@@ -695,6 +701,11 @@ export async function reconcileMembershipFromStripeSession(
     (session.customer_details as Record<string, string>)?.email);
   const customerName =
     meta.recipient_name || meta.customer_name || ((session.customer_details as Record<string, string>)?.name ?? null);
+  const payerEmail =
+    meta.payer_email ||
+    meta.customer_email ||
+    ((session.customer_email as string) ?? (session.customer_details as Record<string, string>)?.email ?? null);
+  const payerName = meta.payer_name || ((session.customer_details as Record<string, string>)?.name ?? null);
 
   let stripePriceId: string | null = null;
   try {
@@ -760,6 +771,8 @@ export async function reconcileMembershipFromStripeSession(
     discountCodeId: meta.discount_code_id ? parseInt(meta.discount_code_id, 10) : null,
     customerEmail,
     customerName,
+    payerEmail,
+    payerName,
     accessExpiresAt,
     stripePriceId,
     forceWelcomeEmail: true,

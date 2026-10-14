@@ -1584,10 +1584,11 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   if (!db) return;
 
   // ── AUTO-ACCOUNT CREATION ────────────────────────────────────────────────
-  // If the buyer was a guest (no account), auto-create one so we can grant
-  // access to purchased content immediately. A welcome email with a
-  // set-password link is sent to the new user.
+  // Resolve the learner account before fulfillment. The product-specific,
+  // checkout-idempotent access email below carries any password-setup link; do
+  // not send a second generic welcome email from this recovery path.
   let resolvedUserId: number | null = userId;
+  let newUserResetToken: string | null = null;
   if (!resolvedUserId && customerEmail) {
     try {
       const nameParts = (customerName || "").trim().split(" ");
@@ -1598,66 +1599,13 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         name: customerName || undefined,
       });
       resolvedUserId = autoUser.id;
-      if (isNew && resetToken) {
-        // Determine login URL from success_url or brand
-        const brandMode = (meta.brand_mode as string) || "aaus";
-        const baseUrl = meta.success_url
-          ? meta.success_url.split("/").slice(0, 3).join("/")
-          : brandMode === "iheartecho" ? "https://app.iheartecho.net" : "https://app.allaboutultrasound.com";
-        const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
-        const firstName = autoUser.firstName || nameParts[0] || "there";
-        // Generate persistent access token for the new account
-        let accessTokenForEmail: string | null = null;
-        try {
-          accessTokenForEmail = await getOrCreateAccessToken(autoUser.id);
-        } catch (atErr) {
-          console.error(`[Stripe] Failed to generate access token for ${customerEmail}:`, atErr);
-        }
-        // Build access URL — clicking this auto-signs the user in
-        const accessUrl = accessTokenForEmail
-          ? buildPersistentAccessUrl(baseUrl, accessTokenForEmail)
-          : setPasswordUrl;
-        // Send welcome + set-password email
-        try {
-          const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
-          const emailContent = buildPasswordResetEmail({
-            firstName,
-            resetUrl: setPasswordUrl,
-            brandMode: brandMode as any,
-            purpose: "welcome",
-            expiresInLabel: "7 days",
-          });
-          // Override subject for new accounts
-          const subject = `Your account is ready — access your ${meta.product_name || "purchase"}`;
-          // Append access link note to the email body
-          const accessNote = accessTokenForEmail
-            ? `<div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
-                <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Quick access link</p>
-                <p style="margin:0;font-size:13px;color:#475569;">You can also click the link below to access your purchase directly — no password needed:</p>
-                <p style="margin:8px 0 0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
-              </div>`
-            : "";
-          const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
-          const { withPurchaseAccessRecipients } = await import("../lib/purchaseAccessEmailDelivery");
-          await _sendEmail(await withPurchaseAccessRecipients({
-            to: { name: customerName || firstName, email: customerEmail },
-            subject,
-            htmlBody: enhancedBody,
-            previewText: `Access your ${meta.product_name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
-            brandMode: "combined",
-          }, { userId: resolvedUserId, checkoutEmail: customerEmail, checkoutName: customerName }));
-          console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${resolvedUserId}) and sent welcome email with access token`);
-        } catch (emailErr) {
-          console.error(`[Stripe] Failed to send welcome email to ${customerEmail}:`, emailErr);
-        }
-      } else {
-        console.log(`[Stripe] Resolved existing account for ${customerEmail} (userId=${resolvedUserId})`);
-      }
+      newUserResetToken = isNew ? resetToken : null;
+      console.log(`[Stripe] ${isNew ? "Created" : "Resolved"} funnel account for ${customerEmail} (userId=${resolvedUserId})`);
     } catch (autoErr) {
-      console.error(`[Stripe] Failed to auto-create account for ${customerEmail}:`, autoErr);
+      console.error(`[Stripe] Failed to resolve funnel account for ${customerEmail}:`, autoErr);
     }
   }
-  // ── END AUTO-ACCOUNT CREATION ────────────────────────────────────────────
+  // ── END AUTO-ACCOUNT CREATION ───────────────────────────────────────────
 
   const checkoutSessionId = paymentIntent.checkout_session_id as string | undefined;
 
@@ -1949,6 +1897,9 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         cardBrand,
         bumpTitles,
         bumpPrices,
+        setPasswordUrl: newUserResetToken
+          ? `${meta.brand_mode === "iheartecho" ? "https://app.iheartecho.com" : "https://app.allaboutultrasound.com"}/auth/reset-password?token=${newUserResetToken}`
+          : null,
       });
     } catch (err) {
       console.error(`[Stripe] Failed to send funnel purchase access email to ${customerEmail}:`, err);

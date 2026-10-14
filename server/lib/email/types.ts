@@ -39,7 +39,7 @@ export interface SendEmailOptions {
   attachments?: EmailAttachment[];
   cc?: EmailRecipient[];
   bcc?: EmailRecipient[];
-  /** Routes through purchase access delivery (learner + payee duplicate + admin BCC). */
+  /** Routes secure learner access plus token-free payer/admin purchase receipts. */
   purchaseAccess?: {
     payee?: EmailRecipient | null;
   };

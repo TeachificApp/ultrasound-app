@@ -33,6 +33,7 @@ type FunnelAccessEmailInput = {
   cardBrand?: string | null;
   bumpTitles?: string;
   bumpPrices?: string;
+  setPasswordUrl?: string | null;
 };
 
 /**
@@ -74,6 +75,7 @@ export async function deliverFunnelPurchaseAccessEmail(
               quizTitle: course.title,
               courseSlug: course.slug,
               accessToken,
+              setPasswordUrl: input.setPasswordUrl,
               brand: course.brand,
             });
           }
@@ -84,6 +86,7 @@ export async function deliverFunnelPurchaseAccessEmail(
             courseTitle: course.title,
             courseSlug: course.slug,
             accessToken,
+            setPasswordUrl: input.setPasswordUrl,
             brand: course.brand,
           });
         }
@@ -104,6 +107,7 @@ export async function deliverFunnelPurchaseAccessEmail(
             productTitle: product.title,
             productSlug: product.slug,
             accessToken,
+            setPasswordUrl: input.setPasswordUrl,
             brand,
           });
         }
@@ -123,6 +127,7 @@ export async function deliverFunnelPurchaseAccessEmail(
             bundleTitle: bundle.title,
             bundleSlug: bundle.slug,
             accessToken,
+            setPasswordUrl: input.setPasswordUrl,
             brand: "aaus",
           });
         }
@@ -148,11 +153,14 @@ export async function deliverFunnelPurchaseAccessEmail(
         cardLast4: input.cardLast4 ?? undefined,
         cardBrand: input.cardBrand ?? undefined,
       });
+      const passwordSetupHtml = input.setPasswordUrl
+        ? `<div style="margin:16px 0;padding:14px 16px;background:#fff7ed;border-left:3px solid #ea580c;border-radius:0 8px 8px 0;"><p style="margin:0 0 8px;font-weight:600;color:#9a3412;">Set your password to keep access</p><p style="margin:0 0 10px;font-size:13px;color:#7c2d12;">Your account was created automatically. Set a password so you can sign in again anytime.</p><a href="${input.setPasswordUrl}" style="color:#ea580c;font-weight:700;">Set My Password</a></div>`
+        : "";
       const { withPurchaseAccessRecipients } = await import("./purchaseAccessEmailDelivery");
       return sendEmail(await withPurchaseAccessRecipients({
         to: { name: input.learnerName || firstName, email: input.learnerEmail },
         subject,
-        htmlBody,
+        htmlBody: htmlBody.replace("</body>", `${passwordSetupHtml}</body>`),
         previewText,
         brandMode: "combined",
       }, {
