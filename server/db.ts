@@ -86,15 +86,24 @@ import { ENV } from "./_core/env";
 import { resolveApplicationDatabaseUrl } from "./lib/databaseUrl";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _resolvedDatabaseUrl: string | null = null;
 
 export async function getDb() {
   const databaseUrl = resolveApplicationDatabaseUrl();
+  // A corrected deployment configuration must not keep serving an old lazy
+  // connection created before the Railway MySQL resolver was available.
+  if (_db && _resolvedDatabaseUrl !== databaseUrl) {
+    _db = null;
+    _resolvedDatabaseUrl = null;
+  }
   if (!_db && databaseUrl) {
     try {
       _db = drizzle(databaseUrl);
+      _resolvedDatabaseUrl = databaseUrl;
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
+      _resolvedDatabaseUrl = null;
     }
   }
   return _db;

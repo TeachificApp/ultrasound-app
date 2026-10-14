@@ -5,25 +5,43 @@ function value(env: Environment, key: string): string | null {
   return candidate || null;
 }
 
+export function isRailwayMysqlUrl(databaseUrl: string | null | undefined): boolean {
+  if (!databaseUrl) return false;
+  return databaseUrl.includes(".rlwy.net") || databaseUrl.includes("railway.internal");
+}
+
+export function isLegacyManusDatabaseUrl(databaseUrl: string | null | undefined): boolean {
+  if (!databaseUrl) return false;
+  return databaseUrl.includes("tidbcloud.com") || databaseUrl.includes("prod.aws");
+}
+
 /**
- * Resolves the sole application database connection.
+ * Resolves the only permitted application database connection.
  *
- * Railway production prefers its MySQL service reference. `DATABASE_URL` remains
- * a fallback so a correctly configured Railway service continues working when the
- * explicit MySQL reference has not yet been added.
+ * A Railway deployment must use its Railway MySQL service reference. It must
+ * never fall back to a Manus/TiDB `DATABASE_URL`: doing so can make a valid
+ * purchase, enrollment, or password session appear missing to learners.
+ *
+ * Local development keeps `DATABASE_URL` as a conventional fallback.
  */
 export function resolveApplicationDatabaseUrl(env: Environment = process.env): string | null {
   const isRailway = env.RAILWAY_PRIMARY === "true"
     || env.RAILWAY_ENVIRONMENT === "production"
     || env.RAILWAY_SERVICE_ID !== undefined;
 
-  const railwayMysql = value(env, "RAILWAY_MYSQL_URL") || value(env, "MYSQL_URL");
-  if (isRailway && railwayMysql) return railwayMysql;
+  const explicitRailwayMysql = value(env, "RAILWAY_MYSQL_URL") || value(env, "MYSQL_URL");
+  if (isRailway) {
+    if (explicitRailwayMysql && isRailwayMysqlUrl(explicitRailwayMysql)) return explicitRailwayMysql;
 
-  return value(env, "DATABASE_URL");
-}
+    // Some Railway services expose the linked database directly as DATABASE_URL.
+    // Accept it only when it is demonstrably the Railway MySQL service.
+    const databaseUrl = value(env, "DATABASE_URL");
+    if (databaseUrl && isRailwayMysqlUrl(databaseUrl)) return databaseUrl;
 
-export function isRailwayMysqlUrl(databaseUrl: string | null | undefined): boolean {
-  if (!databaseUrl) return false;
-  return databaseUrl.includes(".rlwy.net") || databaseUrl.includes("railway.internal");
+    // Fail closed instead of serving a second/legacy database. The startup guard
+    // logs a clear configuration error without disclosing any credentials.
+    return null;
+  }
+
+  return value(env, "DATABASE_URL") || explicitRailwayMysql;
 }

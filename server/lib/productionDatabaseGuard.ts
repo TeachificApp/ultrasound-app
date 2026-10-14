@@ -11,7 +11,11 @@ export function logProductionDatabaseConfigurationWarnings(env: NodeJS.ProcessEn
 
   const resolved = resolveApplicationDatabaseUrl(env);
   if (!resolved) {
-    console.error("[Database] No DATABASE_URL / RAILWAY_MYSQL_URL / MYSQL_URL configured.");
+    console.error(
+      onRailway
+        ? "[Database] CRITICAL: Railway MySQL URL is required. Refusing any legacy DATABASE_URL fallback. Set RAILWAY_MYSQL_URL or MYSQL_URL to the linked Railway MySQL service."
+        : "[Database] No DATABASE_URL / RAILWAY_MYSQL_URL / MYSQL_URL configured.",
+    );
     return;
   }
 
