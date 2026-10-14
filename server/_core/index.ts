@@ -211,7 +211,7 @@ async function startServer() {
   });
   // Build version debug endpoint to verify deployed code
   app.get("/api/debug/build-version", (_req, res) => {
-    res.json({ version: "2026-10-08-card-audio-mux", deployedAt: new Date().toISOString(), spaRegex: "^/(?!media/|api/|manus-storage/).*" });
+    res.json({ version: "2026-10-12-native-thinkific-learner-access", deployedAt: new Date().toISOString(), spaRegex: "^/(?!media/|api/|manus-storage/).*" });
   });
   // Temporary debug endpoint to diagnose Railway DB connection
   app.get("/api/debug/db-status", async (req, res) => {

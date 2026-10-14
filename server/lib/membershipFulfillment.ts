@@ -29,6 +29,7 @@ import { generateAutoLoginToken } from "../routes/autoLogin";
 import { buildPasswordResetEmail, sendEmail } from "../_core/email";
 import { notifyOwner } from "../_core/notification";
 import { isEnrollmentAccessActive } from "./enrollmentAccess";
+import { sendPurchaseNotificationOnce } from "./purchaseNotificationDelivery";
 
 export type MembershipFulfillmentContext = {
   sessionId?: string | null;
@@ -458,7 +459,7 @@ async function sendMembershipWelcomeEmail(opts: {
   resetToken: string | null;
   planId: number;
   primaryCourseSlug?: string | null;
-}): Promise<void> {
+}): Promise<boolean> {
   const baseUrl = "https://app.allaboutultrasound.com";
   const learnBase = "https://learn.allaboutultrasound.com";
   const firstName = opts.name.split(" ")[0] || "there";
@@ -498,13 +499,13 @@ async function sendMembershipWelcomeEmail(opts: {
     const subject = `Your ${opts.planTitle} membership is ready`;
     const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
     const { withPurchaseAccessRecipients } = await import("./purchaseAccessEmailDelivery");
-    await sendEmail(await withPurchaseAccessRecipients({
+    return sendEmail(await withPurchaseAccessRecipients({
       to: { name: opts.name, email: opts.email },
       subject,
       htmlBody: enhancedBody,
       previewText: `Access your ${opts.planTitle} membership on All About Ultrasound`,
+      brandMode: "combined",
     }, { userId: opts.userId, checkoutEmail: opts.email, checkoutName: opts.name }));
-    return;
   }
 
   const { buildFunnelPurchaseConfirmationEmail } = await import("../_core/email");
@@ -516,11 +517,12 @@ async function sendMembershipWelcomeEmail(opts: {
     brandMode: "aaus",
   });
   const { withPurchaseAccessRecipients } = await import("./purchaseAccessEmailDelivery");
-  await sendEmail(await withPurchaseAccessRecipients({
+  return sendEmail(await withPurchaseAccessRecipients({
     to: { name: opts.name, email: opts.email },
     subject: subject.replace("Purchase confirmed", `Your ${opts.planTitle} membership is active`),
     htmlBody: htmlBody.replace("</body>", `${accessNote}</body>`),
     previewText,
+    brandMode: "combined",
   }, { userId: opts.userId, checkoutEmail: opts.email, checkoutName: opts.name }));
 }
 
@@ -647,17 +649,25 @@ export async function fulfillMembershipPurchase(
 
   if (shouldSendEmail && email) {
     try {
-      await sendMembershipWelcomeEmail({
-        userId,
-        email,
-        name: ctx.customerName || email.split("@")[0],
-        planTitle: plan.title,
-        isNewUser: resolved.isNew,
-        resetToken: resolved.resetToken,
-        planId,
-        primaryCourseSlug,
+      const delivery = await sendPurchaseNotificationOnce(db, {
+        checkoutSessionId: sessionId,
+        notificationType: "membership_access",
+        send: () => sendMembershipWelcomeEmail({
+          userId,
+          email,
+          name: ctx.customerName || email.split("@")[0],
+          planTitle: plan.title,
+          isNewUser: resolved.isNew,
+          resetToken: resolved.resetToken,
+          planId,
+          primaryCourseSlug,
+        }),
       });
-      notes.push("Welcome email sent");
+      if (delivery.attempted && delivery.delivered) notes.push("Welcome email sent");
+      else if (delivery.attempted) {
+        notes.push("Welcome email failed");
+        await notifyOwner({ title: "⚠️ Membership access email failed", content: `Checkout ${sessionId ?? "unknown"} granted membership access but its confirmation email could not be sent.` });
+      } else notes.push("Membership access email already sent for this checkout");
     } catch (err) {
       console.error(`[MembershipFulfillment] Welcome email failed for ${email}:`, err);
       notes.push("Welcome email failed");
@@ -679,11 +689,12 @@ export async function reconcileMembershipFromStripeSession(
 ): Promise<MembershipFulfillmentResult> {
   const meta = (session.metadata as Record<string, string>) ?? {};
   const customerEmail =
-    (session.customer_email as string) ??
-    (session.customer_details as Record<string, string>)?.email ??
-    meta.customer_email;
+    meta.recipient_email ||
+    meta.customer_email ||
+    ((session.customer_email as string) ??
+    (session.customer_details as Record<string, string>)?.email);
   const customerName =
-    meta.customer_name ?? (session.customer_details as Record<string, string>)?.name ?? null;
+    meta.recipient_name || meta.customer_name || ((session.customer_details as Record<string, string>)?.name ?? null);
 
   let stripePriceId: string | null = null;
   try {

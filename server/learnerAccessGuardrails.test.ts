@@ -68,7 +68,7 @@ describe("learner LMS access guardrails", () => {
 });
 
 describe("production database guard", () => {
-  it("warns when Railway production resolves legacy TiDB", () => {
+  it("refuses legacy TiDB when Railway MySQL has not been supplied", () => {
     const logs: string[] = [];
     const orig = console.error;
     console.error = (msg: string) => logs.push(String(msg));
@@ -80,6 +80,21 @@ describe("production database guard", () => {
     } finally {
       console.error = orig;
     }
-    expect(logs.some((l) => l.includes("CRITICAL") && l.includes("TiDB"))).toBe(true);
+    expect(logs.some((l) => l.includes("CRITICAL") && l.includes("Railway MySQL URL is required"))).toBe(true);
+  });
+
+  it("fails closed on Railway instead of silently using a legacy DATABASE_URL", () => {
+    const logs: string[] = [];
+    const orig = console.error;
+    console.error = (msg: string) => logs.push(String(msg));
+    try {
+      logProductionDatabaseConfigurationWarnings({
+        RAILWAY_PRIMARY: "true",
+        DATABASE_URL: "mysql://u:p@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/x",
+      });
+    } finally {
+      console.error = orig;
+    }
+    expect(logs.some((l) => l.includes("Railway MySQL URL is required") && l.includes("Refusing"))).toBe(true);
   });
 });

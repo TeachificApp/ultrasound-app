@@ -22,6 +22,7 @@ import { useParams, useLocation, Link } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -382,9 +383,17 @@ export default function Checkout() {
     };
   }, [location]);
 
+  const { user } = useAuth();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [subscriptionAcknowledged, setSubscriptionAcknowledged] = useState(false);
+  // Stripe collects the payer; learner access is confirmed alongside payment.
+  const [learnerIsPayee, setLearnerIsPayee] = useState(true);
+  const [payerEmail, setPayerEmail] = useState("");
+  const [learnerName, setLearnerName] = useState("");
+  const [learnerEmail, setLearnerEmail] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [activeSessionKey, setActiveSessionKey] = useState<string | null>(null);
+  const activeSessionKeyRef = useRef<string | null>(null);
   const [seatCount, setSeatCount] = useState<number>(searchParams.teamTierId ? 3 : 1);
   const [sessionMeta, setSessionMeta] = useState<{
     courseTitle: string;
@@ -416,6 +425,14 @@ export default function Checkout() {
 
   const entityType = searchParams.entityType;
 
+  // A signed-in learner should not have to re-enter their email. Guests enter
+  // it once on this same checkout screen so the server can prevent duplicate
+  // purchases before a fresh Stripe Customer/subscription is created.
+  useEffect(() => {
+    const knownEmail = (user as any)?.email?.trim().toLowerCase();
+    if (knownEmail && !payerEmail) setPayerEmail(knownEmail);
+  }, [user, payerEmail]);
+
   // Compute the correct back-link based on entity type
   const backHref = entityType === "download" ? `/downloads/${slug}`
     : entityType === "physical" ? `/product/${slug}`
@@ -429,6 +446,10 @@ export default function Checkout() {
     : "Back to course";
 
   const onSessionSuccess = (data: any) => {
+    if ((data.alreadyEnrolled || data.alreadyRegistered || data.alreadyPurchased) && data.accessUrl) {
+      window.location.href = data.accessUrl;
+      return;
+    }
     // Free plan: enrollment already completed server-side, redirect to member area
     if (data.free === true && !data.clientSecret) {
       const dest = entityType === "membership" && slug
@@ -446,12 +467,12 @@ export default function Checkout() {
     }
   };
 
-  const createCourseSession = trpc.lmsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
-  const createDownloadSession = trpc.downloadsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
-  const createPhysicalSession = trpc.productsLearner.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
+  const createCourseSession = trpc.lmsLearner.createEmbeddedCheckoutSession.useMutation();
+  const createDownloadSession = trpc.downloadsLearner.createEmbeddedCheckoutSession.useMutation();
+  const createPhysicalSession = trpc.productsLearner.createEmbeddedCheckoutSession.useMutation();
   // NOTE: webinarSession (not webinarAdmin) — publicProcedure, no sign-in required
-  const createWebinarSession = trpc.webinarSession.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
-  const createMembershipSession = trpc.membership.createEmbeddedCheckoutSession.useMutation({ onSuccess: onSessionSuccess });
+  const createWebinarSession = trpc.webinarSession.createEmbeddedCheckoutSession.useMutation();
+  const createMembershipSession = trpc.membership.createEmbeddedCheckoutSession.useMutation();
 
   const createSession = {
     isPending: createCourseSession.isPending || createDownloadSession.isPending || createPhysicalSession.isPending || createWebinarSession.isPending || createMembershipSession.isPending,
@@ -459,29 +480,43 @@ export default function Checkout() {
     error: createCourseSession.error ?? createDownloadSession.error ?? createPhysicalSession.error ?? createWebinarSession.error ?? createMembershipSession.error,
   };
 
-  // Trigger session creation once on mount (useEffect — avoids React Strict Mode double Stripe sessions)
-  const sessionStarted = useRef(false);
+  const hasValidPayerEmail = /^\S+@\S+\.\S+$/.test(payerEmail.trim());
+  const hasValidLearnerDetails = hasValidPayerEmail && (learnerIsPayee || (learnerName.trim().length > 1 && /^\S+@\S+\.\S+$/.test(learnerEmail.trim())));
+  const checkoutSessionKey = [entityType, slug ?? "", searchParams.pricingOptionId ?? "", searchParams.teamTierId ?? "", searchParams.teamTierId ? seatCount : "", payerEmail.trim().toLowerCase(), learnerIsPayee ? "payer" : `${learnerName.trim()}|${learnerEmail.trim().toLowerCase()}`].join(":");
+  const invalidateEmbeddedSession = () => {
+    activeSessionKeyRef.current = null;
+    setActiveSessionKey(null);
+    setClientSecret(null);
+    setSessionMeta(null);
+  };
+  // Show payment as soon as the page opens. Selecting another learner refreshes
+  // the unused session in place instead of adding a separate checkout step.
   useEffect(() => {
-    if (!slug || sessionStarted.current) return;
-    sessionStarted.current = true;
-    if (entityType === "download") {
-      createDownloadSession.mutate({ productSlug: slug, origin: window.location.origin });
-    } else if (entityType === "physical") {
-      createPhysicalSession.mutate({ productSlug: slug, origin: window.location.origin });
-    } else if (entityType === "webinar") {
-      createWebinarSession.mutate({ webinarSlug: slug, origin: window.location.origin });
-    } else if (entityType === "membership") {
-      createMembershipSession.mutate({ planSlug: slug, origin: window.location.origin });
-    } else {
-      createCourseSession.mutate({
-        courseSlug: slug,
-        pricingOptionId: searchParams.pricingOptionId,
-        teamTierId: searchParams.teamTierId,
-        seatCount: searchParams.teamTierId ? seatCount : undefined,
-        origin: window.location.origin,
-      });
-    }
-  }, [slug, entityType, searchParams.pricingOptionId, searchParams.teamTierId, seatCount]);
+    if (!slug || !hasValidLearnerDetails || activeSessionKey === checkoutSessionKey || activeSessionKeyRef.current === checkoutSessionKey) return;
+    const timeout = window.setTimeout(() => {
+      activeSessionKeyRef.current = checkoutSessionKey;
+      setActiveSessionKey(checkoutSessionKey);
+      setClientSecret(null);
+      setSessionMeta(null);
+      const recipient = !learnerIsPayee ? { recipientName: learnerName.trim(), recipientEmail: learnerEmail.trim().toLowerCase() } : {};
+      const payer = { payerEmail: payerEmail.trim().toLowerCase() };
+      const onSuccess = (data: any) => {
+        if (activeSessionKeyRef.current === checkoutSessionKey) onSessionSuccess(data);
+      };
+      if (entityType === "download") {
+        createDownloadSession.mutate({ productSlug: slug, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
+      } else if (entityType === "physical") {
+        createPhysicalSession.mutate({ productSlug: slug, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
+      } else if (entityType === "webinar") {
+        createWebinarSession.mutate({ webinarSlug: slug, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
+      } else if (entityType === "membership") {
+        createMembershipSession.mutate({ planSlug: slug, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
+      } else {
+        createCourseSession.mutate({ courseSlug: slug, pricingOptionId: searchParams.pricingOptionId, teamTierId: searchParams.teamTierId, seatCount: searchParams.teamTierId ? seatCount : undefined, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
+      }
+    }, learnerIsPayee ? 0 : 350);
+    return () => window.clearTimeout(timeout);
+  }, [slug, entityType, searchParams.pricingOptionId, searchParams.teamTierId, seatCount, learnerIsPayee, learnerName, learnerEmail, hasValidLearnerDetails, checkoutSessionKey, activeSessionKey]);
 
   // ── Derived theme values ──────────────────────────────────────────────────
   const primary = sessionMeta?.primaryColor ?? "#179ca3";
@@ -686,7 +721,7 @@ export default function Checkout() {
                             setSeatCount(next);
                             setClientSecret(null);
                             setSessionMeta(null);
-                            setSessionRequested(false);
+                            invalidateEmbeddedSession();
                           }}
                           className="w-8 h-8 rounded-lg border flex items-center justify-center text-lg font-bold transition-colors hover:bg-gray-200 disabled:opacity-40"
                           style={{ borderColor: primary, color: primary }}
@@ -701,7 +736,7 @@ export default function Checkout() {
                             setSeatCount(next);
                             setClientSecret(null);
                             setSessionMeta(null);
-                            setSessionRequested(false);
+                            invalidateEmbeddedSession();
                           }}
                           className="w-8 h-8 rounded-lg border flex items-center justify-center text-lg font-bold transition-colors hover:bg-gray-200"
                           style={{ borderColor: primary, color: primary }}
@@ -844,7 +879,33 @@ export default function Checkout() {
           )}
 
           <div className={`rounded-2xl shadow-sm border overflow-hidden min-h-[400px] ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
-          {!sessionMeta || createSession.isPending ? (
+          <div className={`border-b p-5 ${isDark ? "border-gray-800" : "border-gray-100"}`}>
+            <h3 className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>Checkout details</h3>
+            <div className="mt-3 grid gap-2">
+              <Label htmlFor="payer-email" className={isDark ? "text-gray-300" : "text-gray-700"}>Payer email</Label>
+              <Input id="payer-email" value={payerEmail} onChange={(event) => { setPayerEmail(event.target.value); invalidateEmbeddedSession(); }} placeholder="payer@email.com" type="email" autoComplete="email" required />
+              <p className={`text-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>Your Stripe receipt is sent here. We use this email only to recognize an existing purchase before payment.</p>
+            </div>
+            <p className={`mt-4 text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Will the learner use the same name and email as the payer?</p>
+            <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Learner and payer relationship">
+              <button type="button" aria-pressed={learnerIsPayee} onClick={() => { if (!learnerIsPayee) { setLearnerIsPayee(true); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : isDark ? "border-gray-700 text-gray-300 hover:bg-gray-800" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Yes, same learner</button>
+              <button type="button" aria-pressed={!learnerIsPayee} onClick={() => { if (learnerIsPayee) { setLearnerIsPayee(false); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${!learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : isDark ? "border-gray-700 text-gray-300 hover:bg-gray-800" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>No, another learner</button>
+            </div>
+            {!learnerIsPayee && (
+              <div className="mt-4 grid gap-3">
+                <Input value={learnerName} onChange={(event) => { setLearnerName(event.target.value); invalidateEmbeddedSession(); }} placeholder="Learner full name" autoComplete="name" required />
+                <Input value={learnerEmail} onChange={(event) => { setLearnerEmail(event.target.value); invalidateEmbeddedSession(); }} placeholder="Learner email" type="email" autoComplete="email" required />
+                <p className={`text-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>The payer receives the Stripe receipt. The learner receives the account setup and access email.</p>
+              </div>
+            )}
+          </div>
+          {!hasValidLearnerDetails ? (
+            <div className="flex min-h-[280px] flex-col items-center justify-center p-8 text-center">
+              <ShieldCheck className="h-10 w-10" style={{ color: primary }} />
+              <h4 className={`mt-4 text-base font-semibold ${isDark ? "text-white" : "text-gray-800"}`}>Add the learner’s details</h4>
+              <p className={`mt-2 max-w-xs text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Enter the payer and learner details above to load secure payment.</p>
+            </div>
+          ) : !sessionMeta || createSession.isPending ? (
             /* Loading skeleton */
             <div className="p-8 space-y-4 animate-pulse">
               <div className="h-6 bg-gray-100 rounded w-1/2" />

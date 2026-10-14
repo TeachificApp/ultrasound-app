@@ -19,7 +19,9 @@ watchPatterns = [
 ]
 
 [deploy]
-startCommand = "pnpm start"
+# Keep the deployment process explicitly MySQL-primary even if Railway does not
+# expose deploy.env to a legacy service configuration.
+startCommand = "RAILWAY_PRIMARY=true pnpm start"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 

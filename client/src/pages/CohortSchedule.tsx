@@ -681,6 +681,15 @@ export default function CohortSchedule() {
       <div className="max-w-5xl mx-auto px-4 py-6">
         <Tabs defaultValue={initialTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6 flex-wrap h-auto gap-1 py-1">
+            {course.slug && (
+              <Link
+                href={`/courses/${course.slug}/player`}
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs sm:text-sm font-medium text-teal-700 transition-colors hover:bg-teal-50 hover:text-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2"
+              >
+                <BookOpen className="w-4 h-4" />
+                Course Modules
+              </Link>
+            )}
             <TabsTrigger value="sessions" className="flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
               <Video className="w-4 h-4" />
               Live Sessions

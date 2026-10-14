@@ -21,7 +21,9 @@ describe("digital-download Stripe fulfillment safeguards", () => {
   });
 
   it("records the actual download-email outcome for new and duplicate checkout fulfillment", () => {
-    expect(source).toContain("const deliverySucceeded = await sendPurchaseConfirmationEmail(userId, productId)");
+    expect(source).toContain("async function deliverDownloadAccessOnce");
+    expect(source).toContain('notificationType: "download_access"');
+    expect(source).toContain("const deliverySucceeded = delivery.delivered");
     expect(source).toContain('eventType: deliverySucceeded ? "email_sent" : "email_failed"');
     expect(source).toContain("Download access email failed");
   });

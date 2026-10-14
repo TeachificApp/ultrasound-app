@@ -81,6 +81,20 @@ export function formatInTimeZone(
   return new Intl.DateTimeFormat("en-US", { ...options, timeZone }).format(new Date(value));
 }
 
+/**
+ * Produces a locale-independent YYYY-MM-DD key for placing scheduled items on
+ * a calendar grid. Display-formatters are intentionally not used here because
+ * en-US formatting emits MM/DD/YYYY while calendar cell keys use YYYY-MM-DD.
+ */
+export function calendarDateKeyInTimeZone(
+  value: Date | string | number,
+  timeZone = PLATFORM_TIMEZONE,
+): string | null {
+  if (!isValidInstant(value)) return null;
+  const parts = partsInTimeZone(new Date(value), timeZone);
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+}
+
 /** Formats a stored UTC instant for a `datetime-local` or date-only administrator input. */
 export function formatScheduledInput(
   value: Date | string,

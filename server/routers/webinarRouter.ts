@@ -537,7 +537,7 @@ export const webinarSessionRouter = router({
 
   // ─── Embedded Checkout Session ────────────────────────────────────────────
   createEmbeddedCheckoutSession: publicProcedure
-    .input(z.object({ webinarSlug: z.string(), origin: z.string(), pricingOptionId: z.string().optional(), promoCode: z.string().optional() }))
+    .input(z.object({ webinarSlug: z.string(), origin: z.string(), pricingOptionId: z.string().optional(), promoCode: z.string().optional(), recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().email().max(320).optional(), payerEmail: z.string().trim().email().max(320).optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [webinar] = await db.select().from(webinars).where(eq(webinars.slug, input.webinarSlug)).limit(1);
@@ -545,7 +545,21 @@ export const webinarSessionRouter = router({
       if (webinar.status === "draft") throw new TRPCError({ code: "FORBIDDEN", message: "This webinar is currently unavailable." });
       const { isFree, priceCents } = resolveWebinarPricing(webinar, input.pricingOptionId);
       const subtitle = webinar.hostTitle ?? null;
+      const payerEmail = (ctx.user?.email ?? input.payerEmail ?? "").trim().toLowerCase();
+      const isDifferentRecipient = Boolean(input.recipientEmail && input.recipientEmail.toLowerCase() !== payerEmail);
+      const accessUser = !isDifferentRecipient
+        ? (ctx.user ?? (payerEmail ? await (await import("../db")).getUserByEmail(payerEmail) : null))
+        : null;
       const userId = ctx.user?.id ?? 0;
+      if (accessUser && !isDifferentRecipient) {
+        const [existingRegistration] = await db.select({ id: webinarRegistrations.id })
+          .from(webinarRegistrations)
+          .where(and(eq(webinarRegistrations.webinarId, webinar.id), eq(webinarRegistrations.userId, accessUser.id)))
+          .limit(1);
+        if (existingRegistration) {
+          return { alreadyRegistered: true, accessUrl: `/webinar/${webinar.slug}` };
+        }
+      }
       if (isFree) {
         return { clientSecret: null, free: true, courseTitle: webinar.title, courseSubtitle: subtitle, courseDescription: webinar.description ?? null, courseThumbnail: webinar.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: webinar.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: "usd", minSeats: null, discountPercent: null, brand: webinar.brand ?? "all_about_ultrasound" };
       }
@@ -586,7 +600,7 @@ export const webinarSessionRouter = router({
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
-        customer_email: ctx.user?.email ?? undefined,
+        customer_email: payerEmail || undefined,
         client_reference_id: userId ? userId.toString() : undefined,
         ...(discounts ? { discounts } : { allow_promotion_codes: true }),
         line_items: [{
@@ -603,7 +617,7 @@ export const webinarSessionRouter = router({
           },
           quantity: 1,
         }],
-        metadata: { type: "webinar", webinar_id: webinar.id.toString(), user_id: userId.toString(), customer_email: ctx.user?.email ?? "" },
+        metadata: { type: "webinar", webinar_id: webinar.id.toString(), user_id: input.recipientEmail ? "" : userId.toString(), customer_email: payerEmail, payer_email: payerEmail, recipient_email: input.recipientEmail?.toLowerCase() ?? "", recipient_name: input.recipientName ?? "" },
         payment_intent_data: { description: `${webinar.title} — Webinar Registration` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=webinar`,
       } as any);

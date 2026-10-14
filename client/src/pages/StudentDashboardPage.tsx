@@ -1995,6 +1995,12 @@ function SubscriptionsTab() {
                             {isCancelPending ? "Access until" : "Renews"}: {formatDate(sub.stripe.currentPeriodEnd)}
                           </p>
                         )}
+                        {sub.cancellationRequestedAt && (
+                          <p className="flex items-center gap-1 font-medium text-orange-700">
+                            <XCircle className="w-3.5 h-3.5" />
+                            Cancellation requested: {formatDate(sub.cancellationRequestedAt)}
+                          </p>
+                        )}
                         <p className="text-xs text-gray-400">Since: {formatDate(sub.createdAt)}</p>
                       </div>
                     </div>

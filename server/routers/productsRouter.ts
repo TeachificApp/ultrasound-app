@@ -155,7 +155,7 @@ export const productsLearnerRouter = router({
   /** Create an embedded Stripe Checkout session for a physical product (learner-facing). */
   // NOTE: publicProcedure — guest checkout is allowed, no sign-in required.
   createEmbeddedCheckoutSession: publicProcedure
-    .input(z.object({ productSlug: z.string(), origin: z.string() }))
+    .input(z.object({ productSlug: z.string(), origin: z.string(), recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().email().max(320).optional(), payerEmail: z.string().trim().email().max(320).optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -165,6 +165,7 @@ export const productsLearnerRouter = router({
       if (product.status !== "published") throw new TRPCError({ code: "FORBIDDEN", message: "This product is not available." });
       if (product.checkoutMode !== "native") throw new TRPCError({ code: "BAD_REQUEST", message: "This product uses an external checkout." });
       const userId = ctx.user?.id ?? 0;
+      const payerEmail = (ctx.user?.email ?? input.payerEmail ?? "").trim().toLowerCase();
       if (product.isFree || Number(product.price) === 0) {
         // Auto-grant free product (only if user is logged in)
         if (userId) {
@@ -191,7 +192,7 @@ export const productsLearnerRouter = router({
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
-        customer_email: ctx.user?.email ?? undefined,
+        customer_email: payerEmail || undefined,
         client_reference_id: userId ? userId.toString() : undefined,
         allow_promotion_codes: true,
         line_items: [{
@@ -206,7 +207,7 @@ export const productsLearnerRouter = router({
           },
           quantity: 1,
         }],
-        metadata: { type: "physical_product", product_id: product.id.toString(), user_id: userId.toString(), customer_email: ctx.user?.email ?? "" },
+        metadata: { type: "physical_product", product_id: product.id.toString(), user_id: input.recipientEmail ? "" : userId.toString(), customer_email: payerEmail, payer_email: payerEmail, recipient_email: input.recipientEmail?.toLowerCase() ?? "", recipient_name: input.recipientName ?? "" },
         payment_intent_data: { description: `${product.title} — Physical Product` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=physical`,
         ...shippingOpts,

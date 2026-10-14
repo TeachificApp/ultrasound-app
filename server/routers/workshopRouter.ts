@@ -564,11 +564,19 @@ export const workshopLearnerRouter = router({
         instanceId: z.number(),
         origin: z.string(),
         orderBumpId: z.number().optional(),
+        recipientName: z.string().trim().max(200).optional(),
+        recipientEmail: z.string().trim().email().max(320).optional(),
+        payerEmail: z.string().trim().email().max(320).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const payerEmail = (ctx.user?.email ?? input.payerEmail ?? "").trim().toLowerCase();
+      const isDifferentRecipient = Boolean(input.recipientEmail && input.recipientEmail.toLowerCase() !== payerEmail);
+      const accessUser = !isDifferentRecipient
+        ? (ctx.user ?? (payerEmail ? await (await import("../db")).getUserByEmail(payerEmail) : null))
+        : null;
       const userId = ctx.user?.id ?? 0;
-      const userEmail = ctx.user?.email ?? undefined;
+      const userEmail = payerEmail || undefined;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -611,22 +619,23 @@ export const workshopLearnerRouter = router({
         };
       }
 
-      // Check for existing enrollment (only for authenticated users — guests have userId=0
-      // and we must not block them with a false "already enrolled" match)
-      if (userId) {
+      // Do not create a second workshop purchase for a returning learner. A
+      // deliberately named different recipient is the only path that can add a
+      // second registration from the same payer.
+      if (accessUser) {
         const [existing] = await db
-          .select()
+          .select({ id: workshopEnrollments.id })
           .from(workshopEnrollments)
           .where(
             and(
               eq(workshopEnrollments.workshopId, workshop.id),
               eq(workshopEnrollments.instanceId, instance.id),
-              eq(workshopEnrollments.userId, userId),
+              eq(workshopEnrollments.userId, accessUser.id),
               eq(workshopEnrollments.status, "active")
             )
           )
           .limit(1);
-        if (existing) throw new TRPCError({ code: "CONFLICT", message: "You are already enrolled in this workshop." });
+        if (existing) return { alreadyEnrolled: true, accessUrl: "/my-dashboard?tab=workshops" };
       }
 
       // Workshop and instance prices are canonical decimal dollars; Stripe receives cents only here.
@@ -712,20 +721,23 @@ export const workshopLearnerRouter = router({
         ui_mode: "embedded",
         mode: "payment",
         customer_email: userEmail,
-        client_reference_id: userId ? userId.toString() : undefined,
+        client_reference_id: input.recipientEmail ? undefined : (userId ? userId.toString() : undefined),
         allow_promotion_codes: true,
         line_items: isUpgradeBump
           ? [orderBumpCheckout!.lineItem]
           : [primaryLineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
         metadata: {
-          ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}),
-          ...orderBumpCheckout?.metadata,
-          ...workshopShareMetadata,
+          payer_email: payerEmail,
           type: "workshop",
           workshop_id: workshop.id.toString(),
           instance_id: instance.id.toString(),
-          user_id: userId ? userId.toString() : "",
-          customer_email: userEmail ?? "",
+          user_id: input.recipientEmail ? "" : (userId ? userId.toString() : ""),
+          customer_email: input.recipientEmail?.toLowerCase() ?? userEmail ?? "",
+          recipient_email: input.recipientEmail?.toLowerCase() ?? "",
+          recipient_name: input.recipientName ?? "",
+          ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}),
+          ...orderBumpCheckout?.metadata,
+          ...workshopShareMetadata,
         },
         payment_intent_data: { description: `${workshop.title} — Workshop Registration`, ...workshopShareIntentData },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=workshop`,
@@ -1077,6 +1089,11 @@ export const workshopAdminRouter = router({
         enrollmentCloseDate: z.string().nullish(),
         status: z.enum(["draft", "published", "waitlist", "presale", "cancelled", "completed"]).default("draft"),
         instanceContent: z.string().nullish(),
+        confirmationEmailApproved: z.boolean().default(false),
+        confirmationEmailSubject: z.string().max(500).nullish(),
+        confirmationEmailHeading: z.string().max(500).nullish(),
+        confirmationEmailIntro: z.string().nullish(),
+        confirmationEmailDetails: z.string().nullish(),
         presaleWelcomeHeading: z.string().nullish(),
         presaleWelcomeBody: z.string().nullish(),
         presaleWelcomeMediaUrl: z.string().nullish(),
@@ -1112,6 +1129,12 @@ export const workshopAdminRouter = router({
         status: input.status,
         enrolledCount: 0,
         instanceContent: input.instanceContent ?? undefined,
+        confirmationEmailApproved: input.confirmationEmailApproved,
+        confirmationEmailApprovedAt: input.confirmationEmailApproved ? new Date() : undefined,
+        confirmationEmailSubject: input.confirmationEmailSubject ?? undefined,
+        confirmationEmailHeading: input.confirmationEmailHeading ?? undefined,
+        confirmationEmailIntro: input.confirmationEmailIntro ?? undefined,
+        confirmationEmailDetails: input.confirmationEmailDetails ?? undefined,
         presaleWelcomeHeading: input.presaleWelcomeHeading ?? undefined,
         presaleWelcomeBody: input.presaleWelcomeBody ?? undefined,
         presaleWelcomeMediaUrl: input.presaleWelcomeMediaUrl ?? undefined,
@@ -1148,6 +1171,11 @@ export const workshopAdminRouter = router({
         enrollmentCloseDate: z.string().nullish(),
         status: z.enum(["draft", "published", "waitlist", "presale", "cancelled", "completed"]).optional(),
         instanceContent: z.string().nullish(),
+        confirmationEmailApproved: z.boolean().optional(),
+        confirmationEmailSubject: z.string().max(500).nullish(),
+        confirmationEmailHeading: z.string().max(500).nullish(),
+        confirmationEmailIntro: z.string().nullish(),
+        confirmationEmailDetails: z.string().nullish(),
         presaleWelcomeHeading: z.string().nullish(),
         presaleWelcomeBody: z.string().nullish(),
         presaleWelcomeMediaUrl: z.string().nullish(),
@@ -1161,6 +1189,9 @@ export const workshopAdminRouter = router({
       const { id, startDate, endDate, salesCloseDate, salesOpenDate, enrollmentCloseDate, ...rest } = input;
       const [existing] = await db.select({ status: workshopInstances.status }).from(workshopInstances).where(eq(workshopInstances.id, id)).limit(1);
       const updateData: Record<string, any> = { ...rest };
+      if (rest.confirmationEmailApproved !== undefined) {
+        updateData.confirmationEmailApprovedAt = rest.confirmationEmailApproved ? new Date() : null;
+      }
       const timezone = (rest.timezone as string | undefined) ?? PLATFORM_TIMEZONE;
       if (startDate) updateData.startDate = parseScheduledTimestamp(startDate, timezone, "start");
       if (endDate !== undefined) updateData.endDate = endDate ? parseScheduledTimestamp(endDate, timezone, "end") : null;
@@ -1216,6 +1247,12 @@ export const workshopAdminRouter = router({
         enrolledCount: 0,
         instanceContent: source.instanceContent,
         landingBlocks: source.landingBlocks,
+        confirmationEmailApproved: false,
+        confirmationEmailApprovedAt: null,
+        confirmationEmailSubject: source.confirmationEmailSubject,
+        confirmationEmailHeading: source.confirmationEmailHeading,
+        confirmationEmailIntro: source.confirmationEmailIntro,
+        confirmationEmailDetails: source.confirmationEmailDetails,
         presaleWelcomeHeading: source.presaleWelcomeHeading,
         presaleWelcomeBody: source.presaleWelcomeBody,
         presaleWelcomeMediaUrl: source.presaleWelcomeMediaUrl,

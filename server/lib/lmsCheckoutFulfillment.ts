@@ -21,6 +21,7 @@ import { sendEnrollmentEmail, sendQuizAccessEmail } from "./enrollmentEmail";
 import { notifyOwner } from "../_core/notification";
 import { isEnrollmentAccessActive } from "./enrollmentAccess";
 import { grantScheduledContentAccess } from "./scheduledContentLinks";
+import { sendPurchaseNotificationOnce } from "./purchaseNotificationDelivery";
 
 export type LmsCheckoutFulfillmentResult = {
   success: boolean;
@@ -307,13 +308,16 @@ export async function reconcileLmsCheckoutFromStripeSession(
   }
 
   const customerEmail =
-    (session.customer_email as string) ??
-    (session.customer_details as Record<string, string>)?.email ??
-    meta.customer_email;
+    meta.recipient_email ||
+    meta.customer_email ||
+    ((session.customer_email as string) ??
+    (session.customer_details as Record<string, string>)?.email);
   const customerName =
-    meta.customer_name ?? (session.customer_details as Record<string, string>)?.name ?? null;
+    meta.recipient_name || meta.customer_name || ((session.customer_details as Record<string, string>)?.name ?? null);
 
-  let userId = options.userId ?? parseMetadataUserId(meta);
+  // An explicitly named recipient owns the enrollment, even if the buyer was
+  // signed in and payer user_id metadata is also present.
+  let userId = options.userId ?? (meta.recipient_email ? null : parseMetadataUserId(meta));
   let isNewUser = false;
   let newUserResetToken: string | null = null;
 
@@ -455,7 +459,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
   }
 
   const [course] = await db
-    .select({ title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail })
+    .select({ title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, brand: lmsCourses.brand, sendEnrollmentEmail: lmsCourses.sendEnrollmentEmail })
     .from(lmsCourses)
     .where(eq(lmsCourses.id, courseId))
     .limit(1);
@@ -499,10 +503,9 @@ export async function reconcileLmsCheckoutFromStripeSession(
       .where(and(eq(lmsOrders.userId, userId), eq(lmsOrders.stripeSessionId, sessionId)))
       .limit(1);
     if (alreadyProcessed) {
-      console.log(`[LmsCheckoutFulfillment] Webhook retry detected for session ${sessionId} — enrollment already exists, skipping duplicate alert`);
-      notes.push("Webhook retry — enrollment already active, no action needed");
-      return { success: true, userId, courseId, orderId, isNewUser, notes };
-    }
+      console.log(`[LmsCheckoutFulfillment] Webhook retry detected for session ${sessionId} — checking durable access-email delivery`);
+      notes.push("Webhook retry — enrollment already active");
+    } else {
     const courseTitle = course?.title ?? `Course #${courseId}`;
     const stripeLink = `https://dashboard.stripe.com/payments/${paymentIntentFromSession}`;
     const { getPlatformAdminRecipient } = await import("./platformAdminNotification");
@@ -553,6 +556,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
       rawPayload: { courseId, orderId, pricingType },
     });
     return { success: true, userId, courseId, orderId, isNewUser, notes };
+    }
   }
 
   if (!existingEnrollment) {
@@ -590,9 +594,11 @@ export async function reconcileLmsCheckoutFromStripeSession(
     notes.push("Already enrolled (active)");
   }
 
-  if (customerEmail && course?.slug && (shouldRenew || isNewUser) && !options.linkOnly) {
+  // A completed checkout deserves one access message even if an active
+  // enrollment already existed. The session-scoped record makes this safe for
+  // webhook retries and checkout-status polling.
+  if (customerEmail && course?.slug && !options.linkOnly) {
     try {
-      // Respect per-course and platform-level email enable flags
       const courseEmailEnabled = course.sendEnrollmentEmail !== false;
       let platformEmailEnabled = true;
       try {
@@ -601,65 +607,60 @@ export async function reconcileLmsCheckoutFromStripeSession(
       } catch { /* non-fatal */ }
 
       if (courseEmailEnabled && platformEmailEnabled) {
-        let accessToken: string | null = null;
-        try {
-          accessToken = await getOrCreateAccessToken(userId);
-        } catch { /* optional */ }
-        // For new guest accounts, include a set-password URL so they can create a permanent login
-        const setPasswordUrl = newUserResetToken
-          ? `https://app.allaboutultrasound.com/auth/reset-password?token=${newUserResetToken}`
-          : null;
-        const { resolvePurchaseEmailTargets } = await import("./purchaseAccessEmailDelivery");
-        const { to: learnerTo, payee } = await resolvePurchaseEmailTargets({
-          userId,
-          checkoutEmail: customerEmail,
-          checkoutName: customerName,
+        const delivery = await sendPurchaseNotificationOnce(db, {
+          checkoutSessionId: sessionId,
+          notificationType: "lms_access",
+          send: async () => {
+            let accessToken: string | null = null;
+            try { accessToken = await getOrCreateAccessToken(userId); } catch { /* optional */ }
+            const setPasswordUrl = newUserResetToken
+              ? `https://app.allaboutultrasound.com/auth/reset-password?token=${newUserResetToken}`
+              : null;
+            const { resolvePurchaseEmailTargets } = await import("./purchaseAccessEmailDelivery");
+            const { to: learnerTo, payee } = await resolvePurchaseEmailTargets({
+              userId,
+              checkoutEmail: customerEmail,
+              checkoutName: customerName,
+            });
+            if (course.type === "quiz") {
+              return sendQuizAccessEmail({
+                to: learnerTo,
+                payee,
+                forPurchase: true,
+                quizTitle: course.title,
+                courseSlug: course.slug,
+                accessToken,
+                setPasswordUrl,
+                brand: course.brand,
+              });
+            }
+            return sendEnrollmentEmail({
+              to: learnerTo,
+              payee,
+              forPurchase: true,
+              courseTitle: course.title,
+              courseSlug: course.slug,
+              accessToken,
+              setPasswordUrl,
+              brand: course.brand,
+            });
+          },
         });
-        if (course.type === "quiz") {
-          const quizEmailOk = await sendQuizAccessEmail({
-            to: learnerTo,
-            payee,
-            forPurchase: true,
-            quizTitle: course.title,
-            courseSlug: course.slug,
-            accessToken,
-            setPasswordUrl,
-          });
-          if (quizEmailOk) {
-            notes.push("Quiz access email sent");
-          } else {
-            notes.push("Quiz access email FAILED (check SendGrid key)");
-            // Proactive alert so admin is notified immediately without waiting for a customer complaint
-            notifyOwner({
-              title: "⚠️ Quiz Access Email Failed",
-              content: `Failed to send quiz access email to ${customerEmail} (userId=${userId}) for "${course.title}". Check SendGrid API key in Settings → Secrets.`,
-            }).catch(() => {});
-          }
+        if (delivery.attempted && delivery.delivered) notes.push(course.type === "quiz" ? "Quiz access email sent" : "Enrollment email sent");
+        else if (delivery.attempted) {
+          notes.push("Enrollment email failed");
+          notifyOwner({
+            title: "⚠️ Purchase Access Email Failed",
+            content: `Checkout ${sessionId} granted ${course.type === "quiz" ? "quiz" : "course"} access but its access email could not be sent.`,
+          }).catch(() => {});
         } else {
-          const enrollEmailOk = await sendEnrollmentEmail({
-            to: learnerTo,
-            payee,
-            forPurchase: true,
-            courseTitle: course.title,
-            courseSlug: course.slug,
-            accessToken,
-            setPasswordUrl,
-          });
-          if (enrollEmailOk) {
-            notes.push("Enrollment email sent");
-          } else {
-            notes.push("Enrollment email FAILED (check SendGrid key)");
-            notifyOwner({
-              title: "⚠️ Course Enrollment Email Failed",
-              content: `Failed to send enrollment email to ${customerEmail} (userId=${userId}) for "${course.title}". Check SendGrid API key in Settings → Secrets.`,
-            }).catch(() => {});
-          }
+          notes.push(delivery.reason === "already_sent" ? "Access email already sent for this checkout" : "Access email delivery already in progress");
         }
       } else {
         notes.push(`Enrollment email skipped (course=${courseEmailEnabled}, platform=${platformEmailEnabled})`);
       }
     } catch (err) {
-      console.error(`[LmsCheckoutFulfillment] Email failed for ${customerEmail}:`, err);
+      console.error(`[LmsCheckoutFulfillment] Email failed for checkout ${sessionId}:`, err);
       notes.push("Enrollment email failed");
     }
   }

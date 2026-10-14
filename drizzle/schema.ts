@@ -3600,6 +3600,8 @@ export const lmsOrders = mysqlTable("lms_orders", {
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
   stripeSessionId: varchar("stripe_session_id", { length: 255 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  /** Exact time the learner chose Cancel; access can remain active through the paid period. */
+  cancellationRequestedAt: timestamp("cancellation_requested_at"),
   status: mysqlEnum("status", ["pending", "paid", "failed", "refunded"]).default("pending").notNull(),
   affiliateId: int("affiliate_id"),
   groupId: int("group_id"),
@@ -6483,6 +6485,27 @@ export const emailSendLog = mysqlTable("email_send_log", {
 export type EmailSendLog = typeof emailSendLog.$inferSelect;
 export type InsertEmailSendLog = typeof emailSendLog.$inferInsert;
 
+
+// ─── Purchase Notification Deliveries ─────────────────────────────────────────
+// Durable per-checkout email idempotency. This is separate from email_send_log:
+// one checkout can be reconciled more than once but should only mail once.
+export const purchaseNotificationDeliveries = mysqlTable("purchase_notification_deliveries", {
+  id: int("id").autoincrement().primaryKey(),
+  stripeCheckoutSessionId: varchar("checkout_session_id", { length: 255 }).notNull(),
+  notificationType: varchar("notification_type", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["sending", "sent", "failed"]).default("sending").notNull(),
+  attempts: int("attempts").default(1).notNull(),
+  lastError: text("last_error"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("purchase_notification_delivery_unique").on(table.stripeCheckoutSessionId, table.notificationType),
+  index("purchase_notification_delivery_status_idx").on(table.status, table.updatedAt),
+]);
+export type PurchaseNotificationDelivery = typeof purchaseNotificationDeliveries.$inferSelect;
+export type InsertPurchaseNotificationDelivery = typeof purchaseNotificationDeliveries.$inferInsert;
+
 // ─── User Email Aliases ───────────────────────────────────────────────────────
 // Allows a user to log in with multiple email addresses.
 // The primary email is always stored on users.email; aliases are secondary.
@@ -7621,6 +7644,14 @@ export const workshopInstances = mysqlTable("workshop_instances", {
   instanceContent: longtext("instance_content"),
   // Full page builder blocks for this specific instance's detail page
   landingBlocks: longtext("landing_blocks"),
+  // Registration confirmation is reviewed and approved per scheduled instance.
+  // It never automatically inherits dated copy from another workshop run.
+  confirmationEmailApproved: boolean("confirmation_email_approved").default(false).notNull(),
+  confirmationEmailApprovedAt: timestamp("confirmation_email_approved_at"),
+  confirmationEmailSubject: varchar("confirmation_email_subject", { length: 500 }),
+  confirmationEmailHeading: varchar("confirmation_email_heading", { length: 500 }),
+  confirmationEmailIntro: text("confirmation_email_intro"),
+  confirmationEmailDetails: longtext("confirmation_email_details"),
   presaleWelcomeHeading: varchar("presale_welcome_heading", { length: 500 }),
   presaleWelcomeBody: longtext("presale_welcome_body"),
   presaleWelcomeMediaUrl: text("presale_welcome_media_url"),

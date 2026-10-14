@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isRailwayMysqlUrl, resolveApplicationDatabaseUrl } from "./lib/databaseUrl";
+import {
+  isLegacyManusDatabaseUrl,
+  isRailwayMysqlUrl,
+  resolveApplicationDatabaseUrl,
+} from "./lib/databaseUrl";
 
 describe("resolveApplicationDatabaseUrl", () => {
   const legacyUrl = "mysql://legacy:secret@gateway06.us-east-1.prod.aws.tidbcloud.com:4000/legacy";
@@ -22,13 +26,29 @@ describe("resolveApplicationDatabaseUrl", () => {
     })).toBe(railwayUrl);
   });
 
+  it("fails closed on Railway instead of reading a retired Manus database", () => {
+    expect(resolveApplicationDatabaseUrl({
+      RAILWAY_PRIMARY: "true",
+      DATABASE_URL: legacyUrl,
+    })).toBeNull();
+  });
+
+  it("permits a Railway DATABASE_URL only when it points at Railway MySQL", () => {
+    expect(resolveApplicationDatabaseUrl({
+      RAILWAY_PRIMARY: "true",
+      DATABASE_URL: railwayUrl,
+    })).toBe(railwayUrl);
+  });
+
   it("keeps DATABASE_URL as the local-development fallback", () => {
     expect(resolveApplicationDatabaseUrl({ DATABASE_URL: legacyUrl })).toBe(legacyUrl);
   });
 
-  it("detects Railway private and public MySQL URLs", () => {
+  it("detects Railway private/public MySQL and retired Manus URLs", () => {
     expect(isRailwayMysqlUrl("mysql://root:pass@mysql.railway.internal:3306/railway")).toBe(true);
     expect(isRailwayMysqlUrl("mysql://root:pass@viaduct.proxy.rlwy.net:37790/railway")).toBe(true);
     expect(isRailwayMysqlUrl(legacyUrl)).toBe(false);
+    expect(isLegacyManusDatabaseUrl(legacyUrl)).toBe(true);
+    expect(isLegacyManusDatabaseUrl(railwayUrl)).toBe(false);
   });
 });

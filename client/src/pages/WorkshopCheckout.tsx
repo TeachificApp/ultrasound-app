@@ -15,10 +15,12 @@ import { useParams, useLocation, Link } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Lock, ArrowLeft, AlertCircle, Bell, CheckCircle2, ShieldCheck,
 } from "lucide-react";
@@ -46,6 +48,7 @@ export function WorkshopCheckoutClosedState({ title, backHref }: { title: string
 export default function WorkshopCheckout() {
   const { slug } = useParams<{ slug: string }>();
   const [location] = useLocation();
+  const { user } = useAuth();
 
   const searchParams = useMemo(() => {
     const url = new URL(window.location.href);
@@ -56,7 +59,14 @@ export default function WorkshopCheckout() {
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
+  // Stripe collects the payer; learner access is confirmed alongside payment.
+  const [learnerIsPayee, setLearnerIsPayee] = useState(true);
+  const [payerEmail, setPayerEmail] = useState("");
+  const [learnerName, setLearnerName] = useState("");
+  const [learnerEmail, setLearnerEmail] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [activeSessionKey, setActiveSessionKey] = useState<string | null>(null);
+  const activeSessionKeyRef = useRef<string | null>(null);
   const [freeSuccess, setFreeSuccess] = useState(false);
   const [sessionMeta, setSessionMeta] = useState<{
     workshopTitle: string;
@@ -78,33 +88,55 @@ export default function WorkshopCheckout() {
     availabilityStatus?: "waitlist" | "enrollment_closed";
   } | null>(null);
 
-  const createSession = trpc.workshopLearner.createEmbeddedCheckoutSession.useMutation({
-    onSuccess: (data) => {
-      const { clientSecret: cs, free, ...meta } = data;
-      setSessionMeta({ ...meta, free });
-      if (free) {
-        setFreeSuccess(true);
-      } else {
-        setClientSecret(cs);
-      }
-    },
-  });
-
-  const sessionStarted = useRef(false);
+  const createSession = trpc.workshopLearner.createEmbeddedCheckoutSession.useMutation();
   useEffect(() => {
-    if (!slug || !searchParams.instanceId || sessionStarted.current) return;
-    sessionStarted.current = true;
-    createSession.mutate({
-      workshopSlug: slug,
-      instanceId: searchParams.instanceId,
-      origin: window.location.origin,
-    });
-  }, [slug, searchParams.instanceId]);
+    const knownEmail = (user as any)?.email?.trim().toLowerCase();
+    if (knownEmail && !payerEmail) setPayerEmail(knownEmail);
+  }, [user, payerEmail]);
+  const hasValidPayerEmail = /^\S+@\S+\.\S+$/.test(payerEmail.trim());
+  const hasValidLearnerDetails = hasValidPayerEmail && (learnerIsPayee || (learnerName.trim().length > 1 && /^\S+@\S+\.\S+$/.test(learnerEmail.trim())));
+  const checkoutSessionKey = [slug ?? "", searchParams.instanceId ?? "", payerEmail.trim().toLowerCase(), learnerIsPayee ? "payer" : `${learnerName.trim()}|${learnerEmail.trim().toLowerCase()}`].join(":");
+  const invalidateEmbeddedSession = () => {
+    activeSessionKeyRef.current = null;
+    setActiveSessionKey(null);
+    setClientSecret(null);
+    setSessionMeta(null);
+    setFreeSuccess(false);
+  };
+  useEffect(() => {
+    if (!slug || !searchParams.instanceId || !hasValidLearnerDetails || activeSessionKey === checkoutSessionKey || activeSessionKeyRef.current === checkoutSessionKey) return;
+    const timeout = window.setTimeout(() => {
+      activeSessionKeyRef.current = checkoutSessionKey;
+      setActiveSessionKey(checkoutSessionKey);
+      setClientSecret(null);
+      setSessionMeta(null);
+      setFreeSuccess(false);
+      createSession.mutate({
+        workshopSlug: slug,
+        instanceId: searchParams.instanceId,
+        origin: window.location.origin,
+        payerEmail: payerEmail.trim().toLowerCase(),
+        ...(!learnerIsPayee ? { recipientName: learnerName.trim(), recipientEmail: learnerEmail.trim().toLowerCase() } : {}),
+      }, { onSuccess: (data) => {
+        if (activeSessionKeyRef.current !== checkoutSessionKey) return;
+        if (data.alreadyEnrolled && data.accessUrl) {
+          window.location.href = data.accessUrl;
+          return;
+        }
+        const { clientSecret: cs, free, ...meta } = data;
+        setSessionMeta({ ...meta, free });
+        if (free) setFreeSuccess(true);
+        else setClientSecret(cs);
+      }});
+    }, learnerIsPayee ? 0 : 350);
+    return () => window.clearTimeout(timeout);
+  }, [slug, searchParams.instanceId, learnerIsPayee, payerEmail, learnerName, learnerEmail, hasValidLearnerDetails, checkoutSessionKey, activeSessionKey]);
 
   const primary = sessionMeta?.primaryColor ?? "#189aa1";
   const stripeOptions = useMemo(() => (clientSecret ? { clientSecret } : undefined), [clientSecret]);
 
   const backHref = `/workshops/${slug}`;
+
 
   // Restricted workshop instances never receive a Stripe client secret. Keep users
   // on a clear availability screen so Waitlist capture and closed enrollment cannot
@@ -243,8 +275,36 @@ export default function WorkshopCheckout() {
 
         </div>
 
-        {/* Right — Terms agreement + Stripe embedded checkout */}
+        {/* Right — learner assignment, terms, and embedded Stripe checkout */}
         <div className="space-y-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+            <h3 className="text-base font-semibold text-gray-900">Checkout details</h3>
+            <div className="mt-3 grid gap-2">
+              <Label htmlFor="workshop-payer-email">Payer email</Label>
+              <Input id="workshop-payer-email" value={payerEmail} onChange={(event) => { setPayerEmail(event.target.value); invalidateEmbeddedSession(); }} placeholder="payer@email.com" type="email" autoComplete="email" required />
+              <p className="text-xs leading-relaxed text-gray-500">Your Stripe receipt is sent here. We use it to recognize an existing registration before payment.</p>
+            </div>
+            <p className="mt-4 text-sm text-gray-500">Will the learner use the same name and email as the payer?</p>
+            <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Learner and payer relationship">
+              <button type="button" aria-pressed={learnerIsPayee} onClick={() => { if (!learnerIsPayee) { setLearnerIsPayee(true); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Yes, same learner</button>
+              <button type="button" aria-pressed={!learnerIsPayee} onClick={() => { if (learnerIsPayee) { setLearnerIsPayee(false); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${!learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>No, another learner</button>
+            </div>
+            {!learnerIsPayee && (
+              <div className="mt-4 grid gap-3">
+                <Input value={learnerName} onChange={(event) => { setLearnerName(event.target.value); invalidateEmbeddedSession(); }} placeholder="Learner full name" autoComplete="name" required />
+                <Input value={learnerEmail} onChange={(event) => { setLearnerEmail(event.target.value); invalidateEmbeddedSession(); }} placeholder="Learner email" type="email" autoComplete="email" required />
+                <p className="text-xs leading-relaxed text-gray-500">The payer receives the Stripe receipt. The learner receives workshop registration details and access.</p>
+              </div>
+            )}
+          </div>
+          {!hasValidLearnerDetails ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+              <ShieldCheck className="mx-auto h-10 w-10" style={{ color: primary }} />
+              <h4 className="mt-4 text-base font-semibold text-gray-900">Add the learner’s details</h4>
+              <p className="mt-2 text-sm text-gray-500">Enter the payer and learner details above to load secure payment.</p>
+            </div>
+          ) : (
+            <>
           {/* Terms agreement card — above Stripe embed */}
           {sessionMeta && !sessionMeta.free && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
@@ -311,6 +371,8 @@ export default function WorkshopCheckout() {
               </div>
             ) : null}
           </div>
+            </>
+          )}
         </div>
       </div>
     </div>
