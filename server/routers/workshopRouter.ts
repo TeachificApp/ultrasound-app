@@ -1582,6 +1582,48 @@ export const workshopAdminRouter = router({
       return { success: true };
     }),
 
+  /** Fulfill workshop enrollment from a completed Stripe Checkout session (webhook fallback). */
+  reconcileStripeWorkshopCheckout: protectedProcedure
+    .input(
+      z.object({
+        stripeCheckoutSessionId: z.string().min(1),
+        userId: z.number().int().positive().optional(),
+        email: z.string().email().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Admin only" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const stripe = getStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(input.stripeCheckoutSessionId);
+      if (session.payment_status !== "paid" && session.status !== "complete") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Checkout session is not paid (status=${session.status}, payment=${session.payment_status})`,
+        });
+      }
+
+      const sessionRecord = session as unknown as Record<string, unknown>;
+      const meta = { ...(session.metadata ?? {}) } as Record<string, string>;
+      if (input.userId) meta.user_id = String(input.userId);
+      if (input.email) meta.customer_email = input.email;
+      sessionRecord.metadata = meta;
+
+      const { fulfillWorkshopCheckoutFromStripeSession } = await import("../lib/workshopCheckoutFulfillment");
+      const result = await fulfillWorkshopCheckoutFromStripeSession(db as any, sessionRecord);
+      if (!result.success) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: result.error ?? "Workshop fulfillment failed",
+        });
+      }
+      return result;
+    }),
+
   // ── Pricing Options ────────────────────────────────────────────────────────
 
   /** Save pricing options for a workshop */
