@@ -48,4 +48,30 @@ describe("purchase recipient and cancellation safeguards", () => {
     expect(lms).toContain("autoLoginUrl,");
     expect(completion).toContain('"autoLoginUrl" in data');
   });
+
+  it("records one access notification per checkout while allowing failed delivery to retry", () => {
+    const schema = source("../drizzle/schema.ts");
+    const delivery = source("./lib/purchaseNotificationDelivery.ts");
+    const fulfillment = source("./lib/lmsCheckoutFulfillment.ts");
+
+    expect(schema).toContain('purchase_notification_deliveries');
+    expect(schema).toContain('purchase_notification_delivery_unique');
+    expect(delivery).toContain("INSERT IGNORE INTO purchase_notification_deliveries");
+    expect(delivery).toContain("status = 'failed'");
+    expect(fulfillment).toContain("sendPurchaseNotificationOnce");
+    expect(fulfillment).toContain('notificationType: "lms_access"');
+    expect(fulfillment).not.toContain("course?.slug && (shouldRenew || isNewUser)");
+  });
+
+  it("sends confirmed access notices for webinar, workshop, download, bundle, and physical purchases", () => {
+    const stripe = source("./webhooks/stripe.ts");
+
+    expect(stripe).toContain('notificationType: "workshop_registration"');
+    expect(stripe).toContain('notificationType: "webinar_registration"');
+    expect(stripe).toContain('notificationType: "download_access"');
+    expect(stripe).toContain('notificationType: "bundle_access"');
+    expect(stripe).toContain('notificationType: "physical_order"');
+    expect(stripe).toContain("resolveCheckoutRecipientUser(session, meta)");
+    expect(stripe).toContain("sendPurchaseAccessEmail");
+  });
 });

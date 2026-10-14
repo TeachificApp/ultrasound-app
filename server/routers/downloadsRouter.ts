@@ -2238,85 +2238,27 @@ export const downloadsCheckoutPublicRouter = router({
 });
 
 // ─── Email Helper ───────────────────────────────────────────────────────────
-export async function sendPurchaseConfirmationEmail(userId: number, productId: number) {
+export async function sendPurchaseConfirmationEmail(userId: number, productId: number): Promise<boolean> {
   const db = await getDb();
-  if (!db) return;
+  if (!db) return false;
   const user = await getUserById(userId);
-  if (!user || !user.email) return;
-
+  if (!user?.email) return false;
   const [product] = await db.select().from(digitalProducts)
     .where(eq(digitalProducts.id, productId)).limit(1);
-  if (!product) return;
+  if (!product) return false;
 
-  const files = await db.select().from(digitalProductFiles)
-    .where(eq(digitalProductFiles.productId, productId))
-    .orderBy(asc(digitalProductFiles.sortOrder));
-
-  const appUrl = 'https://app.allaboutultrasound.com';
-  const filesPath = `/downloads/${product.slug}/files`;
-  const filesUrl = `${appUrl}${filesPath}`;
-
-  // Generate a persistent auto-login token so the button logs them in automatically
-  let accessUrl = filesUrl;
-  try {
-    const { generateAutoLoginToken } = await import('../routes/autoLogin');
-    const token = await generateAutoLoginToken(userId, filesUrl);
-    accessUrl = `${appUrl}/api/auth/auto-login?token=${token}&host=${encodeURIComponent(new URL(appUrl).hostname)}`;
-  } catch (tokenErr) {
-    console.error(`[sendPurchaseConfirmationEmail] Failed to generate auto-login token for user ${userId}:`, tokenErr);
-  }
-
-  const fileListHtml = files.map(f =>
-    `<li style="margin:4px 0;">${f.fileName} (${(f.fileSize / 1024 / 1024).toFixed(1)} MB)</li>`
-  ).join("");
-
-  const htmlBody = `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
-<body style="margin:0;padding:0;background:#f0fbfc;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fbfc;padding:32px 16px;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
-        <tr><td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;text-align:center;">
-          <img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp" alt="All About Ultrasound" width="60" height="60" style="border-radius:50%;display:block;margin:0 auto 12px;" />
-          <div style="font-size:18px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">Purchase Confirmed</div>
-        </td></tr>
-        <tr><td style="padding:32px;">
-          <h2 style="margin:0 0 8px;font-size:20px;color:#0e1e2e;font-family:Georgia,serif;">Thank you for your purchase!</h2>
-          <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Hi ${user.name || "there"}, your download is ready.</p>
-          <div style="background:#f0fbfc;border-left:3px solid #189aa1;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
-            <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#189aa1;">Product: ${product.title}</p>
-            <ul style="margin:0;padding-left:20px;font-size:14px;color:#475569;">${fileListHtml}</ul>
-          </div>
-          <div style="text-align:center;margin:28px 0;">
-            <a href="${accessUrl}" style="display:inline-block;background:linear-gradient(135deg,#189aa1,#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">Access Your Files</a>
-          </div>
-          <p style="margin:4px 0 16px;font-size:12px;color:#94a3b8;text-align:center;">This link signs you in automatically — no password needed.</p>
-          <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">Questions? Contact us at <a href="mailto:support@allaboutultrasound.com" style="color:#189aa1;">support@allaboutultrasound.com</a>.</p>
-        </td></tr>
-        <tr><td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
-          <p style="margin:0;font-size:12px;color:#94a3b8;">© All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:#189aa1;text-decoration:none;">www.allaboutultrasound.com</a></p>
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body></html>`;
-
-  const emailOk = await sendEmail({
-    to: { name: user.name || "Customer", email: user.email },
-    subject: `Your download is ready: ${product.title}`,
-    htmlBody,
-    previewText: `Your download "${product.title}" is ready — click to access your files instantly.`,
+  let accessToken: string | null = null;
+  try { accessToken = await getOrCreateAccessToken(userId); } catch { /* plain link remains safe */ }
+  const brand = product.brand === "iheartecho" ? "iheartecho" : "aaus";
+  const delivered = await sendDownloadAccessEmail({
+    to: { name: user.name || user.email.split("@")[0], email: user.email },
+    productTitle: product.title,
+    productSlug: product.slug,
+    accessToken,
+    brand,
   });
-  if (emailOk) {
-    console.log(`[sendPurchaseConfirmationEmail] Sent access email to ${user.email} for product ${productId} (auto-login: ${accessUrl !== filesUrl ? 'yes' : 'no'})`);
-  } else {
-    console.error(`[sendPurchaseConfirmationEmail] FAILED to send access email to ${user.email} for product ${productId}`);
-    const { notifyOwner } = await import("../_core/notification");
-    notifyOwner({
-      title: "⚠️ Download Access Email Failed",
-      content: `Failed to send download access email to ${user.email} (userId=${userId}) for "${product.title}". Check SendGrid API key in Settings → Secrets.`,
-    }).catch(() => {});
+  if (!delivered) {
+    console.error(`[sendPurchaseConfirmationEmail] FAILED to send access email for product ${productId}`);
   }
-  return emailOk;
+  return delivered;
 }

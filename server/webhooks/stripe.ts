@@ -18,7 +18,7 @@ import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { handleStudyGroupCheckoutCompleted, handleStudyGroupSubscriptionLifecycle } from "../routers/studyGroupsRouter";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshopEnrollments, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -27,13 +27,55 @@ import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
 import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail, emailWrapper } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
-import { buildPersistentAccessUrl, sendBundleAccessEmail } from "../lib/enrollmentEmail";
+import { buildPersistentAccessUrl, sendBundleAccessEmail, sendPurchaseAccessEmail } from "../lib/enrollmentEmail";
+import { sendPurchaseNotificationOnce } from "../lib/purchaseNotificationDelivery";
 import { fireCommunityWorkflowRules, onCourseEnrollment } from "../lib/communityAutoJoin";
 import { BRAND_PREMIUM_TRIAL_DAYS, hasBrandMembershipTrial, isBrandMembershipTrialCheckout } from "../lib/brandMembershipTrial";
 import { grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 import { persistLmsSubscriptionInvoice } from "../lib/lmsSubscriptionReconciliation";
 import { grantBundle } from "../lib/membershipFulfillment";
 import { getBrandDisplayConfig } from "@shared/brands";
+
+type CheckoutRecipient = { email: string | null; name: string | null };
+
+/** Recipient metadata takes precedence over the Stripe payment buyer. */
+function getCheckoutRecipient(session: Record<string, unknown>, meta: Record<string, string>): CheckoutRecipient {
+  const details = (session.customer_details ?? {}) as Record<string, unknown>;
+  const stringValue = (value: unknown): string | null => typeof value === "string" && value.trim() ? value.trim() : null;
+  return {
+    email: stringValue(meta.recipient_email) ?? stringValue(meta.customer_email) ?? stringValue(session.customer_email) ?? stringValue(details.email),
+    name: stringValue(meta.recipient_name) ?? stringValue(meta.customer_name) ?? stringValue(details.name),
+  };
+}
+
+function platformBrand(value: string | null | undefined): "aaus" | "iheartecho" {
+  return value === "iheartecho" ? "iheartecho" : "aaus";
+}
+
+function learnOriginForPurchaseBrand(brand: "aaus" | "iheartecho"): string {
+  return brand === "iheartecho" ? "https://learn.iheartecho.com" : "https://learn.allaboutultrasound.com";
+}
+
+async function resolveCheckoutRecipientUser(session: Record<string, unknown>, meta: Record<string, string>) {
+  const recipient = getCheckoutRecipient(session, meta);
+  if (!recipient.email) return null;
+  const nameParts = (recipient.name || "").split(" ").filter(Boolean);
+  const resolved = await getOrCreateUserByEmail({
+    email: recipient.email,
+    name: recipient.name ?? undefined,
+    firstName: nameParts[0] || undefined,
+    lastName: nameParts.slice(1).join(" ") || undefined,
+  });
+  return { ...recipient, user: resolved.user, isNew: resolved.isNew };
+}
+
+async function deliverDownloadAccessOnce(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, checkoutSessionId: string | null | undefined, userId: number, productId: number) {
+  return sendPurchaseNotificationOnce(db, {
+    checkoutSessionId,
+    notificationType: "download_access",
+    send: () => sendPurchaseConfirmationEmail(userId, productId),
+  });
+}
 
 // Stripe webhook secret — optional but strongly recommended in production.
 // Resolve at request time so a rotated secret takes effect without a module reload.
@@ -318,74 +360,13 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
   const db = await getDb();
   if (!db) return;
 
-  // ── AUTO-ACCOUNT CREATION FOR GUESTS ────────────────────────────────────
-  // If the buyer was a guest (no user_id in metadata), auto-create an account
-  // so we can grant download access and send the access email immediately.
-  let userId = meta.user_id ? parseInt(meta.user_id) : null;
-  const customerEmail = (session.customer_email as string)
-    ?? (session.customer_details as Record<string, string>)?.email
-    ?? meta.customer_email;
-  const customerName = meta.customer_name ?? (session.customer_details as Record<string, string>)?.name ?? null;
-
-  if (!userId && customerEmail) {
-    try {
-      const nameParts = (customerName || "").trim().split(" ");
-      const { user: autoUser, isNew, resetToken } = await getOrCreateUserByEmail({
-        email: customerEmail,
-        firstName: nameParts[0] || undefined,
-        lastName: nameParts.slice(1).join(" ") || undefined,
-        name: customerName || undefined,
-      });
-      userId = autoUser.id;
-      if (isNew && resetToken) {
-        const baseUrl = "https://app.allaboutultrasound.com";
-        const setPasswordUrl = `${baseUrl}/auth/reset-password?token=${resetToken}`;
-        const firstName = autoUser.firstName || nameParts[0] || "there";
-        let accessTokenForEmail: string | null = null;
-        try {
-          accessTokenForEmail = await getOrCreateAccessToken(autoUser.id);
-        } catch (atErr) {
-          console.error(`[Stripe] Failed to generate access token for ${customerEmail}:`, atErr);
-        }
-        const accessUrl = accessTokenForEmail
-          ? buildPersistentAccessUrl(`${baseUrl}/my-dashboard`, accessTokenForEmail)
-          : setPasswordUrl;
-        try {
-          const { buildPasswordResetEmail, sendEmail: _sendEmail } = await import("../_core/email");
-          const emailContent = buildPasswordResetEmail({
-            firstName,
-            resetUrl: setPasswordUrl,
-            brandMode: "aaus",
-            purpose: "welcome",
-            expiresInLabel: "7 days",
-          });
-          const subject = `Your purchase is ready — access your download`;
-          const accessNote = accessTokenForEmail
-            ? `<div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
-                <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Quick access link</p>
-                <p style="margin:0;font-size:13px;color:#475569;">Click below to access your download directly — no password needed:</p>
-                <p style="margin:8px 0 0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
-              </div>`
-            : "";
-          const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
-          await _sendEmail({
-            to: { name: customerName || firstName, email: customerEmail },
-            subject,
-            htmlBody: enhancedBody,
-            previewText: `Access your download on All About Ultrasound`,
-          });
-          console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${userId}) and sent welcome email`);
-        } catch (emailErr) {
-          console.error(`[Stripe] Failed to send welcome email to ${customerEmail}:`, emailErr);
-        }
-      } else {
-        console.log(`[Stripe] Resolved existing account for ${customerEmail} (userId=${userId})`);
-      }
-    } catch (autoErr) {
-      console.error(`[Stripe] Failed to auto-create account for ${customerEmail}:`, autoErr);
-    }
-  }
-  // ── END AUTO-ACCOUNT CREATION ────────────────────────────────────────────
+  // Recipient metadata takes priority over the payment buyer. Resolving or
+  // creating the recipient account is safe on webhook/status retries.
+  const resolvedRecipient = await resolveCheckoutRecipientUser(session, meta);
+  const checkoutRecipient = getCheckoutRecipient(session, meta);
+  let userId = resolvedRecipient?.user.id ?? (checkoutRecipient.email ? null : (meta.user_id ? parseInt(meta.user_id) : null));
+  const customerEmail = checkoutRecipient.email;
+  const customerName = resolvedRecipient?.user.name ?? checkoutRecipient.name;
 
   if (!userId) {
     console.warn(`[Stripe] Digital download checkout: no userId and could not resolve from email. Session: ${session.id}`);
@@ -413,6 +394,12 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
         });
       }
       console.log(`[Stripe] Digital download payment already reconciled: ${paymentIntentId}`);
+      if (existingPayment.userId === userId) {
+        const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId);
+        if (delivery.attempted && !delivery.delivered) {
+          await notifyOwner({ title: "⚠️ Download access email failed", content: `Checkout ${session.id} granted a download entitlement but its access email could not be sent.` });
+        }
+      }
       return;
     }
   }
@@ -433,7 +420,8 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       stripePaymentIntentId: (session.payment_intent as string) ?? null,
       message: `Checkout completed but user already owns download product ${productId}`,
     });
-    const deliverySucceeded = await sendPurchaseConfirmationEmail(userId, productId);
+    const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId);
+    const deliverySucceeded = delivery.delivered;
     try {
       const { logPurchaseActivity } = await import("../lib/downloadAccess");
       await logPurchaseActivity(db, {
@@ -526,8 +514,12 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       metadata: { productId, amountCents: session.amount_total, sessionId: session.id },
     });
   } catch (_e) { /* non-blocking */ }
-  // Send purchase confirmation email with file links
-  const deliverySucceeded = await sendPurchaseConfirmationEmail(userId, productId);
+  // Send one session-idempotent purchase confirmation with the file links.
+  const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId);
+  const deliverySucceeded = delivery.delivered;
+  if (delivery.attempted && !delivery.delivered) {
+    await notifyOwner({ title: "⚠️ Download access email failed", content: `Checkout ${session.id} recorded a download purchase but its access email could not be sent.` });
+  }
   if (newPurchaseId) {
     try {
       await logPurchaseActivity(db, {
@@ -549,82 +541,46 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
 async function handleDigitalBundleCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata as Record<string, string>) ?? {};
   if (meta.type !== "digital_bundle") return;
-
   const bundleId = meta.bundle_id ? parseInt(meta.bundle_id) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id) : null;
-  if (!bundleId || !userId) return;
-
+  if (!bundleId) return;
   const db = await getDb();
   if (!db) return;
-
-  // Check if already purchased (idempotent)
-  const [existing] = await db.select().from(digitalBundlePurchases)
-    .where(and(eq(digitalBundlePurchases.userId, userId), eq(digitalBundlePurchases.bundleId, bundleId))).limit(1);
-  if (existing) {
-    console.log(`[Stripe] Digital bundle already purchased: user ${userId}, bundle ${bundleId}`);
-    await fulfillOrderBumpPurchase(db, meta, {
-      userId,
-      sessionId: session.id as string,
-      triggerOrderType: "bundle",
-    });
+  const recipient = await resolveCheckoutRecipientUser(session, meta);
+  const userId = recipient?.user.id ?? (meta.user_id ? parseInt(meta.user_id) : null);
+  if (!userId) {
+    await notifyOwner({ title: "⚠️ Bundle purchase needs review", content: `Checkout ${session.id} for bundle #${bundleId} has no resolvable recipient account.` });
     return;
   }
-
-  // Record bundle purchase
-  await db.insert(digitalBundlePurchases).values({
-    userId,
-    bundleId,
-    stripeCheckoutSessionId: session.id as string,
-  });
-
-  // Grant access to all products in the bundle
-  const bundleItems = await db.select().from(digitalBundleItems)
-    .where(eq(digitalBundleItems.bundleId, bundleId));
-  for (const item of bundleItems) {
-    const [existingPurchase] = await db.select().from(digitalPurchases)
-      .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, item.productId))).limit(1);
-    if (!existingPurchase) {
-      await db.insert(digitalPurchases).values({
-        userId,
-        productId: item.productId,
-        stripeCheckoutSessionId: session.id as string,
-      });
+  const [existing] = await db.select({ id: digitalBundlePurchases.id }).from(digitalBundlePurchases)
+    .where(and(eq(digitalBundlePurchases.userId, userId), eq(digitalBundlePurchases.bundleId, bundleId))).limit(1);
+  const bundleItems = await db.select().from(digitalBundleItems).where(eq(digitalBundleItems.bundleId, bundleId));
+  if (!existing) {
+    await db.insert(digitalBundlePurchases).values({ userId, bundleId, stripeCheckoutSessionId: session.id as string });
+    for (const item of bundleItems) {
+      const [owned] = await db.select({ id: digitalPurchases.id }).from(digitalPurchases)
+        .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, item.productId))).limit(1);
+      if (!owned) await db.insert(digitalPurchases).values({ userId, productId: item.productId, stripeCheckoutSessionId: session.id as string });
     }
   }
-
-  // Direct bundle purchase: one bundle-level message only. The included
-  // downloads are silent grants, so a customer never receives one email per
-  // item from the same bundle purchase.
-  try {
-    const [[bundle], [user]] = await Promise.all([
-      db.select({ title: digitalBundles.title, slug: digitalBundles.slug })
-        .from(digitalBundles).where(eq(digitalBundles.id, bundleId)).limit(1),
-      db.select({ name: users.name, email: users.email })
-        .from(users).where(eq(users.id, userId)).limit(1),
-    ]);
-    if (bundle && user?.email) {
-      const accessToken = await getOrCreateAccessToken(userId);
-      await sendBundleAccessEmail({
-        to: { name: user.name || user.email.split("@")[0], email: user.email },
-        bundleTitle: bundle.title,
-        bundleSlug: bundle.slug,
-        accessToken,
-      });
-    }
-  } catch (emailErr) {
-    console.error(`[Stripe] Bundle access email failed for bundle ${bundleId}:`, emailErr);
+  const [bundle] = await db.select({ title: digitalBundles.title, slug: digitalBundles.slug }).from(digitalBundles)
+    .where(eq(digitalBundles.id, bundleId)).limit(1);
+  const email = recipient?.email ?? (await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1))[0]?.email;
+  if (bundle && email) {
+    const delivery = await sendPurchaseNotificationOnce(db, {
+      checkoutSessionId: session.id as string | undefined,
+      notificationType: "bundle_access",
+      send: async () => sendBundleAccessEmail({
+          to: { name: recipient?.name || email.split("@")[0], email },
+          bundleTitle: bundle.title,
+          bundleSlug: bundle.slug,
+          accessToken: await getOrCreateAccessToken(userId),
+          brand: platformBrand(meta.brand ?? meta.brand_mode),
+        }),
+    });
+    if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Bundle access email failed", content: `Checkout ${session.id} granted bundle access but its access email could not be sent.` });
   }
-
-  await notifyOwner({
-    title: "🎁 New Digital Bundle Purchase",
-    content: `User ID ${userId} purchased bundle ID ${bundleId} (${bundleItems.length} products). Amount: $${(((session.amount_total as number) ?? 0) / 100).toFixed(2)}.`,
-  });
-  await fulfillOrderBumpPurchase(db, meta, {
-    userId,
-    sessionId: session.id as string,
-    triggerOrderType: "bundle",
-  });
-  console.log(`[Stripe] Digital bundle purchase recorded: user ${userId}, bundle ${bundleId}`);
+  if (!existing) await notifyOwner({ title: "🎁 New Digital Bundle Purchase", content: `User ID ${userId} purchased bundle ID ${bundleId} (${bundleItems.length} products).` });
+  await fulfillOrderBumpPurchase(db, meta, { userId, sessionId: session.id as string, triggerOrderType: "bundle" });
 }
 
 /**
@@ -635,127 +591,56 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
 async function handlePhysicalProductCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.type !== "physical_product") return;
-
   const productId = meta.product_id ? parseInt(meta.product_id, 10) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
   const pricingOptionId = meta.pricing_option_id ? parseInt(meta.pricing_option_id, 10) : null;
-  if (!productId || !userId) {
-    console.warn("[Stripe] Physical product checkout missing productId or userId in metadata");
-    return;
-  }
-
+  if (!productId) return;
   const db = await getDb();
   if (!db) return;
-
-  // Idempotency check — don't double-record
-  const [existing] = await db.select({ id: physicalProductOrders.id })
-    .from(physicalProductOrders)
-    .where(and(
-      eq(physicalProductOrders.userId, userId),
-      eq(physicalProductOrders.productId, productId),
-      eq(physicalProductOrders.stripeCheckoutSessionId, session.id as string),
-    )).limit(1);
-  if (existing) {
-    console.log(`[Stripe] Physical product order already recorded: user ${userId}, product ${productId}`);
+  const recipient = await resolveCheckoutRecipientUser(session, meta);
+  const userId = recipient?.user.id ?? (meta.user_id ? parseInt(meta.user_id, 10) : null);
+  if (!userId) {
+    await notifyOwner({ title: "⚠️ Physical product purchase needs review", content: `Checkout ${session.id} for physical product #${productId} has no recipient account.` });
     return;
   }
-
-  // Extract shipping address from Stripe session
-  const shippingDetails = (session.shipping_details ?? session.shipping) as Record<string, any> | null;
-  const addr = shippingDetails?.address ?? null;
-  const shippingAddress = addr ? JSON.stringify({
-    name: shippingDetails?.name ?? "",
-    line1: addr.line1 ?? "",
-    line2: addr.line2 ?? "",
-    city: addr.city ?? "",
-    state: addr.state ?? "",
-    postalCode: addr.postal_code ?? "",
-    country: addr.country ?? "",
-  }) : null;
-
-  const amountPaid = (session.amount_total as number) ?? 0;
-
-  const [inserted] = await db.insert(physicalProductOrders).values({
-    userId,
-    productId,
-    pricingOptionId: pricingOptionId || null,
-    stripeCheckoutSessionId: session.id as string,
-    amountPaid,
-    currency: (session.currency as string) ?? "usd",
-    shippingName: shippingDetails?.name ?? null,
-    shippingLine1: addr?.line1 ?? null,
-    shippingLine2: addr?.line2 ?? null,
-    shippingCity: addr?.city ?? null,
-    shippingState: addr?.state ?? null,
-    shippingPostalCode: addr?.postal_code ?? null,
-    shippingCountry: addr?.country ?? null,
-    fulfillmentStatus: "pending",
-  }).$returningId();
-
-  const orderId = inserted?.id;
-  if (orderId) {
-    try {
-      const bvResult = await fulfillBookvaultOrder(db, orderId, {
-        customerEmail: meta.customer_email ?? (session.customer_email as string) ?? null,
-      });
-      if (bvResult.submitted) {
-        console.log(`[Stripe] BookVault fulfillment started for order ${orderId}`);
-      } else if (bvResult.error) {
-        console.warn(`[Stripe] BookVault fulfillment failed for order ${orderId}: ${bvResult.error}`);
-      }
-    } catch (err) {
-      console.error(`[Stripe] BookVault fulfillment error for order ${orderId}:`, err);
+  const [product] = await db.select({ title: physicalProducts.title, brand: physicalProducts.brand }).from(physicalProducts).where(eq(physicalProducts.id, productId)).limit(1);
+  // Native physical products are kept separately, but a concise confirmation is
+  // preferable to dropping a completed purchase if the catalogue lookup changes.
+  const [existing] = await db.select({ id: physicalProductOrders.id }).from(physicalProductOrders)
+    .where(and(eq(physicalProductOrders.userId, userId), eq(physicalProductOrders.productId, productId), eq(physicalProductOrders.stripeCheckoutSessionId, session.id as string))).limit(1);
+  const shipping = (session.shipping_details ?? session.shipping) as Record<string, any> | null;
+  const address = shipping?.address ?? null;
+  if (!existing) {
+    const [inserted] = await db.insert(physicalProductOrders).values({
+      userId, productId, pricingOptionId: pricingOptionId || null, stripeCheckoutSessionId: session.id as string,
+      amountPaid: (session.amount_total as number) ?? 0, currency: (session.currency as string) ?? "usd",
+      shippingName: shipping?.name ?? null, shippingLine1: address?.line1 ?? null, shippingLine2: address?.line2 ?? null,
+      shippingCity: address?.city ?? null, shippingState: address?.state ?? null, shippingPostalCode: address?.postal_code ?? null,
+      shippingCountry: address?.country ?? null, fulfillmentStatus: "pending",
+    }).$returningId();
+    const orderId = inserted?.id;
+    if (orderId) {
+      const providerEmail = recipient?.email ?? getCheckoutRecipient(session, meta).email;
+      try { await fulfillBookvaultOrder(db, orderId, { customerEmail: providerEmail }); } catch (error) { console.error("[Stripe] BookVault fulfillment error:", error); }
+      try { await fulfillPrintfulOrder(db, orderId, { customerEmail: providerEmail }); } catch (error) { console.error("[Stripe] Printful fulfillment error:", error); }
     }
-    try {
-      const pfResult = await fulfillPrintfulOrder(db, orderId, {
-        customerEmail: meta.customer_email ?? (session.customer_email as string) ?? null,
-      });
-      if (pfResult.submitted) {
-        console.log(`[Stripe] Printful fulfillment started for order ${orderId}`);
-      } else if (pfResult.error) {
-        console.warn(`[Stripe] Printful fulfillment failed for order ${orderId}: ${pfResult.error}`);
-      }
-    } catch (err) {
-      console.error(`[Stripe] Printful fulfillment error for order ${orderId}:`, err);
-    }
+    await notifyOwner({ title: "📦 New Physical Product Order", content: `User ID ${userId} ordered physical product ID ${productId}.` });
   }
-
-  await notifyOwner({
-    title: "📦 New Physical Product Order",
-    content: `User ID ${userId} (${meta.customer_email}) ordered physical product ID ${productId}. Amount: $${(amountPaid / 100).toFixed(2)}. Shipping: ${shippingAddress ? JSON.parse(shippingAddress).line1 + ", " + JSON.parse(shippingAddress).city : "N/A"}.`,
-  });
-
-  // Send order confirmation email to customer
-  const customerEmailForConfirmation = meta.customer_email ?? (session.customer_email as string) ?? (session.customer_details as Record<string, string>)?.email ?? null;
-  if (customerEmailForConfirmation) {
-    try {
-      const { physicalProducts } = await import("../../drizzle/schema");
-      const [product] = await db.select({ title: physicalProducts.title }).from(physicalProducts).where(eq(physicalProducts.id, productId)).limit(1);
-      const productTitle = product?.title ?? `Order #${orderId}`;
-      const customerName = meta.customer_name ?? shippingDetails?.name ?? customerEmailForConfirmation.split("@")[0];
-      const appUrl = "https://app.allaboutultrasound.com";
-      let accessUrl = `${appUrl}/my-orders`;
-      try {
-        const token = await generateAutoLoginToken(userId!, `${appUrl}/my-orders`);
-        accessUrl = `${appUrl}/api/auth/auto-login?token=${token}`;
-      } catch { /* keep plain URL */ }
-      const shippingHtml = shippingAddress ? (() => {
-        const a = JSON.parse(shippingAddress);
-        return `<p style="margin:0 0 4px;font-size:13px;color:#475569;"><strong>Ship to:</strong> ${a.name || customerName}<br/>${a.line1}${a.line2 ? ", " + a.line2 : ""}<br/>${a.city}, ${a.state} ${a.postalCode}<br/>${a.country}</p>`;
-      })() : "";
-      await sendEmail({
-        to: { name: customerName, email: customerEmailForConfirmation },
-        subject: `Order confirmed: ${productTitle}`,
-        previewText: `Your order for ${productTitle} has been received and is being processed.`,
-        htmlBody: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f0fbfc;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fbfc;padding:32px 16px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;text-align:center;"><img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp" alt="All About Ultrasound" width="60" height="60" style="border-radius:50%;display:block;margin:0 auto 12px;"/><div style="font-size:18px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">Order Confirmed</div></td></tr><tr><td style="padding:32px;"><h2 style="margin:0 0 8px;font-size:20px;color:#0e1e2e;font-family:Georgia,serif;">Thank you for your order!</h2><p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Hi ${customerName}, your order has been received and is being processed.</p><div style="background:#f0fbfc;border-left:3px solid #189aa1;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;"><p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#189aa1;">📦 ${productTitle}</p><p style="margin:0;font-size:13px;color:#475569;">Amount paid: <strong>$${(amountPaid / 100).toFixed(2)}</strong></p></div>${shippingHtml}<div style="text-align:center;margin:28px 0;"><a href="${accessUrl}" style="display:inline-block;background:linear-gradient(135deg,#189aa1,#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">View My Orders</a></div><p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">Questions? Contact us at <a href="mailto:support@allaboutultrasound.com" style="color:#189aa1;">support@allaboutultrasound.com</a>.</p></td></tr><tr><td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">© All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:#189aa1;text-decoration:none;">www.allaboutultrasound.com</a></p></td></tr></table></td></tr></table></body></html>`,
-      });
-      console.log(`[Stripe] Order confirmation email sent to ${customerEmailForConfirmation} for product ${productId}`);
-    } catch (emailErr) {
-      console.error(`[Stripe] Failed to send order confirmation email for product ${productId}:`, emailErr);
-    }
+  const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
+  if (email) {
+    const brand = platformBrand(product?.brand ?? meta.brand);
+    const title = product?.title ?? "your order";
+    const delivery = await sendPurchaseNotificationOnce(db, {
+      checkoutSessionId: session.id as string | undefined,
+      notificationType: "physical_order",
+      send: async () => sendPurchaseAccessEmail({
+        to: { name: recipient?.name || email.split("@")[0], email }, subject: `Order confirmed: ${title}`,
+        heading: "Your order is confirmed", intro: `your order for <strong style="color:#0e4a50;">${title}</strong> has been received and is being processed.`,
+        accessLabel: "View My Orders", destinationUrl: `${brand === "iheartecho" ? "https://app.iheartecho.com" : "https://app.allaboutultrasound.com"}/my-orders`,
+        accessToken: await getOrCreateAccessToken(userId), brand, brandMode: brand,
+      }),
+    });
+    if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Physical order confirmation email failed", content: `Checkout ${session.id} recorded a physical product order but its confirmation email could not be sent.` });
   }
-
-  console.log(`[Stripe] Physical product order recorded: user ${userId}, product ${productId}, session ${session.id}`);
 }
 
 /**
@@ -767,154 +652,99 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
   if (meta.type !== "workshop") return;
   const workshopId = meta.workshop_id ? parseInt(meta.workshop_id, 10) : null;
   const instanceId = meta.instance_id ? parseInt(meta.instance_id, 10) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
-  if (!workshopId || !instanceId || !userId) {
-    console.warn("[Stripe] Workshop checkout missing workshopId, instanceId, or userId in metadata");
-    return;
-  }
+  if (!workshopId || !instanceId) return;
   const db = await getDb();
   if (!db) return;
-  const [instanceAvailability] = await db.select({ status: workshopInstances.status })
-    .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
-  // Idempotency check
-  const [existing] = await db.select({ id: workshopEnrollments.id })
-    .from(workshopEnrollments)
-    .where(and(
-      eq(workshopEnrollments.userId, userId),
-      eq(workshopEnrollments.instanceId, instanceId),
-      eq(workshopEnrollments.stripeSessionId, session.id as string),
-    )).limit(1);
-  if (existing) {
-    console.log(`[Stripe] Workshop enrollment already recorded: user ${userId}, instance ${instanceId}`);
+  const recipient = await resolveCheckoutRecipientUser(session, meta);
+  const userId = recipient?.user.id ?? (meta.user_id ? parseInt(meta.user_id, 10) : null);
+  if (!userId) {
+    await notifyOwner({ title: "⚠️ Workshop purchase needs review", content: `Checkout ${session.id} for workshop #${workshopId} has no resolvable recipient account.` });
     return;
   }
-  const amountPaid = (session.amount_total as number) ?? 0;
-  await db.insert(workshopEnrollments).values({
-    workshopId,
-    instanceId,
-    userId,
-    stripeSessionId: session.id as string,
-    amountPaid,
-    currency: (session.currency as string) ?? "usd",
-    status: "active",
-    accessLevel: instanceAvailability?.status === "presale" ? "presale" : "full",
-    accessGrantedAt: new Date(),
-  });
-  await grantScheduledContentAccess(db, {
-    userId,
-    sourceType: "workshop_instance",
-    sourceId: instanceId,
-  });
-  // Fetch workshop/instance details for notification and email
-  const [workshopRow] = await db
-    .select({ title: workshops.title, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
+  const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, brand: workshops.brand, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
     .from(workshops).where(eq(workshops.id, workshopId)).limit(1);
-  const [instanceRow] = await db
-    .select({ title: workshopInstances.title, startDate: workshopInstances.startDate, timezone: workshopInstances.timezone, locationType: workshopInstances.locationType, venueName: workshopInstances.venueName, venueCity: workshopInstances.venueCity, venueState: workshopInstances.venueState, meetingUrl: workshopInstances.meetingUrl })
+  const [instance] = await db.select({ title: workshopInstances.title, status: workshopInstances.status, startDate: workshopInstances.startDate, timezone: workshopInstances.timezone, locationType: workshopInstances.locationType, venueName: workshopInstances.venueName, venueCity: workshopInstances.venueCity, venueState: workshopInstances.venueState, meetingUrl: workshopInstances.meetingUrl })
     .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
-
-  const workshopTitle = workshopRow?.title ?? `Workshop #${workshopId}`;
-  const instanceTitle = instanceRow?.title ? ` — ${instanceRow.title}` : "";
-  await notifyOwner({
-    title: "🏫 New Workshop Enrollment",
-    content: `${meta.customer_email ?? `User #${userId}`} enrolled in "${workshopTitle}${instanceTitle}". Amount: $${(amountPaid / 100).toFixed(2)}.`,
-  });
-
-  // Send workshop registration confirmation email
-  try {
-
-    if (workshopRow?.welcomeEmailEnabled !== false && meta.customer_email) {
-      const customerName = meta.customer_name ?? meta.customer_email.split("@")[0];
-      const firstName = customerName.split(" ")[0];
-      const emailWorkshopTitle = workshopRow?.title ?? "Workshop";
-      const emailInstanceTitle = instanceRow?.title ?? "";
-      const subject = workshopRow?.welcomeEmailSubject || `You're registered: ${emailWorkshopTitle}`;
-      let dateStr = "";
-      if (instanceRow?.startDate) {
-        dateStr = new Date(instanceRow.startDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: instanceRow.timezone ?? "America/New_York" });
-      }
-      let locationStr = "";
-      if (instanceRow?.locationType === "virtual") {
-        locationStr = instanceRow.meetingUrl
-          ? `Virtual — <a href="${instanceRow.meetingUrl}" style="color:#0d9488;">${instanceRow.meetingUrl}</a>`
-          : "Virtual (link will be sent before the event)";
-      } else if (instanceRow?.venueName) {
-        locationStr = [instanceRow.venueName, instanceRow.venueCity, instanceRow.venueState].filter(Boolean).join(", ");
-      }
-      const customBodyHtml = workshopRow?.welcomeEmailBody
-        ? `<div style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.6;">${workshopRow.welcomeEmailBody}</div>`
-        : "";
-      const brandColor = "#0d9488";
-      const brandDark = "#0e4a50";
-      const htmlBody = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/></head>
-<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;"><tr><td align="center">
-<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-<tr><td style="background:linear-gradient(135deg,${brandDark} 0%,${brandDark} 60%,${brandColor} 100%);padding:28px 32px;text-align:center;">
-<img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp" alt="All About Ultrasound" width="80" height="80" style="border-radius:50%;display:block;margin:0 auto 12px;"/>
-<div style="font-size:22px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">All About Ultrasound™</div>
-</td></tr>
-<tr><td style="padding:32px;">
-<h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">You're registered, ${firstName}! 🎉</h2>
-<p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">You've successfully registered for <strong style="color:${brandDark};">${emailWorkshopTitle}${emailInstanceTitle ? ` — ${emailInstanceTitle}` : ""}</strong>.</p>
-${customBodyHtml}
-<div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
-${dateStr ? `<p style="margin:0 0 6px;font-size:14px;color:#0e4a50;"><strong>Date:</strong> ${dateStr}</p>` : ""}
-${locationStr ? `<p style="margin:0;font-size:14px;color:#0e4a50;"><strong>Location:</strong> ${locationStr}</p>` : ""}
-</div>
-<p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">Questions? Reply to this email or contact <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};">support@allaboutultrasound.com</a>.</p>
-</td></tr>
-<tr><td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
-<p style="margin:0;font-size:12px;color:#94a3b8;">© All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:${brandColor};text-decoration:none;">www.allaboutultrasound.com</a></p>
-</td></tr>
-</table>
-</td></tr></table>
-</body></html>`;
-      await sendEmail({ to: { name: customerName, email: meta.customer_email }, subject, htmlBody });
-      console.log(`[Stripe] Workshop confirmation email sent to ${meta.customer_email}`);
-    }
-  } catch (emailErr) {
-    console.error(`[Stripe] Failed to send workshop confirmation email:`, emailErr);
-  }
-
-  try {
-    const { recordRevenueShareFromCompletedCheckout } = await import("../lib/revenueShareEngine");
-    await recordRevenueShareFromCompletedCheckout({
-      session,
-      courseId: workshopId,
-      courseTitle: workshopTitle,
+  if (!workshop || !instance) return;
+  const [existing] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)
+    .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.instanceId, instanceId), eq(workshopEnrollments.stripeSessionId, session.id as string))).limit(1);
+  if (!existing) {
+    await db.insert(workshopEnrollments).values({
+      workshopId, instanceId, userId, stripeSessionId: session.id as string,
+      amountPaid: (session.amount_total as number) ?? 0,
+      currency: (session.currency as string) ?? "usd", status: "active",
+      accessLevel: instance.status === "presale" ? "presale" : "full", accessGrantedAt: new Date(),
     });
-  } catch (rsErr) {
-    console.error("[RevenueShare] Workshop transfer error:", rsErr);
+    await grantScheduledContentAccess(db, { userId, sourceType: "workshop_instance", sourceId: instanceId });
+    await notifyOwner({ title: "🏫 New Workshop Enrollment", content: `User ID ${userId} enrolled in "${workshop.title}".` });
   }
-
-  console.log(`[Stripe] Workshop enrollment recorded: user ${userId}, workshop ${workshopId}, instance ${instanceId}`);
+  const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
+  if (email && workshop.welcomeEmailEnabled !== false) {
+    const brand = platformBrand(workshop.brand);
+    const dateText = instance.startDate ? new Date(instance.startDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: instance.timezone ?? "America/New_York" }) : null;
+    const location = instance.locationType === "virtual" ? (instance.meetingUrl ? `Virtual workshop — meeting link: ${instance.meetingUrl}` : "Virtual workshop — the meeting link will be sent before the event.") : [instance.venueName, instance.venueCity, instance.venueState].filter(Boolean).join(", ");
+    const detailsHtml = `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">${instance.title ? `<p style="margin:0 0 8px;"><strong>Session:</strong> ${instance.title}</p>` : ""}${dateText ? `<p style="margin:0 0 8px;"><strong>Date:</strong> ${dateText}</p>` : ""}${location ? `<p style="margin:0;"><strong>Location:</strong> ${location}</p>` : ""}</div>${workshop.welcomeEmailBody ? `<div style="margin:0 0 20px;">${workshop.welcomeEmailBody}</div>` : ""}`;
+    const delivery = await sendPurchaseNotificationOnce(db, {
+      checkoutSessionId: session.id as string | undefined,
+      notificationType: "workshop_registration",
+      send: async () => sendPurchaseAccessEmail({
+        to: { name: recipient?.name || email.split("@")[0], email },
+        subject: workshop.welcomeEmailSubject || `You're registered: ${workshop.title}`,
+        heading: "Your workshop registration is confirmed",
+        intro: `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
+        accessLabel: "View Workshop Details",
+        destinationUrl: `${learnOriginForPurchaseBrand(brand)}/workshops/${workshop.slug}`,
+        accessToken: await getOrCreateAccessToken(userId), brand, brandMode: "combined", detailsHtml,
+      }),
+    });
+    if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Workshop confirmation email failed", content: `Checkout ${session.id} registered the learner for "${workshop.title}", but its confirmation email could not be sent.` });
+  }
 }
 
 export async function handleWebinarCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.type !== "webinar") return;
   const webinarId = meta.webinar_id ? parseInt(meta.webinar_id, 10) : null;
-  const userId = meta.user_id ? parseInt(meta.user_id, 10) : null;
-  if (!webinarId || !userId) {
-    console.warn("[Stripe] Webinar checkout missing webinarId or userId in metadata");
-    return;
-  }
+  if (!webinarId) return;
   const db = await getDb();
   if (!db) return;
+  const recipient = await resolveCheckoutRecipientUser(session, meta);
+  const userId = recipient?.user.id ?? (meta.user_id ? parseInt(meta.user_id, 10) : null);
+  if (!userId) {
+    await notifyOwner({ title: "⚠️ Webinar purchase needs review", content: `Checkout ${session.id} for webinar #${webinarId} has no resolvable recipient account.` });
+    return;
+  }
+  const [webinar] = await db.select({ title: webinars.title, slug: webinars.slug, brand: webinars.brand, status: webinars.status, scheduledAt: webinars.scheduledAt, type: webinars.type, meetingUrl: webinars.meetingUrl })
+    .from(webinars).where(eq(webinars.id, webinarId)).limit(1);
+  if (!webinar) return;
   const [existing] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
     .where(and(eq(webinarRegistrations.webinarId, webinarId), eq(webinarRegistrations.userId, userId))).limit(1);
-  if (existing) return;
-  const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, webinarId)).limit(1);
-  if (!webinar) return;
-  await db.insert(webinarRegistrations).values({
-    webinarId,
-    userId,
-    stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined,
-    accessLevel: webinar.status === "presale" ? "presale" : "full",
-  });
-  console.log(`[Stripe] Webinar registration fulfilled: user ${userId}, webinar ${webinarId}`);
+  if (!existing) {
+    await db.insert(webinarRegistrations).values({ webinarId, userId, stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined, accessLevel: webinar.status === "presale" ? "presale" : "full" });
+    await notifyOwner({ title: "📺 New Webinar Registration", content: `User ID ${userId} registered for "${webinar.title}".` });
+  }
+  const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
+  if (email) {
+    const brand = platformBrand(webinar.brand);
+    const dateText = webinar.scheduledAt ? new Date(webinar.scheduledAt).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" }) : null;
+    const detailsHtml = `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">${dateText ? `<p style="margin:0 0 8px;"><strong>When:</strong> ${dateText}</p>` : ""}${webinar.type === "live" && webinar.meetingUrl ? `<p style="margin:0;"><strong>Live access:</strong> the session details are available from your webinar page.</p>` : ""}</div>`;
+    const delivery = await sendPurchaseNotificationOnce(db, {
+      checkoutSessionId: session.id as string | undefined,
+      notificationType: "webinar_registration",
+      send: async () => sendPurchaseAccessEmail({
+        to: { name: recipient?.name || email.split("@")[0], email },
+        subject: `You're registered: ${webinar.title}`,
+        heading: "Your webinar registration is confirmed",
+        intro: `you now have access to <strong style="color:#0e4a50;">${webinar.title}</strong>.`,
+        accessLabel: "Open Webinar",
+        destinationUrl: `${learnOriginForPurchaseBrand(brand)}/webinars/${webinar.slug}`,
+        accessToken: await getOrCreateAccessToken(userId), brand, brandMode: "combined", detailsHtml,
+      }),
+    });
+    if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Webinar confirmation email failed", content: `Checkout ${session.id} registered the learner for "${webinar.title}", but its confirmation email could not be sent.` });
+  }
 }
+
 
 /**
  * Handle brand membership upgrade checkout completion.
@@ -1564,78 +1394,35 @@ async function handleBrandSubscriptionLifecycle(subscription: Record<string, unk
 async function handleCanonicalBundleCheckoutCompleted(session: Record<string, unknown>) {
   const meta = (session.metadata ?? {}) as Record<string, string>;
   if (meta.purchase_type !== "bundle_purchase") return;
-
   const bundleId = Number.parseInt(meta.bundle_id ?? "", 10);
-  if (!Number.isInteger(bundleId) || bundleId <= 0) {
-    console.warn("[Stripe] Canonical bundle checkout is missing a valid bundle_id", session.id);
-    return;
-  }
-
-  const customerDetails = (session.customer_details ?? {}) as Record<string, string | undefined>;
-  const email = (session.customer_email as string | undefined) ?? customerDetails.email;
-  if (!email) {
-    console.warn(`[Stripe] Canonical bundle checkout ${session.id} has no customer email`);
-    await notifyOwner({
-      title: "⚠️ Bundle purchase needs review",
-      content: `Stripe checkout ${session.id} for bundle #${bundleId} completed without a purchaser email.`,
-    });
-    return;
-  }
-
+  if (!Number.isInteger(bundleId) || bundleId <= 0) return;
   const db = await getDb();
   if (!db) return;
-
-  const clientReferenceId = typeof session.client_reference_id === "string" ? session.client_reference_id : "";
-  const configuredUserId = Number.parseInt(meta.user_id ?? clientReferenceId, 10);
-  const resolvedUser = Number.isInteger(configuredUserId) && configuredUserId > 0
-    ? { user: { id: configuredUserId, name: customerDetails.name ?? email }, isNew: false }
-    : await getOrCreateUserByEmail({
-        email,
-        name: customerDetails.name ?? undefined,
-        firstName: customerDetails.name?.trim().split(" ")[0] || undefined,
-      });
-  if (!resolvedUser?.user?.id) {
-    console.error(`[Stripe] Unable to resolve purchaser for canonical bundle ${bundleId}: ${email}`);
+  const recipient = await resolveCheckoutRecipientUser(session, meta);
+  const fallbackUserId = Number.parseInt(meta.user_id ?? (typeof session.client_reference_id === "string" ? session.client_reference_id : ""), 10);
+  const userId = recipient?.user.id ?? (Number.isInteger(fallbackUserId) && fallbackUserId > 0 ? fallbackUserId : null);
+  if (!userId) {
+    await notifyOwner({ title: "⚠️ Bundle purchase needs review", content: `Stripe checkout ${session.id} for bundle #${bundleId} has no recipient account.` });
     return;
   }
-
-  const userId = resolvedUser.user.id;
   const notes: string[] = [];
-  const bundle = await grantBundle(
-    db,
-    userId,
-    bundleId,
-    (session.id as string | undefined) ?? null,
-    notes,
-    { source: "stripe_bundle" },
-    {
-      pricingOptionId: meta.pricing_option_id || null,
-      stripePaymentIntentId: (session.payment_intent as string | undefined) ?? null,
-    },
-  );
-  if (!bundle) {
-    console.warn(`[Stripe] Canonical bundle ${bundleId} no longer exists; checkout ${session.id} requires review`);
-    return;
-  }
-
-  try {
-    const accessToken = await getOrCreateAccessToken(userId);
-    await sendBundleAccessEmail({
-      to: { name: resolvedUser.user.name || customerDetails.name || email, email },
-      bundleTitle: bundle.title,
-      bundleSlug: bundle.slug,
-      destinationUrl: `https://learn.allaboutultrasound.com/bundles/${bundle.slug}`,
-      accessToken,
+  const bundle = await grantBundle(db, userId, bundleId, (session.id as string | undefined) ?? null, notes, { source: "stripe_bundle" }, { pricingOptionId: meta.pricing_option_id || null, stripePaymentIntentId: (session.payment_intent as string | undefined) ?? null });
+  if (!bundle) return;
+  const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
+  if (email) {
+    const brand = platformBrand(meta.brand ?? meta.brand_mode);
+    const delivery = await sendPurchaseNotificationOnce(db, {
+      checkoutSessionId: session.id as string | undefined,
+      notificationType: "bundle_access",
+      send: async () => sendBundleAccessEmail({
+        to: { name: recipient?.name || email.split("@")[0], email }, bundleTitle: bundle.title, bundleSlug: bundle.slug,
+        destinationUrl: `${learnOriginForPurchaseBrand(brand)}/bundles/${bundle.slug}`,
+        accessToken: await getOrCreateAccessToken(userId), brand,
+      }),
     });
-  } catch (error) {
-    console.error(`[Stripe] Failed to send canonical bundle access email for checkout ${session.id}:`, error);
+    if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Bundle access email failed", content: `Checkout ${session.id} granted bundle access but its access email could not be sent.` });
   }
-
-  await notifyOwner({
-    title: `💰 Bundle purchase — ${bundle.title}`,
-    content: `Bundle #${bundleId} purchased by ${email}. User ID: ${userId}.\nAccess: ${notes.join(", ") || "already granted"}`,
-  });
-  console.log(`[Stripe] Canonical bundle checkout fulfilled: user ${userId}, bundle ${bundleId}`);
+  await notifyOwner({ title: `💰 Bundle purchase — ${bundle.title}`, content: `Bundle #${bundleId} fulfilled for user ID ${userId}. Access: ${notes.join(", ") || "already granted"}` });
 }
 
 /**
@@ -2940,6 +2727,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
               await handleDualMembershipCheckoutCompleted(storedSession);
               await handlePhysicalProductCheckoutCompleted(storedSession);
               await handleWorkshopCheckoutCompleted(storedSession);
+              await handleWebinarCheckoutCompleted(storedSession);
               await handleMembershipCheckoutCompleted(storedSession);
               await handleDiyCheckoutCompleted(storedSession);
               await handleTeamCheckoutCompleted(storedSession);

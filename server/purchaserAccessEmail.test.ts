@@ -5,8 +5,12 @@ vi.mock("./_core/email", async (importOriginal) => {
   return { ...actual, sendEmail: vi.fn().mockResolvedValue(true) };
 });
 
+vi.mock("./lib/ensureTransactionalEmailDelivery", () => ({
+  ensureTransactionalEmailDelivery: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { buildFunnelPurchaseConfirmationEmail, buildTransactionalEmailCta, sendEmail } from "./_core/email";
-import { sendEnrollmentEmail } from "./lib/enrollmentEmail";
+import { sendEnrollmentEmail, sendPurchaseAccessEmail } from "./lib/enrollmentEmail";
 
 describe("purchaser access email CTA", () => {
   const accessUrl = "https://learn.allaboutultrasound.com/api/auth/auto-login?token=test-token";
@@ -44,10 +48,45 @@ describe("purchaser access email CTA", () => {
       accessToken: "access-token",
     });
     expect(sent).toBe(true);
-    const payload = vi.mocked(sendEmail).mock.calls[0]?.[0];
+    const payload = vi.mocked(sendEmail).mock.calls.at(-1)?.[0];
     const courseUrl = "https://learn.allaboutultrasound.com/auth/access?token=access-token&next=https%3A%2F%2Flearn.allaboutultrasound.com%2Fcourses%2Fsonography-ergonomics%2Fplayer";
     expect(payload?.htmlBody).toContain('bgcolor="#0d9488"');
     expect(payload?.htmlBody).toContain(`href="${courseUrl}"`);
     expect(payload?.htmlBody).toContain("If the button is not visible or does not work");
+  });
+
+  it("keeps iHeartEcho course access and combined Learn email identity on the iHeartEcho domain", async () => {
+    const sent = await sendEnrollmentEmail({
+      to: { name: "Echo Learner", email: "learner@example.com" },
+      courseTitle: "Advanced Echocardiography",
+      courseSlug: "advanced-echocardiography",
+      accessToken: "echo-access-token",
+      brand: "iheartecho",
+    });
+    expect(sent).toBe(true);
+    const payload = vi.mocked(sendEmail).mock.calls.at(-1)?.[0];
+    expect(payload?.brandMode).toBe("combined");
+    expect(payload?.htmlBody).toContain("learn.iheartecho.com/auth/access?token=echo-access-token");
+    expect(payload?.htmlBody).toContain("learn.iheartecho.com%2Fcourses%2Fadvanced-echocardiography%2Fplayer");
+    expect(payload?.htmlBody).not.toContain("learn.allaboutultrasound.com%2Fcourses%2Fadvanced-echocardiography");
+  });
+
+  it("creates a branded generic confirmation with an auto-login CTA", async () => {
+    const sent = await sendPurchaseAccessEmail({
+      to: { name: "Workshop Learner", email: "learner@example.com" },
+      subject: "Workshop confirmed",
+      heading: "Your workshop registration is confirmed",
+      intro: "your registration is complete.",
+      accessLabel: "View Workshop Details",
+      destinationUrl: "https://learn.iheartecho.com/workshops/echo-basics",
+      accessToken: "workshop-token",
+      brand: "iheartecho",
+      brandMode: "combined",
+    });
+    expect(sent).toBe(true);
+    const payload = vi.mocked(sendEmail).mock.calls.at(-1)?.[0];
+    expect(payload?.brandMode).toBe("combined");
+    expect(payload?.htmlBody).toContain("View Workshop Details");
+    expect(payload?.htmlBody).toContain("learn.iheartecho.com/auth/access?token=workshop-token");
   });
 });

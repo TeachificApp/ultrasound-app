@@ -6485,6 +6485,27 @@ export const emailSendLog = mysqlTable("email_send_log", {
 export type EmailSendLog = typeof emailSendLog.$inferSelect;
 export type InsertEmailSendLog = typeof emailSendLog.$inferInsert;
 
+
+// ─── Purchase Notification Deliveries ─────────────────────────────────────────
+// Durable per-checkout email idempotency. This is separate from email_send_log:
+// one checkout can be reconciled more than once but should only mail once.
+export const purchaseNotificationDeliveries = mysqlTable("purchase_notification_deliveries", {
+  id: int("id").autoincrement().primaryKey(),
+  stripeCheckoutSessionId: varchar("checkout_session_id", { length: 255 }).notNull(),
+  notificationType: varchar("notification_type", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["sending", "sent", "failed"]).default("sending").notNull(),
+  attempts: int("attempts").default(1).notNull(),
+  lastError: text("last_error"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("purchase_notification_delivery_unique").on(table.stripeCheckoutSessionId, table.notificationType),
+  index("purchase_notification_delivery_status_idx").on(table.status, table.updatedAt),
+]);
+export type PurchaseNotificationDelivery = typeof purchaseNotificationDeliveries.$inferSelect;
+export type InsertPurchaseNotificationDelivery = typeof purchaseNotificationDeliveries.$inferInsert;
+
 // ─── User Email Aliases ───────────────────────────────────────────────────────
 // Allows a user to log in with multiple email addresses.
 // The primary email is always stored on users.email; aliases are secondary.
