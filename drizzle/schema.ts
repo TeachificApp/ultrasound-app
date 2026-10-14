@@ -7644,6 +7644,14 @@ export const workshopInstances = mysqlTable("workshop_instances", {
   instanceContent: longtext("instance_content"),
   // Full page builder blocks for this specific instance's detail page
   landingBlocks: longtext("landing_blocks"),
+  // Registration confirmation is reviewed and approved per scheduled instance.
+  // It never automatically inherits dated copy from another workshop run.
+  confirmationEmailApproved: boolean("confirmation_email_approved").default(false).notNull(),
+  confirmationEmailApprovedAt: timestamp("confirmation_email_approved_at"),
+  confirmationEmailSubject: varchar("confirmation_email_subject", { length: 500 }),
+  confirmationEmailHeading: varchar("confirmation_email_heading", { length: 500 }),
+  confirmationEmailIntro: text("confirmation_email_intro"),
+  confirmationEmailDetails: longtext("confirmation_email_details"),
   presaleWelcomeHeading: varchar("presale_welcome_heading", { length: 500 }),
   presaleWelcomeBody: longtext("presale_welcome_body"),
   presaleWelcomeMediaUrl: text("presale_welcome_media_url"),

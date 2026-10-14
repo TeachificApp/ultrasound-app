@@ -83,6 +83,22 @@ describe("purchase recipient and cancellation safeguards", () => {
     expect(stripe).toContain("sendPurchaseAccessEmail");
   });
 
+  it("holds automatic workshop registration emails until the owner approves the dated content", () => {
+    const stripe = source("./webhooks/stripe.ts");
+    const workshops = source("../client/src/pages/admin/WorkshopsAdmin.tsx");
+    const router = source("./routers/workshopRouter.ts");
+
+    expect(stripe).toContain("function isWorkshopConfirmationReady(instance:");
+    expect(stripe).toContain("instance.confirmationEmailDetails");
+    expect(stripe).toContain("return instance.confirmationEmailApproved && Boolean(reviewedText);");
+    expect(stripe).toContain("workshop.welcomeEmailEnabled !== false && isWorkshopConfirmationReady(instance)");
+    expect(stripe).toContain("Workshop confirmation held for review");
+    expect(router).toContain("confirmationEmailApproved: z.boolean().default(false)");
+    expect(router).toContain("confirmationEmailApprovedAt = rest.confirmationEmailApproved ? new Date() : null");
+    expect(workshops).toContain("Saving this setting never sends or resends email to existing registrants.");
+    expect(workshops).toContain("Reviewed date, location, and registration details");
+  });
+
   it("routes a returning learner to owned access instead of creating another checkout", () => {
     const checkout = source("../client/src/pages/Checkout.tsx");
     const lms = source("./routers/lmsRouter.ts");

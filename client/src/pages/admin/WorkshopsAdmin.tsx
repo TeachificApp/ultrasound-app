@@ -530,6 +530,11 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
   const [instEnrollmentCloseDate, setInstEnrollmentCloseDate] = useState("");
   const [instStatus, setInstStatus] = useState<"draft" | "published" | "waitlist" | "presale" | "cancelled" | "completed">("draft");
   const [instContent, setInstContent] = useState("");
+  const [instConfirmationEmailApproved, setInstConfirmationEmailApproved] = useState(false);
+  const [instConfirmationEmailSubject, setInstConfirmationEmailSubject] = useState("");
+  const [instConfirmationEmailHeading, setInstConfirmationEmailHeading] = useState("");
+  const [instConfirmationEmailIntro, setInstConfirmationEmailIntro] = useState("");
+  const [instConfirmationEmailDetails, setInstConfirmationEmailDetails] = useState("");
   const [instPresaleWelcomeHeading, setInstPresaleWelcomeHeading] = useState("");
   const [instPresaleWelcomeBody, setInstPresaleWelcomeBody] = useState("");
   const [instPresaleWelcomeMediaUrl, setInstPresaleWelcomeMediaUrl] = useState("");
@@ -664,6 +669,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setEditingInstance(null);
     setInstTitle(""); setInstDescription(""); setInstStartDate(""); setInstEndDate("");
     setInstContent("");
+    setInstConfirmationEmailApproved(false); setInstConfirmationEmailSubject(""); setInstConfirmationEmailHeading(""); setInstConfirmationEmailIntro(""); setInstConfirmationEmailDetails("");
     setInstPresaleWelcomeHeading(""); setInstPresaleWelcomeBody(""); setInstPresaleWelcomeMediaUrl(""); setInstPresaleWelcomeCtaLabel(""); setInstPresaleWelcomeCtaUrl("");
     setInstTimezone("America/New_York"); setInstLocationType("in_person");
     setInstVenueName(""); setInstVenueCity(""); setInstVenueState("");
@@ -691,6 +697,11 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setInstEnrollmentCloseDate(inst.enrollmentCloseDate ? formatScheduledInput(inst.enrollmentCloseDate, PLATFORM_TIMEZONE, false) : "");
     setInstStatus(inst.status ?? "draft");
     setInstContent(inst.instanceContent ?? "");
+    setInstConfirmationEmailApproved(inst.confirmationEmailApproved ?? false);
+    setInstConfirmationEmailSubject(inst.confirmationEmailSubject ?? "");
+    setInstConfirmationEmailHeading(inst.confirmationEmailHeading ?? "");
+    setInstConfirmationEmailIntro(inst.confirmationEmailIntro ?? "");
+    setInstConfirmationEmailDetails(inst.confirmationEmailDetails ?? "");
     setInstPresaleWelcomeHeading(inst.presaleWelcomeHeading ?? ""); setInstPresaleWelcomeBody(inst.presaleWelcomeBody ?? ""); setInstPresaleWelcomeMediaUrl(inst.presaleWelcomeMediaUrl ?? ""); setInstPresaleWelcomeCtaLabel(inst.presaleWelcomeCtaLabel ?? ""); setInstPresaleWelcomeCtaUrl(inst.presaleWelcomeCtaUrl ?? "");
     setInstanceDialogOpen(true);
   }
@@ -715,6 +726,11 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
       enrollmentCloseDate: instEnrollmentCloseDate || null,
       status: instStatus,
       instanceContent: instContent || null,
+      confirmationEmailApproved: instConfirmationEmailApproved,
+      confirmationEmailSubject: instConfirmationEmailSubject || null,
+      confirmationEmailHeading: instConfirmationEmailHeading || null,
+      confirmationEmailIntro: instConfirmationEmailIntro || null,
+      confirmationEmailDetails: instConfirmationEmailDetails || null,
       presaleWelcomeHeading: instPresaleWelcomeHeading || null,
       presaleWelcomeBody: instPresaleWelcomeBody || null,
       presaleWelcomeMediaUrl: instPresaleWelcomeMediaUrl || null,
@@ -1057,6 +1073,9 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
                               On Sale
                             </span>
                           )}
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${inst.confirmationEmailApproved && inst.confirmationEmailDetails ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-800"}`}>
+                            {inst.confirmationEmailApproved && inst.confirmationEmailDetails ? "Confirmation approved" : "Confirmation held"}
+                          </span>
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
@@ -1623,6 +1642,35 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
               <Label className="text-xs font-medium">Instance Content (Rich Text)</Label>
               <p className="text-xs text-gray-400 mb-1">Optional rich text shown on the workshop page for this specific instance (agenda, location details, instructor bio, etc.)</p>
               <RichTextEditor value={instContent} onChange={setInstContent} />
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <Label htmlFor="instConfirmationApproved" className="text-sm font-semibold text-slate-900">Automatic registration confirmation</Label>
+                  <p className="text-xs text-slate-600 mt-1">Held by default. Enable only after reviewing the subject, message, and dated details below.</p>
+                </div>
+                <Switch checked={instConfirmationEmailApproved} onCheckedChange={setInstConfirmationEmailApproved} id="instConfirmationApproved" />
+              </div>
+              <p className="text-xs font-medium text-amber-900">Saving this setting never sends or resends email to existing registrants. It applies only to future completed purchases for this workshop instance.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Email subject <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Input value={instConfirmationEmailSubject} onChange={e => setInstConfirmationEmailSubject(e.target.value)} className="mt-1 text-sm" placeholder={`You're registered: ${title || "Workshop"}`} maxLength={500} />
+                </div>
+                <div>
+                  <Label className="text-xs">Email heading <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Input value={instConfirmationEmailHeading} onChange={e => setInstConfirmationEmailHeading(e.target.value)} className="mt-1 text-sm" placeholder="Your workshop registration is confirmed" maxLength={500} />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Opening message <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <Textarea value={instConfirmationEmailIntro} onChange={e => setInstConfirmationEmailIntro(e.target.value)} className="mt-1 text-sm" rows={2} placeholder="You are registered for this workshop." />
+              </div>
+              <div>
+                <Label className="text-xs font-medium">Reviewed date, location, and registration details *</Label>
+                <p className="text-xs text-gray-500 mb-1">This content replaces the automatic date block. Include the precise date(s), time zone, location, and any required instructions exactly as you want learners to receive them.</p>
+                <RichTextEditor value={instConfirmationEmailDetails} onChange={setInstConfirmationEmailDetails} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

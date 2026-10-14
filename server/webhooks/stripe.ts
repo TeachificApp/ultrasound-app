@@ -56,6 +56,18 @@ function learnOriginForPurchaseBrand(brand: "aaus" | "iheartecho"): string {
   return brand === "iheartecho" ? "https://learn.iheartecho.com" : "https://learn.allaboutultrasound.com";
 }
 
+/** Dated workshop confirmations require both reviewed content and approval. */
+function isWorkshopConfirmationReady(instance: {
+  confirmationEmailApproved: boolean;
+  confirmationEmailDetails: string | null;
+}): boolean {
+  const reviewedText = instance.confirmationEmailDetails
+    ?.replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+  return instance.confirmationEmailApproved && Boolean(reviewedText);
+}
+
 async function resolveCheckoutRecipientUser(session: Record<string, unknown>, meta: Record<string, string>) {
   const recipient = getCheckoutRecipient(session, meta);
   if (!recipient.email) return null;
@@ -663,7 +675,7 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
   }
   const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, brand: workshops.brand, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
     .from(workshops).where(eq(workshops.id, workshopId)).limit(1);
-  const [instance] = await db.select({ title: workshopInstances.title, status: workshopInstances.status, startDate: workshopInstances.startDate, timezone: workshopInstances.timezone, locationType: workshopInstances.locationType, venueName: workshopInstances.venueName, venueCity: workshopInstances.venueCity, venueState: workshopInstances.venueState, meetingUrl: workshopInstances.meetingUrl })
+  const [instance] = await db.select({ title: workshopInstances.title, status: workshopInstances.status, confirmationEmailApproved: workshopInstances.confirmationEmailApproved, confirmationEmailSubject: workshopInstances.confirmationEmailSubject, confirmationEmailHeading: workshopInstances.confirmationEmailHeading, confirmationEmailIntro: workshopInstances.confirmationEmailIntro, confirmationEmailDetails: workshopInstances.confirmationEmailDetails })
     .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
   if (!workshop || !instance) return;
   const [existing] = await db.select({ id: workshopEnrollments.id }).from(workshopEnrollments)
@@ -679,25 +691,24 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
     await notifyOwner({ title: "🏫 New Workshop Enrollment", content: `User ID ${userId} enrolled in "${workshop.title}".` });
   }
   const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
-  if (email && workshop.welcomeEmailEnabled !== false) {
+  if (email && workshop.welcomeEmailEnabled !== false && isWorkshopConfirmationReady(instance)) {
     const brand = platformBrand(workshop.brand);
-    const dateText = instance.startDate ? new Date(instance.startDate).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: instance.timezone ?? "America/New_York" }) : null;
-    const location = instance.locationType === "virtual" ? (instance.meetingUrl ? `Virtual workshop — meeting link: ${instance.meetingUrl}` : "Virtual workshop — the meeting link will be sent before the event.") : [instance.venueName, instance.venueCity, instance.venueState].filter(Boolean).join(", ");
-    const detailsHtml = `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">${instance.title ? `<p style="margin:0 0 8px;"><strong>Session:</strong> ${instance.title}</p>` : ""}${dateText ? `<p style="margin:0 0 8px;"><strong>Date:</strong> ${dateText}</p>` : ""}${location ? `<p style="margin:0;"><strong>Location:</strong> ${location}</p>` : ""}</div>${workshop.welcomeEmailBody ? `<div style="margin:0 0 20px;">${workshop.welcomeEmailBody}</div>` : ""}`;
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "workshop_registration",
       send: async () => sendPurchaseAccessEmail({
         to: { name: recipient?.name || email.split("@")[0], email },
-        subject: workshop.welcomeEmailSubject || `You're registered: ${workshop.title}`,
-        heading: "Your workshop registration is confirmed",
-        intro: `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
+        subject: instance.confirmationEmailSubject?.trim() || workshop.welcomeEmailSubject || `You're registered: ${workshop.title}`,
+        heading: instance.confirmationEmailHeading?.trim() || "Your workshop registration is confirmed",
+        intro: instance.confirmationEmailIntro?.trim() || `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
         accessLabel: "View Workshop Details",
         destinationUrl: `${learnOriginForPurchaseBrand(brand)}/workshops/${workshop.slug}`,
-        accessToken: await getOrCreateAccessToken(userId), brand, brandMode: "combined", detailsHtml,
+        accessToken: await getOrCreateAccessToken(userId), brand, brandMode: "combined", detailsHtml: instance.confirmationEmailDetails!,
       }),
     });
     if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Workshop confirmation email failed", content: `Checkout ${session.id} registered the learner for "${workshop.title}", but its confirmation email could not be sent.` });
+  } else if (email && workshop.welcomeEmailEnabled !== false) {
+    console.info(`[Stripe] Workshop confirmation held for review: ${workshop.id}/${instanceId}`);
   }
 }
 

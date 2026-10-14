@@ -1089,6 +1089,11 @@ export const workshopAdminRouter = router({
         enrollmentCloseDate: z.string().nullish(),
         status: z.enum(["draft", "published", "waitlist", "presale", "cancelled", "completed"]).default("draft"),
         instanceContent: z.string().nullish(),
+        confirmationEmailApproved: z.boolean().default(false),
+        confirmationEmailSubject: z.string().max(500).nullish(),
+        confirmationEmailHeading: z.string().max(500).nullish(),
+        confirmationEmailIntro: z.string().nullish(),
+        confirmationEmailDetails: z.string().nullish(),
         presaleWelcomeHeading: z.string().nullish(),
         presaleWelcomeBody: z.string().nullish(),
         presaleWelcomeMediaUrl: z.string().nullish(),
@@ -1124,6 +1129,12 @@ export const workshopAdminRouter = router({
         status: input.status,
         enrolledCount: 0,
         instanceContent: input.instanceContent ?? undefined,
+        confirmationEmailApproved: input.confirmationEmailApproved,
+        confirmationEmailApprovedAt: input.confirmationEmailApproved ? new Date() : undefined,
+        confirmationEmailSubject: input.confirmationEmailSubject ?? undefined,
+        confirmationEmailHeading: input.confirmationEmailHeading ?? undefined,
+        confirmationEmailIntro: input.confirmationEmailIntro ?? undefined,
+        confirmationEmailDetails: input.confirmationEmailDetails ?? undefined,
         presaleWelcomeHeading: input.presaleWelcomeHeading ?? undefined,
         presaleWelcomeBody: input.presaleWelcomeBody ?? undefined,
         presaleWelcomeMediaUrl: input.presaleWelcomeMediaUrl ?? undefined,
@@ -1160,6 +1171,11 @@ export const workshopAdminRouter = router({
         enrollmentCloseDate: z.string().nullish(),
         status: z.enum(["draft", "published", "waitlist", "presale", "cancelled", "completed"]).optional(),
         instanceContent: z.string().nullish(),
+        confirmationEmailApproved: z.boolean().optional(),
+        confirmationEmailSubject: z.string().max(500).nullish(),
+        confirmationEmailHeading: z.string().max(500).nullish(),
+        confirmationEmailIntro: z.string().nullish(),
+        confirmationEmailDetails: z.string().nullish(),
         presaleWelcomeHeading: z.string().nullish(),
         presaleWelcomeBody: z.string().nullish(),
         presaleWelcomeMediaUrl: z.string().nullish(),
@@ -1173,6 +1189,9 @@ export const workshopAdminRouter = router({
       const { id, startDate, endDate, salesCloseDate, salesOpenDate, enrollmentCloseDate, ...rest } = input;
       const [existing] = await db.select({ status: workshopInstances.status }).from(workshopInstances).where(eq(workshopInstances.id, id)).limit(1);
       const updateData: Record<string, any> = { ...rest };
+      if (rest.confirmationEmailApproved !== undefined) {
+        updateData.confirmationEmailApprovedAt = rest.confirmationEmailApproved ? new Date() : null;
+      }
       const timezone = (rest.timezone as string | undefined) ?? PLATFORM_TIMEZONE;
       if (startDate) updateData.startDate = parseScheduledTimestamp(startDate, timezone, "start");
       if (endDate !== undefined) updateData.endDate = endDate ? parseScheduledTimestamp(endDate, timezone, "end") : null;
@@ -1228,6 +1247,12 @@ export const workshopAdminRouter = router({
         enrolledCount: 0,
         instanceContent: source.instanceContent,
         landingBlocks: source.landingBlocks,
+        confirmationEmailApproved: false,
+        confirmationEmailApprovedAt: null,
+        confirmationEmailSubject: source.confirmationEmailSubject,
+        confirmationEmailHeading: source.confirmationEmailHeading,
+        confirmationEmailIntro: source.confirmationEmailIntro,
+        confirmationEmailDetails: source.confirmationEmailDetails,
         presaleWelcomeHeading: source.presaleWelcomeHeading,
         presaleWelcomeBody: source.presaleWelcomeBody,
         presaleWelcomeMediaUrl: source.presaleWelcomeMediaUrl,
