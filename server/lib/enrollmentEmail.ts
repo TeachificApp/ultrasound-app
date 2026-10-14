@@ -99,12 +99,19 @@ async function deliverEmail(opts: {
   to: { name: string; email: string };
   subject: string;
   htmlBody: string;
+  /** Stripe/checkout payee when different from learner `to`. */
+  payee?: { name: string; email: string } | null;
+  /** When true, BCC admin and send duplicate to payee if provided. */
+  forPurchase?: boolean;
 }): Promise<boolean> {
-  try {
-    const { ensureTransactionalEmailDelivery } = await import("./ensureTransactionalEmailDelivery");
-    await ensureTransactionalEmailDelivery(opts.to.email);
-  } catch (err) {
-    console.warn("[enrollmentEmail] Suppression clear failed (non-fatal):", err);
+  const recipientEmails = [opts.to.email, opts.payee?.email].filter(Boolean) as string[];
+  for (const email of recipientEmails) {
+    try {
+      const { ensureTransactionalEmailDelivery } = await import("./ensureTransactionalEmailDelivery");
+      await ensureTransactionalEmailDelivery(email);
+    } catch (err) {
+      console.warn("[enrollmentEmail] Suppression clear failed (non-fatal):", err);
+    }
   }
 
   return sendEmail({
@@ -112,6 +119,9 @@ async function deliverEmail(opts: {
     subject: opts.subject,
     htmlBody: opts.htmlBody,
     fromName: LMS_FROM_NAME,
+    ...(opts.forPurchase
+      ? { purchaseAccess: { payee: opts.payee ?? null }, transactional: true }
+      : {}),
   });
 }
 
@@ -127,6 +137,8 @@ export async function sendEnrollmentEmail(opts: {
   accessToken?: string | null;
   /** For new guest accounts: URL to set a permanent password */
   setPasswordUrl?: string | null;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const { formatCmeCreditLabel } = await import("../../shared/cmeCreditLabel");
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
@@ -172,7 +184,13 @@ export async function sendEnrollmentEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `);
-  return deliverEmail({ to: opts.to, subject, htmlBody });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
 // ─── Convenience wrapper: send enrollment email by userId + courseId ─────────
@@ -253,6 +271,8 @@ export async function sendDownloadAccessEmail(opts: {
   customIntro?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your download is ready: "${opts.productTitle}"`;
@@ -282,7 +302,13 @@ export async function sendDownloadAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `);
-  return deliverEmail({ to: opts.to, subject, htmlBody });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
 // ─── Bundle Access Email ──────────────────────────────────────────────────────
@@ -296,6 +322,8 @@ export async function sendBundleAccessEmail(opts: {
   destinationUrl?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `You've been granted access to "${opts.bundleTitle}"`;
@@ -325,7 +353,13 @@ export async function sendBundleAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `);
-  return deliverEmail({ to: opts.to, subject, htmlBody });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }
 
 // ─── Quiz Access Email ────────────────────────────────────────────────────────
@@ -339,6 +373,8 @@ export async function sendQuizAccessEmail(opts: {
   accessToken?: string | null;
   /** For new guest accounts: URL to set a permanent password */
   setPasswordUrl?: string | null;
+  payee?: { name: string; email: string } | null;
+  forPurchase?: boolean;
 }): Promise<boolean> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your access to "${opts.quizTitle}" is ready 🎯`;
@@ -378,5 +414,11 @@ export async function sendQuizAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `);
-  return deliverEmail({ to: opts.to, subject, htmlBody });
+  return deliverEmail({
+    to: opts.to,
+    subject,
+    htmlBody,
+    payee: opts.payee,
+    forPurchase: opts.forPurchase,
+  });
 }

@@ -2238,7 +2238,11 @@ export const downloadsCheckoutPublicRouter = router({
 });
 
 // ─── Email Helper ───────────────────────────────────────────────────────────
-export async function sendPurchaseConfirmationEmail(userId: number, productId: number) {
+export async function sendPurchaseConfirmationEmail(
+  userId: number,
+  productId: number,
+  opts?: { payeeEmail?: string | null; payeeName?: string | null },
+) {
   const db = await getDb();
   if (!db) return;
   const user = await getUserById(userId);
@@ -2302,12 +2306,17 @@ export async function sendPurchaseConfirmationEmail(userId: number, productId: n
   </table>
 </body></html>`;
 
-  const emailOk = await sendEmail({
+  const { withPurchaseAccessRecipients } = await import("../lib/purchaseAccessEmailDelivery");
+  const emailOk = await sendEmail(await withPurchaseAccessRecipients({
     to: { name: user.name || "Customer", email: user.email },
     subject: `Your download is ready: ${product.title}`,
     htmlBody,
     previewText: `Your download "${product.title}" is ready — click to access your files instantly.`,
-  });
+  }, {
+    userId,
+    checkoutEmail: opts?.payeeEmail,
+    checkoutName: opts?.payeeName,
+  }));
   if (emailOk) {
     console.log(`[sendPurchaseConfirmationEmail] Sent access email to ${user.email} for product ${productId} (auto-login: ${accessUrl !== filesUrl ? 'yes' : 'no'})`);
   } else {

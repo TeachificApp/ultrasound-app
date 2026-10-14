@@ -33,6 +33,7 @@ import { BRAND_PREMIUM_TRIAL_DAYS, hasBrandMembershipTrial, isBrandMembershipTri
 import { grantScheduledContentAccess } from "../lib/scheduledContentLinks";
 import { persistLmsSubscriptionInvoice } from "../lib/lmsSubscriptionReconciliation";
 import { grantBundle } from "../lib/membershipFulfillment";
+import { withPurchaseAccessRecipients } from "../lib/purchaseAccessEmailDelivery";
 import { getBrandDisplayConfig } from "@shared/brands";
 
 // Stripe webhook secret — optional but strongly recommended in production.
@@ -368,12 +369,12 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
               </div>`
             : "";
           const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
-          await _sendEmail({
+          await _sendEmail(await withPurchaseAccessRecipients({
             to: { name: customerName || firstName, email: customerEmail },
             subject,
             htmlBody: enhancedBody,
             previewText: `Access your download on All About Ultrasound`,
-          });
+          }, { userId, checkoutEmail: customerEmail, checkoutName: customerName }));
           console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${userId}) and sent welcome email`);
         } catch (emailErr) {
           console.error(`[Stripe] Failed to send welcome email to ${customerEmail}:`, emailErr);
@@ -433,7 +434,10 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       stripePaymentIntentId: (session.payment_intent as string) ?? null,
       message: `Checkout completed but user already owns download product ${productId}`,
     });
-    const deliverySucceeded = await sendPurchaseConfirmationEmail(userId, productId);
+    const deliverySucceeded = await sendPurchaseConfirmationEmail(userId, productId, {
+      payeeEmail: customerEmail,
+      payeeName: customerName,
+    });
     try {
       const { logPurchaseActivity } = await import("../lib/downloadAccess");
       await logPurchaseActivity(db, {
@@ -527,7 +531,10 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     });
   } catch (_e) { /* non-blocking */ }
   // Send purchase confirmation email with file links
-  const deliverySucceeded = await sendPurchaseConfirmationEmail(userId, productId);
+  const deliverySucceeded = await sendPurchaseConfirmationEmail(userId, productId, {
+    payeeEmail: customerEmail,
+    payeeName: customerName,
+  });
   if (newPurchaseId) {
     try {
       await logPurchaseActivity(db, {
@@ -604,8 +611,20 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
     ]);
     if (bundle && user?.email) {
       const accessToken = await getOrCreateAccessToken(userId);
+      const checkoutEmail = (session.customer_email as string)
+        ?? (session.customer_details as Record<string, string>)?.email
+        ?? meta.customer_email;
+      const checkoutName = meta.customer_name ?? (session.customer_details as Record<string, string>)?.name ?? null;
+      const { resolvePurchaseEmailTargets } = await import("../lib/purchaseAccessEmailDelivery");
+      const { to, payee } = await resolvePurchaseEmailTargets({
+        userId,
+        checkoutEmail,
+        checkoutName,
+      });
       await sendBundleAccessEmail({
-        to: { name: user.name || user.email.split("@")[0], email: user.email },
+        to,
+        payee,
+        forPurchase: true,
         bundleTitle: bundle.title,
         bundleSlug: bundle.slug,
         accessToken,
@@ -743,12 +762,12 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
         const a = JSON.parse(shippingAddress);
         return `<p style="margin:0 0 4px;font-size:13px;color:#475569;"><strong>Ship to:</strong> ${a.name || customerName}<br/>${a.line1}${a.line2 ? ", " + a.line2 : ""}<br/>${a.city}, ${a.state} ${a.postalCode}<br/>${a.country}</p>`;
       })() : "";
-      await sendEmail({
+      await sendEmail(await withPurchaseAccessRecipients({
         to: { name: customerName, email: customerEmailForConfirmation },
         subject: `Order confirmed: ${productTitle}`,
         previewText: `Your order for ${productTitle} has been received and is being processed.`,
         htmlBody: `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/></head><body style="margin:0;padding:0;background:#f0fbfc;font-family:Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fbfc;padding:32px 16px;"><tr><td align="center"><table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);"><tr><td style="background:linear-gradient(135deg,#0e1e2e 0%,#0e4a50 60%,#189aa1 100%);padding:28px 32px;text-align:center;"><img src="https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_ring_01cc7ccd.webp" alt="All About Ultrasound" width="60" height="60" style="border-radius:50%;display:block;margin:0 auto 12px;"/><div style="font-size:18px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">Order Confirmed</div></td></tr><tr><td style="padding:32px;"><h2 style="margin:0 0 8px;font-size:20px;color:#0e1e2e;font-family:Georgia,serif;">Thank you for your order!</h2><p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">Hi ${customerName}, your order has been received and is being processed.</p><div style="background:#f0fbfc;border-left:3px solid #189aa1;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;"><p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#189aa1;">📦 ${productTitle}</p><p style="margin:0;font-size:13px;color:#475569;">Amount paid: <strong>$${(amountPaid / 100).toFixed(2)}</strong></p></div>${shippingHtml}<div style="text-align:center;margin:28px 0;"><a href="${accessUrl}" style="display:inline-block;background:linear-gradient(135deg,#189aa1,#4ad9e0);color:#ffffff;font-weight:700;font-size:15px;padding:14px 32px;border-radius:8px;text-decoration:none;">View My Orders</a></div><p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">Questions? Contact us at <a href="mailto:support@allaboutultrasound.com" style="color:#189aa1;">support@allaboutultrasound.com</a>.</p></td></tr><tr><td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">© All About Ultrasound™ · <a href="https://www.allaboutultrasound.com" style="color:#189aa1;text-decoration:none;">www.allaboutultrasound.com</a></p></td></tr></table></td></tr></table></body></html>`,
-      });
+      }, { userId, checkoutEmail: customerEmailForConfirmation, checkoutName: customerName }));
       console.log(`[Stripe] Order confirmation email sent to ${customerEmailForConfirmation} for product ${productId}`);
     } catch (emailErr) {
       console.error(`[Stripe] Failed to send order confirmation email for product ${productId}:`, emailErr);
@@ -846,7 +865,11 @@ ${locationStr ? `<p style="margin:0;font-size:14px;color:#0e4a50;"><strong>Locat
 </table>
 </td></tr></table>
 </body></html>`;
-      await sendEmail({ to: { name: customerName, email: meta.customer_email }, subject, htmlBody });
+      await sendEmail(await withPurchaseAccessRecipients({
+        to: { name: customerName, email: meta.customer_email },
+        subject,
+        htmlBody,
+      }, { userId, checkoutEmail: meta.customer_email, checkoutName: meta.customer_name }));
       console.log(`[Stripe] Workshop confirmation email sent to ${meta.customer_email}`);
     }
   } catch (emailErr) {
@@ -1026,12 +1049,12 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
           </div>`
         : "";
       const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
-      await _sendEmail({
+      await _sendEmail(await withPurchaseAccessRecipients({
         to: { name: customerName || firstName, email: customerEmail },
         subject: `Your ${brandLabel} Premium Membership is ready`,
         htmlBody: enhancedBody,
         previewText: `Access your ${brandLabel} premium membership on ${getBrandDisplayConfig(brandMode).shortName}`,
-      });
+      }, { userId, checkoutEmail: customerEmail, checkoutName: customerName }));
       console.log(`[Stripe] Brand membership: welcome email sent to new user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
       console.error(`[Stripe] Brand membership: failed to send welcome email to ${customerEmail}:`, emailErr);
@@ -1063,12 +1086,12 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
         </div>
         <p style="margin:16px 0 0;font-size:13px;color:#64748b;">If you have any questions, reply to this email or contact support.</p>
       `, brandMode);
-      await sendEmail({
+      await sendEmail(await withPurchaseAccessRecipients({
         to: { name: customerName || firstName, email: customerEmail },
         subject: `Your ${planLabel} is ready`,
         htmlBody,
         previewText: `Access your ${planLabel} on ${getBrandDisplayConfig(brandMode).shortName}`,
-      });
+      }, { userId, checkoutEmail: customerEmail, checkoutName: customerName }));
       console.log(`[Stripe] Brand membership: access email sent to existing user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
       console.error(`[Stripe] Brand membership: failed to send access email to existing user ${customerEmail}:`, emailErr);
@@ -1288,12 +1311,12 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
           </div>`
         : "";
       const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
-      await _sendEmail({
+      await _sendEmail(await withPurchaseAccessRecipients({
         to: { name: customerName || firstName, email: customerEmail },
         subject: `Your ${planLabel} is ready`,
         htmlBody: enhancedBody,
         previewText: `Access your ${planLabel} on All About Ultrasound`,
-      });
+      }, { userId, checkoutEmail: customerEmail, checkoutName: customerName }));
       console.log(`[Stripe] Dual membership: welcome email sent to new user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
       console.error(`[Stripe] Dual membership: failed to send welcome email to ${customerEmail}:`, emailErr);
@@ -1323,12 +1346,12 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
         </div>
         <p style="margin:16px 0 0;font-size:13px;color:#64748b;">If you have any questions, reply to this email or contact support.</p>
       `, "aaus");
-      await sendEmail({
+      await sendEmail(await withPurchaseAccessRecipients({
         to: { name: customerName || firstName, email: customerEmail },
         subject: `Your ${planLabel} is ready`,
         htmlBody,
         previewText: `Access your ${planLabel} on All About Ultrasound`,
-      });
+      }, { userId, checkoutEmail: customerEmail, checkoutName: customerName }));
       console.log(`[Stripe] Dual membership: access email sent to existing user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
       console.error(`[Stripe] Dual membership: failed to send access email to existing user ${customerEmail}:`, emailErr);
@@ -1596,8 +1619,16 @@ async function handleCanonicalBundleCheckoutCompleted(session: Record<string, un
 
   try {
     const accessToken = await getOrCreateAccessToken(userId);
+    const { resolvePurchaseEmailTargets } = await import("../lib/purchaseAccessEmailDelivery");
+    const { to, payee } = await resolvePurchaseEmailTargets({
+      userId,
+      checkoutEmail: email,
+      checkoutName: customerDetails.name ?? resolvedUser.user.name,
+    });
     await sendBundleAccessEmail({
-      to: { name: resolvedUser.user.name || customerDetails.name || email, email },
+      to,
+      payee,
+      forPurchase: true,
       bundleTitle: bundle.title,
       bundleSlug: bundle.slug,
       destinationUrl: `https://learn.allaboutultrasound.com/bundles/${bundle.slug}`,
@@ -1739,12 +1770,12 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
               </div>`
             : "";
           const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
-          await _sendEmail({
+          await _sendEmail(await withPurchaseAccessRecipients({
             to: { name: customerName || firstName, email: customerEmail },
             subject,
             htmlBody: enhancedBody,
             previewText: `Access your ${meta.product_name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
-          });
+          }, { userId: resolvedUserId, checkoutEmail: customerEmail, checkoutName: customerName }));
           console.log(`[Stripe] Auto-created account for ${customerEmail} (userId=${resolvedUserId}) and sent welcome email with access token`);
         } catch (emailErr) {
           console.error(`[Stripe] Failed to send welcome email to ${customerEmail}:`, emailErr);
@@ -1788,7 +1819,12 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
             cardLast4,
             cardBrand,
           });
-          await sendEmail({ to: { name: customerName || firstName, email: customerEmail! }, subject, htmlBody, previewText });
+          await sendEmail(await withPurchaseAccessRecipients({
+            to: { name: customerName || firstName, email: customerEmail! },
+            subject,
+            htmlBody,
+            previewText,
+          }, { userId: resolvedUserId, checkoutEmail: customerEmail, checkoutName: customerName }));
           console.log(`[Stripe] Purchase confirmation email sent to existing user ${customerEmail} for "${productName}"`);
         } catch (emailErr) {
           console.error(`[Stripe] Failed to send confirmation email to existing user ${customerEmail}:`, emailErr);
@@ -2114,7 +2150,12 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         cardLast4,
         cardBrand,
       });
-      await sendEmail({ to: { name: customerName || firstName, email: customerEmail }, subject, htmlBody, previewText });
+      await sendEmail(await withPurchaseAccessRecipients({
+        to: { name: customerName || firstName, email: customerEmail },
+        subject,
+        htmlBody,
+        previewText,
+      }, { userId: resolvedUserId, checkoutEmail: customerEmail, checkoutName: customerName }));
       console.log(`[Stripe] Purchase confirmation email sent to ${customerEmail} for "${productName}" (auto-login: ${resolvedUserId ? 'yes' : 'no'})`);
     } catch (err) {
       console.error(`[Stripe] Failed to send purchase confirmation email to ${customerEmail}:`, err);
@@ -2686,7 +2727,7 @@ async function handleTeamCheckoutCompleted(session: Record<string, unknown>) {
   const planLabel = plan === "lifetime" ? "Lifetime" : "Monthly";
   const dashboardUrl = `https://app.allaboutultrasound.com/team/${inserted.id}`;
   try {
-    await sendEmail({
+    await sendEmail(await withPurchaseAccessRecipients({
       to: { name: meta.customer_name ?? customerEmail, email: customerEmail },
       subject: `Your ${brandName} Team Subscription is active — ${orgName}`,
       htmlBody: emailWrapper(`
@@ -2703,7 +2744,7 @@ async function handleTeamCheckoutCompleted(session: Record<string, unknown>) {
         <p style="margin:20px 0;"><a href="${dashboardUrl}" style="background:#0d9488;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Manage Team →</a></p>
         <p style="color:#64748b;font-size:13px;">Each member you invite will receive an email with a link to activate their access.</p>
       `),
-    });
+    }, { userId, checkoutEmail: customerEmail, checkoutName: meta.customer_name ?? null }));
   } catch (emailErr) {
     console.error(`[Stripe][Team] Failed to send confirmation email:`, emailErr);
   }

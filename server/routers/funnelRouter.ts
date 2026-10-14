@@ -1493,12 +1493,13 @@ export const funnelPublicRouter = router({
               resetUrl: setPasswordUrl,
               brandMode: brandMode as any,
             });
-            await _sendEmail({
+            const { withPurchaseAccessRecipients } = await import("../lib/purchaseAccessEmailDelivery");
+            await _sendEmail(await withPurchaseAccessRecipients({
               to: { name: customerName || firstName, email: input.email },
               subject: `Your account is ready — set your password to access ${selectedProduct.name || "your purchase"}`,
               htmlBody: emailContent.htmlBody,
               previewText: `Set your password to access your ${selectedProduct.name || "purchase"} on ${brandMode === "iheartecho" ? "iHeartEcho" : "All About Ultrasound"}`,
-            });
+            }, { userId: resolvedUserId, checkoutEmail: input.email, checkoutName: customerName }));
             console.log(`[FreeCheckout] Sent set-password email to ${input.email} (new user ${resolvedUserId})`);
           } catch (emailErr) {
             console.error(`[FreeCheckout] Failed to send set-password email:`, emailErr);
@@ -1588,7 +1589,13 @@ export const funnelPublicRouter = router({
             loginUrl,
             brandMode: brandMode as any,
           });
-          await sendEmail({ to: { name: customerName || firstName, email: input.email }, subject, htmlBody, previewText });
+          const { withPurchaseAccessRecipients } = await import("../lib/purchaseAccessEmailDelivery");
+          await sendEmail(await withPurchaseAccessRecipients({
+            to: { name: customerName || firstName, email: input.email },
+            subject,
+            htmlBody,
+            previewText,
+          }, { userId: resolvedUserId ?? null, checkoutEmail: input.email, checkoutName: customerName }));
           console.log(`[FreeCheckout] Confirmation email sent to ${input.email}`);
         } catch (emailErr) {
           console.error(`[FreeCheckout] Failed to send confirmation email:`, emailErr);
