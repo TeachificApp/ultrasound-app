@@ -5117,6 +5117,8 @@ export const lmsLearnerRouter = router({
       pricingOptionId: z.number().int().positive().optional(),
       teamTierId: z.number().int().positive().optional(),
       seatCount: z.number().int().positive().optional(),
+      recipientName: z.string().trim().max(200).optional(),
+      recipientEmail: z.string().trim().email().max(320).optional(),
       origin: z.string().url(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -5228,7 +5230,7 @@ export const lmsLearnerRouter = router({
           return_url: returnUrl,
           customer_email: ctx.user?.email ?? undefined,
           allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: String(requestedSeats), ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}) },
+          metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: String(requestedSeats), ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), customer_email: input.recipientEmail.toLowerCase(), user_id: "" } : (ctx.user?.email ? { customer_email: ctx.user.email } : {})) },
           payment_intent_data: { description: `${course.title} — Team License — ${requestedSeats} seats` },
         });
         const terms0 = resolveCheckoutTerms(course, orgSettings);
@@ -5320,7 +5322,7 @@ export const lmsLearnerRouter = router({
           return_url: returnUrl,
           customer_email: ctx.user?.email ?? undefined,
           allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}), ...embeddedOptionShare.metadata },
+          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), customer_email: input.recipientEmail.toLowerCase(), user_id: "" } : (ctx.user?.email ? { customer_email: ctx.user.email } : {})), ...embeddedOptionShare.metadata },
           ...(sessionMode === "payment"
             ? { payment_intent_data: { description: `${course.title} — One-Time Purchase`, ...embeddedOptionShare.paymentIntentData } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
@@ -5414,7 +5416,7 @@ export const lmsLearnerRouter = router({
         return_url: returnUrl,
         customer_email: ctx.user?.email ?? undefined,
         allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(ctx.user?.email ? { customer_email: ctx.user.email } : {}), ...embeddedPrimaryShare.metadata },
+          metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), customer_email: input.recipientEmail.toLowerCase(), user_id: "" } : (ctx.user?.email ? { customer_email: ctx.user.email } : {})), ...embeddedPrimaryShare.metadata },
           ...(sessionMode === "payment"
             ? { payment_intent_data: { description: `${course.title} — One-Time Purchase`, ...embeddedPrimaryShare.paymentIntentData } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
@@ -5457,6 +5459,12 @@ export const lmsLearnerRouter = router({
         expand: ["line_items"],
       });
       const meta = (session.metadata ?? {}) as Record<string, string>;
+      // A checkout always returns through a public page. Resolve the account that
+      // received the entitlement (not merely the browser that paid) and hand that
+      // account directly into its purchased content after confirmed fulfillment.
+      let fulfilledUserId = meta.user_id && Number(meta.user_id) > 0
+        ? Number(meta.user_id)
+        : null;
 
       // Fallback fulfillment: webhook may have missed guest checkouts (no user_id in metadata).
       // IMPORTANT: Only run fulfillment when payment is confirmed — skip delayed-payment methods
@@ -5469,6 +5477,7 @@ export const lmsLearnerRouter = router({
             const { reconcileLmsCheckoutFromStripeSession } = await import("../lib/lmsCheckoutFulfillment");
             const result = await reconcileLmsCheckoutFromStripeSession(db as any, session as unknown as Record<string, unknown>);
             if (result.success) {
+              fulfilledUserId = result.userId;
               console.log(`[CheckoutStatus] LMS fallback fulfilled: user ${result.userId}, course ${result.courseId}`);
               // The completion page is a recovery path for an unavailable or
               // delayed webhook. Mirror the webhook's idempotent revenue-share
@@ -5530,12 +5539,58 @@ export const lmsLearnerRouter = router({
         }
       }
 
+      let autoLoginUrl: string | null = null;
+      const paymentConfirmed = session.status === "complete" && (session.payment_status === "paid" || session.payment_status === "no_payment_required");
+      // Download, product, webinar, workshop, and membership webhooks may finish
+      // just after Stripe returns. Establish the entitled recipient's account here
+      // as well, so every completed checkout has the same immediate sign-in handoff.
+      if (paymentConfirmed && !fulfilledUserId) {
+        const recipientEmail = meta.recipient_email || meta.customer_email || session.customer_details?.email || session.customer_email;
+        const recipientName = meta.recipient_name || meta.customer_name || session.customer_details?.name || undefined;
+        if (recipientEmail) {
+          try {
+            const { getOrCreateUserByEmail } = await import("../db");
+            const account = await getOrCreateUserByEmail({
+              email: recipientEmail,
+              name: recipientName,
+              firstName: recipientName?.split(" ")[0],
+              lastName: recipientName?.split(" ").slice(1).join(" ") || undefined,
+            });
+            fulfilledUserId = account.user.id;
+          } catch (error) {
+            console.error("[CheckoutStatus] Checkout account resolution failed:", error);
+          }
+        }
+      }
+      if (paymentConfirmed && fulfilledUserId) {
+        try {
+          const baseUrl = new URL(ctx.req.headers.origin ?? "https://learn.allaboutultrasound.com").origin;
+          const destination = contentType === "download"
+            ? "/my-downloads"
+            : contentType === "workshop"
+              ? "/my-dashboard?tab=workshops"
+              : contentType === "webinar"
+                ? "/my-dashboard?tab=webinars"
+                : courseSlug
+                  ? `/courses/${courseSlug}/player`
+                  : "/my-dashboard";
+          const { generateAutoLoginToken } = await import("../routes/autoLogin");
+          const token = await generateAutoLoginToken(fulfilledUserId, destination);
+          autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${encodeURIComponent(token)}`;
+        } catch (error) {
+          // Access remains available through the normal sign-in route if token
+          // issuance is temporarily unavailable; never make a paid order fail.
+          console.error("[CheckoutStatus] Auto-login token generation failed:", error);
+        }
+      }
+
       return {
         status: session.status, // 'open' | 'complete' | 'expired'
         paymentStatus: session.payment_status, // 'paid' | 'unpaid' | 'no_payment_required'
         customerEmail: session.customer_details?.email ?? null,
         courseSlug,
         contentType, // 'course' | 'quiz' | 'download' | 'cohort' | 'workshop'
+        autoLoginUrl,
       };
     }),
 

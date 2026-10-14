@@ -537,7 +537,7 @@ export const webinarSessionRouter = router({
 
   // ─── Embedded Checkout Session ────────────────────────────────────────────
   createEmbeddedCheckoutSession: publicProcedure
-    .input(z.object({ webinarSlug: z.string(), origin: z.string(), pricingOptionId: z.string().optional(), promoCode: z.string().optional() }))
+    .input(z.object({ webinarSlug: z.string(), origin: z.string(), pricingOptionId: z.string().optional(), promoCode: z.string().optional(), recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().email().max(320).optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const [webinar] = await db.select().from(webinars).where(eq(webinars.slug, input.webinarSlug)).limit(1);
@@ -603,7 +603,7 @@ export const webinarSessionRouter = router({
           },
           quantity: 1,
         }],
-        metadata: { type: "webinar", webinar_id: webinar.id.toString(), user_id: userId.toString(), customer_email: ctx.user?.email ?? "" },
+        metadata: { type: "webinar", webinar_id: webinar.id.toString(), user_id: input.recipientEmail ? "" : userId.toString(), customer_email: input.recipientEmail?.toLowerCase() ?? ctx.user?.email ?? "", recipient_email: input.recipientEmail?.toLowerCase() ?? "", recipient_name: input.recipientName ?? "" },
         payment_intent_data: { description: `${webinar.title} — Webinar Registration` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=webinar`,
       } as any);

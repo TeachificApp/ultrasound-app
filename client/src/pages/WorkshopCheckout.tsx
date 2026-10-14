@@ -19,8 +19,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  Lock, ArrowLeft, AlertCircle, Bell, CheckCircle2, ShieldCheck,
+  Lock, ArrowLeft, AlertCircle, Bell, CheckCircle2, ShieldCheck, ArrowRight,
 } from "lucide-react";
 import { formatWorkshopDollars } from "../../../shared/workshopPricing";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
@@ -56,6 +57,10 @@ export default function WorkshopCheckout() {
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [waitlistOpen, setWaitlistOpen] = useState(false);
+  const [purchaseForRecipient, setPurchaseForRecipient] = useState(false);
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [checkoutDetailsSubmitted, setCheckoutDetailsSubmitted] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [freeSuccess, setFreeSuccess] = useState(false);
   const [sessionMeta, setSessionMeta] = useState<{
@@ -92,19 +97,54 @@ export default function WorkshopCheckout() {
 
   const sessionStarted = useRef(false);
   useEffect(() => {
-    if (!slug || !searchParams.instanceId || sessionStarted.current) return;
+    if (!slug || !searchParams.instanceId || !checkoutDetailsSubmitted || sessionStarted.current) return;
     sessionStarted.current = true;
     createSession.mutate({
       workshopSlug: slug,
       instanceId: searchParams.instanceId,
       origin: window.location.origin,
+      ...(purchaseForRecipient && recipientEmail.trim()
+        ? { recipientName: recipientName.trim() || undefined, recipientEmail: recipientEmail.trim().toLowerCase() }
+        : {}),
     });
-  }, [slug, searchParams.instanceId]);
+  }, [slug, searchParams.instanceId, checkoutDetailsSubmitted, purchaseForRecipient, recipientName, recipientEmail]);
 
   const primary = sessionMeta?.primaryColor ?? "#189aa1";
   const stripeOptions = useMemo(() => (clientSecret ? { clientSecret } : undefined), [clientSecret]);
 
   const backHref = `/workshops/${slug}`;
+
+  if (!checkoutDetailsSubmitted) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-teal-100 p-7 max-w-xl w-full">
+          <h1 className="text-2xl font-semibold text-gray-900">Workshop registration</h1>
+          <p className="mt-2 text-sm leading-relaxed text-gray-600">Securely register yourself or enter a learner’s details when your organization is paying for their workshop seat.</p>
+          <div className="mt-6 rounded-xl border border-teal-100 bg-teal-50/60 p-4">
+            <div className="flex items-start gap-3">
+              <Checkbox id="workshop-recipient" checked={purchaseForRecipient} onCheckedChange={(checked) => setPurchaseForRecipient(Boolean(checked))} className="mt-0.5" />
+              <label htmlFor="workshop-recipient" className="cursor-pointer text-sm text-teal-950">
+                <span className="font-semibold">Register another learner</span>
+                <span className="mt-1 block text-xs leading-relaxed text-teal-800">The registrant will receive the workshop confirmation and access details.</span>
+              </label>
+            </div>
+            {purchaseForRecipient && (
+              <div className="mt-4 grid gap-3">
+                <Input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} placeholder="Registrant name (optional)" autoComplete="name" />
+                <Input value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="Registrant email" type="email" autoComplete="email" />
+              </div>
+            )}
+          </div>
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Link href={backHref}><Button variant="outline">Back to Workshop</Button></Link>
+            <Button className="text-white bg-[#189aa1] hover:bg-[#147a80]" disabled={purchaseForRecipient && !/^\S+@\S+\.\S+$/.test(recipientEmail.trim())} onClick={() => setCheckoutDetailsSubmitted(true)}>
+              Continue to payment <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Restricted workshop instances never receive a Stripe client secret. Keep users
   // on a clear availability screen so Waitlist capture and closed enrollment cannot

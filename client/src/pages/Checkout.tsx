@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   ShieldCheck, RefreshCw, Lock, AlertCircle, ArrowLeft, CheckCircle2, BookOpen,
-  Award, Star, Heart, Zap, Shield, BadgeCheck, ChevronDown, ChevronRight,
+  Award, Star, Heart, Zap, Shield, BadgeCheck, ChevronDown, ChevronRight, ArrowRight,
   MessageSquare, HelpCircle, Code2,
 } from "lucide-react";
 import {
@@ -384,6 +384,10 @@ export default function Checkout() {
 
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [subscriptionAcknowledged, setSubscriptionAcknowledged] = useState(false);
+  const [purchaseForRecipient, setPurchaseForRecipient] = useState(false);
+  const [recipientName, setRecipientName] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [checkoutDetailsSubmitted, setCheckoutDetailsSubmitted] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [seatCount, setSeatCount] = useState<number>(searchParams.teamTierId ? 3 : 1);
   const [sessionMeta, setSessionMeta] = useState<{
@@ -462,16 +466,19 @@ export default function Checkout() {
   // Trigger session creation once on mount (useEffect — avoids React Strict Mode double Stripe sessions)
   const sessionStarted = useRef(false);
   useEffect(() => {
-    if (!slug || sessionStarted.current) return;
+    if (!slug || !checkoutDetailsSubmitted || sessionStarted.current) return;
     sessionStarted.current = true;
+    const recipient = purchaseForRecipient && recipientEmail.trim()
+      ? { recipientName: recipientName.trim() || undefined, recipientEmail: recipientEmail.trim().toLowerCase() }
+      : {};
     if (entityType === "download") {
-      createDownloadSession.mutate({ productSlug: slug, origin: window.location.origin });
+      createDownloadSession.mutate({ productSlug: slug, origin: window.location.origin, ...recipient });
     } else if (entityType === "physical") {
-      createPhysicalSession.mutate({ productSlug: slug, origin: window.location.origin });
+      createPhysicalSession.mutate({ productSlug: slug, origin: window.location.origin, ...recipient });
     } else if (entityType === "webinar") {
-      createWebinarSession.mutate({ webinarSlug: slug, origin: window.location.origin });
+      createWebinarSession.mutate({ webinarSlug: slug, origin: window.location.origin, ...recipient });
     } else if (entityType === "membership") {
-      createMembershipSession.mutate({ planSlug: slug, origin: window.location.origin });
+      createMembershipSession.mutate({ planSlug: slug, origin: window.location.origin, ...recipient });
     } else {
       createCourseSession.mutate({
         courseSlug: slug,
@@ -479,9 +486,10 @@ export default function Checkout() {
         teamTierId: searchParams.teamTierId,
         seatCount: searchParams.teamTierId ? seatCount : undefined,
         origin: window.location.origin,
+        ...recipient,
       });
     }
-  }, [slug, entityType, searchParams.pricingOptionId, searchParams.teamTierId, seatCount]);
+  }, [slug, entityType, searchParams.pricingOptionId, searchParams.teamTierId, seatCount, checkoutDetailsSubmitted, purchaseForRecipient, recipientName, recipientEmail]);
 
   // ── Derived theme values ──────────────────────────────────────────────────
   const primary = sessionMeta?.primaryColor ?? "#179ca3";
@@ -844,7 +852,38 @@ export default function Checkout() {
           )}
 
           <div className={`rounded-2xl shadow-sm border overflow-hidden min-h-[400px] ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
-          {!sessionMeta || createSession.isPending ? (
+          {!checkoutDetailsSubmitted ? (
+            <div className="p-6 space-y-5">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Secure checkout</h3>
+                <p className="mt-1 text-sm text-gray-500">You can pay for yourself or register another learner. Stripe will collect the payer details securely.</p>
+              </div>
+              <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4">
+                <div className="flex items-start gap-3">
+                  <Checkbox id="recipient" checked={purchaseForRecipient} onCheckedChange={(checked) => setPurchaseForRecipient(Boolean(checked))} className="mt-0.5" />
+                  <label htmlFor="recipient" className="cursor-pointer text-sm text-teal-950">
+                    <span className="font-semibold">Register or give access to someone else</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-teal-800">Use this for an employee, colleague, or another learner. Their account and access confirmation will go to the recipient.</span>
+                  </label>
+                </div>
+                {purchaseForRecipient && (
+                  <div className="mt-4 grid gap-3">
+                    <Input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} placeholder="Recipient name (optional)" autoComplete="name" />
+                    <Input value={recipientEmail} onChange={(event) => setRecipientEmail(event.target.value)} placeholder="Recipient email" type="email" autoComplete="email" required />
+                  </div>
+                )}
+              </div>
+              <Button
+                className="w-full text-white"
+                style={btnStyle}
+                disabled={purchaseForRecipient && !/^\S+@\S+\.\S+$/.test(recipientEmail.trim())}
+                onClick={() => setCheckoutDetailsSubmitted(true)}
+              >
+                Continue to secure payment
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          ) : !sessionMeta || createSession.isPending ? (
             /* Loading skeleton */
             <div className="p-8 space-y-4 animate-pulse">
               <div className="h-6 bg-gray-100 rounded w-1/2" />

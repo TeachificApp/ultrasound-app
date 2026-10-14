@@ -51,6 +51,7 @@ import {
   standaloneQuizAttempts,
   standaloneQuizzes,
   premiumTrialCancellationFeedback,
+  userActivityLogs,
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray, sql, or, isNotNull, gte } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
@@ -938,6 +939,7 @@ export const dashboardRouter = router({
         currency: lmsOrders.currency,
         status: lmsOrders.status,
         createdAt: lmsOrders.createdAt,
+        cancellationRequestedAt: lmsOrders.cancellationRequestedAt,
         courseTitle: lmsCourses.title,
         courseSlug: lmsCourses.slug,
       })
@@ -997,6 +999,7 @@ export const dashboardRouter = router({
             stripeSubscriptionId: o.stripeSubscriptionId,
             status: o.status,
             createdAt: o.createdAt,
+            cancellationRequestedAt: o.cancellationRequestedAt,
             stripe: stripeData,
           };
         })
@@ -1113,6 +1116,26 @@ export const dashboardRouter = router({
         .set({ accessExpiresAt })
         .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.orderId, input.orderId)));
 
+      if (cancellation.outcome === "scheduled") {
+        const requestedAt = new Date();
+        await db.update(lmsOrders)
+          .set({ cancellationRequestedAt: requestedAt })
+          .where(eq(lmsOrders.id, input.orderId));
+        await db.insert(userActivityLogs).values({
+          userId: ctx.user.id,
+          eventType: "subscription_cancelled",
+          description: "Learner scheduled a course subscription cancellation.",
+          courseId: order.courseId,
+          contentTitle: "Course subscription cancellation",
+          metadata: {
+            orderId: input.orderId,
+            stripeSubscriptionId: order.stripeSubscriptionId,
+            requestedAt: requestedAt.toISOString(),
+            accessEndsAt: accessExpiresAt.toISOString(),
+          },
+        });
+      }
+
       if (cancellation.outcome === "already_ended") {
         return { success: true, message: "This subscription has already ended. You will not be charged again." };
       }
@@ -1189,6 +1212,23 @@ export const dashboardRouter = router({
       await db.update(lmsEnrollments)
         .set({ accessExpiresAt })
         .where(eq(lmsEnrollments.id, input.enrollmentId));
+
+      if (cancellation.outcome === "scheduled") {
+        const requestedAt = new Date();
+        await db.insert(userActivityLogs).values({
+          userId: ctx.user.id,
+          eventType: "subscription_cancelled",
+          description: "Learner scheduled a content subscription cancellation.",
+          courseId: enrollment.courseId,
+          contentTitle: "Content subscription cancellation",
+          metadata: {
+            enrollmentId: input.enrollmentId,
+            stripeSubscriptionId: stripeSubId,
+            requestedAt: requestedAt.toISOString(),
+            accessEndsAt: accessExpiresAt.toISOString(),
+          },
+        });
+      }
 
       if (cancellation.outcome === "already_ended") {
         return { success: true, message: "This subscription has already ended. You will not be charged again." };
@@ -1342,6 +1382,22 @@ export const dashboardRouter = router({
           ...(cancellation.periodEnd ? { expiresAt: cancellation.periodEnd } : {}),
         })
         .where(eq(brandMemberships.id, membership.id));
+
+      if (cancellation.outcome === "scheduled") {
+        const requestedAt = new Date();
+        await db.insert(userActivityLogs).values({
+          userId: ctx.user.id,
+          eventType: "subscription_cancelled",
+          description: "Learner scheduled a Premium subscription cancellation.",
+          contentTitle: `${membership.brand} Premium subscription cancellation`,
+          metadata: {
+            membershipId: membership.id,
+            stripeSubscriptionId: membership.stripeSubscriptionId,
+            requestedAt: requestedAt.toISOString(),
+            accessEndsAt: cancellation.periodEnd?.toISOString() ?? null,
+          },
+        });
+      }
 
       return {
         success: true,

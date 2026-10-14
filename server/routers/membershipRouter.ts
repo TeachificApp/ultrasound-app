@@ -883,7 +883,7 @@ const getPublicMembershipCheckoutPageConfig = publicProcedure
   });
 
 const createMembershipEmbeddedCheckoutSession = publicProcedure
-  .input(z.object({ planSlug: z.string(), origin: z.string(), discountCodeId: z.number().optional() }))
+  .input(z.object({ planSlug: z.string(), origin: z.string(), discountCodeId: z.number().optional(), recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().email().max(320).optional() }))
   .mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -983,17 +983,19 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
       customer_email: userEmail ?? undefined,
       allow_promotion_codes: discounts.length === 0,
       ...(discounts.length > 0 ? { discounts } : {}),
-      client_reference_id: userId ? userId.toString() : undefined,
+      client_reference_id: input.recipientEmail ? undefined : (userId ? userId.toString() : undefined),
       metadata: {
         type: "membership",
         plan_id: plan.id.toString(),
-        user_id: userId ? userId.toString() : "0",
-        customer_email: userEmail ?? "",
-        customer_name: userName ?? "",
+        user_id: input.recipientEmail ? "" : (userId ? userId.toString() : "0"),
+        customer_email: input.recipientEmail?.toLowerCase() ?? userEmail ?? "",
+        customer_name: input.recipientName ?? userName ?? "",
+        recipient_email: input.recipientEmail?.toLowerCase() ?? "",
+        recipient_name: input.recipientName ?? "",
         ...(input.discountCodeId ? { discount_code_id: input.discountCodeId.toString() } : {}),
       },
       ...(isRecurring
-        ? { subscription_data: { description: `${plan.title} — Membership — Subscription — Initial`, metadata: { user_id: userId ? userId.toString() : "0", plan_id: plan.id.toString(), type: "membership" } } }
+        ? { subscription_data: { description: `${plan.title} — Membership — Subscription — Initial`, metadata: { user_id: input.recipientEmail ? "" : (userId ? userId.toString() : "0"), plan_id: plan.id.toString(), type: "membership", recipient_email: input.recipientEmail?.toLowerCase() ?? "", recipient_name: input.recipientName ?? "" } } }
         : { payment_intent_data: { description: `${plan.title} — Membership — One-Time` } }),
       return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=membership`,
     }, { idempotencyKey: `membership-embedded-${userId || "guest"}-${plan.id}-${new Date().toISOString().slice(0, 10)}` });
@@ -1090,6 +1092,8 @@ const getMembershipCheckoutSessionStatus = publicProcedure
     const session = await stripe.checkout.sessions.retrieve(input.sessionId, {
       expand: ["line_items"],
     });
+    const meta = (session.metadata ?? {}) as Record<string, string>;
+    let fulfilledUserId = meta.user_id && Number(meta.user_id) > 0 ? Number(meta.user_id) : null;
 
     // IMPORTANT: Only run fulfillment when payment is confirmed — skip delayed-payment methods
     // (ACH, bank debit) where payment_status is 'unpaid' until the bank clears the payment.
@@ -1099,14 +1103,14 @@ const getMembershipCheckoutSessionStatus = publicProcedure
       if (db) {
         try {
           const { reconcileMembershipFromStripeSession } = await import("../lib/membershipFulfillment");
-          await reconcileMembershipFromStripeSession(db as any, session as unknown as Record<string, unknown>);
+          const result = await reconcileMembershipFromStripeSession(db as any, session as unknown as Record<string, unknown>);
+          if (result.success && result.userId) fulfilledUserId = result.userId;
         } catch (err) {
           console.error("[MembershipCheckoutStatus] Fallback fulfillment error:", err);
         }
       }
     }
 
-    const meta = (session.metadata ?? {}) as Record<string, string>;
     let planSlug: string | null = null;
     if (meta.plan_id) {
       const db = await getDb();
@@ -1121,12 +1125,30 @@ const getMembershipCheckoutSessionStatus = publicProcedure
     }
 
     let autoLoginUrl: string | null = null;
-    if (ctx.user && session.status === "complete") {
+    if (session.status === "complete" && !fulfilledUserId) {
+      const recipientEmail = meta.recipient_email || meta.customer_email || session.customer_details?.email || session.customer_email;
+      const recipientName = meta.recipient_name || meta.customer_name || session.customer_details?.name || undefined;
+      if (recipientEmail) {
+        try {
+          const { getOrCreateUserByEmail } = await import("../db");
+          const account = await getOrCreateUserByEmail({
+            email: recipientEmail,
+            name: recipientName,
+            firstName: recipientName?.split(" ")[0],
+            lastName: recipientName?.split(" ").slice(1).join(" ") || undefined,
+          });
+          fulfilledUserId = account.user.id;
+        } catch (error) {
+          console.error("[MembershipCheckoutStatus] Checkout account resolution failed:", error);
+        }
+      }
+    }
+    if (fulfilledUserId && session.status === "complete") {
       try {
         const { generateAutoLoginToken } = await import("../routes/autoLogin");
-        const baseUrl = "https://app.allaboutultrasound.com";
-        const next = planSlug ? `https://learn.allaboutultrasound.com/my-dashboard` : `${baseUrl}/my-dashboard`;
-        const token = await generateAutoLoginToken(ctx.user.id, next);
+        const baseUrl = new URL(ctx.req.headers.origin ?? "https://learn.allaboutultrasound.com").origin;
+        const next = planSlug ? "/my-dashboard" : "/my-dashboard";
+        const token = await generateAutoLoginToken(fulfilledUserId, next);
         autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
       } catch { /* non-fatal */ }
     }

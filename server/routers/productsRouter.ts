@@ -155,7 +155,7 @@ export const productsLearnerRouter = router({
   /** Create an embedded Stripe Checkout session for a physical product (learner-facing). */
   // NOTE: publicProcedure — guest checkout is allowed, no sign-in required.
   createEmbeddedCheckoutSession: publicProcedure
-    .input(z.object({ productSlug: z.string(), origin: z.string() }))
+    .input(z.object({ productSlug: z.string(), origin: z.string(), recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().email().max(320).optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -206,7 +206,7 @@ export const productsLearnerRouter = router({
           },
           quantity: 1,
         }],
-        metadata: { type: "physical_product", product_id: product.id.toString(), user_id: userId.toString(), customer_email: ctx.user?.email ?? "" },
+        metadata: { type: "physical_product", product_id: product.id.toString(), user_id: input.recipientEmail ? "" : userId.toString(), customer_email: input.recipientEmail?.toLowerCase() ?? ctx.user?.email ?? "", recipient_email: input.recipientEmail?.toLowerCase() ?? "", recipient_name: input.recipientName ?? "" },
         payment_intent_data: { description: `${product.title} — Physical Product` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=physical`,
         ...shippingOpts,

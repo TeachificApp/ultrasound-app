@@ -564,6 +564,8 @@ export const workshopLearnerRouter = router({
         instanceId: z.number(),
         origin: z.string(),
         orderBumpId: z.number().optional(),
+        recipientName: z.string().trim().max(200).optional(),
+        recipientEmail: z.string().trim().email().max(320).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -712,7 +714,7 @@ export const workshopLearnerRouter = router({
         ui_mode: "embedded",
         mode: "payment",
         customer_email: userEmail,
-        client_reference_id: userId ? userId.toString() : undefined,
+        client_reference_id: input.recipientEmail ? undefined : (userId ? userId.toString() : undefined),
         allow_promotion_codes: true,
         line_items: isUpgradeBump
           ? [orderBumpCheckout!.lineItem]
@@ -721,8 +723,10 @@ export const workshopLearnerRouter = router({
           type: "workshop",
           workshop_id: workshop.id.toString(),
           instance_id: instance.id.toString(),
-          user_id: userId ? userId.toString() : "",
-          customer_email: userEmail ?? "",
+          user_id: input.recipientEmail ? "" : (userId ? userId.toString() : ""),
+          customer_email: input.recipientEmail?.toLowerCase() ?? userEmail ?? "",
+          recipient_email: input.recipientEmail?.toLowerCase() ?? "",
+          recipient_name: input.recipientName ?? "",
           ...(isUpgradeBump ? { bump_mode: "upgrade" } : {}),
           ...orderBumpCheckout?.metadata,
           ...workshopShareMetadata,

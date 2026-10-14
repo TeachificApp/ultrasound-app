@@ -307,11 +307,12 @@ export async function reconcileLmsCheckoutFromStripeSession(
   }
 
   const customerEmail =
-    (session.customer_email as string) ??
-    (session.customer_details as Record<string, string>)?.email ??
-    meta.customer_email;
+    meta.recipient_email ||
+    meta.customer_email ||
+    ((session.customer_email as string) ??
+    (session.customer_details as Record<string, string>)?.email);
   const customerName =
-    meta.customer_name ?? (session.customer_details as Record<string, string>)?.name ?? null;
+    meta.recipient_name || meta.customer_name || ((session.customer_details as Record<string, string>)?.name ?? null);
 
   let userId = options.userId ?? parseMetadataUserId(meta);
   let isNewUser = false;

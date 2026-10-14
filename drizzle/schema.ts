@@ -3600,6 +3600,8 @@ export const lmsOrders = mysqlTable("lms_orders", {
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
   stripeSessionId: varchar("stripe_session_id", { length: 255 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
+  /** Exact time the learner chose Cancel; access can remain active through the paid period. */
+  cancellationRequestedAt: timestamp("cancellation_requested_at"),
   status: mysqlEnum("status", ["pending", "paid", "failed", "refunded"]).default("pending").notNull(),
   affiliateId: int("affiliate_id"),
   groupId: int("group_id"),

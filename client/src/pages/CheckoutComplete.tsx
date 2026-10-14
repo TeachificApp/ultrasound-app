@@ -62,7 +62,7 @@ export default function CheckoutComplete() {
   const isError = isMembership ? membershipQuery.isError : lmsQuery.isError;
 
   const membershipPlanSlug = isMembership && data && "planSlug" in data ? data.planSlug : null;
-  const autoLoginUrl = isMembership && data && "autoLoginUrl" in data ? data.autoLoginUrl : null;
+  const autoLoginUrl = data && "autoLoginUrl" in data ? data.autoLoginUrl as string | null : null;
 
   const resolvedContentType = (!isMembership && data && "contentType" in data) ? (data as any).contentType as string : "course";
 
