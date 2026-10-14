@@ -94,7 +94,7 @@ function RenderBlock({
                     className="px-8 py-3 rounded-xl font-bold text-base shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90"
                     style={{ backgroundColor: btn.color ?? "#189aa1", color: btn.textColor ?? "#fff" }}
                   >
-                    {isDraft && isEnroll ? "Enrollment Closed" : registering && isEnroll ? "Processing…" : btn.text ?? ctaText}
+                    {isDraft && isEnroll ? "Enrollment Closed" : registering && isEnroll ? "Processing…" : isRegistered && isEnroll ? "Access Webinar" : btn.text ?? ctaText}
                   </button>
                 );
               }) : (
@@ -135,7 +135,7 @@ function RenderBlock({
               className="px-10 py-4 rounded-xl font-bold text-lg shadow-lg disabled:opacity-60 transition-opacity hover:opacity-90"
               style={{ backgroundColor: d.ctaColor ?? "#189aa1", color: d.ctaTextColor ?? "#fff" }}
             >
-              {isDraft ? "Enrollment Closed" : registering ? "Processing…" : (d.ctaText ?? ctaText)}
+              {isDraft ? "Enrollment Closed" : registering ? "Processing…" : isRegistered ? "Access Webinar" : (d.ctaText ?? ctaText)}
             </button>
             {isDraft && (
               <div className="mt-4 space-y-2">

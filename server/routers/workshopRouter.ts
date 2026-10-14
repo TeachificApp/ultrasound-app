@@ -566,11 +566,17 @@ export const workshopLearnerRouter = router({
         orderBumpId: z.number().optional(),
         recipientName: z.string().trim().max(200).optional(),
         recipientEmail: z.string().trim().email().max(320).optional(),
+        payerEmail: z.string().trim().email().max(320).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const payerEmail = (ctx.user?.email ?? input.payerEmail ?? "").trim().toLowerCase();
+      const isDifferentRecipient = Boolean(input.recipientEmail && input.recipientEmail.toLowerCase() !== payerEmail);
+      const accessUser = !isDifferentRecipient
+        ? (ctx.user ?? (payerEmail ? await (await import("../db")).getUserByEmail(payerEmail) : null))
+        : null;
       const userId = ctx.user?.id ?? 0;
-      const userEmail = ctx.user?.email ?? undefined;
+      const userEmail = payerEmail || undefined;
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -613,22 +619,23 @@ export const workshopLearnerRouter = router({
         };
       }
 
-      // Check for existing enrollment (only for authenticated users — guests have userId=0
-      // and we must not block them with a false "already enrolled" match)
-      if (userId) {
+      // Do not create a second workshop purchase for a returning learner. A
+      // deliberately named different recipient is the only path that can add a
+      // second registration from the same payer.
+      if (accessUser) {
         const [existing] = await db
-          .select()
+          .select({ id: workshopEnrollments.id })
           .from(workshopEnrollments)
           .where(
             and(
               eq(workshopEnrollments.workshopId, workshop.id),
               eq(workshopEnrollments.instanceId, instance.id),
-              eq(workshopEnrollments.userId, userId),
+              eq(workshopEnrollments.userId, accessUser.id),
               eq(workshopEnrollments.status, "active")
             )
           )
           .limit(1);
-        if (existing) throw new TRPCError({ code: "CONFLICT", message: "You are already enrolled in this workshop." });
+        if (existing) return { alreadyEnrolled: true, accessUrl: "/my-dashboard?tab=workshops" };
       }
 
       // Workshop and instance prices are canonical decimal dollars; Stripe receives cents only here.
@@ -720,6 +727,7 @@ export const workshopLearnerRouter = router({
           ? [orderBumpCheckout!.lineItem]
           : [primaryLineItem, ...(orderBumpCheckout ? [orderBumpCheckout.lineItem] : [])],
         metadata: {
+          payer_email: payerEmail,
           type: "workshop",
           workshop_id: workshop.id.toString(),
           instance_id: instance.id.toString(),

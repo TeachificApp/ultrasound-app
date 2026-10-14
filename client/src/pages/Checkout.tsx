@@ -22,6 +22,7 @@ import { useParams, useLocation, Link } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -382,10 +383,12 @@ export default function Checkout() {
     };
   }, [location]);
 
+  const { user } = useAuth();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [subscriptionAcknowledged, setSubscriptionAcknowledged] = useState(false);
   // Stripe collects the payer; learner access is confirmed alongside payment.
   const [learnerIsPayee, setLearnerIsPayee] = useState(true);
+  const [payerEmail, setPayerEmail] = useState("");
   const [learnerName, setLearnerName] = useState("");
   const [learnerEmail, setLearnerEmail] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -422,6 +425,14 @@ export default function Checkout() {
 
   const entityType = searchParams.entityType;
 
+  // A signed-in learner should not have to re-enter their email. Guests enter
+  // it once on this same checkout screen so the server can prevent duplicate
+  // purchases before a fresh Stripe Customer/subscription is created.
+  useEffect(() => {
+    const knownEmail = (user as any)?.email?.trim().toLowerCase();
+    if (knownEmail && !payerEmail) setPayerEmail(knownEmail);
+  }, [user, payerEmail]);
+
   // Compute the correct back-link based on entity type
   const backHref = entityType === "download" ? `/downloads/${slug}`
     : entityType === "physical" ? `/product/${slug}`
@@ -435,6 +446,10 @@ export default function Checkout() {
     : "Back to course";
 
   const onSessionSuccess = (data: any) => {
+    if ((data.alreadyEnrolled || data.alreadyRegistered || data.alreadyPurchased) && data.accessUrl) {
+      window.location.href = data.accessUrl;
+      return;
+    }
     // Free plan: enrollment already completed server-side, redirect to member area
     if (data.free === true && !data.clientSecret) {
       const dest = entityType === "membership" && slug
@@ -465,8 +480,9 @@ export default function Checkout() {
     error: createCourseSession.error ?? createDownloadSession.error ?? createPhysicalSession.error ?? createWebinarSession.error ?? createMembershipSession.error,
   };
 
-  const hasValidLearnerDetails = learnerIsPayee || (learnerName.trim().length > 1 && /^\S+@\S+\.\S+$/.test(learnerEmail.trim()));
-  const checkoutSessionKey = [entityType, slug ?? "", searchParams.pricingOptionId ?? "", searchParams.teamTierId ?? "", searchParams.teamTierId ? seatCount : "", learnerIsPayee ? "payer" : `${learnerName.trim()}|${learnerEmail.trim().toLowerCase()}`].join(":");
+  const hasValidPayerEmail = /^\S+@\S+\.\S+$/.test(payerEmail.trim());
+  const hasValidLearnerDetails = hasValidPayerEmail && (learnerIsPayee || (learnerName.trim().length > 1 && /^\S+@\S+\.\S+$/.test(learnerEmail.trim())));
+  const checkoutSessionKey = [entityType, slug ?? "", searchParams.pricingOptionId ?? "", searchParams.teamTierId ?? "", searchParams.teamTierId ? seatCount : "", payerEmail.trim().toLowerCase(), learnerIsPayee ? "payer" : `${learnerName.trim()}|${learnerEmail.trim().toLowerCase()}`].join(":");
   const invalidateEmbeddedSession = () => {
     activeSessionKeyRef.current = null;
     setActiveSessionKey(null);
@@ -483,19 +499,20 @@ export default function Checkout() {
       setClientSecret(null);
       setSessionMeta(null);
       const recipient = !learnerIsPayee ? { recipientName: learnerName.trim(), recipientEmail: learnerEmail.trim().toLowerCase() } : {};
+      const payer = { payerEmail: payerEmail.trim().toLowerCase() };
       const onSuccess = (data: any) => {
         if (activeSessionKeyRef.current === checkoutSessionKey) onSessionSuccess(data);
       };
       if (entityType === "download") {
-        createDownloadSession.mutate({ productSlug: slug, origin: window.location.origin, ...recipient }, { onSuccess });
+        createDownloadSession.mutate({ productSlug: slug, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
       } else if (entityType === "physical") {
-        createPhysicalSession.mutate({ productSlug: slug, origin: window.location.origin, ...recipient }, { onSuccess });
+        createPhysicalSession.mutate({ productSlug: slug, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
       } else if (entityType === "webinar") {
-        createWebinarSession.mutate({ webinarSlug: slug, origin: window.location.origin, ...recipient }, { onSuccess });
+        createWebinarSession.mutate({ webinarSlug: slug, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
       } else if (entityType === "membership") {
-        createMembershipSession.mutate({ planSlug: slug, origin: window.location.origin, ...recipient }, { onSuccess });
+        createMembershipSession.mutate({ planSlug: slug, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
       } else {
-        createCourseSession.mutate({ courseSlug: slug, pricingOptionId: searchParams.pricingOptionId, teamTierId: searchParams.teamTierId, seatCount: searchParams.teamTierId ? seatCount : undefined, origin: window.location.origin, ...recipient }, { onSuccess });
+        createCourseSession.mutate({ courseSlug: slug, pricingOptionId: searchParams.pricingOptionId, teamTierId: searchParams.teamTierId, seatCount: searchParams.teamTierId ? seatCount : undefined, origin: window.location.origin, ...payer, ...recipient }, { onSuccess });
       }
     }, learnerIsPayee ? 0 : 350);
     return () => window.clearTimeout(timeout);
@@ -863,8 +880,13 @@ export default function Checkout() {
 
           <div className={`rounded-2xl shadow-sm border overflow-hidden min-h-[400px] ${isDark ? "bg-gray-900 border-gray-800" : "bg-white border-gray-100"}`}>
           <div className={`border-b p-5 ${isDark ? "border-gray-800" : "border-gray-100"}`}>
-            <h3 className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>Learner access</h3>
-            <p className={`mt-1 text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Will the learner use the same name and email as the payer?</p>
+            <h3 className={`text-base font-semibold ${isDark ? "text-white" : "text-gray-900"}`}>Checkout details</h3>
+            <div className="mt-3 grid gap-2">
+              <Label htmlFor="payer-email" className={isDark ? "text-gray-300" : "text-gray-700"}>Payer email</Label>
+              <Input id="payer-email" value={payerEmail} onChange={(event) => { setPayerEmail(event.target.value); invalidateEmbeddedSession(); }} placeholder="payer@email.com" type="email" autoComplete="email" required />
+              <p className={`text-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>Your Stripe receipt is sent here. We use this email only to recognize an existing purchase before payment.</p>
+            </div>
+            <p className={`mt-4 text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Will the learner use the same name and email as the payer?</p>
             <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Learner and payer relationship">
               <button type="button" aria-pressed={learnerIsPayee} onClick={() => { if (!learnerIsPayee) { setLearnerIsPayee(true); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : isDark ? "border-gray-700 text-gray-300 hover:bg-gray-800" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Yes, same learner</button>
               <button type="button" aria-pressed={!learnerIsPayee} onClick={() => { if (learnerIsPayee) { setLearnerIsPayee(false); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${!learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : isDark ? "border-gray-700 text-gray-300 hover:bg-gray-800" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>No, another learner</button>
@@ -881,7 +903,7 @@ export default function Checkout() {
             <div className="flex min-h-[280px] flex-col items-center justify-center p-8 text-center">
               <ShieldCheck className="h-10 w-10" style={{ color: primary }} />
               <h4 className={`mt-4 text-base font-semibold ${isDark ? "text-white" : "text-gray-800"}`}>Add the learner’s details</h4>
-              <p className={`mt-2 max-w-xs text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Enter the learner’s full name and email above to load secure payment.</p>
+              <p className={`mt-2 max-w-xs text-sm ${isDark ? "text-gray-400" : "text-gray-500"}`}>Enter the payer and learner details above to load secure payment.</p>
             </div>
           ) : !sessionMeta || createSession.isPending ? (
             /* Loading skeleton */

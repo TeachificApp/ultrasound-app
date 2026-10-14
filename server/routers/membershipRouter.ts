@@ -883,7 +883,7 @@ const getPublicMembershipCheckoutPageConfig = publicProcedure
   });
 
 const createMembershipEmbeddedCheckoutSession = publicProcedure
-  .input(z.object({ planSlug: z.string(), origin: z.string(), discountCodeId: z.number().optional(), recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().email().max(320).optional() }))
+  .input(z.object({ planSlug: z.string(), origin: z.string(), discountCodeId: z.number().optional(), recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().email().max(320).optional(), payerEmail: z.string().trim().email().max(320).optional() }))
   .mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -898,7 +898,7 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
 
     // Resolve user info — may be null for guest checkout
     const userId = ctx.user?.id ?? 0;
-    const userEmail = ctx.user?.email ?? null;
+    const userEmail = (ctx.user?.email ?? input.payerEmail ?? null)?.trim().toLowerCase() ?? null;
     const userName = ctx.user?.name ?? null;
 
     const isFree = !plan.price || Number(plan.price) === 0;
@@ -988,7 +988,8 @@ const createMembershipEmbeddedCheckoutSession = publicProcedure
         type: "membership",
         plan_id: plan.id.toString(),
         user_id: input.recipientEmail ? "" : (userId ? userId.toString() : "0"),
-        customer_email: input.recipientEmail?.toLowerCase() ?? userEmail ?? "",
+        customer_email: userEmail ?? "",
+        payer_email: userEmail ?? "",
         customer_name: input.recipientName ?? userName ?? "",
         recipient_email: input.recipientEmail?.toLowerCase() ?? "",
         recipient_name: input.recipientName ?? "",

@@ -15,6 +15,7 @@ import { useParams, useLocation, Link } from "wouter";
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -47,6 +48,7 @@ export function WorkshopCheckoutClosedState({ title, backHref }: { title: string
 export default function WorkshopCheckout() {
   const { slug } = useParams<{ slug: string }>();
   const [location] = useLocation();
+  const { user } = useAuth();
 
   const searchParams = useMemo(() => {
     const url = new URL(window.location.href);
@@ -59,6 +61,7 @@ export default function WorkshopCheckout() {
   const [waitlistOpen, setWaitlistOpen] = useState(false);
   // Stripe collects the payer; learner access is confirmed alongside payment.
   const [learnerIsPayee, setLearnerIsPayee] = useState(true);
+  const [payerEmail, setPayerEmail] = useState("");
   const [learnerName, setLearnerName] = useState("");
   const [learnerEmail, setLearnerEmail] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -86,8 +89,13 @@ export default function WorkshopCheckout() {
   } | null>(null);
 
   const createSession = trpc.workshopLearner.createEmbeddedCheckoutSession.useMutation();
-  const hasValidLearnerDetails = learnerIsPayee || (learnerName.trim().length > 1 && /^\S+@\S+\.\S+$/.test(learnerEmail.trim()));
-  const checkoutSessionKey = [slug ?? "", searchParams.instanceId ?? "", learnerIsPayee ? "payer" : `${learnerName.trim()}|${learnerEmail.trim().toLowerCase()}`].join(":");
+  useEffect(() => {
+    const knownEmail = (user as any)?.email?.trim().toLowerCase();
+    if (knownEmail && !payerEmail) setPayerEmail(knownEmail);
+  }, [user, payerEmail]);
+  const hasValidPayerEmail = /^\S+@\S+\.\S+$/.test(payerEmail.trim());
+  const hasValidLearnerDetails = hasValidPayerEmail && (learnerIsPayee || (learnerName.trim().length > 1 && /^\S+@\S+\.\S+$/.test(learnerEmail.trim())));
+  const checkoutSessionKey = [slug ?? "", searchParams.instanceId ?? "", payerEmail.trim().toLowerCase(), learnerIsPayee ? "payer" : `${learnerName.trim()}|${learnerEmail.trim().toLowerCase()}`].join(":");
   const invalidateEmbeddedSession = () => {
     activeSessionKeyRef.current = null;
     setActiveSessionKey(null);
@@ -107,9 +115,14 @@ export default function WorkshopCheckout() {
         workshopSlug: slug,
         instanceId: searchParams.instanceId,
         origin: window.location.origin,
+        payerEmail: payerEmail.trim().toLowerCase(),
         ...(!learnerIsPayee ? { recipientName: learnerName.trim(), recipientEmail: learnerEmail.trim().toLowerCase() } : {}),
       }, { onSuccess: (data) => {
         if (activeSessionKeyRef.current !== checkoutSessionKey) return;
+        if (data.alreadyEnrolled && data.accessUrl) {
+          window.location.href = data.accessUrl;
+          return;
+        }
         const { clientSecret: cs, free, ...meta } = data;
         setSessionMeta({ ...meta, free });
         if (free) setFreeSuccess(true);
@@ -117,7 +130,7 @@ export default function WorkshopCheckout() {
       }});
     }, learnerIsPayee ? 0 : 350);
     return () => window.clearTimeout(timeout);
-  }, [slug, searchParams.instanceId, learnerIsPayee, learnerName, learnerEmail, hasValidLearnerDetails, checkoutSessionKey, activeSessionKey]);
+  }, [slug, searchParams.instanceId, learnerIsPayee, payerEmail, learnerName, learnerEmail, hasValidLearnerDetails, checkoutSessionKey, activeSessionKey]);
 
   const primary = sessionMeta?.primaryColor ?? "#189aa1";
   const stripeOptions = useMemo(() => (clientSecret ? { clientSecret } : undefined), [clientSecret]);
@@ -265,8 +278,13 @@ export default function WorkshopCheckout() {
         {/* Right — learner assignment, terms, and embedded Stripe checkout */}
         <div className="space-y-4">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-            <h3 className="text-base font-semibold text-gray-900">Learner access</h3>
-            <p className="mt-1 text-sm text-gray-500">Will the learner use the same name and email as the payer?</p>
+            <h3 className="text-base font-semibold text-gray-900">Checkout details</h3>
+            <div className="mt-3 grid gap-2">
+              <Label htmlFor="workshop-payer-email">Payer email</Label>
+              <Input id="workshop-payer-email" value={payerEmail} onChange={(event) => { setPayerEmail(event.target.value); invalidateEmbeddedSession(); }} placeholder="payer@email.com" type="email" autoComplete="email" required />
+              <p className="text-xs leading-relaxed text-gray-500">Your Stripe receipt is sent here. We use it to recognize an existing registration before payment.</p>
+            </div>
+            <p className="mt-4 text-sm text-gray-500">Will the learner use the same name and email as the payer?</p>
             <div className="mt-3 grid grid-cols-2 gap-2" role="group" aria-label="Learner and payer relationship">
               <button type="button" aria-pressed={learnerIsPayee} onClick={() => { if (!learnerIsPayee) { setLearnerIsPayee(true); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>Yes, same learner</button>
               <button type="button" aria-pressed={!learnerIsPayee} onClick={() => { if (learnerIsPayee) { setLearnerIsPayee(false); invalidateEmbeddedSession(); } }} className={`rounded-lg border px-3 py-2.5 text-sm font-semibold transition-colors ${!learnerIsPayee ? "border-teal-600 bg-teal-50 text-teal-900" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}>No, another learner</button>
@@ -283,7 +301,7 @@ export default function WorkshopCheckout() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
               <ShieldCheck className="mx-auto h-10 w-10" style={{ color: primary }} />
               <h4 className="mt-4 text-base font-semibold text-gray-900">Add the learner’s details</h4>
-              <p className="mt-2 text-sm text-gray-500">Enter the learner’s full name and email above to load secure payment.</p>
+              <p className="mt-2 text-sm text-gray-500">Enter the payer and learner details above to load secure payment.</p>
             </div>
           ) : (
             <>

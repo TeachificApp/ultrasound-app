@@ -36,7 +36,7 @@ import { isScheduledDeadlineOpen } from "../../shared/platformTime";
 import { isCohortItemReleased, cohortLessonReleaseDay } from "../../shared/cohortDrip";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
-import { getDb, getOrCreateAccessToken } from "../db";
+import { getDb, getOrCreateAccessToken, getUserByEmail } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { generateCertificatePdf } from "../lib/certificateGenerator";
 import { buildCmeCertificateFileKey } from "../lib/cmeCertificateFilename";
@@ -3198,7 +3198,7 @@ export const lmsLearnerRouter = router({
       // ── Already-enrolled guard ─────────────────────────────────────────────────
       // For one_time purchases, block checkout if the user already has an active
       // full enrollment. Subscription renewals are allowed through.
-      if (pricingType === "one_time" || pricingType === "payment_plan") {
+      if (pricingType === "one_time" || pricingType === "payment_plan" || pricingType === "subscription") {
         const { getActiveEnrollment: checkExistingEnrollment } = await import("../lib/enrollmentAccess");
         const activeEnrollment = await checkExistingEnrollment(db, ctx.user.id, course.id);
         if (activeEnrollment && activeEnrollment.enrollmentType !== "free_preview") {
@@ -3588,7 +3588,7 @@ export const lmsLearnerRouter = router({
       }
 
       // ── Already-enrolled guard (guest path) ─────────────────────────────────
-      if (pricingType === "one_time" || pricingType === "payment_plan") {
+      if (pricingType === "one_time" || pricingType === "payment_plan" || pricingType === "subscription") {
         const [existingGuest] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
           .from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
         if (existingGuest && existingGuest.enrollmentType !== "free_preview") {
@@ -5119,6 +5119,9 @@ export const lmsLearnerRouter = router({
       seatCount: z.number().int().positive().optional(),
       recipientName: z.string().trim().max(200).optional(),
       recipientEmail: z.string().trim().email().max(320).optional(),
+      // Collected on the same checkout screen so a returning learner can be
+      // recognized before Stripe creates another subscription or charge.
+      payerEmail: z.string().trim().email().max(320).optional(),
       origin: z.string().url(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -5128,6 +5131,28 @@ export const lmsLearnerRouter = router({
       const [course] = await db.select().from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
       if (["draft", "archived", "private"].includes(course.status)) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // An existing learner must never be sent to a second checkout for the
+      // same course. A named different recipient is explicitly allowed to buy
+      // their own seat; otherwise resolve the payer before a Stripe session is
+      // created, including guests who are returning with the same email.
+      const payerEmail = (ctx.user?.email ?? input.payerEmail ?? "").trim().toLowerCase();
+      const recipientEmail = input.recipientEmail?.trim().toLowerCase() ?? "";
+      const isDifferentRecipient = Boolean(recipientEmail && recipientEmail !== payerEmail);
+      const accessUser = !isDifferentRecipient
+        ? (ctx.user ?? (payerEmail ? await getUserByEmail(payerEmail) : null))
+        : null;
+      if (accessUser) {
+        const { getActiveEnrollment } = await import("../lib/enrollmentAccess");
+        const existingEnrollment = await getActiveEnrollment(db, accessUser.id, course.id);
+        if (existingEnrollment && existingEnrollment.enrollmentType !== "free_preview") {
+          return {
+            alreadyEnrolled: true,
+            accessUrl: `/courses/${course.slug}/player`,
+            courseSlug: course.slug,
+          };
+        }
+      }
 
       // Fetch org-level legal URLs and checkout terms from platform_settings
       const [orgSettings] = await db.select(checkoutPlatformTermsSelection).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
@@ -5228,9 +5253,9 @@ export const lmsLearnerRouter = router({
           mode: "payment",
           line_items: [{ price: stripePriceId, quantity: requestedSeats, adjustable_quantity: { enabled: true, minimum: tier.minSeats } }],
           return_url: returnUrl,
-          customer_email: ctx.user?.email ?? undefined,
+          customer_email: payerEmail || undefined,
           allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: String(requestedSeats), ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), customer_email: input.recipientEmail.toLowerCase(), user_id: "" } : (ctx.user?.email ? { customer_email: ctx.user.email } : {})) },
+          metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: String(requestedSeats), ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), payer_email: payerEmail, customer_email: payerEmail, user_id: "" } : (payerEmail ? { payer_email: payerEmail, customer_email: payerEmail } : {})) },
           payment_intent_data: { description: `${course.title} — Team License — ${requestedSeats} seats` },
         });
         const terms0 = resolveCheckoutTerms(course, orgSettings);
@@ -5320,9 +5345,9 @@ export const lmsLearnerRouter = router({
           mode: sessionMode,
           line_items: [{ price: stripePriceId!, quantity: 1 }],
           return_url: returnUrl,
-          customer_email: ctx.user?.email ?? undefined,
+          customer_email: payerEmail || undefined,
           allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), customer_email: input.recipientEmail.toLowerCase(), user_id: "" } : (ctx.user?.email ? { customer_email: ctx.user.email } : {})), ...embeddedOptionShare.metadata },
+          metadata: { course_id: String(course.id), pricing_option_id: String(opt.id), source: "hosted_checkout_pricing_option", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), payer_email: payerEmail, customer_email: payerEmail, user_id: "" } : (payerEmail ? { payer_email: payerEmail, customer_email: payerEmail } : {})), ...embeddedOptionShare.metadata },
           ...(sessionMode === "payment"
             ? { payment_intent_data: { description: `${course.title} — One-Time Purchase`, ...embeddedOptionShare.paymentIntentData } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
@@ -5414,9 +5439,9 @@ export const lmsLearnerRouter = router({
         mode: sessionMode,
         line_items: [{ price: stripePriceId!, quantity: 1 }],
         return_url: returnUrl,
-        customer_email: ctx.user?.email ?? undefined,
+        customer_email: payerEmail || undefined,
         allow_promotion_codes: true,
-          metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), customer_email: input.recipientEmail.toLowerCase(), user_id: "" } : (ctx.user?.email ? { customer_email: ctx.user.email } : {})), ...embeddedPrimaryShare.metadata },
+          metadata: { course_id: String(course.id), source: "hosted_checkout_primary", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: "1", ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), payer_email: payerEmail, customer_email: payerEmail, user_id: "" } : (payerEmail ? { payer_email: payerEmail, customer_email: payerEmail } : {})), ...embeddedPrimaryShare.metadata },
           ...(sessionMode === "payment"
             ? { payment_intent_data: { description: `${course.title} — One-Time Purchase`, ...embeddedPrimaryShare.paymentIntentData } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),

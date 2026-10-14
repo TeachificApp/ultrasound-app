@@ -588,7 +588,7 @@ export const downloadsLearnerRouter = router({
   // ─── Embedded Checkout Session (for /checkout/{slug}?type=download) ────────
   // NOTE: publicProcedure — guest checkout is allowed, no sign-in required.
   createEmbeddedCheckoutSession: publicProcedure
-    .input(z.object({ productSlug: z.string(), origin: z.string(), recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().email().max(320).optional() }))
+    .input(z.object({ productSlug: z.string(), origin: z.string(), recipientName: z.string().trim().max(200).optional(), recipientEmail: z.string().trim().email().max(320).optional(), payerEmail: z.string().trim().email().max(320).optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -597,7 +597,19 @@ export const downloadsLearnerRouter = router({
       if (!product) throw new TRPCError({ code: "NOT_FOUND", message: "Product not found" });
       if (["draft", "archived", "private"].includes(product.status)) throw new TRPCError({ code: "FORBIDDEN", message: "This download is currently unavailable." });
       if ((product as any).bundleOnly) throw new TRPCError({ code: "FORBIDDEN", message: "This product is only available as part of a bundle." });
+      const payerEmail = (ctx.user?.email ?? input.payerEmail ?? "").trim().toLowerCase();
+      const isDifferentRecipient = Boolean(input.recipientEmail && input.recipientEmail.trim().toLowerCase() !== payerEmail);
+      const accessUser = !isDifferentRecipient
+        ? (ctx.user ?? (payerEmail ? await getUserByEmail(payerEmail) : null))
+        : null;
       const userId = ctx.user?.id ?? 0;
+      if (accessUser && !product.isFree) {
+        const [existingPurchase] = await db.select({ id: digitalPurchases.id })
+          .from(digitalPurchases)
+          .where(and(eq(digitalPurchases.userId, accessUser.id), eq(digitalPurchases.productId, product.id)))
+          .limit(1);
+        if (existingPurchase) return { alreadyPurchased: true, accessUrl: `/downloads/${product.slug}/files` };
+      }
       if (product.isFree) {
         if (userId) {
           const [existing] = await db.select().from(digitalPurchases)
@@ -620,7 +632,7 @@ export const downloadsLearnerRouter = router({
       const session = await stripe.checkout.sessions.create({
         ui_mode: "embedded",
         mode: "payment",
-        customer_email: ctx.user?.email ?? undefined,
+        customer_email: payerEmail || undefined,
         client_reference_id: userId ? userId.toString() : undefined,
         custom_text: DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT,
         allow_promotion_codes: true,
@@ -636,7 +648,7 @@ export const downloadsLearnerRouter = router({
           },
           quantity: 1,
         }],
-        metadata: { type: "digital_download", product_id: product.id.toString(), user_id: input.recipientEmail ? "" : userId.toString(), customer_email: input.recipientEmail?.toLowerCase() ?? ctx.user?.email ?? "", recipient_email: input.recipientEmail?.toLowerCase() ?? "", recipient_name: input.recipientName ?? "" },
+        metadata: { type: "digital_download", product_id: product.id.toString(), user_id: input.recipientEmail ? "" : userId.toString(), customer_email: payerEmail, payer_email: payerEmail, recipient_email: input.recipientEmail?.toLowerCase() ?? "", recipient_name: input.recipientName ?? "" },
         payment_intent_data: { description: `${product.title} — Digital Download` },
         return_url: `${input.origin}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&type=download`,
       }, { idempotencyKey: `download-embedded-${userId}-${product.id}-${new Date().toISOString().slice(0, 10)}` });

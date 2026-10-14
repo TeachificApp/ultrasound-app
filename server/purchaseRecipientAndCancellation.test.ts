@@ -82,4 +82,28 @@ describe("purchase recipient and cancellation safeguards", () => {
     expect(stripe).toContain("resolveCheckoutRecipientUser(session, meta)");
     expect(stripe).toContain("sendPurchaseAccessEmail");
   });
+
+  it("routes a returning learner to owned access instead of creating another checkout", () => {
+    const checkout = source("../client/src/pages/Checkout.tsx");
+    const lms = source("./routers/lmsRouter.ts");
+    const downloads = source("./routers/downloadsRouter.ts");
+    const webinar = source("./routers/webinarRouter.ts");
+    const workshop = source("./routers/workshopRouter.ts");
+    const workshopCheckout = source("../client/src/pages/WorkshopCheckout.tsx");
+    const webinarLanding = source("../client/src/pages/WebinarLanding.tsx");
+
+    expect(checkout).toContain("Payer email");
+    expect(checkout).toContain("payerEmail");
+    expect(checkout).toContain("data.alreadyEnrolled || data.alreadyRegistered || data.alreadyPurchased");
+    expect(lms).toContain("getActiveEnrollment(db, accessUser.id, course.id)");
+    expect(lms).toContain("accessUrl: `/courses/${course.slug}/player`");
+    expect(downloads).toContain("alreadyPurchased: true");
+    expect(downloads).toContain("accessUrl: `/downloads/${product.slug}/files`");
+    expect(webinar).toContain("alreadyRegistered: true");
+    expect(webinar).toContain("accessUrl: `/webinar/${webinar.slug}`");
+    expect(workshop).toContain('accessUrl: "/my-dashboard?tab=workshops"');
+    expect(workshopCheckout).toContain("data.alreadyEnrolled && data.accessUrl");
+    expect(workshopCheckout).toContain("Payer email");
+    expect(webinarLanding).toContain('"Access Webinar"');
+  });
 });
