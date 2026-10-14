@@ -39,6 +39,7 @@ import { getSitePageDomain } from "@/lib/sitePageDomain";
 import { RESERVED_SITE_SLUGS } from "@shared/sitePagesConstants";
 import { isPublicSiteHost } from "@shared/publicSiteTenants";
 import LegacyStudentDashboardRedirect from "./pages/LegacyStudentDashboardRedirect";
+import LearnerAccessGuide from "./components/LearnerAccessGuide";
 
 // ── Core pages (eagerly loaded — tiny, always needed) ────────────────────────
 import Home from "./pages/Home";
@@ -1729,7 +1730,7 @@ function App() {
           {onMarketingStaging ? (
             <MarketingSiteRouter />
           ) : onLearnSubdomain ? (
-            <><ProfileNameBanner /><LMSRouter /></>
+            <><ProfileNameBanner /><LMSRouter /><LearnerAccessGuide /></>
           ) : onPublicWebsite ? (
             <PublicWebsiteRouter />
           ) : onMembersSubdomain ? (

@@ -6459,6 +6459,21 @@ export const userInterests = mysqlTable("user_interests", {
 export type UserInterest = typeof userInterests.$inferSelect;
 export type InsertUserInterest = typeof userInterests.$inferInsert;
 
+// ─── Learner onboarding guide progress ───────────────────────────────────────
+// Tracks the first three qualifying Learn-site visits per learner. Kept in MySQL
+// rather than browser storage so the guide is consistent across a learner's devices.
+export const learnerOnboardingProgress = mysqlTable("learner_onboarding_progress", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull().unique(),
+  learnVisitCount: int("learn_visit_count").default(0).notNull(),
+  lastVisitKey: varchar("last_visit_key", { length: 128 }),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+export type LearnerOnboardingProgress = typeof learnerOnboardingProgress.$inferSelect;
+export type InsertLearnerOnboardingProgress = typeof learnerOnboardingProgress.$inferInsert;
+
 // ─── Email Send Log ───────────────────────────────────────────────────────────
 // Logs every email sent to a user — both transactional (magic link, welcome,
 // certificate, enrollment confirmation) and campaign emails.

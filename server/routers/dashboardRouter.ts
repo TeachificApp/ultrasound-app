@@ -52,6 +52,7 @@ import {
   standaloneQuizzes,
   premiumTrialCancellationFeedback,
   userActivityLogs,
+  learnerOnboardingProgress,
 } from "../../drizzle/schema";
 import { eq, and, desc, inArray, sql, or, isNotNull, gte } from "drizzle-orm";
 import { getStripeClient } from "../lib/stripeClient";
@@ -65,12 +66,13 @@ import {
   isActiveThinkificMembership,
 } from "../../shared/thinkificLegacy";
 import { restoreMissingCourseCertificate } from "./lmsHelpers";
-import { isEnrollmentCompleted } from "../lib/enrollmentAccess";
+import { hasCourseEnrollmentAccess, isEnrollmentCompleted } from "../lib/enrollmentAccess";
 import { isActiveBrandPremiumTrialSubscription } from "../lib/brandMembershipTrial";
 import { notifyOwner } from "../_core/notification";
 import { getLmsSubscriptionInvoicesForUser } from "../lib/lmsSubscriptionReconciliation";
 import { lmsCourseVisibleInMyContentCondition } from "../lib/lmsCourseVisibility";
 import { maybeRefreshLearnerLmsAccessFromStripe } from "../lib/learnerLmsAccessRefresh";
+import { isPurchaseAccessActive } from "../lib/downloadAccess";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -136,6 +138,101 @@ export const dashboardRouter = router({
       passwordHash: undefined, // never expose hash
     };
   }),
+
+  // ── Learn access guide ──────────────────────────────────────────────────────
+
+  /**
+   * Register one Learn-site visit and return whether to show the brief access
+   * guide. The guide is limited to three visits and is only shown to learners
+   * with content, a workshop/webinar registration, an order, or a membership.
+   */
+  registerLearnOnboardingVisit: protectedProcedure
+    .input(z.object({ visitKey: z.string().min(8).max(128) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const now = new Date();
+      const [courseEnrollments, downloads, bundleAccess, webinarAccess, workshopAccess, physicalOrders, memberships] = await Promise.all([
+        db.select({
+          enrollmentType: lmsEnrollments.enrollmentType,
+          accessExpiresAt: lmsEnrollments.accessExpiresAt,
+          completedAt: lmsEnrollments.completedAt,
+          progressPct: lmsEnrollments.progressPct,
+          courseType: lmsCourses.type,
+        })
+          .from(lmsEnrollments)
+          .innerJoin(lmsCourses, eq(lmsCourses.id, lmsEnrollments.courseId))
+          .where(eq(lmsEnrollments.userId, ctx.user.id)),
+        db.select({ status: digitalPurchases.status, accessExpiresAt: digitalPurchases.accessExpiresAt })
+          .from(digitalPurchases)
+          .where(eq(digitalPurchases.userId, ctx.user.id)),
+        db.select({ accessExpiresAt: bundleEnrollments.accessExpiresAt })
+          .from(bundleEnrollments)
+          .where(eq(bundleEnrollments.userId, ctx.user.id)),
+        db.select({ accessExpiresAt: webinarRegistrations.accessExpiresAt })
+          .from(webinarRegistrations)
+          .where(eq(webinarRegistrations.userId, ctx.user.id)),
+        db.select({ status: workshopEnrollments.status, accessExpiresAt: workshopEnrollments.accessExpiresAt })
+          .from(workshopEnrollments)
+          .where(eq(workshopEnrollments.userId, ctx.user.id)),
+        db.select({ fulfillmentStatus: physicalProductOrders.fulfillmentStatus })
+          .from(physicalProductOrders)
+          .where(eq(physicalProductOrders.userId, ctx.user.id)),
+        db.select({ status: membershipSubscriptions.status, currentPeriodEnd: membershipSubscriptions.currentPeriodEnd })
+          .from(membershipSubscriptions)
+          .where(eq(membershipSubscriptions.userId, ctx.user.id)),
+      ]);
+
+      const activeCourses = courseEnrollments.filter(hasCourseEnrollmentAccess);
+      const hasCohortAccess = activeCourses.some((enrollment) => enrollment.courseType === "cohort");
+      const hasActiveBundle = bundleAccess.some((row) => !row.accessExpiresAt || row.accessExpiresAt > now);
+      const hasActiveWebinar = webinarAccess.some((row) => !row.accessExpiresAt || row.accessExpiresAt > now);
+      const hasActiveWorkshop = workshopAccess.some((row) =>
+        row.status === "active" && (!row.accessExpiresAt || row.accessExpiresAt > now),
+      );
+      const hasActiveMembership = memberships.some((row) =>
+        (row.status === "active" || row.status === "trialing" || row.status === "cancelled")
+        && (!row.currentPeriodEnd || row.currentPeriodEnd > Date.now()),
+      );
+      const hasContent = Boolean(
+        activeCourses.length
+        || downloads.some(isPurchaseAccessActive)
+        || hasActiveBundle
+        || hasActiveWebinar
+        || hasActiveWorkshop
+        || physicalOrders.some((row) => row.fulfillmentStatus !== "cancelled" && row.fulfillmentStatus !== "refunded")
+        || hasActiveMembership,
+      );
+
+      if (!hasContent) return { shouldShow: false, visitCount: 0, hasCohortAccess: false };
+
+      const [existing] = await db
+        .select({ visitCount: learnerOnboardingProgress.learnVisitCount, lastVisitKey: learnerOnboardingProgress.lastVisitKey })
+        .from(learnerOnboardingProgress)
+        .where(eq(learnerOnboardingProgress.userId, ctx.user.id))
+        .limit(1);
+
+      let visitCount: number;
+      if (!existing) {
+        visitCount = 1;
+        await db.insert(learnerOnboardingProgress).values({
+          userId: ctx.user.id,
+          learnVisitCount: visitCount,
+          lastVisitKey: input.visitKey,
+          lastSeenAt: now,
+        });
+      } else if (existing.lastVisitKey === input.visitKey || existing.visitCount >= 3) {
+        visitCount = existing.visitCount;
+      } else {
+        visitCount = Math.min(existing.visitCount + 1, 3);
+        await db.update(learnerOnboardingProgress)
+          .set({ learnVisitCount: visitCount, lastVisitKey: input.visitKey, lastSeenAt: now })
+          .where(eq(learnerOnboardingProgress.userId, ctx.user.id));
+      }
+
+      return { shouldShow: visitCount > 0 && visitCount <= 3, visitCount, hasCohortAccess };
+    }),
 
   // ── My Content ───────────────────────────────────────────────────────────────
 
