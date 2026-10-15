@@ -22,6 +22,7 @@ type ContentItem = {
   status: string;
   previewOnly?: boolean;
   workshopId?: number;
+  courseId?: number;
 };
 type Override = {
   id: number;
@@ -84,12 +85,14 @@ export function PurchaseEmailOverrides() {
   const [previewItem, setPreviewItem] = useState<ContentItem | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedWorkshopInstanceId, setSelectedWorkshopInstanceId] = useState<string>("");
+  const [selectedCohortGroupId, setSelectedCohortGroupId] = useState<string>("");
 
   const catalog = (query.data?.content ?? []) as ContentItem[];
   const overrides = (query.data?.overrides ?? []) as Override[];
   const unavailableSources = query.data?.unavailableSources ?? [];
   const overrideByKey = useMemo(() => new Map(overrides.map((item) => [`${item.contentType}:${item.contentId}`, item])), [overrides]);
   const items = useMemo(() => catalog.filter((item) => {
+    if (item.source === "cohort_group") return false;
     if (typeFilter !== "all" && item.contentType !== typeFilter) return false;
     const text = `${item.title} ${item.subtitle ?? ""}`.toLowerCase();
     return text.includes(search.trim().toLowerCase());
@@ -100,6 +103,10 @@ export function PurchaseEmailOverrides() {
     ? catalog.filter((item) => item.source === "workshop_instance" && item.workshopId === selected.id)
     : [], [catalog, selected]);
   const selectedWorkshopInstance = workshopInstances.find((item) => String(item.id) === selectedWorkshopInstanceId) ?? null;
+  const cohortGroups = useMemo(() => selected?.source === "course" && selected.contentType === "cohort"
+    ? catalog.filter((item) => item.source === "cohort_group" && item.courseId === selected.id)
+    : [], [catalog, selected]);
+  const selectedCohortGroup = cohortGroups.find((item) => String(item.id) === selectedCohortGroupId) ?? null;
   const preview = trpc.purchaseEmailOverrides.preview.useQuery(
     previewItem ? { source: previewItem.source as any, contentId: previewItem.id, contentType: previewItem.contentType as any } : undefined as any,
     { enabled: Boolean(previewItem), retry: false },
@@ -117,6 +124,7 @@ export function PurchaseEmailOverrides() {
 
   useEffect(() => {
     setSelectedWorkshopInstanceId("");
+    setSelectedCohortGroupId("");
   }, [selectedKey]);
 
   function select(item: ContentItem) {
@@ -125,9 +133,13 @@ export function PurchaseEmailOverrides() {
 
   function openPreview() {
     if (!selected) return;
-    const previewTarget = selected.source === "workshop" ? selectedWorkshopInstance : selected;
+    const previewTarget = selected.source === "workshop" ? selectedWorkshopInstance
+      : selected.source === "course" && selected.contentType === "cohort" ? selectedCohortGroup
+      : selected;
     if (!previewTarget) {
-      toast.message("Select a scheduled workshop instance to preview its confirmation with the correct date, time zone, and location.");
+      toast.message(selected.source === "course" && selected.contentType === "cohort"
+        ? "Select a cohort group to preview its confirmation with the correct dates and location."
+        : "Select a scheduled workshop instance to preview its confirmation with the correct date, time zone, and location.");
       return;
     }
     const wasAlreadySelected = previewItem?.source === previewTarget.source && previewItem.id === previewTarget.id && previewItem.contentType === previewTarget.contentType;
@@ -158,12 +170,12 @@ export function PurchaseEmailOverrides() {
               <div className="mt-0.5 rounded-xl bg-teal-600 p-2.5 text-white"><Mail className="h-5 w-5" /></div>
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Purchase Email Overrides</h2>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Purchase emails are automatic. Use this page only to tailor reliable, content-specific copy; all links and workshop schedule details remain generated from the active purchase and scheduled instance.</p>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">Purchase emails are automatic. Use this page only to tailor reliable, content-specific copy; all links and scheduled event details remain generated from the active purchase and selected scheduled group or instance.</p>
               </div>
             </div>
             <Badge className="w-fit bg-teal-100 text-teal-800 hover:bg-teal-100"><ShieldCheck className="mr-1 h-3.5 w-3.5" />No retrospective sends</Badge>
           </div>
-          <div className="mt-4 rounded-lg border border-teal-100 bg-white/80 p-3 text-xs leading-5 text-slate-600"><strong className="text-slate-800">Safe by design:</strong> saving, disabling, or reverting an override never sends or resends an email. A future paid checkout receives exactly one idempotent confirmation. For workshops, the date, time zone, and location are populated from the instance actually purchased—not typed into the default email.</div>
+          <div className="mt-4 rounded-lg border border-teal-100 bg-white/80 p-3 text-xs leading-5 text-slate-600"><strong className="text-slate-800">Safe by design:</strong> saving, disabling, or reverting an override never sends or resends an email. A future paid checkout receives exactly one idempotent confirmation. Webinar, workshop, and cohort schedule details are generated from the purchased event or assigned group—not typed into the default email.</div>
         </CardContent>
       </Card>
 
@@ -211,11 +223,22 @@ export function PurchaseEmailOverrides() {
                 </Select>
                 {workshopInstances.length === 0 && <p className="mt-2 text-xs text-amber-800">No scheduled instances are available for this workshop yet. Add one in Workshops Admin, then refresh this list.</p>}
               </div>}
+              {selected.source === "course" && selected.contentType === "cohort" && <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-4">
+                <Label htmlFor="cohort-email-preview-group" className="font-semibold text-slate-800">Cohort group for preview</Label>
+                <p className="mb-2 mt-1 text-xs leading-5 text-slate-600">Choose the cohort group whose confirmation you want to review. The preview uses that group’s current dates and location; it does not send an email.</p>
+                <Select value={selectedCohortGroupId} onValueChange={setSelectedCohortGroupId}>
+                  <SelectTrigger id="cohort-email-preview-group" className="bg-white"><SelectValue placeholder="Select a cohort group" /></SelectTrigger>
+                  <SelectContent>
+                    {cohortGroups.map((group) => <SelectItem key={group.id} value={String(group.id)}>{group.title}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {cohortGroups.length === 0 && <p className="mt-2 text-xs text-amber-800">No cohort groups are available for this course yet. Add one in Cohort Admin, then refresh this list.</p>}
+              </div>}
               {selected.previewOnly ? <div className="space-y-4"><div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm leading-6 text-violet-950"><p className="font-semibold">System-generated template</p><p className="mt-1">This is an automatic system-level purchase message rather than an individual content record. It is shown here for review only. No email is sent from this page.</p></div><Button variant="outline" className="border-teal-200 text-teal-800 hover:bg-teal-50" onClick={openPreview}><ExternalLink className="mr-2 h-4 w-4" />Preview current email</Button><p className="flex gap-2 text-xs leading-5 text-slate-500"><FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />The preview contains a sample recipient and illustrative links—never a live access token or password-reset token.</p></div> : <>
               <div className="flex items-start justify-between gap-4 rounded-lg border border-teal-100 bg-teal-50/50 p-4"><div><Label htmlFor="purchase-email-override-enabled" className="font-semibold text-slate-800">Use tailored purchase email copy</Label><p className="mt-1 text-xs leading-5 text-slate-600">Switch off to keep this saved draft but use the platform-generated email.</p></div><Switch id="purchase-email-override-enabled" checked={enabled} onCheckedChange={setEnabled} /></div>
               <div className="grid gap-4 md:grid-cols-2"><div><Label>Subject line</Label><Input className="mt-1" value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={500} /></div><div><Label>Heading</Label><Input className="mt-1" value={heading} onChange={(event) => setHeading(event.target.value)} maxLength={500} /></div></div>
               <div><Label>Opening message</Label><textarea className="mt-1 min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus:ring-2 focus:ring-teal-500" value={intro} onChange={(event) => setIntro(event.target.value)} maxLength={5000} /></div>
-              <div><Label>Additional details <span className="font-normal text-slate-400">(optional)</span></Label><p className="mb-2 mt-1 text-xs leading-5 text-slate-500">Use for logistics, preparation instructions, or a help contact. Workshop dates, times, time zone, and location are automatically inserted from the active instance, so leave dated details out of this field.</p><RichTextEditor value={detailsHtml} onChange={setDetailsHtml} minHeight={160} /></div>
+              <div><Label>Additional details <span className="font-normal text-slate-400">(optional)</span></Label><p className="mb-2 mt-1 text-xs leading-5 text-slate-500">Use for logistics, preparation instructions, or a help contact. Webinar, workshop, and cohort schedule details are automatically inserted from the purchased event or assigned group, so leave dated details out of this field.</p><RichTextEditor value={detailsHtml} onChange={setDetailsHtml} minHeight={160} /></div>
               <div className="flex flex-col-reverse justify-between gap-3 border-t pt-4 sm:flex-row sm:items-center"><div className="flex flex-wrap gap-2">{selectedOverride && <Button variant="ghost" className="text-slate-600 hover:text-slate-900" disabled={revert.isPending} onClick={() => revert.mutate({ contentType: selected.contentType as any, contentId: selected.id })}>Revert to generated default</Button>}<Button variant="outline" className="border-teal-200 text-teal-800 hover:bg-teal-50" onClick={openPreview}><ExternalLink className="mr-2 h-4 w-4" />Preview current email</Button></div><Button className="bg-teal-600 text-white hover:bg-teal-700" disabled={save.isPending} onClick={saveCopy}>{save.isPending ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save copy</Button></div>
               <p className="flex gap-2 text-xs leading-5 text-slate-500"><FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />Preview reads the saved, live system configuration and never sends email. Save copy first, then preview it. The delivery system always provides the purchased learner’s access link for future completed purchases.</p>
               </>}

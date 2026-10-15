@@ -3,6 +3,7 @@ import {
   bundles,
   digitalBundles,
   digitalProducts,
+  lmsCohortGroups,
   lmsCourses,
   membershipPlanAccess,
   membershipPlans,
@@ -23,6 +24,8 @@ import { buildFunnelPurchaseConfirmationEmail, buildPasswordResetEmail } from ".
 import { renderExistingBrandMembershipAccessEmail, renderNewBrandMembershipAccessEmail } from "./brandMembershipPurchaseEmail";
 import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from "./purchaseEmailOverride";
 import { renderCurrentWorkshopSchedule } from "./workshopEmailSchedule";
+import { renderCurrentWebinarSchedule } from "./webinarEmailSchedule";
+import { renderCurrentCohortGroupSchedule } from "./cohortEmailSchedule";
 import { renderTeamSubscriptionConfirmationEmail } from "./teamSubscriptionEmail";
 
 export const PURCHASE_EMAIL_PREVIEW_SOURCES = [
@@ -31,6 +34,7 @@ export const PURCHASE_EMAIL_PREVIEW_SOURCES = [
   "digital_bundle",
   "canonical_bundle",
   "webinar",
+  "cohort_group",
   "workshop_instance",
   "physical_product",
   "membership",
@@ -232,7 +236,7 @@ export async function renderCurrentPurchaseEmailPreview(
   }
 
   if (input.source === "webinar") {
-    const [webinar] = await db.select({ title: webinars.title, slug: webinars.slug, brand: webinars.brand, scheduledAt: webinars.scheduledAt, type: webinars.type, meetingUrl: webinars.meetingUrl })
+    const [webinar] = await db.select({ title: webinars.title, slug: webinars.slug, brand: webinars.brand, scheduledAt: webinars.scheduledAt, durationMinutes: webinars.durationMinutes, timezone: webinars.timezone, type: webinars.type, meetingUrl: webinars.meetingUrl })
       .from(webinars).where(eq(webinars.id, input.contentId)).limit(1);
     if (!webinar) throw new Error("The selected webinar could not be found.");
     const brand = purchaseBrand(webinar.brand);
@@ -242,11 +246,41 @@ export async function renderCurrentPurchaseEmailPreview(
       heading: "Your webinar registration is confirmed",
       intro: `you now have access to <strong style="color:#0e4a50;">${webinar.title}</strong>.`,
     }, override);
-    const dateText = webinar.scheduledAt ? new Date(webinar.scheduledAt).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" }) : null;
-    const detailsHtml = `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">${dateText ? `<p style="margin:0 0 8px;"><strong>When:</strong> ${dateText}</p>` : ""}${webinar.type === "live" && webinar.meetingUrl ? `<p style="margin:0;"><strong>Live access:</strong> the session details are available from your webinar page.</p>` : ""}</div>${copy.detailsHtml ?? ""}`;
+    const detailsHtml = `${renderCurrentWebinarSchedule(webinar)}${copy.detailsHtml ?? ""}`;
     return result(webinar.title, "Webinar", await renderPurchaseAccessEmail({
       to: SAMPLE_RECIPIENT, subject: copy.subject, heading: copy.heading, intro: copy.intro, detailsHtml,
       accessLabel: "Open Webinar", destinationUrl: `${learnOrigin(brand)}/webinars/${webinar.slug}`, brand, brandMode: "combined",
+    }));
+  }
+
+  if (input.source === "cohort_group") {
+    const [group] = await db.select({
+      name: lmsCohortGroups.name,
+      startDate: lmsCohortGroups.startDate,
+      endDate: lmsCohortGroups.endDate,
+      location: lmsCohortGroups.location,
+      courseId: lmsCohortGroups.courseId,
+      courseTitle: lmsCourses.title,
+      courseSlug: lmsCourses.slug,
+      courseBrand: lmsCourses.brand,
+      creditHours: lmsCourses.creditHours,
+    }).from(lmsCohortGroups)
+      .leftJoin(lmsCourses, eq(lmsCohortGroups.courseId, lmsCourses.id))
+      .where(eq(lmsCohortGroups.id, input.contentId))
+      .limit(1);
+    if (!group?.courseTitle || !group.courseSlug) throw new Error("The selected cohort group could not be found.");
+    const override = await getEffectivePurchaseEmailOverride(db, [{ contentType: "cohort", contentId: group.courseId }]);
+    const copy = applyPurchaseEmailOverride({
+      subject: `Welcome to ${group.courseTitle}`,
+      heading: "Welcome — your cohort access is ready",
+      intro: `you are enrolled in <strong style="color:#0e4a50;">${group.courseTitle}</strong>.`,
+    }, override);
+    const brand = purchaseBrand(group.courseBrand);
+    const detailsHtml = `${renderCurrentCohortGroupSchedule(group)}${copy.detailsHtml ?? ""}`;
+    return result(`${group.courseTitle} — ${group.name}`, "Cohort group", await renderEnrollmentEmail({
+      to: SAMPLE_RECIPIENT, courseTitle: group.courseTitle, courseSlug: group.courseSlug, creditHours: group.creditHours,
+      customSubject: copy.subject, customHeading: copy.heading, customIntro: copy.intro, customDetailsHtml: detailsHtml,
+      brand,
     }));
   }
 

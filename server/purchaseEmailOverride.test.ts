@@ -54,7 +54,8 @@ describe("purchase email override copy", () => {
     expect(source).toContain("Workshop instance for preview");
     expect(source).toContain("selectedWorkshopInstance");
     expect(source).toContain('item.source === "workshop_instance" && item.workshopId === selected.id');
-    expect(source).toContain('const previewTarget = selected.source === "workshop" ? selectedWorkshopInstance : selected');
+    expect(source).toContain('selected.source === "workshop" ? selectedWorkshopInstance');
+    expect(source).toContain('selected.source === "course" && selected.contentType === "cohort" ? selectedCohortGroup');
   });
 
   it("keeps available content visible when one optional catalog source cannot load", () => {

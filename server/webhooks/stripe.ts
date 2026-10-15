@@ -37,6 +37,7 @@ import { getBrandDisplayConfig } from "@shared/brands";
 import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from "../lib/purchaseEmailOverride";
 import { hasKnownStripeCheckoutRoute, hasUnmatchedPlatformPaymentIntentMetadata, unmatchedStripePaymentMessage } from "../lib/unmatchedStripePayment";
 import { recordReceiptPayee } from "../lib/receiptParticipants";
+import { renderCurrentWebinarSchedule } from "../lib/webinarEmailSchedule";
 type CheckoutRecipient = { email: string | null; name: string | null };
 
 /** Recipient metadata takes precedence over the Stripe payment buyer. */
@@ -823,7 +824,7 @@ export async function handleWebinarCheckoutCompleted(session: Record<string, unk
     return;
   }
   await recordReceiptPayee(db, userId, getCheckoutPayer(session, meta));
-  const [webinar] = await db.select({ title: webinars.title, slug: webinars.slug, brand: webinars.brand, status: webinars.status, scheduledAt: webinars.scheduledAt, type: webinars.type, meetingUrl: webinars.meetingUrl })
+  const [webinar] = await db.select({ title: webinars.title, slug: webinars.slug, brand: webinars.brand, status: webinars.status, scheduledAt: webinars.scheduledAt, durationMinutes: webinars.durationMinutes, timezone: webinars.timezone, type: webinars.type, meetingUrl: webinars.meetingUrl })
     .from(webinars).where(eq(webinars.id, webinarId)).limit(1);
   if (!webinar) return;
   const [existing] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
@@ -841,8 +842,7 @@ export async function handleWebinarCheckoutCompleted(session: Record<string, unk
       heading: "Your webinar registration is confirmed",
       intro: `you now have access to <strong style="color:#0e4a50;">${webinar.title}</strong>.`,
     }, emailOverride);
-    const dateText = webinar.scheduledAt ? new Date(webinar.scheduledAt).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" }) : null;
-    const detailsHtml = `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">${dateText ? `<p style="margin:0 0 8px;"><strong>When:</strong> ${dateText}</p>` : ""}${webinar.type === "live" && webinar.meetingUrl ? `<p style="margin:0;"><strong>Live access:</strong> the session details are available from your webinar page.</p>` : ""}</div>${emailOverride?.detailsHtml ?? ""}`;
+    const detailsHtml = `${renderCurrentWebinarSchedule(webinar)}${copy.detailsHtml ?? ""}`;
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "webinar_registration",

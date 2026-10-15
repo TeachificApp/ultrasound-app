@@ -8,6 +8,7 @@ import {
   digitalProducts,
   bundles as canonicalBundles,
   lmsCourses,
+  lmsCohortGroups,
   membershipPlans,
   physicalProducts,
   purchaseEmailOverrides,
@@ -67,13 +68,14 @@ export const purchaseEmailOverridesRouter = router({
       }
     };
 
-    const [overrides, courses, downloads, bundles, canonicalBundleRows, webinarRows, workshopRows, instanceRows, products, memberships] = await Promise.all([
+    const [overrides, courses, cohortGroups, downloads, bundles, canonicalBundleRows, webinarRows, workshopRows, instanceRows, products, memberships] = await Promise.all([
       readCatalog("saved email overrides", db.select().from(purchaseEmailOverrides).orderBy(desc(purchaseEmailOverrides.updatedAt))),
       readCatalog("courses and quizzes", db.select({ id: lmsCourses.id, title: lmsCourses.title, type: lmsCourses.type, brand: lmsCourses.brand, status: lmsCourses.status }).from(lmsCourses).orderBy(asc(lmsCourses.title))),
+      readCatalog("cohort groups", db.select({ id: lmsCohortGroups.id, courseId: lmsCohortGroups.courseId, name: lmsCohortGroups.name, startDate: lmsCohortGroups.startDate, endDate: lmsCohortGroups.endDate, status: lmsCohortGroups.status }).from(lmsCohortGroups).orderBy(asc(lmsCohortGroups.startDate))),
       readCatalog("downloads", db.select({ id: digitalProducts.id, title: digitalProducts.title, brand: digitalProducts.brand, status: digitalProducts.status }).from(digitalProducts).orderBy(asc(digitalProducts.title))),
       readCatalog("digital bundles", db.select({ id: digitalBundles.id, title: digitalBundles.title, brand: digitalBundles.brand, status: digitalBundles.status }).from(digitalBundles).orderBy(asc(digitalBundles.title))),
       readCatalog("bundles", db.select({ id: canonicalBundles.id, title: canonicalBundles.title, brand: canonicalBundles.brand, status: canonicalBundles.status }).from(canonicalBundles).orderBy(asc(canonicalBundles.title))),
-      readCatalog("webinars", db.select({ id: webinars.id, title: webinars.title, brand: webinars.brand, status: webinars.status }).from(webinars).orderBy(asc(webinars.title))),
+      readCatalog("webinars", db.select({ id: webinars.id, title: webinars.title, brand: webinars.brand, status: webinars.status, scheduledAt: webinars.scheduledAt, durationMinutes: webinars.durationMinutes, timezone: webinars.timezone, type: webinars.type }).from(webinars).orderBy(asc(webinars.title))),
       readCatalog("workshops", db.select({ id: workshops.id, title: workshops.title, brand: workshops.brand, status: workshops.status }).from(workshops).orderBy(asc(workshops.title))),
       readCatalog("workshop instances", db.select({ id: workshopInstances.id, workshopId: workshopInstances.workshopId, title: workshopInstances.title, status: workshopInstances.status, workshopTitle: workshops.title, brand: workshops.brand })
         .from(workshopInstances).leftJoin(workshops, eq(workshopInstances.workshopId, workshops.id)).orderBy(asc(workshops.title), asc(workshopInstances.startDate))),
@@ -82,11 +84,12 @@ export const purchaseEmailOverridesRouter = router({
     ]);
 
     const content = [
-      ...courses.map((item) => ({ id: item.id, source: "course", contentType: item.type === "quiz" ? "quiz" : item.type === "cohort" ? "cohort" : "course", title: item.title, brand: item.brand, status: item.status, subtitle: null })),
+      ...courses.map((item) => ({ id: item.id, source: "course", contentType: item.type === "quiz" ? "quiz" : item.type === "cohort" ? "cohort" : "course", title: item.title, brand: item.brand, status: item.status, subtitle: item.type === "cohort" ? "Select a cohort group below to preview its dated confirmation" : null })),
+      ...cohortGroups.map((item) => ({ id: item.id, source: "cohort_group", contentType: "cohort", title: item.name, brand: null, status: item.status, subtitle: "Cohort group preview", courseId: item.courseId, previewOnly: true })),
       ...downloads.map((item) => ({ ...item, source: "download", contentType: "download", subtitle: null })),
       ...bundles.map((item) => ({ ...item, source: "digital_bundle", contentType: "bundle", subtitle: "Digital bundle" })),
       ...canonicalBundleRows.map((item) => ({ ...item, source: "canonical_bundle", contentType: "bundle", subtitle: "Bundle" })),
-      ...webinarRows.map((item) => ({ ...item, source: "webinar", contentType: "webinar", subtitle: null })),
+      ...webinarRows.map((item) => ({ ...item, source: "webinar", contentType: "webinar", subtitle: item.scheduledAt ? "Scheduled webinar" : "Date and time to be announced" })),
       ...workshopRows.map((item) => ({ ...item, source: "workshop", contentType: "workshop", subtitle: "Select an instance below to preview its dated confirmation" })),
       ...instanceRows.map((item) => ({ id: item.id, source: "workshop_instance", contentType: "workshop_instance", title: item.title, brand: item.brand, status: item.status, subtitle: item.workshopTitle ?? `Workshop #${item.workshopId}` })),
       ...products.map((item) => ({ ...item, source: "physical_product", contentType: "physical_product", subtitle: null })),

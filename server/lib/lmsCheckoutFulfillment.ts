@@ -24,6 +24,7 @@ import { grantScheduledContentAccess } from "./scheduledContentLinks";
 import { sendPurchaseNotificationOnce } from "./purchaseNotificationDelivery";
 import { getEffectivePurchaseEmailOverride } from "./purchaseEmailOverride";
 import { recordReceiptPayee } from "./receiptParticipants";
+import { renderCurrentCohortGroupSchedule } from "./cohortEmailSchedule";
 
 export type LmsCheckoutFulfillmentResult = {
   success: boolean;
@@ -471,6 +472,16 @@ export async function reconcileLmsCheckoutFromStripeSession(
     .from(lmsCourses)
     .where(eq(lmsCourses.id, courseId))
     .limit(1);
+  const [cohortGroupForPurchaseEmail] = course?.type === "cohort"
+    ? await db.select({
+        name: lmsCohortGroups.name,
+        startDate: lmsCohortGroups.startDate,
+        endDate: lmsCohortGroups.endDate,
+        location: lmsCohortGroups.location,
+      }).from(lmsCohortGroups)
+        .where(and(eq(lmsCohortGroups.courseId, courseId), eq(lmsCohortGroups.isFeaturedOnLanding, true)))
+        .limit(1)
+    : [];
 
   const [existingEnrollment] = await db
     .select({
@@ -634,6 +645,9 @@ export async function reconcileLmsCheckoutFromStripeSession(
               contentType: course.type === "quiz" ? "quiz" : course.type === "cohort" ? "cohort" : "course",
               contentId: courseId,
             }]);
+            const customDetailsHtml = cohortGroupForPurchaseEmail
+              ? `${renderCurrentCohortGroupSchedule(cohortGroupForPurchaseEmail)}${emailOverride?.detailsHtml ?? ""}`
+              : emailOverride?.detailsHtml;
             if (course.type === "quiz") {
               return sendQuizAccessEmail({
                 to: learnerTo,
@@ -669,7 +683,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
               customSubject: emailOverride?.subject,
               customHeading: emailOverride?.heading,
               customIntro: emailOverride?.intro,
-              customDetailsHtml: emailOverride?.detailsHtml,
+              customDetailsHtml,
               accessToken,
               setPasswordUrl,
               brand: course.brand,
