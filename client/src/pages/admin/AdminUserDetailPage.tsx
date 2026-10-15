@@ -37,7 +37,12 @@ import { MemberDigitalDownloadPurchaseCard } from "@/components/admin/MemberDigi
 import { Checkbox } from "@/components/ui/checkbox";
 import Layout from "@/components/Layout";
 import { SdmsCmeUserTab } from "@/components/admin/SdmsCmeUserTab";
-import { INVOICE_LOGO_URL, printInvoiceElement } from "@/lib/printInvoice";
+import {
+  formatWorkshopInvoiceInstance,
+  INVOICE_BRAND_FOOTER,
+  INVOICE_LOGO_URL,
+  printInvoiceElement,
+} from "@/lib/printInvoice";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 const BRAND_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -2627,6 +2632,9 @@ function AdminInvoiceView({ t, fmtCurrency, fmtDate }: { t: any; fmtCurrency: (c
     if (Array.isArray(t.lineItems) && t.lineItems.length > 0) return t.lineItems;
     return [{ name: t.productName || 'Purchase', amount: t.amountPaid, qty: 1 }];
   })();
+  const workshopInstance = t.sourceTable === "workshop"
+    ? formatWorkshopInvoiceInstance(t.workshopInstanceTitle, t.workshopInstanceId)
+    : null;
   const sourceLabel = {
     funnel: 'Funnel Purchase', course: 'Course', download: 'Digital Download',
     bundle: 'Bundle', physical: 'Physical Product', workshop: 'Workshop',
@@ -2635,14 +2643,14 @@ function AdminInvoiceView({ t, fmtCurrency, fmtDate }: { t: any; fmtCurrency: (c
   return (
     <div id="admin-invoice-print-area" data-invoice-document className="rounded-xl border border-gray-200 overflow-hidden text-sm">
       <div className="bg-white px-5 py-3 border-b border-gray-100">
-        <img data-invoice-logo src={INVOICE_LOGO_URL} alt="All About Ultrasound and iHeartEcho" className="w-full max-w-[300px] h-auto mx-auto" />
+        <img data-invoice-logo src={INVOICE_LOGO_URL} alt="All About Ultrasound™ and iHeartEcho™" className="w-full max-w-[300px] h-auto mx-auto" />
       </div>
       {/* Header */}
       <div className="bg-gradient-to-r from-[#0e4a50] to-[#189aa1] px-5 py-4 text-white">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-base font-bold tracking-tight">All About Ultrasound, Inc.</p>
-            <p className="text-xs text-teal-100 mt-0.5">dba iHeartEcho</p>
+            <p className="text-base font-bold tracking-tight">All About Ultrasound™, Inc.</p>
+            <p className="text-xs text-teal-100 mt-0.5">dba iHeartEcho™</p>
           </div>
           <div className="text-right">
             <p className="text-xs text-teal-100">Receipt / Invoice</p>
@@ -2692,7 +2700,10 @@ function AdminInvoiceView({ t, fmtCurrency, fmtDate }: { t: any; fmtCurrency: (c
           <tbody>
             {lineItems.map((li, i) => (
               <tr key={i} className="border-b border-gray-50">
-                <td className="py-1.5 text-gray-700">{li.name}</td>
+                <td className="py-1.5 text-gray-700">
+                  <p>{li.name}</p>
+                  {i === 0 && workshopInstance && <p className="mt-0.5 text-[11px] text-gray-500"><span className="font-semibold">Workshop Instance:</span> {workshopInstance}</p>}
+                </td>
                 <td className="py-1.5 text-center text-gray-500">{li.qty ?? 1}</td>
                 <td className="py-1.5 text-right text-gray-700">{fmtCurrency(li.amount * (li.qty ?? 1), t.currency)}</td>
               </tr>
@@ -2719,8 +2730,10 @@ function AdminInvoiceView({ t, fmtCurrency, fmtDate }: { t: any; fmtCurrency: (c
       </div>
       {/* Footer */}
       <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-center">
-        <p className="text-[10px] text-gray-400">All About Ultrasound, Inc. dba iHeartEcho &bull; allaboutultrasound.com</p>
-        <p className="text-[10px] text-gray-400 mt-0.5">For support, contact hello@allaboutultrasound.com</p>
+        <p className="text-[10px] text-gray-400">{INVOICE_BRAND_FOOTER.issuer}</p>
+        <p className="text-[10px] text-gray-400 mt-0.5">{INVOICE_BRAND_FOOTER.allAboutUltrasoundWebsite}</p>
+        <p className="text-[10px] text-gray-400">{INVOICE_BRAND_FOOTER.iHeartEchoWebsite}</p>
+        <p className="text-[10px] text-gray-400 mt-0.5">For support, contact {INVOICE_BRAND_FOOTER.supportEmail}</p>
       </div>
     </div>
   );

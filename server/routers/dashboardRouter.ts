@@ -1691,6 +1691,8 @@ export const dashboardRouter = router({
         id: workshopEnrollments.id,
         workshopTitle: workshops.title,
         workshopBrand: workshops.brand,
+        workshopInstanceId: workshopEnrollments.instanceId,
+        workshopInstanceTitle: workshopInstances.title,
         amountPaid: workshopEnrollments.amountPaid,
         currency: workshopEnrollments.currency,
         createdAt: workshopEnrollments.createdAt,
@@ -1700,6 +1702,7 @@ export const dashboardRouter = router({
       })
       .from(workshopEnrollments)
       .leftJoin(workshops, eq(workshopEnrollments.workshopId, workshops.id))
+      .leftJoin(workshopInstances, eq(workshopEnrollments.instanceId, workshopInstances.id))
       .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.status, "active")))
       .orderBy(desc(workshopEnrollments.createdAt));
 
@@ -1934,10 +1937,12 @@ export const dashboardRouter = router({
           sourceType: null as string | null,
           orderBumps: null as string | null,
           invoiceUrl: null as string | null,
-          transactionId: w.stripePaymentIntentId ?? w.stripeSessionId ?? null as string | null,
-          brand: w.workshopBrand ?? null as string | null,
-          fulfillmentStatus: null as string | null,
-        })),
+        transactionId: w.stripePaymentIntentId ?? w.stripeSessionId ?? null as string | null,
+        brand: w.workshopBrand ?? null as string | null,
+        fulfillmentStatus: null as string | null,
+        workshopInstanceId: w.workshopInstanceId ?? null as number | null,
+        workshopInstanceTitle: w.workshopInstanceTitle ?? null as string | null,
+      })),
       ...webinarRows
         .filter(w => !!w.stripePaymentIntentId && (w.webinarPrice ?? 0) > 0) // only paid webinars
         .map(w => ({

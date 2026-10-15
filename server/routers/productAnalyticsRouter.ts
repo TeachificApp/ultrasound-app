@@ -16,7 +16,7 @@ import {
   funnelPurchases, lmsOrders, lmsCourses, lmsEnrollments,
   digitalProducts, digitalPurchases, digitalBundles, digitalBundlePurchases,
   physicalProducts, physicalProductOrders, users, funnels, funnelPages,
-  manualInvoices, workshopEnrollments, workshops, webinarRegistrations, webinars, lmsSubscriptionInvoices,
+  manualInvoices, workshopEnrollments, workshopInstances, workshops, webinarRegistrations, webinars, lmsSubscriptionInvoices,
 } from "../../drizzle/schema";
 import {
   getAdministratorTransactionStatus,
@@ -562,6 +562,8 @@ export const productAnalyticsRouter = router({
           .select({
             id: workshopEnrollments.id,
             workshopTitle: workshops.title,
+            workshopInstanceId: workshopEnrollments.instanceId,
+            workshopInstanceTitle: workshopInstances.title,
             amountPaid: workshopEnrollments.amountPaid,
             currency: workshopEnrollments.currency,
             status: workshopEnrollments.status,
@@ -570,6 +572,7 @@ export const productAnalyticsRouter = router({
           })
           .from(workshopEnrollments)
           .leftJoin(workshops, eq(workshopEnrollments.workshopId, workshops.id))
+          .leftJoin(workshopInstances, eq(workshopEnrollments.instanceId, workshopInstances.id))
           .where(eq(workshopEnrollments.userId, uid));
         // 7. Webinar registrations (paid)
         const webinarRows = await db
@@ -607,6 +610,8 @@ export const productAnalyticsRouter = router({
           paymentSource: string | null;
           notes: string | null;
           lineItems: Array<{ name: string; amount: number; qty: number }> | null;
+          workshopInstanceId?: number | null;
+          workshopInstanceTitle?: string | null;
         };
 
         const allTxns: TxnRow[] = [
@@ -723,6 +728,8 @@ export const productAnalyticsRouter = router({
             paymentSource: 'stripe',
             notes: null,
             lineItems: [{ name: r.workshopTitle || 'Workshop', amount: Number(r.amountPaid ?? 0), qty: 1 }],
+            workshopInstanceId: r.workshopInstanceId ?? null,
+            workshopInstanceTitle: r.workshopInstanceTitle ?? null,
           })),
           ...webinarRows.filter(r => r.stripePaymentIntentId).map(r => ({
             transactionId: r.id,
@@ -837,7 +844,7 @@ export const productAnalyticsRouter = router({
               html: `
                 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;background:#fff">
                   <h2 style="color:#189aa1;margin-bottom:4px">Receipt</h2>
-                  <p style="color:#666;font-size:13px;margin-bottom:24px">All About Ultrasound, Inc. dba iHeartEcho</p>
+                  <p style="color:#666;font-size:13px;margin-bottom:24px">All About Ultrasound™, Inc. dba iHeartEcho™</p>
                   <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
                     <tr><td style="color:#888;font-size:12px">Invoice #</td><td style="text-align:right;font-size:12px">${invoiceNum}</td></tr>
                     <tr><td style="color:#888;font-size:12px">Date</td><td style="text-align:right;font-size:12px">${new Date(input.paidAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}</td></tr>
@@ -849,7 +856,7 @@ export const productAnalyticsRouter = router({
                     <tfoot><tr><td style="padding-top:12px;font-weight:bold">Total</td><td style="text-align:right;padding-top:12px;font-weight:bold;color:#189aa1">${fmtCurrency(input.amountPaid, input.currency)}</td></tr></tfoot>
                   </table>
                   ${input.notes ? `<p style="color:#888;font-size:12px;margin-top:16px">${input.notes}</p>` : ''}
-                  <p style="color:#aaa;font-size:11px;margin-top:32px">All About Ultrasound, Inc. dba iHeartEcho &bull; allaboutultrasound.com</p>
+                  <p style="color:#aaa;font-size:11px;line-height:1.5;margin-top:32px;text-align:center">All About Ultrasound™, Inc. dba iHeartEcho™<br>www.allaboutultrasound.com<br>www.iheartecho.com<br>For support, contact support@allaboutultrasound.com</p>
                 </div>
               `,
             });

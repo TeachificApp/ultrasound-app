@@ -1,5 +1,29 @@
 export const INVOICE_LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/iQsDpCNNbRktfBlU.jpg";
 
+/** Shared business identity for every on-screen and printed invoice/receipt. */
+export const INVOICE_BRAND_FOOTER = {
+  issuer: "All About Ultrasound™, Inc. dba iHeartEcho™",
+  allAboutUltrasoundWebsite: "www.allaboutultrasound.com",
+  iHeartEchoWebsite: "www.iheartecho.com",
+  supportEmail: "support@allaboutultrasound.com",
+} as const;
+
+/**
+ * Prefer the actual instance title selected at checkout. An existing instance ID
+ * remains a truthful fallback for legacy enrollments whose title was removed or
+ * is temporarily unavailable; no placeholder instance is ever invented.
+ */
+export function formatWorkshopInvoiceInstance(
+  instanceTitle: string | null | undefined,
+  instanceId: number | null | undefined,
+): string | null {
+  const normalizedTitle = instanceTitle?.trim();
+  if (normalizedTitle) return normalizedTitle;
+  return Number.isInteger(instanceId) && (instanceId ?? 0) > 0
+    ? `Instance #${instanceId}`
+    : null;
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")

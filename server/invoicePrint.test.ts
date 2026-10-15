@@ -1,5 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { buildInvoicePrintDocument, INVOICE_LOGO_URL } from "../client/src/lib/printInvoice";
+import {
+  buildInvoicePrintDocument,
+  formatWorkshopInvoiceInstance,
+  INVOICE_BRAND_FOOTER,
+  INVOICE_LOGO_URL,
+} from "../client/src/lib/printInvoice";
 
 describe("branded invoice print document", () => {
   it("preserves application styles, invoice markup, and the supplied company logo", () => {
@@ -29,5 +35,31 @@ describe("branded invoice print document", () => {
 
     expect(html).toContain("Receipt &lt;script&gt;alert(&quot;unsafe&quot;)&lt;/script&gt;");
     expect(html).toContain('<article data-invoice-document>Paid</article>');
+  });
+
+  it("uses the approved footer identity and support mailbox on every rendered invoice", () => {
+    expect(INVOICE_BRAND_FOOTER).toEqual({
+      issuer: "All About Ultrasound™, Inc. dba iHeartEcho™",
+      allAboutUltrasoundWebsite: "www.allaboutultrasound.com",
+      iHeartEchoWebsite: "www.iheartecho.com",
+      supportEmail: "support@allaboutultrasound.com",
+    });
+  });
+
+  it("renders a selected workshop instance without inventing one", () => {
+    expect(formatWorkshopInvoiceInstance("Adult Echo — Fall Session", 44)).toBe("Adult Echo — Fall Session");
+    expect(formatWorkshopInvoiceInstance("   ", 44)).toBe("Instance #44");
+    expect(formatWorkshopInvoiceInstance(null, null)).toBeNull();
+  });
+
+  it("projects workshop instance data into learner and administrator invoice payloads", () => {
+    const learnerPurchases = readFileSync(new URL("./routers/dashboardRouter.ts", import.meta.url), "utf8");
+    const administratorTransactions = readFileSync(new URL("./routers/productAnalyticsRouter.ts", import.meta.url), "utf8");
+
+    for (const source of [learnerPurchases, administratorTransactions]) {
+      expect(source).toContain("workshopInstanceId: workshopEnrollments.instanceId");
+      expect(source).toContain("workshopInstanceTitle: workshopInstances.title");
+      expect(source).toContain(".leftJoin(workshopInstances, eq(workshopEnrollments.instanceId, workshopInstances.id))");
+    }
   });
 });

@@ -51,7 +51,12 @@ import {
   buildStudentDashboardUrl,
   type StudentDashboardContentTab,
 } from "@shared/studentDashboardUrls";
-import { INVOICE_LOGO_URL, printInvoiceElement } from "@/lib/printInvoice";
+import {
+  formatWorkshopInvoiceInstance,
+  INVOICE_BRAND_FOOTER,
+  INVOICE_LOGO_URL,
+  printInvoiceElement,
+} from "@/lib/printInvoice";
 import { StudentQuizResultsPanel } from "@/pages/StudentQuizDashboard";
 import { SurveyPulse } from "@/pages/SurveyPulse";
 
@@ -1600,17 +1605,23 @@ function PurchasesTab() {
             const txId = isManualInvoice ? null : receiptPurchase.transactionId;
             const invoiceNumber = isManualInvoice ? receiptPurchase.transactionId : null;
             const orderId = receiptPurchase.id;
+            const workshopInstance = receiptPurchase.productType === "workshop"
+              ? formatWorkshopInvoiceInstance(
+                receiptPurchase.workshopInstanceTitle,
+                receiptPurchase.workshopInstanceId,
+              )
+              : null;
             return (
               <div className="space-y-4">
                 {/* Printable receipt area */}
                 <div ref={receiptRef} data-invoice-document className="rounded-lg border border-gray-200 overflow-hidden">
                   <div className="bg-white px-5 py-3 border-b border-gray-100">
-                    <img data-invoice-logo src={INVOICE_LOGO_URL} alt="All About Ultrasound and iHeartEcho" className="w-full max-w-[300px] h-auto mx-auto" />
+                    <img data-invoice-logo src={INVOICE_LOGO_URL} alt="All About Ultrasound™ and iHeartEcho™" className="w-full max-w-[300px] h-auto mx-auto" />
                   </div>
                   {/* Header */}
                   <div className="bg-[#0e4a50] px-5 py-4">
-                    <p className="text-white font-bold text-base leading-tight">All About Ultrasound, Inc.</p>
-                    <p className="text-teal-200 text-xs mt-0.5">dba iHeartEcho</p>
+                    <p className="text-white font-bold text-base leading-tight">All About Ultrasound™, Inc.</p>
+                    <p className="text-teal-200 text-xs mt-0.5">dba iHeartEcho™</p>
                   </div>
                   {/* Receipt title + order ID */}
                   <div className="px-5 pt-4 pb-2 flex items-start justify-between border-b border-gray-100">
@@ -1647,6 +1658,7 @@ function PurchasesTab() {
                           <div className="flex-1 pr-4">
                             <p className="text-sm font-medium text-gray-900">{receiptPurchase.description}</p>
                             <p className="text-xs text-gray-500 mt-0.5">{productTypeLabel(receiptPurchase)}</p>
+                            {workshopInstance && <p className="text-xs text-gray-600 mt-1"><span className="font-semibold">Workshop Instance:</span> {workshopInstance}</p>}
                           </div>
                           <span className="text-sm font-semibold text-gray-900 shrink-0">{formatCurrency(baseAmount, receiptPurchase.currency)}</span>
                         </div>
@@ -1723,8 +1735,10 @@ function PurchasesTab() {
                   </div>
                   {/* Footer */}
                   <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-center">
-                    <p className="text-[10px] text-gray-400">All About Ultrasound, Inc. dba iHeartEcho &bull; allaboutultrasound.com</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">Thank you for your purchase. For support, contact hello@allaboutultrasound.com</p>
+                    <p className="text-[10px] text-gray-400">{INVOICE_BRAND_FOOTER.issuer}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{INVOICE_BRAND_FOOTER.allAboutUltrasoundWebsite}</p>
+                    <p className="text-[10px] text-gray-400">{INVOICE_BRAND_FOOTER.iHeartEchoWebsite}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Thank you for your purchase. For support, contact {INVOICE_BRAND_FOOTER.supportEmail}</p>
                     <p className="text-[10px] text-gray-400 mt-1.5 font-medium">All sales are final. &bull; By completing this purchase you agree to our <a href="https://app.allaboutultrasound.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Terms of Service</a>.</p>
                   </div>
                 </div>
