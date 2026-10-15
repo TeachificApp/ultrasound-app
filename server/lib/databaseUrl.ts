@@ -18,30 +18,22 @@ export function isLegacyManusDatabaseUrl(databaseUrl: string | null | undefined)
 /**
  * Resolves the only permitted application database connection.
  *
- * A Railway deployment must use its Railway MySQL service reference. It must
- * never fall back to a Manus/TiDB `DATABASE_URL`: doing so can make a valid
- * purchase, enrollment, or password session appear missing to learners.
- *
- * Local development keeps `DATABASE_URL` as a conventional fallback.
+ * Railway MySQL is the sole permitted application data store in every runtime,
+ * including a Manus-hosted webhook endpoint. It must never fall back to a
+ * Manus/TiDB `DATABASE_URL`: doing so can make a valid purchase, enrollment,
+ * or password session appear missing to learners.
  */
 export function resolveApplicationDatabaseUrl(env: Environment = process.env): string | null {
-  const isRailway = env.RAILWAY_PRIMARY === "true"
-    || env.RAILWAY_ENVIRONMENT === "production"
-    || env.RAILWAY_SERVICE_ID !== undefined;
-
   const explicitRailwayMysql = value(env, "RAILWAY_MYSQL_URL") || value(env, "MYSQL_URL");
-  if (isRailway) {
-    if (explicitRailwayMysql && isRailwayMysqlUrl(explicitRailwayMysql)) return explicitRailwayMysql;
+  if (explicitRailwayMysql && isRailwayMysqlUrl(explicitRailwayMysql)) return explicitRailwayMysql;
 
-    // Some Railway services expose the linked database directly as DATABASE_URL.
-    // Accept it only when it is demonstrably the Railway MySQL service.
-    const databaseUrl = value(env, "DATABASE_URL");
-    if (databaseUrl && isRailwayMysqlUrl(databaseUrl)) return databaseUrl;
+  // Some Railway services expose the linked database directly as DATABASE_URL.
+  // Accept it only when it is demonstrably the Railway MySQL service.
+  const databaseUrl = value(env, "DATABASE_URL");
+  if (databaseUrl && isRailwayMysqlUrl(databaseUrl)) return databaseUrl;
 
-    // Fail closed instead of serving a second/legacy database. The startup guard
-    // logs a clear configuration error without disclosing any credentials.
-    return null;
-  }
-
-  return value(env, "DATABASE_URL") || explicitRailwayMysql;
+  // Fail closed instead of serving a second/legacy database. This deliberately
+  // applies outside a Railway process too: the Stripe endpoint can be hosted on
+  // the published Manus domain while its records must still be Railway MySQL.
+  return null;
 }

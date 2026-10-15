@@ -26,6 +26,13 @@ describe("resolveApplicationDatabaseUrl", () => {
     })).toBe(railwayUrl);
   });
 
+  it("uses explicit Railway MySQL even when the application runtime is not Railway", () => {
+    expect(resolveApplicationDatabaseUrl({
+      DATABASE_URL: legacyUrl,
+      RAILWAY_MYSQL_URL: railwayUrl,
+    })).toBe(railwayUrl);
+  });
+
   it("fails closed on Railway instead of reading a retired Manus database", () => {
     expect(resolveApplicationDatabaseUrl({
       RAILWAY_PRIMARY: "true",
@@ -40,8 +47,12 @@ describe("resolveApplicationDatabaseUrl", () => {
     })).toBe(railwayUrl);
   });
 
-  it("keeps DATABASE_URL as the local-development fallback", () => {
-    expect(resolveApplicationDatabaseUrl({ DATABASE_URL: legacyUrl })).toBe(legacyUrl);
+  it("never falls back to a retired Manus database outside Railway", () => {
+    expect(resolveApplicationDatabaseUrl({ DATABASE_URL: legacyUrl })).toBeNull();
+  });
+
+  it("fails closed for a non-Railway database URL", () => {
+    expect(resolveApplicationDatabaseUrl({ DATABASE_URL: "mysql://root:secret@localhost:3306/other" })).toBeNull();
   });
 
   it("detects Railway private/public MySQL and retired Manus URLs", () => {
