@@ -20,6 +20,9 @@ const brandDark = "#0e4a50";
 
 export type ContentType = "course" | "download" | "bundle" | "quiz";
 
+/** A rendered transactional purchase email. Rendering never sends email or creates access tokens. */
+export type RenderedPurchaseEmail = { subject: string; htmlBody: string };
+
 /**
  * Build an access URL that auto-signs the user in.
  * Format: /auth/access?token=<accessToken>&next=<destination>
@@ -97,7 +100,7 @@ function passwordSetupCta(setPasswordUrl?: string | null): string {
 
 
 // ─── Course Enrollment Email ──────────────────────────────────────────────────
-export async function sendEnrollmentEmail(opts: {
+export type EnrollmentEmailOptions = {
   to: { name: string; email: string };
   courseTitle: string;
   courseSlug: string;
@@ -113,7 +116,9 @@ export async function sendEnrollmentEmail(opts: {
   brand?: Brand;
   payee?: { name: string; email: string } | null;
   forPurchase?: boolean;
-}): Promise<boolean> {
+};
+
+export async function renderEnrollmentEmail(opts: EnrollmentEmailOptions): Promise<RenderedPurchaseEmail> {
   const { formatCmeCreditLabel } = await import("../../shared/cmeCreditLabel");
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const creditLabel = formatCmeCreditLabel(opts.creditHours);
@@ -154,6 +159,11 @@ export async function sendEnrollmentEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
+  return { subject, htmlBody };
+}
+
+export async function sendEnrollmentEmail(opts: EnrollmentEmailOptions): Promise<boolean> {
+  const { subject, htmlBody } = await renderEnrollmentEmail(opts);
   return deliverEmail({
     to: opts.to,
     subject,
@@ -236,7 +246,7 @@ export async function sendEnrollmentEmailForUser(opts: {
 }
 
 // ─── Digital Download Access Email ───────────────────────────────────────────
-export async function sendDownloadAccessEmail(opts: {
+export type DownloadAccessEmailOptions = {
   to: { name: string; email: string };
   productTitle: string;
   productSlug: string;
@@ -251,7 +261,9 @@ export async function sendDownloadAccessEmail(opts: {
   brand?: Brand;
   payee?: { name: string; email: string } | null;
   forPurchase?: boolean;
-}): Promise<boolean> {
+};
+
+export async function renderDownloadAccessEmail(opts: DownloadAccessEmailOptions): Promise<RenderedPurchaseEmail> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your download is ready: "${opts.productTitle}"`;
   const learnerBrand = opts.brand ?? "aaus";
@@ -283,6 +295,11 @@ export async function sendDownloadAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
+  return { subject, htmlBody };
+}
+
+export async function sendDownloadAccessEmail(opts: DownloadAccessEmailOptions): Promise<boolean> {
+  const { subject, htmlBody } = await renderDownloadAccessEmail(opts);
   return deliverEmail({
     to: opts.to,
     subject,
@@ -294,7 +311,7 @@ export async function sendDownloadAccessEmail(opts: {
 }
 
 // ─── Bundle Access Email ──────────────────────────────────────────────────────
-export async function sendBundleAccessEmail(opts: {
+export type BundleAccessEmailOptions = {
   to: { name: string; email: string };
   bundleTitle: string;
   bundleSlug: string;
@@ -311,7 +328,9 @@ export async function sendBundleAccessEmail(opts: {
   brand?: Brand;
   payee?: { name: string; email: string } | null;
   forPurchase?: boolean;
-}): Promise<boolean> {
+};
+
+export async function renderBundleAccessEmail(opts: BundleAccessEmailOptions): Promise<RenderedPurchaseEmail> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `You've been granted access to "${opts.bundleTitle}"`;
   const learnerBrand = opts.brand ?? "aaus";
@@ -343,6 +362,11 @@ export async function sendBundleAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
+  return { subject, htmlBody };
+}
+
+export async function sendBundleAccessEmail(opts: BundleAccessEmailOptions): Promise<boolean> {
+  const { subject, htmlBody } = await renderBundleAccessEmail(opts);
   return deliverEmail({
     to: opts.to,
     subject,
@@ -354,7 +378,7 @@ export async function sendBundleAccessEmail(opts: {
 }
 
 // ─── Quiz Access Email ────────────────────────────────────────────────────────
-export async function sendQuizAccessEmail(opts: {
+export type QuizAccessEmailOptions = {
   to: { name: string; email: string };
   quizTitle: string;
   courseSlug?: string | null;
@@ -369,7 +393,9 @@ export async function sendQuizAccessEmail(opts: {
   brand?: Brand;
   payee?: { name: string; email: string } | null;
   forPurchase?: boolean;
-}): Promise<boolean> {
+};
+
+export async function renderQuizAccessEmail(opts: QuizAccessEmailOptions): Promise<RenderedPurchaseEmail> {
   const firstName = opts.to.name.split(" ")[0] || opts.to.name;
   const subject = opts.customSubject || `Your access to "${opts.quizTitle}" is ready 🎯`;
   const learnerBrand = opts.brand ?? "aaus";
@@ -404,6 +430,11 @@ export async function sendQuizAccessEmail(opts: {
       If you have any questions, reply to this email or visit our help center.
     </p>
   `, "combined");
+  return { subject, htmlBody };
+}
+
+export async function sendQuizAccessEmail(opts: QuizAccessEmailOptions): Promise<boolean> {
+  const { subject, htmlBody } = await renderQuizAccessEmail(opts);
   return deliverEmail({
     to: opts.to,
     subject,
@@ -416,7 +447,7 @@ export async function sendQuizAccessEmail(opts: {
 
 
 /** Sends a reusable confirmation/access message for purchased content. */
-export async function sendPurchaseAccessEmail(opts: {
+export type PurchaseAccessEmailOptions = {
   to: { name: string; email: string };
   subject: string;
   heading: string;
@@ -431,7 +462,9 @@ export async function sendPurchaseAccessEmail(opts: {
   detailsHtml?: string;
   payee?: { name: string; email: string } | null;
   forPurchase?: boolean;
-}): Promise<boolean> {
+};
+
+export async function renderPurchaseAccessEmail(opts: PurchaseAccessEmailOptions): Promise<RenderedPurchaseEmail> {
   const brand = opts.brand ?? "aaus";
   const name = opts.to.name.split(" ")[0] || opts.to.name || "there";
   const accessUrl = buildPersistentAccessUrl(opts.destinationUrl, opts.accessToken, brand);
@@ -443,6 +476,11 @@ export async function sendPurchaseAccessEmail(opts: {
     ${accessCtaWithFallback(accessUrl, opts.accessLabel)}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">If you have questions, reply to this email or contact support.</p>
   `, opts.brandMode ?? "combined");
+  return { subject: opts.subject, htmlBody };
+}
+
+export async function sendPurchaseAccessEmail(opts: PurchaseAccessEmailOptions): Promise<boolean> {
+  const { subject, htmlBody } = await renderPurchaseAccessEmail(opts);
   return deliverEmail({
     to: opts.to,
     subject: opts.subject,

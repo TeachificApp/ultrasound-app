@@ -6,6 +6,7 @@ import { getDb } from "../db";
 import {
   digitalBundles,
   digitalProducts,
+  bundles as canonicalBundles,
   lmsCourses,
   membershipPlans,
   physicalProducts,
@@ -16,8 +17,10 @@ import {
   workshopInstances,
 } from "../../drizzle/schema";
 import { PURCHASE_EMAIL_CONTENT_TYPES } from "../lib/purchaseEmailOverride";
+import { PURCHASE_EMAIL_PREVIEW_SOURCES, renderCurrentPurchaseEmailPreview } from "../lib/purchaseEmailPreview";
 
 const contentTypeSchema = z.enum(PURCHASE_EMAIL_CONTENT_TYPES);
+const previewSourceSchema = z.enum(PURCHASE_EMAIL_PREVIEW_SOURCES);
 
 async function assertPlatformAdmin(ctx: { user: { id: number; role: string } }) {
   if (ctx.user.role === "admin") return;
@@ -48,11 +51,12 @@ export const purchaseEmailOverridesRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
-    const [overrides, courses, downloads, bundles, webinarRows, workshopRows, instanceRows, products, memberships] = await Promise.all([
+    const [overrides, courses, downloads, bundles, canonicalBundleRows, webinarRows, workshopRows, instanceRows, products, memberships] = await Promise.all([
       db.select().from(purchaseEmailOverrides).orderBy(desc(purchaseEmailOverrides.updatedAt)),
       db.select({ id: lmsCourses.id, title: lmsCourses.title, type: lmsCourses.type, brand: lmsCourses.brand, status: lmsCourses.status }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, brand: digitalProducts.brand, status: digitalProducts.status }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
       db.select({ id: digitalBundles.id, title: digitalBundles.title, brand: digitalBundles.brand, status: digitalBundles.status }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
+      db.select({ id: canonicalBundles.id, title: canonicalBundles.title, brand: canonicalBundles.brand, status: canonicalBundles.status }).from(canonicalBundles).orderBy(asc(canonicalBundles.title)),
       db.select({ id: webinars.id, title: webinars.title, brand: webinars.brand, status: webinars.status }).from(webinars).orderBy(asc(webinars.title)),
       db.select({ id: workshops.id, title: workshops.title, brand: workshops.brand, status: workshops.status }).from(workshops).orderBy(asc(workshops.title)),
       db.select({ id: workshopInstances.id, workshopId: workshopInstances.workshopId, title: workshopInstances.title, status: workshopInstances.status, workshopTitle: workshops.title, brand: workshops.brand })
@@ -62,18 +66,50 @@ export const purchaseEmailOverridesRouter = router({
     ]);
 
     const content = [
-      ...courses.map((item) => ({ id: item.id, contentType: item.type === "quiz" ? "quiz" : item.type === "cohort" ? "cohort" : "course", title: item.title, brand: item.brand, status: item.status, subtitle: null })),
-      ...downloads.map((item) => ({ ...item, contentType: "download", subtitle: null })),
-      ...bundles.map((item) => ({ ...item, contentType: "bundle", subtitle: null })),
-      ...webinarRows.map((item) => ({ ...item, contentType: "webinar", subtitle: null })),
-      ...workshopRows.map((item) => ({ ...item, contentType: "workshop", subtitle: null })),
-      ...instanceRows.map((item) => ({ id: item.id, contentType: "workshop_instance", title: item.title, brand: item.brand, status: item.status, subtitle: item.workshopTitle ?? `Workshop #${item.workshopId}` })),
-      ...products.map((item) => ({ ...item, contentType: "physical_product", subtitle: null })),
-      ...memberships.map((item) => ({ ...item, contentType: "membership", subtitle: null })),
+      ...courses.map((item) => ({ id: item.id, source: "course", contentType: item.type === "quiz" ? "quiz" : item.type === "cohort" ? "cohort" : "course", title: item.title, brand: item.brand, status: item.status, subtitle: null })),
+      ...downloads.map((item) => ({ ...item, source: "download", contentType: "download", subtitle: null })),
+      ...bundles.map((item) => ({ ...item, source: "digital_bundle", contentType: "bundle", subtitle: "Digital bundle" })),
+      ...canonicalBundleRows.map((item) => ({ ...item, source: "canonical_bundle", contentType: "bundle", subtitle: "Bundle" })),
+      ...webinarRows.map((item) => ({ ...item, source: "webinar", contentType: "webinar", subtitle: null })),
+      ...workshopRows.map((item) => ({ ...item, source: "workshop", contentType: "workshop", subtitle: "Select an instance below to preview its dated confirmation" })),
+      ...instanceRows.map((item) => ({ id: item.id, source: "workshop_instance", contentType: "workshop_instance", title: item.title, brand: item.brand, status: item.status, subtitle: item.workshopTitle ?? `Workshop #${item.workshopId}` })),
+      ...products.map((item) => ({ ...item, source: "physical_product", contentType: "physical_product", subtitle: null })),
+      ...memberships.map((item) => ({ ...item, source: "membership", contentType: "membership", subtitle: null })),
     ];
 
-    return { content, overrides };
+    const systemPreviewContent = [
+      { id: 1, source: "funnel_fallback", contentType: "membership", title: "Generic funnel / embedded checkout fallback", brand: "all_about_ultrasound", status: "system", subtitle: "Used only when a purchase does not have a product-specific template", previewOnly: true },
+      { id: 1, source: "brand_membership", contentType: "membership", title: "UltrasoundAssist™ Premium — new learner", brand: "all_about_ultrasound", status: "system", subtitle: "New-account access and password setup", previewOnly: true },
+      { id: 2, source: "brand_membership", contentType: "membership", title: "UltrasoundAssist™ Premium — existing learner", brand: "all_about_ultrasound", status: "system", subtitle: "Existing-account access", previewOnly: true },
+      { id: 3, source: "brand_membership", contentType: "membership", title: "EchoAssist™ Premium — new learner", brand: "iheartecho", status: "system", subtitle: "New-account access and password setup", previewOnly: true },
+      { id: 4, source: "brand_membership", contentType: "membership", title: "EchoAssist™ Premium — existing learner", brand: "iheartecho", status: "system", subtitle: "Existing-account access", previewOnly: true },
+      { id: 1, source: "dual_membership", contentType: "membership", title: "All Access Dual Membership — new learner", brand: "all_about_ultrasound", status: "system", subtitle: "New-account access and password setup", previewOnly: true },
+      { id: 2, source: "dual_membership", contentType: "membership", title: "All Access Dual Membership — existing learner", brand: "all_about_ultrasound", status: "system", subtitle: "Existing-account access", previewOnly: true },
+    ];
+
+    return { content: [...content, ...systemPreviewContent], overrides };
   }),
+
+  /** Renders the current saved purchase email without creating tokens, users, or sends. */
+  preview: protectedProcedure
+    .input(z.object({
+      source: previewSourceSchema,
+      contentId: z.number().int().positive(),
+      contentType: contentTypeSchema.optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertPlatformAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      try {
+        return await renderCurrentPurchaseEmailPreview(db, input);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unable to render the current purchase email.",
+        });
+      }
+    }),
 
   /** Creates or updates a copy record. Saving never sends or resends mail. */
   save: protectedProcedure.input(copySchema).mutation(async ({ ctx, input }) => {
