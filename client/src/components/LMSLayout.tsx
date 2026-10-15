@@ -49,7 +49,10 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function LMSLayout({ children }: { children: React.ReactNode }) {
-  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(() => (
+    typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("onboarding_preview_account") === "1"
+  ));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
   const { items: managedHeaderNavItems } = useSiteNavMenu("header", NAV_ITEMS.map((item) => ({

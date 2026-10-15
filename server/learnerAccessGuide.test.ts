@@ -30,6 +30,7 @@ describe("learner access guide", () => {
   it("mounts a visual Learn-domain guide with dashboard, cohort, and billing directions", () => {
     const app = read("client/src/App.tsx");
     const guide = read("client/src/components/LearnerAccessGuide.tsx");
+    const learnLayout = read("client/src/components/LMSLayout.tsx");
 
     expect(app).toContain("<LearnerAccessGuide />");
     expect(guide).toContain("/my-dashboard?tab=content");
@@ -37,7 +38,10 @@ describe("learner access guide", () => {
     expect(guide).toContain("My Cohort");
     expect(guide).toContain("first three Learn visits");
     expect(guide).toContain("onboarding_preview=1");
+    expect(guide).toContain("onboarding_preview_account=1");
     expect(guide).toContain("<iframe");
     expect(guide).toContain("your own signed-in experience");
+    expect(guide).not.toContain("AccountMenuPreview");
+    expect(learnLayout).toContain('get("onboarding_preview_account") === "1"');
   });
 });

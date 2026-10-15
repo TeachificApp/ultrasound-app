@@ -6,7 +6,6 @@ import {
   CreditCard,
   LayoutDashboard,
   PlayCircle,
-  UserRound,
   X,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -19,7 +18,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AAUS_BRAND_LOGO_URL } from "@shared/brands";
 
 const MY_CONTENT_URL = "/my-dashboard?tab=content";
 const SUBSCRIPTIONS_URL = "/my-dashboard?tab=subscriptions";
@@ -42,51 +40,9 @@ function createVisitKey() {
   return `learn-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-function previewUrl(href: string) {
+function previewUrl(href: string, revealAccountMenu = false) {
   const joiner = href.includes("?") ? "&" : "?";
-  return `${href}${joiner}onboarding_preview=1`;
-}
-
-/** Mirrors the real Learn header and expanded account menu from LMSLayout. */
-function AccountMenuPreview() {
-  return (
-    <div className="h-full overflow-hidden bg-[#f0fbfc] text-left">
-      <div className="flex h-14 items-center gap-3 border-b border-gray-200/60 bg-white px-4 shadow-sm sm:px-5">
-        <div className="flex min-w-0 items-center gap-2">
-          <img src={AAUS_BRAND_LOGO_URL} alt="All About Ultrasound" className="h-8 w-8 rounded-full" />
-          <div className="leading-none">
-            <span className="hidden text-[8px] font-medium text-gray-500 sm:block">All About Ultrasound™ | iHeartEcho™</span>
-            <span className="text-xs font-bold text-[#189aa1] sm:text-sm">Learning Platform</span>
-          </div>
-        </div>
-        <nav className="ml-2 hidden items-center gap-3 text-xs font-medium text-gray-600 md:flex">
-          <span>Education Library</span><span>Workshops</span><span>Cross-Training</span><span>Community</span>
-        </nav>
-        <div className="flex-1" />
-        <div className="relative flex items-center gap-2 rounded-lg bg-gray-50 px-2 py-1.5 ring-2 ring-[#189aa1]/25">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[#189aa1]/30 bg-teal-50 text-[#189aa1]"><UserRound className="h-4 w-4" /></span>
-          <span className="hidden text-xs text-gray-700 sm:block">Your account</span>
-          <span className="text-[10px] text-gray-500">⌄</span>
-          <div className="absolute right-0 top-[42px] z-10 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white py-1.5 shadow-xl">
-            <div className="border-b border-gray-100 px-3 py-2">
-              <p className="text-sm font-semibold text-gray-800">Your account</p>
-              <p className="truncate text-xs text-gray-500">your-email@example.com</p>
-            </div>
-            <div className="m-1 rounded-lg bg-teal-50 px-2 py-2 text-sm font-semibold text-teal-800 ring-1 ring-teal-300">
-              <LayoutDashboard className="mr-2 inline h-3.5 w-3.5 text-teal-600" /> My Dashboard
-            </div>
-            <div className="px-3 py-2 text-sm text-gray-700">Profile</div>
-            <div className="border-t border-gray-100 px-3 py-2 text-sm text-red-600">Sign Out</div>
-          </div>
-        </div>
-      </div>
-      <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#189aa1]">Start here</p>
-        <h3 className="mt-2 font-serif text-2xl font-bold text-gray-800">Open the account menu.</h3>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-gray-500">Select <strong className="text-gray-700">My Dashboard</strong> to open the same dashboard that holds all of your purchased and assigned learning.</p>
-      </div>
-    </div>
-  );
+  return `${href}${joiner}onboarding_preview=1${revealAccountMenu ? "&onboarding_preview_account=1" : ""}`;
 }
 
 /**
@@ -227,16 +183,12 @@ export default function LearnerAccessGuide() {
                   <span className="ml-2 truncate text-[10px] font-medium text-slate-400">Learning Platform — your signed-in view</span>
                 </div>
                 <div className="h-[300px] bg-[#f0fbfc] sm:h-[380px]">
-                  {currentPreview.id === "account" ? (
-                    <AccountMenuPreview />
-                  ) : (
-                    <iframe
-                      key={currentPreview.href}
-                      title={`${currentPreview.title} preview`}
-                      src={previewUrl(currentPreview.href)}
-                      className="h-full w-full border-0 bg-white"
-                    />
-                  )}
+                  <iframe
+                    key={currentPreview.id}
+                    title={`${currentPreview.title} preview`}
+                    src={previewUrl(currentPreview.href, currentPreview.id === "account")}
+                    className="h-full w-full border-0 bg-white"
+                  />
                 </div>
               </div>
               <p className="mt-2 text-[11px] leading-5 text-slate-500">The preview is safe to close at any time. Choose <strong>Open this area</strong> to continue in the full Learning Platform.</p>
