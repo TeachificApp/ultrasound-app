@@ -46,13 +46,13 @@ async function getTarget(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, inp
       .from(workshopInstances).innerJoin(workshops, eq(workshopInstances.workshopId, workshops.id))
       .where(eq(workshopInstances.id, input.workshopInstanceId)).limit(1);
     if (!target || (publicOnly && (target.workshopStatus !== "public" || !["published", "presale"].includes(target.status)))) return null;
-    return { id: target.id, title: `${target.workshopTitle} — ${target.title}`, details: target.details, type: input.targetType };
+    return { id: target.id, title: `${target.workshopTitle} — ${target.title}`, details: publicOnly ? null : target.details, type: input.targetType };
   }
   if (!input.webinarId) return null;
   const [target] = await db.select({ id: webinars.id, title: webinars.title, details: webinars.sponsorDetails, status: webinars.status })
     .from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
   if (!target || (publicOnly && !["published", "presale"].includes(target.status))) return null;
-  return { id: target.id, title: target.title, details: target.details, type: input.targetType };
+  return { id: target.id, title: target.title, details: publicOnly ? null : target.details, type: input.targetType };
 }
 
 export const eventPartnershipRouter = router({
