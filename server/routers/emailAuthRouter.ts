@@ -21,12 +21,12 @@ import { sdk } from "../_core/sdk";
 import { addToAllContacts } from "../lib/emailListHelper";
 import { ENV } from "../_core/env";
 import { publicProcedure, router } from "../_core/trpc";
-import { getDb, ensureUserRole } from "../db";
+import { getDb, ensureUserRole, getUsersByEmail } from "../db";
 import { sendEmail, buildWelcomeEmail, buildVerificationEmail, buildPasswordResetEmail } from "../_core/email";
 import { type BrandMode, detectBrandMode, getBrandDisplayConfig, BRAND_DOMAINS } from "@shared/brands";
 import { authEmailField } from "@shared/authEmailField";
 import { users, userEmailAliases } from "../../drizzle/schema";
-import { eq, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -141,15 +141,19 @@ export const emailAuthRouter = router({
       const openId = emailOpenId(email);
       const fullName = `${input.firstName.trim()} ${input.lastName.trim()}`;
 
-      // Check for existing account
-      const existing = await db
+      // Treat primary and verified alias mailboxes as one account family so a
+      // returning learner never creates a second account that hides access.
+      const emailMatches = await getUsersByEmail(email);
+      const openIdMatches = await db
         .select({ id: users.id, isPending: users.isPending, emailVerified: users.emailVerified })
         .from(users)
-        .where(or(eq(users.openId, openId), eq(users.email, email)))
-        .limit(1);
+        .where(eq(users.openId, openId));
+      const existing = [...new Map(
+        [...emailMatches, ...openIdMatches].map((candidate) => [candidate.id, candidate]),
+      ).values()];
 
       if (existing.length > 0) {
-        const existingUser = existing[0];
+        const existingUser = existing.find((candidate) => candidate.isPending) ?? existing[0];
         if (existingUser.isPending) {
           // Admin pre-registered this email — activate the pending account
           const passwordHash = await bcrypt.hash(input.password, 12);
@@ -273,13 +277,14 @@ export const emailAuthRouter = router({
       const email = input.email.toLowerCase().trim();
       const openId = emailOpenId(email);
 
-      const result = await db
+      const emailMatches = await getUsersByEmail(email);
+      const openIdMatches = await db
         .select()
         .from(users)
-        .where(or(eq(users.openId, openId), eq(users.email, email)))
-        .limit(1);
-
-      const user = result[0];
+        .where(eq(users.openId, openId));
+      const candidates = [...new Map(
+        [...emailMatches, ...openIdMatches].map((candidate) => [candidate.id, candidate]),
+      ).values()];
 
       // Generic error to avoid email enumeration
       const invalidError = new TRPCError({
@@ -287,16 +292,23 @@ export const emailAuthRouter = router({
         message: "Invalid email or password.",
       });
 
-      if (!user) throw invalidError;
-      if (!user.passwordHash) {
+      if (candidates.length === 0) throw invalidError;
+      const credentialCandidates = candidates.filter((candidate) => candidate.passwordHash);
+      if (credentialCandidates.length === 0) {
         // Account exists but was created via OAuth — guide them
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "This account was created with Google/Microsoft/Apple. Please use social sign-in.",
         });
       }
-      const passwordMatch = await bcrypt.compare(input.password, user.passwordHash);
-      if (!passwordMatch) throw invalidError;
+      let user = undefined as (typeof credentialCandidates)[number] | undefined;
+      for (const candidate of credentialCandidates) {
+        if (candidate.passwordHash && await bcrypt.compare(input.password, candidate.passwordHash)) {
+          user = candidate;
+          break;
+        }
+      }
+      if (!user) throw invalidError;
 
       // Pending is never a sign-in barrier. A successful password comparison
       // is the credential proof required to clear legacy administrative state.

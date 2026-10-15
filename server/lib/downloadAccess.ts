@@ -2,7 +2,7 @@
  * Digital download access control — per-file limits, expiry, activity logging.
  */
 
-import { and, eq, sql, or, isNull } from "drizzle-orm";
+import { and, eq, inArray, sql, or, isNull } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
 import {
@@ -12,6 +12,7 @@ import {
   digitalPurchaseActivity,
   digitalPurchases,
 } from "../../drizzle/schema";
+import { getLinkedAccountUserIds } from "./linkedAccountAccess";
 
 export type PurchaseAccessRow = {
   id: number;
@@ -175,6 +176,7 @@ export async function loadPurchaseForUser(
   userId: number,
   productId: number,
 ): Promise<(PurchaseAccessRow & { productTitle: string; productMaxDownloads: number | null }) | null> {
+  const linkedUserIds = await getLinkedAccountUserIds(db, userId);
   const [row] = await db
     .select({
       id: digitalPurchases.id,
@@ -192,7 +194,7 @@ export async function loadPurchaseForUser(
     })
     .from(digitalPurchases)
     .innerJoin(digitalProducts, eq(digitalProducts.id, digitalPurchases.productId))
-    .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, productId)))
+    .where(and(inArray(digitalPurchases.userId, linkedUserIds), eq(digitalPurchases.productId, productId)))
     .limit(1);
   return row ?? null;
 }

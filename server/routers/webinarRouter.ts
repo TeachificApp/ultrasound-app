@@ -6,13 +6,14 @@ import { checkoutPlatformTermsSelection, resolveCheckoutTerms } from "./checkout
  */
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { and, desc, eq, sql, asc, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, sql, asc, isNull } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
 import { getDb } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { parseLandingBlocks } from "../lib/extractJson";
 import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
+import { getLinkedAccountUserIds } from "../lib/linkedAccountAccess";
 import {
   webinars, webinarRegistrations, webinarComments, webinarSessions, webinarFunnelSteps, users, cmeActivityForms,
 } from "../../drizzle/schema";
@@ -90,8 +91,9 @@ export const webinarPublicRouter = router({
       let isRegistered = false;
       let isPresaleRestricted = false;
       if ((ctx.user as any)?.id) {
+        const linkedUserIds = await getLinkedAccountUserIds(db, (ctx.user as any).id);
         const [reg] = await db.select({ id: webinarRegistrations.id, accessLevel: webinarRegistrations.accessLevel }).from(webinarRegistrations)
-          .where(and(eq(webinarRegistrations.webinarId, w.id), eq(webinarRegistrations.userId, (ctx.user as any).id))).limit(1);
+          .where(and(eq(webinarRegistrations.webinarId, w.id), inArray(webinarRegistrations.userId, linkedUserIds))).limit(1);
         isRegistered = !!reg;
         isPresaleRestricted = reg?.accessLevel === "presale";
       }
@@ -115,24 +117,27 @@ export const webinarLearnerRouter = router({
     .input(z.object({ webinarId: z.number(), pricingOptionId: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const linkedUserIds = await getLinkedAccountUserIds(db, ctx.user.id);
       const [webinar] = await db.select({ status: webinars.status }).from(webinars).where(eq(webinars.id, input.webinarId)).limit(1);
       if (!webinar) throw new TRPCError({ code: "NOT_FOUND" });
       if (webinar.status === "draft") throw new TRPCError({ code: "FORBIDDEN", message: "This webinar is currently unavailable." });
       const [ex] = await db.select({ id: webinarRegistrations.id }).from(webinarRegistrations)
-        .where(and(eq(webinarRegistrations.webinarId, input.webinarId), eq(webinarRegistrations.userId, ctx.user.id))).limit(1);
+        .where(and(eq(webinarRegistrations.webinarId, input.webinarId), inArray(webinarRegistrations.userId, linkedUserIds))).limit(1);
       if (!ex) await db.insert(webinarRegistrations).values({ webinarId: input.webinarId, userId: ctx.user.id, pricingOptionId: input.pricingOptionId, accessLevel: webinar.status === "presale" ? "presale" : "full" });
       return { success: true };
     }),
 
   markAttended: protectedProcedure.input(z.object({ webinarId: z.number() })).mutation(async ({ input, ctx }) => {
     const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    await db.update(webinarRegistrations).set({ attendedAt: new Date() }).where(and(eq(webinarRegistrations.webinarId, input.webinarId), eq(webinarRegistrations.userId, ctx.user.id)));
+    const linkedUserIds = await getLinkedAccountUserIds(db, ctx.user.id);
+    await db.update(webinarRegistrations).set({ attendedAt: new Date() }).where(and(eq(webinarRegistrations.webinarId, input.webinarId), inArray(webinarRegistrations.userId, linkedUserIds)));
     return { success: true };
   }),
 
   markWatchedReplay: protectedProcedure.input(z.object({ webinarId: z.number() })).mutation(async ({ input, ctx }) => {
     const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    await db.update(webinarRegistrations).set({ watchedReplayAt: new Date() }).where(and(eq(webinarRegistrations.webinarId, input.webinarId), eq(webinarRegistrations.userId, ctx.user.id)));
+    const linkedUserIds = await getLinkedAccountUserIds(db, ctx.user.id);
+    await db.update(webinarRegistrations).set({ watchedReplayAt: new Date() }).where(and(eq(webinarRegistrations.webinarId, input.webinarId), inArray(webinarRegistrations.userId, linkedUserIds)));
     return { success: true };
   }),
 

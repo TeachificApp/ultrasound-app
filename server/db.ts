@@ -378,29 +378,51 @@ export async function clearPendingEmail(userId: number): Promise<void> {
     .where(eq(users.id, userId));
 }
 
-export async function getUserByEmail(email: string) {
+/**
+ * Returns every local account that has verified ownership of this mailbox.
+ * Legacy imports can contain multiple rows for one learner; callers that grant
+ * access must not create another row or discard the older paid entitlements.
+ */
+export async function getUsersByEmail(email: string) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) return [];
   const normalised = email.trim().toLowerCase();
-  // Primary email lookup
-  const rows = await db.select().from(users).where(sql`LOWER(${users.email}) = ${normalised}`).limit(1);
-  if (rows[0]) return rows[0];
-  // Fallback: check email aliases — if matched, return the primary user
+  if (!normalised) return [];
+
+  const primaryRows = await db
+    .select()
+    .from(users)
+    .where(sql`LOWER(${users.email}) = ${normalised}`);
   const aliasRows = await db
     .select({ userId: userEmailAliases.userId })
     .from(userEmailAliases)
-    .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`)
-    .limit(1);
-  if (!aliasRows[0]) {
-    const openIdRows = await db
-      .select()
-      .from(users)
-      .where(eq(users.openId, `email:${normalised}`))
-      .limit(1);
-    return openIdRows[0];
-  }
-  const primaryRows = await db.select().from(users).where(eq(users.id, aliasRows[0].userId)).limit(1);
-  return primaryRows[0];
+    .where(sql`LOWER(${userEmailAliases.email}) = ${normalised}`);
+  const aliasUserIds = [...new Set(aliasRows.map((row) => row.userId))];
+  const aliasUsers = aliasUserIds.length > 0
+    ? await db.select().from(users).where(inArray(users.id, aliasUserIds))
+    : [];
+  const openIdRows = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, `email:${normalised}`));
+
+  return [...new Map(
+    [...primaryRows, ...aliasUsers, ...openIdRows].map((user) => [user.id, user]),
+  ).values()];
+}
+
+export async function getUserByEmail(email: string) {
+  const candidates = await getUsersByEmail(email);
+  if (candidates.length === 0) return undefined;
+
+  // Prefer the active credential-bearing account, then the most recently used
+  // row. Login routes still test all credential candidates, so this deterministic
+  // preference is safe for fulfillment, password reset, and support workflows.
+  return [...candidates].sort((a, b) => {
+    const credentialDifference = Number(Boolean(b.passwordHash)) - Number(Boolean(a.passwordHash));
+    if (credentialDifference !== 0) return credentialDifference;
+    return new Date(b.lastSignedIn).getTime() - new Date(a.lastSignedIn).getTime();
+  })[0];
 }
 
 /**

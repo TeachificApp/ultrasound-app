@@ -21,7 +21,7 @@
 
 import type { Express, Request, Response } from "express";
 import * as bcrypt from "bcryptjs";
-import { getDb, ensureUserRole, getUserByEmail } from "../db";
+import { getDb, ensureUserRole, getUsersByEmail } from "../db";
 import { users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { resolveAuthHostname } from "../_core/cookies";
@@ -75,24 +75,31 @@ export function registerAuthLoginRoute(app: Express) {
 
       const normalizedEmail = normalizeAuthEmail(String(email));
 
-      const user = await getUserByEmail(normalizedEmail);
+      const candidates = await getUsersByEmail(normalizedEmail);
 
       // Generic error to prevent email enumeration
       const invalidError = { error: "Invalid email or password." };
 
-      if (!user) {
+      if (candidates.length === 0) {
         return res.status(401).json(invalidError);
       }
 
-      if (!user.passwordHash) {
+      const credentialCandidates = candidates.filter((candidate) => candidate.passwordHash);
+      if (credentialCandidates.length === 0) {
         return res.status(401).json({
           error:
             "This account uses magic link sign-in. Use Forgot Password to set a password, or request a magic link.",
         });
       }
 
-      const passwordMatch = await bcrypt.compare(String(password), user.passwordHash);
-      if (!passwordMatch) {
+      let user = undefined as (typeof credentialCandidates)[number] | undefined;
+      for (const candidate of credentialCandidates) {
+        if (candidate.passwordHash && await bcrypt.compare(String(password), candidate.passwordHash)) {
+          user = candidate;
+          break;
+        }
+      }
+      if (!user) {
         return res.status(401).json(invalidError);
       }
 

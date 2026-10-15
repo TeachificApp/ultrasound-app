@@ -72,6 +72,7 @@ import { notifyOwner } from "../_core/notification";
 import { getLmsSubscriptionInvoicesForUser } from "../lib/lmsSubscriptionReconciliation";
 import { lmsCourseVisibleInMyContentCondition } from "../lib/lmsCourseVisibility";
 import { maybeRefreshLearnerLmsAccessFromStripe } from "../lib/learnerLmsAccessRefresh";
+import { getLinkedAccountUserIds } from "../lib/linkedAccountAccess";
 import { isPurchaseAccessActive } from "../lib/downloadAccess";
 import {
   receiptParticipantSources,
@@ -253,6 +254,7 @@ export const dashboardRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
     await maybeRefreshLearnerLmsAccessFromStripe(db, ctx.user.id, { role: ctx.user.role });
+    const linkedUserIds = await getLinkedAccountUserIds(db, ctx.user.id);
 
     // 1. LMS enrollments (courses + quiz-type courses)
     const enrollments = await db
@@ -276,7 +278,7 @@ export const dashboardRouter = router({
       })
       .from(lmsEnrollments)
       .innerJoin(lmsCourses, eq(lmsEnrollments.courseId, lmsCourses.id))
-      .where(eq(lmsEnrollments.userId, ctx.user.id))
+      .where(inArray(lmsEnrollments.userId, linkedUserIds))
       .orderBy(desc(lmsEnrollments.enrolledAt));
 
     // 2. Digital purchases
@@ -292,7 +294,7 @@ export const dashboardRouter = router({
       })
       .from(digitalPurchases)
       .innerJoin(digitalProducts, eq(digitalPurchases.productId, digitalProducts.id))
-      .where(eq(digitalPurchases.userId, ctx.user.id))
+      .where(inArray(digitalPurchases.userId, linkedUserIds))
       .orderBy(desc(digitalPurchases.purchasedAt));
 
     // 3. Physical product orders
@@ -312,7 +314,7 @@ export const dashboardRouter = router({
       })
       .from(physicalProductOrders)
       .innerJoin(physicalProducts, eq(physicalProductOrders.productId, physicalProducts.id))
-      .where(eq(physicalProductOrders.userId, ctx.user.id))
+      .where(inArray(physicalProductOrders.userId, linkedUserIds))
       .orderBy(desc(physicalProductOrders.orderedAt));
 
     // 4. Funnel / embedded-checkout purchases
@@ -329,7 +331,7 @@ export const dashboardRouter = router({
         sourceType: funnelPurchases.sourceType,
       })
       .from(funnelPurchases)
-      .where(eq(funnelPurchases.userId, ctx.user.id))
+      .where(inArray(funnelPurchases.userId, linkedUserIds))
       .orderBy(desc(funnelPurchases.purchasedAt));
 
     // 5. Webinar registrations
@@ -349,7 +351,7 @@ export const dashboardRouter = router({
       })
       .from(webinarRegistrations)
       .innerJoin(webinars, eq(webinarRegistrations.webinarId, webinars.id))
-      .where(eq(webinarRegistrations.userId, ctx.user.id))
+      .where(inArray(webinarRegistrations.userId, linkedUserIds))
       .orderBy(desc(webinarRegistrations.registeredAt));
 
     // 6. Bundle enrollments
@@ -366,7 +368,7 @@ export const dashboardRouter = router({
       })
       .from(bundleEnrollments)
       .innerJoin(bundles, eq(bundleEnrollments.bundleId, bundles.id))
-      .where(eq(bundleEnrollments.userId, ctx.user.id))
+      .where(inArray(bundleEnrollments.userId, linkedUserIds))
       .orderBy(desc(bundleEnrollments.enrolledAt));
 
     // 7. Workshop enrollments
@@ -393,7 +395,7 @@ export const dashboardRouter = router({
       .from(workshopEnrollments)
       .innerJoin(workshops, eq(workshopEnrollments.workshopId, workshops.id))
       .leftJoin(workshopInstances, eq(workshopEnrollments.instanceId, workshopInstances.id))
-      .where(and(eq(workshopEnrollments.userId, ctx.user.id), eq(workshopEnrollments.status, "active")))
+      .where(and(inArray(workshopEnrollments.userId, linkedUserIds), eq(workshopEnrollments.status, "active")))
       .orderBy(desc(workshopEnrollments.accessGrantedAt));
 
     // 8. Community memberships
@@ -411,7 +413,7 @@ export const dashboardRouter = router({
       })
       .from(communityMembers)
       .innerJoin(communities, eq(communityMembers.communityId, communities.id))
-      .where(eq(communityMembers.userId, ctx.user.id))
+      .where(inArray(communityMembers.userId, linkedUserIds))
       .orderBy(desc(communityMembers.joinedAt));
 
     // Separate courses from quiz-type LMS items
@@ -471,7 +473,7 @@ export const dashboardRouter = router({
             .from(standaloneQuizAttempts)
             .innerJoin(standaloneQuizzes, eq(standaloneQuizAttempts.quizId, standaloneQuizzes.id))
             .where(and(
-              eq(standaloneQuizAttempts.userId, ctx.user.id),
+              inArray(standaloneQuizAttempts.userId, linkedUserIds),
               isNotNull(standaloneQuizAttempts.completedAt),
               eq(standaloneQuizzes.status, "published"),
             )),
@@ -547,7 +549,7 @@ export const dashboardRouter = router({
     const certRows = await db.select({
       courseId: lmsCertificates.courseId,
       certificateUrl: lmsCertificates.certificateUrl,
-    }).from(lmsCertificates).where(eq(lmsCertificates.userId, ctx.user.id));
+    }).from(lmsCertificates).where(inArray(lmsCertificates.userId, linkedUserIds));
     let certByCourseId = new Map(certRows.map((row) => [row.courseId, row.certificateUrl]));
 
     for (const course of courses) {
@@ -563,7 +565,7 @@ export const dashboardRouter = router({
       if (restored) {
         const [cert] = await db.select({ certificateUrl: lmsCertificates.certificateUrl })
           .from(lmsCertificates)
-          .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.courseId)))
+          .where(and(inArray(lmsCertificates.userId, linkedUserIds), eq(lmsCertificates.courseId, course.courseId)))
           .limit(1);
         if (cert?.certificateUrl) certByCourseId.set(course.courseId, cert.certificateUrl);
       }
@@ -591,7 +593,7 @@ export const dashboardRouter = router({
       .from(membershipSubscriptions)
       .innerJoin(membershipPlans, eq(membershipSubscriptions.planId, membershipPlans.id))
       .where(and(
-        eq(membershipSubscriptions.userId, ctx.user.id),
+        inArray(membershipSubscriptions.userId, linkedUserIds),
         inArray(membershipSubscriptions.status, ["active", "trialing"]),
       ));
 
@@ -900,7 +902,7 @@ export const dashboardRouter = router({
         expiresAt: brandMemberships.expiresAt,
       })
       .from(brandMemberships)
-      .where(eq(brandMemberships.userId, ctx.user.id))
+      .where(inArray(brandMemberships.userId, linkedUserIds))
       .orderBy(desc(brandMemberships.createdAt));
 
     // Map brand + tier to human-readable display names
@@ -950,12 +952,13 @@ export const dashboardRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
     await maybeRefreshLearnerLmsAccessFromStripe(db, ctx.user.id, { role: ctx.user.role });
+    const linkedUserIds = await getLinkedAccountUserIds(db, ctx.user.id);
 
     // Fetch all brand memberships for this user
     const memberships = await db
       .select()
       .from(brandMemberships)
-      .where(eq(brandMemberships.userId, ctx.user.id))
+      .where(inArray(brandMemberships.userId, linkedUserIds))
       .orderBy(desc(brandMemberships.createdAt));
 
     // For native Stripe subscriptions, fetch live subscription data
@@ -1054,7 +1057,7 @@ export const dashboardRouter = router({
       })
       .from(lmsOrders)
       .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
-      .where(and(eq(lmsOrders.userId, ctx.user.id)))
+      .where(inArray(lmsOrders.userId, linkedUserIds))
       .orderBy(desc(lmsOrders.createdAt));
 
     const enrichedCourseOrders = await Promise.all(
@@ -1116,6 +1119,7 @@ export const dashboardRouter = router({
 
     // Also fetch enrollment-based subscriptions (stripeSubscriptionId on lms_enrollments directly,
     // not via an lms_orders row — e.g. admin-granted recurring subscriptions)
+    const linkedUserIdSql = sql.join(linkedUserIds.map((id) => sql`${id}`), sql`, `);
     const enrollmentSubs = await db.execute(
       sql`
         SELECT
@@ -1128,7 +1132,7 @@ export const dashboardRouter = router({
           c.slug AS courseSlug
         FROM lms_enrollments e
         JOIN lms_courses c ON c.id = e.course_id
-        WHERE e.user_id = ${ctx.user.id}
+        WHERE e.user_id IN (${linkedUserIdSql})
           AND e.stripe_subscription_id IS NOT NULL
           AND (
             e.order_id IS NULL
@@ -1616,6 +1620,7 @@ export const dashboardRouter = router({
     const userId = ctx.user.id;
 
     await maybeRefreshLearnerLmsAccessFromStripe(db, userId, { role: ctx.user.role });
+    const linkedUserIds = await getLinkedAccountUserIds(db, userId);
 
     // 1. Funnel / embedded-checkout purchases (one-time)
     const funnelRows = await db
@@ -1635,7 +1640,7 @@ export const dashboardRouter = router({
         cardBrand: funnelPurchases.cardBrand,
       })
       .from(funnelPurchases)
-      .where(eq(funnelPurchases.userId, userId))
+      .where(inArray(funnelPurchases.userId, linkedUserIds))
       .orderBy(desc(funnelPurchases.purchasedAt));
 
     // 2. LMS orders (one-time course purchases)
@@ -1653,7 +1658,7 @@ export const dashboardRouter = router({
       })
       .from(lmsOrders)
       .leftJoin(lmsCourses, eq(lmsOrders.courseId, lmsCourses.id))
-      .where(and(eq(lmsOrders.userId, userId), eq(lmsOrders.status, "paid")))
+      .where(and(inArray(lmsOrders.userId, linkedUserIds), eq(lmsOrders.status, "paid")))
       .orderBy(desc(lmsOrders.createdAt));
 
     const subscriptionInvoiceRows = await getLmsSubscriptionInvoicesForUser(db, userId);
@@ -1671,7 +1676,7 @@ export const dashboardRouter = router({
       })
       .from(digitalPurchases)
       .leftJoin(digitalProducts, eq(digitalPurchases.productId, digitalProducts.id))
-      .where(eq(digitalPurchases.userId, userId))
+      .where(inArray(digitalPurchases.userId, linkedUserIds))
       .orderBy(desc(digitalPurchases.purchasedAt));
 
     // 4. Digital bundle purchases
@@ -1687,7 +1692,7 @@ export const dashboardRouter = router({
       })
       .from(digitalBundlePurchases)
       .leftJoin(digitalBundles, eq(digitalBundlePurchases.bundleId, digitalBundles.id))
-      .where(eq(digitalBundlePurchases.userId, userId))
+      .where(inArray(digitalBundlePurchases.userId, linkedUserIds))
       .orderBy(desc(digitalBundlePurchases.purchasedAt));
 
     // 5. Workshop enrollments (paid)
@@ -1708,7 +1713,7 @@ export const dashboardRouter = router({
       .from(workshopEnrollments)
       .leftJoin(workshops, eq(workshopEnrollments.workshopId, workshops.id))
       .leftJoin(workshopInstances, eq(workshopEnrollments.instanceId, workshopInstances.id))
-      .where(and(eq(workshopEnrollments.userId, userId), eq(workshopEnrollments.status, "active")))
+      .where(and(inArray(workshopEnrollments.userId, linkedUserIds), eq(workshopEnrollments.status, "active")))
       .orderBy(desc(workshopEnrollments.createdAt));
 
     // 6. Webinar registrations (paid — filter by stripePaymentIntentId present)
@@ -1723,7 +1728,7 @@ export const dashboardRouter = router({
       })
       .from(webinarRegistrations)
       .leftJoin(webinars, eq(webinarRegistrations.webinarId, webinars.id))
-      .where(eq(webinarRegistrations.userId, userId))
+      .where(inArray(webinarRegistrations.userId, linkedUserIds))
       .orderBy(desc(webinarRegistrations.registeredAt));
 
     // 7. Physical product orders
@@ -1739,7 +1744,7 @@ export const dashboardRouter = router({
       })
       .from(physicalProductOrders)
       .leftJoin(physicalProducts, eq(physicalProductOrders.productId, physicalProducts.id))
-      .where(eq(physicalProductOrders.userId, userId))
+      .where(inArray(physicalProductOrders.userId, linkedUserIds))
       .orderBy(desc(physicalProductOrders.orderedAt));
 
     // 8. Membership subscriptions (native membership plans)
@@ -1755,13 +1760,13 @@ export const dashboardRouter = router({
       })
       .from(membershipSubscriptions)
       .leftJoin(membershipPlans, eq(membershipSubscriptions.planId, membershipPlans.id))
-      .where(eq(membershipSubscriptions.userId, userId));
+      .where(inArray(membershipSubscriptions.userId, linkedUserIds));
 
     // 9. Collect ALL Stripe customer IDs across all subscription sources
     const brandMembershipRows = await db
       .select({ stripeCustomerId: brandMemberships.stripeCustomerId })
       .from(brandMemberships)
-      .where(eq(brandMemberships.userId, userId));
+      .where(inArray(brandMemberships.userId, linkedUserIds));
 
     const allCustomerIds = [...new Set([
       ...brandMembershipRows.map(m => m.stripeCustomerId),
@@ -1771,7 +1776,7 @@ export const dashboardRouter = router({
     // Fetch manual invoices (admin-created off-platform records)
     let manualInvoiceRows: typeof manualInvoices.$inferSelect[] = [];
     try {
-      manualInvoiceRows = await db.select().from(manualInvoices).where(eq(manualInvoices.userId, ctx.user.id));
+      manualInvoiceRows = await db.select().from(manualInvoices).where(inArray(manualInvoices.userId, linkedUserIds));
       console.log(`[Dashboard] manualInvoices for user ${ctx.user.id}: ${manualInvoiceRows.length} rows`);
     } catch (err) {
       console.warn("[Dashboard] Failed to fetch manualInvoices:", err);
@@ -1798,7 +1803,7 @@ export const dashboardRouter = router({
         })
         .from(deferredCheckoutSessions)
         .where(and(
-          eq(deferredCheckoutSessions.userId, userId),
+          inArray(deferredCheckoutSessions.userId, linkedUserIds),
           eq(deferredCheckoutSessions.status, "pending"),
         ))
         .orderBy(desc(deferredCheckoutSessions.createdAt));

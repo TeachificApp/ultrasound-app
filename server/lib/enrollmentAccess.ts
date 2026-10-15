@@ -11,6 +11,7 @@ import {
   membershipSubscriptions,
   membershipPlanAccess,
 } from "../../drizzle/schema";
+import { getLinkedAccountUserIds } from "./linkedAccountAccess";
 
 export type EnrollmentRow = {
   id: number;
@@ -74,10 +75,11 @@ export async function resolveEnrollmentForCourse(
   const active = await getActiveEnrollment(db, userId, courseId);
   if (active) return active;
 
+  const linkedUserIds = await getLinkedAccountUserIds(db, userId);
   const rows = await db
     .select(enrollmentSelect)
     .from(lmsEnrollments)
-    .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, courseId)))
+    .where(and(inArray(lmsEnrollments.userId, linkedUserIds), eq(lmsEnrollments.courseId, courseId)))
     .orderBy(desc(lmsEnrollments.enrolledAt));
 
   for (const row of rows) {
@@ -92,6 +94,7 @@ export async function resolveEnrollmentByCourseSlug(
   userId: number,
   courseSlug: string,
 ): Promise<EnrollmentRow | null> {
+  const linkedUserIds = await getLinkedAccountUserIds(db, userId);
   const rows = await db
     .select({
       id: lmsEnrollments.id,
@@ -105,7 +108,7 @@ export async function resolveEnrollmentByCourseSlug(
     })
     .from(lmsEnrollments)
     .innerJoin(lmsCourses, eq(lmsCourses.id, lmsEnrollments.courseId))
-    .where(and(eq(lmsEnrollments.userId, userId), eq(lmsCourses.slug, courseSlug)))
+    .where(and(inArray(lmsEnrollments.userId, linkedUserIds), eq(lmsCourses.slug, courseSlug)))
     .orderBy(desc(lmsEnrollments.enrolledAt));
 
   for (const row of rows) {
@@ -124,12 +127,13 @@ export async function getActiveEnrollment(
   userId: number,
   courseId: number,
 ): Promise<EnrollmentRow | null> {
+  const linkedUserIds = await getLinkedAccountUserIds(db, userId);
   const [activeRow] = await db
     .select(enrollmentSelect)
     .from(lmsEnrollments)
     .where(
       and(
-        eq(lmsEnrollments.userId, userId),
+        inArray(lmsEnrollments.userId, linkedUserIds),
         eq(lmsEnrollments.courseId, courseId),
         activeEnrollmentCondition(),
       ),
@@ -144,7 +148,7 @@ export async function getActiveEnrollment(
     .from(lmsEnrollments)
     .where(
       and(
-        eq(lmsEnrollments.userId, userId),
+        inArray(lmsEnrollments.userId, linkedUserIds),
         eq(lmsEnrollments.courseId, courseId),
         or(
           isNotNull(lmsEnrollments.completedAt),
@@ -162,12 +166,13 @@ export async function userHasActiveMembershipPlan(
   planId: number,
 ): Promise<boolean> {
   const now = Date.now();
+  const linkedUserIds = await getLinkedAccountUserIds(db, userId);
   const [sub] = await db
     .select()
     .from(membershipSubscriptions)
     .where(
       and(
-        eq(membershipSubscriptions.userId, userId),
+        inArray(membershipSubscriptions.userId, linkedUserIds),
         eq(membershipSubscriptions.planId, planId),
         inArray(membershipSubscriptions.status, ["active", "trialing"]),
       ),

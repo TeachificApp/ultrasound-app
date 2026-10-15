@@ -13,6 +13,7 @@ import { and, asc, desc, eq, gt, gte, inArray, like, lte, or, sql, isNull } from
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
+import { getLinkedAccountUserIds } from "../lib/linkedAccountAccess";
 import { syncStripeProduct } from "../stripeSync";
 import { buildOrderBumpCheckoutLine } from "../lib/orderBumpCheckout";
 import {
@@ -394,6 +395,7 @@ export const workshopLearnerRouter = router({
   myEnrollments: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const linkedUserIds = await getLinkedAccountUserIds(db, ctx.user.id);
     const enrollments = await db
       .select({
         enrollment: workshopEnrollments,
@@ -408,7 +410,7 @@ export const workshopLearnerRouter = router({
       )
       .where(
         and(
-          eq(workshopEnrollments.userId, ctx.user.id),
+          inArray(workshopEnrollments.userId, linkedUserIds),
           eq(workshopEnrollments.status, "active")
         )
       )
@@ -422,6 +424,7 @@ export const workshopLearnerRouter = router({
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const linkedUserIds = await getLinkedAccountUserIds(db, ctx.user.id);
       const [workshop] = await db
         .select()
         .from(workshops)
@@ -436,7 +439,7 @@ export const workshopLearnerRouter = router({
         .where(
           and(
             eq(workshopEnrollments.workshopId, workshop.id),
-            eq(workshopEnrollments.userId, ctx.user.id),
+            inArray(workshopEnrollments.userId, linkedUserIds),
             eq(workshopEnrollments.status, "active")
           )
         )

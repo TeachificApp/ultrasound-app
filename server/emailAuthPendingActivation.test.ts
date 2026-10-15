@@ -23,7 +23,8 @@ describe("pending account recovery", () => {
 
     expect(emailAuth).not.toContain("Your account has been pre-registered but not yet activated");
     expect(emailAuth).toContain("shouldClearPendingAfterCredentialVerification(user)");
-    expect(emailAuth).toContain("const passwordMatch = await bcrypt.compare");
+    expect(emailAuth).toContain("for (const candidate of credentialCandidates)");
+    expect(emailAuth).toContain("await bcrypt.compare(input.password, candidate.passwordHash)");
   });
 
   it("allows password reset and magic-link handlers to operate without pending-account guards", () => {

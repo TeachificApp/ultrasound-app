@@ -728,26 +728,33 @@ export const appRouter = router({
         password: z.string().min(1).max(128),
       }))
       .mutation(async ({ ctx, input }) => {
-        const { getUserByEmail } = await import('./db');
+        const { getUsersByEmail } = await import('./db');
         const { sdk } = await import('./_core/sdk');
         const { COOKIE_NAME, LAX_COOKIE_NAME, ONE_YEAR_MS } = await import('@shared/const');
         const { getSessionCookieOptions, getLaxSessionCookieOptions, resolveAuthHostname } = await import('./_core/cookies');
         const bcrypt = await import('bcryptjs');
 
         const email = input.email;
-        const user = await getUserByEmail(email);
+        const candidates = await getUsersByEmail(email);
 
         // Generic error to prevent user enumeration
         const authError = new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid email or password.' });
 
-        if (!user) throw authError;
-        if (!user.passwordHash) {
+        if (candidates.length === 0) throw authError;
+        const credentialCandidates = candidates.filter((candidate) => candidate.passwordHash);
+        if (credentialCandidates.length === 0) {
           // Account exists but has no password — guide them to use magic link or reset
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'This account uses magic link sign-in. Use "Forgot password" to set a password, or sign in with the magic link option.' });
         }
 
-        const isValid = await bcrypt.compare(input.password, user.passwordHash);
-        if (!isValid) throw authError;
+        let user = undefined as (typeof credentialCandidates)[number] | undefined;
+        for (const candidate of credentialCandidates) {
+          if (candidate.passwordHash && await bcrypt.compare(input.password, candidate.passwordHash)) {
+            user = candidate;
+            break;
+          }
+        }
+        if (!user) throw authError;
 
         // Build or ensure openId
         const openId = user.openId ?? `email:${email}`;
