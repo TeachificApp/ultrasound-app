@@ -155,6 +155,7 @@ export const dashboardRouter = router({
       const now = new Date();
       const [courseEnrollments, downloads, bundleAccess, webinarAccess, workshopAccess, physicalOrders, memberships] = await Promise.all([
         db.select({
+          courseId: lmsEnrollments.courseId,
           enrollmentType: lmsEnrollments.enrollmentType,
           accessExpiresAt: lmsEnrollments.accessExpiresAt,
           completedAt: lmsEnrollments.completedAt,
@@ -185,7 +186,8 @@ export const dashboardRouter = router({
       ]);
 
       const activeCourses = courseEnrollments.filter(hasCourseEnrollmentAccess);
-      const hasCohortAccess = activeCourses.some((enrollment) => enrollment.courseType === "cohort");
+      const activeCohort = activeCourses.find((enrollment) => enrollment.courseType === "cohort");
+      const hasCohortAccess = Boolean(activeCohort);
       const hasActiveBundle = bundleAccess.some((row) => !row.accessExpiresAt || row.accessExpiresAt > now);
       const hasActiveWebinar = webinarAccess.some((row) => !row.accessExpiresAt || row.accessExpiresAt > now);
       const hasActiveWorkshop = workshopAccess.some((row) =>
@@ -205,7 +207,7 @@ export const dashboardRouter = router({
         || hasActiveMembership,
       );
 
-      if (!hasContent) return { shouldShow: false, visitCount: 0, hasCohortAccess: false };
+      if (!hasContent) return { shouldShow: false, visitCount: 0, hasCohortAccess: false, cohortCourseId: null };
 
       const [existing] = await db
         .select({ visitCount: learnerOnboardingProgress.learnVisitCount, lastVisitKey: learnerOnboardingProgress.lastVisitKey })
@@ -231,7 +233,12 @@ export const dashboardRouter = router({
           .where(eq(learnerOnboardingProgress.userId, ctx.user.id));
       }
 
-      return { shouldShow: visitCount > 0 && visitCount <= 3, visitCount, hasCohortAccess };
+      return {
+        shouldShow: visitCount > 0 && visitCount <= 3,
+        visitCount,
+        hasCohortAccess,
+        cohortCourseId: activeCohort?.courseId ?? null,
+      };
     }),
 
   // ── My Content ───────────────────────────────────────────────────────────────

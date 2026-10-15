@@ -24,6 +24,7 @@ describe("learner access guide", () => {
     expect(router).toContain('row.status === "active"');
     expect(router).toContain("Math.min(existing.visitCount + 1, 3)");
     expect(router).toContain("visitCount > 0 && visitCount <= 3");
+    expect(router).toContain("cohortCourseId: activeCohort?.courseId ?? null");
   });
 
   it("mounts a visual Learn-domain guide with dashboard, cohort, and billing directions", () => {
@@ -35,5 +36,8 @@ describe("learner access guide", () => {
     expect(guide).toContain("/my-dashboard?tab=subscriptions");
     expect(guide).toContain("My Cohort");
     expect(guide).toContain("first three Learn visits");
+    expect(guide).toContain("onboarding_preview=1");
+    expect(guide).toContain("<iframe");
+    expect(guide).toContain("your own signed-in experience");
   });
 });
