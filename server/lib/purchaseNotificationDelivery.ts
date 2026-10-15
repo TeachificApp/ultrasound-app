@@ -21,7 +21,9 @@ export type PurchaseNotificationType =
   | "physical_order"
   | "unmatched_payment_alert"
   | "sponsorship_thank_you"
-  | "sponsorship_admin_alert";
+  | "sponsorship_admin_alert"
+  | "event_partnership_thank_you"
+  | "event_partnership_admin_alert";
 
 export type DeliveryClaim = {
   claimed: boolean;

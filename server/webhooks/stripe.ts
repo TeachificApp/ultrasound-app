@@ -18,7 +18,7 @@ import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { handleStudyGroupCheckoutCompleted, handleStudyGroupSubscriptionLifecycle } from "../routers/studyGroupsRouter";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users, pendingFulfillments, sponsorships } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users, pendingFulfillments, sponsorships, eventPartnershipOrders, eventPartnershipPackages } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -40,6 +40,7 @@ import { hasKnownStripeCheckoutRoute, hasUnmatchedPlatformPaymentIntentMetadata,
 import { recordReceiptPayee } from "../lib/receiptParticipants";
 import { renderCurrentWebinarSchedule } from "../lib/webinarEmailSchedule";
 import { buildAdminSponsorshipAlertEmail, buildSponsorThankYouEmail } from "../lib/sponsorshipEmail";
+import { buildAdminEventPartnershipAlertEmail, buildEventPartnershipThankYouEmail } from "../lib/eventPartnershipEmail";
 import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 type CheckoutRecipient = { email: string | null; name: string | null };
 
@@ -301,6 +302,66 @@ async function handleSponsorshipCheckoutCompleted(session: Record<string, unknow
   ]);
   if ((thankYou.attempted && !thankYou.delivered) || (alert.attempted && !alert.delivered)) {
     await notifyOwner({ title: "Sponsorship email delivery needs review", content: "A paid sponsorship was recorded, but one or more sponsor notifications could not be delivered. The durable delivery log will retry safely." });
+  }
+}
+
+/** Record and notify on an instance-level workshop exhibit or webinar sponsor checkout. */
+async function handleEventPartnershipCheckoutCompleted(session: Record<string, unknown>) {
+  const metadata = (session.metadata as Record<string, string>) ?? {};
+  if (metadata.type !== "event_partnership") return;
+  const orderId = Number.parseInt(metadata.event_partnership_order_id ?? "", 10);
+  const sessionId = typeof session.id === "string" ? session.id : null;
+  if (!Number.isInteger(orderId) || orderId <= 0 || !sessionId) {
+    console.warn("[Stripe] Event partnership checkout is missing its record identifier.");
+    return;
+  }
+  const db = await getDb();
+  if (!db) throw new Error("Event partnership payment could not reach the MySQL database.");
+  const [existing] = await db.select().from(eventPartnershipOrders).where(eq(eventPartnershipOrders.id, orderId)).limit(1);
+  if (!existing) {
+    await notifyOwner({ title: "Event partnership payment needs review", content: "A paid workshop exhibitor or webinar sponsor checkout did not have a matching MySQL record." });
+    return;
+  }
+  if (existing.stripeSessionId && existing.stripeSessionId !== sessionId) {
+    await notifyOwner({ title: "Event partnership payment needs review", content: "An event partnership record was presented by more than one checkout session. No automatic reassignment was made." });
+    return;
+  }
+  await db.update(eventPartnershipOrders).set({
+    stripeSessionId: sessionId,
+    stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+    amountCents: typeof session.amount_total === "number" ? session.amount_total : existing.amountCents,
+    currency: typeof session.currency === "string" ? session.currency.toLowerCase() : existing.currency,
+    paymentStatus: "paid", status: "paid", paidAt: existing.paidAt ?? new Date(),
+  }).where(eq(eventPartnershipOrders.id, orderId));
+  const [record] = await db.select({
+    targetType: eventPartnershipOrders.targetType,
+    contactName: eventPartnershipOrders.contactName, contactEmail: eventPartnershipOrders.contactEmail, contactPhone: eventPartnershipOrders.contactPhone,
+    organizationName: eventPartnershipOrders.organizationName, organizationWebsite: eventPartnershipOrders.organizationWebsite,
+    amountCents: eventPartnershipOrders.amountCents, currency: eventPartnershipOrders.currency, packageName: eventPartnershipPackages.name,
+    workshopTitle: workshops.title, workshopInstanceTitle: workshopInstances.title, webinarTitle: webinars.title,
+  }).from(eventPartnershipOrders)
+    .innerJoin(eventPartnershipPackages, eq(eventPartnershipOrders.packageId, eventPartnershipPackages.id))
+    .leftJoin(workshopInstances, eq(eventPartnershipOrders.workshopInstanceId, workshopInstances.id))
+    .leftJoin(workshops, eq(workshopInstances.workshopId, workshops.id))
+    .leftJoin(webinars, eq(eventPartnershipOrders.webinarId, webinars.id))
+    .where(eq(eventPartnershipOrders.id, orderId)).limit(1);
+  if (!record || (record.targetType !== "workshop_exhibit" && record.targetType !== "webinar_sponsor")) return;
+  const emailRecord = {
+    targetType: record.targetType,
+    targetTitle: record.targetType === "workshop_exhibit" ? [record.workshopTitle, record.workshopInstanceTitle].filter(Boolean).join(" — ") : record.webinarTitle ?? "Webinar",
+    packageName: record.packageName,
+    contactName: record.contactName, contactEmail: record.contactEmail, contactPhone: record.contactPhone,
+    organizationName: record.organizationName, organizationWebsite: record.organizationWebsite,
+    amountCents: record.amountCents, currency: record.currency,
+  };
+  const thankYouEmail = buildEventPartnershipThankYouEmail(emailRecord);
+  const adminAlertEmail = buildAdminEventPartnershipAlertEmail(emailRecord);
+  const [thankYou, alert] = await Promise.all([
+    sendPurchaseNotificationOnce(db, { checkoutSessionId: sessionId, notificationType: "event_partnership_thank_you", send: () => sendEmail({ to: { name: record.contactName, email: record.contactEmail }, subject: thankYouEmail.subject, htmlBody: thankYouEmail.htmlBody }) }),
+    sendPurchaseNotificationOnce(db, { checkoutSessionId: sessionId, notificationType: "event_partnership_admin_alert", send: () => sendEmail({ to: getPlatformAdminRecipient("Event Partnerships"), subject: adminAlertEmail.subject, htmlBody: adminAlertEmail.htmlBody }) }),
+  ]);
+  if ((thankYou.attempted && !thankYou.delivered) || (alert.attempted && !alert.delivered)) {
+    await notifyOwner({ title: "Event partnership email delivery needs review", content: "A paid workshop exhibitor or webinar sponsor record was saved, but one or more notifications could not be delivered. The durable delivery log will retry safely." });
   }
 }
 
@@ -2978,6 +3039,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       }
       // payment_status === "paid" — safe to grant access immediately
       await handleSponsorshipCheckoutCompleted(sessionObj);
+      await handleEventPartnershipCheckoutCompleted(sessionObj);
       await handleFunnelCheckoutSessionCompleted(sessionObj);
       await handleCanonicalBundleCheckoutCompleted(sessionObj);
       await handleCheckoutSessionCompleted(sessionObj);
@@ -3034,6 +3096,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
                 .where(eq(deferredCheckoutSessions.id, deferred.id));
               // Run all fulfillment handlers with the stored session object
               await handleSponsorshipCheckoutCompleted(storedSession);
+              await handleEventPartnershipCheckoutCompleted(storedSession);
               await handleFunnelCheckoutSessionCompleted(storedSession);
               await handleCanonicalBundleCheckoutCompleted(storedSession);
               await handleCheckoutSessionCompleted(storedSession);

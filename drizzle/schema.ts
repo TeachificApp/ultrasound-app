@@ -5370,6 +5370,8 @@ export const webinars = mysqlTable("webinars", {
   thumbnailUrl: text("thumbnail_url"),
   requireRegistration: boolean("require_registration").default(true),
   registrationFormFields: json("registration_form_fields"),
+  // Public event details presented on this webinar's dedicated sponsor page.
+  sponsorDetails: longtext("sponsor_details"),
   postWebinarAction: mysqlEnum("post_webinar_action", ["product","url","thankyou","none"]).default("none"),
   postWebinarProductId: int("post_webinar_product_id"),
   postWebinarUrl: text("post_webinar_url"),
@@ -7646,6 +7648,57 @@ export const sponsorships = mysqlTable("sponsorships", {
 ]);
 export type Sponsorship = typeof sponsorships.$inferSelect;
 export type InsertSponsorship = typeof sponsorships.$inferInsert;
+
+// ─── Event Partnerships ─────────────────────────────────────────────────────
+// Global sponsorships use the published Silver/Gold/Platinum program. These
+// records instead model independently priced exhibit/sponsor packages per event.
+export const eventPartnershipPackages = mysqlTable("event_partnership_packages", {
+  id: int("id").autoincrement().primaryKey(),
+  targetType: mysqlEnum("target_type", ["workshop_exhibit", "webinar_sponsor"]).notNull(),
+  workshopInstanceId: int("workshop_instance_id"),
+  webinarId: int("webinar_id"),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  benefits: longtext("benefits"),
+  amountCents: int("amount_cents").notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("event_partnership_packages_workshop_idx").on(table.workshopInstanceId, table.isActive),
+  index("event_partnership_packages_webinar_idx").on(table.webinarId, table.isActive),
+]);
+export type EventPartnershipPackage = typeof eventPartnershipPackages.$inferSelect;
+
+export const eventPartnershipOrders = mysqlTable("event_partnership_orders", {
+  id: int("id").autoincrement().primaryKey(),
+  targetType: mysqlEnum("target_type", ["workshop_exhibit", "webinar_sponsor"]).notNull(),
+  workshopInstanceId: int("workshop_instance_id"),
+  webinarId: int("webinar_id"),
+  packageId: int("package_id").notNull(),
+  contactName: varchar("contact_name", { length: 255 }).notNull(),
+  contactEmail: varchar("contact_email", { length: 320 }).notNull(),
+  contactPhone: varchar("contact_phone", { length: 60 }),
+  organizationName: varchar("organization_name", { length: 255 }).notNull(),
+  organizationWebsite: varchar("organization_website", { length: 1024 }),
+  notes: text("notes"),
+  amountCents: int("amount_cents").notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  stripeSessionId: varchar("stripe_session_id", { length: 255 }).unique(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  paymentStatus: mysqlEnum("payment_status", ["pending", "paid", "failed", "cancelled"]).default("pending").notNull(),
+  status: mysqlEnum("status", ["pending", "paid", "payment_failed", "cancelled"]).default("pending").notNull(),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("event_partnership_orders_workshop_idx").on(table.workshopInstanceId, table.status),
+  index("event_partnership_orders_webinar_idx").on(table.webinarId, table.status),
+  index("event_partnership_orders_package_idx").on(table.packageId),
+]);
+export type EventPartnershipOrder = typeof eventPartnershipOrders.$inferSelect;
 
 export const workshopWaitlistEntries = mysqlTable("workshop_waitlist_entries", {
   id: int("id").autoincrement().primaryKey(),

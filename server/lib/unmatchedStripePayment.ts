@@ -19,6 +19,7 @@ const KNOWN_CHECKOUT_TYPES = new Set([
   "funnel_form_purchase",
   "embedded_checkout_purchase",
   "sponsorship",
+  "event_partnership",
 ]);
 
 const KNOWN_PRODUCT_TYPES = new Set([

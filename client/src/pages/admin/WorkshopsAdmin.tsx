@@ -38,6 +38,7 @@ import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle"
 import { formatWorkshopDollars } from "../../../../shared/workshopPricing";
 import { formatScheduledInput, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import { UnassignedStudentsAssignPanel } from "@/components/cohort/UnassignedStudentsAssignPanel";
+import { EventPartnershipAdminPanel } from "@/components/admin/EventPartnershipAdminPanel";
 import { User, UserPlus, X } from "lucide-react";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -545,6 +546,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
   const [instEnrollmentCloseDate, setInstEnrollmentCloseDate] = useState("");
   const [instStatus, setInstStatus] = useState<"draft" | "published" | "waitlist" | "presale" | "cancelled" | "completed">("draft");
   const [instContent, setInstContent] = useState("");
+  const [instExhibitorDetails, setInstExhibitorDetails] = useState("");
   const [instConfirmationEmailApproved, setInstConfirmationEmailApproved] = useState(false);
   const [instConfirmationEmailSubject, setInstConfirmationEmailSubject] = useState("");
   const [instConfirmationEmailHeading, setInstConfirmationEmailHeading] = useState("");
@@ -684,6 +686,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setEditingInstance(null);
     setInstTitle(""); setInstDescription(""); setInstStartDate(""); setInstEndDate("");
     setInstContent("");
+    setInstExhibitorDetails("");
     setInstConfirmationEmailApproved(false); setInstConfirmationEmailSubject(""); setInstConfirmationEmailHeading(""); setInstConfirmationEmailIntro(""); setInstConfirmationEmailDetails("");
     setInstPresaleWelcomeHeading(""); setInstPresaleWelcomeBody(""); setInstPresaleWelcomeMediaUrl(""); setInstPresaleWelcomeCtaLabel(""); setInstPresaleWelcomeCtaUrl("");
     setInstTimezone("America/New_York"); setInstLocationType("in_person");
@@ -712,6 +715,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
     setInstEnrollmentCloseDate(inst.enrollmentCloseDate ? formatScheduledInput(inst.enrollmentCloseDate, PLATFORM_TIMEZONE, false) : "");
     setInstStatus(inst.status ?? "draft");
     setInstContent(inst.instanceContent ?? "");
+    setInstExhibitorDetails(inst.exhibitorDetails ?? "");
     setInstConfirmationEmailApproved(inst.confirmationEmailApproved ?? false);
     setInstConfirmationEmailSubject(inst.confirmationEmailSubject ?? "");
     setInstConfirmationEmailHeading(inst.confirmationEmailHeading ?? "");
@@ -741,6 +745,7 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
       enrollmentCloseDate: instEnrollmentCloseDate || null,
       status: instStatus,
       instanceContent: instContent || null,
+      exhibitorDetails: instExhibitorDetails || null,
       confirmationEmailApproved: instConfirmationEmailApproved,
       confirmationEmailSubject: instConfirmationEmailSubject || null,
       confirmationEmailHeading: instConfirmationEmailHeading || null,
@@ -1171,6 +1176,9 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
               </Card>
               <div className="px-1">
                 <ScheduledContentLinksPanel sourceType="workshop_instance" sourceId={inst.id} />
+              </div>
+              <div className="px-1">
+                <EventPartnershipAdminPanel targetType="workshop_exhibit" workshopInstanceId={inst.id} />
               </div>
               {selectedInstanceIdForStudents === inst.id && (
                 <WorkshopInstanceStudentsPanel
@@ -1657,6 +1665,11 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
               <Label className="text-xs font-medium">Instance Content (Rich Text)</Label>
               <p className="text-xs text-gray-400 mb-1">Optional rich text shown on the workshop page for this specific instance (agenda, location details, instructor bio, etc.)</p>
               <RichTextEditor value={instContent} onChange={setInstContent} />
+            </div>
+            <div>
+              <Label className="text-xs font-medium">Exhibitor Event Details</Label>
+              <p className="text-xs text-gray-400 mb-1">Public details for this instance’s dedicated exhibitor page, such as load-in, attendee profile, and on-site contact expectations.</p>
+              <Textarea value={instExhibitorDetails} onChange={e => setInstExhibitorDetails(e.target.value)} className="text-sm" rows={4} placeholder="Describe the exhibitor opportunity for this workshop instance." />
             </div>
             <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-4">
               <div className="flex items-start gap-3">

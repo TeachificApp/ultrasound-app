@@ -247,6 +247,7 @@ export const webinarAdminRouter = router({
       installmentIntervalDays: z.number().nullable().optional(),
       hostName: z.string().optional(), hostTitle: z.string().optional(), hostAvatar: z.string().optional(), maxAttendees: z.number().optional(),
       requireRegistration: z.boolean().optional(), registrationFormFields: z.any().optional(),
+      sponsorDetails: z.string().nullable().optional(),
       aiViewersEnabled: z.boolean().optional(), aiViewersMin: z.number().optional(), aiViewersMax: z.number().optional(), aiViewersPeakAt: z.number().optional(),
       postWebinarAction: z.enum(["product","url","thankyou","none"]).optional(),
       postWebinarProductId: z.number().optional(), postWebinarUrl: z.string().optional(),

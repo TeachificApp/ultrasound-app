@@ -26,6 +26,7 @@ import { PublishDomainSelect } from "@/components/PublishDomainSelect";
 import { AfterPurchaseWorkflowEditor } from "@/components/AfterPurchaseWorkflowEditor";
 import { HidePricingOptionsToggle } from "@/components/HidePricingOptionsToggle";
 import { SdmsCmeConfigPanel, resolveWebinarActivityType } from "@/components/admin/SdmsCmeConfigPanel";
+import { EventPartnershipAdminPanel } from "@/components/admin/EventPartnershipAdminPanel";
 import { formatInTimeZone, formatScheduledInput, parseScheduledTimestamp, PLATFORM_TIMEZONE } from "@shared/platformTime";
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -303,6 +304,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
   const [hostTitle, setHostTitle] = useState("");
   const [maxAttendees, setMaxAttendees] = useState<number | "">("");
   const [requireRegistration, setRequireRegistration] = useState(true);
+  const [sponsorDetails, setSponsorDetails] = useState("");
   const [publishDomain, setPublishDomain] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [slug, setSlug] = useState("");
@@ -348,6 +350,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
     setHostTitle(webinar.hostTitle ?? "");
     setMaxAttendees(webinar.maxAttendees ?? "");
     setRequireRegistration(webinar.requireRegistration ?? true);
+    setSponsorDetails((webinar as any).sponsorDetails ?? "");
     setPublishDomain((webinar as any).publishDomain ?? "");
     setSubtitle((webinar as any).subtitle ?? "");
     setSlug(webinar.slug ?? "");
@@ -406,6 +409,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
       hostName, hostTitle,
       maxAttendees: maxAttendees !== "" ? Number(maxAttendees) : undefined,
       requireRegistration, publishDomain: publishDomain || undefined,
+      sponsorDetails: sponsorDetails || null,
       aiViewersEnabled, aiViewersMin, aiViewersMax, aiViewersPeakAt,
       subtitle: subtitle || undefined,
       slug: slug || undefined,
@@ -501,6 +505,7 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
           <TabsTrigger value="domain" className="text-xs"><Globe className="w-3.5 h-3.5 mr-1" />Domain</TabsTrigger>
           <TabsTrigger value="after-purchase" className="text-xs"><Workflow className="w-3.5 h-3.5 mr-1" />After Purchase</TabsTrigger>
           <TabsTrigger value="checkout-page" className="text-xs"><DollarSign className="w-3.5 h-3.5 mr-1" />Checkout Page</TabsTrigger>
+          <TabsTrigger value="sponsors" className="text-xs"><Users className="w-3.5 h-3.5 mr-1" />Sponsors</TabsTrigger>
           <a href={`/admin/webinars/${webinarId}/landing-builder`} target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-teal-600 text-teal-700 rounded-md hover:bg-teal-50 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -613,6 +618,11 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
               <div className="flex items-center gap-3 pt-1">
                 <Switch checked={requireRegistration} onCheckedChange={setRequireRegistration} id="require-reg" />
                 <Label htmlFor="require-reg" className="text-sm cursor-pointer">Require registration to attend</Label>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-gray-600">Webinar Sponsor Details</Label>
+                <p className="mt-1 text-xs leading-5 text-gray-500">Public information for this webinar’s dedicated sponsor page, including audience, recognition, timing, and coordination details.</p>
+                <Textarea value={sponsorDetails} onChange={e => setSponsorDetails(e.target.value)} rows={4} className="mt-2 text-sm" placeholder="Describe the sponsor opportunity for this webinar." />
               </div>
             </div>
           </div>
@@ -970,6 +980,9 @@ function WebinarEditor({ webinarId, onBack }: { webinarId: number; onBack: () =>
               </div>
             </div>
           </div>
+        </TabsContent>
+        <TabsContent value="sponsors" className="pt-2">
+          <EventPartnershipAdminPanel targetType="webinar_sponsor" webinarId={webinarId} />
         </TabsContent>
       </Tabs>
     </div>

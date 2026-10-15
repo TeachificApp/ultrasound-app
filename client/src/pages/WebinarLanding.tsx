@@ -441,6 +441,10 @@ export default function WebinarLanding() {
         />
       )}
 
+      <div className="mx-auto max-w-5xl px-4 pb-8 text-center">
+        <a href={`/event-partnerships/webinar_sponsor/${webinar.id}`} className="text-sm font-medium text-teal-700 underline underline-offset-4 hover:text-teal-900">Interested in sponsoring this webinar?</a>
+      </div>
+
       {/* Notify Me When Open modal */}
       <Dialog open={draftNotifyOpen} onOpenChange={setDraftNotifyOpen}>
         <DialogContent className="max-w-md">

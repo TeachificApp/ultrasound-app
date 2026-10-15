@@ -85,6 +85,7 @@ import { scheduledContentAdminRouter } from "./routers/scheduledContentAdminRout
 import { surveyPulseRouter } from "./routers/surveyPulseRouter";
 import { purchaseEmailOverridesRouter } from "./routers/purchaseEmailOverridesRouter";
 import { sponsorshipRouter } from "./routers/sponsorshipRouter";
+import { eventPartnershipRouter } from "./routers/eventPartnershipRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -210,6 +211,7 @@ export const appRouter = router({
   marketingSiteAdmin: marketingSiteAdminRouter,
   scheduledContentAdmin: scheduledContentAdminRouter,
   sponsorship: sponsorshipRouter,
+  eventPartnership: eventPartnershipRouter,
 
   auth: router({
     sessionState: publicProcedure.query(async ({ ctx }) => {

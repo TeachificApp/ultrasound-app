@@ -217,6 +217,7 @@ function InstanceCard({
               {instance.status === "presale" ? "Pre-sale: Enroll" : "Register"}
             </Button>
           )}
+          <Link href={`/event-partnerships/workshop_exhibit/${instance.id}`} className="mt-2 block text-center text-xs font-medium text-teal-700 underline underline-offset-2 hover:text-teal-900">Exhibit at this event</Link>
         </div>
       </div>
     </div>

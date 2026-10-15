@@ -114,6 +114,7 @@ const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
 const WorkshopsBrowse = lazy(() => import("./pages/WorkshopsBrowse"));
 const SponsorshipsPage = lazy(() => import("./pages/SponsorshipsPage"));
 const SponsorshipAdmin = lazy(() => import("./pages/admin/SponsorshipAdmin"));
+const EventPartnershipsPage = lazy(() => import("./pages/EventPartnershipsPage"));
 const CrossTrainingBrowse = lazy(() => import("./pages/CrossTrainingBrowse"));
 const WorkshopDetail = lazy(() => import("./pages/WorkshopDetail"));
 const WorkshopLanding = lazy(() => import("./pages/WorkshopLanding"));
@@ -610,6 +611,7 @@ function Router() {
         <Route path="/workshops" component={WorkshopsBrowse} />
         <Route path="/workshops/:slug" component={WorkshopLanding} />
         <Route path="/sponsorships">{() => <Suspense fallback={pageFallback}><SponsorshipsPage /></Suspense>}</Route>
+        <Route path="/event-partnerships/:targetType/:id">{() => <Suspense fallback={pageFallback}><EventPartnershipsPage /></Suspense>}</Route>
         <Route path="/admin/revenue-share">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><RevenueShareAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/partner-portal">{() => <Suspense fallback={pageFallback}><PartnerPortal /></Suspense>}</Route>
         <Route path="/partner-signup">{() => <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>}</Route>
@@ -795,6 +797,7 @@ function MembersRouter() {
     <Switch>
       {/* Redirect all course/education/admin routes to the app (learn) subdomain */}
       <Route path="/sponsorships">{() => <Suspense fallback={pageFallback}><SponsorshipsPage /></Suspense>}</Route>
+      <Route path="/event-partnerships/:targetType/:id">{() => <Suspense fallback={pageFallback}><EventPartnershipsPage /></Suspense>}</Route>
       <Route path="/downloads/:slug/files">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/downloads/${params.slug}/files`); return null; }}</Route>
       <Route path="/courses/:slug/player">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/player`); return null; }}</Route>
       <Route path="/courses/:slug/overview">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/overview`); return null; }}</Route>
@@ -1192,6 +1195,7 @@ function IHeartEchoRouter() {
         <Route path="/unsubscribe" component={Unsubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />
         <Route path="/sponsorships">{() => <SponsorshipsPage />}</Route>
+        <Route path="/event-partnerships/:targetType/:id">{() => <EventPartnershipsPage />}</Route>
 
         {/* Learning links on app.iheartecho.com must stay on the iHeartEcho Learn
             mirror; this includes direct checkout URLs shared from an app page. */}
@@ -1808,6 +1812,7 @@ function PublicWebsiteRouter() {
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/auth/access" component={AccessLinkCallback} />
         <Route path="/sponsorships">{() => <SponsorshipsPage />}</Route>
+        <Route path="/event-partnerships/:targetType/:id">{() => <EventPartnershipsPage />}</Route>
         {/* Learning, purchased content, and every checkout flow always use the
             brand-matched Learn tenant, even when the original link was opened
             from a public custom domain. These routes must precede the public
