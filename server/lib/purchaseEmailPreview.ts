@@ -19,10 +19,11 @@ import {
   renderQuizAccessEmail,
   type RenderedPurchaseEmail,
 } from "./enrollmentEmail";
-import { buildFunnelPurchaseConfirmationEmail } from "../_core/email";
+import { buildFunnelPurchaseConfirmationEmail, buildPasswordResetEmail } from "../_core/email";
 import { renderExistingBrandMembershipAccessEmail, renderNewBrandMembershipAccessEmail } from "./brandMembershipPurchaseEmail";
 import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from "./purchaseEmailOverride";
 import { renderCurrentWorkshopSchedule } from "./workshopEmailSchedule";
+import { renderTeamSubscriptionConfirmationEmail } from "./teamSubscriptionEmail";
 
 export const PURCHASE_EMAIL_PREVIEW_SOURCES = [
   "course",
@@ -36,6 +37,8 @@ export const PURCHASE_EMAIL_PREVIEW_SOURCES = [
   "funnel_fallback",
   "brand_membership",
   "dual_membership",
+  "free_purchase_account_setup",
+  "team_subscription",
 ] as const;
 
 export type PurchaseEmailPreviewSource = typeof PURCHASE_EMAIL_PREVIEW_SOURCES[number];
@@ -75,6 +78,44 @@ export async function renderCurrentPurchaseEmailPreview(
   db: any,
   input: { source: PurchaseEmailPreviewSource; contentId: number; contentType?: string },
 ): Promise<PurchaseEmailPreview> {
+  if (input.source === "free_purchase_account_setup") {
+    const brand = input.contentId === 2 ? "iheartecho" : "aaus";
+    // Mirrors the free-order checkout's current reset-link destination.
+    const baseUrl = brand === "iheartecho" ? "https://app.iheartecho.net" : appOrigin(brand);
+    const email = buildPasswordResetEmail({
+      firstName: SAMPLE_RECIPIENT.name,
+      resetUrl: `${baseUrl}/auth/reset-password`,
+      brandMode: brand,
+    });
+    return result(
+      `Free purchase account setup — ${brand === "iheartecho" ? "iHeartEcho™" : "All About Ultrasound™"}`,
+      "Account setup",
+      { subject: "Your account is ready — set your password to access your purchase", htmlBody: email.htmlBody },
+    );
+  }
+  if (input.source === "team_subscription") {
+    const variants = {
+      1: { brand: "aaus" as const, plan: "monthly" as const },
+      2: { brand: "iheartecho" as const, plan: "monthly" as const },
+      3: { brand: "both" as const, plan: "monthly" as const },
+      4: { brand: "aaus" as const, plan: "lifetime" as const },
+      5: { brand: "iheartecho" as const, plan: "lifetime" as const },
+      6: { brand: "both" as const, plan: "lifetime" as const },
+    } as const;
+    const variant = variants[input.contentId as keyof typeof variants] ?? variants[1];
+    const rendered = renderTeamSubscriptionConfirmationEmail({
+      recipientName: SAMPLE_RECIPIENT.name,
+      brand: variant.brand,
+      plan: variant.plan,
+      organizationName: "Sample Organization",
+      seatCount: 10,
+      discountPercent: 0,
+      totalAmountCents: variant.plan === "monthly" ? 49000 : 249900,
+      dashboardUrl: "https://app.allaboutultrasound.com/team/sample",
+    });
+    const brandLabel = variant.brand === "aaus" ? "UltrasoundAssist™" : variant.brand === "iheartecho" ? "EchoAssist™" : "Both apps";
+    return result(`${brandLabel} Team/University — ${variant.plan}`, "Team subscription", rendered);
+  }
   if (input.source === "funnel_fallback") {
     const rendered = buildFunnelPurchaseConfirmationEmail({
       firstName: SAMPLE_RECIPIENT.name,

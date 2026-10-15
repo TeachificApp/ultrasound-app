@@ -85,6 +85,14 @@ export const purchaseEmailOverridesRouter = router({
       { id: 4, source: "brand_membership", contentType: "membership", title: "EchoAssist™ Premium — existing learner", brand: "iheartecho", status: "system", subtitle: "Existing-account access", previewOnly: true },
       { id: 1, source: "dual_membership", contentType: "membership", title: "All Access Dual Membership — new learner", brand: "all_about_ultrasound", status: "system", subtitle: "New-account access and password setup", previewOnly: true },
       { id: 2, source: "dual_membership", contentType: "membership", title: "All Access Dual Membership — existing learner", brand: "all_about_ultrasound", status: "system", subtitle: "Existing-account access", previewOnly: true },
+      { id: 1, source: "free_purchase_account_setup", contentType: "account_setup", title: "Free purchase — account setup (All About Ultrasound™)", brand: "all_about_ultrasound", status: "system", subtitle: "New learner password setup", previewOnly: true },
+      { id: 2, source: "free_purchase_account_setup", contentType: "account_setup", title: "Free purchase — account setup (iHeartEcho™)", brand: "iheartecho", status: "system", subtitle: "New learner password setup", previewOnly: true },
+      { id: 1, source: "team_subscription", contentType: "team_subscription", title: "UltrasoundAssist™ Team/University — monthly", brand: "all_about_ultrasound", status: "system", subtitle: "Organizer subscription confirmation", previewOnly: true },
+      { id: 2, source: "team_subscription", contentType: "team_subscription", title: "EchoAssist™ Team/University — monthly", brand: "iheartecho", status: "system", subtitle: "Organizer subscription confirmation", previewOnly: true },
+      { id: 3, source: "team_subscription", contentType: "team_subscription", title: "Both Apps Team/University — monthly", brand: "all_about_ultrasound", status: "system", subtitle: "Organizer subscription confirmation", previewOnly: true },
+      { id: 4, source: "team_subscription", contentType: "team_subscription", title: "UltrasoundAssist™ Team/University — lifetime", brand: "all_about_ultrasound", status: "system", subtitle: "Organizer subscription confirmation", previewOnly: true },
+      { id: 5, source: "team_subscription", contentType: "team_subscription", title: "EchoAssist™ Team/University — lifetime", brand: "iheartecho", status: "system", subtitle: "Organizer subscription confirmation", previewOnly: true },
+      { id: 6, source: "team_subscription", contentType: "team_subscription", title: "Both Apps Team/University — lifetime", brand: "all_about_ultrasound", status: "system", subtitle: "Organizer subscription confirmation", previewOnly: true },
     ];
 
     return { content: [...content, ...systemPreviewContent], overrides };

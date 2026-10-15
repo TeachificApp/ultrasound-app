@@ -66,6 +66,7 @@ function learnOriginForPurchaseBrand(brand: "aaus" | "iheartecho"): string {
 }
 
 import { renderCurrentWorkshopSchedule } from "../lib/workshopEmailSchedule";
+import { renderTeamSubscriptionConfirmationEmail } from "../lib/teamSubscriptionEmail";
 
 async function resolveCheckoutRecipientUser(session: Record<string, unknown>, meta: Record<string, string>) {
   const recipient = getCheckoutRecipient(session, meta);
@@ -2493,23 +2494,20 @@ async function handleTeamCheckoutCompleted(session: Record<string, unknown>) {
   const planLabel = plan === "lifetime" ? "Lifetime" : "Monthly";
   const dashboardUrl = `https://app.allaboutultrasound.com/team/${inserted.id}`;
   try {
+    const confirmation = renderTeamSubscriptionConfirmationEmail({
+      recipientName: meta.customer_name ?? customerEmail,
+      brand,
+      plan,
+      organizationName: orgName,
+      seatCount,
+      discountPercent: discountPct,
+      totalAmountCents,
+      dashboardUrl,
+    });
     await sendEmail({
       to: { name: meta.customer_name ?? customerEmail, email: customerEmail },
-      subject: `Your ${brandName} Team Subscription is active — ${orgName}`,
-      htmlBody: emailWrapper(`
-        <h2 style="margin:0 0 16px;">Team subscription confirmed!</h2>
-        <p>Hi ${meta.customer_name ?? "there"},</p>
-        <p>Your <strong>${brandName} Team/University ${planLabel}</strong> subscription for <strong>${orgName}</strong> is now active.</p>
-        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
-          <tr><td style="padding:8px 0;color:#64748b;">Organisation</td><td style="padding:8px 0;font-weight:600;">${orgName}</td></tr>
-          <tr><td style="padding:8px 0;color:#64748b;">Plan</td><td style="padding:8px 0;">${brandName} ${planLabel}</td></tr>
-          <tr><td style="padding:8px 0;color:#64748b;">Seats</td><td style="padding:8px 0;">${seatCount} seat${seatCount > 1 ? "s" : ""}${discountPct > 0 ? ` (${discountPct}% bulk discount)` : ""}</td></tr>
-          <tr><td style="padding:8px 0;color:#64748b;">Total</td><td style="padding:8px 0;">$${(totalAmountCents / 100).toFixed(2)}${plan === "monthly" ? "/month" : " one-time"}</td></tr>
-        </table>
-        <p>Head to your team dashboard to invite members and manage seats:</p>
-        <p style="margin:20px 0;"><a href="${dashboardUrl}" style="background:#0d9488;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Manage Team →</a></p>
-        <p style="color:#64748b;font-size:13px;">Each member you invite will receive an email with a link to activate their access.</p>
-      `),
+      subject: confirmation.subject,
+      htmlBody: confirmation.htmlBody,
     });
   } catch (emailErr) {
     console.error(`[Stripe][Team] Failed to send confirmation email:`, emailErr);
