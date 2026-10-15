@@ -37,4 +37,17 @@ describe("global account access routes", () => {
     expect(auth).toContain('resolveExplicitBrandPremium');
     expect(auth).toContain('const isPremium = opts.ctx.user.isPremium === true || isPremiumByRole;');
   });
+
+  it("routes app-domain workshop pages before the generic funnel catch-all", () => {
+    const app = source("client/src/App.tsx");
+    const start = app.indexOf("function Router()");
+    const end = app.indexOf("function MembersRouter()", start);
+    const appRouter = app.slice(start, end);
+
+    expect(appRouter).toContain('<Route path="/workshops" component={WorkshopsBrowse} />');
+    expect(appRouter).toContain('<Route path="/workshops/:slug" component={WorkshopLanding} />');
+    expect(appRouter.indexOf('path="/workshops/:slug"')).toBeLessThan(
+      appRouter.indexOf('path="/:slug/:pageSlug"'),
+    );
+  });
 });

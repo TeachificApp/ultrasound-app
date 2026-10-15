@@ -553,6 +553,10 @@ function Router() {
         <Route path="/downloads/:slug" component={DownloadLanding} />
         <Route path="/downloads" component={DownloadsBrowse} />
         <Route path="/bundles/:slug" component={BundleLanding} />
+        {/* Workshops are public purchase pages on both the app and Learn domains.
+            These routes must precede the generic two-segment funnel catch-all. */}
+        <Route path="/workshops" component={WorkshopsBrowse} />
+        <Route path="/workshops/:slug" component={WorkshopLanding} />
         <Route path="/admin/revenue-share">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><RevenueShareAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/partner-portal">{() => <Suspense fallback={pageFallback}><PartnerPortal /></Suspense>}</Route>
         <Route path="/partner-signup">{() => <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>}</Route>
