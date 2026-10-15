@@ -3,7 +3,9 @@ import {
   EXPO_PACKAGE_TYPE_META,
   EXPO_PUBLIC_REGISTRATION_TYPES,
   ULTRASOUND_EXPO_AAUS_LOGO_URL,
+  ULTRASOUND_EXPO_BANNER_URL,
   ULTRASOUND_EXPO_LAUNCH_EVENT,
+  ULTRASOUND_EXPO_LOGO_URL,
   ULTRASOUND_EXPO_NAME,
   ULTRASOUND_EXPO_PAGE_EDITOR_PAGES,
   ULTRASOUND_EXPO_SCHEDULE,
@@ -52,17 +54,24 @@ describe("UltrasoundExpo™ annual-event platform", () => {
     ]));
   });
 
-  it("keeps administrative offerings distinct while showing only attendee, exhibit, and sponsor opportunities publicly", () => {
+  it("keeps administrative offerings distinct while exposing only attendee registration publicly", () => {
     expect(isExpoPackageType("registrant")).toBe(true);
     expect(isExpoPackageType("exhibitor")).toBe(true);
     expect(isExpoPackageType("sponsor")).toBe(true);
     expect(isExpoPackageType("product")).toBe(true);
-    expect(EXPO_PUBLIC_REGISTRATION_TYPES).toEqual(["registrant", "exhibitor", "sponsor"]);
+    expect(EXPO_PUBLIC_REGISTRATION_TYPES).toEqual(["registrant"]);
     expect(isExpoPublicRegistrationType("registrant")).toBe(true);
+    expect(isExpoPublicRegistrationType("exhibitor")).toBe(false);
+    expect(isExpoPublicRegistrationType("sponsor")).toBe(false);
     expect(isExpoPublicRegistrationType("product")).toBe(false);
     expect(isExpoPublicRegistrationType("other")).toBe(false);
     expect(isExpoPackageType("workshop_exhibit")).toBe(false);
     expect(EXPO_PACKAGE_TYPE_META.exhibitor.dashboardLabel).toBe("My exhibits");
+  });
+
+  it("keeps supplied Expo logo and banner artwork separate from the existing hero image", () => {
+    expect(ULTRASOUND_EXPO_LOGO_URL).toContain("files.manuscdn.com");
+    expect(ULTRASOUND_EXPO_BANNER_URL).toContain("files.manuscdn.com");
   });
 
   it("builds teal-branded confirmation and admin notices with the actual paid amount", () => {
@@ -115,7 +124,7 @@ describe("UltrasoundExpo™ annual-event platform", () => {
       get: (header: string) => (header.toLowerCase() === "host" ? "ultrasoundexpo.com" : undefined),
     } as any;
     const seo = await getPageSeoForRequest(request);
-    expect(seo?.title).toBe("Register for UltrasoundExpo™ | Attendees, Exhibitors, and Sponsors");
+    expect(seo?.title).toBe("Register for UltrasoundExpo™ | Attendee Registration and Partner Applications");
     const rendered = injectPageSeoIntoHtml(
       '<html><head><title>Generic</title><meta property="og:url" content="https://ultrasoundexpo.com" /></head><body></body></html>',
       seo!,

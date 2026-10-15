@@ -5,6 +5,9 @@ export const ULTRASOUND_EXPO_ORGANIZER = "All About Ultrasound™";
 export const ULTRASOUND_EXPO_ORIGIN = "https://ultrasoundexpo.com";
 export const ULTRASOUND_EXPO_HERO_IMAGE = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/nmDnyKctfSTBjSLH.jpg";
 export const ULTRASOUND_EXPO_AAUS_LOGO_URL = AAUS_SONO_RING_LOGO_URL;
+// Supplied organizer artwork. The hero photo remains the main page background.
+export const ULTRASOUND_EXPO_LOGO_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/qyAMKKVMmuCLxwRU.png";
+export const ULTRASOUND_EXPO_BANNER_URL = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/HHBqBmHJNwmwFetq.png";
 
 /** The CMS domain used by the Site Pages editor for every public Expo screen. */
 export const ULTRASOUND_EXPO_SITE_DOMAIN = "ultrasoundexpo.com";
@@ -173,8 +176,8 @@ export const ULTRASOUND_EXPO_PAGE_EDITOR_PAGES = [
     title: "Register for UltrasoundExpo™",
     pageKind: "sales" as const,
     seo: {
-      title: "Register for UltrasoundExpo™ | Attendees, Exhibitors, and Sponsors",
-      description: "Register for UltrasoundExpo™ as an attendee, exhibitor, or sponsor through secure Stripe checkout.",
+      title: "Register for UltrasoundExpo™ | Attendee Registration and Partner Applications",
+      description: "Register to attend UltrasoundExpo™ or submit an exhibitor or sponsor application for administrator review.",
       image: ULTRASOUND_EXPO_HERO_IMAGE,
     },
     zones: [
@@ -290,8 +293,8 @@ export const ULTRASOUND_EXPO_LAUNCH_EVENT = {
 export const EXPO_PACKAGE_TYPES = ["registrant", "exhibitor", "sponsor", "product", "other"] as const;
 export type ExpoPackageType = typeof EXPO_PACKAGE_TYPES[number];
 
-/** Customer-facing registrations available until additional event offerings are released. */
-export const EXPO_PUBLIC_REGISTRATION_TYPES = ["registrant", "exhibitor", "sponsor"] as const satisfies readonly ExpoPackageType[];
+/** Only attendee registration is public. Exhibit and sponsorship pricing stays inside the approved partner portal. */
+export const EXPO_PUBLIC_REGISTRATION_TYPES = ["registrant"] as const satisfies readonly ExpoPackageType[];
 export type ExpoPublicRegistrationType = typeof EXPO_PUBLIC_REGISTRATION_TYPES[number];
 
 export const EXPO_PACKAGE_TYPE_META: Record<ExpoPackageType, { label: string; dashboardLabel: string; description: string }> = {

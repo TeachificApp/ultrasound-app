@@ -87,6 +87,7 @@ import { purchaseEmailOverridesRouter } from "./routers/purchaseEmailOverridesRo
 import { sponsorshipRouter } from "./routers/sponsorshipRouter";
 import { eventPartnershipRouter } from "./routers/eventPartnershipRouter";
 import { ultrasoundExpoRouter } from "./routers/ultrasoundExpoRouter";
+import { vendorPortalRouter } from "./routers/vendorPortalRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -214,6 +215,7 @@ export const appRouter = router({
   sponsorship: sponsorshipRouter,
   eventPartnership: eventPartnershipRouter,
   ultrasoundExpo: ultrasoundExpoRouter,
+  vendorPortal: vendorPortalRouter,
 
   auth: router({
     sessionState: publicProcedure.query(async ({ ctx }) => {

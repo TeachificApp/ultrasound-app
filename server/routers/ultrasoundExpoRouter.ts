@@ -9,6 +9,7 @@ import {
 import { isExpoPackageType, isExpoPublicRegistrationType, ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
 import { getDb, getUserRoles } from "../db";
 import { getStripeClient } from "../lib/stripeClient";
+import { requireApprovedVendorApplication } from "../lib/vendorPartnerAccess";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
 const EXPO_ORIGINS = new Set([
@@ -180,6 +181,98 @@ export const ultrasoundExpoRouter = router({
       }
     }),
 
+  /** Exhibitor and sponsor pricing/checkouts remain inside the approved partner portal. */
+  createPartnerCheckout: protectedProcedure
+    .input(z.object({
+      packageId: z.number().int().positive(),
+      notes: z.string().trim().max(4_000).optional().or(z.literal("")),
+      origin: z.string().max(2_048),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const application = await requireApprovedVendorApplication(ctx.user.id, "ultrasound_expo");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "UltrasoundExpo™ checkout is temporarily unavailable." });
+      const [selection] = await db.select({
+        packageId: ultrasoundExpoPackages.id,
+        eventId: ultrasoundExpoEvents.id,
+        eventName: ultrasoundExpoEvents.name,
+        eventStatus: ultrasoundExpoEvents.status,
+        packageType: ultrasoundExpoPackages.packageType,
+        packageName: ultrasoundExpoPackages.name,
+        amountCents: ultrasoundExpoPackages.amountCents,
+        currency: ultrasoundExpoPackages.currency,
+        isActive: ultrasoundExpoPackages.isActive,
+      }).from(ultrasoundExpoPackages)
+        .innerJoin(ultrasoundExpoEvents, eq(ultrasoundExpoPackages.eventId, ultrasoundExpoEvents.id))
+        .where(eq(ultrasoundExpoPackages.id, input.packageId))
+        .limit(1);
+      if (!selection || selection.eventStatus !== "published" || !selection.isActive) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "That UltrasoundExpo™ opportunity is no longer available." });
+      }
+      if (selection.packageType !== "exhibitor" && selection.packageType !== "sponsor") {
+        throw new TRPCError({ code: "NOT_FOUND", message: "That UltrasoundExpo™ opportunity is not available through the partner portal." });
+      }
+
+      const created = await db.insert(ultrasoundExpoRegistrations).values({
+        eventId: selection.eventId,
+        packageId: selection.packageId,
+        userId: ctx.user.id,
+        vendorApplicationId: application.id,
+        attendeeName: application.contactName,
+        attendeeEmail: application.contactEmail,
+        attendeePhone: application.contactPhone,
+        organizationName: application.organizationName,
+        organizationWebsite: application.organizationWebsite,
+        notes: input.notes?.trim() || null,
+        amountCents: selection.amountCents,
+        currency: selection.currency,
+        paymentStatus: "pending",
+        status: "pending",
+      }).$returningId();
+      const registrationId = created[0]?.id;
+      if (!registrationId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the UltrasoundExpo™ selection." });
+
+      try {
+        const origin = safeExpoOrigin(input.origin);
+        const session = await getStripeClient().checkout.sessions.create({
+          mode: "payment",
+          customer_email: application.contactEmail,
+          client_reference_id: String(ctx.user.id),
+          billing_address_collection: "auto",
+          allow_promotion_codes: false,
+          line_items: [{
+            price_data: {
+              currency: selection.currency,
+              product_data: {
+                name: `${selection.eventName} — ${selection.packageName}`,
+                description: `UltrasoundExpo™ ${selection.packageType} selection`,
+              },
+              unit_amount: selection.amountCents,
+            },
+            quantity: 1,
+          }],
+          metadata: {
+            type: "ultrasound_expo",
+            ultrasound_expo_registration_id: String(registrationId),
+            ultrasound_expo_event_id: String(selection.eventId),
+            ultrasound_expo_package_type: selection.packageType,
+            vendor_application_id: String(application.id),
+            user_id: String(ctx.user.id),
+            attendee_email: application.contactEmail,
+          },
+          payment_intent_data: { description: `UltrasoundExpo™ — ${selection.packageName}` },
+          success_url: `${origin}/vendor-portal?status=complete&session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${origin}/vendor-portal?status=cancelled`,
+        }, { idempotencyKey: `ultrasound-expo:${registrationId}` });
+        await db.update(ultrasoundExpoRegistrations).set({ stripeSessionId: session.id }).where(eq(ultrasoundExpoRegistrations.id, registrationId));
+        if (!session.url) throw new Error("Stripe did not return a checkout URL.");
+        return { checkoutUrl: session.url };
+      } catch {
+        await db.update(ultrasoundExpoRegistrations).set({ paymentStatus: "failed", status: "payment_failed" }).where(eq(ultrasoundExpoRegistrations.id, registrationId));
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to start secure UltrasoundExpo™ checkout. Please try again." });
+      }
+    }),
+
   myDashboard: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Your UltrasoundExpo™ Dashboard is temporarily unavailable." });
@@ -204,7 +297,7 @@ export const ultrasoundExpoRouter = router({
     }).from(ultrasoundExpoRegistrations)
       .innerJoin(ultrasoundExpoEvents, eq(ultrasoundExpoRegistrations.eventId, ultrasoundExpoEvents.id))
       .innerJoin(ultrasoundExpoPackages, eq(ultrasoundExpoRegistrations.packageId, ultrasoundExpoPackages.id))
-      .where(eq(ultrasoundExpoRegistrations.userId, ctx.user.id))
+      .where(and(eq(ultrasoundExpoRegistrations.userId, ctx.user.id), eq(ultrasoundExpoPackages.packageType, "registrant")))
       .orderBy(desc(ultrasoundExpoRegistrations.createdAt));
     return rows;
   }),

@@ -7621,6 +7621,8 @@ export type InsertWorkshop = typeof workshops.$inferInsert;
 // Stripe remains the source of truth for payment method information.
 export const sponsorships = mysqlTable("sponsorships", {
   id: int("id").autoincrement().primaryKey(),
+  // Linked only after an administrator approves a vendor application.
+  vendorApplicationId: int("vendor_application_id"),
   contactName: varchar("contact_name", { length: 255 }).notNull(),
   contactEmail: varchar("contact_email", { length: 320 }).notNull(),
   contactPhone: varchar("contact_phone", { length: 60 }),
@@ -7645,6 +7647,7 @@ export const sponsorships = mysqlTable("sponsorships", {
   index("sponsorships_status_created_idx").on(table.status, table.createdAt),
   index("sponsorships_workshop_instance_idx").on(table.workshopInstanceId),
   index("sponsorships_contact_email_idx").on(table.contactEmail),
+  index("sponsorships_vendor_application_idx").on(table.vendorApplicationId),
 ]);
 export type Sponsorship = typeof sponsorships.$inferSelect;
 export type InsertSponsorship = typeof sponsorships.$inferInsert;
@@ -7674,6 +7677,8 @@ export type EventPartnershipPackage = typeof eventPartnershipPackages.$inferSele
 
 export const eventPartnershipOrders = mysqlTable("event_partnership_orders", {
   id: int("id").autoincrement().primaryKey(),
+  // Linked only after an administrator approves a vendor application.
+  vendorApplicationId: int("vendor_application_id"),
   targetType: mysqlEnum("target_type", ["workshop_exhibit", "webinar_sponsor"]).notNull(),
   workshopInstanceId: int("workshop_instance_id"),
   webinarId: int("webinar_id"),
@@ -7697,6 +7702,7 @@ export const eventPartnershipOrders = mysqlTable("event_partnership_orders", {
   index("event_partnership_orders_workshop_idx").on(table.workshopInstanceId, table.status),
   index("event_partnership_orders_webinar_idx").on(table.webinarId, table.status),
   index("event_partnership_orders_package_idx").on(table.packageId),
+  index("event_partnership_orders_vendor_application_idx").on(table.vendorApplicationId),
 ]);
 export type EventPartnershipOrder = typeof eventPartnershipOrders.$inferSelect;
 
@@ -9157,6 +9163,35 @@ export type InsertSurveyPulseResponse = typeof surveyPulseResponses.$inferInsert
 // ─── UltrasoundExpo™ ─────────────────────────────────────────────────────────
 // A dedicated annual-event tenant. It shares member identities with the broader
 // platform while keeping Expo registrations, exhibitor records, and event sponsorship reporting separate.
+export const vendorPartnerApplications = mysqlTable("vendor_partner_applications", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationName: varchar("organization_name", { length: 255 }).notNull(),
+  organizationWebsite: varchar("organization_website", { length: 1024 }),
+  organizationLogoUrl: varchar("organization_logo_url", { length: 2048 }),
+  contactName: varchar("contact_name", { length: 255 }).notNull(),
+  contactEmail: varchar("contact_email", { length: 320 }).notNull(),
+  contactPhone: varchar("contact_phone", { length: 60 }).notNull(),
+  message: text("message"),
+  // JSON arrays of shared VendorPartnerScope and VendorPartnerType values.
+  requestedScopes: text("requested_scopes"),
+  partnerTypes: text("partner_types"),
+  status: mysqlEnum("status", ["pending", "approved", "rejected", "suspended"]).default("pending").notNull(),
+  // A server-side approval always associates an exact shared account user ID.
+  linkedUserId: int("linked_user_id"),
+  aausAccess: boolean("aaus_access").default(false).notNull(),
+  expoAccess: boolean("expo_access").default(false).notNull(),
+  reviewerNotes: text("reviewer_notes"),
+  reviewedByUserId: int("reviewed_by_user_id"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("vendor_partner_applications_status_created_idx").on(table.status, table.createdAt),
+  index("vendor_partner_applications_contact_email_idx").on(table.contactEmail),
+  index("vendor_partner_applications_linked_user_idx").on(table.linkedUserId),
+]);
+export type VendorPartnerApplication = typeof vendorPartnerApplications.$inferSelect;
+
 export const ultrasoundExpoEvents = mysqlTable("ultrasound_expo_events", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
@@ -9199,6 +9234,8 @@ export const ultrasoundExpoRegistrations = mysqlTable("ultrasound_expo_registrat
   eventId: int("event_id").notNull(),
   packageId: int("package_id").notNull(),
   userId: int("user_id"),
+  // Exhibitor and sponsor registrations require an approved vendor application.
+  vendorApplicationId: int("vendor_application_id"),
   attendeeName: varchar("attendee_name", { length: 255 }).notNull(),
   attendeeEmail: varchar("attendee_email", { length: 320 }).notNull(),
   attendeePhone: varchar("attendee_phone", { length: 60 }),
@@ -9219,5 +9256,61 @@ export const ultrasoundExpoRegistrations = mysqlTable("ultrasound_expo_registrat
   index("ultrasound_expo_registrations_user_status_idx").on(table.userId, table.status),
   index("ultrasound_expo_registrations_event_status_idx").on(table.eventId, table.status),
   index("ultrasound_expo_registrations_email_idx").on(table.attendeeEmail),
+  index("ultrasound_expo_registrations_vendor_application_idx").on(table.vendorApplicationId),
 ]);
 export type UltrasoundExpoRegistration = typeof ultrasoundExpoRegistrations.$inferSelect;
+
+/** Approved UltrasoundExpo™ partners receive only the event resources admins publish. */
+export const ultrasoundExpoPartnerResources = mysqlTable("ultrasound_expo_partner_resources", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: int("event_id").notNull(),
+  resourceType: mysqlEnum("resource_type", ["floor_plan", "booth_setup", "logistics", "document", "other"]).default("other").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  resourceUrl: varchar("resource_url", { length: 2048 }),
+  isPublished: boolean("is_published").default(false).notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("ultrasound_expo_partner_resources_event_published_idx").on(table.eventId, table.isPublished, table.sortOrder),
+]);
+export type UltrasoundExpoPartnerResource = typeof ultrasoundExpoPartnerResources.$inferSelect;
+
+/** Admin-configured inventory; a floor plan can refer to booth codes without exposing it publicly. */
+export const ultrasoundExpoBooths = mysqlTable("ultrasound_expo_booths", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: int("event_id").notNull(),
+  boothCode: varchar("booth_code", { length: 100 }).notNull(),
+  zoneLabel: varchar("zone_label", { length: 255 }),
+  dimensions: varchar("dimensions", { length: 100 }),
+  description: text("description"),
+  mapReference: varchar("map_reference", { length: 255 }),
+  availabilityStatus: mysqlEnum("availability_status", ["available", "reserved", "sold", "unavailable"]).default("available").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("ultrasound_expo_booths_event_code_unique").on(table.eventId, table.boothCode),
+  index("ultrasound_expo_booths_event_status_idx").on(table.eventId, table.availabilityStatus, table.sortOrder),
+]);
+export type UltrasoundExpoBooth = typeof ultrasoundExpoBooths.$inferSelect;
+
+/** A selection request stays pending until an administrator confirms the booth. */
+export const ultrasoundExpoBoothRequests = mysqlTable("ultrasound_expo_booth_requests", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: int("event_id").notNull(),
+  boothId: int("booth_id").notNull(),
+  vendorApplicationId: int("vendor_application_id").notNull(),
+  status: mysqlEnum("status", ["requested", "confirmed", "declined", "cancelled"]).default("requested").notNull(),
+  vendorNote: text("vendor_note"),
+  adminNote: text("admin_note"),
+  reviewedByUserId: int("reviewed_by_user_id"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("ultrasound_expo_booth_requests_vendor_idx").on(table.vendorApplicationId, table.status),
+  index("ultrasound_expo_booth_requests_event_booth_idx").on(table.eventId, table.boothId, table.status),
+]);
+export type UltrasoundExpoBoothRequest = typeof ultrasoundExpoBoothRequests.$inferSelect;

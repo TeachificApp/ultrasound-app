@@ -153,6 +153,8 @@ const UltrasoundExpoSite = lazy(() => import("./pages/UltrasoundExpoSite"));
 const UltrasoundExpoRegister = lazy(() => import("./pages/UltrasoundExpoRegister"));
 const UltrasoundExpoDashboard = lazy(() => import("./pages/UltrasoundExpoDashboard"));
 const UltrasoundExpoAdmin = lazy(() => import("./pages/admin/UltrasoundExpoAdmin"));
+const PartnerApplication = lazy(() => import("./pages/PartnerApplication"));
+const ApprovedPartnerPortal = lazy(() => import("./pages/ApprovedPartnerPortal"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
@@ -614,6 +616,8 @@ function Router() {
             These routes must precede the generic two-segment funnel catch-all. */}
         <Route path="/workshops" component={WorkshopsBrowse} />
         <Route path="/workshops/:slug" component={WorkshopLanding} />
+        <Route path="/partner-application">{() => <Suspense fallback={pageFallback}><PartnerApplication /></Suspense>}</Route>
+        <Route path="/vendor-portal">{() => <Suspense fallback={pageFallback}><ApprovedPartnerPortal /></Suspense>}</Route>
         <Route path="/sponsorships">{() => <Suspense fallback={pageFallback}><SponsorshipsPage /></Suspense>}</Route>
         <Route path="/event-partnerships/:targetType/:id">{() => <Suspense fallback={pageFallback}><EventPartnershipsPage /></Suspense>}</Route>
         <Route path="/admin/revenue-share">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><RevenueShareAdmin /></Suspense></RoleGuard>}</Route>
@@ -800,6 +804,8 @@ function MembersRouter() {
   return (
     <Switch>
       {/* Redirect all course/education/admin routes to the app (learn) subdomain */}
+      <Route path="/partner-application">{() => <Suspense fallback={pageFallback}><PartnerApplication /></Suspense>}</Route>
+      <Route path="/vendor-portal">{() => <Suspense fallback={pageFallback}><ApprovedPartnerPortal /></Suspense>}</Route>
       <Route path="/sponsorships">{() => <Suspense fallback={pageFallback}><SponsorshipsPage /></Suspense>}</Route>
       <Route path="/event-partnerships/:targetType/:id">{() => <Suspense fallback={pageFallback}><EventPartnershipsPage /></Suspense>}</Route>
       <Route path="/downloads/:slug/files">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/downloads/${params.slug}/files`); return null; }}</Route>
@@ -1198,6 +1204,8 @@ function IHeartEchoRouter() {
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />
+        <Route path="/partner-application">{() => <PartnerApplication />}</Route>
+        <Route path="/vendor-portal">{() => <ApprovedPartnerPortal />}</Route>
         <Route path="/sponsorships">{() => <SponsorshipsPage />}</Route>
         <Route path="/event-partnerships/:targetType/:id">{() => <EventPartnershipsPage />}</Route>
 
@@ -1783,6 +1791,8 @@ function UltrasoundExpoRouter() {
       <Switch>
         <Route path="/register" component={UltrasoundExpoRegister} />
         <Route path="/expo-dashboard" component={UltrasoundExpoDashboard} />
+        <Route path="/partner-application" component={PartnerApplication} />
+        <Route path="/vendor-portal" component={ApprovedPartnerPortal} />
         <Route path="/admin/ultrasound-expo">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UltrasoundExpoAdmin /></RoleGuard>}</Route>
         <Route path="/login" component={Login} />
         <Route path="/forgot-password" component={ForgotPassword} />
@@ -1853,6 +1863,8 @@ function PublicWebsiteRouter() {
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/auth/access" component={AccessLinkCallback} />
+        <Route path="/partner-application">{() => <PartnerApplication />}</Route>
+        <Route path="/vendor-portal">{() => <ApprovedPartnerPortal />}</Route>
         <Route path="/sponsorships">{() => <SponsorshipsPage />}</Route>
         <Route path="/event-partnerships/:targetType/:id">{() => <EventPartnershipsPage />}</Route>
         {/* Learning, purchased content, and every checkout flow always use the
