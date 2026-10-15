@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getStripeClient } from "../lib/stripeClient";
 import { checkoutPlatformTermsSelection, resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_OPTIONS } from "./checkoutTermsHelper";
 import { resolvePresaleWelcome, shouldReleasePresaleEnrollment } from "../../shared/contentAvailability";
@@ -26,6 +27,7 @@ import {
   lmsEnrollments,
   lmsSections,
   lmsLessons,
+  platformSettings,
 } from "../../drizzle/schema";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -123,6 +125,15 @@ export const workshopPublicRouter = router({
       // Instances that are date-valid but sold out (at capacity)
       const soldOutInstances = visibleInstances.filter(isInstanceSoldOut);
 
+      // Checkout presentation is available before an email is entered. Resolve
+      // the exact workshop/platform policy text here so the form does not show
+      // generic or stale legal copy while payment details are still gated.
+      const [platformCheckoutSettings] = await db
+        .select(checkoutPlatformTermsSelection)
+        .from(platformSettings)
+        .limit(1);
+      const checkoutTerms = resolveCheckoutTerms(workshop, platformCheckoutSettings);
+
       // Get pricing options
       const pricingOptions = await db
         .select()
@@ -156,6 +167,7 @@ export const workshopPublicRouter = router({
         allInstances: visibleInstances,
         pricingOptions,
         resources,
+        checkoutTerms,
       };
     }),
 
@@ -702,6 +714,15 @@ export const workshopLearnerRouter = router({
         quantity: 1,
       };
       const isUpgradeBump = orderBumpCheckout?.bumpMode === "upgrade";
+      // Stripe requires that a reused idempotency key represents exactly the same
+      // request. Guest checkout used to key only on a zero user id, allowing a
+      // later payer/recipient edit to collide with a prior session. Hash identity
+      // fields server-side so the key distinguishes the payload without exposing
+      // email addresses in Stripe headers or application logs.
+      const checkoutIdentityFingerprint = createHash("sha256")
+        .update([payerEmail, input.recipientEmail?.trim().toLowerCase() ?? payerEmail].join("|"))
+        .digest("hex")
+        .slice(0, 16);
       const workshopCheckoutIdempotencyKey = buildWorkshopCheckoutIdempotencyKey({
         userId,
         workshopId: workshop.id,
@@ -710,6 +731,7 @@ export const workshopLearnerRouter = router({
         currency: workshop.currency,
         orderBumpId: orderBumpCheckout?.metadata?.order_bump_id,
         bumpMode: orderBumpCheckout?.bumpMode,
+        identityFingerprint: checkoutIdentityFingerprint,
       });
       const { metadata: workshopShareMetadata, paymentIntentData: workshopShareIntentData } =
         await (await import("../lib/revenueShareEngine")).applyRevenueShareToCheckoutSession({

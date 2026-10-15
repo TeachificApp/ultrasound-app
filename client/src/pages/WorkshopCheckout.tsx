@@ -66,6 +66,7 @@ export default function WorkshopCheckout() {
   const [learnerEmail, setLearnerEmail] = useState("");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [activeSessionKey, setActiveSessionKey] = useState<string | null>(null);
+  const [checkoutAttempt, setCheckoutAttempt] = useState(0);
   const activeSessionKeyRef = useRef<string | null>(null);
   const [freeSuccess, setFreeSuccess] = useState(false);
   const [sessionMeta, setSessionMeta] = useState<{
@@ -89,6 +90,42 @@ export default function WorkshopCheckout() {
   } | null>(null);
 
   const createSession = trpc.workshopLearner.createEmbeddedCheckoutSession.useMutation();
+  // Public workshop data is deliberately loaded separately from the payment
+  // session. A guest can therefore review the image, session, price, and terms
+  // before entering an email, and a recoverable checkout error never erases it.
+  const workshopPresentationQuery = trpc.workshop.getBySlug.useQuery(
+    { slug: slug ?? "" },
+    { enabled: Boolean(slug) },
+  );
+  const selectedInstance = useMemo(() => (
+    workshopPresentationQuery.data?.allInstances?.find((instance: any) => instance.id === searchParams.instanceId) ?? null
+  ), [workshopPresentationQuery.data, searchParams.instanceId]);
+  const presentation = sessionMeta ?? (workshopPresentationQuery.data?.workshop && selectedInstance ? {
+    workshopTitle: workshopPresentationQuery.data.workshop.title,
+    instanceTitle: selectedInstance.title ?? null,
+    workshopThumbnail: workshopPresentationQuery.data.workshop.thumbnailUrl ?? null,
+    primaryColor: workshopPresentationQuery.data.workshop.primaryColor ?? "#179ca3",
+    accentColor: workshopPresentationQuery.data.workshop.accentColor ?? "#0d9488",
+    productName: `${workshopPresentationQuery.data.workshop.title} — ${selectedInstance.title ?? workshopPresentationQuery.data.workshop.title}`,
+    displayPrice: selectedInstance.price ?? workshopPresentationQuery.data.workshop.price ?? 0,
+    currency: workshopPresentationQuery.data.workshop.currency ?? "usd",
+    termsUrl: workshopPresentationQuery.data.checkoutTerms?.termsUrl ?? "https://www.allaboutultrasound.com/terms",
+    privacyUrl: workshopPresentationQuery.data.checkoutTerms?.privacyUrl ?? "https://www.allaboutultrasound.com/privacy-policy.html",
+    checkoutTermsText: workshopPresentationQuery.data.checkoutTerms?.checkoutTermsText ?? "I have reviewed and agree to the",
+    checkoutTermsLink1Text: workshopPresentationQuery.data.checkoutTerms?.checkoutTermsLink1Text ?? "Terms of Service",
+    checkoutTermsLink1Url: workshopPresentationQuery.data.checkoutTerms?.checkoutTermsLink1Url ?? "https://www.allaboutultrasound.com/terms",
+    checkoutTermsLink2Text: workshopPresentationQuery.data.checkoutTerms?.checkoutTermsLink2Text ?? "Privacy Policy",
+    checkoutTermsLink2Url: workshopPresentationQuery.data.checkoutTerms?.checkoutTermsLink2Url ?? "https://www.allaboutultrasound.com/privacy-policy.html",
+    free: false,
+  } : null);
+  const friendlyCheckoutError = createSession.isError
+    ? "We could not prepare secure checkout just yet. Your workshop details and registration form are still available—please try again."
+    : null;
+  const retryCheckout = () => {
+    createSession.reset();
+    invalidateEmbeddedSession();
+    setCheckoutAttempt((attempt) => attempt + 1);
+  };
   useEffect(() => {
     const knownEmail = (user as any)?.email?.trim().toLowerCase();
     if (knownEmail && !payerEmail) setPayerEmail(knownEmail);
@@ -130,12 +167,42 @@ export default function WorkshopCheckout() {
       }});
     }, learnerIsPayee ? 0 : 350);
     return () => window.clearTimeout(timeout);
-  }, [slug, searchParams.instanceId, learnerIsPayee, payerEmail, learnerName, learnerEmail, hasValidLearnerDetails, checkoutSessionKey, activeSessionKey]);
+  }, [slug, searchParams.instanceId, learnerIsPayee, payerEmail, learnerName, learnerEmail, hasValidLearnerDetails, checkoutSessionKey, activeSessionKey, checkoutAttempt]);
 
-  const primary = sessionMeta?.primaryColor ?? "#189aa1";
+  const primary = presentation?.primaryColor ?? "#189aa1";
   const stripeOptions = useMemo(() => (clientSecret ? { clientSecret } : undefined), [clientSecret]);
 
   const backHref = `/workshops/${slug}`;
+
+  // The public workshop response knows availability before any payer details are
+  // entered. Honor it immediately rather than creating a Stripe session simply
+  // to discover that registration is closed or waitlisted.
+  if ((selectedInstance as any)?.status === "waitlist") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-teal-100 p-8 max-w-md w-full text-center">
+          <Bell className="h-12 w-12 text-teal-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Join the Waitlist</h2>
+          <p className="text-gray-500 text-sm mb-6">{(selectedInstance as any).title ?? "This workshop session"} is not currently open for registration. Share your name and email and we’ll notify you when enrolment opens.</p>
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <Button className="text-white" style={{ background: primary }} onClick={() => setWaitlistOpen(true)}>Join Waitlist</Button>
+            <Link href={backHref}><Button variant="outline">Back to Workshop</Button></Link>
+          </div>
+          <AvailabilityWaitlistDialog
+            open={waitlistOpen}
+            onClose={() => setWaitlistOpen(false)}
+            productType="workshop_instance"
+            productId={searchParams.instanceId ?? 0}
+            title={(selectedInstance as any).title ?? "Workshop session"}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if ((selectedInstance as any)?.status === "enrollment_closed") {
+    return <WorkshopCheckoutClosedState title={(selectedInstance as any).title ?? "This workshop session"} backHref={backHref} />;
+  }
 
 
   // Restricted workshop instances never receive a Stripe client secret. Keep users
@@ -166,25 +233,6 @@ export default function WorkshopCheckout() {
 
   if (sessionMeta?.availabilityStatus === "enrollment_closed") {
     return <WorkshopCheckoutClosedState title={sessionMeta.instanceTitle ?? sessionMeta.workshopTitle} backHref={backHref} />;
-  }
-
-  // ── Error state ───────────────────────────────────────────────────────────
-  if (createSession.isError) {
-    const msg = (createSession.error as any)?.message ?? "This workshop is not available for purchase right now.";
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-8 max-w-md w-full text-center">
-          <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Registration Unavailable</h2>
-          <p className="text-gray-500 text-sm mb-6">{msg}</p>
-          <Link href={backHref}>
-            <Button variant="outline" className="gap-2">
-              <ArrowLeft className="h-4 w-4" /> Back to Workshop
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
   }
 
   // ── Free enrollment success ───────────────────────────────────────────────
@@ -233,10 +281,10 @@ export default function WorkshopCheckout() {
         <div className="space-y-5">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             {/* Thumbnail */}
-            {sessionMeta?.workshopThumbnail ? (
+            {presentation?.workshopThumbnail ? (
               <img
-                src={sessionMeta.workshopThumbnail}
-                alt={sessionMeta.workshopTitle}
+                src={presentation.workshopThumbnail}
+                alt={presentation.workshopTitle}
                 className="w-full h-44 object-cover"
               />
             ) : (
@@ -244,28 +292,28 @@ export default function WorkshopCheckout() {
             )}
 
             <div className="p-5">
-              {createSession.isPending && !sessionMeta ? (
+              {workshopPresentationQuery.isLoading && !presentation ? (
                 <div className="space-y-3 animate-pulse">
                   <div className="h-5 bg-gray-100 rounded w-3/4" />
                   <div className="h-4 bg-gray-100 rounded w-1/2" />
                   <div className="h-8 bg-gray-100 rounded w-1/3 mt-4" />
                 </div>
-              ) : sessionMeta ? (
+              ) : presentation ? (
                 <>
                   <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: primary }}>
                     Hands-On Workshop
                   </p>
                   <h1 className="text-xl font-bold text-gray-900 leading-snug mb-1">
-                    {sessionMeta.workshopTitle}
+                    {presentation.workshopTitle}
                   </h1>
-                  {sessionMeta.instanceTitle && (
-                    <p className="text-sm text-gray-500 mb-3">{sessionMeta.instanceTitle}</p>
+                  {presentation.instanceTitle && (
+                    <p className="text-sm text-gray-500 mb-3">{presentation.instanceTitle}</p>
                   )}
                   <Separator className="my-3" />
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">Registration fee</span>
                     <span className="text-2xl font-bold" style={{ color: primary }}>
-                      {formatWorkshopDollars(sessionMeta.displayPrice, sessionMeta.currency)}
+                      {formatWorkshopDollars(presentation.displayPrice, presentation.currency)}
                     </span>
                   </div>
                 </>
@@ -297,16 +345,8 @@ export default function WorkshopCheckout() {
               </div>
             )}
           </div>
-          {!hasValidLearnerDetails ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-              <ShieldCheck className="mx-auto h-10 w-10" style={{ color: primary }} />
-              <h4 className="mt-4 text-base font-semibold text-gray-900">Add the learner’s details</h4>
-              <p className="mt-2 text-sm text-gray-500">Enter the payer and learner details above to load secure payment.</p>
-            </div>
-          ) : (
-            <>
-          {/* Terms agreement card — above Stripe embed */}
-          {sessionMeta && !sessionMeta.free && (
+          {/* Terms and workshop policy are visible before a guest enters an email. */}
+          {presentation && !presentation.free && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 space-y-4">
               <h3 className="text-sm font-semibold flex items-center gap-2 text-gray-800">
                 <ShieldCheck className="h-4 w-4" style={{ color: primary }} />
@@ -322,21 +362,21 @@ export default function WorkshopCheckout() {
                 />
                 <label htmlFor="terms" className="text-sm text-gray-700 leading-relaxed cursor-pointer flex-1">
                   <span className="block [&_p]:mb-1 [&_p:last-child]:mb-0 [&_strong]:font-semibold [&_em]:italic">
-                    {sessionMeta.checkoutTermsText && /^\s*</.test(sessionMeta.checkoutTermsText)
-                      ? <span dangerouslySetInnerHTML={{ __html: sessionMeta.checkoutTermsText }} />
-                      : <>{sessionMeta.checkoutTermsText}</>}
+                    {presentation.checkoutTermsText && /^\s*</.test(presentation.checkoutTermsText)
+                      ? <span dangerouslySetInnerHTML={{ __html: presentation.checkoutTermsText }} />
+                      : <>{presentation.checkoutTermsText}</>}
                   </span>
-                  {(sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url) || (sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url) ? (
+                  {(presentation.checkoutTermsLink1Text && presentation.checkoutTermsLink1Url) || (presentation.checkoutTermsLink2Text && presentation.checkoutTermsLink2Url) ? (
                     <span className="block mt-2">
-                      {sessionMeta.checkoutTermsLink1Text && sessionMeta.checkoutTermsLink1Url && (
-                        <a href={sessionMeta.checkoutTermsLink1Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }} onClick={e => e.stopPropagation()}>
-                          {sessionMeta.checkoutTermsLink1Text}
+                      {presentation.checkoutTermsLink1Text && presentation.checkoutTermsLink1Url && (
+                        <a href={presentation.checkoutTermsLink1Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }} onClick={e => e.stopPropagation()}>
+                          {presentation.checkoutTermsLink1Text}
                         </a>
                       )}
-                      {sessionMeta.checkoutTermsLink2Text && sessionMeta.checkoutTermsLink2Url && (
+                      {presentation.checkoutTermsLink2Text && presentation.checkoutTermsLink2Url && (
                         <>{" "}and{" "}
-                        <a href={sessionMeta.checkoutTermsLink2Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }} onClick={e => e.stopPropagation()}>
-                          {sessionMeta.checkoutTermsLink2Text}
+                        <a href={presentation.checkoutTermsLink2Url} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline" style={{ color: primary }} onClick={e => e.stopPropagation()}>
+                          {presentation.checkoutTermsLink2Text}
                         </a></>
                       )}
                     </span>
@@ -351,9 +391,28 @@ export default function WorkshopCheckout() {
             </div>
           )}
 
-          {/* Stripe embedded checkout */}
+          {friendlyCheckoutError && (
+            <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+                <div className="min-w-0">
+                  <p className="font-semibold">Secure checkout needs a refresh</p>
+                  <p className="mt-1 leading-5">{friendlyCheckoutError}</p>
+                  <Button type="button" variant="outline" size="sm" className="mt-3 border-amber-300 bg-white text-amber-950 hover:bg-amber-100" onClick={retryCheckout} disabled={createSession.isPending || !hasValidLearnerDetails}>Try secure checkout again</Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Stripe embedded checkout stays gated only by valid identity and consent. */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[400px]">
-            {createSession.isPending && !clientSecret ? (
+            {!hasValidLearnerDetails ? (
+              <div className="p-8 flex min-h-[300px] flex-col items-center justify-center text-center">
+                <ShieldCheck className="mx-auto h-10 w-10" style={{ color: primary }} />
+                <h4 className="mt-4 text-base font-semibold text-gray-900">Add the learner’s details</h4>
+                <p className="mt-2 max-w-sm text-sm text-gray-500">Enter the payer and learner details above to load secure payment. Workshop details, policy, and registration requirements remain visible while you do.</p>
+              </div>
+            ) : createSession.isPending && !clientSecret ? (
               <div className="p-8 flex flex-col items-center justify-center min-h-[300px] gap-4">
                 <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: primary, borderTopColor: "transparent" }} />
                 <p className="text-sm text-gray-400">Preparing secure checkout…</p>
@@ -369,10 +428,13 @@ export default function WorkshopCheckout() {
                   Please agree to the Terms of Service and Privacy Policy above to proceed to payment.
                 </p>
               </div>
-            ) : null}
+            ) : (
+              <div className="p-8 flex min-h-[300px] flex-col items-center justify-center text-center">
+                <ShieldCheck className="mx-auto h-10 w-10" style={{ color: primary }} />
+                <p className="mt-3 text-sm text-gray-500">Complete the registration details above to continue securely.</p>
+              </div>
+            )}
           </div>
-            </>
-          )}
         </div>
       </div>
     </div>

@@ -37,6 +37,7 @@ export function buildWorkshopCheckoutIdempotencyKey({
   currency,
   orderBumpId,
   bumpMode,
+  identityFingerprint,
 }: {
   userId?: number | null;
   workshopId: number;
@@ -45,10 +46,14 @@ export function buildWorkshopCheckoutIdempotencyKey({
   currency?: string | null;
   orderBumpId?: string | number | null;
   bumpMode?: string | null;
+  /** A one-way server-generated hash of payer/learner identity details. */
+  identityFingerprint?: string | null;
 }) {
   return [
-    "workshop-checkout-v2",
+    // v3 prevents old v2 payload collisions from blocking a corrected checkout.
+    "workshop-checkout-v3",
     userId ?? "guest",
+    identityFingerprint ?? "anonymous",
     workshopId,
     instanceId,
     priceInCents,

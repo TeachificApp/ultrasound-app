@@ -27,10 +27,29 @@ const closedCheckoutMeta = {
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
+    useUtils: () => ({ auth: { me: { setData: vi.fn() } } }),
+    auth: {
+      me: { useQuery: () => ({ data: { email: "learner@example.com" }, isLoading: false, error: null, refetch: vi.fn() }) },
+      sessionState: { useQuery: () => ({ data: { status: "authenticated" }, isLoading: false, error: null }) },
+    },
+    workshop: {
+      getBySlug: {
+        useQuery: () => ({
+          data: {
+            workshop: { title: "Closed workshop", thumbnailUrl: null, primaryColor: "#189aa1", accentColor: "#4ad9e0", price: "2297.00", currency: "usd" },
+            allInstances: [{ id: 9, title: "Closed session", price: "2297.00", status: "enrollment_closed" }],
+            checkoutTerms: { checkoutTermsText: "Terms", checkoutTermsLink1Text: "Terms", checkoutTermsLink1Url: "/terms", checkoutTermsLink2Text: "Privacy", checkoutTermsLink2Url: "/privacy", termsUrl: "/terms", privacyUrl: "/privacy" },
+          },
+          isLoading: false,
+          error: null,
+        }),
+      },
+    },
     workshopLearner: {
       createEmbeddedCheckoutSession: {
         useMutation: (options: { onSuccess: (data: typeof closedCheckoutMeta) => void }) => ({
           mutate: () => options.onSuccess(closedCheckoutMeta),
+          reset: vi.fn(),
           isError: false,
           isPending: false,
         }),
@@ -55,6 +74,7 @@ afterEach(() => {
   delete (globalThis as any).location;
   delete (globalThis as any).addEventListener;
   delete (globalThis as any).removeEventListener;
+  delete (globalThis as any).localStorage;
 });
 
 async function renderCard(instance: any, onWaitlist = () => undefined) {
@@ -121,6 +141,7 @@ describe("WorkshopCheckout closed availability state", () => {
     (globalThis as any).location = dom.window.location;
     (globalThis as any).addEventListener = dom.window.addEventListener.bind(dom.window);
     (globalThis as any).removeEventListener = dom.window.removeEventListener.bind(dom.window);
+    (globalThis as any).localStorage = dom.window.localStorage;
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -129,7 +150,7 @@ describe("WorkshopCheckout closed availability state", () => {
     roots.push(root);
     await act(async () => {
       root.render(React.createElement(Route, { path: "/checkout/workshop/:slug", component: WorkshopCheckout }));
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     });
     expect((container.querySelector('[data-testid="workshop-checkout-closed-cta"]') as HTMLButtonElement).disabled).toBe(true);
     expect(container.querySelector("iframe")).toBeNull();

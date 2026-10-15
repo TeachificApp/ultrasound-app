@@ -18,12 +18,15 @@ describe("workshop dollar pricing", () => {
     expect(resolveWorkshopCheckoutPrice("1297.00", "2297.00")).toEqual({ displayDollars: "1297.00", stripeCents: 129700 });
   });
 
-  it("changes the Stripe idempotency key when a corrected workshop price changes request parameters", () => {
-    const original = buildWorkshopCheckoutIdempotencyKey({ userId: 42, workshopId: 60001, instanceId: 1, priceInCents: 229700, currency: "usd" });
-    const corrected = buildWorkshopCheckoutIdempotencyKey({ userId: 42, workshopId: 60001, instanceId: 1, priceInCents: 229700, currency: "usd" });
-    const legacyPrice = buildWorkshopCheckoutIdempotencyKey({ userId: 42, workshopId: 60001, instanceId: 1, priceInCents: 22970000, currency: "usd" });
-    expect(corrected).toBe(original);
-    expect(corrected).not.toBe(legacyPrice);
+  it("uses a stable key for one payload but separates a changed payer or learner checkout", () => {
+    const original = buildWorkshopCheckoutIdempotencyKey({ userId: 42, workshopId: 60001, instanceId: 1, priceInCents: 229700, currency: "usd", identityFingerprint: "payer-a" });
+    const repeat = buildWorkshopCheckoutIdempotencyKey({ userId: 42, workshopId: 60001, instanceId: 1, priceInCents: 229700, currency: "usd", identityFingerprint: "payer-a" });
+    const differentLearner = buildWorkshopCheckoutIdempotencyKey({ userId: 42, workshopId: 60001, instanceId: 1, priceInCents: 229700, currency: "usd", identityFingerprint: "payer-b" });
+    const legacyPrice = buildWorkshopCheckoutIdempotencyKey({ userId: 42, workshopId: 60001, instanceId: 1, priceInCents: 22970000, currency: "usd", identityFingerprint: "payer-a" });
+    expect(repeat).toBe(original);
+    expect(repeat).not.toBe(differentLearner);
+    expect(repeat).not.toBe(legacyPrice);
+    expect(repeat).toContain("workshop-checkout-v3");
   });
 });
 

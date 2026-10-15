@@ -146,4 +146,16 @@ describe("purchase recipient and cancellation safeguards", () => {
     expect(workshopCheckout).toContain("Payer email");
     expect(webinarLanding).toContain('"Access Webinar"');
   });
+  it("keeps the workshop image, selected session, policy, and registration form visible before email or after a checkout error", () => {
+    const checkout = source("../client/src/pages/WorkshopCheckout.tsx");
+    const workshopRouter = source("./routers/workshopRouter.ts");
+
+    expect(checkout).toContain("workshopPresentationQuery");
+    expect(checkout).toContain("const presentation = sessionMeta");
+    expect(checkout).toContain("Secure checkout needs a refresh");
+    expect(checkout).toContain("Try secure checkout again");
+    expect(checkout).not.toContain("if (createSession.isError)");
+    expect(workshopRouter).toContain("const checkoutTerms = resolveCheckoutTerms(workshop, platformCheckoutSettings)");
+  });
+
 });
