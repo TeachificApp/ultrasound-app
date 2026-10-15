@@ -20,6 +20,14 @@ const brandDark = "#0e4a50";
 
 export type ContentType = "course" | "download" | "bundle" | "quiz";
 
+/** Non-secret details sent only in the administrator's token-free purchase receipt. */
+export type PurchaseNotificationDetails = {
+  userId?: number | null;
+  contentTitle?: string | null;
+  amountCents?: number | null;
+  currency?: string | null;
+};
+
 /** A rendered transactional purchase email. Rendering never sends email or creates access tokens. */
 export type RenderedPurchaseEmail = { subject: string; htmlBody: string };
 
@@ -59,6 +67,8 @@ async function deliverEmail(opts: {
   htmlBody: string;
   brandMode?: BrandMode;
   payee?: { name: string; email: string } | null;
+  /** Actual checkout amount and account ID for the secure administrator receipt. */
+  purchaseDetails?: PurchaseNotificationDetails;
   forPurchase?: boolean;
 }): Promise<boolean> {
   const recipientEmails = [opts.to.email, opts.payee?.email].filter(Boolean) as string[];
@@ -76,7 +86,7 @@ async function deliverEmail(opts: {
     htmlBody: opts.htmlBody,
     brandMode: opts.brandMode ?? "combined",
     ...(opts.forPurchase
-      ? { purchaseAccess: { payee: opts.payee ?? null }, transactional: true }
+      ? { purchaseAccess: { payee: opts.payee ?? null, ...(opts.purchaseDetails ?? {}) }, transactional: true }
       : {}),
   });
 }
@@ -115,6 +125,8 @@ export type EnrollmentEmailOptions = {
   setPasswordUrl?: string | null;
   brand?: Brand;
   payee?: { name: string; email: string } | null;
+  /** Actual checkout amount and account ID for the secure administrator receipt. */
+  purchaseDetails?: PurchaseNotificationDetails;
   forPurchase?: boolean;
 };
 
@@ -170,6 +182,7 @@ export async function sendEnrollmentEmail(opts: EnrollmentEmailOptions): Promise
     htmlBody,
     brandMode: "combined",
     payee: opts.payee,
+    purchaseDetails: { ...opts.purchaseDetails, contentTitle: opts.purchaseDetails?.contentTitle ?? opts.courseTitle },
     forPurchase: opts.forPurchase,
   });
 }
@@ -260,6 +273,8 @@ export type DownloadAccessEmailOptions = {
   setPasswordUrl?: string | null;
   brand?: Brand;
   payee?: { name: string; email: string } | null;
+  /** Actual checkout amount and account ID for the secure administrator receipt. */
+  purchaseDetails?: PurchaseNotificationDetails;
   forPurchase?: boolean;
 };
 
@@ -306,6 +321,7 @@ export async function sendDownloadAccessEmail(opts: DownloadAccessEmailOptions):
     htmlBody,
     brandMode: "combined",
     payee: opts.payee,
+    purchaseDetails: { ...opts.purchaseDetails, contentTitle: opts.purchaseDetails?.contentTitle ?? opts.productTitle },
     forPurchase: opts.forPurchase,
   });
 }
@@ -327,6 +343,8 @@ export type BundleAccessEmailOptions = {
   setPasswordUrl?: string | null;
   brand?: Brand;
   payee?: { name: string; email: string } | null;
+  /** Actual checkout amount and account ID for the secure administrator receipt. */
+  purchaseDetails?: PurchaseNotificationDetails;
   forPurchase?: boolean;
 };
 
@@ -373,6 +391,7 @@ export async function sendBundleAccessEmail(opts: BundleAccessEmailOptions): Pro
     htmlBody,
     brandMode: "combined",
     payee: opts.payee,
+    purchaseDetails: { ...opts.purchaseDetails, contentTitle: opts.purchaseDetails?.contentTitle ?? opts.bundleTitle },
     forPurchase: opts.forPurchase,
   });
 }
@@ -392,6 +411,8 @@ export type QuizAccessEmailOptions = {
   setPasswordUrl?: string | null;
   brand?: Brand;
   payee?: { name: string; email: string } | null;
+  /** Actual checkout amount and account ID for the secure administrator receipt. */
+  purchaseDetails?: PurchaseNotificationDetails;
   forPurchase?: boolean;
 };
 
@@ -441,6 +462,7 @@ export async function sendQuizAccessEmail(opts: QuizAccessEmailOptions): Promise
     htmlBody,
     brandMode: "combined",
     payee: opts.payee,
+    purchaseDetails: { ...opts.purchaseDetails, contentTitle: opts.purchaseDetails?.contentTitle ?? opts.quizTitle },
     forPurchase: opts.forPurchase,
   });
 }
@@ -461,6 +483,8 @@ export type PurchaseAccessEmailOptions = {
   brandMode?: BrandMode;
   detailsHtml?: string;
   payee?: { name: string; email: string } | null;
+  /** Actual checkout amount and account ID for the secure administrator receipt. */
+  purchaseDetails?: PurchaseNotificationDetails;
   forPurchase?: boolean;
 };
 
@@ -487,6 +511,7 @@ export async function sendPurchaseAccessEmail(opts: PurchaseAccessEmailOptions):
     htmlBody,
     brandMode: opts.brandMode ?? "combined",
     payee: opts.payee,
+    purchaseDetails: opts.purchaseDetails,
     forPurchase: opts.forPurchase ?? true,
   });
 }

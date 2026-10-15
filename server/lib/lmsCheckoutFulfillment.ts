@@ -634,6 +634,11 @@ export async function reconcileLmsCheckoutFromStripeSession(
                 forPurchase: true,
                 quizTitle: course.title,
                 courseSlug: course.slug,
+                purchaseDetails: {
+                  userId,
+                  amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+                  currency: typeof session.currency === "string" ? session.currency : null,
+                },
                 customSubject: emailOverride?.subject,
                 customHeading: emailOverride?.heading,
                 customIntro: emailOverride?.intro,
@@ -649,6 +654,11 @@ export async function reconcileLmsCheckoutFromStripeSession(
               forPurchase: true,
               courseTitle: course.title,
               courseSlug: course.slug,
+              purchaseDetails: {
+                userId,
+                amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+                currency: typeof session.currency === "string" ? session.currency : null,
+              },
               customSubject: emailOverride?.subject,
               customHeading: emailOverride?.heading,
               customIntro: emailOverride?.intro,

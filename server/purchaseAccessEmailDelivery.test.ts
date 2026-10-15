@@ -62,6 +62,30 @@ describe("purchase access email delivery", () => {
     expect(admin?.bcc).toBeUndefined();
   });
 
+  it("includes the learner, registered content, paid price, and member profile only in the admin receipt", async () => {
+    const tokenizedUrl = "https://learn.allaboutultrasound.com/auth/access?token=private-token";
+    await sendEmail({
+      to: { name: "Avery Learner", email: "avery@example.com" },
+      subject: "Your access is ready",
+      htmlBody: `<p><a href="${tokenizedUrl}">Access</a></p>`,
+      purchaseAccess: {
+        userId: 42,
+        contentTitle: "Advanced Echocardiography Course",
+        amountCents: 4997,
+        currency: "usd",
+      },
+    });
+
+    const [, admin] = vi.mocked(sendTransactionalEmail).mock.calls.map((call) => call[0]);
+    expect(admin?.to.email).toBe(PURCHASE_ACCESS_ADMIN_EMAIL);
+    expect(admin?.htmlBody).toContain("Avery Learner");
+    expect(admin?.htmlBody).toContain("avery@example.com");
+    expect(admin?.htmlBody).toContain("Advanced Echocardiography Course");
+    expect(admin?.htmlBody).toContain("$49.97");
+    expect(admin?.htmlBody).toContain("https://app.allaboutultrasound.com/admin/users/42");
+    expect(admin?.htmlBody).not.toContain(tokenizedUrl);
+  });
+
   it("does not duplicate the learner message when payer and learner match", async () => {
     const tokenizedUrl = "https://learn.allaboutultrasound.com/auth/access?token=private-token";
     const ok = await sendEmail({

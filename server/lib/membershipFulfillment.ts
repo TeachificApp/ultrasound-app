@@ -37,6 +37,7 @@ export type MembershipFulfillmentContext = {
   stripeSubscriptionId?: string | null;
   stripeCustomerId?: string | null;
   amountTotalCents?: number;
+  currency?: string | null;
   discountCodeId?: number | null;
   customerEmail?: string | null;
   customerName?: string | null;
@@ -464,6 +465,8 @@ async function sendMembershipWelcomeEmail(opts: {
   primaryCourseSlug?: string | null;
   payerEmail?: string | null;
   payerName?: string | null;
+  amountTotalCents?: number | null;
+  currency?: string | null;
   brand?: "all_about_ultrasound" | "iheartecho" | null;
 }): Promise<boolean> {
   const brand = opts.brand === "iheartecho" ? "iheartecho" : "aaus";
@@ -500,6 +503,12 @@ async function sendMembershipWelcomeEmail(opts: {
     heading: copy.heading,
     intro: copy.intro,
     detailsHtml: copy.detailsHtml,
+    purchaseDetails: {
+      userId: opts.userId,
+      contentTitle: opts.planTitle,
+      amountCents: opts.amountTotalCents ?? null,
+      currency: opts.currency ?? null,
+    },
     accessLabel: opts.primaryCourseSlug ? "Start Learning" : "Open My Membership",
     destinationUrl: destination,
     accessToken,
@@ -646,6 +655,8 @@ export async function fulfillMembershipPurchase(
           primaryCourseSlug,
           payerEmail: ctx.payerEmail,
           payerName: ctx.payerName,
+          amountTotalCents: ctx.amountTotalCents ?? null,
+          currency: ctx.currency ?? null,
           brand: plan.brand,
         }),
       });
@@ -748,6 +759,7 @@ export async function reconcileMembershipFromStripeSession(
     stripeSubscriptionId,
     stripeCustomerId,
     amountTotalCents: (session.amount_total as number) ?? 0,
+    currency: typeof session.currency === "string" ? session.currency : null,
     discountCodeId: meta.discount_code_id ? parseInt(meta.discount_code_id, 10) : null,
     customerEmail,
     customerName,

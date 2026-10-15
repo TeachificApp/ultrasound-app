@@ -88,6 +88,7 @@ async function deliverDownloadAccessOnce(
   userId: number,
   productId: number,
   payee?: { email?: string | null; name?: string | null },
+  payment?: { amountCents?: number | null; currency?: string | null },
 ) {
   return sendPurchaseNotificationOnce(db, {
     checkoutSessionId,
@@ -95,6 +96,8 @@ async function deliverDownloadAccessOnce(
     send: () => sendPurchaseConfirmationEmail(userId, productId, {
       payeeEmail: payee?.email,
       payeeName: payee?.name,
+      amountCents: payment?.amountCents ?? null,
+      currency: payment?.currency ?? null,
     }),
   });
 }
@@ -418,7 +421,10 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       }
       console.log(`[Stripe] Digital download payment already reconciled: ${paymentIntentId}`);
       if (existingPayment.userId === userId) {
-        const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer);
+        const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer, {
+    amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+    currency: typeof session.currency === "string" ? session.currency : null,
+  });
         if (delivery.attempted && !delivery.delivered) {
           await notifyOwner({ title: "⚠️ Download access email failed", content: `Checkout ${session.id} granted a download entitlement but its access email could not be sent.` });
         }
@@ -443,7 +449,10 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
       stripePaymentIntentId: (session.payment_intent as string) ?? null,
       message: `Checkout completed but user already owns download product ${productId}`,
     });
-    const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer);
+    const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer, {
+    amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+    currency: typeof session.currency === "string" ? session.currency : null,
+  });
     const deliverySucceeded = delivery.delivered;
     try {
       const { logPurchaseActivity } = await import("../lib/downloadAccess");
@@ -538,7 +547,10 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     });
   } catch (_e) { /* non-blocking */ }
   // Send one session-idempotent purchase confirmation with the file links.
-  const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer);
+  const delivery = await deliverDownloadAccessOnce(db, session.id as string | undefined, userId, productId, payer, {
+    amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+    currency: typeof session.currency === "string" ? session.currency : null,
+  });
   const deliverySucceeded = delivery.delivered;
   if (delivery.attempted && !delivery.delivered) {
     await notifyOwner({ title: "⚠️ Download access email failed", content: `Checkout ${session.id} recorded a download purchase but its access email could not be sent.` });
@@ -607,6 +619,12 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
           forPurchase: true,
           bundleTitle: bundle.title,
           bundleSlug: bundle.slug,
+          purchaseDetails: {
+            userId,
+            amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+            currency: typeof session.currency === "string" ? session.currency : null,
+            contentTitle: bundle.title,
+          },
           customSubject: emailOverride?.subject,
           customHeading: emailOverride?.heading,
           customIntro: emailOverride?.intro,
@@ -689,6 +707,12 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
           to: { name: recipient?.name || to.name || email.split("@")[0], email: to.email || email },
           payee,
           forPurchase: true,
+          purchaseDetails: {
+            userId,
+            amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+            currency: typeof session.currency === "string" ? session.currency : null,
+            contentTitle: title,
+          },
           subject: copy.subject,
           heading: copy.heading,
           intro: copy.intro,
@@ -758,6 +782,12 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
           to: { name: (fulfillment.recipientName ?? recipient.name) || to.name || email.split("@")[0], email: to.email || email },
           payee,
           forPurchase: true,
+          purchaseDetails: {
+            userId,
+            amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+            currency: typeof session.currency === "string" ? session.currency : null,
+            contentTitle: workshop.title,
+          },
           subject: copy.subject,
           heading: copy.heading,
           intro: copy.intro,
@@ -822,6 +852,12 @@ export async function handleWebinarCheckoutCompleted(session: Record<string, unk
           to: { name: recipient?.name || to.name || email.split("@")[0], email: to.email || email },
           payee,
           forPurchase: true,
+          purchaseDetails: {
+            userId,
+            amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+            currency: typeof session.currency === "string" ? session.currency : null,
+            contentTitle: webinar.title,
+          },
           subject: copy.subject,
           heading: copy.heading,
           intro: copy.intro,
@@ -978,6 +1014,13 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
         subject: `Your ${brandLabel} Premium Membership is ready`,
         htmlBody: enhancedBody,
         previewText: `Access your ${brandLabel} premium membership on ${getBrandDisplayConfig(brandMode).shortName}`,
+        purchaseAccess: {
+          userId,
+          contentTitle: `${brandLabel} Premium Membership`,
+          amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+          currency: typeof session.currency === "string" ? session.currency : null,
+        },
+        transactional: true,
       });
       console.log(`[Stripe] Brand membership: welcome email sent to new user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
@@ -1015,6 +1058,13 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
         subject: `Your ${planLabel} is ready`,
         htmlBody,
         previewText: `Access your ${planLabel} on ${getBrandDisplayConfig(brandMode).shortName}`,
+        purchaseAccess: {
+          userId,
+          contentTitle: planLabel,
+          amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+          currency: typeof session.currency === "string" ? session.currency : null,
+        },
+        transactional: true,
       });
       console.log(`[Stripe] Brand membership: access email sent to existing user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
@@ -1240,6 +1290,13 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
         subject: `Your ${planLabel} is ready`,
         htmlBody: enhancedBody,
         previewText: `Access your ${planLabel} on All About Ultrasound`,
+        purchaseAccess: {
+          userId,
+          contentTitle: planLabel,
+          amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+          currency: typeof session.currency === "string" ? session.currency : null,
+        },
+        transactional: true,
       });
       console.log(`[Stripe] Dual membership: welcome email sent to new user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
@@ -1275,6 +1332,13 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
         subject: `Your ${planLabel} is ready`,
         htmlBody,
         previewText: `Access your ${planLabel} on All About Ultrasound`,
+        purchaseAccess: {
+          userId,
+          contentTitle: planLabel,
+          amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+          currency: typeof session.currency === "string" ? session.currency : null,
+        },
+        transactional: true,
       });
       console.log(`[Stripe] Dual membership: access email sent to existing user ${customerEmail} (userId=${userId})`);
     } catch (emailErr) {
@@ -1522,6 +1586,12 @@ async function handleCanonicalBundleCheckoutCompleted(session: Record<string, un
           forPurchase: true,
           bundleTitle: bundle.title,
           bundleSlug: bundle.slug,
+          purchaseDetails: {
+            userId,
+            amountCents: typeof session.amount_total === "number" ? session.amount_total : null,
+            currency: typeof session.currency === "string" ? session.currency : null,
+            contentTitle: bundle.title,
+          },
           customSubject: emailOverride?.subject,
           customHeading: emailOverride?.heading,
           customIntro: emailOverride?.intro,

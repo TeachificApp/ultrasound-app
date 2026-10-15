@@ -41,7 +41,13 @@ export interface SendEmailOptions {
   bcc?: EmailRecipient[];
   /** Routes secure learner access plus token-free payer/admin purchase receipts. */
   purchaseAccess?: {
+    /** Purchaser when access is assigned to a different learner. */
     payee?: EmailRecipient | null;
+    /** Non-secret operational data included only in the platform-admin receipt. */
+    userId?: number | null;
+    contentTitle?: string | null;
+    amountCents?: number | null;
+    currency?: string | null;
   };
   /**
    * Non-PII campaign identifier forwarded to SendGrid as a custom argument.

@@ -2253,7 +2253,12 @@ export const downloadsCheckoutPublicRouter = router({
 export async function sendPurchaseConfirmationEmail(
   userId: number,
   productId: number,
-  opts?: { payeeEmail?: string | null; payeeName?: string | null },
+  opts?: {
+    payeeEmail?: string | null;
+    payeeName?: string | null;
+    amountCents?: number | null;
+    currency?: string | null;
+  },
 ): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
@@ -2283,6 +2288,12 @@ export async function sendPurchaseConfirmationEmail(
     forPurchase: true,
     productTitle: product.title,
     productSlug: product.slug,
+    purchaseDetails: {
+      userId,
+      amountCents: opts?.amountCents ?? null,
+      currency: opts?.currency ?? null,
+      contentTitle: product.title,
+    },
     customSubject: emailOverride?.subject,
     customHeading: emailOverride?.heading,
     customIntro: emailOverride?.intro,
