@@ -239,7 +239,7 @@ export const ULTRASOUND_EXPO_SCHEDULE = {
       title: "Grand Opening & Destination Evening",
       summary: "Friday night becomes the destination event at UltrasoundExpo™.",
       items: [
-        "12 PM – Exhibitor setup",
+        "12 PM – All exhibitor setup complete",
         "3 PM – Workshops / ScanLabs",
         "5 PM – UltrasoundExpo™ Grand Opening",
         "5–8 PM – Expo + Opening Reception",

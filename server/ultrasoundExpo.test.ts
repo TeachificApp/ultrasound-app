@@ -43,6 +43,7 @@ describe("UltrasoundExpo™ annual-event platform", () => {
       title: "Grand Opening & Destination Evening",
       summary: "Friday night becomes the destination event at UltrasoundExpo™.",
     });
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[2].items).toContain("12 PM – All exhibitor setup complete");
     expect(ULTRASOUND_EXPO_SCHEDULE.days[2].items).toContain("5–8 PM – Expo + Opening Reception");
     expect(ULTRASOUND_EXPO_SCHEDULE.days[3].items).toContain("4 PM – Innovation Stage");
     expect(ULTRASOUND_EXPO_SCHEDULE.days[4].items).toContain("12:30 PM – Closing keynote / awards");
