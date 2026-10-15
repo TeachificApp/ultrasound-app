@@ -475,6 +475,7 @@ export default function CohortSchedule() {
   const searchString = useSearch();
   const urlParams = new URLSearchParams(searchString);
   const isStudentPreview = urlParams.get("preview") === "student";
+  const hidePreviewDates = urlParams.get("onboarding_preview_dates") === "hidden";
   const requestedCohortGroupId = Number(urlParams.get("cohortGroupId"));
   const cohortGroupId = Number.isInteger(requestedCohortGroupId) && requestedCohortGroupId > 0
     ? requestedCohortGroupId
@@ -749,7 +750,7 @@ export default function CohortSchedule() {
                     <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Upcoming</h2>
                     <div className="space-y-3">
                       {upcomingSessions.map((session: any) => (
-                        <SessionCard key={session.id} session={session} isUpcoming now={now} />
+                        <SessionCard key={session.id} session={session} isUpcoming now={now} hideScheduleDetails={hidePreviewDates} />
                       ))}
                     </div>
                   </div>
@@ -759,7 +760,7 @@ export default function CohortSchedule() {
                     <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Past Sessions</h2>
                     <div className="space-y-3">
                       {pastSessions.map((session: any) => (
-                        <SessionCard key={session.id} session={session} isUpcoming={false} now={now} />
+                        <SessionCard key={session.id} session={session} isUpcoming={false} now={now} hideScheduleDetails={hidePreviewDates} />
                       ))}
                     </div>
                   </div>
@@ -985,7 +986,7 @@ export default function CohortSchedule() {
 
 // ─── SessionCard ──────────────────────────────────────────────────────────────
 
-function SessionCard({ session, isUpcoming: isUpcomingProp, now }: { session: any; isUpcoming: boolean; now: number }) {
+function SessionCard({ session, isUpcoming: isUpcomingProp, now, hideScheduleDetails = false }: { session: any; isUpcoming: boolean; now: number; hideScheduleDetails?: boolean }) {
   const hasMeetingLink = !!session.meetingUrl;
   const hasRecording = !!session.recordingUrl;
   const tz = session.timezone ?? "";
@@ -1021,17 +1022,21 @@ function SessionCard({ session, isUpcoming: isUpcomingProp, now }: { session: an
             {session.description && (
               <RichTextDisplay content={session.description} className="text-gray-500 text-sm mt-1 line-clamp-2" />
             )}
-            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 flex-wrap">
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3.5 h-3.5" />
-                {fmtDate(session.sessionDate, session.timezone)}
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" />
-                {fmtTime(session.sessionDate, session.timezone)} · {fmtDuration(session.durationMinutes)}
-                {tz && <span className="text-gray-400 text-xs ml-1">({tz})</span>}
-              </span>
-            </div>
+            {hideScheduleDetails ? (
+              <p className="mt-2 text-sm text-gray-500">Session details are available in your cohort workspace.</p>
+            ) : (
+              <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {fmtDate(session.sessionDate, session.timezone)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {fmtTime(session.sessionDate, session.timezone)} · {fmtDuration(session.durationMinutes)}
+                  {tz && <span className="text-gray-400 text-xs ml-1">({tz})</span>}
+                </span>
+              </div>
+            )}
             {isUpcomingProp && hasMeetingLink && !joinable && minutesUntil > 0 && minutesUntil <= 120 && (
               <p className="text-xs text-amber-600 mt-1 font-medium">
                 Join link available in {minutesUntil} min (15 min before start)

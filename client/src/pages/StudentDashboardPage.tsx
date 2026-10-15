@@ -968,7 +968,7 @@ function parseDashboardTabs(search: string): { initialTab: Tab; initialContentTa
   return { initialTab: "content", initialContentTab, initialQuizView };
 }
 
-function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTab?: ContentSubTab; initialQuizView?: QuizContentView }) {
+function MyContentTab({ initialContentTab, initialQuizView, hideDateDetails = false }: { initialContentTab?: ContentSubTab; initialQuizView?: QuizContentView; hideDateDetails?: boolean }) {
   const { data: profile } = trpc.dashboard.getProfile.useQuery();
   const { data, isLoading, isError, error, refetch } = trpc.dashboard.getMyContent.useQuery();
   const [contentTab, setContentTab] = useState<ContentSubTab>(initialContentTab ?? "courses");
@@ -1164,7 +1164,7 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                   displayMode={contentDisplayMode}
                   title={c.courseTitle}
                   brand={c.courseBrand}
-                  subtitle={(c as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(c.enrolledAt)}`}
+                  subtitle={hideDateDetails ? "Available in My Content" : (c as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(c.enrolledAt)}`}
                   badge={(c as any).accessSource ? "Membership" : completed ? "Completed" : "In Progress"}
                   badgeColor={(c as any).accessSource ? "teal" : completed ? "emerald" : "teal"}
                   progressPct={c.progressPct}
@@ -1174,6 +1174,7 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                   cancelAtPeriodEnd={(c as any).cancelAtPeriodEnd ?? false}
                   stripePeriodEnd={(c as any).stripePeriodEnd ?? null}
                   subscriptionCancelledAt={resolveDashboardSubscriptionCancelledAt((c as any).stripeSubscriptionId, (c as any).accessExpiresAt)}
+                  hideDateDetails={hideDateDetails}
                   actions={actions}
                 />
               );})}
@@ -1224,7 +1225,7 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                     displayMode={contentDisplayMode}
                     title={q.courseTitle}
                     brand={q.courseBrand}
-                    subtitle={(q as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(q.enrolledAt)}`}
+                    subtitle={hideDateDetails ? "Available in My Content" : (q as any).accessSource ? "Included via membership" : `Enrolled ${formatDate(q.enrolledAt)}`}
                     badge={(q as any).accessSource ? "Membership" : q.completedAt ? "Completed" : "In Progress"}
                     badgeColor={(q as any).accessSource ? "teal" : q.completedAt ? "emerald" : "blue"}
                     progressPct={q.progressPct}
@@ -1234,6 +1235,7 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                     cancelAtPeriodEnd={(q as any).cancelAtPeriodEnd ?? false}
                     stripePeriodEnd={(q as any).stripePeriodEnd ?? null}
                     subscriptionCancelledAt={resolveDashboardSubscriptionCancelledAt((q as any).stripeSubscriptionId, (q as any).accessExpiresAt)}
+                  hideDateDetails={hideDateDetails}
                     actions={(q as any).contentKind === "standalone_result" ? [
                       { label: "View Results", icon: ClipboardCheck, href: buildStudentDashboardUrl({ tab: "content", contentTab: "quizzes", quizView: "results" }) },
                     ] : (q as any).contentKind === "standalone_quiz" && (q as any).courseSlug && (q as any).lessonId ? [
@@ -1265,13 +1267,14 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                   displayMode={contentDisplayMode}
                   title={d.courseTitle ?? d.productTitle}
                   brand={d.courseBrand}
-                  subtitle={d.accessSource ? "Included via membership or bundle" : `Purchased ${formatDate(d.enrolledAt ?? d.purchasedAt)}`}
+                  subtitle={hideDateDetails ? "Available in My Content" : d.accessSource ? "Included via membership or bundle" : `Purchased ${formatDate(d.enrolledAt ?? d.purchasedAt)}`}
                   badge={d.accessSource ? "Membership" : "Digital Download"}
                   badgeColor="teal"
                   accessSource={d.accessSource ?? null}
                   expiresAt={d.accessExpiresAt ?? null}
                   cancelAtPeriodEnd={d.cancelAtPeriodEnd ?? false}
                   stripePeriodEnd={d.stripePeriodEnd ?? null}
+                  hideDateDetails={hideDateDetails}
                   actions={[
                     {
                       label: "Access Files",
@@ -1306,7 +1309,7 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                   thumbnail={p.productThumbnail}
                   displayMode={contentDisplayMode}
                   title={p.productTitle}
-                  subtitle={`Ordered ${formatDate(p.orderedAt)} · ${formatCurrency(p.amountPaid, p.currency)}`}
+                  subtitle={hideDateDetails ? "Order details available here" : `Ordered ${formatDate(p.orderedAt)} · ${formatCurrency(p.amountPaid, p.currency)}`}
                   badge={p.fulfillmentStatus}
                   badgeColor={p.fulfillmentStatus === "delivered" ? "emerald" : p.fulfillmentStatus === "shipped" ? "teal" : "amber"}
                   trackingInfo={p.trackingNumber ? `${p.trackingCarrier ?? ""} ${p.trackingNumber}`.trim() : undefined}
@@ -1334,7 +1337,7 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                   thumbnail={w.webinarCover}
                   displayMode={contentDisplayMode}
                   title={w.webinarTitle}
-                  subtitle={(w as any).accessSource ? "Included via membership or bundle" : `Registered ${formatDate(w.registeredAt)}${w.scheduledAt ? ` · Scheduled ${formatDate(new Date(w.scheduledAt))}` : ""}`}
+                  subtitle={hideDateDetails ? "Available in My Content" : (w as any).accessSource ? "Included via membership or bundle" : `Registered ${formatDate(w.registeredAt)}${w.scheduledAt ? ` · Scheduled ${formatDate(new Date(w.scheduledAt))}` : ""}`}
                   badge={(w as any).accessSource ? "Membership" : w.attended ? "Attended" : w.webinarStatus === "ended" ? "Replay Available" : "Registered"}
                   badgeColor={(w as any).accessSource ? "teal" : w.attended ? "emerald" : w.webinarStatus === "ended" ? "teal" : "blue"}
                   accessSource={(w as any).accessSource ?? null}
@@ -1362,7 +1365,7 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                   displayMode={contentDisplayMode}
                   title={w.workshopTitle}
                   brand={w.workshopBrand}
-                  subtitle={[
+                  subtitle={hideDateDetails ? "Workshop details available here" : [
                     w.instanceTitle,
                     w.instanceStartDate ? formatInTimeZone(w.instanceStartDate, { year: "numeric", month: "short", day: "numeric" }, PLATFORM_TIMEZONE) : null,
                     w.instanceVenueCity ? `${w.instanceVenueCity}${w.instanceVenueState ? `, ${w.instanceVenueState}` : ""}` : w.instanceLocationType === "virtual" ? "Virtual" : null,
@@ -1392,8 +1395,8 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                   thumbnail={b.bundleCover}
                   displayMode={contentDisplayMode}
                   title={b.bundleTitle}
-                  subtitle={`Enrolled ${formatDate(b.enrolledAt)}`}
-                  badge="Owned"
+                  subtitle={hideDateDetails ? "Available in My Content" : `Enrolled ${formatDate(b.enrolledAt)}`}
+                  badge="Available"
                   badgeColor="emerald"
                   actions={[
                     { label: "View Bundle", icon: ExternalLink, href: `/bundles/${b.bundleSlug}` },
@@ -1422,9 +1425,11 @@ function MyContentTab({ initialContentTab, initialQuizView }: { initialContentTa
                     displayMode={contentDisplayMode}
                     title={m.title}
                     subtitle={
-                      isPlan
-                        ? (m.currentPeriodEnd ? `Renews ${formatDate(m.currentPeriodEnd)}` : "Active")
-                        : (m.expiresAt ? `Expires ${formatDate(m.expiresAt)}` : m.grantedAt ? `Granted ${formatDate(m.grantedAt)}` : "Active")
+                      hideDateDetails
+                        ? "Membership details available here"
+                        : isPlan
+                          ? (m.currentPeriodEnd ? `Renews ${formatDate(m.currentPeriodEnd)}` : "Active")
+                          : (m.expiresAt ? `Expires ${formatDate(m.expiresAt)}` : m.grantedAt ? `Granted ${formatDate(m.grantedAt)}` : "Active")
                     }
                     badge={m.status === "active" ? "Active" : m.status === "trialing" ? "Trial" : m.status === "cancelled" || m.status === "canceled" ? "Cancelled" : m.status === "expired" ? "Expired" : m.status}
                     badgeColor={statusColor}
@@ -1748,7 +1753,7 @@ function PurchasesTab() {
 
 // ─── Subscriptions Tab ────────────────────────────────────────────────────────
 
-function SubscriptionsTab() {
+function SubscriptionsTab({ hideDateDetails = false }: { hideDateDetails?: boolean }) {
   const utils = trpc.useUtils();
   const { data, isLoading } = trpc.dashboard.getMySubscriptions.useQuery();
   const cancelSub = trpc.dashboard.cancelSubscription.useMutation({
@@ -1872,7 +1877,7 @@ function SubscriptionsTab() {
                               {sub.stripe?.amount != null && (
                                 <p>{formatCurrency(sub.stripe.amount, sub.stripe.currency ?? "usd")} / {sub.stripe.interval}</p>
                               )}
-                              {sub.stripe?.currentPeriodEnd && (
+                              {!hideDateDetails && sub.stripe?.currentPeriodEnd && (
                                 <p className="flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5" />
                                   {activeTrial ? "Trial ends" : isCancelPending ? "Access until" : "Renews"}: {formatDate(activeTrial?.endsAt ?? sub.stripe.currentPeriodEnd)}
@@ -1881,13 +1886,13 @@ function SubscriptionsTab() {
                               {activeTrial && !isCancelPending && (
                                 <p className="text-xs font-medium text-sky-700">Cancel before the trial ends and you will not be charged.</p>
                               )}
-                              {!sub.stripe && sub.expiresAt && (
+                              {!hideDateDetails && !sub.stripe && sub.expiresAt && (
                                 <p className="flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5" />
                                   Expires: {formatDate(sub.expiresAt)}
                                 </p>
                               )}
-                              <p className="text-xs text-gray-400">Granted: {formatDate(sub.grantedAt)}</p>
+                              {!hideDateDetails && <p className="text-xs text-gray-400">Granted: {formatDate(sub.grantedAt)}</p>}
                             </div>
                           </div>
 
@@ -1989,19 +1994,19 @@ function SubscriptionsTab() {
                         {sub.stripe?.amount != null && (
                           <p>{formatCurrency(sub.stripe.amount, sub.stripe.currency ?? "usd")} / {sub.stripe.interval}</p>
                         )}
-                        {sub.stripe?.currentPeriodEnd && (
+                        {!hideDateDetails && sub.stripe?.currentPeriodEnd && (
                           <p className="flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5" />
                             {isCancelPending ? "Access until" : "Renews"}: {formatDate(sub.stripe.currentPeriodEnd)}
                           </p>
                         )}
-                        {sub.cancellationRequestedAt && (
+                        {!hideDateDetails && sub.cancellationRequestedAt && (
                           <p className="flex items-center gap-1 font-medium text-orange-700">
                             <XCircle className="w-3.5 h-3.5" />
                             Cancellation requested: {formatDate(sub.cancellationRequestedAt)}
                           </p>
                         )}
-                        <p className="text-xs text-gray-400">Since: {formatDate(sub.createdAt)}</p>
+                        {!hideDateDetails && <p className="text-xs text-gray-400">Since: {formatDate(sub.createdAt)}</p>}
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 items-end">
@@ -2074,13 +2079,13 @@ function SubscriptionsTab() {
                         {sub.stripe?.amount != null && (
                           <p>{formatCurrency(sub.stripe.amount, sub.stripe.currency ?? "usd")} / {sub.stripe.interval}</p>
                         )}
-                        {sub.stripe?.currentPeriodEnd && (
+                        {!hideDateDetails && sub.stripe?.currentPeriodEnd && (
                           <p className="flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5" />
                             {isCancelPending ? "Access until" : "Renews"}: {formatDate(sub.stripe.currentPeriodEnd)}
                           </p>
                         )}
-                        <p className="text-xs text-gray-400">Since: {formatDate(sub.createdAt)}</p>
+                        {!hideDateDetails && <p className="text-xs text-gray-400">Since: {formatDate(sub.createdAt)}</p>}
                       </div>
                     </div>
                     <div className="flex flex-col gap-2 items-end">
@@ -2376,7 +2381,7 @@ function EmptyState({
 }
 
 function ContentCard({
-  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed, accessSource, expiresAt, subscriptionCancelledAt, cancelAtPeriodEnd, stripePeriodEnd, displayMode = "cards",
+  thumbnail, title, brand, subtitle, badge, badgeColor, trackingInfo, actions, progressPct, completed, accessSource, expiresAt, subscriptionCancelledAt, cancelAtPeriodEnd, stripePeriodEnd, hideDateDetails = false, displayMode = "cards",
 }: {
   thumbnail?: string | null;
   title: string;
@@ -2392,6 +2397,7 @@ function ContentCard({
   subscriptionCancelledAt?: Date | null;
   cancelAtPeriodEnd?: boolean;
   stripePeriodEnd?: Date | null;
+  hideDateDetails?: boolean;
   displayMode?: ContentDisplayMode;
   actions: { label: string; icon: React.ElementType; href: string; secondary?: boolean; external?: boolean }[];
 }) {
@@ -2467,7 +2473,7 @@ function ContentCard({
           </div>
         )}
         {/* Renews / Cancels on date — shown when Stripe data is available */}
-        {stripePeriodEnd && !subscriptionCancelledAt && (
+        {!hideDateDetails && stripePeriodEnd && !subscriptionCancelledAt && (
           <p className={`text-xs mb-1 flex items-center gap-1 ${cancelAtPeriodEnd ? "text-orange-500" : "text-teal-600"}`}>
             {cancelAtPeriodEnd ? <XCircle className="w-3 h-3 flex-shrink-0" /> : <Clock className="w-3 h-3 flex-shrink-0" />}
             {cancelAtPeriodEnd
@@ -2477,7 +2483,7 @@ function ContentCard({
           </p>
         )}
         {/* Fallback: plain expiry when no Stripe data */}
-        {expiresAt && !subscriptionCancelledAt && !stripePeriodEnd && (
+        {!hideDateDetails && expiresAt && !subscriptionCancelledAt && !stripePeriodEnd && (
           <p className="text-xs text-amber-600 mb-1 flex items-center gap-1">
             <Clock className="w-3 h-3" />
             Access until {formatDate(expiresAt)}
@@ -2506,7 +2512,7 @@ function ContentCard({
             </a>
           ))}
         </div>
-        {subscriptionCancelledAt && (
+        {!hideDateDetails && subscriptionCancelledAt && (
           <p className="text-xs text-orange-600 mt-2 flex items-center gap-1 font-medium">
             <XCircle className="w-3 h-3 flex-shrink-0" />
             Subscription cancelled — access ends {formatDate(subscriptionCancelledAt)}
@@ -2959,6 +2965,7 @@ export default function StudentDashboardPage() {
   const [, navigate] = useLocation();
   const search = useSearch();
   const authPending = new URLSearchParams(search).get("auth_pending") === "1";
+  const hidePreviewDates = new URLSearchParams(search).get("onboarding_preview_dates") === "hidden";
   const [authRetryCount, setAuthRetryCount] = useState(0);
   const [authRetrying, setAuthRetrying] = useState(authPending);
   const isAdmin = (user as any)?.role === "admin";
@@ -3116,7 +3123,7 @@ export default function StudentDashboardPage() {
         </div>
 
         <div className="max-w-5xl mx-auto px-3 sm:px-8 py-4 sm:py-8">
-          <PremiumTrialCountdownBanner />
+          {!hidePreviewDates && <PremiumTrialCountdownBanner />}
 
           {/* Tab Navigation */}
           <div className="relative mb-5 sm:mb-8">
@@ -3155,10 +3162,10 @@ export default function StudentDashboardPage() {
 
           {/* Tab Content */}
           {activeTab === "profile"       && <ProfileTab />}
-          {activeTab === "content"       && <MyContentTab initialContentTab={initialContentTab} initialQuizView={initialQuizView} />}
+          {activeTab === "content"       && <MyContentTab initialContentTab={initialContentTab} initialQuizView={initialQuizView} hideDateDetails={hidePreviewDates} />}
           {activeTab === "groups"        && <GroupsTab />}
           {activeTab === "survey_pulse"  && <SurveyPulse embedded />}
-          {activeTab === "subscriptions" && <SubscriptionsTab />}
+          {activeTab === "subscriptions" && <SubscriptionsTab hideDateDetails={hidePreviewDates} />}
           {activeTab === "purchases"     && <PurchasesTab />}
           {activeTab === "certificates"  && <CertificatesTab />}
           {activeTab === "instructor"    && <InstructorTab />}

@@ -114,11 +114,17 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
   const prevDataRef = useRef<any>(null);
   const utils = trpc.useUtils();
 
-  const { data, isLoading } = trpc.workshopAdmin.list.useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching } = trpc.workshopAdmin.list.useQuery({
     page,
     pageSize: 20,
     search: search || undefined,
     status: statusFilter !== "all" ? (statusFilter as any) : undefined,
+  }, {
+    // Admin content must revalidate after a stale browser response or a background
+    // deployment. A failed request must never look like an intentionally empty LMS.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
   });
 
   // Sync local workshops from server data
@@ -177,8 +183,8 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
     onError: (e) => toast.error(e.message),
   });
 
-  const workshops = data?.workshops ?? [];
-  const total = data?.total ?? 0;
+  const workshops = localWorkshops.length > 0 ? localWorkshops : (data?.workshops ?? []);
+  const total = data?.total ?? workshops.length;
 
   return (
     <div className="space-y-4">
@@ -218,6 +224,15 @@ function WorkshopsList({ onEdit }: { onEdit: (id: number) => void }) {
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-gray-400">
           <RefreshCw className="w-5 h-5 animate-spin mr-2" /> Loading…
+        </div>
+      ) : isError ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-6 py-12 text-center">
+          <RefreshCw className="mx-auto h-9 w-9 text-amber-600" />
+          <p className="mt-3 font-semibold text-amber-950">Workshops could not be loaded</p>
+          <p className="mt-1 text-sm text-amber-800">{error?.message ?? "Please refresh the workshop list."}</p>
+          <Button className="mt-4" variant="outline" onClick={() => void refetch()} disabled={isFetching}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Retry loading workshops
+          </Button>
         </div>
       ) : workshops.length === 0 ? (
         <div className="text-center py-16 text-gray-400">

@@ -42,7 +42,7 @@ function createVisitKey() {
 
 function previewUrl(href: string, revealAccountMenu = false) {
   const joiner = href.includes("?") ? "&" : "?";
-  return `${href}${joiner}onboarding_preview=1${revealAccountMenu ? "&onboarding_preview_account=1" : ""}`;
+  return `${href}${joiner}onboarding_preview=1&onboarding_preview_dates=hidden${revealAccountMenu ? "&onboarding_preview_account=1" : ""}`;
 }
 
 /**

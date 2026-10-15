@@ -38,6 +38,7 @@ describe("learner access guide", () => {
     expect(guide).toContain("My Cohort");
     expect(guide).toContain("first three Learn visits");
     expect(guide).toContain("onboarding_preview=1");
+    expect(guide).toContain("onboarding_preview_dates=hidden");
     expect(guide).toContain("onboarding_preview_account=1");
     expect(guide).toContain("<iframe");
     expect(guide).toContain("your own signed-in experience");
@@ -47,5 +48,7 @@ describe("learner access guide", () => {
     expect(guide).not.toContain("Open what you own");
     expect(guide).not.toContain("AccountMenuPreview");
     expect(learnLayout).toContain('get("onboarding_preview_account") === "1"');
+    expect(learnLayout).toContain('href="/my-dashboard?tab=content"');
+    expect(learnLayout).toContain('href="/my-dashboard?tab=subscriptions"');
   });
 });
