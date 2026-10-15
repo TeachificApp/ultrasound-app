@@ -11,7 +11,7 @@ describe("sponsorship definitions", () => {
   it("keeps the published workshop sponsorship tiers at their approved amounts", () => {
     expect(SPONSORSHIP_TIERS.silver.amountCents).toBe(250_000);
     expect(SPONSORSHIP_TIERS.gold.amountCents).toBe(500_000);
-    expect(SPONSORSHIP_TIERS.platinum.amountCents).toBe(800_000);
+    expect(SPONSORSHIP_TIERS.platinum.amountCents).toBe(1_000_000);
     expect(resolveSponsorshipAmountCents({ tier: "other", customAmountCents: 12_345 })).toBe(12_345);
   });
 
@@ -33,7 +33,7 @@ describe("sponsorship transactional emails", () => {
     organizationName: "Acme & Co.",
     tier: "platinum" as const,
     scope: "workshop_instance" as const,
-    amountCents: 800_000,
+    amountCents: 1_000_000,
     currency: "usd",
     workshopTitle: "Fetal Echocardiography",
     workshopInstanceTitle: "Daytona Beach 2027",
@@ -43,7 +43,7 @@ describe("sponsorship transactional emails", () => {
     const email = buildSponsorThankYouEmail(record);
     expect(email.subject).toContain("Thank you");
     expect(email.htmlBody).toContain("support@allaboutultrasound.com");
-    expect(email.htmlBody).toContain("$8,000.00");
+    expect(email.htmlBody).toContain("$10,000.00");
     expect(email.htmlBody).toContain("Fetal Echocardiography — Daytona Beach 2027");
     expect(email.htmlBody).not.toContain("Avery <Vendor>");
     expect(email.htmlBody).toContain("Avery &lt;Vendor&gt;");
@@ -54,7 +54,7 @@ describe("sponsorship transactional emails", () => {
     expect(email.subject).toContain("Acme & Co.");
     expect(email.htmlBody).toContain("avery@example.test");
     expect(email.htmlBody).toContain("Platinum");
-    expect(email.htmlBody).toContain("$8,000.00");
+    expect(email.htmlBody).toContain("$10,000.00");
     expect(email.htmlBody).toContain("Daytona Beach 2027");
   });
 });

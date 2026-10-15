@@ -21,7 +21,7 @@ export const SPONSORSHIP_TIERS = {
   },
   platinum: {
     label: "Platinum",
-    amountCents: 800_000,
+    amountCents: 1_000_000,
     description: "Premier support with the strongest available event and digital presence.",
     benefits: [
       "Featured organization and linked website recognition on the workshop page",
