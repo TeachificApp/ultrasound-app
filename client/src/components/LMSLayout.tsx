@@ -10,7 +10,8 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users, DollarSign, Briefcase, BarChart3, CreditCard
+  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users, DollarSign, Briefcase, BarChart3, CreditCard,
+  GraduationCap, Building2, ClipboardList
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -88,7 +89,10 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, loading: authLoading, logout } = useAuth();
   const isAdmin = (user as any)?.role === "admin";
   const appRoles: string[] = (user as any)?.appRoles ?? [];
-  const isPlatformAdmin = appRoles.includes("platform_admin") || isAdmin;
+  const isPlatformAdmin = appRoles.includes("platform_admin") || appRoles.includes("platform_owner") || appRoles.includes("platform_moderator") || isAdmin;
+  const hasEducationManagement = appRoles.includes("education_manager") || appRoles.includes("education_admin") || isPlatformAdmin;
+  const hasDiyAccess = appRoles.includes("diy_user") || appRoles.includes("diy_admin") || isPlatformAdmin;
+  const hasAccreditationManager = appRoles.includes("accreditation_manager") || isPlatformAdmin;
 
   function isActive(href: string, exact?: boolean) {
     if (exact) return location === href;
@@ -268,7 +272,7 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                 {accountOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setAccountOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 w-60 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-50">
+                    <div className="absolute right-0 top-full mt-1 w-60 max-h-[calc(100vh-5rem)] overflow-y-auto bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 z-50">
                       {/* User info */}
                       <div className="px-3 py-2 border-b border-gray-100 mb-1">
                         <p className="text-sm font-semibold text-gray-800 truncate">
@@ -306,6 +310,36 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                         location={location}
                         onNavigate={() => setAccountOpen(false)}
                       />
+                      {hasEducationManagement && (
+                        <>
+                          <div className="border-t border-gray-100 my-1" />
+                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Educator Platform</div>
+                          <a href={getAdminUrl("/educator-assist")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 cursor-pointer flex items-center gap-2">
+                            <GraduationCap className="w-3.5 h-3.5 text-teal-600" /> EducatorAssist™
+                          </a>
+                        </>
+                      )}
+                      {(hasDiyAccess || hasAccreditationManager) && (
+                        <>
+                          <div className="border-t border-gray-100 my-1" />
+                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Accreditation</div>
+                          {hasDiyAccess && (
+                            <>
+                              <a href={getAdminUrl("/lab-admin")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 cursor-pointer flex items-center gap-2">
+                                <Building2 className="w-3.5 h-3.5 text-orange-500" /> Lab Admin Portal
+                              </a>
+                              <a href={getAdminUrl("/diy-member")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 cursor-pointer flex items-center gap-2">
+                                <Users className="w-3.5 h-3.5 text-orange-500" /> Member Portal
+                              </a>
+                            </>
+                          )}
+                          {hasAccreditationManager && (
+                            <a href={getAdminUrl("/accreditation-manager")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer flex items-center gap-2">
+                              <ClipboardList className="w-3.5 h-3.5 text-indigo-500" /> Accreditation Manager
+                            </a>
+                          )}
+                        </>
+                      )}
                       {isPlatformAdmin && (
                         <>
                           <div className="border-t border-gray-100 my-1" />

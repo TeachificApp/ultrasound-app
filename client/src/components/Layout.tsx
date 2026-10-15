@@ -455,8 +455,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                   const roles: string[] = (user as any).appRoles ?? [];
                   const hasPlatformAdmin = roles.includes("platform_admin") || roles.includes("platform_owner") || roles.includes("platform_moderator") || (user as any).role === "admin";
                   const hasAccreditationManager = roles.includes("accreditation_manager") || hasPlatformAdmin;
+                  const hasEducationManagement = roles.includes("education_manager") || roles.includes("education_admin") || hasPlatformAdmin;
                   return (
-                    <div className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
+                    <div className="absolute right-0 top-full mt-1.5 w-72 max-h-[calc(100vh-5rem)] overflow-y-auto bg-white rounded-xl shadow-xl border border-gray-100 z-50">
                       {/* User info header */}
                       <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-[#f0fbfc] to-white">
                         <UserAvatar
@@ -506,8 +507,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         />
                       </div>
 
-                      {/* EducatorAssist™ — admin-only */}
-                      {hasPlatformAdmin && (
+                      {/* EducatorAssist™ — education management */}
+                      {hasEducationManagement && (
                         <div className="px-2 py-1.5 border-t border-gray-100">
                           <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Educator Platform</div>
                           <WouterLink href="/educator-assist">
