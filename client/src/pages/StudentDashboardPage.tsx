@@ -1827,14 +1827,14 @@ function SubscriptionsTab({ hideDateDetails = false }: { hideDateDetails?: boole
   }
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col gap-8">
       {/* ── App Subscriptions (UltrasoundAssist Premium / EchoAssist Premium) ── */}
       {memberships.length > 0 && (
-        <div className="space-y-6">
+        <div className="order-3 space-y-6">
           <div className="flex items-center gap-2 mb-3">
             <div className="h-px flex-1 bg-gray-100" />
             <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border bg-teal-50 text-teal-700 border-teal-200">
-              App Subscriptions
+              Apps
             </span>
             <div className="h-px flex-1 bg-gray-100" />
           </div>
@@ -1970,16 +1970,17 @@ function SubscriptionsTab({ hideDateDetails = false }: { hideDateDetails?: boole
         </div>
       )}
 
-      {/* ── Learn Subscriptions (order-based: courses, quizzes, downloads, products) ── */}
-      {courseSubscriptions.length > 0 && (
-        <div>
+      {/* ── Learn Subscriptions (courses, quizzes, downloads, and other Learn content) ── */}
+      {(courseSubscriptions.length > 0 || enrollmentSubscriptions.length > 0) && (
+        <div className="order-1">
           <div className="flex items-center gap-2 mb-4">
             <div className="h-px flex-1 bg-gray-100" />
             <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border bg-purple-50 text-purple-700 border-purple-200">
-              Learn Subscriptions
+              Learn Subscriptions ({courseSubscriptions.length + enrollmentSubscriptions.length})
             </span>
             <div className="h-px flex-1 bg-gray-100" />
           </div>
+          {courseSubscriptions.length > 0 && (
           <div className="space-y-4">
             {courseSubscriptions.map(sub => {
               const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;
@@ -2052,19 +2053,14 @@ function SubscriptionsTab({ hideDateDetails = false }: { hideDateDetails?: boole
               );
             })}
           </div>
+          )}
         </div>
       )}
 
-      {/* ── Enrollment-based Subscriptions (direct enrollment with Stripe sub) ── */}
+      {/* ── Additional Learn content access (direct enrollment with Stripe subscription) ── */}
       {enrollmentSubscriptions.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="h-px flex-1 bg-gray-100" />
-            <span className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full border bg-teal-50 text-teal-700 border-teal-200">
-              Content Subscriptions
-            </span>
-            <div className="h-px flex-1 bg-gray-100" />
-          </div>
+        <div className="order-2">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-purple-700">Learn Content Access</p>
           <div className="space-y-4">
             {enrollmentSubscriptions.map((sub: any) => {
               const isCancelPending = sub.stripe?.cancelAtPeriodEnd === true;

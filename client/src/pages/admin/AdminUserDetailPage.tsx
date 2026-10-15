@@ -2054,9 +2054,9 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
   }
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col gap-8">
       {/* ── Apps Section ── */}
-      <div>
+      <div className="order-3">
         <SectionHeader
           title={`Apps (${memberships.length})`}
           action={
@@ -2159,10 +2159,10 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
 
       </div>
 
-      {/* ── LMS Content Subscriptions Section ── */}
-      <div>
-        <SectionHeader title={`Content Subscriptions (${contentEnrollments.length})`} />
-        <p className="text-xs text-gray-400 mb-3">Active course, quiz, and download enrollments. Recurring subscriptions show a Cancel option; all enrollments can be removed.</p>
+      {/* ── Learn Content Section ── */}
+      <div className="order-2">
+        <SectionHeader title={`Learn Content Access (${contentEnrollments.length})`} />
+        <p className="text-xs text-gray-400 mb-3">Active Learn courses, quizzes, downloads, cohorts, workshops, and webinars. Recurring subscriptions show a Cancel option; all enrollments can be removed.</p>
         {contentEnrollments.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">No active content enrollments.</p>
         ) : (
@@ -2230,9 +2230,9 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
       </div>
 
       {/* ── Learn Subscriptions Section ── */}
-      <div>
+      <div className="order-1">
         <SectionHeader
-          title={`Learn Subscriptions (${nativeMemberships.length})`}
+          title={`Learn Subscriptions (${nativeMemberships.length + contentEnrollments.length})`}
           action={
             <Button
               size="sm"
@@ -2243,7 +2243,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
             </Button>
           }
         />
-        <p className="text-xs text-gray-400 mb-3">Ongoing LMS membership subscriptions from the Learn platform</p>
+        <p className="text-xs text-gray-400 mb-3">Learn memberships and all related Learn content access are grouped here.</p>
         {nativeMemberships.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-8">No active learn subscriptions.</p>
         ) : (
