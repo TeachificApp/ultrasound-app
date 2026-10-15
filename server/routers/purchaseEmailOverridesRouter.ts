@@ -91,7 +91,7 @@ export const purchaseEmailOverridesRouter = router({
       ...canonicalBundleRows.map((item) => ({ ...item, source: "canonical_bundle", contentType: "bundle", subtitle: "Bundle" })),
       ...webinarRows.map((item) => ({ ...item, source: "webinar", contentType: "webinar", subtitle: item.scheduledAt ? "Scheduled webinar" : "Date and time to be announced" })),
       ...workshopRows.map((item) => ({ ...item, source: "workshop", contentType: "workshop", subtitle: "Select an instance below to preview its dated confirmation" })),
-      ...instanceRows.map((item) => ({ id: item.id, source: "workshop_instance", contentType: "workshop_instance", title: item.title, brand: item.brand, status: item.status, subtitle: item.workshopTitle ?? `Workshop #${item.workshopId}` })),
+      ...instanceRows.map((item) => ({ id: item.id, source: "workshop_instance", contentType: "workshop_instance", title: item.title, brand: item.brand, status: item.status, workshopId: item.workshopId, subtitle: item.workshopTitle ?? `Workshop #${item.workshopId}` })),
       ...products.map((item) => ({ ...item, source: "physical_product", contentType: "physical_product", subtitle: null })),
       ...memberships.map((item) => ({ ...item, source: "membership", contentType: "membership", subtitle: null })),
     ];

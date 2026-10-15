@@ -56,6 +56,10 @@ describe("purchase email override copy", () => {
     expect(source).toContain('item.source === "workshop_instance" && item.workshopId === selected.id');
     expect(source).toContain('selected.source === "workshop" ? selectedWorkshopInstance');
     expect(source).toContain('selected.source === "course" && selected.contentType === "cohort" ? selectedCohortGroup');
+
+    const router = readFileSync("server/routers/purchaseEmailOverridesRouter.ts", "utf8");
+    expect(router).toContain('source: "workshop_instance"');
+    expect(router).toContain("workshopId: item.workshopId");
   });
 
   it("keeps available content visible when one optional catalog source cannot load", () => {
