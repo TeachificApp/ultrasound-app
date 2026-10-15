@@ -103,7 +103,9 @@ export async function sendEnrollmentEmail(opts: {
   courseSlug: string;
   creditHours?: string | null;
   customSubject?: string | null;
+  customHeading?: string | null;
   customIntro?: string | null;
+  customDetailsHtml?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
   /** For new guest accounts: URL to set a permanent password */
@@ -128,13 +130,14 @@ export async function sendEnrollmentEmail(opts: {
   const setPasswordHtml = passwordSetupCta(opts.setPasswordUrl);
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
-      Welcome, ${firstName}! 🎉
+      ${opts.customHeading || `Welcome, ${firstName}! 🎉`}
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
       You've been successfully enrolled in <strong style="color:${brandDark};">${opts.courseTitle}</strong>.
       We're excited to have you on board!
     </p>
     ${introHtml}
+    ${opts.customDetailsHtml ?? ""}
     ${setPasswordHtml}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">Getting started:</p>
@@ -238,7 +241,9 @@ export async function sendDownloadAccessEmail(opts: {
   productTitle: string;
   productSlug: string;
   customSubject?: string | null;
+  customHeading?: string | null;
   customIntro?: string | null;
+  customDetailsHtml?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
   /** For new guest accounts: URL to set a permanent password */
@@ -257,12 +262,13 @@ export async function sendDownloadAccessEmail(opts: {
     : "";
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
-      Hi ${firstName}, your download is ready! 📥
+      ${opts.customHeading || `Hi ${firstName}, your download is ready! 📥`}
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
       You've been granted access to <strong style="color:${brandDark};">${opts.productTitle}</strong>.
     </p>
     ${introHtml}
+    ${opts.customDetailsHtml ?? ""}
     ${passwordSetupCta(opts.setPasswordUrl)}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">Accessing your files:</p>
@@ -293,7 +299,9 @@ export async function sendBundleAccessEmail(opts: {
   bundleTitle: string;
   bundleSlug: string;
   customSubject?: string | null;
+  customHeading?: string | null;
   customIntro?: string | null;
+  customDetailsHtml?: string | null;
   /** Optional canonical bundle URL; legacy digital bundles retain their app route. */
   destinationUrl?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
@@ -314,12 +322,13 @@ export async function sendBundleAccessEmail(opts: {
     : "";
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
-      Hi ${firstName}, your bundle is ready! 📦
+      ${opts.customHeading || `Hi ${firstName}, your bundle is ready! 📦`}
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
       You've been granted access to the <strong style="color:${brandDark};">${opts.bundleTitle}</strong> bundle.
     </p>
     ${introHtml}
+    ${opts.customDetailsHtml ?? ""}
     ${passwordSetupCta(opts.setPasswordUrl)}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">What's included:</p>
@@ -350,7 +359,9 @@ export async function sendQuizAccessEmail(opts: {
   quizTitle: string;
   courseSlug?: string | null;
   customSubject?: string | null;
+  customHeading?: string | null;
   customIntro?: string | null;
+  customDetailsHtml?: string | null;
   /** Persistent access token — auto-signs user in when they click the link */
   accessToken?: string | null;
   /** For new guest accounts: URL to set a permanent password */
@@ -372,12 +383,13 @@ export async function sendQuizAccessEmail(opts: {
   const setPasswordHtml = passwordSetupCta(opts.setPasswordUrl);
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:22px;color:${brandDark};font-family:Georgia,serif;">
-      Hi ${firstName}, your access is ready! 🎯
+      ${opts.customHeading || `Hi ${firstName}, your access is ready! 🎯`}
     </h2>
     <p style="margin:0 0 16px;font-size:15px;color:#475569;line-height:1.6;">
       You now have full access to <strong style="color:${brandDark};">${opts.quizTitle}</strong>.
     </p>
     ${introHtml}
+    ${opts.customDetailsHtml ?? ""}
     ${setPasswordHtml}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
       <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">How to access:</p>

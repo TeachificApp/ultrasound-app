@@ -22,6 +22,7 @@ import { notifyOwner } from "../_core/notification";
 import { isEnrollmentAccessActive } from "./enrollmentAccess";
 import { grantScheduledContentAccess } from "./scheduledContentLinks";
 import { sendPurchaseNotificationOnce } from "./purchaseNotificationDelivery";
+import { getEffectivePurchaseEmailOverride } from "./purchaseEmailOverride";
 
 export type LmsCheckoutFulfillmentResult = {
   success: boolean;
@@ -614,7 +615,7 @@ export async function reconcileLmsCheckoutFromStripeSession(
             let accessToken: string | null = null;
             try { accessToken = await getOrCreateAccessToken(userId); } catch { /* optional */ }
             const setPasswordUrl = newUserResetToken
-              ? `https://app.allaboutultrasound.com/auth/reset-password?token=${newUserResetToken}`
+              ? `${course.brand === "iheartecho" ? "https://app.iheartecho.com" : "https://app.allaboutultrasound.com"}/auth/reset-password?token=${newUserResetToken}`
               : null;
             const { resolvePurchaseEmailTargets } = await import("./purchaseAccessEmailDelivery");
             const { to: learnerTo, payee } = await resolvePurchaseEmailTargets({
@@ -622,6 +623,10 @@ export async function reconcileLmsCheckoutFromStripeSession(
               checkoutEmail: customerEmail,
               checkoutName: customerName,
             });
+            const emailOverride = await getEffectivePurchaseEmailOverride(db, [{
+              contentType: course.type === "quiz" ? "quiz" : course.type === "cohort" ? "cohort" : "course",
+              contentId: courseId,
+            }]);
             if (course.type === "quiz") {
               return sendQuizAccessEmail({
                 to: learnerTo,
@@ -629,6 +634,10 @@ export async function reconcileLmsCheckoutFromStripeSession(
                 forPurchase: true,
                 quizTitle: course.title,
                 courseSlug: course.slug,
+                customSubject: emailOverride?.subject,
+                customHeading: emailOverride?.heading,
+                customIntro: emailOverride?.intro,
+                customDetailsHtml: emailOverride?.detailsHtml,
                 accessToken,
                 setPasswordUrl,
                 brand: course.brand,
@@ -640,6 +649,10 @@ export async function reconcileLmsCheckoutFromStripeSession(
               forPurchase: true,
               courseTitle: course.title,
               courseSlug: course.slug,
+              customSubject: emailOverride?.subject,
+              customHeading: emailOverride?.heading,
+              customIntro: emailOverride?.intro,
+              customDetailsHtml: emailOverride?.detailsHtml,
               accessToken,
               setPasswordUrl,
               brand: course.brand,

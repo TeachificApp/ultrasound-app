@@ -109,20 +109,18 @@ describe("purchase recipient and cancellation safeguards", () => {
     expect(router).toContain("payer_name: userName ??");
   });
 
-  it("holds automatic workshop registration emails until the owner approves the dated content", () => {
+  it("sends future workshop confirmations from the selected instance’s live logistics", () => {
     const stripe = source("./webhooks/stripe.ts");
     const workshops = source("../client/src/pages/admin/WorkshopsAdmin.tsx");
     const router = source("./routers/workshopRouter.ts");
 
-    expect(stripe).toContain("function isWorkshopConfirmationReady(instance:");
-    expect(stripe).toContain("instance.confirmationEmailDetails");
-    expect(stripe).toContain("return instance.confirmationEmailApproved && Boolean(reviewedText);");
-    expect(stripe).toContain("workshop.welcomeEmailEnabled !== false && isWorkshopConfirmationReady(instance)");
-    expect(stripe).toContain("Workshop confirmation held for review");
+    expect(stripe).toContain("renderCurrentWorkshopSchedule(instance)");
+    expect(stripe).toContain('notificationType: "workshop_registration"');
+    expect(stripe).toContain('contentType: "workshop_instance"');
+    expect(stripe).not.toContain("isWorkshopConfirmationReady(instance)");
     expect(router).toContain("confirmationEmailApproved: z.boolean().default(false)");
-    expect(router).toContain("confirmationEmailApprovedAt = rest.confirmationEmailApproved ? new Date() : null");
-    expect(workshops).toContain("Saving this setting never sends or resends email to existing registrants.");
-    expect(workshops).toContain("Reviewed date, location, and registration details");
+    expect(workshops).toContain("Future paid registrations automatically receive a confirmation");
+    expect(workshops).toContain("Saving an instance never sends or resends messages to existing registrants.");
   });
 
   it("routes a returning learner to owned access instead of creating another checkout", () => {

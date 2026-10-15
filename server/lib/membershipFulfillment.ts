@@ -24,12 +24,13 @@ import {
   bundles,
   communityMembers,
 } from "../../drizzle/schema";
-import { getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { generateAutoLoginToken } from "../routes/autoLogin";
-import { buildPasswordResetEmail, sendEmail } from "../_core/email";
+import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
+import { sendEmail } from "../_core/email";
 import { notifyOwner } from "../_core/notification";
 import { isEnrollmentAccessActive } from "./enrollmentAccess";
 import { sendPurchaseNotificationOnce } from "./purchaseNotificationDelivery";
+import { sendPurchaseAccessEmail } from "./enrollmentEmail";
+import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from "./purchaseEmailOverride";
 
 export type MembershipFulfillmentContext = {
   sessionId?: string | null;
@@ -463,71 +464,49 @@ async function sendMembershipWelcomeEmail(opts: {
   primaryCourseSlug?: string | null;
   payerEmail?: string | null;
   payerName?: string | null;
+  brand?: "all_about_ultrasound" | "iheartecho" | null;
 }): Promise<boolean> {
-  const baseUrl = "https://app.allaboutultrasound.com";
-  const learnBase = "https://learn.allaboutultrasound.com";
-  const firstName = opts.name.split(" ")[0] || "there";
+  const brand = opts.brand === "iheartecho" ? "iheartecho" : "aaus";
+  const baseUrl = brand === "iheartecho" ? "https://app.iheartecho.com" : "https://app.allaboutultrasound.com";
+  const learnBase = brand === "iheartecho" ? "https://learn.iheartecho.com" : "https://learn.allaboutultrasound.com";
   const destination = opts.primaryCourseSlug
     ? `${learnBase}/courses/${opts.primaryCourseSlug}/player`
     : `${baseUrl}/my-dashboard`;
-
-  let autoLoginUrl = destination;
-  try {
-    const token = await generateAutoLoginToken(opts.userId, destination);
-    autoLoginUrl = `${baseUrl}/api/auth/auto-login?token=${token}`;
-  } catch {
-    try {
-      const accessToken = await getOrCreateAccessToken(opts.userId);
-      autoLoginUrl = `${learnBase}/auth/access?token=${accessToken}&next=${encodeURIComponent(destination)}`;
-    } catch { /* keep plain URL */ }
-  }
-
   const setPasswordUrl = opts.resetToken
     ? `${baseUrl}/auth/reset-password?token=${opts.resetToken}`
     : null;
-
-  const accessNote = `<div style="margin:16px 0;padding:14px 16px;background:#f0fbfc;border-left:3px solid #0d9488;border-radius:0 8px 8px 0;">
-    <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0e4a50;">Quick access</p>
-    <p style="margin:0;font-size:13px;color:#475569;">Click below to open your membership — you'll be signed in automatically:</p>
-    <p style="margin:8px 0 0;"><a href="${autoLoginUrl}" style="color:#0d9488;font-weight:600;">${autoLoginUrl}</a></p>
-  </div>`;
-
-  if (opts.isNewUser && setPasswordUrl) {
-    const emailContent = buildPasswordResetEmail({
-      firstName,
-      resetUrl: setPasswordUrl,
-      brandMode: "aaus",
-      purpose: "welcome",
-      expiresInLabel: "7 days",
-    });
-    const subject = `Your ${opts.planTitle} membership is ready`;
-    const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
-    const { withPurchaseAccessRecipients } = await import("./purchaseAccessEmailDelivery");
-    return sendEmail(await withPurchaseAccessRecipients({
-      to: { name: opts.name, email: opts.email },
-      subject,
-      htmlBody: enhancedBody,
-      previewText: `Access your ${opts.planTitle} membership on All About Ultrasound`,
-      brandMode: "combined",
-    }, { userId: opts.userId, checkoutEmail: opts.payerEmail ?? opts.email, checkoutName: opts.payerName ?? opts.name }));
-  }
-
-  const { buildFunnelPurchaseConfirmationEmail } = await import("../_core/email");
-  const { subject, htmlBody, previewText } = buildFunnelPurchaseConfirmationEmail({
-    firstName,
-    productName: opts.planTitle,
-    amountPaid: 0,
-    loginUrl: autoLoginUrl,
-    brandMode: "aaus",
+  const db = await getDb();
+  const emailOverride = db
+    ? await getEffectivePurchaseEmailOverride(db, [{ contentType: "membership", contentId: opts.planId }])
+    : null;
+  const copy = applyPurchaseEmailOverride({
+    subject: `Your ${opts.planTitle} membership is active`,
+    heading: "Welcome — your membership is active",
+    intro: `your membership for <strong style="color:#0e4a50;">${opts.planTitle}</strong> is ready.`,
+  }, emailOverride);
+  const { resolvePurchaseEmailTargets } = await import("./purchaseAccessEmailDelivery");
+  const { to, payee } = await resolvePurchaseEmailTargets({
+    userId: opts.userId,
+    checkoutEmail: opts.payerEmail ?? opts.email,
+    checkoutName: opts.payerName ?? opts.name,
   });
-  const { withPurchaseAccessRecipients } = await import("./purchaseAccessEmailDelivery");
-  return sendEmail(await withPurchaseAccessRecipients({
-    to: { name: opts.name, email: opts.email },
-    subject: subject.replace("Purchase confirmed", `Your ${opts.planTitle} membership is active`),
-    htmlBody: htmlBody.replace("</body>", `${accessNote}</body>`),
-    previewText,
+  let accessToken: string | null = null;
+  try { accessToken = await getOrCreateAccessToken(opts.userId); } catch { /* plain access URL remains available */ }
+  return sendPurchaseAccessEmail({
+    to,
+    payee,
+    forPurchase: true,
+    subject: copy.subject,
+    heading: copy.heading,
+    intro: copy.intro,
+    detailsHtml: copy.detailsHtml,
+    accessLabel: opts.primaryCourseSlug ? "Start Learning" : "Open My Membership",
+    destinationUrl: destination,
+    accessToken,
+    setPasswordUrl,
+    brand,
     brandMode: "combined",
-  }, { userId: opts.userId, checkoutEmail: opts.payerEmail ?? opts.email, checkoutName: opts.payerName ?? opts.name }));
+  });
 }
 
 /**
@@ -667,6 +646,7 @@ export async function fulfillMembershipPurchase(
           primaryCourseSlug,
           payerEmail: ctx.payerEmail,
           payerName: ctx.payerName,
+          brand: plan.brand,
         }),
       });
       if (delivery.attempted && delivery.delivered) notes.push("Welcome email sent");

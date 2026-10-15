@@ -14,6 +14,7 @@ import { sendPurchaseNotificationOnce } from "./purchaseNotificationDelivery";
 import { resolvePurchaseEmailTargets } from "./purchaseAccessEmailDelivery";
 import { buildFunnelPurchaseConfirmationEmail } from "../_core/email";
 import { sendEmail } from "../_core/email";
+import { getEffectivePurchaseEmailOverride } from "./purchaseEmailOverride";
 
 type FunnelAccessEmailInput = {
   checkoutSessionId: string;
@@ -67,6 +68,10 @@ export async function deliverFunnelPurchaseAccessEmail(
           .where(eq(lmsCourses.id, input.fulfillmentCourseId))
           .limit(1);
         if (course?.slug) {
+          const emailOverride = await getEffectivePurchaseEmailOverride(db, [{
+            contentType: course.type === "quiz" ? "quiz" : course.type === "cohort" ? "cohort" : "course",
+            contentId: input.fulfillmentCourseId,
+          }]);
           if (course.type === "quiz") {
             return sendQuizAccessEmail({
               to,
@@ -74,6 +79,10 @@ export async function deliverFunnelPurchaseAccessEmail(
               forPurchase: true,
               quizTitle: course.title,
               courseSlug: course.slug,
+              customSubject: emailOverride?.subject,
+              customHeading: emailOverride?.heading,
+              customIntro: emailOverride?.intro,
+              customDetailsHtml: emailOverride?.detailsHtml,
               accessToken,
               setPasswordUrl: input.setPasswordUrl,
               brand: course.brand,
@@ -85,6 +94,10 @@ export async function deliverFunnelPurchaseAccessEmail(
             forPurchase: true,
             courseTitle: course.title,
             courseSlug: course.slug,
+            customSubject: emailOverride?.subject,
+            customHeading: emailOverride?.heading,
+            customIntro: emailOverride?.intro,
+            customDetailsHtml: emailOverride?.detailsHtml,
             accessToken,
             setPasswordUrl: input.setPasswordUrl,
             brand: course.brand,
@@ -100,12 +113,17 @@ export async function deliverFunnelPurchaseAccessEmail(
           .limit(1);
         if (product) {
           const brand = product.brand === "iheartecho" ? "iheartecho" : "aaus";
+          const emailOverride = await getEffectivePurchaseEmailOverride(db, [{ contentType: "download", contentId: input.fulfillmentDownloadId }]);
           return sendDownloadAccessEmail({
             to,
             payee,
             forPurchase: true,
             productTitle: product.title,
             productSlug: product.slug,
+            customSubject: emailOverride?.subject,
+            customHeading: emailOverride?.heading,
+            customIntro: emailOverride?.intro,
+            customDetailsHtml: emailOverride?.detailsHtml,
             accessToken,
             setPasswordUrl: input.setPasswordUrl,
             brand,
@@ -115,20 +133,25 @@ export async function deliverFunnelPurchaseAccessEmail(
 
       if (input.fulfillmentBundleId) {
         const [bundle] = await db
-          .select({ title: digitalBundles.title, slug: digitalBundles.slug })
+          .select({ title: digitalBundles.title, slug: digitalBundles.slug, brand: digitalBundles.brand })
           .from(digitalBundles)
           .where(eq(digitalBundles.id, input.fulfillmentBundleId))
           .limit(1);
         if (bundle) {
+          const emailOverride = await getEffectivePurchaseEmailOverride(db, [{ contentType: "bundle", contentId: input.fulfillmentBundleId }]);
           return sendBundleAccessEmail({
             to,
             payee,
             forPurchase: true,
             bundleTitle: bundle.title,
             bundleSlug: bundle.slug,
+            customSubject: emailOverride?.subject,
+            customHeading: emailOverride?.heading,
+            customIntro: emailOverride?.intro,
+            customDetailsHtml: emailOverride?.detailsHtml,
             accessToken,
             setPasswordUrl: input.setPasswordUrl,
-            brand: "aaus",
+            brand: bundle.brand === "iheartecho" ? "iheartecho" : "aaus",
           });
         }
       }

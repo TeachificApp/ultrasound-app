@@ -1658,33 +1658,14 @@ function WorkshopEditor({ workshopId, onBack, onTypeChangedFromWorkshop }: { wor
               <p className="text-xs text-gray-400 mb-1">Optional rich text shown on the workshop page for this specific instance (agenda, location details, instructor bio, etc.)</p>
               <RichTextEditor value={instContent} onChange={setInstContent} />
             </div>
-            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3">
-              <div className="flex items-start justify-between gap-4">
+            <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-4">
+              <div className="flex items-start gap-3">
+                <Mail className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" />
                 <div>
-                  <Label htmlFor="instConfirmationApproved" className="text-sm font-semibold text-slate-900">Automatic registration confirmation</Label>
-                  <p className="text-xs text-slate-600 mt-1">Held by default. Enable only after reviewing the subject, message, and dated details below.</p>
+                  <Label className="text-sm font-semibold text-slate-900">Automatic registration confirmation</Label>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">Future paid registrations automatically receive a confirmation using this instance’s saved date, time zone, location, and access link. Saving an instance never sends or resends messages to existing registrants.</p>
+                  <p className="mt-2 text-xs font-medium text-teal-900">To tailor wording, go to LMS Admin → Purchase Emails and choose this workshop instance. Dates stay data-bound to the fields above.</p>
                 </div>
-                <Switch checked={instConfirmationEmailApproved} onCheckedChange={setInstConfirmationEmailApproved} id="instConfirmationApproved" />
-              </div>
-              <p className="text-xs font-medium text-amber-900">Saving this setting never sends or resends email to existing registrants. It applies only to future completed purchases for this workshop instance.</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-xs">Email subject <span className="text-gray-400 font-normal">(optional)</span></Label>
-                  <Input value={instConfirmationEmailSubject} onChange={e => setInstConfirmationEmailSubject(e.target.value)} className="mt-1 text-sm" placeholder={`You're registered: ${title || "Workshop"}`} maxLength={500} />
-                </div>
-                <div>
-                  <Label className="text-xs">Email heading <span className="text-gray-400 font-normal">(optional)</span></Label>
-                  <Input value={instConfirmationEmailHeading} onChange={e => setInstConfirmationEmailHeading(e.target.value)} className="mt-1 text-sm" placeholder="Your workshop registration is confirmed" maxLength={500} />
-                </div>
-              </div>
-              <div>
-                <Label className="text-xs">Opening message <span className="text-gray-400 font-normal">(optional)</span></Label>
-                <Textarea value={instConfirmationEmailIntro} onChange={e => setInstConfirmationEmailIntro(e.target.value)} className="mt-1 text-sm" rows={2} placeholder="You are registered for this workshop." />
-              </div>
-              <div>
-                <Label className="text-xs font-medium">Reviewed date, location, and registration details *</Label>
-                <p className="text-xs text-gray-500 mb-1">This content replaces the automatic date block. Include the precise date(s), time zone, location, and any required instructions exactly as you want learners to receive them.</p>
-                <RichTextEditor value={instConfirmationEmailDetails} onChange={setInstConfirmationEmailDetails} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

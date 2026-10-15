@@ -6521,6 +6521,29 @@ export const purchaseNotificationDeliveries = mysqlTable("purchase_notification_
 export type PurchaseNotificationDelivery = typeof purchaseNotificationDeliveries.$inferSelect;
 export type InsertPurchaseNotificationDelivery = typeof purchaseNotificationDeliveries.$inferInsert;
 
+// ─── Purchase Email Overrides ─────────────────────────────────────────────────
+// Optional, platform-admin authored copy for a specific purchasable item.
+// Null / absent fields intentionally fall back to the dynamic standard template.
+export const purchaseEmailOverrides = mysqlTable("purchase_email_overrides", {
+  id: int("id").autoincrement().primaryKey(),
+  contentType: varchar("content_type", { length: 64 }).notNull(),
+  contentId: int("content_id").notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  subject: varchar("subject", { length: 500 }),
+  heading: varchar("heading", { length: 500 }),
+  intro: text("intro"),
+  detailsHtml: longtext("details_html"),
+  createdByUserId: int("created_by_user_id"),
+  updatedByUserId: int("updated_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("purchase_email_override_content_unique").on(table.contentType, table.contentId),
+  index("purchase_email_override_enabled_idx").on(table.enabled, table.updatedAt),
+]);
+export type PurchaseEmailOverride = typeof purchaseEmailOverrides.$inferSelect;
+export type InsertPurchaseEmailOverride = typeof purchaseEmailOverrides.$inferInsert;
+
 // ─── User Email Aliases ───────────────────────────────────────────────────────
 // Allows a user to log in with multiple email addresses.
 // The primary email is always stored on users.email; aliases are secondary.

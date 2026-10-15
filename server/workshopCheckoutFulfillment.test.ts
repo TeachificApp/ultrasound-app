@@ -28,7 +28,7 @@ describe("workshop checkout fulfillment recovery", () => {
     })).toEqual({ email: "learner@example.com", name: "Designated Learner" });
   });
 
-  it("uses recovery for a paid workshop checkout without sending email", () => {
+  it("uses recovery and an automatic data-bound confirmation for a paid workshop checkout", () => {
     const router = source("server/routers/lmsRouter.ts");
     const webhook = source("server/webhooks/stripe.ts");
     const helper = source("server/lib/workshopCheckoutFulfillment.ts");
@@ -37,7 +37,9 @@ describe("workshop checkout fulfillment recovery", () => {
     expect(router).toContain("fulfillWorkshopCheckoutFromStripeSession");
     expect(router).toContain('? "workshop"');
     expect(webhook).toContain("fulfillWorkshopCheckoutFromStripeSession");
-    expect(webhook).toContain("isWorkshopConfirmationReady(instance)");
+    expect(webhook).toContain("renderCurrentWorkshopSchedule(instance)");
+    expect(webhook).toContain('contentType: "workshop_instance"');
+    expect(webhook).not.toContain("isWorkshopConfirmationReady(instance)");
     expect(helper).toContain("It deliberately does not dispatch an email.");
     expect(helper).toContain("isCurrentCheckout");
   });

@@ -34,6 +34,8 @@ import { BRAND_PREMIUM_TRIAL_DAYS, hasBrandMembershipTrial, isBrandMembershipTri
 import { persistLmsSubscriptionInvoice } from "../lib/lmsSubscriptionReconciliation";
 import { grantBundle } from "../lib/membershipFulfillment";
 import { getBrandDisplayConfig } from "@shared/brands";
+import { formatInTimeZone } from "@shared/platformTime";
+import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from "../lib/purchaseEmailOverride";
 
 type CheckoutRecipient = { email: string | null; name: string | null };
 
@@ -64,16 +66,33 @@ function learnOriginForPurchaseBrand(brand: "aaus" | "iheartecho"): string {
   return brand === "iheartecho" ? "https://learn.iheartecho.com" : "https://learn.allaboutultrasound.com";
 }
 
-/** Dated workshop confirmations require both reviewed content and approval. */
-function isWorkshopConfirmationReady(instance: {
-  confirmationEmailApproved: boolean;
-  confirmationEmailDetails: string | null;
-}): boolean {
-  const reviewedText = instance.confirmationEmailDetails
-    ?.replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .trim();
-  return instance.confirmationEmailApproved && Boolean(reviewedText);
+/** Always derive workshop logistics from the instance actually purchased. */
+function renderCurrentWorkshopSchedule(instance: {
+  startDate: Date | string;
+  endDate?: Date | string | null;
+  timezone?: string | null;
+  locationType?: string | null;
+  venueName?: string | null;
+  venueCity?: string | null;
+  venueState?: string | null;
+}): string {
+  const timezone = instance.timezone || "America/New_York";
+  const dateOptions: Intl.DateTimeFormatOptions = { weekday: "long", month: "long", day: "numeric", year: "numeric" };
+  const timeOptions: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit", timeZoneName: "short" };
+  const startDate = formatInTimeZone(instance.startDate, dateOptions, timezone);
+  const startTime = formatInTimeZone(instance.startDate, timeOptions, timezone);
+  const endDate = instance.endDate ? formatInTimeZone(instance.endDate, dateOptions, timezone) : null;
+  const endTime = instance.endDate ? formatInTimeZone(instance.endDate, timeOptions, timezone) : null;
+  const schedule = endDate && endDate !== startDate
+    ? `${startDate}, ${startTime} – ${endDate}, ${endTime}`
+    : `${startDate}, ${startTime}${endTime ? ` – ${endTime}` : ""}`;
+  const location = instance.locationType === "virtual"
+    ? "Virtual workshop"
+    : [instance.venueName, [instance.venueCity, instance.venueState].filter(Boolean).join(", ")].filter(Boolean).join(" · ");
+  return `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+    <p style="margin:0 0 8px;"><strong>When:</strong> ${schedule}</p>
+    ${location ? `<p style="margin:0;"><strong>Location:</strong> ${location}</p>` : ""}
+  </div>`;
 }
 
 async function resolveCheckoutRecipientUser(session: Record<string, unknown>, meta: Record<string, string>) {
@@ -592,10 +611,11 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
       if (!owned) await db.insert(digitalPurchases).values({ userId, productId: item.productId, stripeCheckoutSessionId: session.id as string });
     }
   }
-  const [bundle] = await db.select({ title: digitalBundles.title, slug: digitalBundles.slug }).from(digitalBundles)
+  const [bundle] = await db.select({ title: digitalBundles.title, slug: digitalBundles.slug, brand: digitalBundles.brand }).from(digitalBundles)
     .where(eq(digitalBundles.id, bundleId)).limit(1);
   const email = recipient?.email ?? (await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1))[0]?.email;
   if (bundle && email) {
+    const emailOverride = await getEffectivePurchaseEmailOverride(db, [{ contentType: "bundle", contentId: bundleId }]);
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "bundle_access",
@@ -613,8 +633,12 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
           forPurchase: true,
           bundleTitle: bundle.title,
           bundleSlug: bundle.slug,
+          customSubject: emailOverride?.subject,
+          customHeading: emailOverride?.heading,
+          customIntro: emailOverride?.intro,
+          customDetailsHtml: emailOverride?.detailsHtml,
           accessToken: await getOrCreateAccessToken(userId),
-          brand: platformBrand(meta.brand ?? meta.brand_mode),
+          brand: platformBrand(bundle.brand ?? meta.brand ?? meta.brand_mode),
         });
       },
     });
@@ -670,6 +694,12 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
   if (email) {
     const brand = platformBrand(product?.brand ?? meta.brand);
     const title = product?.title ?? "your order";
+    const emailOverride = await getEffectivePurchaseEmailOverride(db, [{ contentType: "physical_product", contentId: productId }]);
+    const copy = applyPurchaseEmailOverride({
+      subject: `Order confirmed: ${title}`,
+      heading: "Your order is confirmed",
+      intro: `your order for <strong style="color:#0e4a50;">${title}</strong> has been received and is being processed.`,
+    }, emailOverride);
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "physical_order",
@@ -685,14 +715,15 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
           to: { name: recipient?.name || to.name || email.split("@")[0], email: to.email || email },
           payee,
           forPurchase: true,
-          subject: `Order confirmed: ${title}`,
-          heading: "Your order is confirmed",
-          intro: `your order for <strong style="color:#0e4a50;">${title}</strong> has been received and is being processed.`,
+          subject: copy.subject,
+          heading: copy.heading,
+          intro: copy.intro,
           accessLabel: "View My Orders",
           destinationUrl: `${brand === "iheartecho" ? "https://app.iheartecho.com" : "https://app.allaboutultrasound.com"}/my-orders`,
           accessToken: await getOrCreateAccessToken(userId),
           brand,
           brandMode: brand,
+          detailsHtml: copy.detailsHtml,
         });
       },
     });
@@ -719,7 +750,7 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
   const recipient = getCheckoutRecipient(session, meta);
   const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, brand: workshops.brand, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
     .from(workshops).where(eq(workshops.id, workshopId)).limit(1);
-  const [instance] = await db.select({ title: workshopInstances.title, status: workshopInstances.status, confirmationEmailApproved: workshopInstances.confirmationEmailApproved, confirmationEmailSubject: workshopInstances.confirmationEmailSubject, confirmationEmailHeading: workshopInstances.confirmationEmailHeading, confirmationEmailIntro: workshopInstances.confirmationEmailIntro, confirmationEmailDetails: workshopInstances.confirmationEmailDetails })
+  const [instance] = await db.select({ title: workshopInstances.title, status: workshopInstances.status, startDate: workshopInstances.startDate, endDate: workshopInstances.endDate, timezone: workshopInstances.timezone, locationType: workshopInstances.locationType, venueName: workshopInstances.venueName, venueCity: workshopInstances.venueCity, venueState: workshopInstances.venueState })
     .from(workshopInstances).where(eq(workshopInstances.id, instanceId)).limit(1);
   if (!workshop || !instance) return;
   if (fulfillment.created) {
@@ -727,8 +758,18 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
   }
   const email = fulfillment.recipientEmail ?? recipient.email;
   const payer = getCheckoutPayer(session, meta);
-  if (email && workshop.welcomeEmailEnabled !== false && isWorkshopConfirmationReady(instance)) {
+  if (email) {
     const brand = platformBrand(workshop.brand);
+    const emailOverride = await getEffectivePurchaseEmailOverride(db, [
+      { contentType: "workshop_instance", contentId: instanceId },
+      { contentType: "workshop", contentId: workshopId },
+    ]);
+    const copy = applyPurchaseEmailOverride({
+      subject: `You're registered: ${workshop.title}`,
+      heading: "Your workshop registration is confirmed",
+      intro: `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
+    }, emailOverride);
+    const detailsHtml = `${renderCurrentWorkshopSchedule(instance)}${emailOverride?.detailsHtml ?? ""}`;
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "workshop_registration",
@@ -743,21 +784,19 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
           to: { name: (fulfillment.recipientName ?? recipient.name) || to.name || email.split("@")[0], email: to.email || email },
           payee,
           forPurchase: true,
-          subject: instance.confirmationEmailSubject?.trim() || workshop.welcomeEmailSubject || `You're registered: ${workshop.title}`,
-          heading: instance.confirmationEmailHeading?.trim() || "Your workshop registration is confirmed",
-          intro: instance.confirmationEmailIntro?.trim() || `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
+          subject: copy.subject,
+          heading: copy.heading,
+          intro: copy.intro,
           accessLabel: "View Workshop Details",
           destinationUrl: `${learnOriginForPurchaseBrand(brand)}/workshops/${workshop.slug}`,
           accessToken: await getOrCreateAccessToken(userId),
           brand,
           brandMode: "combined",
-          detailsHtml: instance.confirmationEmailDetails!,
+          detailsHtml,
         });
       },
     });
     if (delivery.attempted && !delivery.delivered) await notifyOwner({ title: "⚠️ Workshop confirmation email failed", content: `Checkout ${session.id} registered the learner for "${workshop.title}", but its confirmation email could not be sent.` });
-  } else if (email && workshop.welcomeEmailEnabled !== false) {
-    console.info(`[Stripe] Workshop confirmation held for review: ${workshop.id}/${instanceId}`);
   }
 }
 
@@ -786,8 +825,14 @@ export async function handleWebinarCheckoutCompleted(session: Record<string, unk
   const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
   if (email) {
     const brand = platformBrand(webinar.brand);
+    const emailOverride = await getEffectivePurchaseEmailOverride(db, [{ contentType: "webinar", contentId: webinarId }]);
+    const copy = applyPurchaseEmailOverride({
+      subject: `You're registered: ${webinar.title}`,
+      heading: "Your webinar registration is confirmed",
+      intro: `you now have access to <strong style="color:#0e4a50;">${webinar.title}</strong>.`,
+    }, emailOverride);
     const dateText = webinar.scheduledAt ? new Date(webinar.scheduledAt).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" }) : null;
-    const detailsHtml = `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">${dateText ? `<p style="margin:0 0 8px;"><strong>When:</strong> ${dateText}</p>` : ""}${webinar.type === "live" && webinar.meetingUrl ? `<p style="margin:0;"><strong>Live access:</strong> the session details are available from your webinar page.</p>` : ""}</div>`;
+    const detailsHtml = `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">${dateText ? `<p style="margin:0 0 8px;"><strong>When:</strong> ${dateText}</p>` : ""}${webinar.type === "live" && webinar.meetingUrl ? `<p style="margin:0;"><strong>Live access:</strong> the session details are available from your webinar page.</p>` : ""}</div>${emailOverride?.detailsHtml ?? ""}`;
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "webinar_registration",
@@ -803,9 +848,9 @@ export async function handleWebinarCheckoutCompleted(session: Record<string, unk
           to: { name: recipient?.name || to.name || email.split("@")[0], email: to.email || email },
           payee,
           forPurchase: true,
-          subject: `You're registered: ${webinar.title}`,
-          heading: "Your webinar registration is confirmed",
-          intro: `you now have access to <strong style="color:#0e4a50;">${webinar.title}</strong>.`,
+          subject: copy.subject,
+          heading: copy.heading,
+          intro: copy.intro,
           accessLabel: "Open Webinar",
           destinationUrl: `${learnOriginForPurchaseBrand(brand)}/webinars/${webinar.slug}`,
           accessToken: await getOrCreateAccessToken(userId),
@@ -1485,6 +1530,7 @@ async function handleCanonicalBundleCheckoutCompleted(session: Record<string, un
   const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
   if (email) {
     const brand = platformBrand(meta.brand ?? meta.brand_mode);
+    const emailOverride = await getEffectivePurchaseEmailOverride(db, [{ contentType: "bundle", contentId: bundleId }]);
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
       notificationType: "bundle_access",
@@ -1502,6 +1548,10 @@ async function handleCanonicalBundleCheckoutCompleted(session: Record<string, un
           forPurchase: true,
           bundleTitle: bundle.title,
           bundleSlug: bundle.slug,
+          customSubject: emailOverride?.subject,
+          customHeading: emailOverride?.heading,
+          customIntro: emailOverride?.intro,
+          customDetailsHtml: emailOverride?.detailsHtml,
           destinationUrl: `${learnOriginForPurchaseBrand(brand)}/bundles/${bundle.slug}`,
           accessToken: await getOrCreateAccessToken(userId),
           brand,

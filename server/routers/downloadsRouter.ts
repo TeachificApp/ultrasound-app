@@ -2272,12 +2272,21 @@ export async function sendPurchaseConfirmationEmail(
     checkoutEmail: opts?.payeeEmail,
     checkoutName: opts?.payeeName,
   });
+  const { getEffectivePurchaseEmailOverride } = await import("../lib/purchaseEmailOverride");
+  const emailOverride = await getEffectivePurchaseEmailOverride(db, [{
+    contentType: "download",
+    contentId: productId,
+  }]);
   const delivered = await sendDownloadAccessEmail({
     to,
     payee,
     forPurchase: true,
     productTitle: product.title,
     productSlug: product.slug,
+    customSubject: emailOverride?.subject,
+    customHeading: emailOverride?.heading,
+    customIntro: emailOverride?.intro,
+    customDetailsHtml: emailOverride?.detailsHtml,
     accessToken,
     brand,
   });

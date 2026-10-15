@@ -89,6 +89,7 @@ import { AiSourceFileReview } from "@/components/admin/AiSourceFileReview";
 import { QuizResultsAdmin } from "./QuizResultsAdmin";
 import { InteractiveQuestionEditorPanel, isInteractiveType } from "@/components/InteractiveQuestionEditorPanel";
 import { FocusRegenerationDialog } from "@/components/admin/FocusRegenerationDialog";
+import { PurchaseEmailOverrides } from "@/components/admin/PurchaseEmailOverrides";
 /** Convenience alias used in LandingPageEditor */
 function useOpenLearnLink() {
   const { openLearnLink } = useLearnLink();
@@ -8569,6 +8570,7 @@ const LMS_NAV_GROUPS = [
       { value: "workshops",   label: "Workshops",   icon: Briefcase },
       { value: "bundles",     label: "Bundles",     icon: Layers },
       { value: "memberships", label: "Memberships", icon: Award },
+      { value: "purchase_emails", label: "Purchase Emails", icon: Mail },
       { value: "communities", label: "Communities", icon: Globe },
     ],
   },
@@ -8782,6 +8784,7 @@ export default function LMSAdmin() {
               {resolvedActiveTab === "workshops"   && <WorkshopsAdmin initialEditId={workshopsInitialEditId} onTypeChangedFromWorkshop={handleTypeChangedFromWorkshop} />}
               {resolvedActiveTab === "bundles"     && <BundlesAdmin initialEditId={urlEditBundle ? Number(urlEditBundle) : undefined} />}
               {resolvedActiveTab === "memberships" && <MembershipsAdmin initialEditId={urlEditMembership ? Number(urlEditMembership) : undefined} />}
+              {resolvedActiveTab === "purchase_emails" && <PurchaseEmailOverrides />}
               {resolvedActiveTab === "communities" && <CommunitiesTab />}
               {resolvedActiveTab === "orderbumps"  && <OrderBumpsAdmin />}
               {resolvedActiveTab === "collections" && <CollectionsTab />}

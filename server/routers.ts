@@ -83,6 +83,7 @@ import { siteSettingsRouter } from "./routers/siteSettingsRouter";
 import { newsletterRouter } from "./routers/newsletterRouter";
 import { scheduledContentAdminRouter } from "./routers/scheduledContentAdminRouter";
 import { surveyPulseRouter } from "./routers/surveyPulseRouter";
+import { purchaseEmailOverridesRouter } from "./routers/purchaseEmailOverridesRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -2260,6 +2261,7 @@ export const appRouter = router({
   lmsAdmin: lmsAdminRouter,
   revenueShare: revenueShareRouter,
   lmsEnrollmentAdmin: lmsEnrollmentAdminRouter,
+  purchaseEmailOverrides: purchaseEmailOverridesRouter,
   lmsTeamManager: lmsTeamManagerRouter,
   careerNetwork: careerNetworkRouter,
   lmsGroup: lmsGroupRouter,
