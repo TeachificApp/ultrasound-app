@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
 import { purchaseEmailOverrides } from "../../drizzle/schema";
+import { TRANSACTIONAL_EMAIL_DEEP_TEAL } from "../../shared/transactionalEmailPalette";
 
 /** Content scopes supported by the centralized purchase-email editor. */
 export const PURCHASE_EMAIL_CONTENT_TYPES = [
@@ -111,7 +112,7 @@ export function renderPurchaseEmailOverrideBlock(override?: PurchaseEmailOverrid
   if (!heading && !intro && !details) return "";
   return `
     <section style="margin:0 0 20px;">
-      ${heading ? `<h2 style="margin:0 0 8px;font-size:22px;color:#0e4a50;font-family:Georgia,serif;">${heading}</h2>` : ""}
+      ${heading ? `<h2 style="margin:0 0 8px;font-size:22px;color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};font-family:Georgia,serif;">${heading}</h2>` : ""}
       ${intro ? `<div style="margin:0 0 14px;font-size:15px;color:#475569;line-height:1.6;">${intro}</div>` : ""}
       ${details ? `<div style="margin:0 0 16px;font-size:14px;color:#475569;line-height:1.6;">${details}</div>` : ""}
     </section>`;

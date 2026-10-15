@@ -34,6 +34,7 @@ import { BRAND_PREMIUM_TRIAL_DAYS, hasBrandMembershipTrial, isBrandMembershipTri
 import { persistLmsSubscriptionInvoice } from "../lib/lmsSubscriptionReconciliation";
 import { grantBundle } from "../lib/membershipFulfillment";
 import { getBrandDisplayConfig } from "@shared/brands";
+import { TRANSACTIONAL_EMAIL_DEEP_TEAL } from "@shared/transactionalEmailPalette";
 import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from "../lib/purchaseEmailOverride";
 import { hasKnownStripeCheckoutRoute, hasUnmatchedPlatformPaymentIntentMetadata, unmatchedStripePaymentMessage } from "../lib/unmatchedStripePayment";
 import { recordReceiptPayee } from "../lib/receiptParticipants";
@@ -695,7 +696,7 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
     const copy = applyPurchaseEmailOverride({
       subject: `Order confirmed: ${title}`,
       heading: "Your order is confirmed",
-      intro: `your order for <strong style="color:#0e4a50;">${title}</strong> has been received and is being processed.`,
+      intro: `your order for <strong style="color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">${title}</strong> has been received and is being processed.`,
     }, emailOverride);
     const delivery = await sendPurchaseNotificationOnce(db, {
       checkoutSessionId: session.id as string | undefined,
@@ -771,7 +772,7 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
     const copy = applyPurchaseEmailOverride({
       subject: `You're registered: ${workshop.title}`,
       heading: "Your workshop registration is confirmed",
-      intro: `you are registered for <strong style="color:#0e4a50;">${workshop.title}</strong>.`,
+      intro: `you are registered for <strong style="color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">${workshop.title}</strong>.`,
     }, emailOverride);
     const detailsHtml = `${renderCurrentWorkshopSchedule(instance)}${emailOverride?.detailsHtml ?? ""}`;
     const delivery = await sendPurchaseNotificationOnce(db, {
@@ -840,7 +841,7 @@ export async function handleWebinarCheckoutCompleted(session: Record<string, unk
     const copy = applyPurchaseEmailOverride({
       subject: `You're registered: ${webinar.title}`,
       heading: "Your webinar registration is confirmed",
-      intro: `you now have access to <strong style="color:#0e4a50;">${webinar.title}</strong>.`,
+      intro: `you now have access to <strong style="color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">${webinar.title}</strong>.`,
     }, emailOverride);
     const detailsHtml = `${renderCurrentWebinarSchedule(webinar)}${copy.detailsHtml ?? ""}`;
     const delivery = await sendPurchaseNotificationOnce(db, {

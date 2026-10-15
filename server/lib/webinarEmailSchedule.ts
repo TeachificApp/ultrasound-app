@@ -1,4 +1,5 @@
 import { formatInTimeZone } from "@shared/platformTime";
+import { TRANSACTIONAL_EMAIL_TEAL, TRANSACTIONAL_EMAIL_TINT } from "@shared/transactionalEmailPalette";
 
 /**
  * Renders the schedule details for the webinar configured on the purchased
@@ -27,7 +28,7 @@ export function renderCurrentWebinarSchedule(webinar: {
     ? "the session details are available from your webinar page."
     : null;
 
-  return `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+  return `<div style="background:${TRANSACTIONAL_EMAIL_TINT};border-left:3px solid ${TRANSACTIONAL_EMAIL_TEAL};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
     ${schedule ? `<p style="margin:0${liveAccess ? " 0 8px" : ""};"><strong>When:</strong> ${schedule}</p>` : "<p style=\"margin:0;\"><strong>When:</strong> Date and time to be announced</p>"}
     ${liveAccess ? `<p style="margin:0;"><strong>Live access:</strong> ${liveAccess}</p>` : ""}
   </div>`;

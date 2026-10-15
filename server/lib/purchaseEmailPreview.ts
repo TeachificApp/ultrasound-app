@@ -27,6 +27,7 @@ import { renderCurrentWorkshopSchedule } from "./workshopEmailSchedule";
 import { renderCurrentWebinarSchedule } from "./webinarEmailSchedule";
 import { renderCurrentCohortGroupSchedule } from "./cohortEmailSchedule";
 import { renderTeamSubscriptionConfirmationEmail } from "./teamSubscriptionEmail";
+import { TRANSACTIONAL_EMAIL_DEEP_TEAL } from "../../shared/transactionalEmailPalette";
 
 export const PURCHASE_EMAIL_PREVIEW_SOURCES = [
   "course",
@@ -244,7 +245,7 @@ export async function renderCurrentPurchaseEmailPreview(
     const copy = applyPurchaseEmailOverride({
       subject: `You're registered: ${webinar.title}`,
       heading: "Your webinar registration is confirmed",
-      intro: `you now have access to <strong style="color:#0e4a50;">${webinar.title}</strong>.`,
+      intro: `you now have access to <strong style="color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">${webinar.title}</strong>.`,
     }, override);
     const detailsHtml = `${renderCurrentWebinarSchedule(webinar)}${copy.detailsHtml ?? ""}`;
     return result(webinar.title, "Webinar", await renderPurchaseAccessEmail({
@@ -273,7 +274,7 @@ export async function renderCurrentPurchaseEmailPreview(
     const copy = applyPurchaseEmailOverride({
       subject: `Welcome to ${group.courseTitle}`,
       heading: "Welcome — your cohort access is ready",
-      intro: `you are enrolled in <strong style="color:#0e4a50;">${group.courseTitle}</strong>.`,
+      intro: `you are enrolled in <strong style="color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">${group.courseTitle}</strong>.`,
     }, override);
     const brand = purchaseBrand(group.courseBrand);
     const detailsHtml = `${renderCurrentCohortGroupSchedule(group)}${copy.detailsHtml ?? ""}`;
@@ -298,7 +299,7 @@ export async function renderCurrentPurchaseEmailPreview(
     const copy = applyPurchaseEmailOverride({
       subject: `You're registered: ${instance.workshopTitle}`,
       heading: "Your workshop registration is confirmed",
-      intro: `you are registered for <strong style="color:#0e4a50;">${instance.workshopTitle}</strong>.`,
+      intro: `you are registered for <strong style="color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">${instance.workshopTitle}</strong>.`,
     }, override);
     const brand = purchaseBrand(instance.workshopBrand);
     const detailsHtml = `${renderCurrentWorkshopSchedule(instance)}${copy.detailsHtml ?? ""}`;
@@ -317,7 +318,7 @@ export async function renderCurrentPurchaseEmailPreview(
     const copy = applyPurchaseEmailOverride({
       subject: `Order confirmed: ${product.title}`,
       heading: "Your order is confirmed",
-      intro: `your order for <strong style="color:#0e4a50;">${product.title}</strong> has been received and is being processed.`,
+      intro: `your order for <strong style="color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">${product.title}</strong> has been received and is being processed.`,
     }, override);
     return result(product.title, "Physical product", await renderPurchaseAccessEmail({
       to: SAMPLE_RECIPIENT, subject: copy.subject, heading: copy.heading, intro: copy.intro, detailsHtml: copy.detailsHtml ?? undefined,
@@ -333,7 +334,7 @@ export async function renderCurrentPurchaseEmailPreview(
     const override = await getEffectivePurchaseEmailOverride(db, [{ contentType: "membership", contentId: input.contentId }]);
     const copy = applyPurchaseEmailOverride({
       subject: `Your ${plan.title} membership is active`, heading: "Welcome — your membership is active",
-      intro: `your membership for <strong style="color:#0e4a50;">${plan.title}</strong> is ready.`,
+      intro: `your membership for <strong style="color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">${plan.title}</strong> is ready.`,
     }, override);
     const [primaryCourse] = await db.select({ slug: lmsCourses.slug })
       .from(membershipPlanAccess)

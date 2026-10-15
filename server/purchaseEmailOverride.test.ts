@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { applyPurchaseEmailOverride } from "./lib/purchaseEmailOverride";
+import { renderPurchaseAccessEmail } from "./lib/enrollmentEmail";
 
 describe("purchase email override copy", () => {
   const defaults = {
@@ -73,5 +74,20 @@ describe("purchase email override copy", () => {
     expect(screen).toContain('refetchOnMount: "always"');
     expect(screen).toContain("Content catalog could not load");
     expect(screen).toContain("Some content is temporarily unavailable in this list:");
+  });
+
+  it("uses the shared blue-teal palette in scheduled purchase confirmations", async () => {
+    const email = await renderPurchaseAccessEmail({
+      to: { name: "Sample Learner", email: "sample@example.com" },
+      subject: "Workshop confirmed",
+      heading: "Your workshop registration is confirmed",
+      intro: "you are registered.",
+      accessLabel: "View Workshop Details",
+      destinationUrl: "https://learn.allaboutultrasound.com/workshops/sample",
+    });
+
+    expect(email.htmlBody).toContain("#0b8fa8");
+    expect(email.htmlBody).toContain("#075a70");
+    expect(email.htmlBody).not.toContain('bgcolor="#0d9488"');
   });
 });

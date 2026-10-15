@@ -14,8 +14,9 @@ import {
   sendEmail,
 } from "../_core/email";
 import type { Brand, BrandMode } from "../../shared/brands";
-const brandColor = "#0d9488";
-const brandDark = "#0e4a50";
+import { TRANSACTIONAL_EMAIL_DEEP_TEAL, TRANSACTIONAL_EMAIL_TEAL } from "../../shared/transactionalEmailPalette";
+const brandColor = TRANSACTIONAL_EMAIL_TEAL;
+const brandDark = TRANSACTIONAL_EMAIL_DEEP_TEAL;
 
 
 export type ContentType = "course" | "download" | "bundle" | "quiz";
@@ -157,7 +158,7 @@ export async function renderEnrollmentEmail(opts: EnrollmentEmailOptions): Promi
     ${opts.customDetailsHtml ?? ""}
     ${setPasswordHtml}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
-      <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">Getting started:</p>
+      <p style="margin:0;font-size:14px;color:${brandDark};font-weight:600;">Getting started:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
         <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
         <li style="margin:4px 0;">Track your progress and complete lessons at your own pace</li>
@@ -298,7 +299,7 @@ export async function renderDownloadAccessEmail(opts: DownloadAccessEmailOptions
     ${opts.customDetailsHtml ?? ""}
     ${passwordSetupCta(opts.setPasswordUrl)}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
-      <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">Accessing your files:</p>
+      <p style="margin:0;font-size:14px;color:${brandDark};font-weight:600;">Accessing your files:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
         <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
         <li style="margin:4px 0;">Files are available anytime from your account</li>
@@ -368,7 +369,7 @@ export async function renderBundleAccessEmail(opts: BundleAccessEmailOptions): P
     ${opts.customDetailsHtml ?? ""}
     ${passwordSetupCta(opts.setPasswordUrl)}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
-      <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">What's included:</p>
+      <p style="margin:0;font-size:14px;color:${brandDark};font-weight:600;">What's included:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
         <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
         <li style="margin:4px 0;">Download files are available immediately</li>
@@ -439,7 +440,7 @@ export async function renderQuizAccessEmail(opts: QuizAccessEmailOptions): Promi
     ${opts.customDetailsHtml ?? ""}
     ${setPasswordHtml}
     <div style="background:#f0fbfc;border-left:3px solid ${brandColor};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
-      <p style="margin:0;font-size:14px;color:#0e4a50;font-weight:600;">How to access:</p>
+      <p style="margin:0;font-size:14px;color:${brandDark};font-weight:600;">How to access:</p>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:14px;color:#475569;">
         <li style="margin:4px 0;">Click the button below — you'll be signed in automatically</li>
         <li style="margin:4px 0;">${opts.courseSlug ? "Start the quiz right away in your course player" : "Go to My Dashboard → My Content → Quizzes"}</li>

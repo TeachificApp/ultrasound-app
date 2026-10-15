@@ -1,4 +1,5 @@
 import { formatInTimeZone } from "@shared/platformTime";
+import { TRANSACTIONAL_EMAIL_TEAL, TRANSACTIONAL_EMAIL_TINT } from "@shared/transactionalEmailPalette";
 
 /**
  * Renders schedule details from the exact workshop instance fields. This markup is
@@ -27,7 +28,7 @@ export function renderCurrentWorkshopSchedule(instance: {
   const location = instance.locationType === "virtual"
     ? "Virtual workshop"
     : [instance.venueName, [instance.venueCity, instance.venueState].filter(Boolean).join(", ")].filter(Boolean).join(" · ");
-  return `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+  return `<div style="background:${TRANSACTIONAL_EMAIL_TINT};border-left:3px solid ${TRANSACTIONAL_EMAIL_TEAL};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
     <p style="margin:0 0 8px;"><strong>When:</strong> ${schedule}</p>
     ${location ? `<p style="margin:0;"><strong>Location:</strong> ${location}</p>` : ""}
   </div>`;

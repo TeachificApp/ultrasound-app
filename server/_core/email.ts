@@ -4,6 +4,7 @@
  */
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
+import { TRANSACTIONAL_EMAIL_AQUA, TRANSACTIONAL_EMAIL_DEEP_TEAL, TRANSACTIONAL_EMAIL_TEAL, TRANSACTIONAL_EMAIL_TINT } from "@shared/transactionalEmailPalette";
 import { getDb } from "../db";
 import { eq } from "drizzle-orm";
 import { users, emailSendLog as emailSendLogTable } from "../../drizzle/schema";
@@ -71,8 +72,8 @@ export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
 
 // \u2500\u2500\u2500 Email Templates \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-const brandColor = "#189aa1";
-const brandDark = "#0e1e2e";
+const brandColor = TRANSACTIONAL_EMAIL_TEAL;
+const brandDark = TRANSACTIONAL_EMAIL_DEEP_TEAL;
 
 /** Brand-aware email wrapper. Pass brandMode to customize header/footer. */
 export function emailWrapper(
@@ -94,17 +95,17 @@ export function emailWrapper(
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <title>${bc.displayName}</title>
 </head>
-<body style="margin:0;padding:0;background:#f0fbfc;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fbfc;padding:32px 16px;">
+<body style="margin:0;padding:0;background:${TRANSACTIONAL_EMAIL_TINT};font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:${TRANSACTIONAL_EMAIL_TINT};padding:32px 16px;">
     <tr>
       <td align="center">
         <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg,${bc.darkColor} 0%,#0e4a50 60%,${bc.primaryColor} 100%);padding:28px 32px;text-align:center;">
+            <td style="background:linear-gradient(135deg,${brandDark} 0%,#087188 60%,${brandColor} 100%);padding:28px 32px;text-align:center;">
               ${logoHtml}
               <div style="font-size:22px;font-weight:700;color:#ffffff;font-family:Georgia,serif;">${bc.displayName}</div>
-              <div style="font-size:12px;color:${bc.accentColor};margin-top:4px;">${bc.tagline}</div>
+              <div style="font-size:12px;color:${TRANSACTIONAL_EMAIL_AQUA};margin-top:4px;">${bc.tagline}</div>
             </td>
           </tr>
           <!-- Body -->
@@ -115,7 +116,7 @@ export function emailWrapper(
           </tr>
           <!-- Footer -->
           <tr>
-            <td style="background:#f8fffe;border-top:1px solid #e5f7f8;padding:20px 32px;text-align:center;">
+            <td style="background:#f8feff;border-top:1px solid #dff4f6;padding:20px 32px;text-align:center;">
               <p style="margin:0;font-size:12px;color:#94a3b8;">
                 \u00a9 ${bc.displayName} \u00b7 <a href="${bc.websiteUrl}" style="color:${bc.primaryColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">${bc.websiteUrl.replace("https://", "")}</a>
               </p>

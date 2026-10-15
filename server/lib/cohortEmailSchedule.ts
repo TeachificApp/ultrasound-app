@@ -1,4 +1,5 @@
 import { formatInTimeZone } from "@shared/platformTime";
+import { TRANSACTIONAL_EMAIL_TEAL, TRANSACTIONAL_EMAIL_TINT } from "@shared/transactionalEmailPalette";
 
 /**
  * Renders the schedule details for the exact cohort group assigned to the
@@ -20,7 +21,7 @@ export function renderCurrentCohortGroupSchedule(group: {
     ? `${startDate} – ${endDate}`
     : startDate ?? endDate;
 
-  return `<div style="background:#f0fbfc;border-left:3px solid #0d9488;padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
+  return `<div style="background:${TRANSACTIONAL_EMAIL_TINT};border-left:3px solid ${TRANSACTIONAL_EMAIL_TEAL};padding:14px 16px;border-radius:0 8px 8px 0;margin:0 0 24px;">
     <p style="margin:0 0 ${dateRange || group.location ? "8px" : "0"};"><strong>Cohort group:</strong> ${group.name}</p>
     ${dateRange ? `<p style="margin:0${group.location ? " 0 8px" : ""};"><strong>Dates:</strong> ${dateRange}</p>` : ""}
     ${group.location ? `<p style="margin:0;"><strong>Location:</strong> ${group.location}</p>` : ""}

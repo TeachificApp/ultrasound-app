@@ -1,4 +1,5 @@
 import type { EmailRecipient, SendEmailOptions } from "./email/types";
+import { TRANSACTIONAL_EMAIL_DEEP_TEAL, TRANSACTIONAL_EMAIL_TEAL, TRANSACTIONAL_EMAIL_TINT } from "../../shared/transactionalEmailPalette";
 
 /** Receives a token-free operational purchase receipt for every access grant. */
 export const PURCHASE_ACCESS_ADMIN_EMAIL = "admin@allaboutultrasound.com";
@@ -165,12 +166,12 @@ function buildTokenFreeReceipt(base: SendEmailOptions, to: EmailRecipient, isAdm
     : null;
   const adminDetailRows = isAdminReceipt ? `
         <tr><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#64748b;width:38%;">Learner</td><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#0f172a;font-weight:600;">${learnerName}</td></tr>
-        <tr><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#64748b;">Learner email</td><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#0f172a;"><a href="mailto:${learnerEmail}" style="color:#0d9488;text-decoration:none;">${learnerEmail}</a></td></tr>
+        <tr><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#64748b;">Learner email</td><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#0f172a;"><a href="mailto:${learnerEmail}" style="color:${TRANSACTIONAL_EMAIL_TEAL};text-decoration:none;">${learnerEmail}</a></td></tr>
         <tr><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#64748b;">Registered content</td><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#0f172a;">${productLabel}</td></tr>
         <tr><td style="padding:9px 12px;color:#64748b;">Price paid</td><td style="padding:9px 12px;color:#0f172a;font-weight:700;">${pricePaid}</td></tr>
       ` : "";
   const adminProfileCta = isAdminReceipt && memberProfileUrl
-    ? `<p style="margin:20px 0 0;"><a href="${memberProfileUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;padding:11px 18px;border-radius:7px;text-decoration:none;font-weight:700;">Open Member Profile</a></p>`
+    ? `<p style="margin:20px 0 0;"><a href="${memberProfileUrl}" style="display:inline-block;background:${TRANSACTIONAL_EMAIL_TEAL};color:#ffffff;padding:11px 18px;border-radius:7px;text-decoration:none;font-weight:700;">Open Member Profile</a></p>`
     : "";
   const payeeDetailRows = !isAdminReceipt ? `
         <tr><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#64748b;width:38%;">Enrolled learner</td><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#0f172a;font-weight:600;">${learnerName}</td></tr>
@@ -180,9 +181,9 @@ function buildTokenFreeReceipt(base: SendEmailOptions, to: EmailRecipient, isAdm
   return {
     to,
     subject: `Purchase confirmation — ${base.subject}`,
-    htmlBody: `<!doctype html><html><body style="margin:0;padding:24px;background:#f0fbfc;font-family:Arial,sans-serif;color:#334155;">
+    htmlBody: `<!doctype html><html><body style="margin:0;padding:24px;background:${TRANSACTIONAL_EMAIL_TINT};font-family:Arial,sans-serif;color:#334155;">
       <main style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px;">
-        <h2 style="margin:0 0 16px;color:#0e4a50;">Purchase confirmed</h2>
+        <h2 style="margin:0 0 16px;color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">Purchase confirmed</h2>
         <p>Hi ${recipientName},</p>
         ${isAdminReceipt ? `<p>A learner purchase has been completed and access has been prepared.</p>
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #dceff0;border-radius:8px;border-collapse:separate;border-spacing:0;margin:18px 0;background:#fbffff;">${adminDetailRows}</table>${adminProfileCta}` : `<p>A purchase has been completed for <strong>${productLabel}</strong>.</p>

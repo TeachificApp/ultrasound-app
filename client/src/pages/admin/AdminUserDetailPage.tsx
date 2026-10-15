@@ -4270,14 +4270,17 @@ export default function AdminUserDetailPage() {
 
   if (error || !data) {
     const isForbidden = (error as any)?.data?.code === "FORBIDDEN";
+    const isNotFound = (error as any)?.data?.code === "NOT_FOUND";
     const errMsg = isForbidden
       ? "Access denied. Please ensure you are logged in as an admin."
-      : "We could not load this member profile just now. Please try again in a moment. No member information was changed.";
+      : isNotFound
+        ? "This profile link does not match an active member record in the current MySQL system. No member information was changed. Return to Members to find the current profile."
+        : "We could not load this member profile just now. Please try again in a moment. No member information was changed.";
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-screen gap-4">
           <p className="max-w-md text-center text-gray-500">{errMsg}</p>
-          <button onClick={() => refetch()} className="text-sm text-teal-600 hover:underline">Try again</button>
+          {!isNotFound && <button onClick={() => refetch()} className="text-sm text-teal-600 hover:underline">Try again</button>}
           <button onClick={() => navigate("/admin/members")} className="text-sm text-gray-400 hover:underline">← Back to Members</button>
         </div>
       </Layout>

@@ -50,7 +50,7 @@ describe("purchaser access email CTA", () => {
     expect(sent).toBe(true);
     const payload = vi.mocked(sendEmail).mock.calls.at(-1)?.[0];
     const courseUrl = "https://learn.allaboutultrasound.com/auth/access?token=access-token&next=https%3A%2F%2Flearn.allaboutultrasound.com%2Fcourses%2Fsonography-ergonomics%2Fplayer";
-    expect(payload?.htmlBody).toContain('bgcolor="#0d9488"');
+    expect(payload?.htmlBody).toContain('bgcolor="#0b8fa8"');
     expect(payload?.htmlBody).toContain(`href="${courseUrl}"`);
     expect(payload?.htmlBody).toContain("If the button is not visible or does not work");
   });
