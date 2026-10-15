@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import { STUDENT_DASHBOARD_PATH } from "@shared/studentDashboardUrls";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useLmsAnalytics } from "@/hooks/useAnalytics";
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1817,6 +1818,7 @@ export default function CoursePlayer() {
   const [contentFullscreen, setContentFullscreen] = useState(false);
   const [showCourseStartModal, setShowCourseStartModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const lastRecordedLessonRef = useRef<number | null>(null);
   const utils = trpc.useUtils();
 
   // Access links reach the player immediately after the server sets the new
@@ -1883,6 +1885,7 @@ export default function CoursePlayer() {
     { lessonId: selectedLessonId! },
     { enabled: !!selectedLessonId }
   );
+  const { trackVideo } = useLmsAnalytics(selectedLessonId ?? undefined, data?.course?.id);
   const { data: notesData, refetch: refetchNotes } = trpc.lmsLearner.getCourseNotes.useQuery(
     { courseSlug: slug! },
     { enabled: !!slug && !!user }
@@ -1922,6 +1925,7 @@ export default function CoursePlayer() {
       utils.lmsLearner.getCoursePlayer.invalidate({ slug: slug! });
     },
   });
+  const recordLessonFileDownload = trpc.lmsLearner.recordLessonFileDownload.useMutation();
   const saveNote = trpc.lmsLearner.saveNote.useMutation({
     onSuccess: () => { refetchNotes(); toast.success("Note saved"); },
     onError: (e) => toast.error(`Failed to save note: ${e.message}`),
@@ -1936,20 +1940,19 @@ export default function CoursePlayer() {
 
   useEffect(() => { setVideoWatched(false); setRightPanelTab("info"); }, [selectedLessonId]);
 
-  // A lesson can be selected from the initial course route, a refreshed editor
-  // state, or automatic Next navigation. Persist that opened state even when it
-  // did not originate from a sidebar click, so an open-based prerequisite gate
-  // continues to unlock normal learner progression after a page refresh.
+  // Record every distinct lesson selected in this player session. The server keeps
+  // progress idempotent, while the append-only activity log preserves actual access.
   useEffect(() => {
-    if (!selectedLessonId || !slug || optimisticOpened.has(selectedLessonId)) return;
-    if ((data?.progress ?? []).some((progressRow: any) => progressRow.lessonId === selectedLessonId)) return;
+    if (!selectedLessonId || !slug || !data) return;
+    if (lastRecordedLessonRef.current === selectedLessonId) return;
+    lastRecordedLessonRef.current = selectedLessonId;
     setOptimisticOpened((previous) => new Set([...previous, selectedLessonId]));
     recordLessonOpened.mutate({
       lessonId: selectedLessonId,
       courseSlug: slug,
-      isAdminPreview: data?.isAdminPreview ?? false,
+      isAdminPreview: data.isAdminPreview ?? false,
     });
-  }, [selectedLessonId, slug, data?.isAdminPreview, data?.progress, optimisticOpened, recordLessonOpened]);
+  }, [selectedLessonId, slug, data, recordLessonOpened]);
   // Exit fullscreen on Escape key
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape" && contentFullscreen) setContentFullscreen(false); };
@@ -2321,11 +2324,6 @@ export default function CoursePlayer() {
     }
     setSelectedLessonId(lessonId);
     setOptimisticOpened((prev) => new Set([...prev, lessonId]));
-    recordLessonOpened.mutate({
-      lessonId,
-      courseSlug: slug!,
-      isAdminPreview: data?.isAdminPreview ?? false,
-    });
   };
 
   const currentIdx = allLessons.findIndex((l: any) => l.id === selectedLessonId);
@@ -3103,13 +3101,21 @@ export default function CoursePlayer() {
                           src={lessonData.content}
                           controls
                           className="w-full h-full"
+                          onPlay={(event) => {
+                            const video = event.currentTarget;
+                            trackVideo("play", Math.floor(video.currentTime), Math.floor(video.duration || 0), video.duration ? Math.floor((video.currentTime / video.duration) * 100) : 0);
+                          }}
                           onTimeUpdate={(event) => {
                             const video = event.currentTarget;
                             if (hasReachedCmeVideoCompletionThreshold(video.currentTime, video.duration)) {
                               setVideoWatched(true);
                             }
                           }}
-                          onEnded={() => setVideoWatched(true)}
+                          onEnded={(event) => {
+                            const video = event.currentTarget;
+                            setVideoWatched(true);
+                            trackVideo("complete", Math.floor(video.duration || video.currentTime), Math.floor(video.duration || 0), 100);
+                          }}
                         />
                       </div>
                       {requireVideoCompletion && !videoWatched && !isAdminPreviewMode && (
@@ -3180,7 +3186,7 @@ export default function CoursePlayer() {
                       <Download className="w-8 h-8" style={{ color: primaryColor }} />
                       <div>
                         <p className="font-medium text-gray-900">{lessonData.title}</p>
-                        <a href={lessonData.content} target="_blank" rel="noreferrer" className="text-sm underline" style={{ color: primaryColor }}>Download file</a>
+                        <a href={lessonData.content} target="_blank" rel="noreferrer" onClick={() => recordLessonFileDownload.mutate({ lessonId: lessonData.id, courseSlug: slug!, fileName: lessonData.title })} className="text-sm underline" style={{ color: primaryColor }}>Download file</a>
                       </div>
                     </div>
                   )}
@@ -3306,7 +3312,15 @@ export default function CoursePlayer() {
                           />
                         ) : (
                           <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-lg">
-                            <BlockPreview block={block} courseId={data?.course?.id} />
+                            <BlockPreview
+                              block={block}
+                              courseId={data?.course?.id}
+                              onFileDownload={({ fileName }) => recordLessonFileDownload.mutate({ lessonId: lessonData.id, courseSlug: slug!, fileName })}
+                              onVideoEvent={(eventType, video) => {
+                                if (eventType === "complete") setVideoWatched(true);
+                                trackVideo(eventType, video.positionSec, video.durationSec, video.percentWatched);
+                              }}
+                            />
                           </div>
                         )
                       ))}

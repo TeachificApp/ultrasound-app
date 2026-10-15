@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Download, ExternalLink, FolderOpen, Link2 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
 
 export type CohortResourceView = {
   id: number;
@@ -15,7 +16,8 @@ export type CohortResourceView = {
   scope?: "course" | "cohort";
 };
 
-export function CohortResourceCard({ resource }: { resource: CohortResourceView }) {
+export function CohortResourceCard({ resource, courseId }: { resource: CohortResourceView; courseId: number }) {
+  const recordResourceAccess = trpc.lmsLearner.recordCohortResourceAccess.useMutation();
   const isDownload = resource.actionType === "download";
   const href = resource.actionUrl ?? undefined;
   const isExternal = href?.startsWith("http");
@@ -31,6 +33,7 @@ export function CohortResourceCard({ resource }: { resource: CohortResourceView 
         target={isDownload || isExternal ? "_blank" : undefined}
         rel={isDownload || isExternal ? "noopener noreferrer" : undefined}
         download={isDownload && !href.startsWith("/") ? resource.downloadFileName ?? true : undefined}
+        onClick={() => recordResourceAccess.mutate({ courseId, resourceId: resource.id })}
       >
         {isDownload ? <Download className="w-3.5 h-3.5" /> : <ExternalLink className="w-3.5 h-3.5" />}
         {isDownload ? "Download" : "Open Link"}

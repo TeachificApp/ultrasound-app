@@ -2434,7 +2434,7 @@ export const lmsLearnerRouter = router({
 
   /** Record that a learner opened a lesson (for prerequisite gates that unlock on view). */
   recordLessonOpened: protectedProcedure
-    .input(z.object({ lessonId: z.number(), courseSlug: z.string(), isAdminPreview: z.boolean().optional() }))
+    .input(z.object({ lessonId: z.number().int().positive(), courseSlug: z.string(), isAdminPreview: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -2456,6 +2456,24 @@ export const lmsLearnerRouter = router({
       }
       if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
 
+      const [lesson] = await db.select({
+        id: lmsLessons.id,
+        title: lmsLessons.title,
+        courseId: lmsLessons.courseId,
+        sectionId: lmsLessons.sectionId,
+      }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+
+      let lessonCourseId = lesson.courseId;
+      let sectionTitle: string | null = null;
+      if (lesson.sectionId) {
+        const [section] = await db.select({ courseId: lmsSections.courseId, title: lmsSections.title })
+          .from(lmsSections).where(eq(lmsSections.id, lesson.sectionId)).limit(1);
+        lessonCourseId = lessonCourseId ?? section?.courseId ?? null;
+        sectionTitle = section?.title ?? null;
+      }
+      if (lessonCourseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
+
       const [existing] = await db.select({ id: lmsLessonProgress.id })
         .from(lmsLessonProgress)
         .where(and(eq(lmsLessonProgress.enrollmentId, enrollment.id), eq(lmsLessonProgress.lessonId, input.lessonId)))
@@ -2471,9 +2489,66 @@ export const lmsLearnerRouter = router({
           set: { lessonId: sql`${lmsLessonProgress.lessonId}` },
         });
       }
+
+      // A progress row only proves the learner has opened a lesson at least once.
+      // Keep an append-only activity event as well, so admins can distinguish each
+      // module/lesson access from completion and video playback.
+      if (!input.isAdminPreview) {
+        const lessonTitle = lesson.title ?? `Lesson #${lesson.id}`;
+        db.insert(userActivityLogs).values({
+          userId: ctx.user.id,
+          eventType: "lesson_access",
+          description: sectionTitle
+            ? `Accessed module: ${sectionTitle} — lesson: ${lessonTitle} in ${course.title}`
+            : `Accessed lesson: ${lessonTitle} in ${course.title}`,
+          path: `/courses/${course.slug}/player?lesson=${lesson.id}`,
+          courseId: course.id,
+          lessonId: lesson.id,
+          contentTitle: lessonTitle,
+          metadata: { courseSlug: course.slug, courseTitle: course.title, sectionTitle, source: "course_player" },
+        }).catch(() => {});
+      }
       return { success: true };
     }),
-
+  /** Record a learner click on a course lesson file before the browser downloads it. */
+  recordLessonFileDownload: protectedProcedure
+    .input(z.object({ lessonId: z.number().int().positive(), courseSlug: z.string(), fileName: z.string().trim().max(512).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [course] = await db.select({ id: lmsCourses.id, slug: lmsCourses.slug, title: lmsCourses.title })
+        .from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
+      if (!course) throw new TRPCError({ code: "NOT_FOUND" });
+      const [enrollment] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, course.id))).limit(1);
+      if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
+      const [lesson] = await db.select({ id: lmsLessons.id, title: lmsLessons.title, courseId: lmsLessons.courseId, sectionId: lmsLessons.sectionId })
+        .from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      let lessonCourseId = lesson.courseId;
+      let sectionTitle: string | null = null;
+      if (lesson.sectionId) {
+        const [section] = await db.select({ courseId: lmsSections.courseId, title: lmsSections.title })
+          .from(lmsSections).where(eq(lmsSections.id, lesson.sectionId)).limit(1);
+        lessonCourseId = lessonCourseId ?? section?.courseId ?? null;
+        sectionTitle = section?.title ?? null;
+      }
+      if (lessonCourseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
+      const fileName = input.fileName?.trim() || lesson.title || `Lesson file #${lesson.id}`;
+      await db.insert(userActivityLogs).values({
+        userId: ctx.user.id,
+        eventType: "download",
+        description: sectionTitle
+          ? `Downloaded lesson file: ${fileName} from module ${sectionTitle} in ${course.title}`
+          : `Downloaded lesson file: ${fileName} from ${course.title}`,
+        path: `/courses/${course.slug}/player?lesson=${lesson.id}`,
+        courseId: course.id,
+        lessonId: lesson.id,
+        contentTitle: fileName,
+        metadata: { courseSlug: course.slug, courseTitle: course.title, sectionTitle, resourceScope: "course_lesson" },
+      });
+      return { success: true };
+    }),
   /** Mark a lesson complete */
   markLessonComplete: protectedProcedure
     .input(z.object({ lessonId: z.number(), courseSlug: z.string(), isAdminPreview: z.boolean().optional() }))
@@ -2507,10 +2582,12 @@ export const lmsLearnerRouter = router({
       }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
       if (!lesson) throw new TRPCError({ code: "NOT_FOUND" });
       let lessonCourseId = lesson.courseId;
-      if (!lessonCourseId && lesson.sectionId) {
-        const [section] = await db.select({ courseId: lmsSections.courseId })
+      let sectionTitle: string | null = null;
+      if (lesson.sectionId) {
+        const [section] = await db.select({ courseId: lmsSections.courseId, title: lmsSections.title })
           .from(lmsSections).where(eq(lmsSections.id, lesson.sectionId)).limit(1);
-        lessonCourseId = section?.courseId ?? null;
+        lessonCourseId = lessonCourseId ?? section?.courseId ?? null;
+        sectionTitle = section?.title ?? null;
       }
       if (lessonCourseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
 
@@ -2535,17 +2612,20 @@ export const lmsLearnerRouter = router({
           });
       }
       await recalcProgress(db, enrollment.id);
-      // Log lesson completion to unified activity log (fire-and-forget)
+      // Log first completion separately from access, retaining the module title when present.
       if (!wasAlreadyComplete) {
-        const [lesson] = await db.select({ title: lmsLessons.title }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+        const lessonTitle = lesson.title ?? `Lesson #${input.lessonId}`;
         db.insert(userActivityLogs).values({
           userId: ctx.user.id,
           eventType: 'lesson_complete',
-          description: `Completed lesson: ${lesson?.title ?? `Lesson #${input.lessonId}`} in ${course.title}`,
+          description: sectionTitle
+            ? `Completed module lesson: ${sectionTitle} — ${lessonTitle} in ${course.title}`
+            : `Completed lesson: ${lessonTitle} in ${course.title}`,
+          path: `/courses/${course.slug}/player?lesson=${lesson.id}`,
           courseId: course.id,
-          lessonId: input.lessonId,
-          contentTitle: lesson?.title ?? null,
-          metadata: { courseSlug: input.courseSlug, courseTitle: course.title },
+          lessonId: lesson.id,
+          contentTitle: lessonTitle,
+          metadata: { courseSlug: course.slug, courseTitle: course.title, sectionTitle },
         }).catch(() => {});
       }
       return { success: true };
@@ -4473,6 +4553,46 @@ export const lmsLearnerRouter = router({
       return { course, sessions, assignments, recordings, resources, mySubmissions, myGroup };
     }),
 
+  /** Record learner access to a cohort resource (download or external resource link). */
+  recordCohortResourceAccess: protectedProcedure
+    .input(z.object({ courseId: z.number().int().positive(), resourceId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [enrollment] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+        .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
+      if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
+      const [course] = await db.select({ title: lmsCourses.title }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      const [resource] = await db.select({
+        id: lmsCohortResources.id,
+        title: lmsCohortResources.title,
+        actionType: lmsCohortResources.actionType,
+        cohortGroupId: lmsCohortResources.cohortGroupId,
+      }).from(lmsCohortResources)
+        .where(and(eq(lmsCohortResources.id, input.resourceId), eq(lmsCohortResources.courseId, input.courseId), eq(lmsCohortResources.status, "published")))
+        .limit(1);
+      if (!resource || !course) throw new TRPCError({ code: "NOT_FOUND" });
+      if (resource.cohortGroupId != null) {
+        const [groupEnrollment] = await db.select({ cohortGroupId: lmsCohortGroupEnrollments.cohortGroupId })
+          .from(lmsCohortGroupEnrollments)
+          .where(and(eq(lmsCohortGroupEnrollments.userId, ctx.user.id), eq(lmsCohortGroupEnrollments.courseId, input.courseId)))
+          .limit(1);
+        if (groupEnrollment?.cohortGroupId !== resource.cohortGroupId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "This resource is not assigned to your cohort" });
+        }
+      }
+      const eventType = resource.actionType === "download" ? "download" : "cohort_resource_open";
+      await db.insert(userActivityLogs).values({
+        userId: ctx.user.id,
+        eventType,
+        description: `${resource.actionType === "download" ? "Downloaded" : "Opened"} cohort resource: ${resource.title} in ${course.title}`,
+        path: `/cohort/${input.courseId}?tab=resources`,
+        courseId: input.courseId,
+        contentTitle: resource.title,
+        metadata: { cohortResourceId: resource.id, actionType: resource.actionType, resourceScope: "cohort" },
+      });
+      return { success: true };
+    }),
   /** Get the learner's assigned cohort group for a course */
   getMyCohortGroup: protectedProcedure
     .input(z.object({ courseId: z.number() }))
@@ -4898,6 +5018,19 @@ export const lmsLearnerRouter = router({
         const [s] = await db.select().from(lmsCohortSessions).where(eq(lmsCohortSessions.id, recording.sessionId)).limit(1);
         session = s ?? null;
       }
+      // Preserve an access event even for providers that cannot expose playback callbacks
+      // (for example, secure external embeds). Playback milestones are logged separately.
+      if (!isAdmin) {
+        await db.insert(userActivityLogs).values({
+          userId: ctx.user.id,
+          eventType: "cohort_recording_access",
+          description: `Accessed cohort recording: ${recording.title}`,
+          path: `/cohort/${input.courseId}/replay/${input.recordingId}`,
+          courseId: input.courseId,
+          contentTitle: recording.title,
+          metadata: { recordingId: recording.id, sessionId: recording.sessionId, resourceScope: "cohort_recording" },
+        }).catch(() => {});
+      }
       // Get user's progress for this recording
       const [progress] = await db.select().from(lmsCohortRecordingProgress)
         .where(and(eq(lmsCohortRecordingProgress.userId, ctx.user.id), eq(lmsCohortRecordingProgress.recordingId, input.recordingId)))
@@ -4951,6 +5084,20 @@ export const lmsLearnerRouter = router({
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       const completed = input.percentWatched >= 90;
       const now = new Date();
+      const isAdmin = ["admin", "platform_admin", "platform_owner"].includes(ctx.user.role ?? "");
+      const [recordingContext] = await db.select({
+        title: lmsCohortRecordings.title,
+        courseTitle: lmsCourses.title,
+      }).from(lmsCohortRecordings)
+        .innerJoin(lmsCourses, eq(lmsCourses.id, lmsCohortRecordings.courseId))
+        .where(and(eq(lmsCohortRecordings.id, input.recordingId), eq(lmsCohortRecordings.courseId, input.courseId)))
+        .limit(1);
+      if (!recordingContext) throw new TRPCError({ code: "NOT_FOUND", message: "Recording not found" });
+      if (!isAdmin) {
+        const [enrollment] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
+        if (!enrollment) throw new TRPCError({ code: "FORBIDDEN", message: "Not enrolled in this cohort" });
+      }
       // Check if row exists
       const [existing] = await db.select().from(lmsCohortRecordingProgress)
         .where(and(eq(lmsCohortRecordingProgress.userId, ctx.user.id), eq(lmsCohortRecordingProgress.recordingId, input.recordingId)))
@@ -4981,18 +5128,22 @@ export const lmsLearnerRouter = router({
           completedAt: completed ? now : null,
         });
       }
-      // Log to userActivityLogs for analytics
-      if (input.eventType === "play" || input.eventType === "complete") {
+      // Store title-rich replay milestones in the same activity stream used by admins.
+      if (!isAdmin && (input.eventType === "play" || input.eventType === "complete")) {
         await db.insert(userActivityLogs).values({
           userId: ctx.user.id,
           eventType: input.eventType === "complete" ? "video_complete" : "video_play",
+          description: `${input.eventType === "complete" ? "Completed" : "Started"} cohort recording: ${recordingContext.title} in ${recordingContext.courseTitle}`,
+          path: `/cohort/${input.courseId}/replay/${input.recordingId}`,
           courseId: input.courseId,
-          metadata: JSON.stringify({
+          contentTitle: recordingContext.title,
+          metadata: {
             recordingId: input.recordingId,
             positionSec: input.positionSec,
             durationSec: input.durationSec,
             percentWatched: input.percentWatched,
-          }),
+            resourceScope: "cohort_recording",
+          },
         }).catch(() => {});
       }
       return { success: true, completed };

@@ -883,7 +883,7 @@ export default function CohortSchedule() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {resources.map((res: any) => (
-                  <CohortResourceCard key={res.id} resource={res} />
+                  <CohortResourceCard key={res.id} resource={res} courseId={id} />
                 ))}
               </div>
             )}

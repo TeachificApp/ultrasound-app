@@ -17,6 +17,7 @@ import {
   lmsEnrollments,
   lmsCourses,
   lmsLessons,
+  lmsSections,
   lmsThinkificImports,
   digitalDownloadEvents,
   digitalProducts,
@@ -105,7 +106,7 @@ export const analyticsTrackRouter = router({
       return { ok: true };
     }),
 
-  /** Called when a video event fires (play, pause, complete, progress) */
+  /** Called when a course video event fires (play, pause, complete, seek, progress). */
   videoEvent: protectedProcedure
     .input(z.object({
       lessonId: z.number().int(),
@@ -118,6 +119,30 @@ export const analyticsTrackRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) return { ok: false };
+      const [course] = await db.select({ id: lmsCourses.id, title: lmsCourses.title })
+        .from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      const [lesson] = await db.select({
+        id: lmsLessons.id,
+        title: lmsLessons.title,
+        courseId: lmsLessons.courseId,
+        sectionId: lmsLessons.sectionId,
+      }).from(lmsLessons).where(eq(lmsLessons.id, input.lessonId)).limit(1);
+      if (!course || !lesson) throw new TRPCError({ code: "NOT_FOUND" });
+      let lessonCourseId = lesson.courseId;
+      let sectionTitle: string | null = null;
+      if (lesson.sectionId) {
+        const [section] = await db.select({ courseId: lmsSections.courseId, title: lmsSections.title })
+          .from(lmsSections).where(eq(lmsSections.id, lesson.sectionId)).limit(1);
+        lessonCourseId = lessonCourseId ?? section?.courseId ?? null;
+        sectionTitle = section?.title ?? null;
+      }
+      if (lessonCourseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
+      const isAdmin = ["admin", "platform_admin", "platform_owner"].includes(ctx.user.role ?? "");
+      if (!isAdmin) {
+        const [enrollment] = await db.select({ id: lmsEnrollments.id }).from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, ctx.user.id), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
+        if (!enrollment) throw new TRPCError({ code: "FORBIDDEN" });
+      }
       await db.insert(lmsVideoEvents).values({
         userId: ctx.user.id,
         lessonId: input.lessonId,
@@ -127,20 +152,22 @@ export const analyticsTrackRouter = router({
         durationSec: input.durationSec,
         percentWatched: input.percentWatched,
       });
-      // Log to unified activity table
-      if (input.eventType === 'play' || input.eventType === 'complete') {
+      if (!isAdmin && (input.eventType === "play" || input.eventType === "complete")) {
+        const lessonTitle = lesson.title ?? `Lesson #${lesson.id}`;
         logActivity(db, {
           userId: ctx.user.id,
-          eventType: input.eventType === 'play' ? 'video_play' : 'video_complete',
-          description: `${input.eventType === 'play' ? 'Started' : 'Completed'} video (lesson ${input.lessonId}, course ${input.courseId})`,
+          eventType: input.eventType === "play" ? "video_play" : "video_complete",
+          description: sectionTitle
+            ? `${input.eventType === "play" ? "Started" : "Completed"} video: ${lessonTitle} in module ${sectionTitle} — ${course.title}`
+            : `${input.eventType === "play" ? "Started" : "Completed"} video: ${lessonTitle} in ${course.title}`,
+          path: `/courses/${course.id}/player?lesson=${lesson.id}`,
           ipAddress: getClientIp(ctx),
           userAgent: getUserAgent(ctx),
-          metadata: { lessonId: input.lessonId, courseId: input.courseId, percentWatched: input.percentWatched, positionSec: input.positionSec },
+          metadata: { lessonId: lesson.id, courseId: course.id, sectionTitle, percentWatched: input.percentWatched, positionSec: input.positionSec },
         });
       }
       return { ok: true };
     }),
-
   /** Self-service: returns the current user's own activity summary (no admin required) */
   myActivity: protectedProcedure
     .query(async ({ ctx }) => {

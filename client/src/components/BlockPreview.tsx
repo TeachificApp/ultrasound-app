@@ -126,7 +126,7 @@ export const CC = ({ children, className = "", ...rest }: React.HTMLAttributes<H
   <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${className}`.trim()} {...rest}>{children}</div>
 );
 
-export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnroll, onCheckoutPage, onDirectCheckout, nestingDepth = 0 }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number; onEnroll?: (...args: any[]) => void; onCheckoutPage?: (...args: any[]) => void; onDirectCheckout?: DirectCheckoutHandler; /** Protect public rendering from malformed recursively nested column data. */ nestingDepth?: number }) {
+export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnroll, onCheckoutPage, onDirectCheckout, onFileDownload, onVideoEvent, nestingDepth = 0 }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number; onEnroll?: (...args: any[]) => void; onCheckoutPage?: (...args: any[]) => void; onDirectCheckout?: DirectCheckoutHandler; onFileDownload?: (file: { fileName: string; fileUrl: string }) => void; onVideoEvent?: (eventType: "play" | "complete", video: { positionSec: number; durationSec: number; percentWatched: number }) => void; /** Protect public rendering from malformed recursively nested column data. */ nestingDepth?: number }) {
   const { user } = useAuth();
   const d = block.data ?? {};
   const handleBlockCtaClick = (e: React.MouseEvent<HTMLElement>) =>
@@ -319,6 +319,14 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                   playsInline
                   className={`w-full h-full object-cover ${videoId}`}
                   style={{ height: d.height || undefined, accentColor: videoAccent }}
+                  onPlay={(event) => {
+                    const video = event.currentTarget;
+                    onVideoEvent?.("play", { positionSec: Math.floor(video.currentTime), durationSec: Math.floor(video.duration || 0), percentWatched: video.duration ? Math.floor((video.currentTime / video.duration) * 100) : 0 });
+                  }}
+                  onEnded={(event) => {
+                    const video = event.currentTarget;
+                    onVideoEvent?.("complete", { positionSec: Math.floor(video.duration || video.currentTime), durationSec: Math.floor(video.duration || 0), percentWatched: 100 });
+                  }}
                 />
               </div>
             ) : (
@@ -1254,11 +1262,11 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
             {d.description && <p className="text-sm text-gray-500 mb-3">{d.description}</p>}
             {isPdf && <iframe src={fileUrl} className="w-full rounded-lg border border-gray-200" style={{ height: `${d.inlineHeight ?? 600}px` }} title={fileName} />}
             {isImage && <img src={fileUrl} alt={fileName} className="max-w-full rounded-lg shadow" />}
-            {isVideo && <video src={fileUrl} controls className="w-full rounded-lg shadow" style={{ maxHeight: `${d.inlineHeight ?? 400}px` }} />}
+            {isVideo && <video src={fileUrl} controls className="w-full rounded-lg shadow" style={{ maxHeight: `${d.inlineHeight ?? 400}px` }} onPlay={(event) => { const video = event.currentTarget; onVideoEvent?.("play", { positionSec: Math.floor(video.currentTime), durationSec: Math.floor(video.duration || 0), percentWatched: video.duration ? Math.floor((video.currentTime / video.duration) * 100) : 0 }); }} onEnded={(event) => { const video = event.currentTarget; onVideoEvent?.("complete", { positionSec: Math.floor(video.duration || video.currentTime), durationSec: Math.floor(video.duration || 0), percentWatched: 100 }); }} />}
             {isAudio && <audio src={fileUrl} controls className="w-full" />}
             {/* Always show download button in inline mode */}
             <div className="mt-3 flex justify-end">
-              <a href={fileUrl} download={fileName}
+              <a href={fileUrl} download={fileName} onClick={() => onFileDownload?.({ fileName: fileName || d.label || "Download file", fileUrl })}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
                 style={{ backgroundColor: d.buttonColor ?? "#179ca3", color: d.buttonTextColor ?? "#fff" }}>
                 <Upload size={14} />{d.buttonText ?? "Download"}
@@ -1283,7 +1291,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
               {d.showFileSize !== false && d.fileSize && <p className="text-xs text-gray-400 mt-0.5">{d.fileSize}</p>}
               {!fileUrl && <p className="text-xs text-amber-500 mt-0.5">No file selected</p>}
             </div>
-            <a href={fileUrl || "#"} download={fileName} onClick={e => !fileUrl && e.preventDefault()}
+            <a href={fileUrl || "#"} download={fileName} onClick={e => { if (!fileUrl) e.preventDefault(); else onFileDownload?.({ fileName: fileName || d.label || "Download file", fileUrl }); }}
               className="px-5 py-2.5 rounded-lg text-sm font-semibold flex-shrink-0 transition-opacity"
               style={{ backgroundColor: d.buttonColor ?? "#179ca3", color: d.buttonTextColor ?? "#ffffff", opacity: fileUrl ? 1 : 0.4 }}>
               {d.buttonText ?? "Download"}
@@ -1389,7 +1397,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                 <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-gray-400 text-xs">Left column (empty)</div>
               ) : (
                 <div className="space-y-2">
-                  {leftBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} nestingDepth={nestingDepth + 1} />)}
+                  {leftBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} courseId={courseId} onFileDownload={onFileDownload} onVideoEvent={onVideoEvent} nestingDepth={nestingDepth + 1} />)}
                 </div>
               )}
             </div>
@@ -1398,7 +1406,7 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
                 <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center text-gray-400 text-xs">Right column (empty)</div>
               ) : (
                 <div className="space-y-2">
-                  {rightBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} nestingDepth={nestingDepth + 1} />)}
+                  {rightBlocks.map((b: Block) => <BlockPreview key={b.id} block={b} courseId={courseId} onFileDownload={onFileDownload} onVideoEvent={onVideoEvent} nestingDepth={nestingDepth + 1} />)}
                 </div>
               )}
             </div>

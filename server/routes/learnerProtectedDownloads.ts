@@ -129,16 +129,18 @@ router.get(
         return;
       }
 
-      if (purchase && !inline) {
+      if (!inline) {
+        // Free member files have no purchase row, but are still a real learner
+        // download and must appear in the user activity trail.
         await recordDigitalDownloadEvent(db, {
           userId: user.id,
           productId,
           fileId,
-          purchaseId: purchase.id,
+          purchaseId: purchase?.id ?? null,
           fileName: file.fileName,
           ipAddress: clientIp(req),
           userAgent: req.headers["user-agent"] ?? null,
-          productTitle: purchase.productTitle,
+          productTitle: purchase?.productTitle ?? product.title,
         });
       }
 
