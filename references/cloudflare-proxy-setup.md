@@ -1,22 +1,22 @@
-# Cloudflare Reverse Proxy — SEO Setup Guide
+# Cloudflare Reverse Proxy — Public-Domain Access Setup
 
 ## What This Does
 
-Public-facing landing and funnel pages are served from **allaboutultrasound.com** (root domain) for SEO purposes. All authenticated app flows — student dashboards, course players, member portals, admin panels — remain on their existing subdomains and are unaffected.
+Public-facing marketing and funnel pages can remain on a root domain for SEO while every account, course, content, and checkout link still works. The worker sends all learner-platform paths to the matching **Learn** domain and sends non-LMS administration to the matching **App** domain.
 
 | URL pattern | Served from | Purpose |
 |---|---|---|
-| `allaboutultrasound.com/courses/:slug` | Root domain (proxied) | Course landing pages — SEO |
-| `allaboutultrasound.com/downloads/:slug` | Root domain (proxied) | Download landing pages — SEO |
-| `allaboutultrasound.com/bundles/:slug` | Root domain (proxied) | Bundle landing pages — SEO |
-| `allaboutultrasound.com/product/:slug` | Root domain (proxied) | Product landing pages — SEO |
+| `allaboutultrasound.com/courses/:slug` | Learn domain | Course content and landing experience |
+| `allaboutultrasound.com/downloads/:slug` | Learn domain | Download catalogue and access |
+| `allaboutultrasound.com/bundles/:slug` | Learn domain | Bundle content and access |
+| `allaboutultrasound.com/product/:slug` | Learn domain | Product content and access |
 | `allaboutultrasound.com/:slug/:pageSlug` | Root domain (proxied) | Funnel pages — SEO |
 | `allaboutultrasound.com/p/:slug` | Root domain (proxied) | Standalone landing pages — SEO |
-| `app.allaboutultrasound.com/dashboard` | App subdomain | Student dashboard |
-| `learn.allaboutultrasound.com/...` | App subdomain | Course player |
-| `members.allaboutultrasound.com/...` | App subdomain | Member portal |
+| `allaboutultrasound.com/my-dashboard` | Learn domain | Student dashboard and subscription management |
+| `allaboutultrasound.com/checkout/*` | Learn domain | All checkout flows |
+| `learn.allaboutultrasound.com/...` | Learn subdomain | Course player and learner experience |
 | `allaboutultrasound.com/admin/*` | Redirects → app subdomain | Admin panel |
-| `allaboutultrasound.com/dashboard` | Redirects → app subdomain | Student dashboard |
+| `allaboutultrasound.com/admin/lms/*` | Redirects → Learn subdomain | LMS administration |
 
 ---
 
@@ -42,7 +42,10 @@ In the Worker settings → **Variables** → **Environment Variables**, add:
 | Variable | Value |
 |---|---|
 | `APP_ORIGIN` | `https://app.allaboutultrasound.com` |
+| `LEARN_ORIGIN` | `https://learn.allaboutultrasound.com` |
 | `ROOT_DOMAIN` | `allaboutultrasound.com` |
+
+For the iHeartEcho root domain, use the same worker with `APP_ORIGIN=https://app.iheartecho.com`, `LEARN_ORIGIN=https://learn.iheartecho.com`, and `ROOT_DOMAIN=iheartecho.com`.
 
 ---
 
@@ -95,7 +98,7 @@ Open `https://allaboutultrasound.com/courses/your-course-slug` in a browser, vie
 The canonical URL should point to the **root domain**, not `app.allaboutultrasound.com`.
 
 ### App flows still work
-Confirm that `allaboutultrasound.com/dashboard` redirects to `app.allaboutultrasound.com/dashboard` and that the student portal, course player, and admin panel are unaffected.
+Confirm that `allaboutultrasound.com/my-dashboard` and `allaboutultrasound.com/checkout/...` redirect to `learn.allaboutultrasound.com`, and that `allaboutultrasound.com/admin/*` redirects to the App domain (except `/admin/lms/*`, which redirects to Learn).
 
 ### Google Search Console
 Submit `allaboutultrasound.com` as a property in Google Search Console and request indexing for your key landing pages. It may take 2–4 weeks for Google to re-crawl and update rankings.
@@ -132,10 +135,10 @@ Google indexes:        allaboutultrasound.com/courses/intro-to-vascular ✓
 
 ## What Is NOT Proxied (Stays on Subdomains)
 
-The following paths are explicitly excluded from proxying and will either redirect to the app subdomain or pass through to your existing root domain server:
+The following paths are explicitly excluded from proxying and redirect to the appropriate app tenant:
 
-- `/dashboard`, `/admin/*`, `/my-downloads`, `/account`, `/profile`
-- `/login`, `/logout`, `/settings`, `/notifications`
+- `/my-dashboard`, `/checkout/*`, `/courses/*`, `/downloads/*`, `/bundles/*`, `/workshops/*`, `/webinars/*`, `/cohort/*`, `/quizzes/*`, `/account`, `/profile`, `/login`, `/settings`, `/notifications` → Learn
+- `/admin/*`, `/platform-admin/*`, `/forms/*` → App, except `/admin/lms/*` and `/admin/lesson-comments/*` → Learn
 - `/api/*` — all tRPC and REST API calls
 - `/forms/*` — embedded form renderer (these are typically iframed anyway)
 - `/student/*`, `/media/*`

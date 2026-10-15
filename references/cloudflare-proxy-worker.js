@@ -1,9 +1,8 @@
 /**
  * Cloudflare Worker — allaboutultrasound.com SEO Proxy
  *
- * Routes public-facing landing/funnel pages through the root domain
- * (allaboutultrasound.com) while leaving all authenticated app flows
- * on their existing subdomains (app.allaboutultrasound.com, etc.).
+ * Routes public-facing landing/funnel pages through a root domain while sending
+ * account, learning, and checkout routes to the matching brand destination.
  *
  * PROXIED paths (served from root domain for SEO):
  *   /courses/:slug          → course landing pages
@@ -20,13 +19,13 @@
  *   /robots.txt             → robots file
  *
  * REDIRECTED paths (send users to the correct subdomain):
- *   /my-dashboard           → members.allaboutultrasound.com/my-dashboard
- *   /my-downloads           → members.allaboutultrasound.com/my-downloads
- *   /account, /profile      → members.allaboutultrasound.com/...
+ *   /my-dashboard           → learn.<brand>/my-dashboard
+ *   /my-downloads           → learn.<brand>/my-downloads
+ *   /account, /profile      → learn.<brand>/...
  *   /courses/:slug/player   → learn.allaboutultrasound.com/courses/:slug/player
  *   /downloads/:slug/files  → learn.allaboutultrasound.com/downloads/:slug/files
  *   /admin/*                → app.allaboutultrasound.com/admin/...
- *   /login                  → app.allaboutultrasound.com/login
+ *   /login                  → learn.<brand>/login
  *
  * WWW HANDLING:
  *   All requests to www.allaboutultrasound.com are 301 redirected to
@@ -38,8 +37,13 @@
  * ─── Configuration ────────────────────────────────────────────────────────
  * Set these as Worker environment variables in the Cloudflare dashboard:
  *
- *   APP_ORIGIN   = https://app.allaboutultrasound.com
- *   ROOT_DOMAIN  = allaboutultrasound.com
+ *   APP_ORIGIN     = https://app.allaboutultrasound.com
+ *   LEARN_ORIGIN   = https://learn.allaboutultrasound.com
+ *   ROOT_DOMAIN    = allaboutultrasound.com
+ *
+ * For an iHeartEcho root-domain worker, set APP_ORIGIN to
+ * https://app.iheartecho.com and LEARN_ORIGIN to
+ * https://learn.iheartecho.com. The same worker otherwise applies.
  *
  * ─── Canonical URL signal ─────────────────────────────────────────────────
  * The Worker adds an `x-canonical-host` header to every proxied request.
@@ -51,6 +55,7 @@
 // ── Configurable constants ─────────────────────────────────────────────────
 // These are overridden by Worker environment variables when deployed.
 const DEFAULT_APP_ORIGIN = "https://app.allaboutultrasound.com";
+const DEFAULT_LEARN_ORIGIN = "https://learn.allaboutultrasound.com";
 const DEFAULT_ROOT_DOMAIN = "allaboutultrasound.com";
 
 // ── Path matchers ──────────────────────────────────────────────────────────
@@ -95,17 +100,16 @@ function shouldProxy(pathname) {
  * Returns a redirect URL if the path belongs to the authenticated app,
  * or null if it should pass through to the root domain origin.
  */
-const MEMBERS_ORIGIN = "https://members.allaboutultrasound.com";
-const LEARN_ORIGIN = "https://learn.allaboutultrasound.com";
-
-function getAppRedirect(pathname, appOrigin) {
+function getAppRedirect(pathname, appOrigin, learnOrigin) {
   // Player/access paths → learn subdomain
-  if (/^\/courses\/[^/]+\/player(\/|$)/.test(pathname)) return `${LEARN_ORIGIN}${pathname}`;
-  if (/^\/downloads\/[^/]+\/files(\/|$)/.test(pathname)) return `${LEARN_ORIGIN}${pathname}`;
-  if (/^\/courses\/[^/]+\/overview(\/|$)/.test(pathname)) return `${LEARN_ORIGIN}${pathname}`;
+  if (/^\/courses\/[^/]+\/player(\/|$)/.test(pathname)) return `${learnOrigin}${pathname}`;
+  if (/^\/downloads\/[^/]+\/files(\/|$)/.test(pathname)) return `${learnOrigin}${pathname}`;
+  if (/^\/courses\/[^/]+\/overview(\/|$)/.test(pathname)) return `${learnOrigin}${pathname}`;
 
-  // Account/dashboard paths → members subdomain
-  const MEMBERS_PATHS = [
+  // Account/dashboard and all learning routes → the Learn tenant.
+  // This keeps subscription management, paid content, course activity, and
+  // checkout on the same learner platform regardless of entry domain.
+  const LEARN_PATHS = [
     /^\/my-dashboard(\/|$)/,
     /^\/my-downloads(\/|$)/,
     /^\/account(\/|$)/,
@@ -113,16 +117,41 @@ function getAppRedirect(pathname, appOrigin) {
     /^\/settings(\/|$)/,
     /^\/notifications(\/|$)/,
     /^\/upgrade-success(\/|$)/,
+    /^\/checkout(\/|$)/,
+    /^\/courses(\/|$)/,
+    /^\/cohort(\/|$)/,
+    /^\/downloads(\/|$)/,
+    /^\/bundles(\/|$)/,
+    /^\/product(\/|$)/,
+    /^\/products(\/|$)/,
+    /^\/workshops(\/|$)/,
+    /^\/webinars?(\/|$)/,
+    /^\/collections(\/|$)/,
+    /^\/my-memberships(\/|$)/,
+    /^\/my-quizzes(\/|$)/,
+    /^\/quizzes(\/|$)/,
+    /^\/study-groups(\/|$)/,
+    /^\/education-library(\/|$)/,
+    /^\/login(\/|$)/,
+    /^\/register(\/|$)/,
+    /^\/forgot-password(\/|$)/,
+    /^\/reset-password(\/|$)/,
+    /^\/magic-link(\/|$)/,
   ];
-  for (const pattern of MEMBERS_PATHS) {
-    if (pattern.test(pathname)) return `${MEMBERS_ORIGIN}${pathname}`;
+  for (const pattern of LEARN_PATHS) {
+    if (pattern.test(pathname)) return `${learnOrigin}${pathname}`;
+  }
+
+  // LMS administration follows the Learn tenant; other administration stays
+  // with the brand-matched app tenant.
+  if (/^\/admin\/lms(\/|$)/.test(pathname) || /^\/admin\/lesson-comments(\/|$)/.test(pathname)) {
+    return `${learnOrigin}${pathname}`;
   }
 
   // App-only paths → app subdomain (but NOT /api — we proxy that)
   const APP_PATHS = [
     /^\/admin(\/|$)/,
     /^\/platform-admin(\/|$)/,
-    /^\/login(\/|$)/,
     /^\/logout(\/|$)/,
     /^\/forms(\/|$)/,
   ];
@@ -148,6 +177,7 @@ const RESERVED_PREFIXES = new Set([
 export default {
   async fetch(request, env) {
     const appOrigin = (env.APP_ORIGIN || DEFAULT_APP_ORIGIN).replace(/\/$/, "");
+    const learnOrigin = (env.LEARN_ORIGIN || DEFAULT_LEARN_ORIGIN).replace(/\/$/, "");
     const rootDomain = env.ROOT_DOMAIN || DEFAULT_ROOT_DOMAIN;
 
     const url = new URL(request.url);
@@ -170,7 +200,7 @@ export default {
     }
 
     // ─── 2. Redirect known app-only paths to the correct subdomain ──────
-    const appRedirect = getAppRedirect(pathname, appOrigin);
+    const appRedirect = getAppRedirect(pathname, appOrigin, learnOrigin);
     if (appRedirect) {
       return Response.redirect(`${appRedirect}${search}`, 302);
     }
