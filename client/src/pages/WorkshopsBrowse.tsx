@@ -8,7 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Briefcase, Search } from "lucide-react";
+import { Briefcase, HandHeart, Search } from "lucide-react";
 import { CourseInstanceInfo } from "@/components/CourseInstanceInfo";
 import { formatWorkshopDollars } from "../../../shared/workshopPricing";
 
@@ -117,6 +117,11 @@ export default function WorkshopsBrowse() {
               Immersive, hands-on training experiences led by expert sonographers.
               Build confidence, sharpen your technique, and advance your clinical skills.
             </p>
+            <Link href="/sponsorships">
+              <span className="mt-6 inline-flex items-center gap-2 rounded-lg border border-white/40 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-white/20">
+                <HandHeart className="h-4 w-4" /> Sponsor a workshop or educational program
+              </span>
+            </Link>
           </div>
         </div>
 

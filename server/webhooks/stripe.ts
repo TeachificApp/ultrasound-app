@@ -18,7 +18,7 @@ import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { handleStudyGroupCheckoutCompleted, handleStudyGroupSubscriptionLifecycle } from "../routers/studyGroupsRouter";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users, pendingFulfillments } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users, pendingFulfillments, sponsorships } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -39,6 +39,8 @@ import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from ".
 import { hasKnownStripeCheckoutRoute, hasUnmatchedPlatformPaymentIntentMetadata, unmatchedStripePaymentMessage } from "../lib/unmatchedStripePayment";
 import { recordReceiptPayee } from "../lib/receiptParticipants";
 import { renderCurrentWebinarSchedule } from "../lib/webinarEmailSchedule";
+import { buildAdminSponsorshipAlertEmail, buildSponsorThankYouEmail } from "../lib/sponsorshipEmail";
+import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 type CheckoutRecipient = { email: string | null; name: string | null };
 
 /** Recipient metadata takes precedence over the Stripe payment buyer. */
@@ -217,6 +219,89 @@ async function handleCheckoutSessionCompleted(session: Record<string, unknown>) 
     title: "🎉 New Concierge Purchase",
     content: `Accreditation Concierge™ purchased by ${customerEmail} for organization "${orgName}". Amount: $${(amountTotal / 100).toFixed(2)}. Concierge access has been activated automatically.`,
   });
+}
+
+/** Record and notify on a paid vendor/exhibitor sponsorship checkout. */
+async function handleSponsorshipCheckoutCompleted(session: Record<string, unknown>) {
+  const metadata = (session.metadata as Record<string, string>) ?? {};
+  if (metadata.type !== "sponsorship") return;
+
+  const sponsorshipId = Number.parseInt(metadata.sponsorship_id ?? "", 10);
+  const sessionId = typeof session.id === "string" ? session.id : null;
+  if (!Number.isInteger(sponsorshipId) || sponsorshipId <= 0 || !sessionId) {
+    console.warn("[Stripe] Sponsorship checkout is missing its record identifier.");
+    return;
+  }
+
+  const db = await getDb();
+  if (!db) throw new Error("Sponsorship payment could not reach the MySQL database.");
+  const [existing] = await db.select().from(sponsorships).where(eq(sponsorships.id, sponsorshipId)).limit(1);
+  if (!existing) {
+    await notifyOwner({ title: "Sponsorship payment needs review", content: "A paid sponsorship checkout did not have a matching sponsorship record in MySQL." });
+    return;
+  }
+  if (existing.stripeSessionId && existing.stripeSessionId !== sessionId) {
+    await notifyOwner({ title: "Sponsorship payment needs review", content: "A sponsorship record was presented by more than one checkout session. No automatic reassignment was made." });
+    return;
+  }
+
+  await db.update(sponsorships).set({
+    stripeSessionId: sessionId,
+    stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+    amountCents: typeof session.amount_total === "number" ? session.amount_total : existing.amountCents,
+    currency: typeof session.currency === "string" ? session.currency.toLowerCase() : existing.currency,
+    paymentStatus: "paid",
+    status: "paid",
+    paidAt: existing.paidAt ?? new Date(),
+  }).where(eq(sponsorships.id, sponsorshipId));
+
+  const [record] = await db.select({
+    contactName: sponsorships.contactName,
+    contactEmail: sponsorships.contactEmail,
+    organizationName: sponsorships.organizationName,
+    sponsorshipTier: sponsorships.sponsorshipTier,
+    sponsorshipScope: sponsorships.sponsorshipScope,
+    amountCents: sponsorships.amountCents,
+    currency: sponsorships.currency,
+    otherPurpose: sponsorships.otherPurpose,
+    workshopTitle: workshops.title,
+    workshopInstanceTitle: workshopInstances.title,
+  }).from(sponsorships)
+    .leftJoin(workshopInstances, eq(sponsorships.workshopInstanceId, workshopInstances.id))
+    .leftJoin(workshops, eq(workshopInstances.workshopId, workshops.id))
+    .where(eq(sponsorships.id, sponsorshipId))
+    .limit(1);
+  if (!record) return;
+
+  const emailRecord = {
+    contactName: record.contactName,
+    contactEmail: record.contactEmail,
+    organizationName: record.organizationName,
+    tier: record.sponsorshipTier,
+    scope: record.sponsorshipScope,
+    amountCents: record.amountCents,
+    currency: record.currency,
+    otherPurpose: record.otherPurpose,
+    workshopTitle: record.workshopTitle,
+    workshopInstanceTitle: record.workshopInstanceTitle,
+  };
+  const thankYouEmail = buildSponsorThankYouEmail(emailRecord);
+  const adminAlertEmail = buildAdminSponsorshipAlertEmail(emailRecord);
+  const [thankYou, alert] = await Promise.all([
+    sendPurchaseNotificationOnce(db, {
+      checkoutSessionId: sessionId,
+      notificationType: "sponsorship_thank_you",
+      send: () => sendEmail({ to: { name: record.contactName, email: record.contactEmail }, subject: thankYouEmail.subject, htmlBody: thankYouEmail.htmlBody }),
+    }),
+    sendPurchaseNotificationOnce(db, {
+      checkoutSessionId: sessionId,
+      notificationType: "sponsorship_admin_alert",
+      send: () => sendEmail({ to: getPlatformAdminRecipient("Sponsorship Team"), subject: adminAlertEmail.subject, htmlBody: adminAlertEmail.htmlBody }),
+    }),
+  ]);
+  if ((thankYou.attempted && !thankYou.delivered) || (alert.attempted && !alert.delivered)) {
+    await notifyOwner({ title: "Sponsorship email delivery needs review", content: "A paid sponsorship was recorded, but one or more sponsor notifications could not be delivered. The durable delivery log will retry safely." });
+  }
 }
 
 async function handleMembershipCheckoutCompleted(session: Record<string, unknown>) {
@@ -2892,6 +2977,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
         return;
       }
       // payment_status === "paid" — safe to grant access immediately
+      await handleSponsorshipCheckoutCompleted(sessionObj);
       await handleFunnelCheckoutSessionCompleted(sessionObj);
       await handleCanonicalBundleCheckoutCompleted(sessionObj);
       await handleCheckoutSessionCompleted(sessionObj);
@@ -2947,6 +3033,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
                 .set({ status: "completed", completedAt: new Date() })
                 .where(eq(deferredCheckoutSessions.id, deferred.id));
               // Run all fulfillment handlers with the stored session object
+              await handleSponsorshipCheckoutCompleted(storedSession);
               await handleFunnelCheckoutSessionCompleted(storedSession);
               await handleCanonicalBundleCheckoutCompleted(storedSession);
               await handleCheckoutSessionCompleted(storedSession);

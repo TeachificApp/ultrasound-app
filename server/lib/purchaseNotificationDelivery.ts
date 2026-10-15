@@ -19,7 +19,9 @@ export type PurchaseNotificationType =
   | "webinar_registration"
   | "membership_access"
   | "physical_order"
-  | "unmatched_payment_alert";
+  | "unmatched_payment_alert"
+  | "sponsorship_thank_you"
+  | "sponsorship_admin_alert";
 
 export type DeliveryClaim = {
   claimed: boolean;

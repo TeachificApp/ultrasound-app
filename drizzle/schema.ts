@@ -7614,6 +7614,39 @@ export const workshops = mysqlTable("workshops", {
 export type Workshop = typeof workshops.$inferSelect;
 export type InsertWorkshop = typeof workshops.$inferInsert;
 
+// ─── Exhibitor & Sponsorships ────────────────────────────────────────────────
+// Business contact and payment-reference data for vendor/exhibitor sponsorships.
+// Stripe remains the source of truth for payment method information.
+export const sponsorships = mysqlTable("sponsorships", {
+  id: int("id").autoincrement().primaryKey(),
+  contactName: varchar("contact_name", { length: 255 }).notNull(),
+  contactEmail: varchar("contact_email", { length: 320 }).notNull(),
+  contactPhone: varchar("contact_phone", { length: 60 }),
+  organizationName: varchar("organization_name", { length: 255 }).notNull(),
+  organizationWebsite: varchar("organization_website", { length: 1024 }),
+  organizationLogoUrl: varchar("organization_logo_url", { length: 2048 }),
+  sponsorshipTier: mysqlEnum("sponsorship_tier", ["silver", "gold", "platinum", "other"]).notNull(),
+  sponsorshipScope: mysqlEnum("sponsorship_scope", ["workshop_instance", "website", "app", "podcast", "other"]).notNull(),
+  workshopInstanceId: int("workshop_instance_id"),
+  otherPurpose: text("other_purpose"),
+  amountCents: int("amount_cents").notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  stripeSessionId: varchar("stripe_session_id", { length: 255 }).unique(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  paymentStatus: mysqlEnum("payment_status", ["pending", "paid", "failed", "cancelled"]).default("pending").notNull(),
+  status: mysqlEnum("status", ["pending", "paid", "payment_failed", "cancelled"]).default("pending").notNull(),
+  notes: text("notes"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("sponsorships_status_created_idx").on(table.status, table.createdAt),
+  index("sponsorships_workshop_instance_idx").on(table.workshopInstanceId),
+  index("sponsorships_contact_email_idx").on(table.contactEmail),
+]);
+export type Sponsorship = typeof sponsorships.$inferSelect;
+export type InsertSponsorship = typeof sponsorships.$inferInsert;
+
 export const workshopWaitlistEntries = mysqlTable("workshop_waitlist_entries", {
   id: int("id").autoincrement().primaryKey(),
   workshopId: int("workshop_id").notNull(),

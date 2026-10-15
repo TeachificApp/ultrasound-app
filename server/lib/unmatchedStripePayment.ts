@@ -18,6 +18,7 @@ const KNOWN_CHECKOUT_TYPES = new Set([
   "team_subscription",
   "funnel_form_purchase",
   "embedded_checkout_purchase",
+  "sponsorship",
 ]);
 
 const KNOWN_PRODUCT_TYPES = new Set([

@@ -84,6 +84,7 @@ import { newsletterRouter } from "./routers/newsletterRouter";
 import { scheduledContentAdminRouter } from "./routers/scheduledContentAdminRouter";
 import { surveyPulseRouter } from "./routers/surveyPulseRouter";
 import { purchaseEmailOverridesRouter } from "./routers/purchaseEmailOverridesRouter";
+import { sponsorshipRouter } from "./routers/sponsorshipRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -208,6 +209,7 @@ export const appRouter = router({
   marketingSitePublic: marketingSitePublicRouter,
   marketingSiteAdmin: marketingSiteAdminRouter,
   scheduledContentAdmin: scheduledContentAdminRouter,
+  sponsorship: sponsorshipRouter,
 
   auth: router({
     sessionState: publicProcedure.query(async ({ ctx }) => {

@@ -112,6 +112,8 @@ function LearnContentRedirect() {
 const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
 // ── Workshops ────────────────────────────────────────────────────────────────
 const WorkshopsBrowse = lazy(() => import("./pages/WorkshopsBrowse"));
+const SponsorshipsPage = lazy(() => import("./pages/SponsorshipsPage"));
+const SponsorshipAdmin = lazy(() => import("./pages/admin/SponsorshipAdmin"));
 const CrossTrainingBrowse = lazy(() => import("./pages/CrossTrainingBrowse"));
 const WorkshopDetail = lazy(() => import("./pages/WorkshopDetail"));
 const WorkshopLanding = lazy(() => import("./pages/WorkshopLanding"));
@@ -607,6 +609,7 @@ function Router() {
             These routes must precede the generic two-segment funnel catch-all. */}
         <Route path="/workshops" component={WorkshopsBrowse} />
         <Route path="/workshops/:slug" component={WorkshopLanding} />
+        <Route path="/sponsorships">{() => <Suspense fallback={pageFallback}><SponsorshipsPage /></Suspense>}</Route>
         <Route path="/admin/revenue-share">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><RevenueShareAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/partner-portal">{() => <Suspense fallback={pageFallback}><PartnerPortal /></Suspense>}</Route>
         <Route path="/partner-signup">{() => <Suspense fallback={pageFallback}><PartnerSignup /></Suspense>}</Route>
@@ -616,6 +619,7 @@ function Router() {
         <Route path="/cme-disclosure/generic">{() => <Suspense fallback={pageFallback}><CmeDisclosureFormGeneric /></Suspense>}</Route>
         <Route path="/cme-disclosure/:token">{() => <Suspense fallback={pageFallback}><CmeDisclosureForm /></Suspense>}</Route>
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/sponsorships">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SponsorshipAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePagesAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
@@ -790,6 +794,7 @@ function MembersRouter() {
   return (
     <Switch>
       {/* Redirect all course/education/admin routes to the app (learn) subdomain */}
+      <Route path="/sponsorships">{() => <Suspense fallback={pageFallback}><SponsorshipsPage /></Suspense>}</Route>
       <Route path="/downloads/:slug/files">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/downloads/${params.slug}/files`); return null; }}</Route>
       <Route path="/courses/:slug/player">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/player`); return null; }}</Route>
       <Route path="/courses/:slug/overview">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/overview`); return null; }}</Route>
@@ -798,6 +803,7 @@ function MembersRouter() {
       {/* ── Admin routes served directly on app.allaboutultrasound.com ── */}
       <Route path="/admin/members">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><MembersHub /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/product-analytics">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" /></div>}><ProductAnalytics /></Suspense></RoleGuard>}</Route>
+      <Route path="/admin/sponsorships">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SponsorshipAdmin /></Suspense></RoleGuard>}</Route>
       <Route path="/admin/sales">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
       <Route path="/admin/sales-dashboard">{() => { window.location.replace("/admin/members?tab=sales"); return null; }}</Route>
       <Route path="/admin/user-analytics">{() => { window.location.replace("/admin/members?tab=members"); return null; }}</Route>
@@ -1062,6 +1068,7 @@ function LMSRouter() {
           { base: "/admin/public-site", render: () => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSiteAdmin /></RoleGuard> },
         ])}
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
+        <Route path="/admin/sponsorships">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SponsorshipAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePagesAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/:courseId/landing-builder">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><LandingPageBuilder /></RoleGuard>}</Route>
@@ -1184,6 +1191,7 @@ function IHeartEchoRouter() {
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />
+        <Route path="/sponsorships">{() => <SponsorshipsPage />}</Route>
 
         {/* Learning links on app.iheartecho.com must stay on the iHeartEcho Learn
             mirror; this includes direct checkout URLs shared from an app page. */}
@@ -1480,7 +1488,7 @@ const RESERVED_FUNNEL_SLUGS = new Set([
   "educator-assist", "educator-admin", "student-dashboard", "image-quality-review",
   "accreditation-manager", "accreditation-navigator", "diy-accreditation-plans",
   "memberships", "my-memberships", "404", "terms", "privacy", "contact",
-  "cme-disclosure", "partner-signup",
+  "cme-disclosure", "partner-signup", "sponsorships",
 ]);
 
 /** Guards /:slug/:pageSlug — never treat reserved or /admin paths as funnels. */
@@ -1799,6 +1807,7 @@ function PublicWebsiteRouter() {
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/auth/access" component={AccessLinkCallback} />
+        <Route path="/sponsorships">{() => <SponsorshipsPage />}</Route>
         {/* Learning, purchased content, and every checkout flow always use the
             brand-matched Learn tenant, even when the original link was opened
             from a public custom domain. These routes must precede the public
