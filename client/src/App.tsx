@@ -19,7 +19,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
 import MembersLayout from "./components/MembersLayout";
-import { getLearnAppUrl, isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain, isMarketingStagingDomain, LEARN_APP_URL, MEMBERS_APP_URL, ROOT_DOMAIN_URL } from "./hooks/useSubdomain";
+import { getLearnAppUrl, isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain, isMarketingStagingDomain, isUltrasoundExpoDomain, LEARN_APP_URL, MEMBERS_APP_URL, ROOT_DOMAIN_URL } from "./hooks/useSubdomain";
 import { MetaPixel } from "./components/MetaPixel";
 import { PurchaseSuccessTracker } from "./components/PurchaseSuccessTracker";
 import UpgradePrompt from "./components/UpgradePrompt";
@@ -149,6 +149,10 @@ const LessonScheduleEmbed = lazy(() => import("./pages/embed/LessonScheduleEmbed
 const PublicMarketingSitePage = lazy(() => import("./pages/PublicMarketingSitePage"));
 const PublicSiteAdmin = lazy(() => import("./pages/admin/PublicSiteAdmin"));
 const PublicSitePageBuilder = lazy(() => import("./pages/admin/PublicSitePageBuilder"));
+const UltrasoundExpoSite = lazy(() => import("./pages/UltrasoundExpoSite"));
+const UltrasoundExpoRegister = lazy(() => import("./pages/UltrasoundExpoRegister"));
+const UltrasoundExpoDashboard = lazy(() => import("./pages/UltrasoundExpoDashboard"));
+const UltrasoundExpoAdmin = lazy(() => import("./pages/admin/UltrasoundExpoAdmin"));
 
 // ── UltrasoundAssist™ Hub ────────────────────────────────────────────────────
 const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
@@ -1762,6 +1766,44 @@ function AccreditationDivisionRouter() {
   );
 }
 
+/** Dedicated annual-event tenant for UltrasoundExpo™. Its event records,
+ * registration checkout, and dashboards remain distinct from Learn content. */
+function UltrasoundExpoRouter() {
+  usePageViewTracker();
+  useSsoConsumer();
+  useSsoBridge();
+  useCrossDomainSso();
+  const pageFallback = (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+    </div>
+  );
+  return (
+    <Suspense fallback={pageFallback}>
+      <Switch>
+        <Route path="/register" component={UltrasoundExpoRegister} />
+        <Route path="/expo-dashboard" component={UltrasoundExpoDashboard} />
+        <Route path="/admin/ultrasound-expo">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UltrasoundExpoAdmin /></RoleGuard>}</Route>
+        <Route path="/login" component={Login} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
+        <Route path="/magic-link" component={MagicLinkRequest} />
+        <Route path="/auth/magic" component={MagicLinkCallback} />
+        <Route path="/auth/access" component={AccessLinkCallback} />
+        <Route path="/attend" component={UltrasoundExpoSite} />
+        <Route path="/exhibit" component={UltrasoundExpoSite} />
+        <Route path="/sponsor" component={UltrasoundExpoSite} />
+        <Route path="/program" component={UltrasoundExpoSite} />
+        <Route path="/expo" component={UltrasoundExpoSite} />
+        <Route path="/connect" component={UltrasoundExpoSite} />
+        <Route path="/about" component={UltrasoundExpoSite} />
+        <Route path="/" component={UltrasoundExpoSite} />
+        <Route component={UltrasoundExpoSite} />
+      </Switch>
+    </Suspense>
+  );
+}
+
 function MarketingSiteRouter() {
   usePageViewTracker();
   const pageFallback = (
@@ -1866,6 +1908,7 @@ function PublicWebsiteRouter() {
 
 function App() {
   const onMarketingStaging = isMarketingStagingDomain();
+  const onUltrasoundExpo = isUltrasoundExpoDomain();
   const onLearnSubdomain = isLearnDomain();
   const onMembersSubdomain = isMembersDomain();
   const onIHeartEchoSubdomain = isIHeartEchoDomain();
@@ -1882,6 +1925,8 @@ function App() {
           <LegacyPasswordSetupRedirect />
           {onMarketingStaging ? (
             <MarketingSiteRouter />
+          ) : onUltrasoundExpo ? (
+            <UltrasoundExpoRouter />
           ) : onLearnSubdomain ? (
             <><ProfileNameBanner /><LMSRouter /><LearnerAccessGuide /></>
           ) : onPublicWebsite ? (

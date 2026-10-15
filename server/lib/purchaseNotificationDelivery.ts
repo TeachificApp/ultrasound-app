@@ -23,7 +23,9 @@ export type PurchaseNotificationType =
   | "sponsorship_thank_you"
   | "sponsorship_admin_alert"
   | "event_partnership_thank_you"
-  | "event_partnership_admin_alert";
+  | "event_partnership_admin_alert"
+  | "ultrasound_expo_thank_you"
+  | "ultrasound_expo_admin_alert";
 
 export type DeliveryClaim = {
   claimed: boolean;

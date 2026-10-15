@@ -86,6 +86,7 @@ import { surveyPulseRouter } from "./routers/surveyPulseRouter";
 import { purchaseEmailOverridesRouter } from "./routers/purchaseEmailOverridesRouter";
 import { sponsorshipRouter } from "./routers/sponsorshipRouter";
 import { eventPartnershipRouter } from "./routers/eventPartnershipRouter";
+import { ultrasoundExpoRouter } from "./routers/ultrasoundExpoRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -212,6 +213,7 @@ export const appRouter = router({
   scheduledContentAdmin: scheduledContentAdminRouter,
   sponsorship: sponsorshipRouter,
   eventPartnership: eventPartnershipRouter,
+  ultrasoundExpo: ultrasoundExpoRouter,
 
   auth: router({
     sessionState: publicProcedure.query(async ({ ctx }) => {

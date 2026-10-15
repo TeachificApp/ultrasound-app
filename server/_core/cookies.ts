@@ -9,6 +9,7 @@ export const KNOWN_COOKIE_DOMAINS = [
   ".allaboutultrasound.net",
   ".iheartecho.com",
   ".iheartecho.net",
+  ".ultrasoundexpo.com",
 ] as const;
 
 function isIpAddress(host: string) {

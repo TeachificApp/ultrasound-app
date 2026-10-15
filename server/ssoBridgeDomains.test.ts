@@ -56,6 +56,15 @@ describe("ssoBridgeDomains", () => {
     expect(getSsoBridgeOrigins("www.iheartecho.net")[0]).toBe("https://learn.iheartecho.com");
   });
 
+  it("bridges UltrasoundExpo through the established Learn identity", () => {
+    expect(hostnameNeedsSsoBridge("ultrasoundexpo.com")).toBe(true);
+    expect(hostnameNeedsSsoBridge("www.ultrasoundexpo.com")).toBe(true);
+    expect(getSsoBridgeOrigins("ultrasoundexpo.com")).toEqual([
+      "https://learn.allaboutultrasound.com",
+      "https://app.allaboutultrasound.com",
+    ]);
+  });
+
   it("includes iHeart Learn in the silent SSO broadcast targets", () => {
     const source = readFileSync("client/src/hooks/useCrossDomainSso.ts", "utf8");
     expect(source).toContain('"https://learn.iheartecho.com"');

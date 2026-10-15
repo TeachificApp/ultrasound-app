@@ -305,6 +305,13 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                       >
                         <CreditCard className="w-3.5 h-3.5 text-teal-600" /> My Subscriptions
                       </a>
+                      <a
+                        href="https://ultrasoundexpo.com/expo-dashboard"
+                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        onClick={() => setAccountOpen(false)}
+                      >
+                        <Briefcase className="w-3.5 h-3.5 text-teal-600" /> My Expo Dashboard
+                      </a>
                       <SiteNavProfileLinks
                         items={profileNavItems}
                         location={location}

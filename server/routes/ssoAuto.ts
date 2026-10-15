@@ -60,6 +60,8 @@ const ALLOWED_ORIGINS = new Set([
   "https://learn.iheartecho.com",
   "https://members.allaboutultrasound.com",
   "https://accreditation.iheartecho.com",
+  "https://ultrasoundexpo.com",
+  "https://www.ultrasoundexpo.com",
   // Staging / manus.space domains — allow any *.manus.space origin
 ]);
 
@@ -76,6 +78,8 @@ const ALLOWED_COOKIE_DOMAINS = new Set([
   "learn.iheartecho.com",
   "members.allaboutultrasound.com",
   "accreditation.iheartecho.com",
+  "ultrasoundexpo.com",
+  "www.ultrasoundexpo.com",
 ]);
 
 /**
@@ -86,6 +90,8 @@ const BRIDGE_FALLBACK_ORIGINS = new Set([
   "https://learn.iheartecho.com",
   "https://learn.allaboutultrasound.com",
   "https://app.allaboutultrasound.com",
+  "https://ultrasoundexpo.com",
+  "https://www.ultrasoundexpo.com",
 ]);
 
 function getFallbackBridgeUrl(req: Request, returnUrl: string): string | null {

@@ -20,6 +20,7 @@ const KNOWN_CHECKOUT_TYPES = new Set([
   "embedded_checkout_purchase",
   "sponsorship",
   "event_partnership",
+  "ultrasound_expo",
 ]);
 
 const KNOWN_PRODUCT_TYPES = new Set([

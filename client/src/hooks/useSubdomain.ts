@@ -69,6 +69,15 @@ export const ROOT_DOMAIN_URL = "https://allaboutultrasound.com";
 export const MARKETING_STAGING_URL = "https://site.allaboutultrasound.com";
 
 const MARKETING_STAGING_HOSTNAMES = ["site.allaboutultrasound.com"];
+const ULTRASOUND_EXPO_HOSTNAMES = ["ultrasoundexpo.com", "www.ultrasoundexpo.com"];
+
+/** The dedicated UltrasoundExpo™ annual-event tenant. */
+export function isUltrasoundExpoDomain(): boolean {
+  const hostname = window.location.hostname.toLowerCase();
+  if (ULTRASOUND_EXPO_HOSTNAMES.includes(hostname)) return true;
+  const params = new URLSearchParams(window.location.search);
+  return params.get("subdomain") === "ultrasoundexpo";
+}
 
 /**
  * Keeps Learn navigation on the active Learn tenant and chooses the iHeartEcho

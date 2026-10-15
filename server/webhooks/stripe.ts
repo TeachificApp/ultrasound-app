@@ -18,7 +18,7 @@ import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { handleStudyGroupCheckoutCompleted, handleStudyGroupSubscriptionLifecycle } from "../routers/studyGroupsRouter";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users, pendingFulfillments, sponsorships, eventPartnershipOrders, eventPartnershipPackages } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users, pendingFulfillments, sponsorships, eventPartnershipOrders, eventPartnershipPackages, ultrasoundExpoEvents, ultrasoundExpoPackages, ultrasoundExpoRegistrations } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -41,6 +41,7 @@ import { recordReceiptPayee } from "../lib/receiptParticipants";
 import { renderCurrentWebinarSchedule } from "../lib/webinarEmailSchedule";
 import { buildAdminSponsorshipAlertEmail, buildSponsorThankYouEmail } from "../lib/sponsorshipEmail";
 import { buildAdminEventPartnershipAlertEmail, buildEventPartnershipThankYouEmail } from "../lib/eventPartnershipEmail";
+import { buildUltrasoundExpoAdminAlertEmail, buildUltrasoundExpoThankYouEmail } from "../lib/ultrasoundExpoEmail";
 import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 type CheckoutRecipient = { email: string | null; name: string | null };
 
@@ -362,6 +363,101 @@ async function handleEventPartnershipCheckoutCompleted(session: Record<string, u
   ]);
   if ((thankYou.attempted && !thankYou.delivered) || (alert.attempted && !alert.delivered)) {
     await notifyOwner({ title: "Event partnership email delivery needs review", content: "A paid workshop exhibitor or webinar sponsor record was saved, but one or more notifications could not be delivered. The durable delivery log will retry safely." });
+  }
+}
+
+/**
+ * Finalize an annual UltrasoundExpo™ checkout. This is deliberately separate
+ * from the AAUS/iHeartEcho sponsorship and workshop-exhibit handlers: Expo
+ * registrations have their own records, ticket code, dashboard, and reporting.
+ */
+async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unknown>) {
+  const metadata = (session.metadata as Record<string, string>) ?? {};
+  if (metadata.type !== "ultrasound_expo") return;
+
+  const registrationId = Number.parseInt(metadata.ultrasound_expo_registration_id ?? "", 10);
+  const sessionId = typeof session.id === "string" ? session.id : null;
+  if (!Number.isInteger(registrationId) || registrationId <= 0 || !sessionId) {
+    console.warn("[Stripe][Expo] Checkout is missing its registration identifier.");
+    return;
+  }
+
+  const db = await getDb();
+  if (!db) throw new Error("UltrasoundExpo payment could not reach the MySQL database.");
+  const [existing] = await db.select().from(ultrasoundExpoRegistrations)
+    .where(eq(ultrasoundExpoRegistrations.id, registrationId)).limit(1);
+  if (!existing) {
+    await notifyOwner({ title: "UltrasoundExpo payment needs review", content: "A paid Expo checkout did not have a matching registration record in Railway MySQL." });
+    return;
+  }
+  if (existing.stripeSessionId && existing.stripeSessionId !== sessionId) {
+    await notifyOwner({ title: "UltrasoundExpo payment needs review", content: "An Expo registration record was presented by more than one checkout session. No automatic reassignment was made." });
+    return;
+  }
+
+  const nameParts = existing.attendeeName.split(" ").filter(Boolean);
+  const resolved = await getOrCreateUserByEmail({
+    email: existing.attendeeEmail,
+    name: existing.attendeeName,
+    firstName: nameParts[0] || undefined,
+    lastName: nameParts.slice(1).join(" ") || undefined,
+  });
+  const ticketCode = existing.ticketCode ?? `UEX-${existing.eventId}-${existing.id}`;
+  await db.update(ultrasoundExpoRegistrations).set({
+    userId: resolved.user.id,
+    stripeSessionId: sessionId,
+    stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+    amountCents: typeof session.amount_total === "number" ? session.amount_total : existing.amountCents,
+    currency: typeof session.currency === "string" ? session.currency.toLowerCase() : existing.currency,
+    ticketCode,
+    paymentStatus: "paid",
+    status: "confirmed",
+    paidAt: existing.paidAt ?? new Date(),
+  }).where(eq(ultrasoundExpoRegistrations.id, registrationId));
+
+  const [record] = await db.select({
+    attendeeName: ultrasoundExpoRegistrations.attendeeName,
+    attendeeEmail: ultrasoundExpoRegistrations.attendeeEmail,
+    organizationName: ultrasoundExpoRegistrations.organizationName,
+    ticketCode: ultrasoundExpoRegistrations.ticketCode,
+    amountCents: ultrasoundExpoRegistrations.amountCents,
+    currency: ultrasoundExpoRegistrations.currency,
+    eventName: ultrasoundExpoEvents.name,
+    packageName: ultrasoundExpoPackages.name,
+    packageType: ultrasoundExpoPackages.packageType,
+  }).from(ultrasoundExpoRegistrations)
+    .innerJoin(ultrasoundExpoEvents, eq(ultrasoundExpoRegistrations.eventId, ultrasoundExpoEvents.id))
+    .innerJoin(ultrasoundExpoPackages, eq(ultrasoundExpoRegistrations.packageId, ultrasoundExpoPackages.id))
+    .where(eq(ultrasoundExpoRegistrations.id, registrationId)).limit(1);
+  if (!record) return;
+
+  const emailRecord = {
+    attendeeName: record.attendeeName,
+    attendeeEmail: record.attendeeEmail,
+    organizationName: record.organizationName,
+    eventName: record.eventName,
+    packageName: record.packageName,
+    packageType: record.packageType,
+    amountCents: record.amountCents,
+    currency: record.currency,
+    ticketCode: ticketCode,
+  };
+  const thankYouEmail = buildUltrasoundExpoThankYouEmail(emailRecord);
+  const adminAlertEmail = buildUltrasoundExpoAdminAlertEmail(emailRecord);
+  const [thankYou, alert] = await Promise.all([
+    sendPurchaseNotificationOnce(db, {
+      checkoutSessionId: sessionId,
+      notificationType: "ultrasound_expo_thank_you",
+      send: () => sendEmail({ to: { name: record.attendeeName, email: record.attendeeEmail }, subject: thankYouEmail.subject, htmlBody: thankYouEmail.htmlBody }),
+    }),
+    sendPurchaseNotificationOnce(db, {
+      checkoutSessionId: sessionId,
+      notificationType: "ultrasound_expo_admin_alert",
+      send: () => sendEmail({ to: getPlatformAdminRecipient("UltrasoundExpo Team"), subject: adminAlertEmail.subject, htmlBody: adminAlertEmail.htmlBody }),
+    }),
+  ]);
+  if ((thankYou.attempted && !thankYou.delivered) || (alert.attempted && !alert.delivered)) {
+    await notifyOwner({ title: "UltrasoundExpo email delivery needs review", content: "A paid Expo registration was saved, but one or more confirmation notifications could not be delivered. The durable delivery log will retry safely." });
   }
 }
 
@@ -3040,6 +3136,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       // payment_status === "paid" — safe to grant access immediately
       await handleSponsorshipCheckoutCompleted(sessionObj);
       await handleEventPartnershipCheckoutCompleted(sessionObj);
+      await handleUltrasoundExpoCheckoutCompleted(sessionObj);
       await handleFunnelCheckoutSessionCompleted(sessionObj);
       await handleCanonicalBundleCheckoutCompleted(sessionObj);
       await handleCheckoutSessionCompleted(sessionObj);
@@ -3097,6 +3194,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
               // Run all fulfillment handlers with the stored session object
               await handleSponsorshipCheckoutCompleted(storedSession);
               await handleEventPartnershipCheckoutCompleted(storedSession);
+              await handleUltrasoundExpoCheckoutCompleted(storedSession);
               await handleFunnelCheckoutSessionCompleted(storedSession);
               await handleCanonicalBundleCheckoutCompleted(storedSession);
               await handleCheckoutSessionCompleted(storedSession);

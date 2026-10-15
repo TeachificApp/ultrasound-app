@@ -25,6 +25,8 @@ export const SSO_BRIDGE_CLIENT_HOSTS = new Set([
   "learn.iheartecho.com",
   "accreditation.iheartecho.com",
   "members.allaboutultrasound.com",
+  "ultrasoundexpo.com",
+  "www.ultrasoundexpo.com",
 ]);
 
 /** Bridge origins to try from the current hostname (never bridge to self). */
@@ -46,6 +48,9 @@ export function getSsoBridgeOrigins(currentHostname: string): string[] {
     return ["https://learn.iheartecho.com", "https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
   }
   if (host === "allaboutultrasound.net" || host === "www.allaboutultrasound.net") {
+    return ["https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
+  }
+  if (host === "ultrasoundexpo.com" || host === "www.ultrasoundexpo.com") {
     return ["https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
   }
   return SSO_BRIDGE_ORIGINS.filter((origin) => new URL(origin).hostname !== host);

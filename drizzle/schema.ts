@@ -9153,3 +9153,71 @@ export const surveyPulseResponses = mysqlTable("survey_pulse_responses", {
 }));
 export type SurveyPulseResponse = typeof surveyPulseResponses.$inferSelect;
 export type InsertSurveyPulseResponse = typeof surveyPulseResponses.$inferInsert;
+
+// ─── UltrasoundExpo™ ─────────────────────────────────────────────────────────
+// A dedicated annual-event tenant. It shares member identities with the broader
+// platform while keeping Expo registrations, exhibitor records, and event sponsorship reporting separate.
+export const ultrasoundExpoEvents = mysqlTable("ultrasound_expo_events", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at"),
+  timezone: varchar("timezone", { length: 64 }).default("America/New_York").notNull(),
+  locationLabel: varchar("location_label", { length: 512 }),
+  description: text("description"),
+  heroImageUrl: varchar("hero_image_url", { length: 2048 }),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("ultrasound_expo_events_status_starts_idx").on(table.status, table.startsAt),
+]);
+export type UltrasoundExpoEvent = typeof ultrasoundExpoEvents.$inferSelect;
+
+export const ultrasoundExpoPackages = mysqlTable("ultrasound_expo_packages", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: int("event_id").notNull(),
+  packageType: mysqlEnum("package_type", ["registrant", "exhibitor", "sponsor", "product", "other"]).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  benefits: longtext("benefits"),
+  amountCents: int("amount_cents").notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("ultrasound_expo_packages_event_active_idx").on(table.eventId, table.isActive),
+  index("ultrasound_expo_packages_event_type_idx").on(table.eventId, table.packageType),
+]);
+export type UltrasoundExpoPackage = typeof ultrasoundExpoPackages.$inferSelect;
+
+export const ultrasoundExpoRegistrations = mysqlTable("ultrasound_expo_registrations", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: int("event_id").notNull(),
+  packageId: int("package_id").notNull(),
+  userId: int("user_id"),
+  attendeeName: varchar("attendee_name", { length: 255 }).notNull(),
+  attendeeEmail: varchar("attendee_email", { length: 320 }).notNull(),
+  attendeePhone: varchar("attendee_phone", { length: 60 }),
+  organizationName: varchar("organization_name", { length: 255 }),
+  organizationWebsite: varchar("organization_website", { length: 1024 }),
+  notes: text("notes"),
+  ticketCode: varchar("ticket_code", { length: 80 }),
+  amountCents: int("amount_cents").notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  stripeSessionId: varchar("stripe_session_id", { length: 255 }).unique(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  paymentStatus: mysqlEnum("payment_status", ["pending", "paid", "failed", "cancelled"]).default("pending").notNull(),
+  status: mysqlEnum("status", ["pending", "confirmed", "payment_failed", "cancelled"]).default("pending").notNull(),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("ultrasound_expo_registrations_user_status_idx").on(table.userId, table.status),
+  index("ultrasound_expo_registrations_event_status_idx").on(table.eventId, table.status),
+  index("ultrasound_expo_registrations_email_idx").on(table.attendeeEmail),
+]);
+export type UltrasoundExpoRegistration = typeof ultrasoundExpoRegistrations.$inferSelect;
