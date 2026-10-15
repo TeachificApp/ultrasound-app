@@ -1637,6 +1637,7 @@ async function handleFunnelCheckoutSessionCompleted(session: Record<string, unkn
   await handleFunnelPaymentIntentSucceeded({
     metadata: meta,
     amount: session.amount_total,
+    currency: session.currency,
     id: piId,
     checkout_session_id: sessionId,
   });
@@ -1662,6 +1663,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
   const bumpTitles = meta.bump_titles ?? "";
   const bumpPrices = meta.bump_prices ?? "";
   const amount = paymentIntent.amount as number;
+  const currency = typeof paymentIntent.currency === "string" ? paymentIntent.currency : null;
   const piId = paymentIntent.id as string;
   // Shipping address (only for physical products)
   const shippingName = meta.shipping_name ?? null;
@@ -1986,6 +1988,7 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
         fulfillmentDownloadId,
         fulfillmentBundleId,
         amountCents: amount ?? 0,
+        currency,
         brandMode: meta.brand_mode,
         cardLast4,
         cardBrand,

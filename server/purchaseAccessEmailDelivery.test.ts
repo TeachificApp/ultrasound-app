@@ -32,14 +32,17 @@ describe("purchase access email delivery", () => {
     expect(withPayee.payee).toEqual({ name: "Payee Parent", email: "payee@example.com" });
   });
 
-  it("sends the learner's tokenized message only to the learner and safe receipts to payer and admin", async () => {
+  it("sends the learner's tokenized message only to the learner and detailed safe receipts to payer and admin", async () => {
     const tokenizedUrl = "https://learn.allaboutultrasound.com/auth/access?token=private-token";
     const ok = await sendEmail({
-      to: { name: "Learner", email: "learner@example.com" },
+      to: { name: "Enrolled Learner", email: "learner@example.com" },
       subject: "Your course access",
       htmlBody: `<p><a href="${tokenizedUrl}">Access</a></p>`,
       purchaseAccess: {
         payee: { name: "Payee", email: "payee@example.com" },
+        contentTitle: "Advanced Echocardiography Course",
+        amountCents: 4997,
+        currency: "usd",
       },
     });
 
@@ -53,6 +56,10 @@ describe("purchase access email delivery", () => {
 
     expect(payee?.to.email).toBe("payee@example.com");
     expect(payee?.htmlBody).not.toContain(tokenizedUrl);
+    expect(payee?.htmlBody).toContain("Enrolled Learner");
+    expect(payee?.htmlBody).toContain("Advanced Echocardiography Course");
+    expect(payee?.htmlBody).toContain("$49.97");
+    expect(payee?.htmlBody).toContain("Amount paid");
     expect(payee?.htmlBody).toContain("does not include any sign-in or access link");
     expect(payee?.bcc).toBeUndefined();
 

@@ -29,6 +29,7 @@ type FunnelAccessEmailInput = {
   fulfillmentDownloadId: number | null;
   fulfillmentBundleId: number | null;
   amountCents: number;
+  currency?: string | null;
   brandMode?: string;
   cardLast4?: string | null;
   cardBrand?: string | null;
@@ -79,7 +80,7 @@ export async function deliverFunnelPurchaseAccessEmail(
               forPurchase: true,
               quizTitle: course.title,
               courseSlug: course.slug,
-              purchaseDetails: { userId: input.userId, amountCents: input.amountCents, contentTitle: course.title },
+              purchaseDetails: { userId: input.userId, amountCents: input.amountCents, currency: input.currency, contentTitle: course.title },
               customSubject: emailOverride?.subject,
               customHeading: emailOverride?.heading,
               customIntro: emailOverride?.intro,
@@ -95,7 +96,7 @@ export async function deliverFunnelPurchaseAccessEmail(
             forPurchase: true,
             courseTitle: course.title,
             courseSlug: course.slug,
-            purchaseDetails: { userId: input.userId, amountCents: input.amountCents, contentTitle: course.title },
+            purchaseDetails: { userId: input.userId, amountCents: input.amountCents, currency: input.currency, contentTitle: course.title },
             customSubject: emailOverride?.subject,
             customHeading: emailOverride?.heading,
             customIntro: emailOverride?.intro,
@@ -122,7 +123,7 @@ export async function deliverFunnelPurchaseAccessEmail(
             forPurchase: true,
             productTitle: product.title,
             productSlug: product.slug,
-            purchaseDetails: { userId: input.userId, amountCents: input.amountCents, contentTitle: product.title },
+            purchaseDetails: { userId: input.userId, amountCents: input.amountCents, currency: input.currency, contentTitle: product.title },
             customSubject: emailOverride?.subject,
             customHeading: emailOverride?.heading,
             customIntro: emailOverride?.intro,
@@ -148,7 +149,7 @@ export async function deliverFunnelPurchaseAccessEmail(
             forPurchase: true,
             bundleTitle: bundle.title,
             bundleSlug: bundle.slug,
-            purchaseDetails: { userId: input.userId, amountCents: input.amountCents, contentTitle: bundle.title },
+            purchaseDetails: { userId: input.userId, amountCents: input.amountCents, currency: input.currency, contentTitle: bundle.title },
             customSubject: emailOverride?.subject,
             customHeading: emailOverride?.heading,
             customIntro: emailOverride?.intro,
@@ -196,6 +197,7 @@ export async function deliverFunnelPurchaseAccessEmail(
         checkoutName: input.payerName ?? input.learnerName,
         contentTitle: input.productName,
         amountCents: input.amountCents,
+        currency: input.currency,
       }));
     },
   });

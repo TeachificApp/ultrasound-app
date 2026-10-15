@@ -172,6 +172,11 @@ function buildTokenFreeReceipt(base: SendEmailOptions, to: EmailRecipient, isAdm
   const adminProfileCta = isAdminReceipt && memberProfileUrl
     ? `<p style="margin:20px 0 0;"><a href="${memberProfileUrl}" style="display:inline-block;background:#0d9488;color:#ffffff;padding:11px 18px;border-radius:7px;text-decoration:none;font-weight:700;">Open Member Profile</a></p>`
     : "";
+  const payeeDetailRows = !isAdminReceipt ? `
+        <tr><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#64748b;width:38%;">Enrolled learner</td><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#0f172a;font-weight:600;">${learnerName}</td></tr>
+        <tr><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#64748b;">Item</td><td style="padding:9px 12px;border-bottom:1px solid #e5f0f1;color:#0f172a;">${productLabel}</td></tr>
+        <tr><td style="padding:9px 12px;color:#64748b;">Amount paid</td><td style="padding:9px 12px;color:#0f172a;font-weight:700;">${pricePaid}</td></tr>
+      ` : "";
   return {
     to,
     subject: `Purchase confirmation — ${base.subject}`,
@@ -181,6 +186,7 @@ function buildTokenFreeReceipt(base: SendEmailOptions, to: EmailRecipient, isAdm
         <p>Hi ${recipientName},</p>
         ${isAdminReceipt ? `<p>A learner purchase has been completed and access has been prepared.</p>
         <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #dceff0;border-radius:8px;border-collapse:separate;border-spacing:0;margin:18px 0;background:#fbffff;">${adminDetailRows}</table>${adminProfileCta}` : `<p>A purchase has been completed for <strong>${productLabel}</strong>.</p>
+        <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border:1px solid #dceff0;border-radius:8px;border-collapse:separate;border-spacing:0;margin:18px 0;background:#fbffff;">${payeeDetailRows}</table>
         <p>The enrolled learner has received their secure access instructions separately.</p>`}
         <p style="margin:20px 0 0;font-size:12px;color:#64748b;">For privacy, this confirmation does not include any sign-in or access link.</p>
       </main>
