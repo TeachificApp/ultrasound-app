@@ -9,6 +9,7 @@ export const SITE_PAGE_DOMAINS = [
   { value: "app.allaboutultrasound.com",     label: "App — allaboutultrasound.com",            brand: "aaus" as Brand },
   { value: "members.allaboutultrasound.com", label: "Members — allaboutultrasound.com",        brand: "aaus" as Brand },
   { value: "allaboutultrasound.com",         label: "Marketing root — allaboutultrasound.com", brand: "aaus" as Brand },
+  { value: "ultrasoundexpo.com",             label: "UltrasoundExpo™ — ultrasoundexpo.com",   brand: "aaus" as Brand },
   // ── iHeartEcho ───────────────────────────────────────────────────────────
   { value: "app.iheartecho.com",             label: "App — iheartecho.com",                   brand: "iheartecho" as Brand },
   { value: "app.iheartecho.net",             label: "App — iheartecho.net (legacy)",           brand: "iheartecho" as Brand },

@@ -5,20 +5,50 @@ import {
   ULTRASOUND_EXPO_AAUS_LOGO_URL,
   ULTRASOUND_EXPO_LAUNCH_EVENT,
   ULTRASOUND_EXPO_NAME,
+  ULTRASOUND_EXPO_PAGE_EDITOR_PAGES,
+  ULTRASOUND_EXPO_SCHEDULE,
+  ULTRASOUND_EXPO_SITE_DOMAIN,
   formatExpoMoney,
+  getUltrasoundExpoEditorPage,
+  getUltrasoundExpoPageSeo,
   isExpoPackageType,
   isExpoPublicRegistrationType,
 } from "../shared/ultrasoundExpo";
 import { buildUltrasoundExpoAdminAlertEmail, buildUltrasoundExpoThankYouEmail } from "./lib/ultrasoundExpoEmail";
 import { hasKnownStripeCheckoutRoute } from "./lib/unmatchedStripePayment";
+import { getPageSeoForRequest, injectPageSeoIntoHtml } from "./routes/funnelOgMeta";
 
 describe("UltrasoundExpo™ annual-event platform", () => {
-  it("keeps the inaugural annual event configured for Orlando on January 16–17, 2028", () => {
+  it("keeps the inaugural annual event configured for Orlando on January 15–18, 2028", () => {
     expect(ULTRASOUND_EXPO_NAME).toBe("UltrasoundExpo™");
     expect(ULTRASOUND_EXPO_AAUS_LOGO_URL).toContain("sono-ring4_orig.png");
-    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.startsAtIso).toContain("2028-01-16");
-    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.endsAtIso).toContain("2028-01-17");
+    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.startsAtIso).toContain("2028-01-15");
+    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.endsAtIso).toContain("2028-01-18");
     expect(ULTRASOUND_EXPO_LAUNCH_EVENT.locationLabel).toBe("Orlando, FL · Venue to be announced");
+  });
+
+  it("publishes the Friday destination opening and the complete editable annual schedule", () => {
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[0]).toMatchObject({
+      label: "Wednesday",
+      title: "Exhibitor Setup",
+      items: ["Exhibitor setup"],
+    });
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[1]).toMatchObject({
+      label: "Thursday",
+      title: "Exhibitor Setup",
+      items: ["Exhibitor setup"],
+    });
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[2]).toMatchObject({
+      label: "Friday",
+      title: "Grand Opening & Destination Evening",
+      summary: "Friday night becomes the destination event at UltrasoundExpo™.",
+    });
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[2].items).toContain("5–8 PM – Expo + Opening Reception");
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[3].items).toContain("4 PM – Innovation Stage");
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[4].items).toContain("12:30 PM – Closing keynote / awards");
+    expect(getUltrasoundExpoEditorPage("program")?.zones.map((zone) => zone.key)).toEqual(expect.arrayContaining([
+      "schedule_heading", "schedule_introduction", "wednesday_schedule", "thursday_schedule", "friday_schedule", "saturday_schedule", "sunday_schedule",
+    ]));
   });
 
   it("keeps administrative offerings distinct while showing only attendee, exhibit, and sponsor opportunities publicly", () => {
@@ -62,5 +92,36 @@ describe("UltrasoundExpo™ annual-event platform", () => {
   it("recognizes Expo Stripe checkouts as deliberate fulfillment routes", () => {
     expect(hasKnownStripeCheckoutRoute({}, { type: "ultrasound_expo" })).toBe(true);
     expect(formatExpoMoney(1000000)).toBe("$10,000.00");
+  });
+
+  it("defines customer-facing SEO and editable entries for every public Expo screen", () => {
+    expect(ULTRASOUND_EXPO_SITE_DOMAIN).toBe("ultrasoundexpo.com");
+    expect(ULTRASOUND_EXPO_PAGE_EDITOR_PAGES.map((page) => page.slug)).toEqual([
+      "home", "attend", "exhibit", "sponsor", "program", "expo", "connect", "about", "register", "expo-dashboard",
+    ]);
+    expect(getUltrasoundExpoEditorPage("register")?.zones.map((zone) => zone.key)).toContain("checkout_headline");
+    expect(getUltrasoundExpoPageSeo("home").title).toBe("UltrasoundExpo™ | The Annual Event for Ultrasound Professionals");
+    expect(getUltrasoundExpoPageSeo("home").description).toContain("All About Ultrasound™");
+  });
+
+  it("serves an Expo-specific search preview without relying on the generic app metadata", async () => {
+    const request = {
+      hostname: "ultrasoundexpo.com",
+      path: "/register",
+      originalUrl: "/register",
+      protocol: "https",
+      headers: {},
+      get: (header: string) => (header.toLowerCase() === "host" ? "ultrasoundexpo.com" : undefined),
+    } as any;
+    const seo = await getPageSeoForRequest(request);
+    expect(seo?.title).toBe("Register for UltrasoundExpo™ | Attendees, Exhibitors, and Sponsors");
+    const rendered = injectPageSeoIntoHtml(
+      '<html><head><title>Generic</title><meta property="og:url" content="https://ultrasoundexpo.com" /></head><body></body></html>',
+      seo!,
+      request,
+    );
+    expect(rendered).toContain('content="https://ultrasoundexpo.com/register"');
+    expect(rendered.match(/property="og:url"/g)).toHaveLength(1);
+    expect(rendered).toContain('data-page-seo="1"');
   });
 });

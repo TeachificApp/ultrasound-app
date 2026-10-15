@@ -7,6 +7,7 @@ import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 import { getPageSeoForRequest, injectPageSeoIntoHtml } from "../routes/funnelOgMeta";
 import { resolveAssetUrl } from "../lib/resolveAssetUrl";
+import { ULTRASOUND_EXPO_HERO_IMAGE, ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
 
 /** Helper: look up per-page SEO and inject it into the HTML if found. */
 async function injectPageSeo(html: string, req: Request): Promise<string> {
@@ -31,6 +32,16 @@ const SPA_CATCH_ALL_REGEX = /^\/(?!media\/|api\/|manus-storage\/).*/;
  * Social crawlers don't execute JS, so OG tags must be injected server-side.
  */
 const BRAND_META: Record<string, { title: string; description: string; ogTitle: string; ogDescription: string; ogImage: string; ogUrl: string; themeColor: string; appTitle: string }> = {
+  ultrasoundexpo: {
+    title: "UltrasoundExpo™ | The Annual Event for Ultrasound Professionals",
+    description: "UltrasoundExpo™ by All About Ultrasound™ is the annual meeting for sonographers, physicians, educators, innovators, and the ultrasound industry.",
+    ogTitle: "UltrasoundExpo™ | The Annual Event for Ultrasound Professionals",
+    ogDescription: "Education, innovation, hands-on learning, careers, connection, exhibitors, and sponsors — all in one annual ultrasound event.",
+    ogImage: ULTRASOUND_EXPO_HERO_IMAGE,
+    ogUrl: ULTRASOUND_EXPO_ORIGIN,
+    themeColor: "#087f8c",
+    appTitle: "UltrasoundExpo™",
+  },
   iheartecho: {
     title: "iHeartEcho — Echocardiography Clinical Intelligence",
     description: "iHeartEcho — Echocardiography clinical intelligence for cardiac ultrasound students, sonographers, echocardiographers, and cardiologists.",

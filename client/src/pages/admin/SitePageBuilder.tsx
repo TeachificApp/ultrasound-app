@@ -31,6 +31,10 @@ import {
 } from "@/pages/admin/LandingPageBuilder";
 import { ArrowLeft, Save, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  getUltrasoundExpoEditorPage,
+  ULTRASOUND_EXPO_SITE_DOMAIN,
+} from "@shared/ultrasoundExpo";
 
 export default function SitePageBuilder() {
   const { pageId } = useParams<{ pageId: string }>();
@@ -50,11 +54,19 @@ export default function SitePageBuilder() {
   const [showInProfileNav, setShowInProfileNav] = useState(false);
   const [isHiddenFromNav, setIsHiddenFromNav] = useState(true);
   const [rightPanelWidth, setRightPanelWidth] = useState(300);
+  const [editableZones, setEditableZones] = useState<Record<string, string>>({});
   const rightPanelDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const { data: page, isLoading } = trpc.sitePages.admin.getPage.useQuery(
     { pageId: numericId },
     { enabled: Number.isFinite(numericId) },
+  );
+  const expoPage = page?.domain === ULTRASOUND_EXPO_SITE_DOMAIN
+    ? getUltrasoundExpoEditorPage(page.slug)
+    : undefined;
+  const pageZones = trpc.sitePages.admin.getPageZones.useQuery(
+    { domain: page?.domain ?? "", slug: page?.slug ?? "" },
+    { enabled: !!expoPage && !!page?.domain && !!page?.slug },
   );
 
   const saveBlocks = trpc.sitePages.admin.saveBlocks.useMutation({
@@ -67,6 +79,10 @@ export default function SitePageBuilder() {
   });
   const updateMeta = trpc.sitePages.admin.updatePageMeta.useMutation({
     onSuccess: () => toast.success("Page settings saved"),
+    onError: (e) => toast.error(e.message),
+  });
+  const saveZones = trpc.sitePages.admin.savePageZones.useMutation({
+    onSuccess: () => toast.success("Expo page content saved"),
     onError: (e) => toast.error(e.message),
   });
 
@@ -87,6 +103,11 @@ export default function SitePageBuilder() {
     setIsHiddenFromNav(page.isHiddenFromNav);
     setHasLoaded(true);
   }, [page, hasLoaded]);
+
+  useEffect(() => {
+    if (!expoPage || !pageZones.data) return;
+    setEditableZones(pageZones.data.zones ?? {});
+  }, [expoPage, pageZones.data]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const selectedBlock = blocks.find((b) => b.id === selectedId) ?? null;
@@ -112,7 +133,15 @@ export default function SitePageBuilder() {
   };
 
   const handleSaveAll = async () => {
-    await saveBlocks.mutateAsync({ pageId: numericId, blocks: JSON.stringify(blocks) });
+    if (expoPage && page) {
+      await saveZones.mutateAsync({
+        domain: page.domain,
+        slug: page.slug,
+        zones: editableZones,
+      });
+    } else {
+      await saveBlocks.mutateAsync({ pageId: numericId, blocks: JSON.stringify(blocks) });
+    }
     await saveSeo.mutateAsync({ pageId: numericId, seoTitle, seoDescription, seoImage });
     await updateMeta.mutateAsync({
       pageId: numericId,
@@ -168,8 +197,9 @@ export default function SitePageBuilder() {
       </header>
 
       <div className="flex-1 flex min-h-0">
-        {/* Block catalog */}
-        <aside className="w-52 border-r bg-white overflow-y-auto shrink-0 p-2">
+        {/* Block catalog — Expo system pages use their established layouts and
+            expose their live copy fields in Page settings instead. */}
+        {!expoPage && <aside className="w-52 border-r bg-white overflow-y-auto shrink-0 p-2">
           {CATALOG_CATEGORIES.map((cat) => (
             <button
               key={cat}
@@ -195,45 +225,79 @@ export default function SitePageBuilder() {
               </button>
             ))}
           </div>
-        </aside>
+        </aside>}
 
         {/* Canvas */}
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToFirstScrollableAncestor]}>
-            <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-              <div className="max-w-4xl mx-auto bg-white shadow-sm rounded-lg overflow-hidden min-h-[400px]">
-                {blocks.length === 0 ? (
-                  <div className="p-12 text-center text-gray-400 border-2 border-dashed m-4 rounded-lg">
-                    Drag blocks from the left or click + to add content
-                  </div>
-                ) : (
-                  blocks.map((block, idx) => (
-                    <SortableBlock
-                      key={block.id}
-                      block={block}
-                      isSelected={selectedId === block.id}
-                      onSelect={() => setSelectedId(block.id)}
-                      onDelete={() => {
-                        setBlocks((prev) => prev.filter((b) => b.id !== block.id));
-                        if (selectedId === block.id) setSelectedId(null);
-                      }}
-                      onDuplicate={() => {
-                        const copy: Block = { ...block, id: uid(), data: { ...block.data } };
-                        setBlocks((prev) => [...prev, copy]);
-                      }}
-                      onMoveUp={idx > 0 ? () => setBlocks((prev) => arrayMove(prev, idx, idx - 1)) : undefined}
-                      onMoveDown={idx < blocks.length - 1 ? () => setBlocks((prev) => arrayMove(prev, idx, idx + 1)) : undefined}
-                    />
-                  ))
-                )}
+          {expoPage ? (
+            <div className="mx-auto flex min-h-[400px] max-w-4xl items-center justify-center rounded-lg border border-cyan-100 bg-white p-10 text-center shadow-sm">
+              <div className="max-w-md space-y-3">
+                <p className="text-xs font-bold uppercase tracking-[.18em] text-teal-700">UltrasoundExpo™ live layout</p>
+                <h2 className="text-2xl font-bold text-slate-900">Edit content without replacing the established page design.</h2>
+                <p className="text-sm leading-6 text-slate-600">The fields in Page settings control the customer-facing copy on this screen. SEO fields control its search and social preview. Use Preview to view the intact public layout.</p>
               </div>
-            </SortableContext>
-          </DndContext>
+            </div>
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd} modifiers={[restrictToFirstScrollableAncestor]}>
+              <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+                <div className="max-w-4xl mx-auto bg-white shadow-sm rounded-lg overflow-hidden min-h-[400px]">
+                  {blocks.length === 0 ? (
+                    <div className="p-12 text-center text-gray-400 border-2 border-dashed m-4 rounded-lg">
+                      Drag blocks from the left or click + to add content
+                    </div>
+                  ) : (
+                    blocks.map((block, idx) => (
+                      <SortableBlock
+                        key={block.id}
+                        block={block}
+                        isSelected={selectedId === block.id}
+                        onSelect={() => setSelectedId(block.id)}
+                        onDelete={() => {
+                          setBlocks((prev) => prev.filter((b) => b.id !== block.id));
+                          if (selectedId === block.id) setSelectedId(null);
+                        }}
+                        onDuplicate={() => {
+                          const copy: Block = { ...block, id: uid(), data: { ...block.data } };
+                          setBlocks((prev) => [...prev, copy]);
+                        }}
+                        onMoveUp={idx > 0 ? () => setBlocks((prev) => arrayMove(prev, idx, idx - 1)) : undefined}
+                        onMoveDown={idx < blocks.length - 1 ? () => setBlocks((prev) => arrayMove(prev, idx, idx + 1)) : undefined}
+                      />
+                    ))
+                  )}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
         </main>
 
         {/* Settings */}
         <aside className="border-l bg-white overflow-y-auto shrink-0 p-4 space-y-4" style={{ width: rightPanelWidth }}>
           <h3 className="font-semibold text-sm">Page settings</h3>
+          {expoPage && <>
+            <div className="space-y-3 rounded-lg border border-cyan-100 bg-cyan-50/40 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-teal-800">Page content</p>
+              {expoPage.zones.map((zone) => <div key={zone.key} className="space-y-1.5">
+                <Label className="text-xs">{zone.label}</Label>
+                {("multiline" in zone && zone.multiline) ? (
+                  <Textarea
+                    rows={3}
+                    value={editableZones[zone.key] ?? ""}
+                    placeholder="Leave blank to use the current live copy"
+                    onChange={(event) => setEditableZones((current) => ({ ...current, [zone.key]: event.target.value }))}
+                  />
+                ) : (
+                  <Input
+                    value={editableZones[zone.key] ?? ""}
+                    placeholder="Leave blank to use the current live copy"
+                    onChange={(event) => setEditableZones((current) => ({ ...current, [zone.key]: event.target.value }))}
+                  />
+                )}
+                <p className="text-[11px] leading-4 text-slate-500">{zone.hint}</p>
+              </div>)}
+            </div>
+            <hr />
+          </>}
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
               <Label>Show in header nav</Label>

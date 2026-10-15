@@ -17,9 +17,13 @@ import type { Express, Request } from "express";
 import fs from "fs";
 import path from "path";
 import { getDb } from "../db";
-import { funnels, funnelPages, lmsCourses, lmsLandingPages, workshops, digitalProducts } from "../../drizzle/schema";
+import { funnels, funnelPages, lmsCourses, lmsLandingPages, workshops, digitalProducts, sitePages } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { ENV } from "../_core/env";
+import {
+  getUltrasoundExpoEditorPage,
+  ULTRASOUND_EXPO_SITE_DOMAIN,
+} from "../../shared/ultrasoundExpo";
 
 function escapeHtml(str: string): string {
   return str
@@ -42,6 +46,11 @@ function escapeHtml(str: string): string {
  *  3. The actual request host (no proxy — use as-is)
  */
 function getCanonicalHost(req: Request): string {
+  const requestHost = (req.get("host") ?? "").toLowerCase().split(":")[0];
+  // Expo uses its own canonical site; never inherit a general platform root.
+  if (requestHost === "ultrasoundexpo.com" || requestHost === "www.ultrasoundexpo.com") {
+    return ULTRASOUND_EXPO_SITE_DOMAIN;
+  }
   const cfHeader = req.headers["x-canonical-host"];
   if (cfHeader && typeof cfHeader === "string" && cfHeader.trim()) {
     return cfHeader.trim();
@@ -175,7 +184,9 @@ function injectSeoIntoHtml(
   // Canonical URL always uses https on the canonical host
   const canonicalUrl = `https://${canonicalHost}${actualPath}`;
   // OG URL reflects the actual request (may be the subdomain or root)
-  const pageUrl = `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+  const pageUrl = canonicalHost === ULTRASOUND_EXPO_SITE_DOMAIN
+    ? canonicalUrl
+    : `${req.protocol}://${req.get("host")}${req.originalUrl}`;
 
   const metaTags = buildMetaTags({
     title: seo.title,
@@ -195,6 +206,11 @@ function injectSeoIntoHtml(
     html = html.replace(/(<meta\s+property="og:description"\s+content=")[^"]*("[^>]*>)/g, `$1${escapeHtml(seo.description)}$2`);
     html = html.replace(/(<meta\s+name="description"\s+content=")[^"]*("[^>]*>)/g, `$1${escapeHtml(seo.description)}$2`);
   }
+  // Replace a generic host-level preview URL with the canonical page URL.
+  html = html.replace(
+    /(<meta\s+property="og:url"\s+content=")[^"]*("[^>]*>)/g,
+    `$1${escapeHtml(pageUrl)}$2`,
+  );
   if (seo.image) {
     html = html.replace(/(<meta\s+property="og:image"\s+content=")[^"]*("[^>]*>)/g, `$1${escapeHtml(seo.image)}$2`);
     html = html.replace(/(<meta\s+name="twitter:image"\s+content=")[^"]*("[^>]*>)/g, `$1${escapeHtml(seo.image)}$2`);
@@ -216,6 +232,7 @@ function injectSeoIntoHtml(
       if (alreadyHasOgTitle && tag.includes('property="og:title"')) return false;
       if (alreadyHasOgDesc && tag.includes('property="og:description"')) return false;
       if (alreadyHasOgImage && (tag.includes('property="og:image"') || tag.includes('og:image:width') || tag.includes('og:image:height'))) return false;
+      if (tag.includes('property="og:url"')) return false;
       if (tag.includes('<title>')) return false; // already replaced above
       if (tag.includes('name="description"')) return false; // already replaced above
       if (tag.includes('name="twitter:title"')) return false;
@@ -330,6 +347,52 @@ async function getDownloadLandingSeo(
   }
 }
 
+async function getUltrasoundExpoSeo(
+  req: Request,
+): Promise<{ title: string; description: string; image?: string | null } | null> {
+  const host = (req.hostname || req.get("host") || "").toLowerCase().split(":")[0];
+  if (host !== "ultrasoundexpo.com" && host !== "www.ultrasoundexpo.com") return null;
+
+  const pathname = req.path.replace(/^\/+|\/+$/g, "");
+  const slug = pathname || "home";
+  const definition = getUltrasoundExpoEditorPage(slug);
+  if (!definition) return null;
+
+  try {
+    const db = await getDb();
+    if (db) {
+      const [page] = await db
+        .select({
+          seoTitle: sitePages.seoTitle,
+          seoDescription: sitePages.seoDescription,
+          seoImage: sitePages.seoImage,
+        })
+        .from(sitePages)
+        .where(
+          and(
+            eq(sitePages.domain, ULTRASOUND_EXPO_SITE_DOMAIN),
+            eq(sitePages.slug, slug),
+            eq(sitePages.status, "published"),
+          ),
+        )
+        .limit(1);
+      if (page) {
+        return {
+          title: page.seoTitle || definition.seo.title,
+          description: page.seoDescription || definition.seo.description,
+          image: page.seoImage || definition.seo.image,
+        };
+      }
+    }
+  } catch (error: any) {
+    console.error(`[getUltrasoundExpoSeo] ${error.message}`);
+  }
+
+  // Keep social previews correctly branded while an editor record is being
+  // provisioned or during an isolated database recovery.
+  return definition.seo;
+}
+
 /**
  * Resolve per-page SEO data for a given request path.
  * Returns null when the path does not match a known landing page type.
@@ -337,6 +400,8 @@ async function getDownloadLandingSeo(
 export async function getPageSeoForRequest(
   req: Request
 ): Promise<{ title: string; description: string; image?: string | null } | null> {
+  const expoSeo = await getUltrasoundExpoSeo(req);
+  if (expoSeo) return expoSeo;
   const pathname = req.path; // e.g. /courses/live-vascular...
   const courseMatch = pathname.match(/^\/courses\/([^/]+)$/);
   if (courseMatch) return getCourseLandingSeo(courseMatch[1]);

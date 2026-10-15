@@ -19,6 +19,10 @@ import {
   RESERVED_SITE_SLUGS,
   type SitePageTreeNode,
 } from "../../shared/sitePagesConstants";
+import {
+  ULTRASOUND_EXPO_PAGE_EDITOR_PAGES,
+  ULTRASOUND_EXPO_SITE_DOMAIN,
+} from "../../shared/ultrasoundExpo";
 
 export async function ensureDefaultSitePages(
   domain: string,
@@ -50,6 +54,55 @@ export async function ensureDefaultSitePages(
       navSortOrder: 0,
       createdByUserId: userId ?? null,
     });
+  }
+
+  // The dedicated Expo tenant uses its established, purpose-built public
+  // layouts. Seed corresponding Site Pages rows so every public Expo route is
+  // discoverable, editable, and SEO-manageable in the existing Site Pages tool.
+  if (domain === ULTRASOUND_EXPO_SITE_DOMAIN) {
+    for (const page of ULTRASOUND_EXPO_PAGE_EDITOR_PAGES) {
+      const [existing] = await db
+        .select({ id: sitePages.id })
+        .from(sitePages)
+        .where(and(eq(sitePages.domain, domain), eq(sitePages.slug, page.slug)))
+        .limit(1);
+      if (existing) {
+        // Never replace a page that an administrator has already configured;
+        // only fill the initial SEO values that were previously blank.
+        await db
+          .update(sitePages)
+          .set({
+            seoTitle: page.seo.title,
+            seoDescription: page.seo.description,
+            seoImage: page.seo.image,
+          })
+          .where(
+            and(
+              eq(sitePages.id, existing.id),
+              eq(sitePages.seoTitle, ""),
+            ),
+          );
+        continue;
+      }
+
+      await db.insert(sitePages).values({
+        domain,
+        slug: page.slug,
+        title: page.title,
+        pageKind: page.pageKind,
+        status: "published",
+        blocks: "[]",
+        seoTitle: page.seo.title,
+        seoDescription: page.seo.description,
+        seoImage: page.seo.image,
+        isHiddenFromNav: true,
+        showInHeaderNav: false,
+        showInSidebarNav: false,
+        showInProfileNav: false,
+        navSortOrder: ULTRASOUND_EXPO_PAGE_EDITOR_PAGES.indexOf(page),
+        createdByUserId: userId ?? null,
+      });
+    }
   }
 }
 
@@ -88,8 +141,12 @@ function siteRowToNode(
     parentId,
     children: [],
     editable: true,
-    editorRoute: `/admin/lms/site-pages?domain=${encodeURIComponent(row.domain)}&edit=${row.id}`,
-    previewUrl: row.slug ? `https://${row.domain}/${row.slug}` : null,
+    editorRoute: `/admin/lms/site-pages/${row.id}/edit?domain=${encodeURIComponent(row.domain)}`,
+    previewUrl: row.slug
+      ? row.domain === ULTRASOUND_EXPO_SITE_DOMAIN && row.slug === "home"
+        ? `https://${row.domain}/`
+        : `https://${row.domain}/${row.slug}`
+      : null,
     hiddenFromNav: row.isHiddenFromNav,
     showInHeaderNav: row.showInHeaderNav,
     showInSidebarNav: row.showInSidebarNav,

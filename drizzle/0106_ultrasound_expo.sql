@@ -62,5 +62,5 @@ CREATE TABLE IF NOT EXISTS ultrasound_expo_registrations (
 );
 
 INSERT INTO ultrasound_expo_events (name, slug, starts_at, ends_at, timezone, location_label, description, hero_image_url, status)
-SELECT 'UltrasoundExpo™ 2028', 'ultrasoundexpo-2028', '2028-01-16 09:00:00', '2028-01-17 17:00:00', 'America/New_York', 'Location to be announced', 'A new annual meeting for sonographers, physicians, educators, innovators, and the ultrasound industry.', 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/nmDnyKctfSTBjSLH.jpg', 'published'
+SELECT 'UltrasoundExpo™ 2028', 'ultrasoundexpo-2028', '2028-01-15 12:00:00', '2028-01-18 14:00:00', 'America/New_York', 'Location to be announced', 'The annual ultrasound event for education, innovation, ScanLabs, exhibits, and connection — with a destination Grand Opening and Opening Reception on Friday evening.', 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/nmDnyKctfSTBjSLH.jpg', 'published'
 WHERE NOT EXISTS (SELECT 1 FROM ultrasound_expo_events WHERE slug = 'ultrasoundexpo-2028');

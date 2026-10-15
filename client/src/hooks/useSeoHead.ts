@@ -21,6 +21,10 @@ import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
 export interface SeoHeadOptions {
   /** Page title — appended with site name automatically */
   title?: string;
+  /** Override the default site name for a dedicated brand experience. */
+  siteName?: string;
+  /** Set false when title already includes the complete branded title. */
+  appendSiteName?: boolean;
   /** Meta description (max ~160 chars for best results) */
   description?: string;
   /** OG image URL — absolute URL required */
@@ -90,6 +94,8 @@ export function useSeoHead(opts: SeoHeadOptions) {
   useEffect(() => {
     const {
       title,
+      siteName = SITE_NAME,
+      appendSiteName = true,
       description = DEFAULT_DESC,
       image = DEFAULT_IMAGE,
       canonical,
@@ -101,7 +107,11 @@ export function useSeoHead(opts: SeoHeadOptions) {
     } = opts;
 
     // ── Title ────────────────────────────────────────────────────────────────
-    const fullTitle = title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
+    const fullTitle = title
+      ? appendSiteName && siteName
+        ? `${title} | ${siteName}`
+        : title
+      : DEFAULT_TITLE;
     document.title = fullTitle;
 
     // ── Basic meta ───────────────────────────────────────────────────────────
@@ -120,7 +130,7 @@ export function useSeoHead(opts: SeoHeadOptions) {
     setMeta('meta[property="og:image"]', "content", image);
     setMeta('meta[property="og:image:width"]', "content", "1200");
     setMeta('meta[property="og:image:height"]', "content", "630");
-    setMeta('meta[property="og:site_name"]', "content", SITE_NAME);
+    setMeta('meta[property="og:site_name"]', "content", siteName || SITE_NAME);
     if (canonical) setMeta('meta[property="og:url"]', "content", canonical);
 
     // ── Twitter Card ─────────────────────────────────────────────────────────
@@ -154,7 +164,7 @@ export function useSeoHead(opts: SeoHeadOptions) {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    opts.title, opts.description, opts.image, opts.canonical,
+    opts.title, opts.siteName, opts.appendSiteName, opts.description, opts.image, opts.canonical,
     opts.type, opts.keywords, opts.noindex, opts.twitterCard,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     JSON.stringify(opts.jsonLd),
