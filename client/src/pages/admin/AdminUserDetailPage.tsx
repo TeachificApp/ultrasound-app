@@ -37,6 +37,7 @@ import { MemberDigitalDownloadPurchaseCard } from "@/components/admin/MemberDigi
 import { Checkbox } from "@/components/ui/checkbox";
 import Layout from "@/components/Layout";
 import { SdmsCmeUserTab } from "@/components/admin/SdmsCmeUserTab";
+import { INVOICE_LOGO_URL, printInvoiceElement } from "@/lib/printInvoice";
 
 // ─── Brand config ─────────────────────────────────────────────────────────────
 const BRAND_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -2632,7 +2633,10 @@ function AdminInvoiceView({ t, fmtCurrency, fmtDate }: { t: any; fmtCurrency: (c
     webinar: 'Webinar', manual_invoice: 'Manual Invoice',
   }[t.sourceTable as string] ?? 'Purchase';
   return (
-    <div id="admin-invoice-print-area" className="rounded-xl border border-gray-200 overflow-hidden text-sm">
+    <div id="admin-invoice-print-area" data-invoice-document className="rounded-xl border border-gray-200 overflow-hidden text-sm">
+      <div className="bg-white px-5 py-3 border-b border-gray-100">
+        <img data-invoice-logo src={INVOICE_LOGO_URL} alt="All About Ultrasound and iHeartEcho" className="w-full max-w-[300px] h-auto mx-auto" />
+      </div>
       {/* Header */}
       <div className="bg-gradient-to-r from-[#0e4a50] to-[#189aa1] px-5 py-4 text-white">
         <div className="flex items-start justify-between">
@@ -3043,13 +3047,7 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="outline" size="sm" onClick={() => {
                 const el = document.getElementById('admin-invoice-print-area');
-                if (!el) return;
-                const win = window.open('', '_blank');
-                if (!win) return;
-                win.document.write(`<!DOCTYPE html><html><head><title>Invoice</title><style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;margin:0;padding:32px;color:#1e293b}*{box-sizing:border-box}@media print{body{padding:0}}</style></head><body>${el.innerHTML}</body></html>`);
-                win.document.close();
-                win.focus();
-                setTimeout(() => { win.print(); win.close(); }, 400);
+                printInvoiceElement({ element: el, title: 'Invoice / Receipt' });
               }} className="gap-1.5">
                 <Download className="w-3.5 h-3.5" /> Print / Save PDF
               </Button>

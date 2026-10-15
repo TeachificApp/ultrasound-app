@@ -51,6 +51,7 @@ import {
   buildStudentDashboardUrl,
   type StudentDashboardContentTab,
 } from "@shared/studentDashboardUrls";
+import { INVOICE_LOGO_URL, printInvoiceElement } from "@/lib/printInvoice";
 import { StudentQuizResultsPanel } from "@/pages/StudentQuizDashboard";
 import { SurveyPulse } from "@/pages/SurveyPulse";
 
@@ -1505,18 +1506,7 @@ function PurchasesTab() {
   const purchases = data ?? [];
 
   function handlePrint() {
-    const el = receiptRef.current;
-    if (!el) return;
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Receipt</title><style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 32px; color: #1e293b; }
-      * { box-sizing: border-box; }
-      @media print { body { padding: 0; } }
-    </style></head><body>${el.innerHTML}</body></html>`);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 400);
+    printInvoiceElement({ element: receiptRef.current, title: "Invoice / Receipt" });
   }
 
   return (
@@ -1613,7 +1603,10 @@ function PurchasesTab() {
             return (
               <div className="space-y-4">
                 {/* Printable receipt area */}
-                <div ref={receiptRef} className="rounded-lg border border-gray-200 overflow-hidden">
+                <div ref={receiptRef} data-invoice-document className="rounded-lg border border-gray-200 overflow-hidden">
+                  <div className="bg-white px-5 py-3 border-b border-gray-100">
+                    <img data-invoice-logo src={INVOICE_LOGO_URL} alt="All About Ultrasound and iHeartEcho" className="w-full max-w-[300px] h-auto mx-auto" />
+                  </div>
                   {/* Header */}
                   <div className="bg-[#0e4a50] px-5 py-4">
                     <p className="text-white font-bold text-base leading-tight">All About Ultrasound, Inc.</p>
