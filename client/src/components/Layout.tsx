@@ -26,6 +26,7 @@ import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
 import { SiteNavProfileLinks } from "@/components/SiteNavLinks";
 import GetAppBanner from "@/components/GetAppBanner";
 import UserAvatar from "@/components/UserAvatar";
+import { buildStudentDashboardUrl } from "@shared/studentDashboardUrls";
 
 /** Badge showing the count of echo cases pending admin review */
 function CasePendingBadge() {
@@ -452,25 +453,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 {/* Dropdown */}
                 {accountOpen && (() => {
                   const roles: string[] = (user as any).appRoles ?? [];
-                  const isPremiumUser = (user as any).isPremium === true;
-                  const hasDiyAdmin = roles.includes("diy_admin");
                   const hasPlatformAdmin = roles.includes("platform_admin") || roles.includes("platform_owner") || roles.includes("platform_moderator") || (user as any).role === "admin";
                   const hasAccreditationManager = roles.includes("accreditation_manager") || hasPlatformAdmin;
-                  const ROLE_LABELS: Record<string, { label: string; color: string }> = {
-                    diy_user:  { label: "DIY Accreditation", color: "#f59e0b" },
-                    diy_admin: { label: "Lab Admin",         color: "#f97316" },
-                    platform_owner:     { label: "Platform Owner",     color: "#7c3aed" },
-                    platform_admin:     { label: "Platform Admin",     color: "#dc2626" },
-                    platform_moderator: { label: "Moderator",          color: "#0891b2" },
-                    instructor:         { label: "Instructor",         color: "#059669" },
-                    team_admin:         { label: "Team Admin",         color: "#d97706" },
-                    affiliate:          { label: "Affiliate",          color: "#9333ea" },
-                  };
-                  const roleBadges = roles.filter(r => ROLE_LABELS[r]).map(r => ROLE_LABELS[r]);
-                  const allBadges = [
-                    ...(isPremiumUser ? [{ label: "Premium", color: "#189aa1" }] : []),
-                    ...roleBadges,
-                  ];
                   return (
                     <div className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-gray-100 z-50 overflow-hidden">
                       {/* User info header */}
@@ -483,56 +467,30 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           fallbackClassName="w-10 h-10"
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm md:text-base font-semibold text-gray-800 truncate flex items-center gap-1.5">
+                          <div className="text-sm md:text-base font-semibold text-gray-800 truncate">
                             {user?.displayName || user?.name || "Account"}
-                            {isPremiumUser && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                style={{ background: "#189aa115", color: "#189aa1", border: "1px solid #189aa140" }}>
-                                <Crown className="w-2.5 h-2.5" />
-                                PREMIUM
-                              </span>
-                            )}
                           </div>
                           <div className="text-xs md:text-sm text-gray-400 truncate">{user?.email}</div>
                         </div>
                       </div>
 
-                      {/* Subscription badges */}
-                      {allBadges.length > 0 && (
-                        <div className="px-4 py-2.5 border-b border-gray-100">
-                          <a
-                            href="/premium"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1.5 hover:text-[#189aa1] transition-colors flex items-center gap-1"
-                          >
-                            My Subscriptions
-                          </a>
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {allBadges.map(({ label, color }) => (
-                              <a
-                                key={label}
-                                href="/premium"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold hover:opacity-80 transition-opacity"
-                                style={{ background: color + "15", color, border: `1px solid ${color}40` }}
-                              >
-                                {label === "Premium" && <Crown className="w-2.5 h-2.5" />}
-                                {label}
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
                       {/* Profile section */}
                       <div className="px-2 py-1.5">
                         <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Profile</div>
-                        <a href="https://members.allaboutultrasound.com/my-dashboard" onClick={() => setAccountOpen(false)}
+                        <a href={buildStudentDashboardUrl({ origin: "relative" })} onClick={() => setAccountOpen(false)}
                           className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
                           <GraduationCap className="w-3.5 h-3.5 text-[#189aa1]" />
                           My Dashboard
+                        </a>
+                        <a href={buildStudentDashboardUrl({ origin: "relative", tab: "content" })} onClick={() => setAccountOpen(false)}
+                          className="flex items-center gap-2 w-full pl-10 pr-3 py-1.5 rounded-lg text-xs text-gray-600 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
+                          <BookOpen className="w-3.5 h-3.5 text-[#189aa1]" />
+                          My Content
+                        </a>
+                        <a href={buildStudentDashboardUrl({ origin: "relative", tab: "subscriptions" })} onClick={() => setAccountOpen(false)}
+                          className="flex items-center gap-2 w-full pl-10 pr-3 py-1.5 rounded-lg text-xs text-gray-600 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
+                          <CreditCard className="w-3.5 h-3.5 text-[#189aa1]" />
+                          My Subscriptions
                         </a>
                         <WouterLink href="/case-library/submit">
                           <button onClick={() => setAccountOpen(false)}
@@ -547,29 +505,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                           onNavigate={() => setAccountOpen(false)}
                         />
                       </div>
-
-                      {/* Accreditation Portal section — for any DIY user or admin */}
-                      {(hasDiyAccess || hasDiyAdmin) && (
-                        <div className="px-2 py-1.5 border-t border-gray-100">
-                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Accreditation</div>
-                          {/* Lab Admin Portal — all DIY users */}
-                          <WouterLink href="/lab-admin">
-                            <button onClick={() => setAccountOpen(false)}
-                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
-                              <Building2 className="w-3.5 h-3.5 text-orange-500" />
-                              Lab Admin Portal
-                            </button>
-                          </WouterLink>
-                          {/* Member Portal — all DIY users */}
-                          <WouterLink href="/diy-member">
-                            <button onClick={() => setAccountOpen(false)}
-                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
-                              <Users className="w-3.5 h-3.5 text-orange-500" />
-                              Member Portal
-                            </button>
-                          </WouterLink>
-                        </div>
-                      )}
 
                       {/* EducatorAssist™ — admin-only */}
                       {hasPlatformAdmin && (
@@ -586,6 +521,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         </div>
                       )}
 
+                      {/* Accreditation portals */}
+                      {(hasDiyAccess || hasAccreditationManager) && (
+                        <div className="px-2 py-1.5 border-t border-gray-100">
+                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Accreditation</div>
+                          {hasDiyAccess && (
+                            <>
+                              <WouterLink href="/lab-admin">
+                                <button onClick={() => setAccountOpen(false)}
+                                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
+                                  <Building2 className="w-3.5 h-3.5 text-orange-500" />
+                                  Lab Admin Portal
+                                </button>
+                              </WouterLink>
+                              <WouterLink href="/diy-member">
+                                <button onClick={() => setAccountOpen(false)}
+                                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
+                                  <Users className="w-3.5 h-3.5 text-orange-500" />
+                                  Member Portal
+                                </button>
+                              </WouterLink>
+                            </>
+                          )}
+                          {hasAccreditationManager && (
+                            <WouterLink href="/accreditation-manager">
+                              <button onClick={() => setAccountOpen(false)}
+                                className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-all text-left">
+                                <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
+                                <span className="flex-1">Accreditation Manager</span>
+                              </button>
+                            </WouterLink>
+                          )}
+                        </div>
+                      )}
+
                       {/* Platform Admin section — only for platform_admin */}
                       {hasPlatformAdmin && (
                         <div className="px-2 py-1.5 border-t border-gray-100">
@@ -598,18 +567,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                               <PendingBadge />
                             </button>
                           </WouterLink>
-                        </div>
-                      )}
-
-                      {/* Accreditation Manager section — for platform_admin and accreditation_manager */}
-                      {hasAccreditationManager && (
-                        <div className="px-2 py-1.5 border-t border-gray-100">
-                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Accreditation</div>
-                          <WouterLink href="/accreditation-manager">
+                          <WouterLink href="/admin/lms">
                             <button onClick={() => setAccountOpen(false)}
-                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-all text-left">
-                              <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
-                              <span className="flex-1">Accreditation Manager</span>
+                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-teal-50 hover:text-teal-600 transition-all text-left">
+                              <BookOpen className="w-3.5 h-3.5 text-teal-500" />
+                              <span className="flex-1">LMS Management</span>
                             </button>
                           </WouterLink>
                         </div>

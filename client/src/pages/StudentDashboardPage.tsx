@@ -3144,7 +3144,7 @@ export default function StudentDashboardPage() {
             )}
             <div
               ref={tabScrollRef}
-              className="flex gap-1 bg-white rounded-xl border border-gray-100 shadow-sm p-1 overflow-x-auto scrollbar-hide"
+              className="flex flex-wrap gap-1 bg-white rounded-xl border border-gray-100 shadow-sm p-1"
             >
               {TABS.map(t => (
                 <button

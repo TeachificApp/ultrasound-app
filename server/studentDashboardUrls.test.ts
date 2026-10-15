@@ -14,6 +14,11 @@ describe("student dashboard URLs", () => {
       .toBe("/my-dashboard?tab=profile");
   });
 
+  it("builds same-app subscription management links", () => {
+    expect(buildStudentDashboardUrl({ origin: "relative", tab: "subscriptions" }))
+      .toBe("/my-dashboard?tab=subscriptions");
+  });
+
   it("builds learn-domain quiz player links", () => {
     expect(buildQuizCoursePlayerUrl("rphs-venous"))
       .toBe("https://learn.allaboutultrasound.com/courses/rphs-venous/player");
