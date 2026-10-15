@@ -284,17 +284,30 @@ export const adminUserRouter = router({
 
       // Purchaser identity is intentionally excluded for restricted managers and
       // all learner routes. Platform Admins retain it for payment/dispute review.
-      const privatePurchasePayees = isRestrictedManager
-        ? []
-        : await db.select({
-          id: purchasePayees.id,
-          name: purchasePayees.name,
-          email: purchasePayees.email,
-          firstObservedAt: purchasePayees.firstObservedAt,
-          lastObservedAt: purchasePayees.lastObservedAt,
-        }).from(purchasePayees)
-          .where(eq(purchasePayees.userId, input.userId))
-          .orderBy(desc(purchasePayees.lastObservedAt));
+      let privatePurchasePayees: Array<{
+        id: number;
+        name: string | null;
+        email: string;
+        firstObservedAt: Date;
+        lastObservedAt: Date;
+      }> = [];
+      if (!isRestrictedManager) {
+        try {
+          privatePurchasePayees = await db.select({
+            id: purchasePayees.id,
+            name: purchasePayees.name,
+            email: purchasePayees.email,
+            firstObservedAt: purchasePayees.firstObservedAt,
+            lastObservedAt: purchasePayees.lastObservedAt,
+          }).from(purchasePayees)
+            .where(eq(purchasePayees.userId, input.userId))
+            .orderBy(desc(purchasePayees.lastObservedAt));
+        } catch (purchasePayeeReadError) {
+          // Purchaser history is supplemental. A delayed schema rollout must
+          // never make every administrator member profile unavailable.
+          console.error(`[AdminUser] Could not load purchaser history for user ${input.userId}:`, purchasePayeeReadError);
+        }
+      }
 
       // Digital product purchases
       const [digitalPurchaseList] = await db.execute(sql`
