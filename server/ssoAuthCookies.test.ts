@@ -41,4 +41,11 @@ describe("SSO cookie hostname resolution", () => {
     const host = resolveAuthHostname(req);
     expect(host).toBe("app.iheartecho.com");
   });
+
+  it("scopes a public .net login to its own parent domain", () => {
+    const req = mockReq({ "x-app-hostname": "www.allaboutultrasound.net" });
+    const host = resolveAuthHostname(req);
+    expect(host).toBe("www.allaboutultrasound.net");
+    expect(getSessionCookieOptions(req, host).domain).toBe(".allaboutultrasound.net");
+  });
 });

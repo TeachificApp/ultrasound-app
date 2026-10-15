@@ -18,6 +18,10 @@ export const SSO_BRIDGE_CLIENT_HOSTS = new Set([
   "app.allaboutultrasound.com",
   "app.iheartecho.com",
   "app.iheartecho.net",
+  "allaboutultrasound.net",
+  "www.allaboutultrasound.net",
+  "iheartecho.net",
+  "www.iheartecho.net",
   "learn.iheartecho.com",
   "accreditation.iheartecho.com",
   "members.allaboutultrasound.com",
@@ -37,6 +41,12 @@ export function getSsoBridgeOrigins(currentHostname: string): string[] {
   }
   if (host === "app.iheartecho.com" || host === "app.iheartecho.net") {
     return ["https://learn.iheartecho.com", "https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
+  }
+  if (host === "iheartecho.net" || host === "www.iheartecho.net") {
+    return ["https://learn.iheartecho.com", "https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
+  }
+  if (host === "allaboutultrasound.net" || host === "www.allaboutultrasound.net") {
+    return ["https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
   }
   return SSO_BRIDGE_ORIGINS.filter((origin) => new URL(origin).hostname !== host);
 }

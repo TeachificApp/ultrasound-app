@@ -22,7 +22,11 @@ const BROADCAST_TTL_MS = 30 * 60 * 1000;
 const ALL_DOMAINS = [
   "https://app.iheartecho.com",
   "https://app.iheartecho.net",
+  "https://iheartecho.net",
+  "https://www.iheartecho.net",
   "https://app.allaboutultrasound.com",
+  "https://allaboutultrasound.net",
+  "https://www.allaboutultrasound.net",
   "https://learn.allaboutultrasound.com",
   "https://learn.iheartecho.com",
   "https://members.allaboutultrasound.com",

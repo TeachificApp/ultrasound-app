@@ -58,4 +58,22 @@ describe("global account access routes", () => {
       appRouter.indexOf('path="/workshops/:slug" component={WorkshopLanding}'),
     );
   });
+
+  it("hands public custom-domain learning and checkout links to the matched Learn tenant", () => {
+    const app = source("client/src/App.tsx");
+    const start = app.indexOf("function PublicWebsiteRouter()");
+    const end = app.indexOf("function App()", start);
+    const publicRouter = app.slice(start, end);
+
+    expect(app).toContain('return <SsoRedirect path={path} targetOrigin={getLearnAppUrl()} />');
+    expect(publicRouter).toContain("useSsoConsumer();");
+    expect(publicRouter).toContain("useCrossDomainSso();");
+    expect(publicRouter).toContain('<Route path="/checkout/:slug" component={LearnContentRedirect} />');
+    expect(publicRouter).toContain('<Route path="/courses/:slug/player" component={LearnContentRedirect} />');
+    expect(publicRouter).toContain('<Route path="/workshops/:slug" component={LearnContentRedirect} />');
+    expect(publicRouter).toContain('<Route path="/my-dashboard" component={LearnContentRedirect} />');
+    expect(publicRouter.indexOf('path="/checkout/:slug"')).toBeLessThan(
+      publicRouter.indexOf('path="/:slug/:pageSlug"'),
+    );
+  });
 });

@@ -6,6 +6,7 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 /** Cookie domains that may have been used across AAUS / iHeartEcho deployments. */
 export const KNOWN_COOKIE_DOMAINS = [
   ".allaboutultrasound.com",
+  ".allaboutultrasound.net",
   ".iheartecho.com",
   ".iheartecho.net",
 ] as const;

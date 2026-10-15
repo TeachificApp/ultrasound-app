@@ -26,7 +26,7 @@ import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import LeadCaptureModal from "@/components/LeadCaptureModal";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
-import { LEARN_APP_URL } from "@/hooks/useSubdomain";
+import { getLearnAppUrl } from "@/hooks/useSubdomain";
 import { getLoginUrl } from "@/const";
 import { MathContent } from "@/components/MathContent";
 import { UnavailableContentPage } from "@/components/UnavailableContentPage";
@@ -1062,7 +1062,7 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
     if (behavior === "send_email" && btn.emailAddress) return `mailto:${btn.emailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     if (behavior === "direct_checkout") return "#";
-    if (behavior === "landing_page" && (btn as any).landingPageSlug) return `${LEARN_APP_URL}/courses/${(btn as any).landingPageSlug}`;
+    if (behavior === "landing_page" && (btn as any).landingPageSlug) return `${getLearnAppUrl()}/courses/${(btn as any).landingPageSlug}`;
     if (behavior === "funnel_page" && (btn as any).funnelPageValue) {
       const [fs, ps] = ((btn as any).funnelPageValue as string).split("/");
       if (fs && ps) return `/${fs}/${ps}`;
@@ -1094,7 +1094,7 @@ function HeroBlockWithLeadCapture({ d, heroButtons, heroBg, bgType, hasInlineMed
           // handled by createDirectCheckout mutation below
         }
         else if (beh === "landing_page" && d.heroLandingPageSlug) {
-          window.open(`${LEARN_APP_URL}/courses/${d.heroLandingPageSlug}`, "_blank");
+          window.open(`${getLearnAppUrl()}/courses/${d.heroLandingPageSlug}`, "_blank");
         }
         else if (beh === "funnel_page" && d.heroFunnelPageValue) {
           const [fs, ps] = (d.heroFunnelPageValue as string).split("/");
@@ -1212,7 +1212,7 @@ function CtaStandaloneBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: 
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     if (behavior === "direct_checkout" || behavior === "free_enrollment") return "#";
-    if (behavior === "landing_page" && d.ctaLandingPageSlug) return `${LEARN_APP_URL}/courses/${d.ctaLandingPageSlug}`;
+    if (behavior === "landing_page" && d.ctaLandingPageSlug) return `${getLearnAppUrl()}/courses/${d.ctaLandingPageSlug}`;
     if (behavior === "funnel_page" && d.ctaFunnelPageValue) {
       const [fs, ps] = (d.ctaFunnelPageValue as string).split("/");
       if (fs && ps) return `/${fs}/${ps}`;
@@ -1352,7 +1352,7 @@ function PricingCtaBlock({ d, funnelId, pageId, funnelSlug, nextPage }: { d: Rec
     if (behavior === "send_email" && d.ctaEmailAddress) return `mailto:${d.ctaEmailAddress}`;
     if (behavior === "next_funnel_step" && nextPageUrl) return nextPageUrl;
     if (behavior === "direct_checkout" || behavior === "free_enrollment") return "#";
-    if (behavior === "landing_page" && d.ctaLandingPageSlug) return `${LEARN_APP_URL}/courses/${d.ctaLandingPageSlug}`;
+    if (behavior === "landing_page" && d.ctaLandingPageSlug) return `${getLearnAppUrl()}/courses/${d.ctaLandingPageSlug}`;
     if (behavior === "funnel_page" && d.ctaFunnelPageValue) {
       const [fs, ps] = (d.ctaFunnelPageValue as string).split("/");
       if (fs && ps) return `/${fs}/${ps}`;

@@ -51,7 +51,11 @@ const TRANSPARENT_GIF = Buffer.from(
 const ALLOWED_ORIGINS = new Set([
   "https://app.iheartecho.net",
   "https://app.iheartecho.com",
+  "https://iheartecho.net",
+  "https://www.iheartecho.net",
   "https://app.allaboutultrasound.com",
+  "https://allaboutultrasound.net",
+  "https://www.allaboutultrasound.net",
   "https://learn.allaboutultrasound.com",
   "https://learn.iheartecho.com",
   "https://members.allaboutultrasound.com",
@@ -63,7 +67,11 @@ const ALLOWED_ORIGINS = new Set([
 const ALLOWED_COOKIE_DOMAINS = new Set([
   "app.iheartecho.com",
   "app.iheartecho.net",
+  "iheartecho.net",
+  "www.iheartecho.net",
   "app.allaboutultrasound.com",
+  "allaboutultrasound.net",
+  "www.allaboutultrasound.net",
   "learn.allaboutultrasound.com",
   "learn.iheartecho.com",
   "members.allaboutultrasound.com",

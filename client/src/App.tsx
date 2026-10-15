@@ -104,8 +104,8 @@ const funnelPageFallback = (
  * iHeartEcho Learn mirror.
  */
 function LearnContentRedirect() {
-  const destination = `${getLearnAppUrl()}${window.location.pathname}${window.location.search}${window.location.hash}`;
-  return <HardRedirect to={destination} />;
+  const path = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  return <SsoRedirect path={path} targetOrigin={getLearnAppUrl()} />;
 }
 
 // ── Digital Downloads ──────────────────────────────────────────────────────────
@@ -1776,6 +1776,12 @@ function MarketingSiteRouter() {
 /** Public brand websites — independently editable CMS tenants on .net now and .com at promotion. */
 function PublicWebsiteRouter() {
   usePageViewTracker();
+  // Public brand sites remain browseable without a session. When a visitor has
+  // already signed in elsewhere, these hooks establish a first-party session
+  // before an account, checkout, or learning route hands off to Learn.
+  useSsoConsumer();
+  useSsoBridge();
+  useCrossDomainSso();
   const pageFallback = (
     <div className="flex items-center justify-center h-screen">
       <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
@@ -1793,6 +1799,46 @@ function PublicWebsiteRouter() {
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/auth/access" component={AccessLinkCallback} />
+        {/* Learning, purchased content, and every checkout flow always use the
+            brand-matched Learn tenant, even when the original link was opened
+            from a public custom domain. These routes must precede the public
+            site and funnel catch-alls below. */}
+        <Route path="/checkout/complete" component={LearnContentRedirect} />
+        <Route path="/checkout/workshop/:slug" component={LearnContentRedirect} />
+        <Route path="/checkout/:slug" component={LearnContentRedirect} />
+        <Route path="/courses/:slug/player" component={LearnContentRedirect} />
+        <Route path="/courses/:slug/overview" component={LearnContentRedirect} />
+        <Route path="/courses/:slug" component={LearnContentRedirect} />
+        <Route path="/cohort/:courseId/assignment/:assignmentId" component={LearnContentRedirect} />
+        <Route path="/cohort/:courseId/replay/:recordingId" component={LearnContentRedirect} />
+        <Route path="/cohort/:courseId" component={LearnContentRedirect} />
+        <Route path="/education-library" component={LearnContentRedirect} />
+        <Route path="/collections/:id" component={LearnContentRedirect} />
+        <Route path="/downloads/:slug/files" component={LearnContentRedirect} />
+        <Route path="/downloads/:slug" component={LearnContentRedirect} />
+        <Route path="/downloads" component={LearnContentRedirect} />
+        <Route path="/bundles/:slug" component={LearnContentRedirect} />
+        <Route path="/workshops/:slug" component={LearnContentRedirect} />
+        <Route path="/workshops" component={LearnContentRedirect} />
+        <Route path="/cross-training" component={LearnContentRedirect} />
+        <Route path="/webinars/:slug" component={LearnContentRedirect} />
+        <Route path="/webinar/:slug" component={LearnContentRedirect} />
+        <Route path="/products" component={LearnContentRedirect} />
+        <Route path="/product/:slug" component={LearnContentRedirect} />
+        <Route path="/memberships/:slug" component={LearnContentRedirect} />
+        <Route path="/my-memberships/:slug" component={LearnContentRedirect} />
+        <Route path="/my-memberships" component={LearnContentRedirect} />
+        <Route path="/my-downloads" component={LearnContentRedirect} />
+        <Route path="/my-dashboard/my-content" component={LearnContentRedirect} />
+        <Route path="/my-dashboard" component={LearnContentRedirect} />
+        <Route path="/dashboard/:rest*" component={LearnContentRedirect} />
+        <Route path="/dashboard" component={LearnContentRedirect} />
+        <Route path="/profile" component={LearnContentRedirect} />
+        <Route path="/my-quizzes" component={LearnContentRedirect} />
+        <Route path="/quizzes/:quizId/results/:attemptId" component={LearnContentRedirect} />
+        <Route path="/quizzes/:quizId" component={LearnContentRedirect} />
+        <Route path="/study-groups/:groupId" component={LearnContentRedirect} />
+        <Route path="/study-groups" component={LearnContentRedirect} />
         {/* Public funnels share the `.net` marketing host but must take precedence
             over the editable site catch-all, otherwise every funnel slug renders
             the marketing site's 404 page. */}

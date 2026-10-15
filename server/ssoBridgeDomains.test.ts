@@ -44,8 +44,22 @@ describe("ssoBridgeDomains", () => {
     ]);
   });
 
+  it("bridges every deployed public .net host without changing public browsing", () => {
+    expect(hostnameNeedsSsoBridge("allaboutultrasound.net")).toBe(true);
+    expect(hostnameNeedsSsoBridge("www.allaboutultrasound.net")).toBe(true);
+    expect(hostnameNeedsSsoBridge("iheartecho.net")).toBe(true);
+    expect(hostnameNeedsSsoBridge("www.iheartecho.net")).toBe(true);
+    expect(getSsoBridgeOrigins("allaboutultrasound.net")).toEqual([
+      "https://learn.allaboutultrasound.com",
+      "https://app.allaboutultrasound.com",
+    ]);
+    expect(getSsoBridgeOrigins("www.iheartecho.net")[0]).toBe("https://learn.iheartecho.com");
+  });
+
   it("includes iHeart Learn in the silent SSO broadcast targets", () => {
     const source = readFileSync("client/src/hooks/useCrossDomainSso.ts", "utf8");
     expect(source).toContain('"https://learn.iheartecho.com"');
+    expect(source).toContain('"https://allaboutultrasound.net"');
+    expect(source).toContain('"https://www.iheartecho.net"');
   });
 });
