@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import NameCollectionModal from "@/components/NameCollectionModal";
 import { Link, Link as WouterLink, useLocation } from "wouter";
 import {
-  Heart, Calculator, ClipboardList, Activity,
+  Heart, Calculator, ClipboardList, Activity, CreditCard,
   Scan, BookOpen, FileText, Menu, X, ChevronRight,
   Stethoscope, Zap, ExternalLink, ShoppingBag, FlaskConical, MessageCircle, Award, Shield, GraduationCap,
   BookMarked, Library, Plus, Crown, Droplets, Building2, Users, UserPlus,
