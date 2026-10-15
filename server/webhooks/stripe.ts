@@ -18,7 +18,7 @@ import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { handleStudyGroupCheckoutCompleted, handleStudyGroupSubscriptionLifecycle } from "../routers/studyGroupsRouter";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users, pendingFulfillments } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -35,6 +35,7 @@ import { persistLmsSubscriptionInvoice } from "../lib/lmsSubscriptionReconciliat
 import { grantBundle } from "../lib/membershipFulfillment";
 import { getBrandDisplayConfig } from "@shared/brands";
 import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from "../lib/purchaseEmailOverride";
+import { hasKnownStripeCheckoutRoute, hasUnmatchedPlatformPaymentIntentMetadata, unmatchedStripePaymentMessage } from "../lib/unmatchedStripePayment";
 
 type CheckoutRecipient = { email: string | null; name: string | null };
 
@@ -2381,6 +2382,147 @@ export async function handleInvoicePaymentFailed(invoice: Record<string, unknown
   }
 }
 
+function safeEmailAddress(value: unknown): string {
+  return typeof value === "string" && value.trim()
+    ? value.trim().slice(0, 320)
+    : "unmatched-payment@allaboutultrasound.invalid";
+}
+
+function positiveIntegerFromUnknown(value: unknown): number | null {
+  const parsed = typeof value === "string" || typeof value === "number"
+    ? Number.parseInt(String(value), 10)
+    : NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function escapeAlertHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getUnmatchedRouteSummary(metadata: Record<string, string>): string {
+  const fields = ["type", "product_type", "purchase_type", "checkout_type", "source"]
+    .filter((key) => typeof metadata[key] === "string" && metadata[key].trim())
+    .map((key) => `${key}=${metadata[key].trim().slice(0, 120)}`);
+  return fields.length ? `Routing metadata: ${fields.join(", ")}.` : "No recognized routing metadata was supplied.";
+}
+
+/**
+ * Records an actionable exception and emails the platform administrator once
+ * when Stripe reports a positive successful payment with no platform route.
+ * It deliberately grants no access and exposes no learner access token.
+ */
+async function recordUnmatchedSuccessfulStripePayment(
+  payment: Record<string, unknown>,
+  source: "checkout" | "payment_intent",
+): Promise<void> {
+  const metadata = (payment.metadata ?? {}) as Record<string, string>;
+  const hasKnownRoute = source === "checkout"
+    ? hasKnownStripeCheckoutRoute(payment, metadata)
+    : !hasUnmatchedPlatformPaymentIntentMetadata(metadata);
+  if (hasKnownRoute) return;
+
+  const amountCents = typeof payment.amount_total === "number"
+    ? payment.amount_total
+    : (typeof payment.amount_received === "number" ? payment.amount_received : (typeof payment.amount === "number" ? payment.amount : 0));
+  if (!Number.isFinite(amountCents) || amountCents <= 0) return;
+
+  const checkoutSessionId = typeof payment.id === "string" && source === "checkout" ? payment.id : null;
+  const paymentIntentId = source === "payment_intent"
+    ? (typeof payment.id === "string" ? payment.id : null)
+    : (typeof payment.payment_intent === "string" ? payment.payment_intent : null);
+  const paymentReference = paymentIntentId ?? (checkoutSessionId ? `checkout:${checkoutSessionId}` : null);
+  if (!paymentReference) return;
+
+  const customerDetails = (payment.customer_details ?? {}) as Record<string, unknown>;
+  const payerEmail = safeEmailAddress(
+    metadata.payer_email ?? metadata.customer_email ?? payment.customer_email ?? customerDetails.email ?? payment.receipt_email,
+  );
+  const customerName = typeof customerDetails.name === "string" && customerDetails.name.trim()
+    ? customerDetails.name.trim().slice(0, 255)
+    : (typeof metadata.customer_name === "string" ? metadata.customer_name.trim().slice(0, 255) || null : null);
+  const routeSummary = getUnmatchedRouteSummary(metadata);
+  const message = unmatchedStripePaymentMessage(routeSummary);
+  const db = await getDb();
+  if (!db) {
+    await notifyOwner({
+      title: "⚠️ Unmatched successful Stripe payment",
+      content: `Stripe reported a successful ${source} payment (${paymentReference}), but the MySQL exception record could not be created because the database was unavailable. ${routeSummary}`,
+    }).catch(() => {});
+    return;
+  }
+
+  let isNewException = false;
+  try {
+    const [existing] = await db.select({ id: pendingFulfillments.id })
+      .from(pendingFulfillments)
+      .where(eq(pendingFulfillments.stripePaymentIntentId, paymentReference))
+      .limit(1);
+    if (!existing) {
+      await db.insert(pendingFulfillments).values({
+        stripePaymentIntentId: paymentReference,
+        userId: positiveIntegerFromUnknown(metadata.user_id),
+        email: payerEmail,
+        customerName,
+        productName: "Unmatched successful Stripe payment",
+        productType: "other",
+        amountPaid: String((amountCents / 100).toFixed(2)),
+        status: "failed",
+        attempts: 0,
+        errorMessage: message,
+        fulfillmentNotes: "Manual review required. No entitlement was granted automatically.",
+      });
+      isNewException = true;
+      console.error(`[Stripe] ${message} Reference=${paymentReference}`);
+    }
+  } catch (error) {
+    console.error(`[Stripe] Could not persist unmatched payment ${paymentReference}:`, error);
+    await notifyOwner({
+      title: "⚠️ Unmatched successful Stripe payment",
+      content: `Stripe reported a successful ${source} payment (${paymentReference}), but the MySQL exception record could not be created. ${routeSummary}`,
+    }).catch(() => {});
+    return;
+  }
+
+  if (!isNewException) return;
+
+  const deliveryKey = checkoutSessionId ?? paymentReference;
+  const delivery = await sendPurchaseNotificationOnce(db as any, {
+    checkoutSessionId: deliveryKey,
+    notificationType: "unmatched_payment_alert",
+    send: () => sendEmail({
+      to: { name: "All About Ultrasound Platform Admin", email: "admin@allaboutultrasound.com" },
+      subject: "Action needed: unmatched successful Stripe payment",
+      previewText: "A successful Stripe payment needs manual fulfillment review.",
+      transactional: true,
+      brandMode: "combined",
+      htmlBody: emailWrapper(`
+        <h1 style="margin:0 0 16px;color:#0e4a50;font-size:24px;">Successful payment needs review</h1>
+        <p style="margin:0 0 16px;color:#334155;line-height:1.6;">Stripe reported a successful payment, but it did not match any recognized platform fulfillment route. <strong>No learner access was granted automatically.</strong></p>
+        <div style="background:#fff7ed;border-left:4px solid #ea580c;padding:16px;border-radius:0 8px 8px 0;color:#431407;line-height:1.7;">
+          <div><strong>Payment reference:</strong> ${escapeAlertHtml(paymentReference)}</div>
+          ${checkoutSessionId ? `<div><strong>Checkout session:</strong> ${escapeAlertHtml(checkoutSessionId)}</div>` : ""}
+          <div><strong>Amount:</strong> ${escapeAlertHtml(((amountCents / 100).toFixed(2)))} ${escapeAlertHtml(String(payment.currency ?? "usd").toUpperCase())}</div>
+          <div><strong>Customer email:</strong> ${escapeAlertHtml(payerEmail)}</div>
+          <div><strong>Routing:</strong> ${escapeAlertHtml(routeSummary)}</div>
+        </div>
+        <p style="margin:20px 0 0;color:#334155;line-height:1.6;">Open <strong>Platform Admin → Fulfillment Monitor</strong> to review the recorded exception and complete the correct entitlement manually.</p>
+      `, "combined", "This is an internal payment-reconciliation alert from"),
+    }),
+  });
+
+  if (delivery.attempted && !delivery.delivered) {
+    await notifyOwner({
+      title: "⚠️ Unmatched successful Stripe payment — email alert failed",
+      content: `The unmatched payment ${paymentReference} was recorded in MySQL, but the administrator email alert could not be delivered. ${routeSummary}`,
+    }).catch(() => {});
+  }
+}
+
 function stripeWebhookRawBody(req: Request, res: Response, next: () => void) {
   let data = "";
   req.setEncoding("utf8");
@@ -2674,6 +2816,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       await handleDiyCheckoutCompleted(sessionObj);
       await handleTeamCheckoutCompleted(sessionObj);
       await handleStudyGroupCheckoutCompleted(sessionObj);
+      await recordUnmatchedSuccessfulStripePayment(sessionObj, "checkout");
       // Fire community workflow rules for any purchase (fire-and-forget)
       try {
         const meta = (sessionObj.metadata as Record<string, string>) ?? {};
@@ -2728,6 +2871,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
               await handleDiyCheckoutCompleted(storedSession);
               await handleTeamCheckoutCompleted(storedSession);
               await handleStudyGroupCheckoutCompleted(storedSession);
+              await recordUnmatchedSuccessfulStripePayment(storedSession, "checkout");
               // Fire community workflow rules
               try {
                 const meta = (storedSession.metadata as Record<string, string>) ?? {};
@@ -2753,6 +2897,7 @@ async function stripeWebhookHandler(req: Request & { rawBody?: string }, res: Re
       }
       // Always run the funnel handler (handles inline funnel form payments)
       await handleFunnelPaymentIntentSucceeded(sessionObj);
+      await recordUnmatchedSuccessfulStripePayment(sessionObj, "payment_intent");
     } else if (eventType === "account.updated") {
       const accountId = sessionObj.id as string | undefined;
       if (accountId) {

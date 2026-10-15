@@ -13,6 +13,7 @@ import { getDb, getOrCreateUserByEmail } from "../db";
 import { pendingFulfillments, lmsEnrollments, digitalPurchases, brandMemberships } from "../../drizzle/schema";
 import { and, eq, desc, or, inArray, sql } from "drizzle-orm";
 import { executeFulfillment, FulfillmentInput } from "../lib/fulfillmentEngine";
+import { isUnmatchedStripePaymentException } from "../lib/unmatchedStripePayment";
 import { notifyOwner } from "../_core/notification";
 
 // Admin guard
@@ -100,6 +101,13 @@ export const fulfillmentAdminRouter = router({
 
       if (!record) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Fulfillment record not found" });
+      }
+
+      if (isUnmatchedStripePaymentException(record)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This payment has no recognized fulfillment route. Verify the Stripe payment and grant the appropriate access manually; do not retry it as a generic order.",
+        });
       }
 
       // If no user ID, try to resolve by email
@@ -259,6 +267,13 @@ export const fulfillmentAdminRouter = router({
     let failCount = 0;
 
     for (const record of records) {
+      // An unmatched payment has no safe generic retry path. It remains visible
+      // for a deliberate, product-specific manual resolution.
+      if (isUnmatchedStripePaymentException(record)) {
+        failCount++;
+        continue;
+      }
+
       // Skip records with no user ID and no email
       if (!record.userId && !record.email) {
         failCount++;

@@ -125,7 +125,7 @@ export default function FulfillmentAdmin() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Fulfillment Monitor</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Every paid order creates a record here. Failed fulfillments can be retried with one click.
+            Every paid order creates a record here. Routed failures can be retried; unmatched Stripe payments require a product-specific manual review.
           </p>
         </div>
         <div className="flex gap-2">
@@ -288,7 +288,7 @@ export default function FulfillmentAdmin() {
             <p className="font-semibold text-red-800">Action Required</p>
             <p className="text-sm text-red-700 mt-0.5">
               {stats?.failed ?? 0} failed and {stats?.pending ?? 0} pending fulfillments need attention.
-              Students may not have received access they paid for. Click "Retry All Failed" to fix them.
+              Students may not have received access they paid for. Use "Retry All Failed" only for routed failures; items marked "Manual review" need an exact entitlement decision.
             </p>
           </div>
         </div>
@@ -337,7 +337,9 @@ export default function FulfillmentAdmin() {
                   </tr>
                 </thead>
                 <tbody>
-                  {records.map((r) => (
+                  {records.map((r) => {
+                    const isUnmatchedPayment = r.productType === "other" && r.errorMessage?.startsWith("UNMATCHED_STRIPE_PAYMENT:");
+                    return (
                     <tr key={r.id} className="border-b hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-2 text-gray-500 font-mono text-xs">{r.id}</td>
                       <td className="px-4 py-2"><StatusBadge status={r.status} /></td>
@@ -374,7 +376,9 @@ export default function FulfillmentAdmin() {
                         {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
                       </td>
                       <td className="px-4 py-2">
-                        {(r.status === "failed" || r.status === "pending") && (
+                        {isUnmatchedPayment ? (
+                          <span className="text-xs font-medium text-amber-700">Manual review</span>
+                        ) : (r.status === "failed" || r.status === "pending") && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -388,7 +392,8 @@ export default function FulfillmentAdmin() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
