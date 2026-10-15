@@ -6,7 +6,7 @@ import {
   ultrasoundExpoPackages,
   ultrasoundExpoRegistrations,
 } from "../../drizzle/schema";
-import { isExpoPackageType, ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
+import { isExpoPackageType, isExpoPublicRegistrationType, ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
 import { getDb, getUserRoles } from "../db";
 import { getStripeClient } from "../lib/stripeClient";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -79,9 +79,10 @@ export const ultrasoundExpoRouter = router({
       .orderBy(asc(ultrasoundExpoEvents.startsAt))
       .limit(1);
     if (!event) return { event: null, packages: [] };
-    const packages = await db.select().from(ultrasoundExpoPackages)
+    const packages = (await db.select().from(ultrasoundExpoPackages)
       .where(and(eq(ultrasoundExpoPackages.eventId, event.id), eq(ultrasoundExpoPackages.isActive, true)))
-      .orderBy(asc(ultrasoundExpoPackages.sortOrder), asc(ultrasoundExpoPackages.id));
+      .orderBy(asc(ultrasoundExpoPackages.sortOrder), asc(ultrasoundExpoPackages.id)))
+      .filter(item => isExpoPublicRegistrationType(item.packageType));
     return { event, packages };
   }),
 
@@ -98,7 +99,7 @@ export const ultrasoundExpoRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Expo checkout is temporarily unavailable." });
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "UltrasoundExpo™ checkout is temporarily unavailable." });
       const [selection] = await db.select({
         packageId: ultrasoundExpoPackages.id,
         eventId: ultrasoundExpoEvents.id,
@@ -114,10 +115,13 @@ export const ultrasoundExpoRouter = router({
         .where(eq(ultrasoundExpoPackages.id, input.packageId))
         .limit(1);
       if (!selection || selection.eventStatus !== "published" || !selection.isActive) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "That Expo option is no longer available." });
+        throw new TRPCError({ code: "NOT_FOUND", message: "That UltrasoundExpo™ opportunity is no longer available." });
       }
       if (!isExpoPackageType(selection.packageType)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "That Expo option has an invalid category." });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "That UltrasoundExpo™ opportunity has an invalid category." });
+      }
+      if (!isExpoPublicRegistrationType(selection.packageType)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "That UltrasoundExpo™ opportunity is not currently available for registration." });
       }
       const created = await db.insert(ultrasoundExpoRegistrations).values({
         eventId: selection.eventId,
@@ -134,7 +138,7 @@ export const ultrasoundExpoRouter = router({
         status: "pending",
       }).$returningId();
       const registrationId = created[0]?.id;
-      if (!registrationId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the Expo selection." });
+      if (!registrationId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the UltrasoundExpo™ selection." });
 
       try {
         const origin = safeExpoOrigin(input.origin);
@@ -172,13 +176,13 @@ export const ultrasoundExpoRouter = router({
       } catch (error) {
         await db.update(ultrasoundExpoRegistrations).set({ paymentStatus: "failed", status: "payment_failed" })
           .where(eq(ultrasoundExpoRegistrations.id, registrationId));
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to start secure Expo checkout. Please try again." });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to start secure UltrasoundExpo™ checkout. Please try again." });
       }
     }),
 
   myDashboard: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Your Expo Dashboard is temporarily unavailable." });
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Your UltrasoundExpo™ Dashboard is temporarily unavailable." });
     const rows = await db.select({
       id: ultrasoundExpoRegistrations.id,
       attendeeName: ultrasoundExpoRegistrations.attendeeName,
@@ -266,7 +270,7 @@ export const ultrasoundExpoRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [source] = await db.select().from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.id, input.sourceEventId)).limit(1);
-    if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "The source Expo event no longer exists." });
+    if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "The source UltrasoundExpo™ event no longer exists." });
     const created = await db.insert(ultrasoundExpoEvents).values({
       name: input.name,
       slug: input.slug,
@@ -279,7 +283,7 @@ export const ultrasoundExpoRouter = router({
       status: input.status,
     }).$returningId();
     const newEventId = created[0]?.id;
-    if (!newEventId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to duplicate this Expo event." });
+    if (!newEventId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to duplicate this UltrasoundExpo™ event." });
     const packages = await db.select().from(ultrasoundExpoPackages).where(eq(ultrasoundExpoPackages.eventId, source.id));
     if (packages.length) {
       await db.insert(ultrasoundExpoPackages).values(packages.map(item => ({

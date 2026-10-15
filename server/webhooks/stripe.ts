@@ -378,7 +378,7 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
   const registrationId = Number.parseInt(metadata.ultrasound_expo_registration_id ?? "", 10);
   const sessionId = typeof session.id === "string" ? session.id : null;
   if (!Number.isInteger(registrationId) || registrationId <= 0 || !sessionId) {
-    console.warn("[Stripe][Expo] Checkout is missing its registration identifier.");
+    console.warn("[Stripe][UltrasoundExpo™] Checkout is missing its registration identifier.");
     return;
   }
 
@@ -387,11 +387,11 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
   const [existing] = await db.select().from(ultrasoundExpoRegistrations)
     .where(eq(ultrasoundExpoRegistrations.id, registrationId)).limit(1);
   if (!existing) {
-    await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "A paid Expo checkout did not have a matching registration record in Railway MySQL." });
+    await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "A paid UltrasoundExpo™ checkout did not have a matching registration record in Railway MySQL." });
     return;
   }
   if (existing.stripeSessionId && existing.stripeSessionId !== sessionId) {
-    await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "An Expo registration record was presented by more than one checkout session. No automatic reassignment was made." });
+    await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "An UltrasoundExpo™ registration record was presented by more than one checkout session. No automatic reassignment was made." });
     return;
   }
 
@@ -457,7 +457,7 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
     }),
   ]);
   if ((thankYou.attempted && !thankYou.delivered) || (alert.attempted && !alert.delivered)) {
-    await notifyOwner({ title: "UltrasoundExpo™ email delivery needs review", content: "A paid Expo registration was saved, but one or more confirmation notifications could not be delivered. The durable delivery log will retry safely." });
+    await notifyOwner({ title: "UltrasoundExpo™ email delivery needs review", content: "A paid UltrasoundExpo™ registration was saved, but one or more confirmation notifications could not be delivered. The durable delivery log will retry safely." });
   }
 }
 

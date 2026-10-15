@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   EXPO_PACKAGE_TYPE_META,
+  EXPO_PUBLIC_REGISTRATION_TYPES,
   ULTRASOUND_EXPO_AAUS_LOGO_URL,
   ULTRASOUND_EXPO_LAUNCH_EVENT,
   ULTRASOUND_EXPO_NAME,
   formatExpoMoney,
   isExpoPackageType,
+  isExpoPublicRegistrationType,
 } from "../shared/ultrasoundExpo";
 import { buildUltrasoundExpoAdminAlertEmail, buildUltrasoundExpoThankYouEmail } from "./lib/ultrasoundExpoEmail";
 import { hasKnownStripeCheckoutRoute } from "./lib/unmatchedStripePayment";
@@ -19,11 +21,15 @@ describe("UltrasoundExpo™ annual-event platform", () => {
     expect(ULTRASOUND_EXPO_LAUNCH_EVENT.locationLabel).toBe("Orlando, FL · Venue to be announced");
   });
 
-  it("keeps Expo event registrations, exhibits, sponsors, products, and other options distinct", () => {
+  it("keeps administrative offerings distinct while showing only attendee, exhibit, and sponsor opportunities publicly", () => {
     expect(isExpoPackageType("registrant")).toBe(true);
     expect(isExpoPackageType("exhibitor")).toBe(true);
     expect(isExpoPackageType("sponsor")).toBe(true);
     expect(isExpoPackageType("product")).toBe(true);
+    expect(EXPO_PUBLIC_REGISTRATION_TYPES).toEqual(["registrant", "exhibitor", "sponsor"]);
+    expect(isExpoPublicRegistrationType("registrant")).toBe(true);
+    expect(isExpoPublicRegistrationType("product")).toBe(false);
+    expect(isExpoPublicRegistrationType("other")).toBe(false);
     expect(isExpoPackageType("workshop_exhibit")).toBe(false);
     expect(EXPO_PACKAGE_TYPE_META.exhibitor.dashboardLabel).toBe("My exhibits");
   });

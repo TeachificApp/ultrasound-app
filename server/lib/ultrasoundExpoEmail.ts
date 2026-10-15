@@ -42,7 +42,7 @@ export function buildUltrasoundExpoThankYouEmail(record: UltrasoundExpoEmailReco
     <p style="margin:0 0 17px;font-size:16px;line-height:1.65;color:#334155;">Hi ${escapeHtml(record.attendeeName)},</p>
     <p style="margin:0 0 20px;font-size:16px;line-height:1.65;color:#334155;">Your ${escapeHtml(record.packageType.toLowerCase())} purchase for <strong>${escapeHtml(record.eventName)}</strong> is confirmed.</p>
     <div style="border:1px solid #c8edf0;border-radius:10px;background:#f2fcfd;padding:18px 20px;margin:0 0 22px;">${details(record)}</div>
-    <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#475569;">Your ticket details and Expo purchases will be available in your UltrasoundExpo™ Dashboard. For help, contact <a href="mailto:support@allaboutultrasound.com" style="color:#087f8c;text-decoration:underline;">support@allaboutultrasound.com</a>.</p>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.65;color:#475569;">Your ticket details and UltrasoundExpo™ purchases will be available in your UltrasoundExpo™ Dashboard. For help, contact <a href="mailto:support@allaboutultrasound.com" style="color:#087f8c;text-decoration:underline;">support@allaboutultrasound.com</a>.</p>
     <p style="margin:0;font-size:15px;line-height:1.65;color:#475569;">With appreciation,<br/><strong>${ULTRASOUND_EXPO_NAME} by All About Ultrasound™</strong></p>`;
   return {
     subject: `${ULTRASOUND_EXPO_NAME} confirmation — ${record.packageName}`,
@@ -53,7 +53,7 @@ export function buildUltrasoundExpoThankYouEmail(record: UltrasoundExpoEmailReco
 export function buildUltrasoundExpoAdminAlertEmail(record: UltrasoundExpoEmailRecord) {
   const content = `
     <h1 style="margin:0 0 14px;font-family:Georgia,serif;font-size:26px;line-height:1.2;color:#075a68;">New ${ULTRASOUND_EXPO_NAME} payment</h1>
-    <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">A registration, exhibit, or sponsorship payment is ready for Expo team follow-up.</p>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#475569;">A registration, exhibit, or sponsorship payment is ready for UltrasoundExpo™ team follow-up.</p>
     ${details(record)}
     <p style="margin:22px 0 0;font-size:14px;color:#475569;">Review the transaction in the UltrasoundExpo™ administration dashboard.</p>`;
   return {

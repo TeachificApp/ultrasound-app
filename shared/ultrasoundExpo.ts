@@ -19,36 +19,44 @@ export const ULTRASOUND_EXPO_LAUNCH_EVENT = {
 export const EXPO_PACKAGE_TYPES = ["registrant", "exhibitor", "sponsor", "product", "other"] as const;
 export type ExpoPackageType = typeof EXPO_PACKAGE_TYPES[number];
 
+/** Customer-facing registrations available until additional event offerings are released. */
+export const EXPO_PUBLIC_REGISTRATION_TYPES = ["registrant", "exhibitor", "sponsor"] as const satisfies readonly ExpoPackageType[];
+export type ExpoPublicRegistrationType = typeof EXPO_PUBLIC_REGISTRATION_TYPES[number];
+
 export const EXPO_PACKAGE_TYPE_META: Record<ExpoPackageType, { label: string; dashboardLabel: string; description: string }> = {
   registrant: {
-    label: "Registration",
+    label: "Register (Attendee)",
     dashboardLabel: "My registrations",
-    description: "Professional attendance, ticket, and event information.",
+    description: "Reserve your place at UltrasoundExpo™ with event details delivered as plans are confirmed.",
   },
   exhibitor: {
     label: "Exhibit",
     dashboardLabel: "My exhibits",
-    description: "Event-specific exhibit space and vendor participation.",
+    description: "Put your technology, services, and expertise in front of the UltrasoundExpo™ community.",
   },
   sponsor: {
-    label: "Event sponsorship",
-    dashboardLabel: "My event sponsorships",
-    description: "UltrasoundExpo™-specific sponsorship opportunities and recognition.",
+    label: "Sponsor",
+    dashboardLabel: "My sponsorships",
+    description: "Create meaningful visibility through an UltrasoundExpo™ sponsorship opportunity.",
   },
   product: {
     label: "Product",
-    dashboardLabel: "My Expo products",
+    dashboardLabel: "My UltrasoundExpo™ products",
     description: "Event merchandise, add-ons, and future physical offerings.",
   },
   other: {
-    label: "Other Expo option",
-    dashboardLabel: "My Expo options",
-    description: "Additional event-specific packages configured by the Expo team.",
+    label: "Additional UltrasoundExpo™ option",
+    dashboardLabel: "My UltrasoundExpo™ options",
+    description: "Additional event offerings configured for a future UltrasoundExpo™ year.",
   },
 };
 
 export function isExpoPackageType(value: string): value is ExpoPackageType {
   return (EXPO_PACKAGE_TYPES as readonly string[]).includes(value);
+}
+
+export function isExpoPublicRegistrationType(value: string): value is ExpoPublicRegistrationType {
+  return (EXPO_PUBLIC_REGISTRATION_TYPES as readonly string[]).includes(value);
 }
 
 export function formatExpoMoney(amountCents: number, currency = "usd"): string {
