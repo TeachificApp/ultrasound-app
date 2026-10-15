@@ -6,6 +6,7 @@ import {
   INVOICE_BRAND_FOOTER,
   INVOICE_LOGO_URL,
 } from "../client/src/lib/printInvoice";
+import { buildReceiptParticipants } from "./lib/receiptParticipants";
 
 describe("branded invoice print document", () => {
   it("preserves application styles, invoice markup, and the supplied company logo", () => {
@@ -67,5 +68,25 @@ describe("branded invoice print document", () => {
     const learnerReceipt = readFileSync(new URL("../client/src/pages/StudentDashboardPage.tsx", import.meta.url), "utf8");
     expect(learnerReceipt).toContain('href="https://www.allaboutultrasound.com/terms.html"');
     expect(learnerReceipt).not.toContain('href="https://app.allaboutultrasound.com/terms"');
+  });
+
+  it("shows only the registered learner when the learner is also the purchaser", () => {
+    expect(buildReceiptParticipants(
+      { name: "Registered Learner", email: "learner@example.com" },
+      { name: "Same Learner", email: "LEARNER@example.com" },
+    )).toEqual({
+      learner: { name: "Registered Learner", email: "learner@example.com" },
+      payer: null,
+    });
+  });
+
+  it("retains a different purchaser alongside the registered learner", () => {
+    expect(buildReceiptParticipants(
+      { name: "Registered Learner", email: "learner@example.com" },
+      { name: "Institution Buyer", email: "buyer@example.com" },
+    )).toEqual({
+      learner: { name: "Registered Learner", email: "learner@example.com" },
+      payer: { name: "Institution Buyer", email: "buyer@example.com" },
+    });
   });
 });

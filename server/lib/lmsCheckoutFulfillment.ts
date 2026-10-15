@@ -23,6 +23,7 @@ import { isEnrollmentAccessActive } from "./enrollmentAccess";
 import { grantScheduledContentAccess } from "./scheduledContentLinks";
 import { sendPurchaseNotificationOnce } from "./purchaseNotificationDelivery";
 import { getEffectivePurchaseEmailOverride } from "./purchaseEmailOverride";
+import { recordReceiptPayee } from "./receiptParticipants";
 
 export type LmsCheckoutFulfillmentResult = {
   success: boolean;
@@ -390,6 +391,12 @@ export async function reconcileLmsCheckoutFromStripeSession(
   if (!userId) {
     return { success: false, userId: null, courseId, orderId: null, isNewUser: false, notes, error: "No user could be resolved" };
   }
+
+  // Retain a different payment buyer for Platform Admin dispute review. This
+  // record is not included in learner profile data or access emails.
+  const payerEmail = meta.payer_email || (session.customer_email as string | undefined) || (session.customer_details as Record<string, string> | undefined)?.email || null;
+  const payerName = meta.payer_name || meta.customer_name || (session.customer_details as Record<string, string> | undefined)?.name || null;
+  await recordReceiptPayee(db, userId, { email: payerEmail, name: payerName });
 
   const sessionId = session.id as string;
   const stripeSubscriptionId = (session.subscription as string) ?? null;

@@ -36,7 +36,7 @@ import { grantBundle } from "../lib/membershipFulfillment";
 import { getBrandDisplayConfig } from "@shared/brands";
 import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from "../lib/purchaseEmailOverride";
 import { hasKnownStripeCheckoutRoute, hasUnmatchedPlatformPaymentIntentMetadata, unmatchedStripePaymentMessage } from "../lib/unmatchedStripePayment";
-
+import { recordReceiptPayee } from "../lib/receiptParticipants";
 type CheckoutRecipient = { email: string | null; name: string | null };
 
 /** Recipient metadata takes precedence over the Stripe payment buyer. */
@@ -54,7 +54,7 @@ function getCheckoutPayer(session: Record<string, unknown>, meta: Record<string,
   const stringValue = (value: unknown): string | null => typeof value === "string" && value.trim() ? value.trim() : null;
   return {
     email: stringValue(meta.payer_email) ?? stringValue(session.customer_email) ?? stringValue(details.email) ?? stringValue(meta.customer_email),
-    name: stringValue(meta.customer_name) ?? stringValue(details.name),
+    name: stringValue(meta.payer_name) ?? stringValue(meta.customer_name) ?? stringValue(details.name),
   };
 }
 
@@ -403,6 +403,8 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     return;
   }
 
+  await recordReceiptPayee(db, userId, payer);
+
   const amountTotal = (session.amount_total as number) ?? 0;
   const paymentIntentId = (session.payment_intent as string) ?? null;
 
@@ -586,6 +588,7 @@ async function handleDigitalBundleCheckoutCompleted(session: Record<string, unkn
     await notifyOwner({ title: "⚠️ Bundle purchase needs review", content: `Checkout ${session.id} for bundle #${bundleId} has no resolvable recipient account.` });
     return;
   }
+  await recordReceiptPayee(db, userId, getCheckoutPayer(session, meta));
   const [existing] = await db.select({ id: digitalBundlePurchases.id }).from(digitalBundlePurchases)
     .where(and(eq(digitalBundlePurchases.userId, userId), eq(digitalBundlePurchases.bundleId, bundleId))).limit(1);
   const bundleItems = await db.select().from(digitalBundleItems).where(eq(digitalBundleItems.bundleId, bundleId));
@@ -659,6 +662,7 @@ async function handlePhysicalProductCheckoutCompleted(session: Record<string, un
     await notifyOwner({ title: "⚠️ Physical product purchase needs review", content: `Checkout ${session.id} for physical product #${productId} has no recipient account.` });
     return;
   }
+  await recordReceiptPayee(db, userId, getCheckoutPayer(session, meta));
   const [product] = await db.select({ title: physicalProducts.title, brand: physicalProducts.brand }).from(physicalProducts).where(eq(physicalProducts.id, productId)).limit(1);
   // Native physical products are kept separately, but a concise confirmation is
   // preferable to dropping a completed purchase if the catalogue lookup changes.
@@ -746,6 +750,7 @@ async function handleWorkshopCheckoutCompleted(session: Record<string, unknown>)
   }
   const { userId, workshopId, instanceId } = fulfillment;
   const recipient = getCheckoutRecipient(session, meta);
+  await recordReceiptPayee(db, userId, getCheckoutPayer(session, meta));
   const [workshop] = await db.select({ title: workshops.title, slug: workshops.slug, brand: workshops.brand, welcomeEmailEnabled: workshops.welcomeEmailEnabled, welcomeEmailSubject: workshops.welcomeEmailSubject, welcomeEmailBody: workshops.welcomeEmailBody })
     .from(workshops).where(eq(workshops.id, workshopId)).limit(1);
   const [instance] = await db.select({ title: workshopInstances.title, status: workshopInstances.status, startDate: workshopInstances.startDate, endDate: workshopInstances.endDate, timezone: workshopInstances.timezone, locationType: workshopInstances.locationType, venueName: workshopInstances.venueName, venueCity: workshopInstances.venueCity, venueState: workshopInstances.venueState })
@@ -817,6 +822,7 @@ export async function handleWebinarCheckoutCompleted(session: Record<string, unk
     await notifyOwner({ title: "⚠️ Webinar purchase needs review", content: `Checkout ${session.id} for webinar #${webinarId} has no resolvable recipient account.` });
     return;
   }
+  await recordReceiptPayee(db, userId, getCheckoutPayer(session, meta));
   const [webinar] = await db.select({ title: webinars.title, slug: webinars.slug, brand: webinars.brand, status: webinars.status, scheduledAt: webinars.scheduledAt, type: webinars.type, meetingUrl: webinars.meetingUrl })
     .from(webinars).where(eq(webinars.id, webinarId)).limit(1);
   if (!webinar) return;
@@ -940,6 +946,8 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
     });
     return;
   }
+
+  await recordReceiptPayee(db, userId, getCheckoutPayer(session, meta));
 
   // ── Grant brand membership ─────────────────────────────────────────────────
   const isLifetime = meta.interval === "lifetime" || !subscriptionId;
@@ -1193,6 +1201,8 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
     });
     return;
   }
+
+  await recordReceiptPayee(db, userId, getCheckoutPayer(session, meta));
 
   // ── Grant both brand memberships ─────────────────────────────────────────────
   const source = isLifetime ? "stripe_dual_lifetime" : "stripe_dual";
@@ -1562,6 +1572,7 @@ async function handleCanonicalBundleCheckoutCompleted(session: Record<string, un
     await notifyOwner({ title: "⚠️ Bundle purchase needs review", content: `Stripe checkout ${session.id} for bundle #${bundleId} has no recipient account.` });
     return;
   }
+  await recordReceiptPayee(db, userId, getCheckoutPayer(session, meta));
   const notes: string[] = [];
   const bundle = await grantBundle(db, userId, bundleId, (session.id as string | undefined) ?? null, notes, { source: "stripe_bundle" }, { pricingOptionId: meta.pricing_option_id || null, stripePaymentIntentId: (session.payment_intent as string | undefined) ?? null });
   if (!bundle) return;
@@ -1702,6 +1713,13 @@ async function handleFunnelPaymentIntentSucceeded(paymentIntent: Record<string, 
     }
   }
   // ── END AUTO-ACCOUNT CREATION ───────────────────────────────────────────
+
+  if (resolvedUserId) {
+    await recordReceiptPayee(db, resolvedUserId, {
+      email: meta.payer_email ?? customerEmail ?? null,
+      name: meta.payer_name ?? customerName ?? null,
+    });
+  }
 
   const checkoutSessionId = paymentIntent.checkout_session_id as string | undefined;
 

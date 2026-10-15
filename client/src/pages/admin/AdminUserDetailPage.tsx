@@ -70,6 +70,14 @@ function formatCurrency(cents: number, currency = "usd"): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
 }
 
+function receiptSourceForTransaction(transaction: any) {
+  if (transaction.sourceTable === "course") return transaction.invoiceNumber ? "course_renewal" : "course_order";
+  if (["funnel", "download", "bundle", "workshop", "webinar", "physical", "manual_invoice"].includes(transaction.sourceTable)) {
+    return transaction.sourceTable;
+  }
+  return null;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string }> = {
     active:     { label: "Active",     color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
@@ -371,6 +379,22 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
           <div className="text-center"><div className="text-lg font-bold text-gray-900">{data.memberships?.length ?? 0}</div><div className="text-xs text-gray-500">Memberships</div></div>
         </div>
       </div>
+
+      {data.privatePurchasePayees?.length > 0 && (
+        <div className="bg-white rounded-xl border border-amber-200 shadow-sm p-6">
+          <SectionHeader title="Private Purchaser Records" />
+          <p className="text-xs text-gray-500 mb-3">Shown only to Platform Admins for purchase verification and dispute review. These details are not visible to the learner.</p>
+          <div className="space-y-2">
+            {data.privatePurchasePayees.map((payee: any) => (
+              <div key={payee.id} className="rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2.5">
+                <p className="text-sm font-semibold text-gray-800">{payee.name || "Purchaser"}</p>
+                <p className="text-xs text-gray-600">{payee.email}</p>
+                <p className="text-[11px] text-gray-400 mt-1">Most recently used {formatDate(payee.lastObservedAt)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Platform Roles panel */}
       <AppRolesPanel userId={userId} refetch={refetch} />
@@ -2627,7 +2651,7 @@ function SubscriptionsTab({ userId, data, refetch }: { userId: number; data: any
 }
 
 // ─── Admin Invoice View Component ───────────────────────────────────────────
-function AdminInvoiceView({ t, fmtCurrency, fmtDate }: { t: any; fmtCurrency: (c: number, cur?: string) => string; fmtDate: (d: Date | string) => string }) {
+function AdminInvoiceView({ t, participants, fmtCurrency, fmtDate }: { t: any; participants: any; fmtCurrency: (c: number, cur?: string) => string; fmtDate: (d: Date | string) => string }) {
   const lineItems: Array<{ name: string; amount: number; qty: number }> = (() => {
     if (Array.isArray(t.lineItems) && t.lineItems.length > 0) return t.lineItems;
     return [{ name: t.productName || 'Purchase', amount: t.amountPaid, qty: 1 }];
@@ -2635,6 +2659,8 @@ function AdminInvoiceView({ t, fmtCurrency, fmtDate }: { t: any; fmtCurrency: (c
   const workshopInstance = t.sourceTable === "workshop"
     ? formatWorkshopInvoiceInstance(t.workshopInstanceTitle, t.workshopInstanceId)
     : null;
+  const registeredLearner = participants?.learner ?? { name: t.studentName, email: t.studentEmail };
+  const purchaser = participants?.payer ?? null;
   const sourceLabel = {
     funnel: 'Funnel Purchase', course: 'Course', download: 'Digital Download',
     bundle: 'Bundle', physical: 'Physical Product', workshop: 'Workshop',
@@ -2658,11 +2684,20 @@ function AdminInvoiceView({ t, fmtCurrency, fmtDate }: { t: any; fmtCurrency: (c
           </div>
         </div>
       </div>
-      {/* Bill To */}
-      <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
-        <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Bill To</p>
-        <p className="font-semibold text-gray-800">{t.studentName}</p>
-        {t.studentEmail && <p className="text-xs text-gray-500">{t.studentEmail}</p>}
+      {/* Purchase parties — a separate purchaser is shown only when one paid for this learner. */}
+      <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Registered Learner</p>
+          <p className="font-semibold text-gray-800">{registeredLearner.name || "Registered learner"}</p>
+          {registeredLearner.email && <p className="text-xs text-gray-500">{registeredLearner.email}</p>}
+        </div>
+        {purchaser && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Purchaser / Payee</p>
+            <p className="font-semibold text-gray-800">{purchaser.name || "Purchaser"}</p>
+            <p className="text-xs text-gray-500">{purchaser.email}</p>
+          </div>
+        )}
       </div>
       {/* Meta */}
       <div className="px-5 py-3 border-b border-gray-100 grid grid-cols-2 gap-2">
@@ -2746,6 +2781,16 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
   const [refundOpen, setRefundOpen] = useState<{ piId: string; purchaseId?: number } | null>(null);
   const [addInvoiceOpen, setAddInvoiceOpen] = useState(false);
   const [viewInvoice, setViewInvoice] = useState<any | null>(null);
+  const receiptParticipantInput = useMemo(() => {
+    const source = viewInvoice ? receiptSourceForTransaction(viewInvoice) : null;
+    return source && viewInvoice?.transactionId
+      ? { userId, source, transactionId: viewInvoice.transactionId }
+      : null;
+  }, [userId, viewInvoice]);
+  const { data: invoiceParticipants, isFetching: isLoadingInvoiceParticipants } = trpc.adminUser.getReceiptParticipants.useQuery(
+    receiptParticipantInput ?? { userId, source: "manual_invoice", transactionId: 1 },
+    { enabled: Boolean(receiptParticipantInput) },
+  );
   const [invoiceForm, setInvoiceForm] = useState({
     description: '',
     lineItems: [{ name: '', amount: '', qty: '1' }],
@@ -3056,13 +3101,13 @@ function TransactionsTab({ userId, data: userData, refetch }: { userId: number; 
               <DialogTitle>Invoice / Receipt</DialogTitle>
               <DialogDescription>Official payment record</DialogDescription>
             </DialogHeader>
-            <AdminInvoiceView t={viewInvoice} fmtCurrency={fmtCurrency} fmtDate={fmtDate} />
+            <AdminInvoiceView t={viewInvoice} participants={invoiceParticipants} fmtCurrency={fmtCurrency} fmtDate={fmtDate} />
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="outline" size="sm" onClick={() => {
+              <Button variant="outline" size="sm" disabled={Boolean(receiptParticipantInput) && isLoadingInvoiceParticipants} onClick={() => {
                 const el = document.getElementById('admin-invoice-print-area');
                 printInvoiceElement({ element: el, title: 'Invoice / Receipt' });
               }} className="gap-1.5">
-                <Download className="w-3.5 h-3.5" /> Print / Save PDF
+                {isLoadingInvoiceParticipants ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Print / Save PDF
               </Button>
               <Button variant="outline" size="sm" onClick={() => setViewInvoice(null)}>Close</Button>
             </div>

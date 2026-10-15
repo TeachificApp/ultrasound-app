@@ -59,6 +59,7 @@ import {
   workshopInstances,
   workshops,
   couponMetadata,
+  purchasePayees,
 } from "../../drizzle/schema";
 import { and, eq, desc, sql, count } from "drizzle-orm";
 import { issueCertificateIfEnabled } from "./lmsHelpers";
@@ -78,6 +79,7 @@ import {
 } from "../lib/couponAdmin";
 import { parseBuilderConfig } from "../lib/quizBuilderConfig";
 import { stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
+import { receiptParticipantSources, resolveReceiptParticipants } from "../lib/receiptParticipants";
 type AdminAccessScope = "full" | "manager";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }): Promise<AdminAccessScope> {
@@ -279,6 +281,20 @@ export const adminUserRouter = router({
         .from(funnelPurchases)
         .where(eq(funnelPurchases.userId, input.userId))
         .orderBy(desc(funnelPurchases.purchasedAt));
+
+      // Purchaser identity is intentionally excluded for restricted managers and
+      // all learner routes. Platform Admins retain it for payment/dispute review.
+      const privatePurchasePayees = isRestrictedManager
+        ? []
+        : await db.select({
+          id: purchasePayees.id,
+          name: purchasePayees.name,
+          email: purchasePayees.email,
+          firstObservedAt: purchasePayees.firstObservedAt,
+          lastObservedAt: purchasePayees.lastObservedAt,
+        }).from(purchasePayees)
+          .where(eq(purchasePayees.userId, input.userId))
+          .orderBy(desc(purchasePayees.lastObservedAt));
 
       // Digital product purchases
       const [digitalPurchaseList] = await db.execute(sql`
@@ -548,6 +564,7 @@ export const adminUserRouter = router({
         memberships: isRestrictedManager
           ? memberships.map(({ price, currency, ...membership }) => membership)
           : memberships,
+        privatePurchasePayees,
         funnelPurchases: isRestrictedManager ? [] : funnelPurchaseList,
         digitalPurchases: (digitalPurchaseList as any[]).map(r => ({
           id: Number(r.id),
@@ -2929,6 +2946,20 @@ export const adminUserRouter = router({
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const totalRevenue = all.filter(p => p.status === 'paid' || p.status === 'fulfilled' || p.status === 'pending').reduce((s, p) => s + p.amountPaid, 0);
       return { purchases: all, totalRevenue };
+    }),
+
+  /** Purchaser identity for one verified receipt; never exposed through learner routes. */
+  getReceiptParticipants: protectedProcedure
+    .input(z.object({
+      userId: z.number().int().positive(),
+      source: z.enum(receiptParticipantSources),
+      transactionId: z.union([z.number().int().positive(), z.string().trim().min(1).max(255)]),
+    }))
+    .query(async ({ ctx, input }) => {
+      await assertFinancialAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      return resolveReceiptParticipants(db, input.userId, input.source, input.transactionId);
     }),
 
   /** List all email aliases for a user */

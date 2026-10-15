@@ -31,6 +31,7 @@ import { isEnrollmentAccessActive } from "./enrollmentAccess";
 import { sendPurchaseNotificationOnce } from "./purchaseNotificationDelivery";
 import { sendPurchaseAccessEmail } from "./enrollmentEmail";
 import { applyPurchaseEmailOverride, getEffectivePurchaseEmailOverride } from "./purchaseEmailOverride";
+import { recordReceiptPayee } from "./receiptParticipants";
 
 export type MembershipFulfillmentContext = {
   sessionId?: string | null;
@@ -770,6 +771,10 @@ export async function reconcileMembershipFromStripeSession(
     forceWelcomeEmail: true,
     forceRenew: true,
   });
+
+  if (result.success && result.userId) {
+    await recordReceiptPayee(db, result.userId, { email: payerEmail, name: payerName });
+  }
 
   if (result.success && stripeCustomerId && stripeSubscriptionId) {
     const duplicates = await cancelDuplicateStripeSubscriptions({

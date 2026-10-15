@@ -73,6 +73,11 @@ import { getLmsSubscriptionInvoicesForUser } from "../lib/lmsSubscriptionReconci
 import { lmsCourseVisibleInMyContentCondition } from "../lib/lmsCourseVisibility";
 import { maybeRefreshLearnerLmsAccessFromStripe } from "../lib/learnerLmsAccessRefresh";
 import { isPurchaseAccessActive } from "../lib/downloadAccess";
+import {
+  receiptParticipantSources,
+  resolveReceiptParticipants,
+  type ReceiptParticipantSource,
+} from "../lib/receiptParticipants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -2029,8 +2034,51 @@ export const dashboardRouter = router({
       })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    return allPurchases;
+    const [registeredLearner] = await db.select({
+      name: users.name,
+      displayName: users.displayName,
+      email: users.email,
+    }).from(users).where(eq(users.id, userId)).limit(1);
+    const registeredLearnerName = registeredLearner?.displayName ?? registeredLearner?.name ?? null;
+    const registeredLearnerEmail = registeredLearner?.email ?? null;
+    const receiptReferencePrefixes: Array<{ prefix: string; source: ReceiptParticipantSource }> = [
+      { prefix: "course-renewal-", source: "course_renewal" },
+      { prefix: "funnel-", source: "funnel" },
+      { prefix: "order-", source: "course_order" },
+      { prefix: "download-", source: "download" },
+      { prefix: "bundle-", source: "bundle" },
+      { prefix: "workshop-", source: "workshop" },
+      { prefix: "webinar-", source: "webinar" },
+      { prefix: "physical-", source: "physical" },
+      { prefix: "invoice-", source: "stripe_invoice" },
+      { prefix: "manual-", source: "manual_invoice" },
+    ];
+
+    return allPurchases.map((purchase) => {
+      const receiptReference = receiptReferencePrefixes.find(({ prefix }) => purchase.id.startsWith(prefix));
+      return {
+        ...purchase,
+        registeredLearnerName,
+        registeredLearnerEmail,
+        receiptSource: receiptReference?.source ?? null,
+        receiptTransactionId: receiptReference ? purchase.id.slice(receiptReference.prefix.length) : null,
+      };
+    });
   }),
+
+  // ── Receipt parties ────────────────────────────────────────────────────────
+
+  /** Resolve purchaser details only for one of the authenticated learner's receipts. */
+  getPurchaseReceiptParticipants: protectedProcedure
+    .input(z.object({
+      source: z.enum(receiptParticipantSources),
+      transactionId: z.union([z.number().int().positive(), z.string().trim().min(1).max(255)]),
+    }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      return resolveReceiptParticipants(db, ctx.user.id, input.source, input.transactionId);
+    }),
 
   // Fetch card last4 for a specific payment intent (called lazily when receipt modal opens)
   getPaymentMethodDetails: protectedProcedure

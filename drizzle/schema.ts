@@ -8161,6 +8161,24 @@ export const manualInvoices = mysqlTable("manualInvoices", {
 export type ManualInvoice = typeof manualInvoices.$inferSelect;
 export type InsertManualInvoice = typeof manualInvoices.$inferInsert;
 
+// ─── Private Purchaser Records ─────────────────────────────────────────────────
+// A purchaser may be different from the registered learner (for example, an
+// employer purchasing education for a staff member). These records are never
+// returned to learner-facing routes; they are retained for Platform Admin review.
+export const purchasePayees = mysqlTable("purchase_payees", {
+  id: int("id").primaryKey().autoincrement(),
+  userId: int("user_id").notNull(),
+  name: varchar("name", { length: 255 }),
+  email: varchar("email", { length: 320 }).notNull(),
+  firstObservedAt: timestamp("first_observed_at").defaultNow().notNull(),
+  lastObservedAt: timestamp("last_observed_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  purchasePayeeUserEmailUnique: uniqueIndex("purchase_payee_user_email_unique").on(table.userId, table.email),
+  purchasePayeeUserLastObservedIdx: index("purchase_payee_user_last_observed_idx").on(table.userId, table.lastObservedAt),
+}));
+export type PurchasePayee = typeof purchasePayees.$inferSelect;
+export type InsertPurchasePayee = typeof purchasePayees.$inferInsert;
+
 // ─── Deferred Checkout Sessions ───────────────────────────────────────────────
 // Stores checkout sessions where payment_status !== "paid" at the time of
 // checkout.session.completed (e.g., ACH, SEPA, bank debits). Access is

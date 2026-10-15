@@ -9,7 +9,7 @@
  *   4. certificates  — earned certificates (both brands)
  */
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { PREMIUM_TRIAL_CTA } from "@/lib/premiumTrial";
@@ -1505,6 +1505,15 @@ function PurchasesTab() {
   const { data, isLoading } = trpc.dashboard.getMyPurchases.useQuery();
   const [receiptPurchase, setReceiptPurchase] = useState<any | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const receiptParticipantInput = useMemo(() => (
+    receiptPurchase?.receiptSource && receiptPurchase?.receiptTransactionId
+      ? { source: receiptPurchase.receiptSource, transactionId: receiptPurchase.receiptTransactionId }
+      : null
+  ), [receiptPurchase]);
+  const { data: receiptParticipants, isFetching: isLoadingReceiptParticipants } = trpc.dashboard.getPurchaseReceiptParticipants.useQuery(
+    receiptParticipantInput ?? { source: "manual_invoice", transactionId: 1 },
+    { enabled: Boolean(receiptParticipantInput) },
+  );
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -1611,6 +1620,11 @@ function PurchasesTab() {
                 receiptPurchase.workshopInstanceId,
               )
               : null;
+            const registeredLearner = receiptParticipants?.learner ?? {
+              name: receiptPurchase.registeredLearnerName ?? "Registered learner",
+              email: receiptPurchase.registeredLearnerEmail ?? "",
+            };
+            const purchaser = receiptParticipants?.payer ?? null;
             return (
               <div className="space-y-4">
                 {/* Printable receipt area */}
@@ -1633,6 +1647,21 @@ function PurchasesTab() {
                       <p className="text-xs text-gray-400">Date</p>
                       <p className="text-sm font-medium text-gray-700">{formatDate(receiptPurchase.date)}</p>
                     </div>
+                  </div>
+                  {/* Purchase parties — the purchaser is listed only for an actual different payee. */}
+                  <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Registered Learner</p>
+                      <p className="text-sm font-semibold text-gray-800">{registeredLearner.name || "Registered learner"}</p>
+                      {registeredLearner.email && <p className="text-xs text-gray-500">{registeredLearner.email}</p>}
+                    </div>
+                    {purchaser && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-gray-400 font-semibold mb-1">Purchaser / Payee</p>
+                        <p className="text-sm font-semibold text-gray-800">{purchaser.name || "Purchaser"}</p>
+                        <p className="text-xs text-gray-500">{purchaser.email}</p>
+                      </div>
+                    )}
                   </div>
                   {/* Line items */}
                   <div className="px-5 py-3 space-y-2">
@@ -1744,8 +1773,8 @@ function PurchasesTab() {
                 </div>
                 {/* Actions */}
                 <div className="flex justify-end gap-2 pt-1">
-                  <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1.5">
-                    <Download className="w-3.5 h-3.5" /> Print / Save PDF
+                  <Button variant="outline" size="sm" onClick={handlePrint} disabled={Boolean(receiptParticipantInput) && isLoadingReceiptParticipants} className="gap-1.5">
+                    {isLoadingReceiptParticipants ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Print / Save PDF
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => setReceiptPurchase(null)}>Close</Button>
                 </div>
