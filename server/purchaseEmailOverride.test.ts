@@ -48,6 +48,15 @@ describe("purchase email override copy", () => {
     expect(source).toContain("workshop_instance");
   });
 
+  it("requires a selected scheduled instance for a workshop confirmation preview", () => {
+    const source = readFileSync("client/src/components/admin/PurchaseEmailOverrides.tsx", "utf8");
+    expect(source).toContain('id="workshop-email-preview-instance"');
+    expect(source).toContain("Workshop instance for preview");
+    expect(source).toContain("selectedWorkshopInstance");
+    expect(source).toContain('item.source === "workshop_instance" && item.workshopId === selected.id');
+    expect(source).toContain('const previewTarget = selected.source === "workshop" ? selectedWorkshopInstance : selected');
+  });
+
   it("keeps available content visible when one optional catalog source cannot load", () => {
     const router = readFileSync("server/routers/purchaseEmailOverridesRouter.ts", "utf8");
     const screen = readFileSync("client/src/components/admin/PurchaseEmailOverrides.tsx", "utf8");

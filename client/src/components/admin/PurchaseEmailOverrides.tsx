@@ -21,6 +21,7 @@ type ContentItem = {
   brand: string | null;
   status: string;
   previewOnly?: boolean;
+  workshopId?: number;
 };
 type Override = {
   id: number;
@@ -82,6 +83,7 @@ export function PurchaseEmailOverrides() {
   const [detailsHtml, setDetailsHtml] = useState("");
   const [previewItem, setPreviewItem] = useState<ContentItem | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [selectedWorkshopInstanceId, setSelectedWorkshopInstanceId] = useState<string>("");
 
   const catalog = (query.data?.content ?? []) as ContentItem[];
   const overrides = (query.data?.overrides ?? []) as Override[];
@@ -94,6 +96,10 @@ export function PurchaseEmailOverrides() {
   }), [catalog, typeFilter, search]);
   const selected = catalog.find((item) => `${item.source}:${item.contentType}:${item.id}` === selectedKey) ?? null;
   const selectedOverride = selected && !selected.previewOnly ? overrideByKey.get(`${selected.contentType}:${selected.id}`) : null;
+  const workshopInstances = useMemo(() => selected?.source === "workshop"
+    ? catalog.filter((item) => item.source === "workshop_instance" && item.workshopId === selected.id)
+    : [], [catalog, selected]);
+  const selectedWorkshopInstance = workshopInstances.find((item) => String(item.id) === selectedWorkshopInstanceId) ?? null;
   const preview = trpc.purchaseEmailOverrides.preview.useQuery(
     previewItem ? { source: previewItem.source as any, contentId: previewItem.id, contentType: previewItem.contentType as any } : undefined as any,
     { enabled: Boolean(previewItem), retry: false },
@@ -109,18 +115,23 @@ export function PurchaseEmailOverrides() {
     setDetailsHtml(selectedOverride?.detailsHtml ?? "");
   }, [selectedKey, selectedOverride?.id, selectedOverride?.updatedAt]);
 
+  useEffect(() => {
+    setSelectedWorkshopInstanceId("");
+  }, [selectedKey]);
+
   function select(item: ContentItem) {
     setSelectedKey(`${item.source}:${item.contentType}:${item.id}`);
   }
 
   function openPreview() {
     if (!selected) return;
-    if (selected.source === "workshop") {
+    const previewTarget = selected.source === "workshop" ? selectedWorkshopInstance : selected;
+    if (!previewTarget) {
       toast.message("Select a scheduled workshop instance to preview its confirmation with the correct date, time zone, and location.");
       return;
     }
-    const wasAlreadySelected = previewItem?.source === selected.source && previewItem.id === selected.id && previewItem.contentType === selected.contentType;
-    setPreviewItem(selected);
+    const wasAlreadySelected = previewItem?.source === previewTarget.source && previewItem.id === previewTarget.id && previewItem.contentType === previewTarget.contentType;
+    setPreviewItem(previewTarget);
     setPreviewOpen(true);
     if (wasAlreadySelected) void preview.refetch();
   }
@@ -189,6 +200,17 @@ export function PurchaseEmailOverrides() {
           {!selected ? <CardContent className="flex min-h-[620px] flex-col items-center justify-center p-8 text-center"><div className="rounded-2xl bg-teal-50 p-4 text-teal-600"><Sparkles className="h-7 w-7" /></div><h3 className="mt-4 font-semibold text-slate-800">Choose an item to customize</h3><p className="mt-1 max-w-sm text-sm text-slate-500">Its standard confirmation remains active until you save an override.</p></CardContent> : <>
             <CardHeader className="border-b pb-4"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{selected.title}</CardTitle><p className="mt-1 text-xs text-slate-500">{LABELS[selected.contentType]}{selected.subtitle ? ` · ${selected.subtitle}` : ""}</p></div><Badge variant="outline">{selected.status}</Badge></div></CardHeader>
             <CardContent className="space-y-5 p-5">
+              {selected.source === "workshop" && <div className="rounded-lg border border-teal-200 bg-teal-50/60 p-4">
+                <Label htmlFor="workshop-email-preview-instance" className="font-semibold text-slate-800">Workshop instance for preview</Label>
+                <p className="mb-2 mt-1 text-xs leading-5 text-slate-600">Choose the scheduled instance whose confirmation you want to review. The preview uses that instance’s current date, time zone, and location; it does not send an email.</p>
+                <Select value={selectedWorkshopInstanceId} onValueChange={setSelectedWorkshopInstanceId}>
+                  <SelectTrigger id="workshop-email-preview-instance" className="bg-white"><SelectValue placeholder="Select a scheduled workshop instance" /></SelectTrigger>
+                  <SelectContent>
+                    {workshopInstances.map((instance) => <SelectItem key={instance.id} value={String(instance.id)}>{instance.title}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {workshopInstances.length === 0 && <p className="mt-2 text-xs text-amber-800">No scheduled instances are available for this workshop yet. Add one in Workshops Admin, then refresh this list.</p>}
+              </div>}
               {selected.previewOnly ? <div className="space-y-4"><div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm leading-6 text-violet-950"><p className="font-semibold">System-generated template</p><p className="mt-1">This is an automatic system-level purchase message rather than an individual content record. It is shown here for review only. No email is sent from this page.</p></div><Button variant="outline" className="border-teal-200 text-teal-800 hover:bg-teal-50" onClick={openPreview}><ExternalLink className="mr-2 h-4 w-4" />Preview current email</Button><p className="flex gap-2 text-xs leading-5 text-slate-500"><FileText className="mt-0.5 h-3.5 w-3.5 shrink-0" />The preview contains a sample recipient and illustrative links—never a live access token or password-reset token.</p></div> : <>
               <div className="flex items-start justify-between gap-4 rounded-lg border border-teal-100 bg-teal-50/50 p-4"><div><Label htmlFor="purchase-email-override-enabled" className="font-semibold text-slate-800">Use tailored purchase email copy</Label><p className="mt-1 text-xs leading-5 text-slate-600">Switch off to keep this saved draft but use the platform-generated email.</p></div><Switch id="purchase-email-override-enabled" checked={enabled} onCheckedChange={setEnabled} /></div>
               <div className="grid gap-4 md:grid-cols-2"><div><Label>Subject line</Label><Input className="mt-1" value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={500} /></div><div><Label>Heading</Label><Input className="mt-1" value={heading} onChange={(event) => setHeading(event.target.value)} maxLength={500} /></div></div>
