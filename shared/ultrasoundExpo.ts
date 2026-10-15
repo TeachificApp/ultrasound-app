@@ -1,7 +1,10 @@
+import { AAUS_SONO_RING_LOGO_URL } from "./brands";
+
 export const ULTRASOUND_EXPO_NAME = "UltrasoundExpo™";
 export const ULTRASOUND_EXPO_ORGANIZER = "All About Ultrasound™";
 export const ULTRASOUND_EXPO_ORIGIN = "https://ultrasoundexpo.com";
 export const ULTRASOUND_EXPO_HERO_IMAGE = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/nmDnyKctfSTBjSLH.jpg";
+export const ULTRASOUND_EXPO_AAUS_LOGO_URL = AAUS_SONO_RING_LOGO_URL;
 
 export const ULTRASOUND_EXPO_LAUNCH_EVENT = {
   name: "UltrasoundExpo™ 2028",
@@ -30,7 +33,7 @@ export const EXPO_PACKAGE_TYPE_META: Record<ExpoPackageType, { label: string; da
   sponsor: {
     label: "Event sponsorship",
     dashboardLabel: "My event sponsorships",
-    description: "UltrasoundExpo-specific sponsorship opportunities and recognition.",
+    description: "UltrasoundExpo™-specific sponsorship opportunities and recognition.",
   },
   product: {
     label: "Product",

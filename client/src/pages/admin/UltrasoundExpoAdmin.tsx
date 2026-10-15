@@ -38,7 +38,7 @@ export default function UltrasoundExpoAdmin() {
   const newEvent = () => { setEventId("new"); setEventForm({ name: "UltrasoundExpo™", slug: "ultrasoundexpo", startsAt: "", endsAt: "", timezone: "America/New_York", locationLabel: "", description: "", heroImageUrl: ULTRASOUND_EXPO_HERO_IMAGE, status: "draft" }); resetPackage(); };
 
   if (snapshot.isLoading) return <div className="flex min-h-[60vh] items-center justify-center text-[#087f8c]">Loading UltrasoundExpo™ administration…</div>;
-  if (snapshot.error) return <div className="m-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">UltrasoundExpo administration could not be loaded. Please reload, or confirm platform-admin access.</div>;
+  if (snapshot.error) return <div className="m-6 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">UltrasoundExpo™ administration could not be loaded. Please reload, or confirm platform-admin access.</div>;
   const paidRegistrations = eventRegistrations.filter(row => row.paymentStatus === "paid");
   const paidTotal = paidRegistrations.reduce((sum, row) => sum + Number(row.amountCents), 0);
 

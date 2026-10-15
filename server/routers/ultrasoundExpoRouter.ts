@@ -73,7 +73,7 @@ const packageInput = z.object({
 export const ultrasoundExpoRouter = router({
   publicLaunch: publicProcedure.query(async () => {
     const db = await getDb();
-    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "UltrasoundExpo is temporarily unavailable." });
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "UltrasoundExpo™ is temporarily unavailable." });
     const [event] = await db.select().from(ultrasoundExpoEvents)
       .where(eq(ultrasoundExpoEvents.status, "published"))
       .orderBy(asc(ultrasoundExpoEvents.startsAt))

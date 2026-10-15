@@ -383,15 +383,15 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
   }
 
   const db = await getDb();
-  if (!db) throw new Error("UltrasoundExpo payment could not reach the MySQL database.");
+  if (!db) throw new Error("UltrasoundExpo™ payment could not reach the MySQL database.");
   const [existing] = await db.select().from(ultrasoundExpoRegistrations)
     .where(eq(ultrasoundExpoRegistrations.id, registrationId)).limit(1);
   if (!existing) {
-    await notifyOwner({ title: "UltrasoundExpo payment needs review", content: "A paid Expo checkout did not have a matching registration record in Railway MySQL." });
+    await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "A paid Expo checkout did not have a matching registration record in Railway MySQL." });
     return;
   }
   if (existing.stripeSessionId && existing.stripeSessionId !== sessionId) {
-    await notifyOwner({ title: "UltrasoundExpo payment needs review", content: "An Expo registration record was presented by more than one checkout session. No automatic reassignment was made." });
+    await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "An Expo registration record was presented by more than one checkout session. No automatic reassignment was made." });
     return;
   }
 
@@ -453,11 +453,11 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
     sendPurchaseNotificationOnce(db, {
       checkoutSessionId: sessionId,
       notificationType: "ultrasound_expo_admin_alert",
-      send: () => sendEmail({ to: getPlatformAdminRecipient("UltrasoundExpo Team"), subject: adminAlertEmail.subject, htmlBody: adminAlertEmail.htmlBody }),
+      send: () => sendEmail({ to: getPlatformAdminRecipient("UltrasoundExpo™ Team"), subject: adminAlertEmail.subject, htmlBody: adminAlertEmail.htmlBody }),
     }),
   ]);
   if ((thankYou.attempted && !thankYou.delivered) || (alert.attempted && !alert.delivered)) {
-    await notifyOwner({ title: "UltrasoundExpo email delivery needs review", content: "A paid Expo registration was saved, but one or more confirmation notifications could not be delivered. The durable delivery log will retry safely." });
+    await notifyOwner({ title: "UltrasoundExpo™ email delivery needs review", content: "A paid Expo registration was saved, but one or more confirmation notifications could not be delivered. The durable delivery log will retry safely." });
   }
 }
 

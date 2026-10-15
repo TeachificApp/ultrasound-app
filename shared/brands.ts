@@ -88,7 +88,11 @@ const AAUS_EMAIL_LOGO =
 const IHE_EMAIL_LOGO =
   "https://www.iheartecho.com/uploads/5/3/6/0/5360192/published/sono-ring-echo-iheartecho.png";
 
-export { AAUS_LOGO as AAUS_BRAND_LOGO_URL, IHE_LOGO as IHE_BRAND_LOGO_URL };
+export {
+  AAUS_LOGO as AAUS_BRAND_LOGO_URL,
+  IHE_LOGO as IHE_BRAND_LOGO_URL,
+  AAUS_EMAIL_LOGO as AAUS_SONO_RING_LOGO_URL,
+};
 
 export function getBrandDisplayConfig(mode: BrandMode): BrandDisplayConfig {
   switch (mode) {

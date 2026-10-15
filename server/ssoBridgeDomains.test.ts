@@ -56,7 +56,7 @@ describe("ssoBridgeDomains", () => {
     expect(getSsoBridgeOrigins("www.iheartecho.net")[0]).toBe("https://learn.iheartecho.com");
   });
 
-  it("bridges UltrasoundExpo through the established Learn identity", () => {
+  it("bridges UltrasoundExpo™ through the established Learn identity", () => {
     expect(hostnameNeedsSsoBridge("ultrasoundexpo.com")).toBe(true);
     expect(hostnameNeedsSsoBridge("www.ultrasoundexpo.com")).toBe(true);
     expect(getSsoBridgeOrigins("ultrasoundexpo.com")).toEqual([
