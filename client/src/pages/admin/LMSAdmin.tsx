@@ -14788,7 +14788,7 @@ function LMSPublishDomainSettings() {
                       <Input
                         value={termsUrl}
                         onChange={e => { setTermsUrl(e.target.value); setDirty(true); }}
-                        placeholder="https://www.allaboutultrasound.com/terms"
+                        placeholder="https://www.allaboutultrasound.com/terms.html"
                         className="text-sm"
                       />
                     </div>

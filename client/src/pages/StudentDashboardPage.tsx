@@ -1739,7 +1739,7 @@ function PurchasesTab() {
                     <p className="text-[10px] text-gray-400 mt-0.5">{INVOICE_BRAND_FOOTER.allAboutUltrasoundWebsite}</p>
                     <p className="text-[10px] text-gray-400">{INVOICE_BRAND_FOOTER.iHeartEchoWebsite}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">Thank you for your purchase. For support, contact {INVOICE_BRAND_FOOTER.supportEmail}</p>
-                    <p className="text-[10px] text-gray-400 mt-1.5 font-medium">All sales are final. &bull; By completing this purchase you agree to our <a href="https://app.allaboutultrasound.com/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Terms of Service</a>.</p>
+                    <p className="text-[10px] text-gray-400 mt-1.5 font-medium">All sales are final. &bull; By completing this purchase you agree to our <a href="https://www.allaboutultrasound.com/terms.html" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">Terms of Service</a>.</p>
                   </div>
                 </div>
                 {/* Actions */}

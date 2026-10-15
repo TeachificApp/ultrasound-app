@@ -854,7 +854,7 @@ export const INLINE_CHECKOUT_DEFAULTS: InlineCheckoutBlockData = {
   orderBumps: [],
   termsText:      "I attest that I meet the pre-requisites for this course and I agree to the",
   termsLinkText:  "TERMS OF SERVICE",
-  termsLinkUrl:   "/terms",
+  termsLinkUrl:   "https://www.allaboutultrasound.com/terms.html",
   submitText:     "Submit",
   successRedirect: "",
   sourceType:     "landing_page",

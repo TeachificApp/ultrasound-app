@@ -243,7 +243,7 @@ export default function CheckoutComplete() {
           </p>
           <p className="text-gray-400 text-[10px] mb-7">
             All sales are final. By completing this purchase you agree to our{" "}
-            <a href="/terms" className="underline hover:text-gray-600">Terms of Service</a>.
+            <a href="https://www.allaboutultrasound.com/terms.html" className="underline hover:text-gray-600">Terms of Service</a>.
           </p>
 
           <div className="flex flex-col gap-3">

@@ -21,7 +21,7 @@ describe("iHeartEcho authentication branding", () => {
     }
   });
 
-  it("creates iHeartEcho reset email content with iHeartEcho identity and destination", () => {
+  it("creates iHeartEcho reset email content with iHeartEcho identity and the shared Terms destination", () => {
     const resetUrl = "https://app.iheartecho.com/reset-password?token=example";
     const email = buildPasswordResetEmail({
       firstName: "Lara",
@@ -35,7 +35,7 @@ describe("iHeartEcho authentication branding", () => {
     expect(email.htmlBody).toContain("iHeartEcho™");
     expect(email.htmlBody).toContain(resetUrl);
     expect(email.htmlBody).toContain("www.iheartecho.com");
-    expect(emailWrapper("content", "iheartecho")).toContain("https://app.iheartecho.com/terms");
+    expect(emailWrapper("content", "iheartecho")).toContain("https://www.allaboutultrasound.com/terms.html");
   });
 
   it("uses the iHeartEcho application origin for iHeartEcho membership welcome links", () => {

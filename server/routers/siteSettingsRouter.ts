@@ -73,7 +73,7 @@ export const siteSettingsRouter = router({
       return {
         termsText: "I have reviewed and agree to the",
         termsLink1Text: "Terms of Service",
-        termsLink1Url: "",
+        termsLink1Url: "https://www.allaboutultrasound.com/terms.html",
         termsLink2Text: "Privacy Policy",
         termsLink2Url: "",
       };
@@ -95,7 +95,7 @@ export const siteSettingsRouter = router({
     return {
       termsText: row?.checkoutTermsText ?? "I have reviewed and agree to the",
       termsLink1Text: row?.checkoutTermsLinkText1 ?? "Terms of Service",
-      termsLink1Url: row?.checkoutTermsLinkUrl1 ?? row?.termsUrl ?? "",
+      termsLink1Url: row?.checkoutTermsLinkUrl1 ?? row?.termsUrl ?? "https://www.allaboutultrasound.com/terms.html",
       termsLink2Text: row?.checkoutTermsLinkText2 ?? "Privacy Policy",
       termsLink2Url: row?.checkoutTermsLinkUrl2 ?? row?.privacyUrl ?? "",
     };

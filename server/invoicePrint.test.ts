@@ -62,4 +62,10 @@ describe("branded invoice print document", () => {
       expect(source).toContain(".leftJoin(workshopInstances, eq(workshopEnrollments.instanceId, workshopInstances.id))");
     }
   });
+
+  it("links learner receipts to the public Terms of Service page", () => {
+    const learnerReceipt = readFileSync(new URL("../client/src/pages/StudentDashboardPage.tsx", import.meta.url), "utf8");
+    expect(learnerReceipt).toContain('href="https://www.allaboutultrasound.com/terms.html"');
+    expect(learnerReceipt).not.toContain('href="https://app.allaboutultrasound.com/terms"');
+  });
 });

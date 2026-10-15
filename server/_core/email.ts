@@ -123,7 +123,7 @@ export function emailWrapper(
                 ${footerContext} ${bc.displayName}.
               </p>
               <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;">
-                All sales are final. &bull; <a href="${bc.appUrl}/terms" style="color:${bc.primaryColor};text-decoration:underline;" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+                All sales are final. &bull; <a href="https://www.allaboutultrasound.com/terms.html" style="color:${bc.primaryColor};text-decoration:underline;" target="_blank" rel="noopener noreferrer">Terms of Service</a>
               </p>
             </td>
           </tr>
@@ -1045,7 +1045,7 @@ export function buildFunnelPurchaseConfirmationEmail(opts: {
     </p>
     <p style="margin:16px 0 0;font-size:11px;color:#cbd5e1;line-height:1.5;border-top:1px solid #e5f7f8;padding-top:12px;">
       All sales are final. By completing this purchase you agree to our
-      <a href="https://app.allaboutultrasound.com/terms" style="color:${brandColor};text-decoration:underline;" target="_blank" rel="noopener noreferrer">Terms of Service</a>.
+      <a href="https://www.allaboutultrasound.com/terms.html" style="color:${brandColor};text-decoration:underline;" target="_blank" rel="noopener noreferrer">Terms of Service</a>.
     </p>
   `, opts.brandMode);
   return { subject, htmlBody, previewText };

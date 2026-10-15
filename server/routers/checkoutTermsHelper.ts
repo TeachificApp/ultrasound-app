@@ -58,7 +58,7 @@ export const checkoutPlatformTermsSelection = {
 
 const DEFAULT_TERMS_TEXT = "I have reviewed and agree to the";
 const DEFAULT_LINK1_TEXT = "Terms of Service";
-const DEFAULT_LINK1_URL = "https://www.allaboutultrasound.com/terms";
+const DEFAULT_LINK1_URL = "https://www.allaboutultrasound.com/terms.html";
 const DEFAULT_LINK2_TEXT = "Privacy Policy";
 const DEFAULT_LINK2_URL = "https://www.allaboutultrasound.com/privacy-policy.html";
 
