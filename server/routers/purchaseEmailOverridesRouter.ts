@@ -51,18 +51,34 @@ export const purchaseEmailOverridesRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
+    // This administration screen must remain useful even while an optional
+    // catalog table is being migrated. A missing/older table must not turn an
+    // otherwise healthy 99-item catalog into the misleading "No matching
+    // content" screen. Each source fails independently and is identified to
+    // the administrator for a focused repair.
+    const unavailableSources: string[] = [];
+    const readCatalog = async <T,>(source: string, query: Promise<T>): Promise<T> => {
+      try {
+        return await query;
+      } catch (error) {
+        unavailableSources.push(source);
+        console.error(`[purchase-email-overrides] Unable to load ${source}:`, error);
+        return [] as unknown as T;
+      }
+    };
+
     const [overrides, courses, downloads, bundles, canonicalBundleRows, webinarRows, workshopRows, instanceRows, products, memberships] = await Promise.all([
-      db.select().from(purchaseEmailOverrides).orderBy(desc(purchaseEmailOverrides.updatedAt)),
-      db.select({ id: lmsCourses.id, title: lmsCourses.title, type: lmsCourses.type, brand: lmsCourses.brand, status: lmsCourses.status }).from(lmsCourses).orderBy(asc(lmsCourses.title)),
-      db.select({ id: digitalProducts.id, title: digitalProducts.title, brand: digitalProducts.brand, status: digitalProducts.status }).from(digitalProducts).orderBy(asc(digitalProducts.title)),
-      db.select({ id: digitalBundles.id, title: digitalBundles.title, brand: digitalBundles.brand, status: digitalBundles.status }).from(digitalBundles).orderBy(asc(digitalBundles.title)),
-      db.select({ id: canonicalBundles.id, title: canonicalBundles.title, brand: canonicalBundles.brand, status: canonicalBundles.status }).from(canonicalBundles).orderBy(asc(canonicalBundles.title)),
-      db.select({ id: webinars.id, title: webinars.title, brand: webinars.brand, status: webinars.status }).from(webinars).orderBy(asc(webinars.title)),
-      db.select({ id: workshops.id, title: workshops.title, brand: workshops.brand, status: workshops.status }).from(workshops).orderBy(asc(workshops.title)),
-      db.select({ id: workshopInstances.id, workshopId: workshopInstances.workshopId, title: workshopInstances.title, status: workshopInstances.status, workshopTitle: workshops.title, brand: workshops.brand })
-        .from(workshopInstances).leftJoin(workshops, eq(workshopInstances.workshopId, workshops.id)).orderBy(asc(workshops.title), asc(workshopInstances.startDate)),
-      db.select({ id: physicalProducts.id, title: physicalProducts.title, brand: physicalProducts.brand, status: physicalProducts.status }).from(physicalProducts).orderBy(asc(physicalProducts.title)),
-      db.select({ id: membershipPlans.id, title: membershipPlans.title, brand: membershipPlans.brand, status: membershipPlans.status }).from(membershipPlans).orderBy(asc(membershipPlans.title)),
+      readCatalog("saved email overrides", db.select().from(purchaseEmailOverrides).orderBy(desc(purchaseEmailOverrides.updatedAt))),
+      readCatalog("courses and quizzes", db.select({ id: lmsCourses.id, title: lmsCourses.title, type: lmsCourses.type, brand: lmsCourses.brand, status: lmsCourses.status }).from(lmsCourses).orderBy(asc(lmsCourses.title))),
+      readCatalog("downloads", db.select({ id: digitalProducts.id, title: digitalProducts.title, brand: digitalProducts.brand, status: digitalProducts.status }).from(digitalProducts).orderBy(asc(digitalProducts.title))),
+      readCatalog("digital bundles", db.select({ id: digitalBundles.id, title: digitalBundles.title, brand: digitalBundles.brand, status: digitalBundles.status }).from(digitalBundles).orderBy(asc(digitalBundles.title))),
+      readCatalog("bundles", db.select({ id: canonicalBundles.id, title: canonicalBundles.title, brand: canonicalBundles.brand, status: canonicalBundles.status }).from(canonicalBundles).orderBy(asc(canonicalBundles.title))),
+      readCatalog("webinars", db.select({ id: webinars.id, title: webinars.title, brand: webinars.brand, status: webinars.status }).from(webinars).orderBy(asc(webinars.title))),
+      readCatalog("workshops", db.select({ id: workshops.id, title: workshops.title, brand: workshops.brand, status: workshops.status }).from(workshops).orderBy(asc(workshops.title))),
+      readCatalog("workshop instances", db.select({ id: workshopInstances.id, workshopId: workshopInstances.workshopId, title: workshopInstances.title, status: workshopInstances.status, workshopTitle: workshops.title, brand: workshops.brand })
+        .from(workshopInstances).leftJoin(workshops, eq(workshopInstances.workshopId, workshops.id)).orderBy(asc(workshops.title), asc(workshopInstances.startDate))),
+      readCatalog("physical products", db.select({ id: physicalProducts.id, title: physicalProducts.title, brand: physicalProducts.brand, status: physicalProducts.status }).from(physicalProducts).orderBy(asc(physicalProducts.title))),
+      readCatalog("membership plans", db.select({ id: membershipPlans.id, title: membershipPlans.title, brand: membershipPlans.brand, status: membershipPlans.status }).from(membershipPlans).orderBy(asc(membershipPlans.title))),
     ]);
 
     const content = [
@@ -95,7 +111,7 @@ export const purchaseEmailOverridesRouter = router({
       { id: 6, source: "team_subscription", contentType: "team_subscription", title: "Both Apps Team/University — lifetime", brand: "all_about_ultrasound", status: "system", subtitle: "Organizer subscription confirmation", previewOnly: true },
     ];
 
-    return { content: [...content, ...systemPreviewContent], overrides };
+    return { content: [...content, ...systemPreviewContent], overrides, unavailableSources };
   }),
 
   /** Renders the current saved purchase email without creating tokens, users, or sends. */

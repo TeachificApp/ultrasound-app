@@ -55,7 +55,14 @@ const DEFAULT_COPY: Record<string, { subject: string; heading: string; intro: st
 
 export function PurchaseEmailOverrides() {
   const utils = trpc.useUtils();
-  const query = trpc.purchaseEmailOverrides.list.useQuery(undefined, { staleTime: 20_000 });
+  const query = trpc.purchaseEmailOverrides.list.useQuery(undefined, {
+    // Always refresh when the console opens. The catalog reflects live content
+    // and should not retain an empty response following a just-completed
+    // Railway schema or content update.
+    staleTime: 0,
+    refetchOnMount: "always",
+    retry: 2,
+  });
   const save = trpc.purchaseEmailOverrides.save.useMutation({
     onSuccess: async () => { await Promise.all([utils.purchaseEmailOverrides.list.invalidate(), utils.purchaseEmailOverrides.preview.invalidate()]); toast.success("Purchase email copy saved. No email was sent."); },
     onError: (error) => toast.error(error.message),
@@ -78,6 +85,7 @@ export function PurchaseEmailOverrides() {
 
   const catalog = (query.data?.content ?? []) as ContentItem[];
   const overrides = (query.data?.overrides ?? []) as Override[];
+  const unavailableSources = query.data?.unavailableSources ?? [];
   const overrideByKey = useMemo(() => new Map(overrides.map((item) => [`${item.contentType}:${item.contentId}`, item])), [overrides]);
   const items = useMemo(() => catalog.filter((item) => {
     if (typeFilter !== "all" && item.contentType !== typeFilter) return false;
@@ -160,6 +168,8 @@ export function PurchaseEmailOverrides() {
               <Button size="icon" variant="outline" className="h-9 w-9" onClick={() => query.refetch()} aria-label="Refresh catalog"><RefreshCw className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`} /></Button>
             </div>
             <div className="relative"><Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" /><Input className="h-9 pl-9" placeholder="Search title" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+            {query.error && <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm leading-5 text-rose-800"><p className="font-semibold">Content catalog could not load</p><p className="mt-1">{query.error.message}</p><Button variant="outline" size="sm" className="mt-2 border-rose-300 bg-white text-rose-800 hover:bg-rose-100" onClick={() => query.refetch()}><RefreshCw className="mr-2 h-3.5 w-3.5" />Try again</Button></div>}
+            {unavailableSources.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><strong>Some content is temporarily unavailable in this list:</strong> {unavailableSources.join(", ")}. All other purchase-email templates remain available to review.</div>}
             <div className="max-h-[520px] space-y-1 overflow-y-auto pr-1">
               {query.isLoading ? <p className="p-4 text-sm text-slate-500">Loading content…</p> : items.map((item) => {
                 const key = `${item.source}:${item.contentType}:${item.id}`;
@@ -170,7 +180,7 @@ export function PurchaseEmailOverrides() {
                   <p className="mt-1 text-xs text-slate-500">{LABELS[item.contentType]}{item.subtitle ? ` · ${item.subtitle}` : ""}</p>
                 </button>;
               })}
-              {!query.isLoading && items.length === 0 && <p className="p-4 text-sm text-slate-500">No matching content.</p>}
+              {!query.isLoading && !query.error && items.length === 0 && <p className="p-4 text-sm text-slate-500">No matching content. Clear the search or choose another content type.</p>}
             </div>
           </CardContent>
         </Card>

@@ -19,7 +19,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
 import MembersLayout from "./components/MembersLayout";
-import { isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain, isMarketingStagingDomain, LEARN_APP_URL, MEMBERS_APP_URL, ROOT_DOMAIN_URL } from "./hooks/useSubdomain";
+import { getLearnAppUrl, isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain, isMarketingStagingDomain, LEARN_APP_URL, MEMBERS_APP_URL, ROOT_DOMAIN_URL } from "./hooks/useSubdomain";
 import { MetaPixel } from "./components/MetaPixel";
 import { PurchaseSuccessTracker } from "./components/PurchaseSuccessTracker";
 import UpgradePrompt from "./components/UpgradePrompt";
@@ -96,6 +96,17 @@ const funnelPageFallback = (
     <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
   </div>
 );
+
+/**
+ * Learning content and every checkout flow belong on the Learn tenant, not an
+ * app tenant. Preserve the complete destination (including checkout options,
+ * return parameters, and anchors) while keeping iHeartEcho visitors on the
+ * iHeartEcho Learn mirror.
+ */
+function LearnContentRedirect() {
+  const destination = `${getLearnAppUrl()}${window.location.pathname}${window.location.search}${window.location.hash}`;
+  return <HardRedirect to={destination} />;
+}
 
 // ── Digital Downloads ──────────────────────────────────────────────────────────
 const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
@@ -537,6 +548,45 @@ function Router() {
         <Route path="/case-library/submit" component={SubmitCase} />
         <Route path="/case-library/edit/:id" component={SubmitCase} />
         <Route path="/case-library/:id" component={CaseDetail} />
+
+        {/* ── Learning content — always served by the brand-matched Learn tenant ── */}
+        {/* Keep these ahead of local app routes so an app-domain course, workshop,
+            cohort, product, or checkout URL never renders a partial app shell. */}
+        <Route path="/checkout/complete" component={LearnContentRedirect} />
+        <Route path="/checkout/workshop/:slug" component={LearnContentRedirect} />
+        <Route path="/checkout/:slug" component={LearnContentRedirect} />
+        <Route path="/courses/:slug/player" component={LearnContentRedirect} />
+        <Route path="/courses/:slug/overview" component={LearnContentRedirect} />
+        <Route path="/courses/:slug" component={LearnContentRedirect} />
+        <Route path="/cohort/:courseId/assignment/:assignmentId" component={LearnContentRedirect} />
+        <Route path="/cohort/:courseId/replay/:recordingId" component={LearnContentRedirect} />
+        <Route path="/cohort/:courseId" component={LearnContentRedirect} />
+        <Route path="/education-library" component={LearnContentRedirect} />
+        <Route path="/collections/:id" component={LearnContentRedirect} />
+        <Route path="/downloads/:slug/files" component={LearnContentRedirect} />
+        <Route path="/downloads/:slug" component={LearnContentRedirect} />
+        <Route path="/downloads" component={LearnContentRedirect} />
+        <Route path="/bundles/:slug" component={LearnContentRedirect} />
+        <Route path="/workshops/:slug" component={LearnContentRedirect} />
+        <Route path="/workshops" component={LearnContentRedirect} />
+        <Route path="/cross-training" component={LearnContentRedirect} />
+        <Route path="/webinars/:slug" component={LearnContentRedirect} />
+        <Route path="/webinar/:slug" component={LearnContentRedirect} />
+        <Route path="/products" component={LearnContentRedirect} />
+        <Route path="/product/:slug" component={LearnContentRedirect} />
+        <Route path="/memberships/:slug" component={LearnContentRedirect} />
+        <Route path="/my-memberships/:slug" component={LearnContentRedirect} />
+        <Route path="/my-memberships" component={LearnContentRedirect} />
+        <Route path="/my-downloads" component={LearnContentRedirect} />
+        <Route path="/my-dashboard/my-content" component={LearnContentRedirect} />
+        <Route path="/my-dashboard" component={LearnContentRedirect} />
+        <Route path="/dashboard/:rest*" component={LearnContentRedirect} />
+        <Route path="/dashboard" component={LearnContentRedirect} />
+        <Route path="/my-quizzes" component={LearnContentRedirect} />
+        <Route path="/quizzes/:quizId/results/:attemptId" component={LearnContentRedirect} />
+        <Route path="/quizzes/:quizId" component={LearnContentRedirect} />
+        <Route path="/study-groups/:groupId" component={LearnContentRedirect} />
+        <Route path="/study-groups" component={LearnContentRedirect} />
 
         {/* ── LMS — LMS Management ─────────────────────────────────────────────── */}
         <Route path="/education-library">{() => { window.location.replace(`${LEARN_APP_URL}/education-library`); return null; }}</Route>
@@ -1134,6 +1184,45 @@ function IHeartEchoRouter() {
         <Route path="/enrolled" component={Enrolled} />
         <Route path="/unsubscribe" component={Unsubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />
+
+        {/* Learning links on app.iheartecho.com must stay on the iHeartEcho Learn
+            mirror; this includes direct checkout URLs shared from an app page. */}
+        <Route path="/checkout/complete" component={LearnContentRedirect} />
+        <Route path="/checkout/workshop/:slug" component={LearnContentRedirect} />
+        <Route path="/checkout/:slug" component={LearnContentRedirect} />
+        <Route path="/courses/:slug/player" component={LearnContentRedirect} />
+        <Route path="/courses/:slug/overview" component={LearnContentRedirect} />
+        <Route path="/courses/:slug" component={LearnContentRedirect} />
+        <Route path="/cohort/:courseId/assignment/:assignmentId" component={LearnContentRedirect} />
+        <Route path="/cohort/:courseId/replay/:recordingId" component={LearnContentRedirect} />
+        <Route path="/cohort/:courseId" component={LearnContentRedirect} />
+        <Route path="/education-library" component={LearnContentRedirect} />
+        <Route path="/collections/:id" component={LearnContentRedirect} />
+        <Route path="/downloads/:slug/files" component={LearnContentRedirect} />
+        <Route path="/downloads/:slug" component={LearnContentRedirect} />
+        <Route path="/downloads" component={LearnContentRedirect} />
+        <Route path="/bundles/:slug" component={LearnContentRedirect} />
+        <Route path="/workshops/:slug" component={LearnContentRedirect} />
+        <Route path="/workshops" component={LearnContentRedirect} />
+        <Route path="/cross-training" component={LearnContentRedirect} />
+        <Route path="/webinars/:slug" component={LearnContentRedirect} />
+        <Route path="/webinar/:slug" component={LearnContentRedirect} />
+        <Route path="/products" component={LearnContentRedirect} />
+        <Route path="/product/:slug" component={LearnContentRedirect} />
+        <Route path="/memberships/:slug" component={LearnContentRedirect} />
+        <Route path="/my-memberships/:slug" component={LearnContentRedirect} />
+        <Route path="/my-memberships" component={LearnContentRedirect} />
+        <Route path="/my-downloads" component={LearnContentRedirect} />
+        <Route path="/my-dashboard/my-content" component={LearnContentRedirect} />
+        <Route path="/my-dashboard" component={LearnContentRedirect} />
+        <Route path="/dashboard/:rest*" component={LearnContentRedirect} />
+        <Route path="/dashboard" component={LearnContentRedirect} />
+        <Route path="/my-quizzes" component={LearnContentRedirect} />
+        <Route path="/quizzes/:quizId/results/:attemptId" component={LearnContentRedirect} />
+        <Route path="/quizzes/:quizId" component={LearnContentRedirect} />
+        <Route path="/study-groups/:groupId" component={LearnContentRedirect} />
+        <Route path="/study-groups" component={LearnContentRedirect} />
+
                 <Route path="/premium" component={Premium} />
         <Route path="/profile" component={Profile} />
         <Route path="/dashboard/:rest*" component={LegacyStudentDashboardRedirect} />

@@ -47,4 +47,17 @@ describe("purchase email override copy", () => {
     expect(source).toContain("saving, disabling, or reverting an override never sends or resends an email");
     expect(source).toContain("workshop_instance");
   });
+
+  it("keeps available content visible when one optional catalog source cannot load", () => {
+    const router = readFileSync("server/routers/purchaseEmailOverridesRouter.ts", "utf8");
+    const screen = readFileSync("client/src/components/admin/PurchaseEmailOverrides.tsx", "utf8");
+
+    expect(router).toContain("const unavailableSources: string[] = []");
+    expect(router).toContain("const readCatalog = async");
+    expect(router).toContain('readCatalog("workshops"');
+    expect(router).toContain("unavailableSources");
+    expect(screen).toContain('refetchOnMount: "always"');
+    expect(screen).toContain("Content catalog could not load");
+    expect(screen).toContain("Some content is temporarily unavailable in this list:");
+  });
 });
