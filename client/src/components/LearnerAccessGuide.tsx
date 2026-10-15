@@ -69,8 +69,8 @@ export default function LearnerAccessGuide() {
     {
       id: "account",
       label: "1. My Dashboard",
-      title: "Open My Dashboard from your account menu",
-      description: "This is the real menu available from the top-right of every Learn page.",
+      title: "Select your name or avatar at the top-right, then choose My Dashboard",
+      description: "This first preview opens the real signed-in account menu available on every Learn page and highlights My Dashboard.",
       icon: LayoutDashboard,
       href: MY_CONTENT_URL,
     },
@@ -157,7 +157,7 @@ export default function LearnerAccessGuide() {
                   >
                     <span className={`mb-2 flex h-8 w-8 items-center justify-center rounded-lg ${selected ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-600"}`}><Icon className="h-4 w-4" /></span>
                     <span className={`block text-[10px] font-bold uppercase tracking-[0.12em] ${selected ? "text-teal-700" : "text-slate-400"}`}>{preview.label}</span>
-                    <span className="mt-0.5 block text-xs font-bold leading-5 text-slate-800">{preview.id === "content" ? "Open what you own" : preview.id === "billing" ? "Manage your plan" : preview.id === "cohort" ? "Enter My Cohort" : "Use your account menu"}</span>
+                    <span className="mt-0.5 block text-xs font-bold leading-5 text-slate-800">{preview.id === "content" ? "Access your learning" : preview.id === "billing" ? "Manage your plan" : preview.id === "cohort" ? "Enter My Cohort" : "Click top-right, then My Dashboard"}</span>
                   </button>
                 );
               })}

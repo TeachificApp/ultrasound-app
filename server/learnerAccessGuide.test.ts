@@ -41,6 +41,10 @@ describe("learner access guide", () => {
     expect(guide).toContain("onboarding_preview_account=1");
     expect(guide).toContain("<iframe");
     expect(guide).toContain("your own signed-in experience");
+    expect(guide).toContain("Select your name or avatar at the top-right, then choose My Dashboard");
+    expect(guide).toContain("Click top-right, then My Dashboard");
+    expect(guide).toContain("Access your learning");
+    expect(guide).not.toContain("Open what you own");
     expect(guide).not.toContain("AccountMenuPreview");
     expect(learnLayout).toContain('get("onboarding_preview_account") === "1"');
   });
