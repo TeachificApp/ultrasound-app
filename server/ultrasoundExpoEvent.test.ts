@@ -5,8 +5,15 @@ import {
   ULTRASOUND_EXPO_EVENT_PAGE_ACCESS_LEVELS,
   ULTRASOUND_EXPO_EVENT_PAGE_TYPES,
 } from "../shared/ultrasoundExpoEvent";
+import { EXPO_TENANT_CONFIG, getExpoTenantForHostname } from "../shared/expoTenant";
 
 describe("UltrasoundExpo™ event instances", () => {
+  it("keeps EchoExpo marketing-only while sharing UltrasoundExpo administration", () => {
+    expect(getExpoTenantForHostname("echoexpo.iheartecho.com")).toBe("echo_expo");
+    expect(EXPO_TENANT_CONFIG.echo_expo.partnerScope).toBe("ultrasound_expo");
+    expect(EXPO_TENANT_CONFIG.echo_expo.adminPath).toBe("/admin/ultrasound-expo");
+  });
+
   it("exports a standards-compatible multi-session event calendar", () => {
     const ics = buildUltrasoundExpoAgendaIcs("UltrasoundExpo™ 2028", [{
       id: 8,

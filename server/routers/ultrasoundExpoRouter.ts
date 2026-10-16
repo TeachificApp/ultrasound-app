@@ -10,6 +10,7 @@ import {
   ultrasoundExpoRegistrations,
 } from "../../drizzle/schema";
 import { ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
+import { EXPO_EVENT_TENANTS } from "../../shared/expoTenant";
 import { getDb, getUserRoles } from "../db";
 import { getStripeClient } from "../lib/stripeClient";
 import { requireApprovedVendorApplication } from "../lib/vendorPartnerAccess";
@@ -26,6 +27,7 @@ const EXPO_ORIGINS = new Set([
 ]);
 
 const packageTypeInput = z.enum(["registrant", "exhibitor", "sponsor", "product", "other"]);
+const eventTenantInput = z.enum(EXPO_EVENT_TENANTS);
 
 function safeExpoOrigin(origin: string): string {
   try {
@@ -62,7 +64,9 @@ const eventUpdateInput = z.object({
   status: z.enum(["draft", "published", "archived"]),
 });
 
-const eventCreateInput = eventUpdateInput.omit({ id: true });
+const eventCreateInput = eventUpdateInput.omit({ id: true }).extend({
+  tenant: eventTenantInput.default("ultrasound_expo"),
+});
 
 const packageInput = z.object({
   id: z.number().int().positive().optional(),
@@ -218,6 +222,7 @@ export const ultrasoundExpoRouter = router({
       eventSlug: ultrasoundExpoEvents.slug,
       startsAt: ultrasoundExpoEvents.startsAt,
       endsAt: ultrasoundExpoEvents.endsAt,
+      eventTenant: ultrasoundExpoEvents.tenant,
       locationLabel: ultrasoundExpoEvents.locationLabel,
       packageName: ultrasoundExpoPackages.name,
       packageType: ultrasoundExpoPackages.packageType,
@@ -249,6 +254,7 @@ export const ultrasoundExpoRouter = router({
       createdAt: ultrasoundExpoRegistrations.createdAt,
       eventId: ultrasoundExpoEvents.id,
       eventName: ultrasoundExpoEvents.name,
+      eventTenant: ultrasoundExpoEvents.tenant,
       packageName: ultrasoundExpoPackages.name,
       packageType: ultrasoundExpoPackages.packageType,
     }).from(ultrasoundExpoRegistrations)
@@ -265,6 +271,7 @@ export const ultrasoundExpoRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const created = await db.insert(ultrasoundExpoEvents).values({
+      tenant: input.tenant,
       name: input.name,
       slug: input.slug,
       startsAt: input.startsAt,
@@ -295,6 +302,7 @@ export const ultrasoundExpoRouter = router({
     const [source] = await db.select().from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.id, input.sourceEventId)).limit(1);
     if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "The source UltrasoundExpo™ event no longer exists." });
     const created = await db.insert(ultrasoundExpoEvents).values({
+      tenant: source.tenant,
       name: input.name,
       slug: input.slug,
       startsAt: input.startsAt,

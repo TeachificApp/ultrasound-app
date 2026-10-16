@@ -17,9 +17,11 @@ function queryDefaults(location: string) {
   const params = new URLSearchParams(location.split("?")[1] ?? "");
   const scope = params.get("scope") as VendorPartnerScope | null;
   const type = params.get("type") as VendorPartnerType | null;
+  const eventFocus: "" | "ultrasound_expo" | "echo_expo" = params.get("event") === "echoexpo" ? "echo_expo" : params.get("event") === "ultrasoundexpo" ? "ultrasound_expo" : "";
   return {
     scopes: scope && scopes.includes(scope) ? [scope] : ["aaus_ihe", "ultrasound_expo"] as VendorPartnerScope[],
     types: type && partnerTypes.includes(type) ? [type] : ["vendor"] as VendorPartnerType[],
+    eventFocus,
   };
 }
 
@@ -35,6 +37,7 @@ export default function PartnerApplication() {
   const [message, setMessage] = useState("");
   const [selectedScopes, setSelectedScopes] = useState<VendorPartnerScope[]>(defaults.scopes);
   const [selectedTypes, setSelectedTypes] = useState<VendorPartnerType[]>(defaults.types);
+  const [eventFocus, setEventFocus] = useState<"" | "ultrasound_expo" | "echo_expo">(defaults.eventFocus);
   const [logo, setLogo] = useState<{ dataUri: string; mimeType: string; fileName: string } | null>(null);
   const [submitted, setSubmitted] = useState(false);
   useEffect(() => {
@@ -74,6 +77,7 @@ export default function PartnerApplication() {
       message: message || undefined,
       requestedScopes: selectedScopes,
       partnerTypes: selectedTypes,
+      eventFocus: eventFocus || undefined,
     });
   };
 
@@ -97,6 +101,7 @@ export default function PartnerApplication() {
             {isAuthenticated && !authLoading && <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm leading-6 text-slate-700"><strong className="text-[#062634]">Shared Learn account detected.</strong> Submit with your account email to keep your future attendee registration and approved exhibitor access connected to this same profile.</div>}
             <div className="grid gap-4 sm:grid-cols-2"><Field label="Organization name"><Input required value={organizationName} onChange={e => setOrganizationName(e.target.value)} autoComplete="organization" /></Field><Field label="Organization website (optional)"><Input type="text" inputMode="url" value={organizationWebsite} onChange={e => setOrganizationWebsite(e.target.value)} placeholder="yourorganization.com" autoComplete="url" /></Field><Field label="Contact name"><Input required value={contactName} onChange={e => setContactName(e.target.value)} autoComplete="name" /></Field><Field label="Email address"><Input required type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} autoComplete="email" /></Field><Field label="Phone"><Input required type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} autoComplete="tel" /></Field><Field label="Organization logo"><div className="flex items-center gap-3"><label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-bold text-[#087f8c] hover:bg-cyan-50"><ImagePlus className="h-4 w-4" />{logo ? "Replace logo" : "Upload logo"}<input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 3 * 1024 * 1024) { toast.error("Choose a PNG, JPEG, or WebP logo no larger than 3 MB."); return; } const reader = new FileReader(); reader.onload = () => setLogo({ dataUri: String(reader.result), mimeType: file.type, fileName: file.name }); reader.readAsDataURL(file); }} /></label>{logo && <span className="max-w-[160px] truncate text-xs text-slate-500">{logo.fileName}</span>}</div></Field></div>
             <fieldset><legend className="text-sm font-bold text-slate-700">Where would you like to participate?</legend><div className="mt-3 grid gap-3 sm:grid-cols-2">{scopes.map(scope => <label key={scope} className={`cursor-pointer rounded-xl border p-4 transition ${selectedScopes.includes(scope) ? "border-[#087f8c] bg-[#ebfbfb]" : "border-slate-200 hover:border-cyan-300"}`}><input className="sr-only" type="checkbox" checked={selectedScopes.includes(scope)} onChange={() => toggleScope(scope)} /><span className="block font-bold text-[#062634]">{VENDOR_PARTNER_SCOPE_LABELS[scope]}</span><span className="mt-1 block text-xs leading-5 text-slate-500">{scope === "aaus_ihe" ? "General sponsorship, workshop exhibit, and webinar partner opportunities." : "Annual event exhibit, sponsor, resource, and booth request access."}</span></label>)}</div></fieldset>
+            {selectedScopes.includes("ultrasound_expo") && <label className="grid gap-1.5 text-sm font-bold text-slate-700">UltrasoundExpo™ event pathway <select value={eventFocus} onChange={event => setEventFocus(event.target.value as typeof eventFocus)} className="h-10 rounded-md border border-slate-200 bg-white px-3 font-normal"><option value="">UltrasoundExpo™ (general event)</option><option value="echo_expo">EchoExpo™ (cardiac ultrasound / echocardiography)</option></select><span className="text-xs font-normal leading-5 text-slate-500">Choose EchoExpo™ for the cardiac ultrasound exhibit, sponsor, or attendee pathway. Approval and your secure partner workspace remain within UltrasoundExpo™.</span></label>}
             <fieldset><legend className="text-sm font-bold text-slate-700">How would you like to participate?</legend><p className="mt-1 text-xs leading-5 text-slate-500">Select all that apply. An organization may be a vendor, exhibitor, sponsor, or any combination.</p><div className="mt-3 grid gap-3 sm:grid-cols-3">{partnerTypes.map(type => {
               const details: Record<VendorPartnerType, string> = {
                 vendor: "Provides products, services, or solutions for the ultrasound community.",

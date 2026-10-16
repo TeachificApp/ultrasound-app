@@ -107,6 +107,7 @@ const applicationInput = z.object({
   message: z.string().trim().max(4_000).optional(),
   requestedScopes: z.array(scopeInput).min(1).max(2),
   partnerTypes: z.array(partnerTypeInput).min(1).max(3),
+  eventFocus: z.enum(["ultrasound_expo", "echo_expo"]).optional(),
 });
 
 export const vendorPortalRouter = router({
@@ -166,6 +167,7 @@ export const vendorPortalRouter = router({
           message: input.message?.trim() || null,
           requestedScopes: JSON.stringify([...new Set(input.requestedScopes)]),
           partnerTypes: JSON.stringify([...new Set(input.partnerTypes)]),
+          eventFocus: input.eventFocus ?? null,
           linkedUserId: verifiedSharedUserId,
           status: "pending",
         });

@@ -19,7 +19,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { RoleGuard } from "@/components/RoleGuard";
 import LMSLayout from "./components/LMSLayout";
 import MembersLayout from "./components/MembersLayout";
-import { getLearnAppUrl, isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain, isMarketingStagingDomain, isUltrasoundExpoDomain, LEARN_APP_URL, MEMBERS_APP_URL, ROOT_DOMAIN_URL } from "./hooks/useSubdomain";
+import { getLearnAppUrl, isLearnDomain, isIHeartEchoDomain, isMembersDomain, isAccreditationDomain, isMarketingStagingDomain, isUltrasoundExpoDomain, isEchoExpoDomain, LEARN_APP_URL, MEMBERS_APP_URL, ROOT_DOMAIN_URL } from "./hooks/useSubdomain";
 import { MetaPixel } from "./components/MetaPixel";
 import { PurchaseSuccessTracker } from "./components/PurchaseSuccessTracker";
 import UpgradePrompt from "./components/UpgradePrompt";
@@ -150,6 +150,7 @@ const PublicMarketingSitePage = lazy(() => import("./pages/PublicMarketingSitePa
 const PublicSiteAdmin = lazy(() => import("./pages/admin/PublicSiteAdmin"));
 const PublicSitePageBuilder = lazy(() => import("./pages/admin/PublicSitePageBuilder"));
 const UltrasoundExpoSite = lazy(() => import("./pages/UltrasoundExpoSite"));
+const EchoExpoSite = lazy(() => import("./pages/EchoExpoSite"));
 const UltrasoundExpoRegister = lazy(() => import("./pages/UltrasoundExpoRegister"));
 const UltrasoundExpoDashboard = lazy(() => import("./pages/UltrasoundExpoDashboard"));
 const UltrasoundExpoAdmin = lazy(() => import("./pages/admin/UltrasoundExpoAdmin"));
@@ -1829,6 +1830,13 @@ function UltrasoundExpoRouter() {
   );
 }
 
+/** EchoExpo™ is a public marketing site. Registration, approvals, event records,
+ * dashboards, community access, and partner operations remain on UltrasoundExpo.com. */
+function EchoExpoMarketingRouter() {
+  usePageViewTracker();
+  return <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" /></div>}><EchoExpoSite /></Suspense>;
+}
+
 function MarketingSiteRouter() {
   usePageViewTracker();
   const pageFallback = (
@@ -1936,6 +1944,7 @@ function PublicWebsiteRouter() {
 function App() {
   const onMarketingStaging = isMarketingStagingDomain();
   const onUltrasoundExpo = isUltrasoundExpoDomain();
+  const onEchoExpo = isEchoExpoDomain();
   const onLearnSubdomain = isLearnDomain();
   const onMembersSubdomain = isMembersDomain();
   const onIHeartEchoSubdomain = isIHeartEchoDomain();
@@ -1954,6 +1963,8 @@ function App() {
             <MarketingSiteRouter />
           ) : onUltrasoundExpo ? (
             <UltrasoundExpoRouter />
+          ) : onEchoExpo ? (
+            <EchoExpoMarketingRouter />
           ) : onLearnSubdomain ? (
             <><ProfileNameBanner /><LMSRouter /><LearnerAccessGuide /></>
           ) : onPublicWebsite ? (

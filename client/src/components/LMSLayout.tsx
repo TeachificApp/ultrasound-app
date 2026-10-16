@@ -24,6 +24,7 @@ const AAUS_LOGO = AAUS_BRAND_LOGO_URL;
 const MEMBERS_URL = "https://members.allaboutultrasound.com";
 import { getAdminUrl, APP_URL } from "@/hooks/useSubdomain";
 import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
+import { trpc } from "@/lib/trpc";
 import { SiteNavHeaderLinks, SiteNavProfileLinks } from "@/components/SiteNavLinks";
 import { STUDENT_DASHBOARD_PATH } from "@shared/studentDashboardUrls";
 import { removeQuizNavigationItems } from "@/lib/quizNavigation";
@@ -87,12 +88,17 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
   })();
 
   const { isAuthenticated, user, loading: authLoading, logout } = useAuth();
+  const expoRegistrations = trpc.ultrasoundExpo.myDashboard.useQuery(undefined, { enabled: isAuthenticated });
+  const expoPartnerAccess = trpc.vendorPortal.myAccess.useQuery(undefined, { enabled: isAuthenticated });
   const isAdmin = (user as any)?.role === "admin";
   const appRoles: string[] = (user as any)?.appRoles ?? [];
   const isPlatformAdmin = appRoles.includes("platform_admin") || appRoles.includes("platform_owner") || appRoles.includes("platform_moderator") || isAdmin;
   const hasEducationManagement = appRoles.includes("education_manager") || appRoles.includes("education_admin") || isPlatformAdmin;
   const hasDiyAccess = appRoles.includes("diy_user") || appRoles.includes("diy_admin") || isPlatformAdmin;
   const hasAccreditationManager = appRoles.includes("accreditation_manager") || isPlatformAdmin;
+  const hasUltrasoundExpoAccess = isPlatformAdmin
+    || (expoRegistrations.data?.length ?? 0) > 0
+    || !!expoPartnerAccess.data?.approved.ultrasoundExpo;
 
   function isActive(href: string, exact?: boolean) {
     if (exact) return location === href;
@@ -305,13 +311,13 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                       >
                         <CreditCard className="w-3.5 h-3.5 text-teal-600" /> My Subscriptions
                       </a>
-                      <a
+                      {hasUltrasoundExpoAccess && <a
                         href="https://ultrasoundexpo.com/expo-dashboard"
                         className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                         onClick={() => setAccountOpen(false)}
                       >
-                        <Briefcase className="w-3.5 h-3.5 text-teal-600" /> My Expo Dashboard
-                      </a>
+                        <Briefcase className="w-3.5 h-3.5 text-teal-600" /> UltrasoundExpo™
+                      </a>}
                       <SiteNavProfileLinks
                         items={profileNavItems}
                         location={location}

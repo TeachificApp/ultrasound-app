@@ -9175,6 +9175,9 @@ export const vendorPartnerApplications = mysqlTable("vendor_partner_applications
   // JSON arrays of shared VendorPartnerScope and VendorPartnerType values.
   requestedScopes: text("requested_scopes"),
   partnerTypes: text("partner_types"),
+  // Optional pathway preference for a registered companion event; approval remains
+  // controlled by the parent UltrasoundExpo™ scope.
+  eventFocus: varchar("event_focus", { length: 40 }),
   status: mysqlEnum("status", ["pending", "approved", "rejected", "suspended"]).default("pending").notNull(),
   // A server-side approval always associates an exact shared account user ID.
   linkedUserId: int("linked_user_id"),
@@ -9194,6 +9197,9 @@ export type VendorPartnerApplication = typeof vendorPartnerApplications.$inferSe
 
 export const ultrasoundExpoEvents = mysqlTable("ultrasound_expo_events", {
   id: int("id").autoincrement().primaryKey(),
+  // Keeps EchoExpo™ event instances, registration options, and reports isolated
+  // while the established tables and shared account architecture remain reusable.
+  tenant: varchar("tenant", { length: 40 }).default("ultrasound_expo").notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   slug: varchar("slug", { length: 255 }).notNull().unique(),
   startsAt: timestamp("starts_at").notNull(),
@@ -9210,6 +9216,7 @@ export const ultrasoundExpoEvents = mysqlTable("ultrasound_expo_events", {
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 }, (table) => [
   index("ultrasound_expo_events_status_starts_idx").on(table.status, table.startsAt),
+  index("ultrasound_expo_events_tenant_status_starts_idx").on(table.tenant, table.status, table.startsAt),
 ]);
 export type UltrasoundExpoEvent = typeof ultrasoundExpoEvents.$inferSelect;
 
