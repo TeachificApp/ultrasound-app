@@ -85,10 +85,15 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(ultrasoundSite).toContain("PLEASE DO NOT SIT HERE ALL DAY.");
     expect(ultrasoundSite).toContain("ScanLabs, new technology, live demonstrations, SonoGames, Innovation Showcase");
     expect(ultrasoundSite).toContain("Not Another Conference.");
+    expect(ultrasoundSite).not.toContain("You don&apos;t just attend UltrasoundExpo™");
+    expect(ultrasoundSite).toContain("text-[#4ad9e0]");
+    expect(ultrasoundSite).toContain("You Don&apos;t Just Attend It. You Experience It.");
     expect(echoSite).toContain("More than a cardiac conference");
     expect(echoSite).toContain("immersive echocardiography experience");
     expect(echoSite).toContain("new cardiac imaging technology");
     expect(echoSite).toContain("A Cardiac Ultrasound Experience.");
+    expect(echoSite).not.toContain("You don&apos;t just attend EchoExpo™");
+    expect(echoSite).toContain("You Don&apos;t Just Attend It. You Experience It.");
   });
 
   it("exports a standards-compatible multi-session event calendar", () => {

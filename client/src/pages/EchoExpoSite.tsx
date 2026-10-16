@@ -143,7 +143,6 @@ function EchoExperienceManifesto() {
         <h2 className="mt-4 max-w-4xl text-4xl font-black leading-[1.02] tracking-[-.05em] sm:text-6xl">EchoExpo™ isn&apos;t just another cardiac ultrasound conference or exhibit-hall destination.</h2>
         <p className="mt-6 max-w-3xl text-xl leading-8 text-slate-200">It&apos;s an immersive echocardiography experience built around scanning, discovering, connecting, and participating.</p>
         <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">Explore advancing cardiac ultrasound technology. Get hands-on. Earn CME. Compete in Echo Games. Meet the people shaping what&apos;s next in echocardiography. Connect with the cardiac ultrasound community.</p>
-        <p className="mt-8 text-2xl font-black tracking-[-.03em] text-[#80eee8] sm:text-3xl">You don&apos;t just attend EchoExpo™. You experience it.</p>
       </div>
       <aside className="rounded-[2rem] border border-[#74d9d7]/35 bg-white/8 p-8 shadow-2xl shadow-cyan-950/30 sm:p-10">
         <p className="text-xs font-black uppercase tracking-[.2em] text-[#80eee8]">PLEASE DO NOT SIT HERE ALL DAY.</p>
@@ -154,7 +153,7 @@ function EchoExperienceManifesto() {
     </div>
     <div className="mx-auto mt-12 max-w-7xl border-t border-white/15 pt-9 text-center">
       <p className="text-2xl font-black tracking-[-.04em] text-white sm:text-4xl">Not Another Conference. <span className="text-[#80eee8]">A Cardiac Ultrasound Experience.</span></p>
-      <p className="mt-3 text-lg font-bold text-slate-300">You Don&apos;t Just Attend It. You Experience It.</p>
+      <p className="mt-4 text-xl font-black tracking-[.02em] text-[#4ad9e0] drop-shadow-[0_0_22px_rgba(74,217,224,.42)] sm:text-2xl">You Don&apos;t Just Attend It. You Experience It.</p>
     </div>
   </section>;
 }
