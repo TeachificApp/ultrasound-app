@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isApprovedVendorForScope, parseVendorPartnerValues } from "../shared/vendorPartner";
 import { isExpoPublicRegistrationType } from "../shared/ultrasoundExpo";
-import { normalizeOrganizationWebsiteInput } from "./routers/vendorPortalRouter";
+import { getVerifiedSharedAccountLink, normalizeOrganizationWebsiteInput } from "./routers/vendorPortalRouter";
 
 describe("approved vendor partner access", () => {
   const approvedExpoVendor = {
@@ -36,5 +36,11 @@ describe("approved vendor partner access", () => {
     expect(normalizeOrganizationWebsiteInput(" www.sonamedicalsolutions.com ")).toBe("https://www.sonamedicalsolutions.com");
     expect(normalizeOrganizationWebsiteInput("https://sonamedicalsolutions.com")).toBe("https://sonamedicalsolutions.com");
     expect(normalizeOrganizationWebsiteInput("")).toBe("");
+  });
+
+  it("links an exhibitor application only to the matching signed-in Learn account", () => {
+    expect(getVerifiedSharedAccountLink("learner@example.com", { id: 42, email: "LEARNER@example.com" })).toBe(42);
+    expect(getVerifiedSharedAccountLink("vendor@example.com", { id: 42, email: "learner@example.com" })).toBeNull();
+    expect(getVerifiedSharedAccountLink("learner@example.com", null)).toBeNull();
   });
 });

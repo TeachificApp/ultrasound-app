@@ -47,6 +47,14 @@ export function normalizeOrganizationWebsiteInput(value: unknown) {
   return `https://${trimmed}`;
 }
 
+export function getVerifiedSharedAccountLink(
+  contactEmail: string,
+  user: { id: number; email?: string | null } | null | undefined,
+): number | null {
+  const signedInEmail = user?.email?.trim().toLowerCase();
+  return signedInEmail && signedInEmail === contactEmail.trim().toLowerCase() ? user?.id ?? null : null;
+}
+
 function decodeOrganizationLogo(dataUri: string, mimeType: string): Buffer {
   if (!logoMimeTypes.has(mimeType)) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Upload a PNG, JPEG, or WebP organization logo." });
@@ -104,12 +112,16 @@ const applicationInput = z.object({
 export const vendorPortalRouter = router({
   submitApplication: publicProcedure
     .input(applicationInput)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Partner applications are temporarily unavailable." });
 
       const contactEmail = input.contactEmail.trim().toLowerCase();
       const organizationName = input.organizationName.trim();
+      // A signed-in Learn/app member may apply as an attendee and an exhibitor.
+      // Link only an exact, authenticated mailbox match; approval is still required
+      // before this application grants any vendor, exhibitor, or sponsor access.
+      const verifiedSharedUserId = getVerifiedSharedAccountLink(contactEmail, ctx.user);
       let existingPending: { id: number } | undefined;
       try {
         [existingPending] = await db.select({ id: vendorPartnerApplications.id })
@@ -154,8 +166,9 @@ export const vendorPortalRouter = router({
           message: input.message?.trim() || null,
           requestedScopes: JSON.stringify([...new Set(input.requestedScopes)]),
           partnerTypes: JSON.stringify([...new Set(input.partnerTypes)]),
+          linkedUserId: verifiedSharedUserId,
           status: "pending",
-        }).$returningId();
+        });
       } catch (error) {
         console.error("[vendor-partner] Application save failed", error);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "We could not submit your application right now. Please try again shortly or contact support@allaboutultrasound.com." });
