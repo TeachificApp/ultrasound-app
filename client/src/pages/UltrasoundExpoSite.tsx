@@ -4,7 +4,7 @@ import { ArrowRight, CalendarDays, ChevronDown, CircleCheck, Handshake, MapPin, 
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { useSeoHead } from "@/hooks/useSeoHead";
-import { getUltrasoundExpoPageSeo, ULTRASOUND_EXPO_BANNER_URL, ULTRASOUND_EXPO_HERO_IMAGE, ULTRASOUND_EXPO_LOGO_URL, ULTRASOUND_EXPO_NAME, ULTRASOUND_EXPO_ORGANIZER, ULTRASOUND_EXPO_ORIGIN, ULTRASOUND_EXPO_SCHEDULE, ULTRASOUND_EXPO_SITE_DOMAIN } from "@shared/ultrasoundExpo";
+import { getUltrasoundExpoPageSeo, ULTRASOUND_EXPO_HERO_IMAGE, ULTRASOUND_EXPO_LOGO_URL, ULTRASOUND_EXPO_NAME, ULTRASOUND_EXPO_ORGANIZER, ULTRASOUND_EXPO_ORIGIN, ULTRASOUND_EXPO_SCHEDULE, ULTRASOUND_EXPO_SITE_DOMAIN } from "@shared/ultrasoundExpo";
 
 const NAVIGATION = [
   { label: "Attend", href: "/attend" },
@@ -41,26 +41,25 @@ function ExpoHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#061e2a]/95 text-white backdrop-blur">
       <div className="mx-auto flex h-18 max-w-7xl items-center justify-between gap-5 px-4 py-3 sm:px-6">
-        <Link href="/" className="group flex min-w-0 items-center gap-3">
+        <Link href="/" className="group flex shrink-0 items-center gap-3 whitespace-nowrap">
           <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-[#66d4d2]/50 bg-white shadow-lg shadow-cyan-950/40">
             <img src={ULTRASOUND_EXPO_LOGO_URL} alt="UltrasoundExpo™ logo" className="h-full w-full object-contain p-0.5" />
           </span>
-          <span className="min-w-0 leading-tight">
-            <span className="block truncate text-lg font-black tracking-[-0.04em]">Ultrasound<span className="text-[#6be1dc]">Expo™</span></span>
+          <span className="leading-tight">
+            <span className="block text-lg font-black tracking-[-0.04em]">Ultrasound<span className="text-[#6be1dc]">Expo™</span></span>
             <span className="block text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-300">by All About Ultrasound™</span>
           </span>
         </Link>
-        <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
+        <nav className="hidden items-center gap-1 xl:flex" aria-label="Primary navigation">
           {NAVIGATION.map(item => <Link key={item.href} href={item.href} className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${location === item.href ? "bg-white/10 text-[#8aeae5]" : "text-slate-200 hover:bg-white/10 hover:text-white"}`}>{item.label}</Link>)}
         </nav>
         <div className="hidden items-center gap-2 sm:flex">
-          <img src={ULTRASOUND_EXPO_BANNER_URL} alt="UltrasoundExpo™" className="hidden h-9 w-auto max-w-[220px] object-contain object-right lg:block" />
           <Link href="/expo-dashboard" className="rounded-lg px-3 py-2 text-sm font-semibold text-[#a5f4ef] hover:bg-white/10">My UltrasoundExpo™</Link>
-          <Button onClick={() => setLocation("/register")} className="bg-[#0c9ba3] font-bold hover:bg-[#0a858d]">Attendee registration coming soon</Button>
+          <Button onClick={() => setLocation("/register")} className="h-9 bg-[#0c9ba3] px-3 text-sm font-bold hover:bg-[#0a858d]">Register Now</Button>
         </div>
-        <button onClick={() => setOpen(!open)} className="rounded-lg p-2 text-white hover:bg-white/10 lg:hidden" aria-label="Toggle menu">{open ? <X /> : <Menu />}</button>
+        <button onClick={() => setOpen(!open)} className="rounded-lg p-2 text-white hover:bg-white/10 xl:hidden" aria-label="Toggle menu">{open ? <X /> : <Menu />}</button>
       </div>
-      {open && <div className="border-t border-white/10 px-4 py-3 lg:hidden"><nav className="grid gap-1">{NAVIGATION.map(item => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10">{item.label}</Link>)}<Link href="/expo-dashboard" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-[#8aeae5]">My UltrasoundExpo™ Dashboard</Link><Button onClick={() => { setOpen(false); setLocation("/register"); }} className="mt-2 bg-[#0c9ba3]">Attendee registration coming soon</Button></nav></div>}
+      {open && <div className="border-t border-white/10 px-4 py-3 xl:hidden"><nav className="grid gap-1">{NAVIGATION.map(item => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10">{item.label}</Link>)}<Link href="/expo-dashboard" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-[#8aeae5]">My UltrasoundExpo™ Dashboard</Link><Button onClick={() => { setOpen(false); setLocation("/register"); }} className="mt-2 h-10 bg-[#0c9ba3] text-sm">Register Now</Button></nav></div>}
     </header>
   );
 }
