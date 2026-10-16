@@ -55,6 +55,8 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(ultrasoundSite).toContain("https://echocardiographyexpo.com/");
     expect(echoSite).toContain("by iHeartEcho™");
     expect(echoSite).toContain("echoexpo-logo_535dff69.png");
+    expect(echoSite).toContain("Echo<span");
+    expect(echoSite).toContain("h-12 w-12 shrink-0");
     expect(echoSite).toContain("echoexpo-tradeshow-hero_04c02c20.png");
     expect(echoSite).toContain("EchoExpo trade-show floor with a cardiac ultrasound demonstration in the foreground");
     expect(echoSite).toContain("Everything Echo.");
