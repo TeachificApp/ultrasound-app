@@ -40,6 +40,13 @@ const scopeInput = z.enum(VENDOR_PARTNER_SCOPES);
 const partnerTypeInput = z.enum(VENDOR_PARTNER_TYPES);
 const logoMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+export function normalizeOrganizationWebsiteInput(value: unknown) {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (!trimmed || /^[a-z][a-z\d+.-]*:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 function decodeOrganizationLogo(dataUri: string, mimeType: string): Buffer {
   if (!logoMimeTypes.has(mimeType)) {
     throw new TRPCError({ code: "BAD_REQUEST", message: "Upload a PNG, JPEG, or WebP organization logo." });
@@ -72,7 +79,17 @@ function asApplication(row: typeof vendorPartnerApplications.$inferSelect) {
 
 const applicationInput = z.object({
   organizationName: z.string().trim().min(2).max(255),
-  organizationWebsite: z.string().trim().url().max(1024).optional().or(z.literal("")),
+  organizationWebsite: z.preprocess(
+    normalizeOrganizationWebsiteInput,
+    z.string().trim().url().max(1024).refine(value => {
+      try {
+        const parsed = new URL(value);
+        return ["http:", "https:"].includes(parsed.protocol) && Boolean(parsed.hostname);
+      } catch {
+        return false;
+      }
+    }, "Enter a valid website address, such as yourorganization.com.").optional().or(z.literal("")),
+  ),
   organizationLogoDataUri: z.string().min(1).max(4_500_000).optional(),
   organizationLogoMimeType: z.string().max(100).optional(),
   organizationLogoFileName: z.string().trim().max(255).optional(),
@@ -93,14 +110,21 @@ export const vendorPortalRouter = router({
 
       const contactEmail = input.contactEmail.trim().toLowerCase();
       const organizationName = input.organizationName.trim();
-      const [existingPending] = await db.select({ id: vendorPartnerApplications.id })
-        .from(vendorPartnerApplications)
-        .where(and(
-          eq(vendorPartnerApplications.contactEmail, contactEmail),
-          eq(vendorPartnerApplications.organizationName, organizationName),
-          eq(vendorPartnerApplications.status, "pending"),
-        ))
-        .limit(1);
+      let existingPending: { id: number } | undefined;
+      try {
+        [existingPending] = await db.select({ id: vendorPartnerApplications.id })
+          .from(vendorPartnerApplications)
+          .where(and(
+            eq(vendorPartnerApplications.contactEmail, contactEmail),
+            eq(vendorPartnerApplications.organizationName, organizationName),
+            eq(vendorPartnerApplications.status, "pending"),
+          ))
+          .limit(1);
+      } catch (error) {
+        // A transient duplicate-check failure must not block an otherwise valid
+        // public application. The failed query is logged only on the server.
+        console.error("[vendor-partner] Pending-application check failed; continuing to save application.", error);
+      }
       if (existingPending) {
         return { success: true, duplicatePending: true };
       }
@@ -119,18 +143,24 @@ export const vendorPortalRouter = router({
         }
       }
 
-      const created = await db.insert(vendorPartnerApplications).values({
-        organizationName,
-        organizationWebsite: input.organizationWebsite?.trim() || null,
-        organizationLogoUrl,
-        contactName: input.contactName.trim(),
-        contactEmail,
-        contactPhone: input.contactPhone.trim(),
-        message: input.message?.trim() || null,
-        requestedScopes: JSON.stringify([...new Set(input.requestedScopes)]),
-        partnerTypes: JSON.stringify([...new Set(input.partnerTypes)]),
-        status: "pending",
-      }).$returningId();
+      let created: Array<{ id: number }>;
+      try {
+        created = await db.insert(vendorPartnerApplications).values({
+          organizationName,
+          organizationWebsite: input.organizationWebsite?.trim() || null,
+          organizationLogoUrl,
+          contactName: input.contactName.trim(),
+          contactEmail,
+          contactPhone: input.contactPhone.trim(),
+          message: input.message?.trim() || null,
+          requestedScopes: JSON.stringify([...new Set(input.requestedScopes)]),
+          partnerTypes: JSON.stringify([...new Set(input.partnerTypes)]),
+          status: "pending",
+        }).$returningId();
+      } catch (error) {
+        console.error("[vendor-partner] Application save failed", error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "We could not submit your application right now. Please try again shortly or contact support@allaboutultrasound.com." });
+      }
       const applicationId = created[0]?.id;
       if (!applicationId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "We could not save your partner application. Please try again." });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isApprovedVendorForScope, parseVendorPartnerValues } from "../shared/vendorPartner";
 import { isExpoPublicRegistrationType } from "../shared/ultrasoundExpo";
+import { normalizeOrganizationWebsiteInput } from "./routers/vendorPortalRouter";
 
 describe("approved vendor partner access", () => {
   const approvedExpoVendor = {
@@ -28,5 +29,12 @@ describe("approved vendor partner access", () => {
       .toEqual(["aaus_ihe", "ultrasound_expo"]);
     expect(parseVendorPartnerValues('["vendor","exhibitor","sponsor"]', ["vendor", "exhibitor", "sponsor"] as const))
       .toEqual(["vendor", "exhibitor", "sponsor"]);
+  });
+
+  it("accepts a domain-only organization website and normalizes it for storage", () => {
+    expect(normalizeOrganizationWebsiteInput("sonamedicalsolutions.com")).toBe("https://sonamedicalsolutions.com");
+    expect(normalizeOrganizationWebsiteInput(" www.sonamedicalsolutions.com ")).toBe("https://www.sonamedicalsolutions.com");
+    expect(normalizeOrganizationWebsiteInput("https://sonamedicalsolutions.com")).toBe("https://sonamedicalsolutions.com");
+    expect(normalizeOrganizationWebsiteInput("")).toBe("");
   });
 });
