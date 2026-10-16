@@ -45,6 +45,18 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(registrationPage).toContain('isEchoExpoDomain()');
   });
 
+  it("features the cardiac EchoExpo pathway on UltrasoundExpo and uses a dedicated cardiac hero", async () => {
+    const [ultrasoundSite, echoSite] = await Promise.all([
+      import("node:fs/promises").then(fs => fs.readFile("client/src/pages/UltrasoundExpoSite.tsx", "utf8")),
+      import("node:fs/promises").then(fs => fs.readFile("client/src/pages/EchoExpoSite.tsx", "utf8")),
+    ]);
+    expect(ultrasoundSite).toContain("Inside UltrasoundExpo™");
+    expect(ultrasoundSite).toContain("Explore EchoExpo™");
+    expect(ultrasoundSite).toContain("https://echoexpo.iheartecho.com/");
+    expect(echoSite).toContain("echoexpo-cardiac-hero_55f85ac1.png");
+    expect(echoSite).toContain("Cardiac sonographer performing an echocardiography examination");
+  });
+
   it("exports a standards-compatible multi-session event calendar", () => {
     const ics = buildUltrasoundExpoAgendaIcs("UltrasoundExpo™ 2028", [{
       id: 8,
