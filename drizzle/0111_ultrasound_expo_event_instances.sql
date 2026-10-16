@@ -1,9 +1,25 @@
 -- UltrasoundExpo™ per-event agenda, landing pages, partner profiles, product documents, and recording access.
 -- Additive only: all existing Expo events, registrations, vendors, and pages remain intact.
 
-ALTER TABLE `ultrasound_expo_events` ADD COLUMN IF NOT EXISTS `registration_terms` text NULL AFTER `hero_image_url`;
-ALTER TABLE `ultrasound_expo_events` ADD COLUMN IF NOT EXISTS `attendee_instructions` text NULL AFTER `registration_terms`;
-ALTER TABLE `ultrasound_expo_events` ADD COLUMN IF NOT EXISTS `partner_instructions` text NULL AFTER `attendee_instructions`;
+-- Railway MySQL does not support ADD COLUMN IF NOT EXISTS. Keep each addition
+-- idempotent without failing when this migration is re-applied to an existing event table.
+SET @expo_event_column_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ultrasound_expo_events' AND COLUMN_NAME = 'registration_terms');
+SET @expo_event_column_sql = IF(@expo_event_column_exists = 0, 'ALTER TABLE `ultrasound_expo_events` ADD COLUMN `registration_terms` TEXT NULL AFTER `hero_image_url`', 'SELECT 1');
+PREPARE expo_event_column_statement FROM @expo_event_column_sql;
+EXECUTE expo_event_column_statement;
+DEALLOCATE PREPARE expo_event_column_statement;
+
+SET @expo_event_column_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ultrasound_expo_events' AND COLUMN_NAME = 'attendee_instructions');
+SET @expo_event_column_sql = IF(@expo_event_column_exists = 0, 'ALTER TABLE `ultrasound_expo_events` ADD COLUMN `attendee_instructions` TEXT NULL AFTER `registration_terms`', 'SELECT 1');
+PREPARE expo_event_column_statement FROM @expo_event_column_sql;
+EXECUTE expo_event_column_statement;
+DEALLOCATE PREPARE expo_event_column_statement;
+
+SET @expo_event_column_exists = (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ultrasound_expo_events' AND COLUMN_NAME = 'partner_instructions');
+SET @expo_event_column_sql = IF(@expo_event_column_exists = 0, 'ALTER TABLE `ultrasound_expo_events` ADD COLUMN `partner_instructions` TEXT NULL AFTER `attendee_instructions`', 'SELECT 1');
+PREPARE expo_event_column_statement FROM @expo_event_column_sql;
+EXECUTE expo_event_column_statement;
+DEALLOCATE PREPARE expo_event_column_statement;
 
 CREATE TABLE IF NOT EXISTS `ultrasound_expo_agenda_items` (
   `id` int NOT NULL AUTO_INCREMENT,
