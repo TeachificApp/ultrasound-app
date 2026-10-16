@@ -19,6 +19,8 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 const EXPO_ORIGINS = new Set([
   "ultrasoundexpo.com",
   "www.ultrasoundexpo.com",
+  "echocardiographyexpo.com",
+  "www.echocardiographyexpo.com",
   "app.allaboutultrasound.com",
   "learn.allaboutultrasound.com",
   "members.allaboutultrasound.com",

@@ -33,6 +33,8 @@ const ALL_DOMAINS = [
   "https://accreditation.iheartecho.com",
   "https://ultrasoundexpo.com",
   "https://www.ultrasoundexpo.com",
+  "https://echocardiographyexpo.com",
+  "https://www.echocardiographyexpo.com",
 ] as const;
 
 function isAccreditationDomain(): boolean {

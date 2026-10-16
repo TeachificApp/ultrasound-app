@@ -6793,7 +6793,58 @@ export const emailListSubscribers = mysqlTable("emailListSubscribers", {
 export type EmailListSubscriber = typeof emailListSubscribers.$inferSelect;
 export type InsertEmailListSubscriber = typeof emailListSubscribers.$inferInsert;
 
-// ─── Lead Capture Widgets ──────────────────────────────────────────────────────
+// ─── Email Campaign Automations ──────────────────────────────────────────────
+// Rules are intentionally inactive until a platform administrator explicitly
+// enables them. Delivery rows preserve an immutable per-event email snapshot.
+export const emailAutomationWorkflows = mysqlTable("email_automation_workflows", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  scope: mysqlEnum("scope", ["learn", "apps", "expo"]).notNull(),
+  triggerType: varchar("trigger_type", { length: 80 }).notNull(),
+  targetType: varchar("target_type", { length: 80 }),
+  targetId: int("target_id"),
+  emailTemplateId: int("email_template_id").notNull(),
+  senderProfileId: int("sender_profile_id"),
+  subject: varchar("subject", { length: 500 }).notNull(),
+  htmlBody: longtext("html_body").notNull(),
+  delayMinutes: int("delay_minutes").default(0).notNull(),
+  isActive: boolean("is_active").default(false).notNull(),
+  createdByUserId: int("created_by_user_id").notNull(),
+  lastTriggeredAt: timestamp("last_triggered_at"),
+  lastStatus: varchar("last_status", { length: 80 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("email_automation_workflows_active_trigger_idx").on(table.isActive, table.scope, table.triggerType),
+  index("email_automation_workflows_target_idx").on(table.targetType, table.targetId),
+]);
+export type EmailAutomationWorkflow = typeof emailAutomationWorkflows.$inferSelect;
+
+export const emailAutomationDeliveries = mysqlTable("email_automation_deliveries", {
+  id: int("id").autoincrement().primaryKey(),
+  workflowId: int("workflow_id").notNull(),
+  sourceKey: varchar("source_key", { length: 255 }).notNull(),
+  userId: int("user_id"),
+  recipientEmail: varchar("recipient_email", { length: 320 }).notNull(),
+  recipientName: varchar("recipient_name", { length: 255 }),
+  subject: varchar("subject", { length: 500 }).notNull(),
+  htmlBody: longtext("html_body").notNull(),
+  senderProfileId: int("sender_profile_id"),
+  status: mysqlEnum("status", ["queued", "sending", "sent", "failed", "cancelled"]).default("queued").notNull(),
+  attempts: int("attempts").default(0).notNull(),
+  scheduledFor: timestamp("scheduled_for").defaultNow().notNull(),
+  sentAt: timestamp("sent_at"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("email_automation_deliveries_workflow_source_unique").on(table.workflowId, table.sourceKey),
+  index("email_automation_deliveries_due_idx").on(table.status, table.scheduledFor),
+  index("email_automation_deliveries_workflow_idx").on(table.workflowId, table.createdAt),
+]);
+export type EmailAutomationDelivery = typeof emailAutomationDeliveries.$inferSelect;
+
+// ─── Lead Capture Widgets ──────────────────────────────────────────────────
 export const leadCaptureWidgets = mysqlTable("leadCaptureWidgets", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),

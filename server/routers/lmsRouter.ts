@@ -2627,6 +2627,13 @@ export const lmsLearnerRouter = router({
           contentTitle: lessonTitle,
           metadata: { courseSlug: course.slug, courseTitle: course.title, sectionTitle },
         }).catch(() => {});
+        import("../lib/emailAutomation").then(({ fireEmailAutomationEvent }) =>
+          fireEmailAutomationEvent({
+            type: "course_completion", scope: "learn", userId: ctx.user.id, email: ctx.user.email,
+            name: ctx.user.name, targetId: course.id, contentName: course.title,
+            sourceKey: `course-lesson-complete:${ctx.user.id}:${course.id}:${lesson.id}`,
+          }),
+        ).catch(() => {});
       }
       return { success: true };
     }),

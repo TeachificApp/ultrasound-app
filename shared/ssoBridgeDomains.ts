@@ -27,6 +27,10 @@ export const SSO_BRIDGE_CLIENT_HOSTS = new Set([
   "members.allaboutultrasound.com",
   "ultrasoundexpo.com",
   "www.ultrasoundexpo.com",
+  "echocardiographyexpo.com",
+  "www.echocardiographyexpo.com",
+  // Legacy marketing hostname remains an alias while traffic transitions.
+  "echoexpo.iheartecho.com",
 ]);
 
 /** Bridge origins to try from the current hostname (never bridge to self). */
@@ -52,6 +56,9 @@ export function getSsoBridgeOrigins(currentHostname: string): string[] {
   }
   if (host === "ultrasoundexpo.com" || host === "www.ultrasoundexpo.com") {
     return ["https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
+  }
+  if (host === "echocardiographyexpo.com" || host === "www.echocardiographyexpo.com" || host === "echoexpo.iheartecho.com") {
+    return ["https://learn.iheartecho.com", "https://learn.allaboutultrasound.com", "https://app.allaboutultrasound.com"];
   }
   return SSO_BRIDGE_ORIGINS.filter((origin) => new URL(origin).hostname !== host);
 }

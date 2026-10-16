@@ -14,7 +14,7 @@ export const SITE_PAGE_DOMAINS = [
   { value: "app.iheartecho.com",             label: "App — iheartecho.com",                   brand: "iheartecho" as Brand },
   { value: "app.iheartecho.net",             label: "App — iheartecho.net (legacy)",           brand: "iheartecho" as Brand },
   { value: "accreditation.iheartecho.com",   label: "Accreditation — iheartecho.com",         brand: "iheartecho" as Brand },
-  { value: "echoexpo.iheartecho.com",        label: "EchoExpo™ — echoexpo.iheartecho.com",   brand: "iheartecho" as Brand },
+  { value: "echoexpo.iheartecho.com",          label: "EchoExpo™ — echoexpo.iheartecho.com",     brand: "iheartecho" as Brand },
 ] as const;
 
 export type SitePageDomain = (typeof SITE_PAGE_DOMAINS)[number]["value"];

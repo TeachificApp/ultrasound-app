@@ -104,6 +104,15 @@ export async function addToEmailList(
         .update(emailLists)
         .set({ subscriberCount: sql`subscriberCount + 1` })
         .where(eq(emailLists.id, listId));
+      const [list] = await db.select({ name: emailLists.name }).from(emailLists).where(eq(emailLists.id, listId)).limit(1);
+      import("./emailAutomation").then(({ fireEmailAutomationEvent }) => {
+        for (const scope of ["learn", "apps", "expo"] as const) {
+          fireEmailAutomationEvent({
+            type: "list_signup", scope, userId: options.userId ?? null, email: normalizedEmail, name: name ?? null,
+            targetId: listId, eventName: list?.name ?? "Email list", sourceKey: `email-list:${listId}:${normalizedEmail}:reactivated`,
+          }).catch(() => {});
+        }
+      }).catch(() => {});
       return;
     }
 
@@ -118,7 +127,7 @@ export async function addToEmailList(
       return;
     }
 
-    await db.insert(emailListSubscribers).values({
+    const [created] = await db.insert(emailListSubscribers).values({
       listId,
       email: normalizedEmail,
       name: name ?? null,
@@ -132,6 +141,15 @@ export async function addToEmailList(
       .update(emailLists)
       .set({ subscriberCount: sql`subscriberCount + 1` })
       .where(eq(emailLists.id, listId));
+    const [list] = await db.select({ name: emailLists.name }).from(emailLists).where(eq(emailLists.id, listId)).limit(1);
+    import("./emailAutomation").then(({ fireEmailAutomationEvent }) => {
+      for (const scope of ["learn", "apps", "expo"] as const) {
+        fireEmailAutomationEvent({
+          type: "list_signup", scope, userId: options.userId ?? null, email: normalizedEmail, name: name ?? null,
+          targetId: listId, eventName: list?.name ?? "Email list", sourceKey: `email-list:${listId}:${normalizedEmail}:${(created as any).insertId ?? "new"}`,
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   } catch (err: unknown) {
     if ((err as { code?: string })?.code === "ER_DUP_ENTRY") return;
     console.error("[emailListHelper] addToEmailList error:", err);

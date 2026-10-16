@@ -23,6 +23,8 @@ export const BRAND_DOMAINS: Record<string, Brand> = {
   "iheartecho.net": "iheartecho",
   "www.iheartecho.net": "iheartecho",
   "accreditation.iheartecho.com": "iheartecho",
+  "echocardiographyexpo.com": "iheartecho",
+  "www.echocardiographyexpo.com": "iheartecho",
   // UltrasoundExpo™ shares identities with the AAUS platform but remains an
   // independent annual-event environment with its own registrations and data.
   "ultrasoundexpo.com": "aaus",

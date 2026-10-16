@@ -20,7 +20,7 @@ import { z } from "zod";
 import { invokeLLM } from "../_core/llm";
 import { generateImage } from "../_core/imageGeneration";
 import { storagePut } from "../storage";
-import { eq, and, desc, lte, sql } from "drizzle-orm";
+import { eq, and, asc, desc, lte, sql } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb, getUserRoles } from "../db";
 import {
@@ -41,6 +41,9 @@ import {
   bundles,
   webinars,
   digitalProducts,
+  emailAutomationWorkflows,
+  emailAutomationDeliveries,
+  ultrasoundExpoEvents,
 } from "../../drizzle/schema";
 import { addToEmailList, ensureAllContactsList } from "../lib/emailListHelper";
 import { resolveRecipients } from "../lib/emailCampaignAudienceResolver";
@@ -54,6 +57,7 @@ import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
 import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
 import { normalizeCampaignEmailHtml } from "../../shared/emailCampaignLayout";
+import { EMAIL_AUTOMATION_SCOPES, EMAIL_AUTOMATION_TRIGGER_META, EMAIL_AUTOMATION_TRIGGERS } from "../../shared/emailAutomation";
 import { resolveCampaignTestSubject } from "../../shared/emailCampaignTestSubject";
 import {
   injectTrackingPixel,
@@ -707,6 +711,124 @@ Rules:
         }
       }
       return { success: true, alreadyUnsubscribed: !!u.unsubscribedAt };
+    }),
+
+  // ── Admin: if/then email workflow automations ─────────────────────────────
+
+  getAutomationOptions: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx.user.id);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const [courses, lists, templates, expoEvents, workshopsForAutomation, webinarsForAutomation, productsForAutomation] = await Promise.all([
+      db.select({ id: lmsCourses.id, name: lmsCourses.title, kind: lmsCourses.type }).from(lmsCourses).orderBy(asc(lmsCourses.title)).limit(1000),
+      db.select({ id: emailLists.id, name: emailLists.name }).from(emailLists).orderBy(asc(emailLists.name)).limit(1000),
+      db.select({ id: emailTemplates.id, name: emailTemplates.name, subject: emailTemplates.subject }).from(emailTemplates).orderBy(desc(emailTemplates.updatedAt)).limit(1000),
+      db.select({ id: ultrasoundExpoEvents.id, name: ultrasoundExpoEvents.name, tenant: ultrasoundExpoEvents.tenant }).from(ultrasoundExpoEvents).orderBy(desc(ultrasoundExpoEvents.startsAt)).limit(1000),
+      db.select({ id: workshops.id, name: workshops.title }).from(workshops).orderBy(asc(workshops.title)).limit(1000),
+      db.select({ id: webinars.id, name: webinars.title }).from(webinars).orderBy(asc(webinars.title)).limit(1000),
+      db.select({ id: digitalProducts.id, name: digitalProducts.title }).from(digitalProducts).orderBy(asc(digitalProducts.title)).limit(1000),
+    ]);
+    return { courses, lists, templates, expoEvents, workshops: workshopsForAutomation, webinars: webinarsForAutomation, products: productsForAutomation };
+  }),
+
+  listAutomations: protectedProcedure.query(async ({ ctx }) => {
+    await assertAdmin(ctx.user.id);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const workflows = await db.select().from(emailAutomationWorkflows).orderBy(desc(emailAutomationWorkflows.updatedAt)).limit(500);
+    const workflowIds = workflows.map((workflow) => workflow.id);
+    const deliveryCounts = new Map<number, { queued: number; sent: number; failed: number }>();
+    if (workflowIds.length) {
+      const [rows] = await db.execute(sql`SELECT workflow_id AS workflowId,
+        SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END) AS queued,
+        SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+        FROM email_automation_deliveries WHERE workflow_id IN (${sql.join(workflowIds.map((id) => sql`${id}`), sql`, `)}) GROUP BY workflow_id`) as any;
+      for (const row of Array.isArray(rows) ? rows : []) deliveryCounts.set(Number(row.workflowId), { queued: Number(row.queued || 0), sent: Number(row.sent || 0), failed: Number(row.failed || 0) });
+    }
+    return workflows.map((workflow) => ({ ...workflow, deliveryCounts: deliveryCounts.get(workflow.id) ?? { queued: 0, sent: 0, failed: 0 } }));
+  }),
+
+  saveAutomation: protectedProcedure
+    .input(z.object({
+      id: z.number().int().positive().optional(),
+      name: z.string().trim().min(2).max(255),
+      scope: z.enum(EMAIL_AUTOMATION_SCOPES),
+      triggerType: z.enum(EMAIL_AUTOMATION_TRIGGERS),
+      targetType: z.string().trim().max(80).optional().nullable(),
+      targetId: z.number().int().positive().optional().nullable(),
+      emailTemplateId: z.number().int().positive(),
+      senderProfileId: z.number().int().positive().optional().nullable(),
+      delayMinutes: z.number().int().min(0).max(43200).default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, input.emailTemplateId)).limit(1);
+      if (!template) throw new TRPCError({ code: "NOT_FOUND", message: "Choose an existing email template." });
+      if (!template.subject.trim() || !template.htmlBody.trim()) throw new TRPCError({ code: "BAD_REQUEST", message: "The selected template needs both a subject and email body." });
+      const triggerMeta = EMAIL_AUTOMATION_TRIGGER_META[input.triggerType];
+      if (!triggerMeta.scopes.includes(input.scope)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "That activity is not available in the selected workspace." });
+      }
+      if ((triggerMeta.targetType ?? null) !== (input.targetType || null)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The selected activity and its item filter do not match." });
+      }
+      const values = {
+        name: input.name,
+        scope: input.scope,
+        triggerType: input.triggerType,
+        targetType: input.targetType || null,
+        targetId: input.targetId ?? null,
+        emailTemplateId: input.emailTemplateId,
+        senderProfileId: input.senderProfileId ?? null,
+        subject: template.subject,
+        htmlBody: normalizeCampaignEmailHtml(template.htmlBody),
+        delayMinutes: input.delayMinutes,
+        updatedAt: new Date(),
+      };
+      if (input.id) {
+        const [existing] = await db.select({ isActive: emailAutomationWorkflows.isActive })
+          .from(emailAutomationWorkflows).where(eq(emailAutomationWorkflows.id, input.id)).limit(1);
+        if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Workflow automation not found." });
+        await db.update(emailAutomationWorkflows).set(values).where(eq(emailAutomationWorkflows.id, input.id));
+        return { id: input.id, isActive: existing.isActive };
+      }
+      const [created] = await db.insert(emailAutomationWorkflows).values({ ...values, isActive: false, createdByUserId: ctx.user.id });
+      return { id: (created as any).insertId as number, isActive: false };
+    }),
+
+  setAutomationActive: protectedProcedure
+    .input(z.object({ id: z.number().int().positive(), isActive: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertFullPlatformAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(emailAutomationWorkflows).set({ isActive: input.isActive, updatedAt: new Date() }).where(eq(emailAutomationWorkflows.id, input.id));
+      return { success: true, isActive: input.isActive };
+    }),
+
+  deleteAutomation: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertFullPlatformAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      await db.update(emailAutomationWorkflows).set({ isActive: false, updatedAt: new Date() }).where(eq(emailAutomationWorkflows.id, input.id));
+      await db.update(emailAutomationDeliveries).set({ status: "cancelled" }).where(and(eq(emailAutomationDeliveries.workflowId, input.id), eq(emailAutomationDeliveries.status, "queued")));
+      return { success: true };
+    }),
+
+  listAutomationDeliveries: protectedProcedure
+    .input(z.object({ workflowId: z.number().int().positive().optional() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      return db.select().from(emailAutomationDeliveries)
+        .where(input.workflowId ? eq(emailAutomationDeliveries.workflowId, input.workflowId) : undefined)
+        .orderBy(desc(emailAutomationDeliveries.createdAt)).limit(100);
     }),
 
   // ── Admin: email templates ────────────────────────────────────────────────

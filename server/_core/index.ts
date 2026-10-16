@@ -66,6 +66,7 @@ import { hourlyBackupHandler } from "../routes/hourlyBackupHandler";
 import { sdmsCmeDailySummaryHandler } from "../routes/sdmsCmeDailySummary";
 import { cmeExpiryCheckHandler } from "../scheduled/cmeExpiryCheck";
 import { stripeSubscriptionSyncHandler } from "../scheduled/stripeSubscriptionSync";
+import { emailAutomationHeartbeatHandler } from "../routes/emailAutomationHeartbeat";
 import { clearSessionCookies, getSessionCookieOptions } from "./cookies";
 import { COOKIE_NAME, DEMO_COOKIE_NAME } from "../../shared/const";
 import { parse as parseCookieHeader } from "cookie";
@@ -807,6 +808,8 @@ async function startServer() {
   app.post("/api/scheduled/cme-expiry-check", cmeExpiryCheckHandler);
 
   app.post("/api/scheduled/stripe-subscription-sync", stripeSubscriptionSyncHandler);
+  // Heartbeat: durable email campaign workflow delivery queue (every five minutes)
+  app.post("/api/scheduled/email-automation-delivery", emailAutomationHeartbeatHandler);
   // Admin REST API: GET /api/quiz-results/export-csv
   app.get("/api/quiz-results/export-csv", async (req: any, res: any) => {
     try {

@@ -385,6 +385,16 @@ export const vendorPortalRouter = router({
           const approvedScopes: VendorPartnerScope[] = [aausAccess ? "aaus_ihe" : null, expoAccess ? "ultrasound_expo" : null].filter((value): value is VendorPartnerScope => !!value);
           const email = buildVendorApprovedEmail({ organizationName: application.organizationName, contactName: application.contactName, approvedScopes });
           await sendEmail({ to: { name: application.contactName, email: application.contactEmail }, subject: email.subject, htmlBody: email.htmlBody }).catch(error => console.error("[vendor-partner] Approval email failed", error));
+          if (expoAccess) {
+            import("../lib/emailAutomation").then(({ fireEmailAutomationEvent }) =>
+              fireEmailAutomationEvent({
+                type: "expo_vendor_approved", scope: "expo", userId: resolved.user.id,
+                email: application.contactEmail, name: application.contactName,
+                contentName: application.organizationName, eventName: "UltrasoundExpo™",
+                sourceKey: `vendor-approval:${application.id}`,
+              }),
+            ).catch(() => {});
+          }
         }
         return { success: true, status: "approved" as const, linkedUserId: resolved.user.id };
       }

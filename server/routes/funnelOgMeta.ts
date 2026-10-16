@@ -51,6 +51,9 @@ function getCanonicalHost(req: Request): string {
   if (requestHost === "ultrasoundexpo.com" || requestHost === "www.ultrasoundexpo.com") {
     return ULTRASOUND_EXPO_SITE_DOMAIN;
   }
+  if (requestHost === "echocardiographyexpo.com" || requestHost === "www.echocardiographyexpo.com" || requestHost === "echoexpo.iheartecho.com") {
+    return "echoexpo.iheartecho.com";
+  }
   const cfHeader = req.headers["x-canonical-host"];
   if (cfHeader && typeof cfHeader === "string" && cfHeader.trim()) {
     return cfHeader.trim();

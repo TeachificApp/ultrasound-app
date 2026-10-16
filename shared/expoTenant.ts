@@ -45,7 +45,9 @@ export function isExpoEventTenant(value: string): value is ExpoEventTenant {
 
 export function getExpoTenantForHostname(hostname: string | null | undefined): ExpoEventTenant {
   const host = (hostname || "").trim().toLowerCase().split(":")[0];
-  return host === "echoexpo.iheartecho.com" ? "echo_expo" : "ultrasound_expo";
+  return host === "echocardiographyexpo.com" || host === "www.echocardiographyexpo.com" || host === "echoexpo.iheartecho.com"
+    ? "echo_expo"
+    : "ultrasound_expo";
 }
 
 export function getExpoTenantConfig(tenant: ExpoEventTenant): ExpoTenantConfig {

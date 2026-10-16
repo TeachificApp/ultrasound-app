@@ -9,7 +9,10 @@ import { EXPO_TENANT_CONFIG, getExpoTenantForHostname } from "../shared/expoTena
 
 describe("UltrasoundExpo™ event instances", () => {
   it("keeps EchoExpo marketing-only while sharing UltrasoundExpo administration", () => {
+    expect(getExpoTenantForHostname("echocardiographyexpo.com")).toBe("echo_expo");
+    expect(getExpoTenantForHostname("www.echocardiographyexpo.com")).toBe("echo_expo");
     expect(getExpoTenantForHostname("echoexpo.iheartecho.com")).toBe("echo_expo");
+    expect(EXPO_TENANT_CONFIG.echo_expo.origin).toBe("https://echoexpo.iheartecho.com");
     expect(EXPO_TENANT_CONFIG.echo_expo.partnerScope).toBe("ultrasound_expo");
     expect(EXPO_TENANT_CONFIG.echo_expo.adminPath).toBe("/admin/ultrasound-expo");
   });

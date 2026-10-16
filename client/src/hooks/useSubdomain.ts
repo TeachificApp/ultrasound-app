@@ -70,7 +70,7 @@ export const MARKETING_STAGING_URL = "https://site.allaboutultrasound.com";
 
 const MARKETING_STAGING_HOSTNAMES = ["site.allaboutultrasound.com"];
 const ULTRASOUND_EXPO_HOSTNAMES = ["ultrasoundexpo.com", "www.ultrasoundexpo.com"];
-const ECHO_EXPO_HOSTNAMES = ["echoexpo.iheartecho.com"];
+const ECHO_EXPO_HOSTNAMES = ["echocardiographyexpo.com", "www.echocardiographyexpo.com", "echoexpo.iheartecho.com"];
 
 /** The dedicated UltrasoundExpo™ annual-event tenant. */
 export function isUltrasoundExpoDomain(): boolean {

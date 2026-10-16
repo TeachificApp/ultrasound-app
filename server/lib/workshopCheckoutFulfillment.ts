@@ -187,6 +187,13 @@ export async function fulfillWorkshopCheckoutFromStripeSession(
     sourceType: "workshop_instance",
     sourceId: instanceId,
   });
+  import("./emailAutomation").then(({ fireEmailAutomationEvent }) =>
+    fireEmailAutomationEvent({
+      type: "workshop_registration", scope: "learn", userId, email: recipient.email, name: recipient.name,
+      targetId: workshopId, contentName: `Workshop #${workshopId}`,
+      sourceKey: `workshop-registration:${sessionId ?? `${userId}:${instanceId}`}`,
+    }),
+  ).catch(() => {});
 
   return { success: true, created: true, isCurrentCheckout: true, ...resultBase };
 }

@@ -613,6 +613,24 @@ export async function reconcileLmsCheckoutFromStripeSession(
     notes.push("Already enrolled (active)");
   }
 
+  // Marketing automations are opt-in rules. They receive only this current
+  // checkout event and never backfill historical purchases.
+  if (!options.linkOnly) {
+    const sourceBase = `lms-checkout:${sessionId}`;
+    import("./emailAutomation").then(({ fireEmailAutomationEvent }) => {
+      fireEmailAutomationEvent({
+        type: "course_purchase", scope: "learn", userId, email: customerEmail, name: customerName,
+        targetId: courseId, contentName: course?.title ?? null, sourceKey: sourceBase,
+      }).catch(() => {});
+      if (shouldRenew) {
+        fireEmailAutomationEvent({
+          type: "course_enrollment", scope: "learn", userId, email: customerEmail, name: customerName,
+          targetId: courseId, contentName: course?.title ?? null, sourceKey: `${sourceBase}:enrollment`,
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+  }
+
   // A completed checkout deserves one access message even if an active
   // enrollment already existed. The session-scoped record makes this safe for
   // webhook retries and checkout-status polling.

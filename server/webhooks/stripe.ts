@@ -441,6 +441,14 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
       await grantUltrasoundExpoEventCommunityAccess(db, event, resolved.user.id).catch((error) => {
         console.error("[Stripe][UltrasoundExpo™] Event community enrollment failed", error);
       });
+      import("../lib/emailAutomation").then(({ fireEmailAutomationEvent }) =>
+        fireEmailAutomationEvent({
+          type: "expo_registration", scope: "expo", userId: resolved.user.id,
+          email: record.attendeeEmail, name: record.attendeeName, targetId: event.id,
+          eventName: event.name, contentName: record.packageName,
+          sourceKey: `ultrasound-expo-registration:${registrationId}:${sessionId}`,
+        }),
+      ).catch(() => {});
     }
   }
 
@@ -753,6 +761,13 @@ async function handleDigitalDownloadCheckoutCompleted(session: Record<string, un
     accessExpiresAt,
   });
   const newPurchaseId = (newPurchase as any)?.insertId ?? null;
+  import("../lib/emailAutomation").then(({ fireEmailAutomationEvent }) =>
+    fireEmailAutomationEvent({
+      type: "product_purchase", scope: "learn", userId, email: customerEmail, name: customerName,
+      targetId: productId, contentName: productRow?.title ?? `Product #${productId}`,
+      sourceKey: `product-purchase:${session.id ?? paymentIntentId ?? newPurchaseId}`,
+    }),
+  ).catch(() => {});
 
   if (newPurchaseId) {
     try {
@@ -1088,6 +1103,13 @@ export async function handleWebinarCheckoutCompleted(session: Record<string, unk
   if (!existing) {
     await db.insert(webinarRegistrations).values({ webinarId, userId, stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : undefined, accessLevel: webinar.status === "presale" ? "presale" : "full" });
     await notifyOwner({ title: "📺 New Webinar Registration", content: `User ID ${userId} registered for "${webinar.title}".` });
+    import("../lib/emailAutomation").then(({ fireEmailAutomationEvent }) =>
+      fireEmailAutomationEvent({
+        type: "webinar_registration", scope: "learn", userId, email: recipient?.email ?? getCheckoutRecipient(session, meta).email,
+        name: recipient?.name ?? getCheckoutRecipient(session, meta).name, targetId: webinarId,
+        contentName: webinar.title, sourceKey: `webinar-registration:${session.id ?? webinarId}:${userId}`,
+      }),
+    ).catch(() => {});
   }
   const email = recipient?.email ?? getCheckoutRecipient(session, meta).email;
   if (email) {

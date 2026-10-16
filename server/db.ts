@@ -479,6 +479,14 @@ export async function getOrCreateUserByEmail(opts: {
   import("./lib/communityAutoJoin").then(({ fireCommunityWorkflowRules }) => {
     fireCommunityWorkflowRules(newUser!.id, { type: "any_signup" }).catch(() => {});
   }).catch(() => {});
+  import("./lib/emailAutomation").then(({ fireEmailAutomationEvent }) => {
+    for (const scope of ["learn", "apps", "expo"] as const) {
+      fireEmailAutomationEvent({
+        type: "account_signup", scope, userId: newUser!.id, email: newUser!.email,
+        name: newUser!.displayName || newUser!.name, sourceKey: `email-account-signup:${newUser!.id}`,
+      }).catch(() => {});
+    }
+  }).catch(() => {});
   import("./lib/ensureFreeMembership").then(({ ensureFreeMembership }) => {
     ensureFreeMembership(newUser!.id).catch(() => {});
   }).catch(() => {});

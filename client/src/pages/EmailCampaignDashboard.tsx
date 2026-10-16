@@ -30,6 +30,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EmailCampaignEditor from "./EmailCampaignEditor";
 import EmailListsTab from "./EmailListsTab";
+import EmailAutomationTab from "./EmailAutomationTab";
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({ icon, label, value, sub, color }: { icon: React.ReactNode; label: string; value: string | number; sub?: string; color?: string }) {
@@ -1036,7 +1037,7 @@ export default function EmailCampaignDashboard() {
             </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "Merriweather, serif" }}>Email Campaigns</h1>
-              <p className="text-sm text-gray-500">Manage campaigns, templates, and sender profiles</p>
+              <p className="text-sm text-gray-500">Manage campaigns, templates, sender profiles, and workflow automations</p>
             </div>
           </div>
           <Button onClick={() => { setEditCampaignId(undefined); setShowEditor(true); }} style={{ background: "#189aa1" }} className="text-white">
@@ -1057,6 +1058,9 @@ export default function EmailCampaignDashboard() {
             <TabsTrigger value="campaigns" className="flex items-center gap-1.5">
               <Mail className="w-4 h-4" /> Campaigns
               {campaigns && <Badge variant="secondary" className="ml-1 text-xs">{campaigns.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="automations" className="flex items-center gap-1.5">
+              <Zap className="w-4 h-4" /> Automations
             </TabsTrigger>
             <TabsTrigger value="senders" className="flex items-center gap-1.5">
               <UserCircle className="w-4 h-4" /> Sender Profiles
@@ -1198,6 +1202,11 @@ export default function EmailCampaignDashboard() {
                 </table>
               </div>
             )}
+          </TabsContent>
+
+          {/* ── Workflow automations tab ─────────────────────────────────── */}
+          <TabsContent value="automations">
+            <EmailAutomationTab canActivate={!isRestrictedManager} />
           </TabsContent>
 
           {/* ── Sender profiles tab ───────────────────────────────────────── */}
