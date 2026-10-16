@@ -64,6 +64,16 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(echoSite).toContain("One Place.");
   });
 
+  it("keeps public EchoExpo exhibit content focused on sales copy rather than portal mechanics", async () => {
+    const echoSite = await import("node:fs/promises").then(fs => fs.readFile("client/src/pages/EchoExpoSite.tsx", "utf8"));
+    expect(echoSite).toContain("Make cardiac imaging your most valuable conversation.");
+    expect(echoSite).toContain("One event. A powerful cardiac audience.");
+    expect(echoSite).toContain("Explore exhibit opportunities");
+    expect(echoSite).not.toContain("shared partner workspace");
+    expect(echoSite).not.toContain("One approved portal. Clear event choices.");
+    expect(echoSite).not.toContain("shared UltrasoundExpo™ partner portal");
+  });
+
   it("exports a standards-compatible multi-session event calendar", () => {
     const ics = buildUltrasoundExpoAgendaIcs("UltrasoundExpo™ 2028", [{
       id: 8,
