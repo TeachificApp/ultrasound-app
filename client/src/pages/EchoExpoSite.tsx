@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSeoHead } from "@/hooks/useSeoHead";
+import { ExpoAccountMenu, ExpoMobileAccountLinks } from "@/components/ExpoAccountMenu";
 
 const ULTRASOUND_EXPO_ORIGIN = "https://ultrasoundexpo.com";
 const ECHO_EXPO_ORIGIN = "https://echoexpo.iheartecho.com";
@@ -113,11 +114,12 @@ function EchoExpoHeader() {
       </nav>
       <div className="hidden items-center gap-2 sm:flex">
         <a href={ULTRASOUND_EXPO_ORIGIN} className="rounded-lg px-3 py-2 text-sm font-semibold text-[#9eece8] hover:bg-white/10">UltrasoundExpo™</a>
+        <ExpoAccountMenu />
         <Button onClick={() => setLocation(ECHO_EXPO_REGISTER_PATH)} className="h-9 bg-[#0b9fa5] px-3 text-sm font-bold hover:bg-[#098a90]">Register Now</Button>
       </div>
       <button onClick={() => setOpen(current => !current)} className="rounded-lg p-2 text-white hover:bg-white/10 xl:hidden" aria-label="Toggle EchoExpo navigation">{open ? <X /> : <Menu />}</button>
     </div>
-    {open && <div className="border-t border-white/10 px-4 py-3 xl:hidden"><nav className="grid gap-1">{NAVIGATION.map(item => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10">{item.label}</Link>)}<a href={ULTRASOUND_EXPO_ORIGIN} className="rounded-lg px-3 py-3 text-sm font-semibold text-[#9eece8] hover:bg-white/10">UltrasoundExpo™</a><Button onClick={() => { setOpen(false); setLocation(ECHO_EXPO_REGISTER_PATH); }} className="mt-2 h-10 bg-[#0b9fa5] text-sm">Register Now</Button></nav></div>}
+    {open && <div className="border-t border-white/10 px-4 py-3 xl:hidden"><nav className="grid gap-1">{NAVIGATION.map(item => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10">{item.label}</Link>)}<a href={ULTRASOUND_EXPO_ORIGIN} className="rounded-lg px-3 py-3 text-sm font-semibold text-[#9eece8] hover:bg-white/10">UltrasoundExpo™</a><ExpoMobileAccountLinks onNavigate={() => setOpen(false)} /><Button onClick={() => { setOpen(false); setLocation(ECHO_EXPO_REGISTER_PATH); }} className="mt-2 h-10 bg-[#0b9fa5] text-sm">Register Now</Button></nav></div>}
   </header>;
 }
 

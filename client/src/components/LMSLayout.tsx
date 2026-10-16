@@ -26,7 +26,7 @@ import { getAdminUrl, APP_URL } from "@/hooks/useSubdomain";
 import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
 import { trpc } from "@/lib/trpc";
 import { SiteNavHeaderLinks, SiteNavProfileLinks } from "@/components/SiteNavLinks";
-import { STUDENT_DASHBOARD_PATH } from "@shared/studentDashboardUrls";
+import { UnifiedProfileLinks } from "@/components/UnifiedProfileLinks";
 import { removeQuizNavigationItems } from "@/lib/quizNavigation";
 const AAUS_APP_URL = "https://app.allaboutultrasound.com";
 
@@ -289,118 +289,13 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                         </p>
                       </div>
 
-                      {/* My Dashboard — stays on learn domain */}
-                      <a
-                        href={STUDENT_DASHBOARD_PATH}
-                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        onClick={() => setAccountOpen(false)}
-                      >
-                        <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
-                      </a>
-                      <a
-                        href="/my-dashboard?tab=content"
-                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        onClick={() => setAccountOpen(false)}
-                      >
-                        <BookOpen className="w-3.5 h-3.5 text-teal-600" /> My Content
-                      </a>
-                      <a
-                        href="/my-dashboard?tab=subscriptions"
-                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        onClick={() => setAccountOpen(false)}
-                      >
-                        <CreditCard className="w-3.5 h-3.5 text-teal-600" /> My Subscriptions
-                      </a>
-                      {hasUltrasoundExpoAccess && <a
-                        href="https://ultrasoundexpo.com/expo-dashboard"
-                        className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                        onClick={() => setAccountOpen(false)}
-                      >
-                        <Briefcase className="w-3.5 h-3.5 text-teal-600" /> UltrasoundExpo™
-                      </a>}
-                      <SiteNavProfileLinks
-                        items={profileNavItems}
-                        location={location}
-                        onNavigate={() => setAccountOpen(false)}
-                      />
-                      {hasEducationManagement && (
-                        <>
-                          <div className="border-t border-gray-100 my-1" />
-                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Educator Platform</div>
-                          <a href={getAdminUrl("/educator-assist")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-teal-50 hover:text-teal-700 cursor-pointer flex items-center gap-2">
-                            <GraduationCap className="w-3.5 h-3.5 text-teal-600" /> EducatorAssist™
-                          </a>
-                        </>
-                      )}
-                      {(hasDiyAccess || hasAccreditationManager) && (
-                        <>
-                          <div className="border-t border-gray-100 my-1" />
-                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Accreditation</div>
-                          {hasDiyAccess && (
-                            <>
-                              <a href={getAdminUrl("/lab-admin")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 cursor-pointer flex items-center gap-2">
-                                <Building2 className="w-3.5 h-3.5 text-orange-500" /> Lab Admin Portal
-                              </a>
-                              <a href={getAdminUrl("/diy-member")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 cursor-pointer flex items-center gap-2">
-                                <Users className="w-3.5 h-3.5 text-orange-500" /> Member Portal
-                              </a>
-                            </>
-                          )}
-                          {hasAccreditationManager && (
-                            <a href={getAdminUrl("/accreditation-manager")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer flex items-center gap-2">
-                              <ClipboardList className="w-3.5 h-3.5 text-indigo-500" /> Accreditation Manager
-                            </a>
-                          )}
-                        </>
-                      )}
-                      {isPlatformAdmin && (
-                        <>
-                          <div className="border-t border-gray-100 my-1" />
-                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin</div>
-                          <a href={getAdminUrl("/platform-admin")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                              <ShieldCheck className="w-3.5 h-3.5 text-gray-500" /> Platform Admin
-                          </a>
-                          <div className="border-t border-gray-100 my-1" />
-                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">LMS Management</div>
-                          <a href={getAdminUrl("/admin/lms")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                              <Settings className="w-3.5 h-3.5 text-gray-500" /> LMS Admin
-                          </a>
-                          <a href={getAdminUrl("/admin/ultrasound-expo")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-cyan-50 hover:text-[#087f8c] cursor-pointer flex items-center gap-2">
-                              <CalendarDays className="w-3.5 h-3.5 text-[#087f8c]" /> UltrasoundExpo™ Management
-                          </a>
-                          <a href={getAdminUrl("/admin/media-repository")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                              <FolderOpen className="w-3.5 h-3.5 text-gray-500" /> Media Repository
-                          </a>
-                          <a href={getAdminUrl("/admin/lesson-comments")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                              <MessageSquare className="w-3.5 h-3.5 text-gray-500" /> Lesson Comments
-                          </a>
-                          <a href={getAdminUrl("/admin/community")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                              <Users className="w-3.5 h-3.5 text-gray-500" /> Community Admin
-                          </a>
-                        </>
-                      )}
-
-                      {/* Affiliate Dashboard */}
-                      {appRoles.includes("affiliate") && (
-                        <>
-                          <div className="border-t border-gray-100 my-1" />
-                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Affiliate</div>
-                          <a href={`${MEMBERS_URL}/affiliate-dashboard`} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 cursor-pointer flex items-center gap-2">
-                            <DollarSign className="w-3.5 h-3.5 text-purple-500" /> Affiliate Dashboard
-                          </a>
-                        </>
-                      )}
-
-                      {/* Instructor Portal */}
-                      {appRoles.includes("instructor") && (
-                        <>
-                          <div className="border-t border-gray-100 my-1" />
-                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Instructor</div>
-                          <a href={`${MEMBERS_URL}/instructor-portal`} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 cursor-pointer flex items-center gap-2">
-                            <BookOpen className="w-3.5 h-3.5 text-emerald-500" /> Instructor Portal
-                          </a>
-                        </>
-                      )}
+                      <UnifiedProfileLinks user={user} onNavigate={() => setAccountOpen(false)} additionalItems={
+                        <SiteNavProfileLinks
+                          items={profileNavItems}
+                          location={location}
+                          onNavigate={() => setAccountOpen(false)}
+                        />
+                      } />
 
                       <div className="border-t border-gray-100 my-1" />
                       <button

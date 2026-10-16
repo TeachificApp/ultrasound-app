@@ -26,7 +26,7 @@ import { useSiteNavMenu } from "@/hooks/useSiteNavMenu";
 import { SiteNavProfileLinks } from "@/components/SiteNavLinks";
 import GetAppBanner from "@/components/GetAppBanner";
 import UserAvatar from "@/components/UserAvatar";
-import { buildStudentDashboardUrl } from "@shared/studentDashboardUrls";
+import { UnifiedProfileLinks } from "@/components/UnifiedProfileLinks";
 
 /** Badge showing the count of echo cases pending admin review */
 function CasePendingBadge() {
@@ -475,24 +475,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         </div>
                       </div>
 
-                      {/* Profile section */}
+                      {/* Canonical Learn-first account navigation */}
                       <div className="px-2 py-1.5">
-                        <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Profile</div>
-                        <a href={buildStudentDashboardUrl({ origin: "relative" })} onClick={() => setAccountOpen(false)}
-                          className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
-                          <GraduationCap className="w-3.5 h-3.5 text-[#189aa1]" />
-                          My Dashboard
-                        </a>
-                        <a href={buildStudentDashboardUrl({ origin: "relative", tab: "content" })} onClick={() => setAccountOpen(false)}
-                          className="flex items-center gap-2 w-full pl-10 pr-3 py-1.5 rounded-lg text-xs text-gray-600 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
-                          <BookOpen className="w-3.5 h-3.5 text-[#189aa1]" />
-                          My Content
-                        </a>
-                        <a href={buildStudentDashboardUrl({ origin: "relative", tab: "subscriptions" })} onClick={() => setAccountOpen(false)}
-                          className="flex items-center gap-2 w-full pl-10 pr-3 py-1.5 rounded-lg text-xs text-gray-600 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
-                          <CreditCard className="w-3.5 h-3.5 text-[#189aa1]" />
-                          My Subscriptions
-                        </a>
+                        <UnifiedProfileLinks user={user} onNavigate={() => setAccountOpen(false)} additionalItems={
+                          <SiteNavProfileLinks
+                            items={profileNavItems}
+                            location={location}
+                            onNavigate={() => setAccountOpen(false)}
+                          />
+                        } />
                         <WouterLink href="/case-library/submit">
                           <button onClick={() => setAccountOpen(false)}
                             className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs md:text-sm text-gray-700 hover:bg-[#f0fbfc] hover:text-[#189aa1] transition-all text-left">
@@ -500,107 +491,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             Submit Ultrasound Case
                           </button>
                         </WouterLink>
-                        <SiteNavProfileLinks
-                          items={profileNavItems}
-                          location={location}
-                          onNavigate={() => setAccountOpen(false)}
-                        />
                       </div>
-
-                      {/* EducatorAssist™ — education management */}
-                      {hasEducationManagement && (
-                        <div className="px-2 py-1.5 border-t border-gray-100">
-                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Educator Platform</div>
-                          <WouterLink href="/educator-assist">
-                            <button onClick={() => setAccountOpen(false)}
-                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-teal-50 hover:text-[#189aa1] transition-all text-left">
-                              <GraduationCap className="w-3.5 h-3.5 text-[#189aa1]" />
-                              <span className="flex-1">EducatorAssist™</span>
-                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Admin</span>
-                            </button>
-                          </WouterLink>
-                        </div>
-                      )}
-
-                      {/* Accreditation portals */}
-                      {(hasDiyAccess || hasAccreditationManager) && (
-                        <div className="px-2 py-1.5 border-t border-gray-100">
-                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Accreditation</div>
-                          {hasDiyAccess && (
-                            <>
-                              <WouterLink href="/lab-admin">
-                                <button onClick={() => setAccountOpen(false)}
-                                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
-                                  <Building2 className="w-3.5 h-3.5 text-orange-500" />
-                                  Lab Admin Portal
-                                </button>
-                              </WouterLink>
-                              <WouterLink href="/diy-member">
-                                <button onClick={() => setAccountOpen(false)}
-                                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-all text-left">
-                                  <Users className="w-3.5 h-3.5 text-orange-500" />
-                                  Member Portal
-                                </button>
-                              </WouterLink>
-                            </>
-                          )}
-                          {hasAccreditationManager && (
-                            <WouterLink href="/accreditation-manager">
-                              <button onClick={() => setAccountOpen(false)}
-                                className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-all text-left">
-                                <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
-                                <span className="flex-1">Accreditation Manager</span>
-                              </button>
-                            </WouterLink>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Platform Admin section — only for platform_admin */}
-                      {hasPlatformAdmin && (
-                        <div className="px-2 py-1.5 border-t border-gray-100">
-                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Platform Admin</div>
-                          <WouterLink href="/platform-admin">
-                            <button onClick={() => setAccountOpen(false)}
-                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-teal-50 hover:text-teal-600 transition-all text-left">
-                              <Shield className="w-3.5 h-3.5 text-teal-500" />
-                              <span className="flex-1">Platform Management</span>
-                              <PendingBadge />
-                            </button>
-                          </WouterLink>
-                          <WouterLink href="/admin/lms">
-                            <button onClick={() => setAccountOpen(false)}
-                              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-teal-50 hover:text-teal-600 transition-all text-left">
-                              <BookOpen className="w-3.5 h-3.5 text-teal-500" />
-                              <span className="flex-1">LMS Management</span>
-                            </button>
-                          </WouterLink>
-                        </div>
-                      )}
-
-                      {/* Affiliate Dashboard — for users with affiliate role */}
-                      {roles.includes("affiliate") && (
-                        <div className="px-2 py-1.5 border-t border-gray-100">
-                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Affiliate</div>
-                          <a href="https://members.allaboutultrasound.com/affiliate-dashboard" onClick={() => setAccountOpen(false)}
-                            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-all text-left">
-                            <DollarSign className="w-3.5 h-3.5 text-purple-500" />
-                            <span className="flex-1">Affiliate Dashboard</span>
-                          </a>
-                        </div>
-                      )}
-
-                      {/* Instructor Portal — for users with instructor role */}
-                      {roles.includes("instructor") && (
-                        <div className="px-2 py-1.5 border-t border-gray-100">
-                          <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider px-2 mb-1">Instructor</div>
-                          <Link href="/instructor-portal" onClick={() => setAccountOpen(false)}
-                            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-xs text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 transition-all text-left">
-                            <BookOpen className="w-3.5 h-3.5 text-emerald-500" />
-                            <span className="flex-1">Instructor Portal</span>
-                          </Link>
-                        </div>
-                      )}
 
                       {/* Sign out */}
                       <div className="px-2 py-1.5 border-t border-gray-100">

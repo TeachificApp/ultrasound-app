@@ -4,6 +4,7 @@ import { ArrowRight, CalendarDays, ChevronDown, CircleCheck, Handshake, MapPin, 
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { useSeoHead } from "@/hooks/useSeoHead";
+import { ExpoAccountMenu, ExpoMobileAccountLinks } from "@/components/ExpoAccountMenu";
 import { getUltrasoundExpoPageSeo, ULTRASOUND_EXPO_EVENT_DATES_LABEL, ULTRASOUND_EXPO_HERO_IMAGE, ULTRASOUND_EXPO_LOCATION_LABEL, ULTRASOUND_EXPO_LOGO_URL, ULTRASOUND_EXPO_NAME, ULTRASOUND_EXPO_ORGANIZER, ULTRASOUND_EXPO_ORIGIN, ULTRASOUND_EXPO_SCHEDULE, ULTRASOUND_EXPO_SITE_DOMAIN } from "@shared/ultrasoundExpo";
 
 const EXHIBITOR_APPLICATION_HREF = "/partner-application?scope=ultrasound_expo&type=exhibitor";
@@ -62,12 +63,12 @@ function ExpoHeader() {
           {NAVIGATION.map(item => <Link key={item.href} href={item.href} className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${location === item.href ? "bg-white/10 text-[#8aeae5]" : "text-slate-200 hover:bg-white/10 hover:text-white"}`}>{item.label}</Link>)}
         </nav>
         <div className="hidden items-center gap-2 sm:flex">
-          <Link href="/expo-dashboard" className="rounded-lg px-3 py-2 text-sm font-semibold text-[#a5f4ef] hover:bg-white/10">My UltrasoundExpo™</Link>
+          <ExpoAccountMenu />
           <Button onClick={() => setLocation("/register")} className="h-9 bg-[#0c9ba3] px-3 text-sm font-bold hover:bg-[#0a858d]">Register Now</Button>
         </div>
         <button onClick={() => setOpen(!open)} className="rounded-lg p-2 text-white hover:bg-white/10 xl:hidden" aria-label="Toggle menu">{open ? <X /> : <Menu />}</button>
       </div>
-      {open && <div className="border-t border-white/10 px-4 py-3 xl:hidden"><nav className="grid gap-1">{NAVIGATION.map(item => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10">{item.label}</Link>)}<Link href="/expo-dashboard" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-[#8aeae5]">My UltrasoundExpo™ Dashboard</Link><Button onClick={() => { setOpen(false); setLocation("/register"); }} className="mt-2 h-10 bg-[#0c9ba3] text-sm">Register Now</Button></nav></div>}
+      {open && <div className="border-t border-white/10 px-4 py-3 xl:hidden"><nav className="grid gap-1">{NAVIGATION.map(item => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10">{item.label}</Link>)}<ExpoMobileAccountLinks onNavigate={() => setOpen(false)} /><Button onClick={() => { setOpen(false); setLocation("/register"); }} className="mt-2 h-10 bg-[#0c9ba3] text-sm">Register Now</Button></nav></div>}
     </header>
   );
 }

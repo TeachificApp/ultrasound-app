@@ -20,9 +20,10 @@ describe("UltrasoundExpo™ event instances", () => {
   it("serves Expo management on the app admin domain used by the profile menu", async () => {
     const [appSource, navSource] = await Promise.all([
       import("node:fs/promises").then(fs => fs.readFile("client/src/App.tsx", "utf8")),
-      import("node:fs/promises").then(fs => fs.readFile("client/src/components/LMSLayout.tsx", "utf8")),
+      import("node:fs/promises").then(fs => fs.readFile("client/src/components/UnifiedProfileLinks.tsx", "utf8")),
     ]);
-    expect(navSource).toContain('getAdminUrl("/admin/ultrasound-expo")');
+    expect(navSource).toContain('href={`${APP_URL}/admin/ultrasound-expo`}');
+    expect(navSource).toContain("UltrasoundExpo™ Management");
     expect(appSource).toContain('<Route path="/admin/ultrasound-expo">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UltrasoundExpoAdmin /></RoleGuard>}</Route>');
     expect(appSource).toContain('<Route path="/admin/ultrasound-expo/events/:eventId/pages/:pageId/edit">');
   });

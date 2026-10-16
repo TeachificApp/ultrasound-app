@@ -24,6 +24,7 @@ import NameCollectionModal from "@/components/NameCollectionModal";
 import UserAvatar from "@/components/UserAvatar";
 import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
 import { AAUS_BRAND_LOGO_URL } from "@shared/brands";
+import { UnifiedProfileLinks } from "@/components/UnifiedProfileLinks";
 
 const AAUS_LOGO = AAUS_BRAND_LOGO_URL;
 
@@ -209,50 +210,13 @@ export default function MembersLayout({ children }: { children: React.ReactNode 
                         </p>
                       </div>
 
-                      <Link href="/my-dashboard" onClick={() => setAccountOpen(false)}>
-                        <div className={`px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer flex items-center gap-2 ${isActive("/my-dashboard") ? "text-teal-700 font-medium" : "text-gray-700"}`}>
-                          <LayoutDashboard className="w-3.5 h-3.5 text-teal-600" /> My Dashboard
-                        </div>
-                      </Link>
-                      <SiteNavProfileLinks
-                        items={profileNavItems}
-                        location={location}
-                        onNavigate={() => setAccountOpen(false)}
-                      />
-                      {/* App return links — mobile (matches LMS nav order) */}
-                      <div className="md:hidden border-t border-gray-100 mt-1 pt-1">
-                        <a href={LEARN_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
-                          <GraduationCap className="w-3.5 h-3.5 text-gray-500" /> Learning Platform
-                        </a>
-                        <a href={`${LEARN_URL}/community`} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
-                          <Users className="w-3.5 h-3.5 text-gray-500" /> Community
-                        </a>
-                        <a href={AAUS_APP_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
-                          <ExternalLink className="w-3.5 h-3.5 text-gray-500" /> UltrasoundAssist™
-                        </a>
-                        <a href={IHE_APP_URL} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2" onClick={() => setAccountOpen(false)}>
-                          <ExternalLink className="w-3.5 h-3.5 text-gray-500" /> EchoAssist™
-                        </a>
-                      </div>
-
-                      {isPlatformAdmin && (
-                        <>
-                          <div className="border-t border-gray-100 my-1" />
-                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Admin</div>
-                          <a href={getAdminUrl("/platform-admin")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                              <ShieldCheck className="w-3.5 h-3.5 text-gray-500" /> Platform Admin
-                          </a>
-                          <a href={getAdminUrl("/admin/lms")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                              <Settings className="w-3.5 h-3.5 text-gray-500" /> LMS Admin
-                          </a>
-                          <a href={getAdminUrl("/admin/media-repository")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                              <FolderOpen className="w-3.5 h-3.5 text-gray-500" /> Media Repository
-                          </a>
-                          <a href={getAdminUrl("/admin/lesson-comments")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-                              <MessageSquare className="w-3.5 h-3.5 text-gray-500" /> Lesson Comments
-                          </a>
-                        </>
-                      )}
+                      <UnifiedProfileLinks user={user} onNavigate={() => setAccountOpen(false)} additionalItems={
+                        <SiteNavProfileLinks
+                          items={profileNavItems}
+                          location={location}
+                          onNavigate={() => setAccountOpen(false)}
+                        />
+                      } />
 
                       <div className="border-t border-gray-100 my-1" />
                       <button
