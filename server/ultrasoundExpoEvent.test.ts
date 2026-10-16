@@ -58,7 +58,7 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(echoSite).toContain("echoexpo-logo_535dff69.png");
     expect(echoSite).toContain("Echo<span");
     expect(echoSite).toContain("h-12 w-12 shrink-0");
-    expect(echoSite).toContain('const ECHO_EXPO_HERO_IMAGE = "/manus-storage/echoexpo-supplied-tradeshow-hero_e230df63.png";');
+    expect(echoSite).toContain('const ECHO_EXPO_HERO_IMAGE = "/manus-storage/echoexpo-hero-approved_2a95e8a5.png";');
     expect(echoSite).toContain("image: ECHO_EXPO_HERO_IMAGE");
     expect(echoSite).toContain("src={ECHO_EXPO_HERO_IMAGE}");
     expect(echoSite).not.toContain("src={ULTRASOUND_EXPO_HERO_IMAGE}");

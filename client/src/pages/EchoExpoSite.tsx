@@ -23,7 +23,7 @@ import { ExpoAccountMenu, ExpoMobileAccountLinks } from "@/components/ExpoAccoun
 
 const ULTRASOUND_EXPO_ORIGIN = "https://ultrasoundexpo.com";
 const ECHO_EXPO_ORIGIN = "https://echoexpo.iheartecho.com";
-const ECHO_EXPO_HERO_IMAGE = "/manus-storage/echoexpo-supplied-tradeshow-hero_e230df63.png";
+const ECHO_EXPO_HERO_IMAGE = "/manus-storage/echoexpo-hero-approved_2a95e8a5.png";
 const ECHO_EXPO_EXHIBIT_PATH = "/partner-application?scope=ultrasound_expo&type=exhibitor&event=echoexpo";
 const ECHO_EXPO_SPONSOR_PATH = "/partner-application?scope=ultrasound_expo&type=sponsor&event=echoexpo";
 const ECHO_EXPO_REGISTER_PATH = "/register?event=echoexpo";
