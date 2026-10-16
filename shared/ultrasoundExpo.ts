@@ -3,6 +3,8 @@ import { AAUS_SONO_RING_LOGO_URL } from "./brands";
 export const ULTRASOUND_EXPO_NAME = "UltrasoundExpo™";
 export const ULTRASOUND_EXPO_ORGANIZER = "All About Ultrasound™";
 export const ULTRASOUND_EXPO_ORIGIN = "https://ultrasoundexpo.com";
+export const ULTRASOUND_EXPO_EVENT_DATES_LABEL = "January 14–16, 2028";
+export const ULTRASOUND_EXPO_LOCATION_LABEL = "Orlando, Florida";
 export const ULTRASOUND_EXPO_HERO_IMAGE = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/nmDnyKctfSTBjSLH.jpg";
 export const ULTRASOUND_EXPO_AAUS_LOGO_URL = AAUS_SONO_RING_LOGO_URL;
 // Supplied organizer artwork. The hero photo remains the main page background.
@@ -286,7 +288,7 @@ export const ULTRASOUND_EXPO_LAUNCH_EVENT = {
   startsAtIso: "2028-01-14T12:00:00-05:00",
   endsAtIso: "2028-01-16T14:00:00-05:00",
   timezone: "America/New_York",
-  locationLabel: "Orlando, FL · Venue to be announced",
+  locationLabel: ULTRASOUND_EXPO_LOCATION_LABEL,
   shortDescription: "The annual ultrasound event for education, innovation, ScanLabs, exhibits, and connection — with a destination Grand Opening and Opening Reception on Friday evening.",
 } as const;
 

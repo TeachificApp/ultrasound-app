@@ -4,7 +4,9 @@ import {
   EXPO_PUBLIC_REGISTRATION_TYPES,
   ULTRASOUND_EXPO_AAUS_LOGO_URL,
   ULTRASOUND_EXPO_BANNER_URL,
+  ULTRASOUND_EXPO_EVENT_DATES_LABEL,
   ULTRASOUND_EXPO_LAUNCH_EVENT,
+  ULTRASOUND_EXPO_LOCATION_LABEL,
   ULTRASOUND_EXPO_LOGO_URL,
   ULTRASOUND_EXPO_NAME,
   ULTRASOUND_EXPO_PAGE_EDITOR_PAGES,
@@ -25,9 +27,11 @@ describe("UltrasoundExpo™ annual-event platform", () => {
   it("keeps the inaugural annual event configured for Orlando on January 14–16, 2028", () => {
     expect(ULTRASOUND_EXPO_NAME).toBe("UltrasoundExpo™");
     expect(ULTRASOUND_EXPO_AAUS_LOGO_URL).toContain("sono-ring4_orig.png");
+    expect(ULTRASOUND_EXPO_EVENT_DATES_LABEL).toBe("January 14–16, 2028");
+    expect(ULTRASOUND_EXPO_LOCATION_LABEL).toBe("Orlando, Florida");
     expect(ULTRASOUND_EXPO_LAUNCH_EVENT.startsAtIso).toContain("2028-01-14");
     expect(ULTRASOUND_EXPO_LAUNCH_EVENT.endsAtIso).toContain("2028-01-16");
-    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.locationLabel).toBe("Orlando, FL · Venue to be announced");
+    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.locationLabel).toBe("Orlando, Florida");
   });
 
   it("publishes the Friday destination opening and the complete editable annual schedule", () => {

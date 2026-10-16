@@ -1,7 +1,7 @@
 import { ArrowLeft, CalendarClock } from "lucide-react";
 import { Link } from "wouter";
 import { useSeoHead } from "@/hooks/useSeoHead";
-import { getUltrasoundExpoPageSeo, ULTRASOUND_EXPO_NAME, ULTRASOUND_EXPO_ORIGIN } from "@shared/ultrasoundExpo";
+import { getUltrasoundExpoPageSeo, ULTRASOUND_EXPO_EVENT_DATES_LABEL, ULTRASOUND_EXPO_LOCATION_LABEL, ULTRASOUND_EXPO_NAME, ULTRASOUND_EXPO_ORIGIN } from "@shared/ultrasoundExpo";
 
 export default function UltrasoundExpoRegister() {
   const seo = getUltrasoundExpoPageSeo("register");
@@ -22,6 +22,7 @@ export default function UltrasoundExpoRegister() {
       <section className="mt-8 rounded-3xl border border-cyan-100 bg-white px-6 py-12 text-center shadow-[0_16px_42px_rgba(4,66,74,.1)] sm:px-12">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#e4f8f8]"><CalendarClock className="h-7 w-7 text-[#087f8c]" /></div>
         <h1 className="mt-6 text-3xl font-black tracking-[-.05em] text-[#062634] sm:text-5xl">Attendee registration coming soon</h1>
+        <p className="mt-5 text-sm font-black uppercase tracking-[.16em] text-[#087f8c]">{ULTRASOUND_EXPO_EVENT_DATES_LABEL} · {ULTRASOUND_EXPO_LOCATION_LABEL}</p>
       </section>
     </main>
   </div>;
