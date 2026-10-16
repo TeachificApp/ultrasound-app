@@ -45,7 +45,7 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(registrationPage).toContain('isEchoExpoDomain()');
   });
 
-  it("features the cardiac EchoExpo pathway on UltrasoundExpo and uses a dedicated cardiac hero", async () => {
+  it("features the cardiac EchoExpo pathway on UltrasoundExpo and shares the UltrasoundExpo hero", async () => {
     const [ultrasoundSite, echoSite] = await Promise.all([
       import("node:fs/promises").then(fs => fs.readFile("client/src/pages/UltrasoundExpoSite.tsx", "utf8")),
       import("node:fs/promises").then(fs => fs.readFile("client/src/pages/EchoExpoSite.tsx", "utf8")),
@@ -57,8 +57,9 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(echoSite).toContain("echoexpo-logo_535dff69.png");
     expect(echoSite).toContain("Echo<span");
     expect(echoSite).toContain("h-12 w-12 shrink-0");
-    expect(echoSite).toContain("echoexpo-tradeshow-hero-simplified_8272f5e4.png");
-    expect(echoSite).toContain("discreet left-chest cardiac ultrasound demonstration");
+    expect(echoSite).toContain('import { ULTRASOUND_EXPO_HERO_IMAGE } from "@shared/ultrasoundExpo";');
+    expect(echoSite).toContain("image: ULTRASOUND_EXPO_HERO_IMAGE");
+    expect(echoSite).toContain("src={ULTRASOUND_EXPO_HERO_IMAGE}");
     expect(echoSite).toContain("Everything Echo.");
     expect(echoSite).toContain("One Place.");
   });
