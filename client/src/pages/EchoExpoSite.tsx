@@ -104,7 +104,7 @@ function EchoExpoHeader() {
   return <header className="sticky top-0 z-50 border-b border-white/10 bg-[#071f2d]/95 text-white backdrop-blur">
     <div className="mx-auto flex min-h-[72px] max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
       <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="EchoExpo home">
-        <img src="/manus-storage/echoexpo-logo_535dff69.png" alt="EchoExpo™ by iHeartEcho™" className="h-11 max-w-[190px] object-contain object-left" />
+        <div className="leading-none"><p className="whitespace-nowrap text-2xl font-black tracking-[-.06em] text-white">Echo<span className="text-[#72e1de]">Expo</span><sup className="ml-0.5 align-top text-[9px] tracking-normal">™</sup></p><p className="mt-1 text-[8px] font-black uppercase tracking-[.22em] text-slate-200">by iHeartEcho™</p></div>
       </Link>
       <nav className="hidden items-center gap-0.5 xl:flex" aria-label="EchoExpo primary navigation">
         {NAVIGATION.map(item => <Link key={item.href} href={item.href} className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${currentPath === item.href ? "bg-white/10 text-[#8bece7]" : "text-slate-200 hover:bg-white/10 hover:text-white"}`}>{item.label}</Link>)}

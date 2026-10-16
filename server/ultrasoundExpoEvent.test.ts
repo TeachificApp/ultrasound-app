@@ -52,7 +52,8 @@ describe("UltrasoundExpo™ event instances", () => {
     ]);
     expect(ultrasoundSite).toContain("Inside UltrasoundExpo™");
     expect(ultrasoundSite).toContain("Explore EchoExpo™");
-    expect(ultrasoundSite).toContain("https://echoexpo.iheartecho.com/");
+    expect(ultrasoundSite).toContain("https://echocardiographyexpo.com/");
+    expect(echoSite).toContain("by iHeartEcho™");
     expect(echoSite).toContain("echoexpo-cardiac-hero-accurate_fa9f76dd.png");
     expect(echoSite).toContain("Sonographer performing a transthoracic echocardiography examination with a patient and cart-based ultrasound machine");
   });
