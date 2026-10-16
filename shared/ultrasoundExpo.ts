@@ -220,25 +220,25 @@ export function getUltrasoundExpoPageSeo(slug: string): ExpoPageSeo {
 
 export const ULTRASOUND_EXPO_SCHEDULE = {
   heading: "The UltrasoundExpo™ Schedule",
-  introduction: "Exhibitor setup begins Wednesday and continues Thursday, followed by a destination Friday evening, a full Saturday of education and innovation, and a Sunday closing celebration. All scheduled program times are Eastern Time.",
+  introduction: "Pre-event exhibitor setup begins Wednesday and continues Thursday, followed by UltrasoundExpo™ from Friday, January 14 through Sunday, January 16, 2028. All scheduled program times are Eastern Time.",
   days: [
     {
       key: "wednesday_schedule",
-      label: "Wednesday",
-      title: "Exhibitor Setup",
+      label: "Wednesday, January 12",
+      title: "Pre-Event Exhibitor Setup",
       summary: "Dedicated exhibitor setup and installation day.",
       items: ["Exhibitor setup"],
     },
     {
       key: "thursday_schedule",
-      label: "Thursday",
-      title: "Exhibitor Setup",
+      label: "Thursday, January 13",
+      title: "Pre-Event Exhibitor Setup",
       summary: "Continued exhibitor setup and installation day.",
       items: ["Exhibitor setup"],
     },
     {
       key: "friday_schedule",
-      label: "Friday",
+      label: "Friday, January 14",
       title: "Grand Opening & Destination Evening",
       summary: "Friday night becomes the destination event at UltrasoundExpo™.",
       items: [
@@ -250,7 +250,7 @@ export const ULTRASOUND_EXPO_SCHEDULE = {
     },
     {
       key: "saturday_schedule",
-      label: "Saturday",
+      label: "Saturday, January 15",
       title: "Education, Expo & Innovation",
       items: [
         "8 AM – Keynote",
@@ -267,7 +267,7 @@ export const ULTRASOUND_EXPO_SCHEDULE = {
     },
     {
       key: "sunday_schedule",
-      label: "Sunday",
+      label: "Sunday, January 16",
       title: "CME, ScanLabs & Closing Celebration",
       items: [
         "8 AM – CME",
@@ -283,8 +283,8 @@ export const ULTRASOUND_EXPO_SCHEDULE = {
 export const ULTRASOUND_EXPO_LAUNCH_EVENT = {
   name: "UltrasoundExpo™ 2028",
   slug: "ultrasoundexpo-2028",
-  startsAtIso: "2028-01-15T12:00:00-05:00",
-  endsAtIso: "2028-01-18T14:00:00-05:00",
+  startsAtIso: "2028-01-14T12:00:00-05:00",
+  endsAtIso: "2028-01-16T14:00:00-05:00",
   timezone: "America/New_York",
   locationLabel: "Orlando, FL · Venue to be announced",
   shortDescription: "The annual ultrasound event for education, innovation, ScanLabs, exhibits, and connection — with a destination Grand Opening and Opening Reception on Friday evening.",

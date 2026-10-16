@@ -97,7 +97,7 @@ function ProgramSchedule({ zones }: { zones: Record<string, string> }) {
   return <section className="border-t border-cyan-100 bg-[#e8f7f8] px-4 py-16 sm:px-6 sm:py-20">
     <div className="mx-auto max-w-7xl">
       <div className="max-w-3xl">
-        <p className="text-xs font-black uppercase tracking-[.2em] text-[#087f8c]">January 15–18, 2028 · Orlando, Florida</p>
+        <p className="text-xs font-black uppercase tracking-[.2em] text-[#087f8c]">January 14–16, 2028 · Orlando, Florida</p>
         <h2 className="mt-3 text-4xl font-black tracking-[-.05em] text-[#062634] sm:text-5xl whitespace-pre-line">{heading}</h2>
         <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600 whitespace-pre-line">{introduction}</p>
       </div>

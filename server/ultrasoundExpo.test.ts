@@ -21,27 +21,27 @@ import { hasKnownStripeCheckoutRoute } from "./lib/unmatchedStripePayment";
 import { getPageSeoForRequest, injectPageSeoIntoHtml } from "./routes/funnelOgMeta";
 
 describe("UltrasoundExpo™ annual-event platform", () => {
-  it("keeps the inaugural annual event configured for Orlando on January 15–18, 2028", () => {
+  it("keeps the inaugural annual event configured for Orlando on January 14–16, 2028", () => {
     expect(ULTRASOUND_EXPO_NAME).toBe("UltrasoundExpo™");
     expect(ULTRASOUND_EXPO_AAUS_LOGO_URL).toContain("sono-ring4_orig.png");
-    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.startsAtIso).toContain("2028-01-15");
-    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.endsAtIso).toContain("2028-01-18");
+    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.startsAtIso).toContain("2028-01-14");
+    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.endsAtIso).toContain("2028-01-16");
     expect(ULTRASOUND_EXPO_LAUNCH_EVENT.locationLabel).toBe("Orlando, FL · Venue to be announced");
   });
 
   it("publishes the Friday destination opening and the complete editable annual schedule", () => {
     expect(ULTRASOUND_EXPO_SCHEDULE.days[0]).toMatchObject({
-      label: "Wednesday",
-      title: "Exhibitor Setup",
+      label: "Wednesday, January 12",
+      title: "Pre-Event Exhibitor Setup",
       items: ["Exhibitor setup"],
     });
     expect(ULTRASOUND_EXPO_SCHEDULE.days[1]).toMatchObject({
-      label: "Thursday",
-      title: "Exhibitor Setup",
+      label: "Thursday, January 13",
+      title: "Pre-Event Exhibitor Setup",
       items: ["Exhibitor setup"],
     });
     expect(ULTRASOUND_EXPO_SCHEDULE.days[2]).toMatchObject({
-      label: "Friday",
+      label: "Friday, January 14",
       title: "Grand Opening & Destination Evening",
       summary: "Friday night becomes the destination event at UltrasoundExpo™.",
     });
