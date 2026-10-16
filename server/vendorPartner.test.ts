@@ -17,8 +17,8 @@ describe("approved vendor partner access", () => {
     expect(isApprovedVendorForScope({ ...approvedExpoVendor, status: "pending" }, 42, "ultrasound_expo")).toBe(false);
   });
 
-  it("allows only attendee registration categories through a public Expo route", () => {
-    expect(isExpoPublicRegistrationType("registrant")).toBe(true);
+  it("keeps public Expo registration pending while partner categories remain private", () => {
+    expect(isExpoPublicRegistrationType("registrant")).toBe(false);
     expect(isExpoPublicRegistrationType("exhibitor")).toBe(false);
     expect(isExpoPublicRegistrationType("sponsor")).toBe(false);
   });
@@ -26,5 +26,7 @@ describe("approved vendor partner access", () => {
   it("parses only recognized application scopes and partner types", () => {
     expect(parseVendorPartnerValues('["aaus_ihe","untrusted","ultrasound_expo"]', ["aaus_ihe", "ultrasound_expo"] as const))
       .toEqual(["aaus_ihe", "ultrasound_expo"]);
+    expect(parseVendorPartnerValues('["vendor","exhibitor","sponsor"]', ["vendor", "exhibitor", "sponsor"] as const))
+      .toEqual(["vendor", "exhibitor", "sponsor"]);
   });
 });
