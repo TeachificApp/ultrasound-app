@@ -9472,3 +9472,93 @@ export const ultrasoundExpoRecordings = mysqlTable("ultrasound_expo_recordings",
   index("ultrasound_expo_recordings_event_status_idx").on(table.eventId, table.status, table.sortOrder),
 ]);
 export type UltrasoundExpoRecording = typeof ultrasoundExpoRecordings.$inferSelect;
+
+// ─── ExpoPoints ────────────────────────────────────────────────────────────────
+// Each program is tied to one annual Expo instance. A program can include either
+// tenant or both, while every point movement stays in a durable per-program ledger.
+export const expoPointsPrograms = mysqlTable("expo_points_programs", {
+  id: int("id").autoincrement().primaryKey(),
+  hostEventId: int("host_event_id").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  leaderboardScope: mysqlEnum("leaderboard_scope", ["ultrasound_expo", "echo_expo", "combined"]).default("ultrasound_expo").notNull(),
+  eligibleRolesJson: text("eligible_roles_json").notNull(),
+  liveDisplayEnabled: boolean("live_display_enabled").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdByUserId: int("created_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("expo_points_programs_host_event_unique").on(table.hostEventId),
+  index("expo_points_programs_scope_active_idx").on(table.leaderboardScope, table.isActive),
+]);
+export type ExpoPointsProgram = typeof expoPointsPrograms.$inferSelect;
+
+/** Which Expo instance records contribute to an ExpoPoints program. */
+export const expoPointsProgramEvents = mysqlTable("expo_points_program_events", {
+  id: int("id").autoincrement().primaryKey(),
+  programId: int("program_id").notNull(),
+  eventId: int("event_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("expo_points_program_events_program_event_unique").on(table.programId, table.eventId),
+  index("expo_points_program_events_event_idx").on(table.eventId),
+]);
+export type ExpoPointsProgramEvent = typeof expoPointsProgramEvents.$inferSelect;
+
+/** Append-only balance ledger. Negative entries are used only for fulfilled rewards or admin corrections. */
+export const expoPointsTransactions = mysqlTable("expo_points_transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  programId: int("program_id").notNull(),
+  eventId: int("event_id"),
+  userId: int("user_id").notNull(),
+  activityType: mysqlEnum("activity_type", ["attendance", "cme", "booth_visit", "expo_game", "networking", "community", "other", "admin_adjustment", "reward_redemption"]).notNull(),
+  points: int("points").notNull(),
+  description: varchar("description", { length: 1_000 }).notNull(),
+  sourceKey: varchar("source_key", { length: 255 }),
+  awardedByUserId: int("awarded_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("expo_points_transactions_source_unique").on(table.programId, table.sourceKey),
+  index("expo_points_transactions_program_user_created_idx").on(table.programId, table.userId, table.createdAt),
+  index("expo_points_transactions_program_event_idx").on(table.programId, table.eventId),
+]);
+export type ExpoPointsTransaction = typeof expoPointsTransactions.$inferSelect;
+
+/** Rewards are configured per program and can be redeemed only from a positive balance. */
+export const expoPointsRewards = mysqlTable("expo_points_rewards", {
+  id: int("id").autoincrement().primaryKey(),
+  programId: int("program_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  pointsCost: int("points_cost").notNull(),
+  inventoryLimit: int("inventory_limit"),
+  redeemedCount: int("redeemed_count").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("expo_points_rewards_program_active_idx").on(table.programId, table.isActive, table.sortOrder),
+]);
+export type ExpoPointsReward = typeof expoPointsRewards.$inferSelect;
+
+/** Redemption requests provide a fulfillment queue without storing payment data. */
+export const expoPointsRedemptions = mysqlTable("expo_points_redemptions", {
+  id: int("id").autoincrement().primaryKey(),
+  programId: int("program_id").notNull(),
+  rewardId: int("reward_id").notNull(),
+  userId: int("user_id").notNull(),
+  pointsCost: int("points_cost").notNull(),
+  status: mysqlEnum("status", ["requested", "fulfilled", "cancelled"]).default("requested").notNull(),
+  transactionId: int("transaction_id"),
+  fulfillmentNote: text("fulfillment_note"),
+  fulfilledByUserId: int("fulfilled_by_user_id"),
+  fulfilledAt: timestamp("fulfilled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("expo_points_redemptions_program_status_idx").on(table.programId, table.status, table.createdAt),
+  index("expo_points_redemptions_user_idx").on(table.userId, table.createdAt),
+]);
+export type ExpoPointsRedemption = typeof expoPointsRedemptions.$inferSelect;

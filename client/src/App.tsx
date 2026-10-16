@@ -153,6 +153,7 @@ const UltrasoundExpoSite = lazy(() => import("./pages/UltrasoundExpoSite"));
 const EchoExpoSite = lazy(() => import("./pages/EchoExpoSite"));
 const UltrasoundExpoRegister = lazy(() => import("./pages/UltrasoundExpoRegister"));
 const UltrasoundExpoDashboard = lazy(() => import("./pages/UltrasoundExpoDashboard"));
+const ExpoPointsLiveDisplay = lazy(() => import("./pages/ExpoPointsLiveDisplay"));
 const UltrasoundExpoAdmin = lazy(() => import("./pages/admin/UltrasoundExpoAdmin"));
 const UltrasoundExpoEventHub = lazy(() => import("./pages/UltrasoundExpoEventHub"));
 const UltrasoundExpoEventPage = lazy(() => import("./pages/UltrasoundExpoEventPage"));
@@ -620,6 +621,7 @@ function Router() {
             These routes must precede the generic two-segment funnel catch-all. */}
         <Route path="/workshops" component={WorkshopsBrowse} />
         <Route path="/workshops/:slug" component={WorkshopLanding} />
+        <Route path="/expo-points/live/:programId" component={ExpoPointsLiveDisplay} />
         <Route path="/partner-application">{() => <Suspense fallback={pageFallback}><PartnerApplication /></Suspense>}</Route>
         <Route path="/vendor-portal">{() => <Suspense fallback={pageFallback}><ApprovedPartnerPortal /></Suspense>}</Route>
         <Route path="/sponsorships">{() => <Suspense fallback={pageFallback}><SponsorshipsPage /></Suspense>}</Route>
@@ -1797,6 +1799,7 @@ function UltrasoundExpoRouter() {
     <Suspense fallback={pageFallback}>
       <Switch>
         <Route path="/register" component={UltrasoundExpoRegister} />
+        <Route path="/expo-points/live/:programId" component={ExpoPointsLiveDisplay} />
         <Route path="/expo-dashboard" component={UltrasoundExpoDashboard} />
         <Route path="/partner-application" component={PartnerApplication} />
         <Route path="/vendor-portal" component={ApprovedPartnerPortal} />
@@ -1844,6 +1847,7 @@ function EchoExpoMarketingRouter() {
   const pageFallback = <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" /></div>;
   return <Suspense fallback={pageFallback}><Switch>
     <Route path="/register" component={UltrasoundExpoRegister} />
+    <Route path="/expo-points/live/:programId" component={ExpoPointsLiveDisplay} />
     <Route path="/partner-application" component={PartnerApplication} />
     <Route path="/login" component={Login} />
     <Route path="/forgot-password" component={ForgotPassword} />

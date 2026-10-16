@@ -89,6 +89,7 @@ import { eventPartnershipRouter } from "./routers/eventPartnershipRouter";
 import { ultrasoundExpoRouter } from "./routers/ultrasoundExpoRouter";
 import { ultrasoundExpoEventRouter } from "./routers/ultrasoundExpoEventRouter";
 import { vendorPortalRouter } from "./routers/vendorPortalRouter";
+import { expoPointsRouter } from "./routers/expoPointsRouter";
 import {
   getUserById,
   getUsersByIds,
@@ -2308,6 +2309,7 @@ export const appRouter = router({
   // ─── iHeartEcho Routers ──────────────────────────────────────────────────────
   soundBytes: soundBytesRouter,
   leaderboard: leaderboardRouter,
+  expoPoints: expoPointsRouter,
   abTest: abTestRouter,
   engagement: engagementRouter,
   // ─── Brand Membership (multi-tenant premium) ─────────────────────────────────
