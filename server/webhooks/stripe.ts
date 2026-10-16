@@ -43,6 +43,7 @@ import { buildAdminSponsorshipAlertEmail, buildSponsorThankYouEmail } from "../l
 import { buildAdminEventPartnershipAlertEmail, buildEventPartnershipThankYouEmail } from "../lib/eventPartnershipEmail";
 import { buildUltrasoundExpoAdminAlertEmail, buildUltrasoundExpoThankYouEmail } from "../lib/ultrasoundExpoEmail";
 import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
+import { grantUltrasoundExpoEventCommunityAccess } from "../lib/ultrasoundExpoCommunity";
 type CheckoutRecipient = { email: string | null; name: string | null };
 
 /** Recipient metadata takes precedence over the Stripe payment buyer. */
@@ -430,6 +431,18 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
     .innerJoin(ultrasoundExpoPackages, eq(ultrasoundExpoRegistrations.packageId, ultrasoundExpoPackages.id))
     .where(eq(ultrasoundExpoRegistrations.id, registrationId)).limit(1);
   if (!record) return;
+
+  // An approved vendor application does not open the attendee community. The
+  // event-specific paid registration is the only automatic enrollment signal.
+  if (record.packageType === "registrant" || record.packageType === "exhibitor" || record.packageType === "sponsor") {
+    const [event] = await db.select().from(ultrasoundExpoEvents)
+      .where(eq(ultrasoundExpoEvents.id, existing.eventId)).limit(1);
+    if (event) {
+      await grantUltrasoundExpoEventCommunityAccess(db, event, resolved.user.id).catch((error) => {
+        console.error("[Stripe][UltrasoundExpo™] Event community enrollment failed", error);
+      });
+    }
+  }
 
   const emailRecord = {
     attendeeName: record.attendeeName,

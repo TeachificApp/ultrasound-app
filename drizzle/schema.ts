@@ -9202,6 +9202,9 @@ export const ultrasoundExpoEvents = mysqlTable("ultrasound_expo_events", {
   locationLabel: varchar("location_label", { length: 512 }),
   description: text("description"),
   heroImageUrl: varchar("hero_image_url", { length: 2048 }),
+  registrationTerms: text("registration_terms"),
+  attendeeInstructions: text("attendee_instructions"),
+  partnerInstructions: text("partner_instructions"),
   status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -9314,3 +9317,100 @@ export const ultrasoundExpoBoothRequests = mysqlTable("ultrasound_expo_booth_req
   index("ultrasound_expo_booth_requests_event_booth_idx").on(table.eventId, table.boothId, table.status),
 ]);
 export type UltrasoundExpoBoothRequest = typeof ultrasoundExpoBoothRequests.$inferSelect;
+
+/** Event-instance agenda that powers the public schedule and downloadable calendar. */
+export const ultrasoundExpoAgendaItems = mysqlTable("ultrasound_expo_agenda_items", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: int("event_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at"),
+  locationLabel: varchar("location_label", { length: 512 }),
+  speakerNames: text("speaker_names"),
+  category: varchar("category", { length: 100 }),
+  status: mysqlEnum("status", ["draft", "published", "cancelled"]).default("draft").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("ultrasound_expo_agenda_event_status_starts_idx").on(table.eventId, table.status, table.startsAt),
+]);
+export type UltrasoundExpoAgendaItem = typeof ultrasoundExpoAgendaItems.$inferSelect;
+
+/** Multiple landing, attendee, exhibitor, schedule, and prospectus pages per Expo instance. */
+export const ultrasoundExpoEventPages = mysqlTable("ultrasound_expo_event_pages", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: int("event_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull(),
+  pageType: mysqlEnum("page_type", ["landing", "attendee", "exhibitor", "schedule", "prospectus", "custom"]).default("custom").notNull(),
+  accessLevel: mysqlEnum("access_level", ["public", "registered", "partners"]).default("public").notNull(),
+  blocksJson: longtext("blocks_json"),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  seoTitle: varchar("seo_title", { length: 255 }),
+  seoDescription: text("seo_description"),
+  createdByUserId: int("created_by_user_id"),
+  updatedByUserId: int("updated_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("ultrasound_expo_event_pages_event_slug_unique").on(table.eventId, table.slug),
+  index("ultrasound_expo_event_pages_event_status_idx").on(table.eventId, table.status, table.accessLevel),
+]);
+export type UltrasoundExpoEventPage = typeof ultrasoundExpoEventPages.$inferSelect;
+
+/** One editable organization profile per paid partner, within each Expo event instance. */
+export const ultrasoundExpoPartnerProfiles = mysqlTable("ultrasound_expo_partner_profiles", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: int("event_id").notNull(),
+  vendorApplicationId: int("vendor_application_id").notNull(),
+  displayName: varchar("display_name", { length: 255 }).notNull(),
+  summary: text("summary"),
+  websiteUrl: varchar("website_url", { length: 1024 }),
+  logoUrl: varchar("logo_url", { length: 2048 }),
+  contactEmail: varchar("contact_email", { length: 320 }),
+  contactPhone: varchar("contact_phone", { length: 60 }),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  uniqueIndex("ultrasound_expo_partner_profiles_event_vendor_unique").on(table.eventId, table.vendorApplicationId),
+  index("ultrasound_expo_partner_profiles_event_published_idx").on(table.eventId, table.isPublished),
+]);
+export type UltrasoundExpoPartnerProfile = typeof ultrasoundExpoPartnerProfiles.$inferSelect;
+
+/** Product brochures and documents are stored in object storage and attached to partner profiles. */
+export const ultrasoundExpoPartnerDocuments = mysqlTable("ultrasound_expo_partner_documents", {
+  id: int("id").autoincrement().primaryKey(),
+  partnerProfileId: int("partner_profile_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  fileUrl: varchar("file_url", { length: 2048 }).notNull(),
+  fileName: varchar("file_name", { length: 255 }),
+  mimeType: varchar("mime_type", { length: 100 }),
+  isPublished: boolean("is_published").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("ultrasound_expo_partner_documents_profile_published_idx").on(table.partnerProfileId, table.isPublished),
+]);
+export type UltrasoundExpoPartnerDocument = typeof ultrasoundExpoPartnerDocuments.$inferSelect;
+
+/** Paid post-event recordings remain independent from the registered-event community. */
+export const ultrasoundExpoRecordings = mysqlTable("ultrasound_expo_recordings", {
+  id: int("id").autoincrement().primaryKey(),
+  eventId: int("event_id").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  videoUrl: varchar("video_url", { length: 2048 }),
+  thumbnailUrl: varchar("thumbnail_url", { length: 2048 }),
+  durationSeconds: int("duration_seconds"),
+  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  sortOrder: int("sort_order").default(0).notNull(),
+  createdByUserId: int("created_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("ultrasound_expo_recordings_event_status_idx").on(table.eventId, table.status, table.sortOrder),
+]);
+export type UltrasoundExpoRecording = typeof ultrasoundExpoRecordings.$inferSelect;

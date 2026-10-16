@@ -153,6 +153,9 @@ const UltrasoundExpoSite = lazy(() => import("./pages/UltrasoundExpoSite"));
 const UltrasoundExpoRegister = lazy(() => import("./pages/UltrasoundExpoRegister"));
 const UltrasoundExpoDashboard = lazy(() => import("./pages/UltrasoundExpoDashboard"));
 const UltrasoundExpoAdmin = lazy(() => import("./pages/admin/UltrasoundExpoAdmin"));
+const UltrasoundExpoEventHub = lazy(() => import("./pages/UltrasoundExpoEventHub"));
+const UltrasoundExpoEventPage = lazy(() => import("./pages/UltrasoundExpoEventPage"));
+const ExpoEventPageBuilder = lazy(() => import("./pages/admin/ExpoEventPageBuilder"));
 const PartnerApplication = lazy(() => import("./pages/PartnerApplication"));
 const ApprovedPartnerPortal = lazy(() => import("./pages/ApprovedPartnerPortal"));
 
@@ -1793,7 +1796,19 @@ function UltrasoundExpoRouter() {
         <Route path="/expo-dashboard" component={UltrasoundExpoDashboard} />
         <Route path="/partner-application" component={PartnerApplication} />
         <Route path="/vendor-portal" component={ApprovedPartnerPortal} />
+        <Route path="/admin/ultrasound-expo/events/:eventId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ExpoEventPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SitePageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/lms/site-pages">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><SitePagesAdmin /></RoleGuard>}</Route>
         <Route path="/admin/ultrasound-expo">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UltrasoundExpoAdmin /></RoleGuard>}</Route>
+        <Route path="/events/:eventSlug/:pageSlug" component={UltrasoundExpoEventPage} />
+        <Route path="/events/:eventSlug" component={UltrasoundExpoEventHub} />
+        <Route path="/community/members/:userId" component={CommunityProfile} />
+        <Route path="/community/dms/c/:conversationId" component={CommunityDMs} />
+        <Route path="/community/dms/:userId" component={CommunityDMs} />
+        <Route path="/community/dms" component={CommunityDMs} />
+        <Route path="/community/spaces/:spaceId/channels/:channelId" component={CommunityFeed} />
+        <Route path="/community/spaces/:spaceId" component={CommunityFeed} />
+        <Route path="/community/:slug" component={CommunityFeed} />
         <Route path="/login" component={Login} />
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />

@@ -2,8 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
+  ultrasoundExpoAgendaItems,
   ultrasoundExpoEvents,
+  ultrasoundExpoEventPages,
   ultrasoundExpoPackages,
+  ultrasoundExpoRecordings,
   ultrasoundExpoRegistrations,
 } from "../../drizzle/schema";
 import { ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
@@ -53,6 +56,9 @@ const eventUpdateInput = z.object({
   locationLabel: z.string().trim().max(512).optional().or(z.literal("")),
   description: z.string().trim().max(8_000).optional().or(z.literal("")),
   heroImageUrl: z.string().trim().url().max(2048).optional().or(z.literal("")),
+  registrationTerms: z.string().trim().max(12_000).optional().or(z.literal("")),
+  attendeeInstructions: z.string().trim().max(12_000).optional().or(z.literal("")),
+  partnerInstructions: z.string().trim().max(12_000).optional().or(z.literal("")),
   status: z.enum(["draft", "published", "archived"]),
 });
 
@@ -209,6 +215,7 @@ export const ultrasoundExpoRouter = router({
       paidAt: ultrasoundExpoRegistrations.paidAt,
       createdAt: ultrasoundExpoRegistrations.createdAt,
       eventName: ultrasoundExpoEvents.name,
+      eventSlug: ultrasoundExpoEvents.slug,
       startsAt: ultrasoundExpoEvents.startsAt,
       endsAt: ultrasoundExpoEvents.endsAt,
       locationLabel: ultrasoundExpoEvents.locationLabel,
@@ -266,6 +273,9 @@ export const ultrasoundExpoRouter = router({
       locationLabel: input.locationLabel || null,
       description: input.description || null,
       heroImageUrl: input.heroImageUrl || null,
+      registrationTerms: input.registrationTerms || null,
+      attendeeInstructions: input.attendeeInstructions || null,
+      partnerInstructions: input.partnerInstructions || null,
       status: input.status,
     }).$returningId();
     return { id: created[0]?.id ?? null };
@@ -293,11 +303,19 @@ export const ultrasoundExpoRouter = router({
       locationLabel: source.locationLabel,
       description: source.description,
       heroImageUrl: source.heroImageUrl,
+      registrationTerms: source.registrationTerms,
+      attendeeInstructions: source.attendeeInstructions,
+      partnerInstructions: source.partnerInstructions,
       status: input.status,
     }).$returningId();
     const newEventId = created[0]?.id;
     if (!newEventId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to duplicate this UltrasoundExpo™ event." });
     const packages = await db.select().from(ultrasoundExpoPackages).where(eq(ultrasoundExpoPackages.eventId, source.id));
+    const [agenda, pages, recordings] = await Promise.all([
+      db.select().from(ultrasoundExpoAgendaItems).where(eq(ultrasoundExpoAgendaItems.eventId, source.id)),
+      db.select().from(ultrasoundExpoEventPages).where(eq(ultrasoundExpoEventPages.eventId, source.id)),
+      db.select().from(ultrasoundExpoRecordings).where(eq(ultrasoundExpoRecordings.eventId, source.id)),
+    ]);
     if (packages.length) {
       await db.insert(ultrasoundExpoPackages).values(packages.map(item => ({
         eventId: newEventId,
@@ -311,7 +329,28 @@ export const ultrasoundExpoRouter = router({
         isActive: false,
       })));
     }
-    return { id: newEventId, copiedPackages: packages.length };
+    if (agenda.length) {
+      await db.insert(ultrasoundExpoAgendaItems).values(agenda.map(item => ({
+        eventId: newEventId, title: item.title, description: item.description,
+        startsAt: input.startsAt, endsAt: null, locationLabel: source.locationLabel,
+        speakerNames: item.speakerNames, category: item.category, status: "draft" as const, sortOrder: item.sortOrder,
+      })));
+    }
+    if (pages.length) {
+      await db.insert(ultrasoundExpoEventPages).values(pages.map(item => ({
+        eventId: newEventId, title: item.title, slug: item.slug, pageType: item.pageType,
+        accessLevel: item.accessLevel, blocksJson: item.blocksJson, status: "draft" as const,
+        seoTitle: item.seoTitle, seoDescription: item.seoDescription, createdByUserId: ctx.user.id, updatedByUserId: ctx.user.id,
+      })));
+    }
+    if (recordings.length) {
+      await db.insert(ultrasoundExpoRecordings).values(recordings.map(item => ({
+        eventId: newEventId, title: item.title, description: item.description, videoUrl: null,
+        thumbnailUrl: item.thumbnailUrl, durationSeconds: item.durationSeconds, status: "draft" as const,
+        sortOrder: item.sortOrder, createdByUserId: ctx.user.id,
+      })));
+    }
+    return { id: newEventId, copiedPackages: packages.length, copiedAgendaItems: agenda.length, copiedPages: pages.length, copiedRecordingShells: recordings.length };
   }),
 
   updateEvent: protectedProcedure.input(eventUpdateInput).mutation(async ({ ctx, input }) => {
@@ -327,6 +366,9 @@ export const ultrasoundExpoRouter = router({
       locationLabel: input.locationLabel || null,
       description: input.description || null,
       heroImageUrl: input.heroImageUrl || null,
+      registrationTerms: input.registrationTerms || null,
+      attendeeInstructions: input.attendeeInstructions || null,
+      partnerInstructions: input.partnerInstructions || null,
       status: input.status,
     }).where(eq(ultrasoundExpoEvents.id, input.id));
     return { success: true };
