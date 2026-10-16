@@ -74,6 +74,14 @@ describe("UltrasoundExpo™ annual-event platform", () => {
     expect(EXPO_PACKAGE_TYPE_META.exhibitor.dashboardLabel).toBe("My exhibits");
   });
 
+  it("routes public exhibitor calls to the approval application rather than commerce", async () => {
+    const publicSite = await import("node:fs/promises").then(fs => fs.readFile("client/src/pages/UltrasoundExpoSite.tsx", "utf8"));
+    expect(publicSite).toContain('const EXHIBITOR_APPLICATION_HREF = "/partner-application?scope=ultrasound_expo&type=exhibitor"');
+    expect(publicSite).toContain('Applications open now');
+    expect(publicSite).toContain('Apply to Exhibit Now');
+    expect(publicSite).not.toContain('href="/exhibit"');
+  });
+
   it("rejects public attendee checkout while registration is coming soon", async () => {
     const caller = ultrasoundExpoRouter.createCaller({} as any);
     await expect(caller.createCheckout({
