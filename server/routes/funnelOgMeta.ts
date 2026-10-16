@@ -24,6 +24,7 @@ import {
   getUltrasoundExpoEditorPage,
   ULTRASOUND_EXPO_SITE_DOMAIN,
 } from "../../shared/ultrasoundExpo";
+import { getMetadataRequestHostname, getSiteMetadataForHostname } from "../lib/siteMetadata";
 
 function escapeHtml(str: string): string {
   return str
@@ -46,7 +47,7 @@ function escapeHtml(str: string): string {
  *  3. The actual request host (no proxy — use as-is)
  */
 function getCanonicalHost(req: Request): string {
-  const requestHost = (req.get("host") ?? "").toLowerCase().split(":")[0];
+  const requestHost = getMetadataRequestHostname(req);
   // Expo uses its own canonical site; never inherit a general platform root.
   if (requestHost === "ultrasoundexpo.com" || requestHost === "www.ultrasoundexpo.com") {
     return ULTRASOUND_EXPO_SITE_DOMAIN;
@@ -353,7 +354,7 @@ async function getDownloadLandingSeo(
 async function getUltrasoundExpoSeo(
   req: Request,
 ): Promise<{ title: string; description: string; image?: string | null } | null> {
-  const host = (req.hostname || req.get("host") || "").toLowerCase().split(":")[0];
+  const host = getMetadataRequestHostname(req);
   if (host !== "ultrasoundexpo.com" && host !== "www.ultrasoundexpo.com") return null;
 
   const pathname = req.path.replace(/^\/+|\/+$/g, "");
@@ -396,6 +397,58 @@ async function getUltrasoundExpoSeo(
   return definition.seo;
 }
 
+const ECHO_EXPO_PAGE_SEO: Record<string, { title: string; description: string }> = {
+  home: {
+    title: "EchoExpo™ | The Echocardiography Experience at UltrasoundExpo™",
+    description: "EchoExpo™ brings cardiac ultrasound education, Echo Skills, Echo Games, hands-on CME, innovation, and a dedicated exhibit hall to Orlando, January 14–16, 2028.",
+  },
+  attend: {
+    title: "Attend EchoExpo™ | Cardiac Ultrasound Event Information",
+    description: "Explore the EchoExpo™ attendee experience for cardiac ultrasound and echocardiography professionals.",
+  },
+  exhibit: {
+    title: "Exhibit at EchoExpo™ | Reach the Cardiac Imaging Community",
+    description: "Put your organization in front of cardiac ultrasound and echocardiography professionals at EchoExpo™.",
+  },
+  sponsor: {
+    title: "Sponsor EchoExpo™ | Cardiac Ultrasound Event Partnerships",
+    description: "Build meaningful visibility with cardiac imaging professionals through EchoExpo™ sponsorship opportunities.",
+  },
+  program: {
+    title: "EchoExpo™ Program | Cardiac Education, Skills, and Innovation",
+    description: "Explore the developing EchoExpo™ program for echocardiography education, Echo Skills, hands-on learning, and community.",
+  },
+  expo: {
+    title: "EchoExpo™ Exhibit Hall | Cardiac Imaging Innovation",
+    description: "Discover the dedicated EchoExpo™ exhibit hall for cardiac imaging technology, education, and innovation.",
+  },
+  connect: {
+    title: "Connect at EchoExpo™ | The Cardiac Ultrasound Community",
+    description: "Meet the cardiac ultrasound professionals, educators, innovators, and organizations shaping what comes next at EchoExpo™.",
+  },
+  about: {
+    title: "About EchoExpo™ | The Cardiac Experience at UltrasoundExpo™",
+    description: "Learn about EchoExpo™, the dedicated echocardiography and cardiac ultrasound experience within UltrasoundExpo™.",
+  },
+  register: {
+    title: "EchoExpo™ Attendee Registration Coming Soon",
+    description: "Attendee registration for EchoExpo™ is coming soon.",
+  },
+};
+
+function getEchoExpoSeo(
+  req: Request,
+): { title: string; description: string; image?: string | null } | null {
+  const host = getMetadataRequestHostname(req);
+  const siteMetadata = getSiteMetadataForHostname(host);
+  if (siteMetadata?.siteName !== "EchoExpo™") return null;
+
+  const pathname = req.path.replace(/^\/+|\/+$/g, "");
+  const slug = pathname || "home";
+  const page = ECHO_EXPO_PAGE_SEO[slug] ?? ECHO_EXPO_PAGE_SEO.home;
+  return { ...page, image: siteMetadata.image };
+}
+
 /**
  * Resolve per-page SEO data for a given request path.
  * Returns null when the path does not match a known landing page type.
@@ -405,6 +458,8 @@ export async function getPageSeoForRequest(
 ): Promise<{ title: string; description: string; image?: string | null } | null> {
   const expoSeo = await getUltrasoundExpoSeo(req);
   if (expoSeo) return expoSeo;
+  const echoExpoSeo = getEchoExpoSeo(req);
+  if (echoExpoSeo) return echoExpoSeo;
   const pathname = req.path; // e.g. /courses/live-vascular...
   const courseMatch = pathname.match(/^\/courses\/([^/]+)$/);
   if (courseMatch) return getCourseLandingSeo(courseMatch[1]);
