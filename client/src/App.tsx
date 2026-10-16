@@ -632,6 +632,9 @@ function Router() {
         {/* Generic CME disclosure form — must be registered BEFORE the :token route */}
         <Route path="/cme-disclosure/generic">{() => <Suspense fallback={pageFallback}><CmeDisclosureFormGeneric /></Suspense>}</Route>
         <Route path="/cme-disclosure/:token">{() => <Suspense fallback={pageFallback}><CmeDisclosureForm /></Suspense>}</Route>
+        {/* Annual-event administration lives on the app tenant as well as the dedicated public Expo domain. */}
+        <Route path="/admin/ultrasound-expo/events/:eventId/pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><ExpoEventPageBuilder /></RoleGuard>}</Route>
+        <Route path="/admin/ultrasound-expo">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><UltrasoundExpoAdmin /></RoleGuard>}</Route>
         <Route path="/admin/lms">{() => <RoleGuard roles={["platform_admin", "platform_manager"]} allowAdmin={true}><LMSAdmin /></RoleGuard>}</Route>
         <Route path="/admin/sponsorships">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SponsorshipAdmin /></Suspense></RoleGuard>}</Route>
         <Route path="/admin/lms/site-pages/:pageId/edit">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><Suspense fallback={pageFallback}><SitePageBuilder /></Suspense></RoleGuard>}</Route>
