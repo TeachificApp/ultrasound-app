@@ -56,11 +56,11 @@ function ExpoHeader() {
         <div className="hidden items-center gap-2 sm:flex">
           <img src={ULTRASOUND_EXPO_BANNER_URL} alt="UltrasoundExpo™" className="hidden h-9 w-auto max-w-[220px] object-contain object-right lg:block" />
           <Link href="/expo-dashboard" className="rounded-lg px-3 py-2 text-sm font-semibold text-[#a5f4ef] hover:bg-white/10">My UltrasoundExpo™</Link>
-          <Button onClick={() => setLocation("/register?type=registrant")} className="bg-[#0c9ba3] font-bold hover:bg-[#0a858d]">Register to Attend</Button>
+          <Button onClick={() => setLocation("/register")} className="bg-[#0c9ba3] font-bold hover:bg-[#0a858d]">Attendee registration coming soon</Button>
         </div>
         <button onClick={() => setOpen(!open)} className="rounded-lg p-2 text-white hover:bg-white/10 lg:hidden" aria-label="Toggle menu">{open ? <X /> : <Menu />}</button>
       </div>
-      {open && <div className="border-t border-white/10 px-4 py-3 lg:hidden"><nav className="grid gap-1">{NAVIGATION.map(item => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10">{item.label}</Link>)}<Link href="/expo-dashboard" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-[#8aeae5]">My UltrasoundExpo™ Dashboard</Link><Button onClick={() => { setOpen(false); setLocation("/register?type=registrant"); }} className="mt-2 bg-[#0c9ba3]">Register to Attend</Button></nav></div>}
+      {open && <div className="border-t border-white/10 px-4 py-3 lg:hidden"><nav className="grid gap-1">{NAVIGATION.map(item => <Link key={item.href} href={item.href} onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-slate-100 hover:bg-white/10">{item.label}</Link>)}<Link href="/expo-dashboard" onClick={() => setOpen(false)} className="rounded-lg px-3 py-3 text-sm font-semibold text-[#8aeae5]">My UltrasoundExpo™ Dashboard</Link><Button onClick={() => { setOpen(false); setLocation("/register"); }} className="mt-2 bg-[#0c9ba3]">Attendee registration coming soon</Button></nav></div>}
     </header>
   );
 }

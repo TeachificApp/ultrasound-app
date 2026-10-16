@@ -6,7 +6,7 @@ import {
   ultrasoundExpoPackages,
   ultrasoundExpoRegistrations,
 } from "../../drizzle/schema";
-import { isExpoPackageType, isExpoPublicRegistrationType, ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
+import { ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
 import { getDb, getUserRoles } from "../db";
 import { getStripeClient } from "../lib/stripeClient";
 import { requireApprovedVendorApplication } from "../lib/vendorPartnerAccess";
@@ -80,13 +80,12 @@ export const ultrasoundExpoRouter = router({
       .orderBy(asc(ultrasoundExpoEvents.startsAt))
       .limit(1);
     if (!event) return { event: null, packages: [] };
-    const packages = (await db.select().from(ultrasoundExpoPackages)
-      .where(and(eq(ultrasoundExpoPackages.eventId, event.id), eq(ultrasoundExpoPackages.isActive, true)))
-      .orderBy(asc(ultrasoundExpoPackages.sortOrder), asc(ultrasoundExpoPackages.id)))
-      .filter(item => isExpoPublicRegistrationType(item.packageType));
-    return { event, packages };
+    // Attendee registration is intentionally paused. Partner pricing is available only
+    // through the separately authorized partner portal and never through this endpoint.
+    return { event, packages: [] };
   }),
 
+  /** Attendee registration is paused; no public data, sign-in, or checkout flow is available. */
   createCheckout: publicProcedure
     .input(z.object({
       packageId: z.number().int().positive(),
@@ -98,87 +97,8 @@ export const ultrasoundExpoRouter = router({
       notes: z.string().trim().max(4_000).optional().or(z.literal("")),
       origin: z.string().max(2048),
     }))
-    .mutation(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "UltrasoundExpo™ checkout is temporarily unavailable." });
-      const [selection] = await db.select({
-        packageId: ultrasoundExpoPackages.id,
-        eventId: ultrasoundExpoEvents.id,
-        eventName: ultrasoundExpoEvents.name,
-        eventStatus: ultrasoundExpoEvents.status,
-        packageType: ultrasoundExpoPackages.packageType,
-        packageName: ultrasoundExpoPackages.name,
-        amountCents: ultrasoundExpoPackages.amountCents,
-        currency: ultrasoundExpoPackages.currency,
-        isActive: ultrasoundExpoPackages.isActive,
-      }).from(ultrasoundExpoPackages)
-        .innerJoin(ultrasoundExpoEvents, eq(ultrasoundExpoPackages.eventId, ultrasoundExpoEvents.id))
-        .where(eq(ultrasoundExpoPackages.id, input.packageId))
-        .limit(1);
-      if (!selection || selection.eventStatus !== "published" || !selection.isActive) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "That UltrasoundExpo™ opportunity is no longer available." });
-      }
-      if (!isExpoPackageType(selection.packageType)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "That UltrasoundExpo™ opportunity has an invalid category." });
-      }
-      if (!isExpoPublicRegistrationType(selection.packageType)) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "That UltrasoundExpo™ opportunity is not currently available for registration." });
-      }
-      const created = await db.insert(ultrasoundExpoRegistrations).values({
-        eventId: selection.eventId,
-        packageId: selection.packageId,
-        attendeeName: input.attendeeName,
-        attendeeEmail: input.attendeeEmail.toLowerCase(),
-        attendeePhone: input.attendeePhone || null,
-        organizationName: input.organizationName || null,
-        organizationWebsite: input.organizationWebsite || null,
-        notes: input.notes || null,
-        amountCents: selection.amountCents,
-        currency: selection.currency,
-        paymentStatus: "pending",
-        status: "pending",
-      }).$returningId();
-      const registrationId = created[0]?.id;
-      if (!registrationId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the UltrasoundExpo™ selection." });
-
-      try {
-        const origin = safeExpoOrigin(input.origin);
-        const session = await getStripeClient().checkout.sessions.create({
-          mode: "payment",
-          customer_email: input.attendeeEmail.toLowerCase(),
-          billing_address_collection: "auto",
-          allow_promotion_codes: false,
-          line_items: [{
-            price_data: {
-              currency: selection.currency,
-              product_data: {
-                name: `${selection.eventName} — ${selection.packageName}`,
-                description: `UltrasoundExpo™ ${selection.packageType} selection`,
-              },
-              unit_amount: selection.amountCents,
-            },
-            quantity: 1,
-          }],
-          metadata: {
-            type: "ultrasound_expo",
-            ultrasound_expo_registration_id: String(registrationId),
-            ultrasound_expo_event_id: String(selection.eventId),
-            ultrasound_expo_package_type: selection.packageType,
-            attendee_email: input.attendeeEmail.toLowerCase(),
-          },
-          payment_intent_data: { description: `UltrasoundExpo™ — ${selection.packageName}` },
-          success_url: `${origin}/expo-dashboard?status=complete&session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${origin}/register?status=cancelled`,
-        }, { idempotencyKey: `ultrasound-expo:${registrationId}` });
-        await db.update(ultrasoundExpoRegistrations).set({ stripeSessionId: session.id })
-          .where(eq(ultrasoundExpoRegistrations.id, registrationId));
-        if (!session.url) throw new Error("Stripe did not return a checkout URL.");
-        return { checkoutUrl: session.url };
-      } catch (error) {
-        await db.update(ultrasoundExpoRegistrations).set({ paymentStatus: "failed", status: "payment_failed" })
-          .where(eq(ultrasoundExpoRegistrations.id, registrationId));
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to start secure UltrasoundExpo™ checkout. Please try again." });
-      }
+    .mutation(() => {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Attendee registration is coming soon." });
     }),
 
   /** Exhibitor and sponsor pricing/checkouts remain inside the approved partner portal. */

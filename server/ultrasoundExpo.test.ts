@@ -18,6 +18,7 @@ import {
 } from "../shared/ultrasoundExpo";
 import { buildUltrasoundExpoAdminAlertEmail, buildUltrasoundExpoThankYouEmail } from "./lib/ultrasoundExpoEmail";
 import { hasKnownStripeCheckoutRoute } from "./lib/unmatchedStripePayment";
+import { ultrasoundExpoRouter } from "./routers/ultrasoundExpoRouter";
 import { getPageSeoForRequest, injectPageSeoIntoHtml } from "./routes/funnelOgMeta";
 
 describe("UltrasoundExpo™ annual-event platform", () => {
@@ -54,19 +55,32 @@ describe("UltrasoundExpo™ annual-event platform", () => {
     ]));
   });
 
-  it("keeps administrative offerings distinct while exposing only attendee registration publicly", () => {
+  it("keeps all attendee registration options pending while retaining private partner categories", () => {
     expect(isExpoPackageType("registrant")).toBe(true);
     expect(isExpoPackageType("exhibitor")).toBe(true);
     expect(isExpoPackageType("sponsor")).toBe(true);
     expect(isExpoPackageType("product")).toBe(true);
-    expect(EXPO_PUBLIC_REGISTRATION_TYPES).toEqual(["registrant"]);
-    expect(isExpoPublicRegistrationType("registrant")).toBe(true);
+    expect(EXPO_PUBLIC_REGISTRATION_TYPES).toEqual([]);
+    expect(isExpoPublicRegistrationType("registrant")).toBe(false);
     expect(isExpoPublicRegistrationType("exhibitor")).toBe(false);
     expect(isExpoPublicRegistrationType("sponsor")).toBe(false);
     expect(isExpoPublicRegistrationType("product")).toBe(false);
     expect(isExpoPublicRegistrationType("other")).toBe(false);
     expect(isExpoPackageType("workshop_exhibit")).toBe(false);
     expect(EXPO_PACKAGE_TYPE_META.exhibitor.dashboardLabel).toBe("My exhibits");
+  });
+
+  it("rejects public attendee checkout while registration is coming soon", async () => {
+    const caller = ultrasoundExpoRouter.createCaller({} as any);
+    await expect(caller.createCheckout({
+      packageId: 1,
+      attendeeName: "Expo Participant",
+      attendeeEmail: "participant@example.com",
+      origin: "https://ultrasoundexpo.com",
+    })).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      message: "Attendee registration is coming soon.",
+    });
   });
 
   it("keeps supplied Expo logo and banner artwork separate from the existing hero image", () => {
@@ -124,7 +138,7 @@ describe("UltrasoundExpo™ annual-event platform", () => {
       get: (header: string) => (header.toLowerCase() === "host" ? "ultrasoundexpo.com" : undefined),
     } as any;
     const seo = await getPageSeoForRequest(request);
-    expect(seo?.title).toBe("Register for UltrasoundExpo™ | Attendee Registration and Partner Applications");
+    expect(seo?.title).toBe("UltrasoundExpo™ Attendee Registration Coming Soon");
     const rendered = injectPageSeoIntoHtml(
       '<html><head><title>Generic</title><meta property="og:url" content="https://ultrasoundexpo.com" /></head><body></body></html>',
       seo!,
@@ -133,5 +147,25 @@ describe("UltrasoundExpo™ annual-event platform", () => {
     expect(rendered).toContain('content="https://ultrasoundexpo.com/register"');
     expect(rendered.match(/property="og:url"/g)).toHaveLength(1);
     expect(rendered).toContain('data-page-seo="1"');
+  });
+
+  it("serves UltrasoundExpo™ metadata at the root domain instead of UltrasoundAssist™ metadata", async () => {
+    const request = {
+      hostname: "ultrasoundexpo.com",
+      path: "/",
+      originalUrl: "/",
+      protocol: "https",
+      headers: {},
+      get: (header: string) => (header.toLowerCase() === "host" ? "ultrasoundexpo.com" : undefined),
+    } as any;
+    const seo = await getPageSeoForRequest(request);
+    expect(seo?.title).toBe("UltrasoundExpo™ | The Annual Event for Ultrasound Professionals");
+    const rendered = injectPageSeoIntoHtml(
+      '<html><head><title>UltrasoundAssist™ — Clinical Ultrasound App</title><meta name="description" content="Clinical app" /><meta property="og:title" content="UltrasoundAssist™ — Clinical Ultrasound App" /></head><body></body></html>',
+      seo!,
+      request,
+    );
+    expect(rendered).toContain('<title>UltrasoundExpo™ | The Annual Event for Ultrasound Professionals</title>');
+    expect(rendered).not.toContain('UltrasoundAssist™ — Clinical Ultrasound App');
   });
 });
