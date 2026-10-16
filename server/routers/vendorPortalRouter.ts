@@ -143,9 +143,8 @@ export const vendorPortalRouter = router({
         }
       }
 
-      let created: Array<{ id: number }>;
       try {
-        created = await db.insert(vendorPartnerApplications).values({
+        await db.insert(vendorPartnerApplications).values({
           organizationName,
           organizationWebsite: input.organizationWebsite?.trim() || null,
           organizationLogoUrl,
@@ -161,8 +160,6 @@ export const vendorPortalRouter = router({
         console.error("[vendor-partner] Application save failed", error);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "We could not submit your application right now. Please try again shortly or contact support@allaboutultrasound.com." });
       }
-      const applicationId = created[0]?.id;
-      if (!applicationId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "We could not save your partner application. Please try again." });
 
       const record = {
         organizationName,
@@ -183,7 +180,7 @@ export const vendorPortalRouter = router({
       if (received.status === "rejected" || alerted.status === "rejected") {
         console.error("[vendor-partner] Application saved but one or more notification attempts failed.");
       }
-      return { success: true, applicationId };
+      return { success: true };
     }),
 
   myAccess: protectedProcedure.query(async ({ ctx }) => {
