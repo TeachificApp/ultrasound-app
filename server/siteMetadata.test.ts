@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   getMetadataRequestHostname,
@@ -72,5 +74,13 @@ describe("domain-specific social metadata", () => {
     expect(learn).toContain("Learn | All About Ultrasound™ + iHeartEcho™");
     expect(accreditation).toContain("Accreditation | iHeartEcho™");
     expect(accreditation).toContain('property="og:url" content="https://accreditation.iheartecho.com/"');
+  });
+
+  it("sets independent browser favicon fallbacks for both Expo hosts", () => {
+    const indexHtml = readFileSync(resolve(process.cwd(), "client/index.html"), "utf8");
+    expect(indexHtml).toContain("isExpo=h==='ultrasoundexpo.com'");
+    expect(indexHtml).toContain("qyAMKKVMmuCLxwRU.png");
+    expect(indexHtml).toContain("isEchoExpo=h==='echocardiographyexpo.com'");
+    expect(indexHtml).toContain("echoexpo-logo_535dff69.png");
   });
 });
