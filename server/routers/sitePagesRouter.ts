@@ -190,6 +190,7 @@ export const sitePagesAdminRouter = router({
         pageId: z.number(),
         seoTitle: z.string().max(255).optional(),
         seoDescription: z.string().optional(),
+        seoKeywords: z.string().max(4000).optional(),
         seoImage: z.string().max(512).optional(),
       }),
     )
@@ -202,6 +203,7 @@ export const sitePagesAdminRouter = router({
         .set({
           seoTitle: input.seoTitle ?? null,
           seoDescription: input.seoDescription ?? null,
+          seoKeywords: input.seoKeywords ?? null,
           seoImage: input.seoImage ?? null,
         })
         .where(eq(sitePages.id, input.pageId));

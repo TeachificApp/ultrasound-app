@@ -33,6 +33,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuPortal } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -8327,6 +8328,7 @@ export default function LandingPageBuilder() {
   // SEO / Link Preview state
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [seoSaved, setSeoSaved] = useState(false);
   const seoInitialized = useRef(false);
@@ -8418,6 +8420,7 @@ export default function LandingPageBuilder() {
       setSeoTitle(lpData.seoTitle ?? lpData.defaultSeoTitle ?? "");
       setSeoDescription(lpData.seoDescription ?? lpData.defaultSeoDescription ?? "");
       setSeoImage(lpData.seoImage ?? lpData.defaultSeoImage ?? "");
+      setSeoKeywords(lpData.seoKeywords ?? "");
     }
     let generatedDraft: Block[] | null = null;
     try {
@@ -8476,6 +8479,7 @@ export default function LandingPageBuilder() {
       courseId: numericCourseId,
       seoTitle: seoTitle.trim() || null,
       seoDescription: seoDescription.trim() || null,
+      seoKeywords: seoKeywords.trim() || null,
       seoImage: seoImage.trim() || null,
     });
   };
@@ -9068,6 +9072,7 @@ export default function LandingPageBuilder() {
               </div>
               <div className="pl-4 pr-3 py-3 space-y-3 flex-1">
                 <p className="text-[10px] text-gray-400">Override what iMessage, WhatsApp, and social media show when this page link is shared. Fields auto-populate from your course SEO settings.</p>
+                <PageSeoMetadataEditor compact value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }} onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); }} fallbackTitle={courseInfo?.title ?? "Course"} previewDomain="learn.allaboutultrasound.com" uploadContext={`courses/${numericCourseId}`} />
                 <div>
                   <label className="text-[10px] font-medium text-gray-600 block mb-1">Display Name (og:title)</label>
                   <input

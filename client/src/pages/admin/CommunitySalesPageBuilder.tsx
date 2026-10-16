@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -39,6 +40,7 @@ export default function CommunitySalesPageBuilder() {
   // SEO state
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [seoSaved, setSeoSaved] = useState(false);
   // Block picker modal
@@ -96,6 +98,10 @@ export default function CommunitySalesPageBuilder() {
     if (lpData.landingPageBlocks) {
       try { setBlocks(JSON.parse(lpData.landingPageBlocks) as Block[]); } catch {}
     }
+    if (lpData.seoTitle) setSeoTitle(lpData.seoTitle);
+    if (lpData.seoDescription) setSeoDescription(lpData.seoDescription);
+    if (lpData.seoKeywords) setSeoKeywords(lpData.seoKeywords);
+    if (lpData.seoImage) setSeoImage(lpData.seoImage);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lpData]);
 
@@ -106,10 +112,14 @@ export default function CommunitySalesPageBuilder() {
   });
 
   // ── Save SEO ──
-  const seoSavePending = false;
+  const saveSeo = trpc.community.admin.updateCommunity.useMutation({
+    onSuccess: () => { setSeoSaved(true); toast.success("SEO settings saved."); },
+    onError: (error: any) => toast.error(`SEO save failed: ${error.message}`),
+  });
+  const seoSavePending = saveSeo.isPending;
 
   const handleSaveSeo = () => {
-    toast.info('SEO settings coming soon.');
+    saveSeo.mutate({ id: numericId, seoTitle, seoDescription, seoKeywords, seoImage });
   };
 
   const handleSave = async () => {
@@ -274,6 +284,7 @@ export default function CommunitySalesPageBuilder() {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">SEO / Link Preview</h3>
                   <div className="space-y-3">
+                    <PageSeoMetadataEditor compact value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }} onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); setSeoSaved(false); }} fallbackTitle={pageInfo?.title ?? "Community"} previewDomain="learn.allaboutultrasound.com" uploadContext={`communities/${numericId}/landing`} />
                     <div>
                       <label className="text-xs text-gray-500 mb-1 block">Meta Title</label>
                       <Input value={seoTitle} onChange={e => setSeoTitle(e.target.value)} placeholder="Page title for search engines" className="text-sm h-8" />

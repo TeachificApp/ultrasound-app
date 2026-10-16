@@ -23,6 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAutoSave } from "@/hooks/useAutoSave";
@@ -454,6 +455,7 @@ export default function FunnelPageEditor() {
   const [showSeoPanel, setShowSeoPanel] = useState(false);
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [seoSaved, setSeoSaved] = useState(false);
   // Track whether SEO fields have been initialized so block-save invalidations
@@ -467,6 +469,7 @@ export default function FunnelPageEditor() {
     seoInitialized.current = true;
     setSeoTitle(pageData.page.seoTitle ?? "");
     setSeoDescription(pageData.page.seoDescription ?? "");
+    setSeoKeywords(pageData.page.seoKeywords ?? "");
     setSeoImage(pageData.page.seoImage ?? "");
   }, [pageData]);
 
@@ -492,6 +495,7 @@ export default function FunnelPageEditor() {
       id: numericPageId,
       seoTitle: seoTitle.trim() || null,
       seoDescription: seoDescription.trim() || null,
+      seoKeywords: seoKeywords.trim() || null,
       seoImage: seoImage.trim() || null,
     });
   };
@@ -804,6 +808,7 @@ export default function FunnelPageEditor() {
             {showSeoPanel && (
               <div className="mt-2 space-y-2 px-1">
                 <p className="text-[10px] text-gray-400">Override what iMessage, WhatsApp, and social media show when this link is shared.</p>
+                <PageSeoMetadataEditor compact value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }} onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); }} fallbackTitle={currentPage?.title ?? "Page"} previewDomain="allaboutultrasound.com" uploadContext={`funnels/${numericPageId}`} />
                 <div>
                   <label className="text-[10px] font-medium text-gray-600 block mb-1">Display Name</label>
                   <input

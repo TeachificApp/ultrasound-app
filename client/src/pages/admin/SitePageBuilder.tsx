@@ -15,6 +15,7 @@ import {
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +49,7 @@ export default function SitePageBuilder() {
   const [addOpen, setAddOpen] = useState(false);
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [showInHeaderNav, setShowInHeaderNav] = useState(false);
   const [showInSidebarNav, setShowInSidebarNav] = useState(false);
@@ -96,6 +98,7 @@ export default function SitePageBuilder() {
     }
     setSeoTitle(page.seoTitle ?? "");
     setSeoDescription(page.seoDescription ?? "");
+    setSeoKeywords(page.seoKeywords ?? "");
     setSeoImage(page.seoImage ?? "");
     setShowInHeaderNav(page.showInHeaderNav);
     setShowInSidebarNav(page.showInSidebarNav);
@@ -142,7 +145,7 @@ export default function SitePageBuilder() {
     } else {
       await saveBlocks.mutateAsync({ pageId: numericId, blocks: JSON.stringify(blocks) });
     }
-    await saveSeo.mutateAsync({ pageId: numericId, seoTitle, seoDescription, seoImage });
+    await saveSeo.mutateAsync({ pageId: numericId, seoTitle, seoDescription, seoKeywords, seoImage });
     await updateMeta.mutateAsync({
       pageId: numericId,
       showInHeaderNav,
@@ -317,15 +320,13 @@ export default function SitePageBuilder() {
             </div>
           </div>
           <hr />
-          <h3 className="font-semibold text-sm">SEO</h3>
-          <div className="space-y-2">
-            <Label className="text-xs">Title</Label>
-            <Input value={seoTitle} onChange={(e) => setSeoTitle(e.target.value)} className="h-8 text-sm" />
-            <Label className="text-xs">Description</Label>
-            <Textarea value={seoDescription} onChange={(e) => setSeoDescription(e.target.value)} rows={3} className="text-sm" />
-            <Label className="text-xs">Image URL</Label>
-            <Input value={seoImage} onChange={(e) => setSeoImage(e.target.value)} className="h-8 text-sm" />
-          </div>
+          <PageSeoMetadataEditor
+            value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }}
+            onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); }}
+            fallbackTitle={page.title}
+            previewDomain={page.domain}
+            uploadContext={`site-pages/${page.id}`}
+          />
           {selectedBlock && (
             <>
               <hr />

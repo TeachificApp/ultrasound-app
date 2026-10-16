@@ -845,6 +845,7 @@ export const downloadsAdminRouter = router({
         landingHeadline: digitalProducts.landingHeadline,
         seoTitle: digitalProducts.seoTitle,
         seoDescription: digitalProducts.seoDescription,
+        seoKeywords: digitalProducts.metaKeywords,
         seoImage: digitalProducts.seoImage,
       }).from(digitalProducts).where(eq(digitalProducts.id, input.productId)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND" });
@@ -857,6 +858,7 @@ export const downloadsAdminRouter = router({
         heroImageUrl: product.thumbnailUrl ?? "",
         seoTitle: product.seoTitle ?? null,
         seoDescription: product.seoDescription ?? null,
+        seoKeywords: product.seoKeywords ?? null,
         seoImage: product.seoImage ?? null,
       };
     }),
@@ -867,6 +869,7 @@ export const downloadsAdminRouter = router({
       productId: z.number(),
       seoTitle: z.string().nullable().optional(),
       seoDescription: z.string().nullable().optional(),
+      seoKeywords: z.string().nullable().optional(),
       seoImage: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -877,6 +880,7 @@ export const downloadsAdminRouter = router({
         .set({
           seoTitle: input.seoTitle ?? null,
           seoDescription: input.seoDescription ?? null,
+          metaKeywords: input.seoKeywords ?? null,
           seoImage: input.seoImage ?? null,
         })
         .where(eq(digitalProducts.id, input.productId));

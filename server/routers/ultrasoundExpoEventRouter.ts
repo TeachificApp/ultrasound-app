@@ -180,6 +180,8 @@ const eventPageInput = z.object({
   status: z.enum(["draft", "published", "archived"]),
   seoTitle: z.string().trim().max(255).optional().or(z.literal("")),
   seoDescription: z.string().trim().max(4_000).optional().or(z.literal("")),
+  seoKeywords: z.string().trim().max(4_000).optional().or(z.literal("")),
+  seoImage: z.string().trim().max(512).optional().or(z.literal("")),
 });
 
 const recordingInput = z.object({
@@ -386,7 +388,7 @@ export const ultrasoundExpoEventRouter = router({
     await assertExpoAdmin(ctx.user); const db = await getDb(); if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" }); await getEventById(db, input.eventId);
     let blocksJson = input.blocksJson || "[]";
     try { if (!Array.isArray(JSON.parse(blocksJson))) throw new Error("not an array"); } catch { throw new TRPCError({ code: "BAD_REQUEST", message: "Event page content must be valid page blocks." }); }
-    const values = { eventId: input.eventId, title: input.title, slug: toSlug(input.slug), pageType: input.pageType, accessLevel: input.accessLevel, blocksJson, status: input.status, seoTitle: input.seoTitle || null, seoDescription: input.seoDescription || null, updatedByUserId: ctx.user.id };
+    const values = { eventId: input.eventId, title: input.title, slug: toSlug(input.slug), pageType: input.pageType, accessLevel: input.accessLevel, blocksJson, status: input.status, seoTitle: input.seoTitle || null, seoDescription: input.seoDescription || null, seoKeywords: input.seoKeywords || null, seoImage: input.seoImage || null, updatedByUserId: ctx.user.id };
     try {
       if (input.id) { await db.update(ultrasoundExpoEventPages).set(values).where(and(eq(ultrasoundExpoEventPages.id, input.id), eq(ultrasoundExpoEventPages.eventId, input.eventId))); return { id: input.id, updated: true }; }
       const created = await db.insert(ultrasoundExpoEventPages).values({ ...values, createdByUserId: ctx.user.id }).$returningId(); return { id: created[0]?.id ?? null, updated: false };

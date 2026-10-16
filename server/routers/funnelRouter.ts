@@ -576,6 +576,7 @@ export const funnelRouter = router({
         showNavigationButton: z.boolean().optional(),
         seoTitle: z.string().nullable().optional(),
         seoDescription: z.string().nullable().optional(),
+        seoKeywords: z.string().nullable().optional(),
         seoImage: z.string().nullable().optional(),
       })
     )

@@ -259,6 +259,8 @@ export const webinarAdminRouter = router({
       slug: z.string().optional(),
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),
+      seoKeywords: z.string().nullable().optional(),
+      seoImage: z.string().nullable().optional(),
       purchaseTermsText: z.string().max(2000).nullable().optional(),
       purchaseTermsLinkText1: z.string().max(255).nullable().optional(),
       purchaseTermsLinkUrl1: z.string().max(2048).nullable().optional(),

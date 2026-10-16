@@ -546,6 +546,7 @@ export const productsRouter = router({
         landingHeadline: physicalProducts.landingHeadline,
         seoTitle: physicalProducts.seoTitle,
         seoDescription: physicalProducts.seoDescription,
+        seoKeywords: physicalProducts.metaKeywords,
         seoImage: physicalProducts.seoImage,
       }).from(physicalProducts).where(eq(physicalProducts.id, input.productId)).limit(1);
       if (!product) throw new TRPCError({ code: "NOT_FOUND" });
@@ -558,6 +559,7 @@ export const productsRouter = router({
         heroImageUrl: product.thumbnailUrl ?? "",
         seoTitle: product.seoTitle ?? null,
         seoDescription: product.seoDescription ?? null,
+        seoKeywords: product.seoKeywords ?? null,
         seoImage: product.seoImage ?? null,
       };
     }),
@@ -568,6 +570,7 @@ export const productsRouter = router({
       productId: z.number(),
       seoTitle: z.string().nullable().optional(),
       seoDescription: z.string().nullable().optional(),
+      seoKeywords: z.string().nullable().optional(),
       seoImage: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -580,6 +583,7 @@ export const productsRouter = router({
         .set({
           seoTitle: input.seoTitle ?? null,
           seoDescription: input.seoDescription ?? null,
+          metaKeywords: input.seoKeywords ?? null,
           seoImage: input.seoImage ?? null,
         })
         .where(eq(physicalProducts.id, input.productId));

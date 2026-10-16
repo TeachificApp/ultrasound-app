@@ -467,6 +467,8 @@ export const bundleRouter = router({
       slug: z.string().optional(),
       metaTitle: z.string().optional(),
       metaDescription: z.string().optional(),
+      metaKeywords: z.string().nullable().optional(),
+      seoImage: z.string().nullable().optional(),
       publishDomain: z.string().optional(),
       collectShippingAddress: z.boolean().optional(),
     }))

@@ -500,6 +500,7 @@ Rules:
         ctaText: lmsLandingPages.ctaText,
         seoTitle: lmsLandingPages.seoTitle,
         seoDescription: lmsLandingPages.seoDescription,
+        seoKeywords: lmsLandingPages.seoKeywords,
         seoImage: lmsLandingPages.seoImage,
       }).from(lmsLandingPages).where(eq(lmsLandingPages.courseId, input.courseId)).limit(1);
       const [course] = await db.select({
@@ -525,6 +526,7 @@ Rules:
         // Per-page SEO overrides (null = no override set)
         seoTitle: lp?.seoTitle ?? null,
         seoDescription: lp?.seoDescription ?? null,
+        seoKeywords: lp?.seoKeywords ?? null,
         seoImage: lp?.seoImage ?? null,
         // Course settings-page SEO defaults (auto-populate when no override)
         defaultSeoTitle: course?.metaTitle ?? course?.title ?? "",
@@ -596,6 +598,7 @@ Rules:
       courseId: z.number(),
       seoTitle: z.string().nullable().optional(),
       seoDescription: z.string().nullable().optional(),
+      seoKeywords: z.string().nullable().optional(),
       seoImage: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {

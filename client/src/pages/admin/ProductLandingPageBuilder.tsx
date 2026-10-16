@@ -23,6 +23,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -51,6 +52,7 @@ export default function ProductLandingPageBuilder() {
   // SEO / Link Preview state
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [seoSaved, setSeoSaved] = useState(false);
 
@@ -174,6 +176,7 @@ export default function ProductLandingPageBuilder() {
     if ((lpData as any).seoTitle) setSeoTitle((lpData as any).seoTitle);
     if ((lpData as any).seoDescription) setSeoDescription((lpData as any).seoDescription);
     if ((lpData as any).seoImage) setSeoImage((lpData as any).seoImage);
+    if ((lpData as any).seoKeywords) setSeoKeywords((lpData as any).seoKeywords);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lpData]);
 
@@ -183,7 +186,7 @@ export default function ProductLandingPageBuilder() {
     onError: (e: any) => toast.error(`SEO save failed: ${e.message}`),
   });
   const handleSaveSeo = () => {
-    saveSeoMutation.mutate({ productId: numericProductId, seoTitle, seoDescription, seoImage });
+    saveSeoMutation.mutate({ productId: numericProductId, seoTitle, seoDescription, seoKeywords, seoImage });
   };
 
   const saveBlocks = trpc.productsAdmin.saveLandingBlocks.useMutation({
@@ -520,6 +523,13 @@ export default function ProductLandingPageBuilder() {
               </div>
               <div className="pl-4 pr-3 py-3 space-y-3 flex-1">
                 <p className="text-[10px] text-gray-400">Override what iMessage, WhatsApp, and social media show when this page link is shared.</p>
+                <PageSeoMetadataEditor compact
+                  value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }}
+                  onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); }}
+                  fallbackTitle={productInfo?.title ?? "Product"}
+                  previewDomain="allaboutultrasound.com"
+                  uploadContext={`physical-products/${numericProductId}`}
+                />
                 <div>
                   <label className="text-[10px] font-medium text-gray-600 block mb-1">Display Name (og:title)</label>
                   <input

@@ -1178,6 +1178,8 @@ const communityAdminRouter = router({
     backgroundColor: z.string().optional(),
     seoTitle: z.string().optional(),
     seoDescription: z.string().optional(),
+    seoKeywords: z.string().optional(),
+    seoImage: z.string().optional(),
   })).mutation(async ({ ctx, input }) => {
     await assertAdmin(ctx);
     const db = await getDb();

@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -40,6 +41,7 @@ export default function WebinarLandingPageBuilder() {
   // SEO state
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [seoSaved, setSeoSaved] = useState(false);
   // Block picker modal
@@ -100,6 +102,7 @@ export default function WebinarLandingPageBuilder() {
     if (lpData.metaTitle) setSeoTitle(lpData.metaTitle);
     if (lpData.metaDescription) setSeoDescription(lpData.metaDescription);
     if (lpData.seoImage) setSeoImage(lpData.seoImage);
+    if (lpData.seoKeywords) setSeoKeywords(lpData.seoKeywords);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lpData]);
 
@@ -125,7 +128,7 @@ export default function WebinarLandingPageBuilder() {
   });
 
   const handleSaveSeo = () => {
-    saveSeoMutation.mutate({ id: numericId, metaTitle: seoTitle, metaDescription: seoDescription, seoImage });
+    saveSeoMutation.mutate({ id: numericId, metaTitle: seoTitle, metaDescription: seoDescription, seoKeywords, seoImage });
   };
 
   const handleSave = async () => {
@@ -309,6 +312,7 @@ export default function WebinarLandingPageBuilder() {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">SEO / Link Preview</h3>
                   <div className="space-y-3">
+                    <PageSeoMetadataEditor compact value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }} onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); }} fallbackTitle={ pageInfo?.title ?? "Webinar" } previewDomain="learn.allaboutultrasound.com" uploadContext={`webinars/${numericId}`} />
                     <div>
                       <label className="text-xs text-gray-500 mb-1 block">Meta Title</label>
                       <Input value={seoTitle} onChange={e => setSeoTitle(e.target.value)} placeholder="Page title for search engines" className="text-sm h-8" />

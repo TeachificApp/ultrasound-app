@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -39,6 +40,7 @@ export default function MembershipSalesPageBuilder() {
   // SEO state
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [seoSaved, setSeoSaved] = useState(false);
   // Block picker modal
@@ -97,8 +99,10 @@ export default function MembershipSalesPageBuilder() {
     if (plan.landingPageBlocks) {
       try { setBlocks(JSON.parse(plan.landingPageBlocks) as Block[]); } catch {}
     }
-    if (plan.seoTitle) setSeoTitle(plan.seoTitle);
-    if (plan.seoDescription) setSeoDescription(plan.seoDescription);
+    if (plan.metaTitle) setSeoTitle(plan.metaTitle);
+    if (plan.metaDescription) setSeoDescription(plan.metaDescription);
+    if (plan.seoKeywords) setSeoKeywords(plan.seoKeywords);
+    if (plan.seoImage) setSeoImage(plan.seoImage);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lpData]);
 
@@ -109,11 +113,14 @@ export default function MembershipSalesPageBuilder() {
   });
 
   // ── Save SEO ──
-  // No dedicated SEO procedure for memberships — saved via updateLandingPageBlocks
-  const seoSavePending = false;
+  const saveSeo = trpc.membership.update.useMutation({
+    onSuccess: () => { setSeoSaved(true); toast.success("SEO settings saved."); },
+    onError: (error: any) => toast.error(`SEO save failed: ${error.message}`),
+  });
+  const seoSavePending = saveSeo.isPending;
 
   const handleSaveSeo = () => {
-    toast.info('SEO settings will be saved with the page blocks.');
+    saveSeo.mutate({ id: numericId, metaTitle: seoTitle || null, metaDescription: seoDescription || null, seoKeywords: seoKeywords || null, seoImage: seoImage || null });
   };
 
   const handleSave = async () => {
@@ -278,6 +285,7 @@ export default function MembershipSalesPageBuilder() {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">SEO / Link Preview</h3>
                   <div className="space-y-3">
+                    <PageSeoMetadataEditor compact value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }} onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); setSeoSaved(false); }} fallbackTitle={pageInfo?.title ?? "Membership"} previewDomain="learn.allaboutultrasound.com" uploadContext={`memberships/${numericId}`} />
                     <div>
                       <label className="text-xs text-gray-500 mb-1 block">Meta Title</label>
                       <Input value={seoTitle} onChange={e => setSeoTitle(e.target.value)} placeholder="Page title for search engines" className="text-sm h-8" />

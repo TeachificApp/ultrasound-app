@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -39,6 +40,7 @@ export default function WebinarPlayerPageBuilder() {
   // SEO state
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [seoSaved, setSeoSaved] = useState(false);
   // Block picker modal
@@ -98,6 +100,10 @@ export default function WebinarPlayerPageBuilder() {
     if (raw) {
       try { setBlocks(JSON.parse(raw) as Block[]); } catch {}
     }
+    setSeoTitle(lpData.metaTitle ?? "");
+    setSeoDescription(lpData.metaDescription ?? "");
+    setSeoKeywords((lpData as any).seoKeywords ?? "");
+    setSeoImage((lpData as any).seoImage ?? "");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lpData]);
 
@@ -108,10 +114,14 @@ export default function WebinarPlayerPageBuilder() {
   });
 
   // ── Save SEO ──
-  const seoSavePending = false;
+  const saveSeo = trpc.webinarAdmin.update.useMutation({
+    onSuccess: () => { setSeoSaved(true); toast.success("SEO settings saved."); },
+    onError: (error: any) => toast.error(`SEO save failed: ${error.message}`),
+  });
+  const seoSavePending = saveSeo.isPending;
 
   const handleSaveSeo = () => {
-    toast.info('SEO settings are managed on the landing page.');
+    saveSeo.mutate({ id: numericId, metaTitle: seoTitle || undefined, metaDescription: seoDescription || undefined, seoKeywords: seoKeywords || undefined, seoImage: seoImage || undefined });
   };
 
   const handleSave = async () => {
@@ -276,6 +286,7 @@ export default function WebinarPlayerPageBuilder() {
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">SEO / Link Preview</h3>
                   <div className="space-y-3">
+                    <PageSeoMetadataEditor compact value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }} onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); setSeoSaved(false); }} fallbackTitle={pageInfo?.title ?? "Webinar"} previewDomain="learn.allaboutultrasound.com" uploadContext={`webinars/${numericId}/player`} />
                     <div>
                       <label className="text-xs text-gray-500 mb-1 block">Meta Title</label>
                       <Input value={seoTitle} onChange={e => setSeoTitle(e.target.value)} placeholder="Page title for search engines" className="text-sm h-8" />

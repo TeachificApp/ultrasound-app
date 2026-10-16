@@ -3585,6 +3585,7 @@ export const lmsLandingPages = mysqlTable("lms_landing_pages", {
   seoTitle: varchar("seo_title", { length: 255 }),
   seoDescription: text("seo_description"),
   seoImage: varchar("seo_image", { length: 512 }),
+  seoKeywords: text("seo_keywords"),
   // Per-funnel publish domain override (null = use global funnelPublishDomain)
   publishDomain: varchar("publish_domain", { length: 255 }),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
@@ -4052,6 +4053,7 @@ export const funnelPages = mysqlTable("funnel_pages", {
   seoTitle: varchar("seo_title", { length: 255 }), // overrides <title> and og:title
   seoDescription: text("seo_description"),          // overrides meta description and og:description
   seoImage: varchar("seo_image", { length: 512 }),   // overrides og:image URL
+  seoKeywords: text("seo_keywords"),                  // comma-separated search terms
   // Analytics
   views: int("views").default(0).notNull(),
   conversions: int("conversions").default(0).notNull(),
@@ -4445,6 +4447,7 @@ export const sitePages = mysqlTable(
     seoTitle: varchar("seo_title", { length: 255 }),
     seoDescription: text("seo_description"),
     seoImage: varchar("seo_image", { length: 512 }),
+    seoKeywords: text("seo_keywords"),
     parentPageId: int("parent_page_id"),
     navSortOrder: int("nav_sort_order").default(0).notNull(),
     showInHeaderNav: boolean("show_in_header_nav").default(false).notNull(),
@@ -5319,6 +5322,8 @@ export const webinars = mysqlTable("webinars", {
   coverImage: text("cover_image"),
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+  seoKeywords: text("seo_keywords"),
+  seoImage: varchar("seo_image", { length: 512 }),
   type: mysqlEnum("type", ["live", "prerecorded"]).default("live").notNull(),
   status: mysqlEnum("status", ["draft", "published", "ended", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
   scheduledAt: bigint("scheduled_at", { mode: "number" }),
@@ -5476,6 +5481,8 @@ export const bundles = mysqlTable("bundles", {
   coverImage: text("cover_image"),
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+  metaKeywords: text("meta_keywords"),
+  seoImage: varchar("seo_image", { length: 512 }),
   status: mysqlEnum("status", ["draft", "published", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
   accessType: mysqlEnum("access_type", ["free", "paid"]).default("paid").notNull(),
   pricingOptions: longtext("pricing_options"),
@@ -5557,6 +5564,8 @@ export const membershipPlans = mysqlTable("membership_plans", {
   coverImage: text("cover_image"),
   metaTitle: varchar("meta_title", { length: 255 }),
   metaDescription: text("meta_description"),
+  seoKeywords: text("seo_keywords"),
+  seoImage: varchar("seo_image", { length: 512 }),
   iconImage: text("icon_image"),
   accentColor: varchar("accent_color", { length: 32 }).default("#189aa1"),
   status: mysqlEnum("status", ["draft", "published", "enrollment_closed", "waitlist", "presale"]).default("draft").notNull(),
@@ -5667,6 +5676,8 @@ export const communities = mysqlTable("communities", {
   backgroundColor: varchar("background_color", { length: 32 }),
   seoTitle: varchar("seo_title", { length: 255 }),
   seoDescription: text("seo_description"),
+  seoKeywords: text("seo_keywords"),
+  seoImage: varchar("seo_image", { length: 512 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 });
@@ -9408,6 +9419,8 @@ export const ultrasoundExpoEventPages = mysqlTable("ultrasound_expo_event_pages"
   status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
   seoTitle: varchar("seo_title", { length: 255 }),
   seoDescription: text("seo_description"),
+  seoKeywords: text("seo_keywords"),
+  seoImage: varchar("seo_image", { length: 512 }),
   createdByUserId: int("created_by_user_id"),
   updatedByUserId: int("updated_by_user_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

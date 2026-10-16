@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -127,6 +128,10 @@ export default function BundleLandingPageBuilder() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [pageInfo, setPageInfo] = useState<{ title: string; slug?: string } | null>(null);
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
+  const [seoImage, setSeoImage] = useState("");
   // Block picker modal
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [pickerTab, setPickerTab] = useState<"catalog" | "from_pages" | "templates">("catalog");
@@ -195,6 +200,10 @@ export default function BundleLandingPageBuilder() {
     setHasLoaded(true);
     const bundle = lpData.bundle;
     setPageInfo({ title: bundle.title, slug: bundle.slug });
+    setSeoTitle(bundle.metaTitle ?? "");
+    setSeoDescription(bundle.metaDescription ?? "");
+    setSeoKeywords(bundle.metaKeywords ?? "");
+    setSeoImage(bundle.seoImage ?? "");
     if (bundle.landingPageBlocks) {
       try {
         const savedBlocks = JSON.parse(bundle.landingPageBlocks) as Block[];
@@ -217,7 +226,7 @@ export default function BundleLandingPageBuilder() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await saveBlocks.mutateAsync({ id: numericId, landingPageBlocks: JSON.stringify(blocks) });
+      await saveBlocks.mutateAsync({ id: numericId, landingPageBlocks: JSON.stringify(blocks), metaTitle: seoTitle || undefined, metaDescription: seoDescription || undefined, metaKeywords: seoKeywords || null, seoImage: seoImage || null });
     } finally {
       setIsSaving(false);
     }
@@ -375,6 +384,7 @@ export default function BundleLandingPageBuilder() {
               <div className="p-4 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-gray-700 mb-2">Bundle Page Settings</h3>
+                  <PageSeoMetadataEditor compact value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }} onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); }} fallbackTitle={pageInfo?.title ?? "Bundle"} previewDomain="learn.allaboutultrasound.com" uploadContext={`bundles/${numericId}`} />
                   <p className="text-xs text-gray-500 leading-relaxed">
                     Edit the public URL, selected domain, page title, description, cover image, and SEO details in Bundle Settings.
                   </p>

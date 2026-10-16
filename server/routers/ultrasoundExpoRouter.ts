@@ -350,7 +350,8 @@ export const ultrasoundExpoRouter = router({
       await db.insert(ultrasoundExpoEventPages).values(pages.map(item => ({
         eventId: newEventId, title: item.title, slug: item.slug, pageType: item.pageType,
         accessLevel: item.accessLevel, blocksJson: item.blocksJson, status: "draft" as const,
-        seoTitle: item.seoTitle, seoDescription: item.seoDescription, createdByUserId: ctx.user.id, updatedByUserId: ctx.user.id,
+        seoTitle: item.seoTitle, seoDescription: item.seoDescription, seoKeywords: item.seoKeywords,
+        seoImage: item.seoImage, createdByUserId: ctx.user.id, updatedByUserId: ctx.user.id,
       })));
     }
     if (recordings.length) {

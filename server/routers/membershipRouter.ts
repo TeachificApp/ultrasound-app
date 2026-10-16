@@ -375,6 +375,8 @@ const updateMembership = adminProcedure
       slug: z.string().optional(),
       metaTitle: z.string().optional().nullable(),
       metaDescription: z.string().optional().nullable(),
+      seoKeywords: z.string().optional().nullable(),
+      seoImage: z.string().optional().nullable(),
       brand: z.enum(["all_about_ultrasound", "iheartecho"]).optional(),
     })
   )

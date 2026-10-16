@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,6 +45,7 @@ export default function WorkshopLandingPageBuilder() {
   // SEO state
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDescription, setSeoDescription] = useState("");
+  const [seoKeywords, setSeoKeywords] = useState("");
   const [seoImage, setSeoImage] = useState("");
   const [seoSaved, setSeoSaved] = useState(false);
 
@@ -166,6 +168,7 @@ export default function WorkshopLandingPageBuilder() {
     if ((w as any).metaTitle) setSeoTitle((w as any).metaTitle);
     if ((w as any).metaDescription) setSeoDescription((w as any).metaDescription);
     if ((w as any).seoImage) setSeoImage((w as any).seoImage);
+    if ((w as any).metaKeywords) setSeoKeywords((w as any).metaKeywords);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lpData]);
 
@@ -181,7 +184,7 @@ export default function WorkshopLandingPageBuilder() {
     onError: (e: any) => toast.error(`SEO save failed: ${e.message}`),
   });
   const handleSaveSeo = () => {
-    saveSeoMutation.mutate({ id: numericId, metaTitle: seoTitle, metaDescription: seoDescription, seoImage });
+    saveSeoMutation.mutate({ id: numericId, metaTitle: seoTitle, metaDescription: seoDescription, metaKeywords: seoKeywords, seoImage });
   };
 
   const handleSave = async () => {
@@ -462,6 +465,7 @@ export default function WorkshopLandingPageBuilder() {
               <div className="border-t pt-4">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">SEO / Meta</p>
                 <div className="space-y-3">
+                  <PageSeoMetadataEditor compact value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }} onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); }} fallbackTitle={ pageInfo?.title ?? "Workshop" } previewDomain="learn.allaboutultrasound.com" uploadContext={`workshops/${numericId}`} />
                   <div>
                     <Label className="text-xs text-gray-500 mb-1 block">Meta Title</Label>
                     <Input value={seoTitle} onChange={e => setSeoTitle(e.target.value)} placeholder="Page title for search engines" className="text-xs h-8" />

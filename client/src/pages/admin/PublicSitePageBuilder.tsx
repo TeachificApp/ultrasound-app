@@ -3,6 +3,7 @@ import { useLocation, useParams } from "wouter";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { trpc } from "@/lib/trpc";
+import { PageSeoMetadataEditor } from "@/components/PageSeoMetadataEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -396,7 +397,7 @@ function PublicSitePageBuilderWorkspace({
         </SettingsSection>
 
         <SettingsSection title="SEO" icon={<Sparkles className="w-4 h-4 text-teal-600" />}>
-          <div><Label className="text-xs">SEO title</Label><Input value={seoTitle} onChange={(event) => setSeoTitle(event.target.value)} /></div><div><Label className="text-xs">Meta description</Label><Textarea rows={3} value={seoDescription} onChange={(event) => setSeoDescription(event.target.value)} /></div><div><Label className="text-xs">Keywords</Label><Input value={seoKeywords} onChange={(event) => setSeoKeywords(event.target.value)} placeholder="ultrasound, clinical education" /></div><div><Label className="text-xs">Open Graph image URL</Label><Input value={seoImage} onChange={(event) => setSeoImage(event.target.value)} /></div><div className="flex items-center justify-between gap-3"><div><Label className="text-sm">Hide from search</Label><p className="text-xs text-slate-500">Sends noindex to crawlers.</p></div><Switch checked={hideFromSearch} onCheckedChange={setHideFromSearch} /></div>
+          <PageSeoMetadataEditor value={{ title: seoTitle, description: seoDescription, keywords: seoKeywords, image: seoImage }} onChange={(next) => { setSeoTitle(next.title); setSeoDescription(next.description); setSeoKeywords(next.keywords); setSeoImage(next.image); }} fallbackTitle={title || page?.title || "Page title"} previewDomain={tenant.currentHost} uploadContext={`marketing-site/${tenantKey}/pages/${id}`} /><div className="flex items-center justify-between gap-3"><div><Label className="text-sm">Hide from search</Label><p className="text-xs text-slate-500">Sends noindex to crawlers.</p></div><Switch checked={hideFromSearch} onCheckedChange={setHideFromSearch} /></div>
         </SettingsSection>
 
         <SettingsSection title="Advanced code" icon={<ShieldCheck className="w-4 h-4 text-teal-600" />}>
