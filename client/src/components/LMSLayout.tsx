@@ -10,7 +10,7 @@ import { Link, useLocation } from "wouter";
 import {
   LogIn, LogOut, Settings, ChevronDown,
   FolderOpen, ExternalLink, LayoutDashboard,
-  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users, DollarSign, Briefcase, BarChart3, CreditCard,
+  BookOpen, Menu, X, ShieldCheck, MessageSquare, Users, DollarSign, Briefcase, BarChart3, CreditCard, CalendarDays,
   GraduationCap, Building2, ClipboardList
 } from "lucide-react";
 import NotificationBell from "@/components/NotificationBell";
@@ -360,8 +360,13 @@ export default function LMSLayout({ children }: { children: React.ReactNode }) {
                           <a href={getAdminUrl("/platform-admin")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
                               <ShieldCheck className="w-3.5 h-3.5 text-gray-500" /> Platform Admin
                           </a>
+                          <div className="border-t border-gray-100 my-1" />
+                          <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">LMS Management</div>
                           <a href={getAdminUrl("/admin/lms")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
                               <Settings className="w-3.5 h-3.5 text-gray-500" /> LMS Admin
+                          </a>
+                          <a href={getAdminUrl("/admin/ultrasound-expo")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-cyan-50 hover:text-[#087f8c] cursor-pointer flex items-center gap-2">
+                              <CalendarDays className="w-3.5 h-3.5 text-[#087f8c]" /> UltrasoundExpo™ Management
                           </a>
                           <a href={getAdminUrl("/admin/media-repository")} onClick={() => setAccountOpen(false)} className="px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer flex items-center gap-2">
                               <FolderOpen className="w-3.5 h-3.5 text-gray-500" /> Media Repository
