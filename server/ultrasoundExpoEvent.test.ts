@@ -27,6 +27,24 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(appSource).toContain('<Route path="/admin/ultrasound-expo/events/:eventId/pages/:pageId/edit">');
   });
 
+  it("gives EchoExpo a full public event navigation while tagging shared operations as EchoExpo", async () => {
+    const [echoSite, appSource, registrationPage] = await Promise.all([
+      import("node:fs/promises").then(fs => fs.readFile("client/src/pages/EchoExpoSite.tsx", "utf8")),
+      import("node:fs/promises").then(fs => fs.readFile("client/src/App.tsx", "utf8")),
+      import("node:fs/promises").then(fs => fs.readFile("client/src/pages/UltrasoundExpoRegister.tsx", "utf8")),
+    ]);
+    expect(echoSite).toContain('"/attend"');
+    expect(echoSite).toContain('"/exhibit"');
+    expect(echoSite).toContain('"/sponsor"');
+    expect(echoSite).toContain('"/program"');
+    expect(echoSite).toContain('"/expo"');
+    expect(echoSite).toContain('event=echoexpo');
+    expect(echoSite).toContain('ULTRASOUND_EXPO_ORIGIN');
+    expect(appSource).toContain('function EchoExpoMarketingRouter()');
+    expect(appSource).toContain('<Route path="/partner-application" component={PartnerApplication} />');
+    expect(registrationPage).toContain('isEchoExpoDomain()');
+  });
+
   it("exports a standards-compatible multi-session event calendar", () => {
     const ics = buildUltrasoundExpoAgendaIcs("UltrasoundExpo™ 2028", [{
       id: 8,

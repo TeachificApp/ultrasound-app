@@ -1833,11 +1833,26 @@ function UltrasoundExpoRouter() {
   );
 }
 
-/** EchoExpo™ is a public marketing site. Registration, approvals, event records,
- * dashboards, community access, and partner operations remain on UltrasoundExpo.com. */
+/** EchoExpo™ is a focused public event site. Its registration/application pages
+ * live on the EchoExpo host, while records, dashboards, approvals, and operations
+ * remain in the shared UltrasoundExpo™ workspace. */
 function EchoExpoMarketingRouter() {
   usePageViewTracker();
-  return <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" /></div>}><EchoExpoSite /></Suspense>;
+  useSsoConsumer();
+  useSsoBridge();
+  useCrossDomainSso();
+  const pageFallback = <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" /></div>;
+  return <Suspense fallback={pageFallback}><Switch>
+    <Route path="/register" component={UltrasoundExpoRegister} />
+    <Route path="/partner-application" component={PartnerApplication} />
+    <Route path="/login" component={Login} />
+    <Route path="/forgot-password" component={ForgotPassword} />
+    <Route path="/reset-password" component={ResetPassword} />
+    <Route path="/magic-link" component={MagicLinkRequest} />
+    <Route path="/auth/magic" component={MagicLinkCallback} />
+    <Route path="/auth/access" component={AccessLinkCallback} />
+    <Route component={EchoExpoSite} />
+  </Switch></Suspense>;
 }
 
 function MarketingSiteRouter() {
