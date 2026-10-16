@@ -76,6 +76,21 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(echoSite).not.toContain("shared UltrasoundExpo™ partner portal");
   });
 
+  it("frames both event home pages as active experiences, with EchoExpo tailored to cardiac ultrasound", async () => {
+    const [ultrasoundSite, echoSite] = await Promise.all([
+      import("node:fs/promises").then(fs => fs.readFile("client/src/pages/UltrasoundExpoSite.tsx", "utf8")),
+      import("node:fs/promises").then(fs => fs.readFile("client/src/pages/EchoExpoSite.tsx", "utf8")),
+    ]);
+    expect(ultrasoundSite).toContain("More than a conference");
+    expect(ultrasoundSite).toContain("PLEASE DO NOT SIT HERE ALL DAY.");
+    expect(ultrasoundSite).toContain("ScanLabs, new technology, live demonstrations, SonoGames, Innovation Showcase");
+    expect(ultrasoundSite).toContain("Not Another Conference.");
+    expect(echoSite).toContain("More than a cardiac conference");
+    expect(echoSite).toContain("immersive echocardiography experience");
+    expect(echoSite).toContain("new cardiac imaging technology");
+    expect(echoSite).toContain("A Cardiac Ultrasound Experience.");
+  });
+
   it("exports a standards-compatible multi-session event calendar", () => {
     const ics = buildUltrasoundExpoAgendaIcs("UltrasoundExpo™ 2028", [{
       id: 8,

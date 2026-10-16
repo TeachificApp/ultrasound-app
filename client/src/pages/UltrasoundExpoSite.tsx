@@ -128,6 +128,30 @@ function ProgramSchedule({ zones }: { zones: Record<string, string> }) {
   </section>;
 }
 
+function ExperienceManifesto() {
+  return <section className="border-y border-cyan-100 bg-[#062b3a] px-4 py-20 text-white sm:px-6 sm:py-24">
+    <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.08fr_.92fr] lg:items-end">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[.22em] text-[#80eee8]">More than a conference</p>
+        <h2 className="mt-4 max-w-4xl text-4xl font-black leading-[1.02] tracking-[-.05em] sm:text-6xl">UltrasoundExpo™ isn&apos;t just another conference or another exhibit hall.</h2>
+        <p className="mt-6 max-w-3xl text-xl leading-8 text-slate-200">It&apos;s an immersive ultrasound experience built around doing, discovering, connecting, and participating.</p>
+        <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">Explore new technology. Get hands-on. Earn CME. Compete in ultrasound challenges. Meet the people building what&apos;s next. Connect with the ultrasound community.</p>
+        <p className="mt-8 text-2xl font-black tracking-[-.03em] text-[#80eee8] sm:text-3xl">You don&apos;t just attend UltrasoundExpo™. You experience it.</p>
+      </div>
+      <aside className="rounded-[2rem] border border-[#74d9d7]/35 bg-white/8 p-8 shadow-2xl shadow-cyan-950/30 sm:p-10">
+        <p className="text-xs font-black uppercase tracking-[.2em] text-[#80eee8]">PLEASE DO NOT SIT HERE ALL DAY.</p>
+        <h3 className="mt-4 text-3xl font-black leading-tight tracking-[-.04em]">UltrasoundExpo™ was designed to get you out of the chair.</h3>
+        <p className="mt-6 text-lg font-black uppercase tracking-[.18em] text-white">Scan. Explore. Compete. Learn. Network. Discover.</p>
+        <p className="mt-7 leading-7 text-slate-200">Of course there will be world-class education. But there will also be ScanLabs, new technology, live demonstrations, SonoGames, Innovation Showcase, friendly competitions, career opportunities, and an entire ultrasound community waiting outside the classroom.</p>
+      </aside>
+    </div>
+    <div className="mx-auto mt-12 max-w-7xl border-t border-white/15 pt-9 text-center">
+      <p className="text-2xl font-black tracking-[-.04em] text-white sm:text-4xl">Not Another Conference. <span className="text-[#80eee8]">An Ultrasound Experience.</span></p>
+      <p className="mt-3 text-lg font-bold text-slate-300">You Don&apos;t Just Attend It. You Experience It.</p>
+    </div>
+  </section>;
+}
+
 export default function UltrasoundExpoSite() {
   const [location] = useLocation();
   const { data, isLoading } = trpc.ultrasoundExpo.publicLaunch.useQuery();
@@ -184,6 +208,7 @@ export default function UltrasoundExpoSite() {
           </div>
         </div>
       </section>
+      <ExperienceManifesto />
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6"><p className="text-center text-xs font-black uppercase tracking-[.22em] text-[#087f8c]">A national meeting place</p><h2 className="mx-auto mt-3 max-w-3xl text-center text-3xl font-black tracking-[-.04em] text-[#062634] sm:text-5xl whitespace-pre-line">{zones.community_headline?.trim() || "One event. The entire ultrasound community."}</h2><div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{EXPERIENCES.map(([Icon, title, text]) => <div key={title} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_12px_36px_rgba(10,68,76,.06)] transition-transform hover:-translate-y-1"><Icon className="h-7 w-7 text-[#087f8c]" /><h3 className="mt-5 text-xl font-black text-[#062634]">{title}</h3><p className="mt-3 text-sm leading-6 text-slate-600">{text}</p><ChevronDown className="mt-5 h-4 w-4 -rotate-90 text-[#087f8c]" /></div>)}</div></section>
       <section className="bg-[#e8f7f8] px-4 py-20 sm:px-6"><div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.05fr_.95fr] lg:items-center"><div><p className="text-xs font-black uppercase tracking-[.2em] text-[#087f8c]">Experience the UltrasoundExpo™ Exhibit Hall</p><h2 className="mt-3 text-4xl font-black tracking-[-.05em] text-[#062634] sm:text-5xl whitespace-pre-line">{zones.exhibit_headline?.trim() || "Meet the teams building what comes next."}</h2><p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">Explore ultrasound manufacturers, technologies, AI solutions, workflow tools, education platforms, career opportunities, accessories, medical devices, software, and emerging ultrasound innovations.</p><Link href={EXHIBITOR_APPLICATION_HREF} className="mt-7 inline-flex items-center gap-2 font-bold text-[#087f8c] hover:text-[#065f68]">Apply to exhibit <ArrowRight className="h-4 w-4" /></Link></div><div className="rounded-[2rem] bg-[#062b3a] p-8 text-white shadow-2xl shadow-cyan-900/20"><p className="text-xs font-black uppercase tracking-[.18em] text-[#80eee8]">Designed to grow</p><div className="mt-6 space-y-5">{[[CalendarDays, "Annual event platform", "Each annual UltrasoundExpo™ experience brings new programs and opportunities."],[ShieldCheck, "Your event experience, in one place", "Use your account to access UltrasoundExpo™ registration details, tickets, and event updates."],[MapPin, "Live details when ready", "Venue, travel, agenda, pricing, and announcements will be shared as plans are confirmed."]].map(([Icon, title, text]) => <div key={String(title)} className="flex gap-4"><div className="mt-0.5 rounded-lg bg-white/10 p-2"><Icon className="h-5 w-5 text-[#80eee8]" /></div><div><h3 className="font-bold">{title}</h3><p className="mt-1 text-sm leading-6 text-slate-300">{text}</p></div></div>)}</div></div></div></section>
       <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6"><div className="grid gap-8 md:grid-cols-2"><div className="rounded-3xl bg-[#062b3a] p-8 text-white"><p className="text-xs font-black uppercase tracking-[.2em] text-[#80eee8]">Get hands-on</p><h2 className="mt-3 text-3xl font-black tracking-[-.04em]">ScanLabs, workshops, and skills that translate.</h2><p className="mt-4 leading-7 text-slate-300">As programming is published, administrators can manage event-specific hands-on experiences, capacity, waitlists, and CME designations through UltrasoundExpo™.</p><Link href="/program" className="mt-6 inline-flex items-center gap-2 font-bold text-[#80eee8]">Explore the program <ArrowRight className="h-4 w-4" /></Link></div><div className="rounded-3xl bg-[#0c9ba3] p-8 text-white"><p className="text-xs font-black uppercase tracking-[.2em] text-white/75">Founding industry partners</p><h2 className="mt-3 text-3xl font-black tracking-[-.04em] whitespace-pre-line">{zones.partner_headline?.trim() || "Create a presence at the ultrasound industry's new annual meeting."}</h2><p className="mt-4 leading-7 text-white/85">UltrasoundExpo™ sponsorships and exhibit opportunities are designed to help organizations build meaningful connections.</p><Link href="/sponsor" className="mt-6 inline-flex items-center gap-2 font-bold text-white">Partner with UltrasoundExpo™ <ArrowRight className="h-4 w-4" /></Link></div></div></section>
