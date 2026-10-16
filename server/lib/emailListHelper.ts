@@ -11,9 +11,149 @@
 import { eq, and, sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { emailLists, emailListSubscribers, newsletterSubscribers, users } from "../../drizzle/schema";
+import {
+  EXPO_EMAIL_LISTS,
+  getExpoAttendeeListKey,
+  getExpoProgramLabel,
+  getPartnerProgramTags,
+  getPartnerRoleTags,
+} from "../../shared/expoEmailAudience";
+import type { ExpoEventTenant } from "../../shared/expoTenant";
+import type { EmailAutomationScope } from "../../shared/emailAutomation";
 
 // Cache the All Contacts list ID so we don't query on every call.
 let allContactsListId: number | null = null;
+const expoAudienceListIds = new Map<keyof typeof EXPO_EMAIL_LISTS, number>();
+
+function parseMetadata(value: string | null | undefined): Record<string, unknown> {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function mergeMetadata(existing: string | null | undefined, incoming: Record<string, unknown> | undefined): string | null {
+  if (!incoming) return existing ?? null;
+  const merged = { ...parseMetadata(existing) };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (Array.isArray(value) && Array.isArray(merged[key])) {
+      merged[key] = [...new Set([...(merged[key] as unknown[]), ...value])];
+    } else {
+      merged[key] = value;
+    }
+  }
+  return JSON.stringify(merged);
+}
+
+async function ensureNamedEmailList(
+  key: keyof typeof EXPO_EMAIL_LISTS,
+): Promise<number> {
+  const cached = expoAudienceListIds.get(key);
+  if (cached) return cached;
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const definition = EXPO_EMAIL_LISTS[key];
+  const [existing] = await db.select({ id: emailLists.id })
+    .from(emailLists)
+    .where(eq(emailLists.name, definition.name))
+    .limit(1);
+  if (existing) {
+    expoAudienceListIds.set(key, existing.id);
+    return existing.id;
+  }
+  const [created] = await db.insert(emailLists).values({
+    name: definition.name,
+    description: definition.description,
+    isActive: true,
+    subscriberCount: 0,
+  });
+  const listId = (created as { insertId: number }).insertId;
+  expoAudienceListIds.set(key, listId);
+  return listId;
+}
+
+/** Ensures the three system-managed Expo audience lists are available to admins. */
+export async function ensureExpoAudienceLists(): Promise<Record<keyof typeof EXPO_EMAIL_LISTS, number>> {
+  const entries = await Promise.all(
+    (Object.keys(EXPO_EMAIL_LISTS) as Array<keyof typeof EXPO_EMAIL_LISTS>)
+      .map(async (key) => [key, await ensureNamedEmailList(key)] as const),
+  );
+  return Object.fromEntries(entries) as Record<keyof typeof EXPO_EMAIL_LISTS, number>;
+}
+
+/** Adds a confirmed event attendee to the appropriate program-specific audience. */
+export async function addExpoAttendeeToEmailList(input: {
+  tenant: ExpoEventTenant;
+  eventId: number;
+  eventName: string;
+  registrationId: number;
+  userId?: number | null;
+  email: string;
+  name?: string | null;
+}): Promise<void> {
+  try {
+    const listId = await ensureNamedEmailList(getExpoAttendeeListKey(input.tenant));
+    const program = getExpoProgramLabel(input.tenant);
+    await addToEmailList(listId, input.email, input.name, {
+      userId: input.userId ?? undefined,
+      source: "expo_attendee_registration",
+      sourceId: String(input.registrationId),
+      metadata: {
+        programTags: [program],
+        participantType: "Attendee",
+        participantRoles: ["Attendee"],
+        eventTenant: input.tenant,
+        eventId: input.eventId,
+        eventName: input.eventName,
+      },
+      automationScope: "expo",
+    });
+  } catch (error) {
+    console.error("[emailListHelper] Unable to add Expo attendee to audience list", error);
+  }
+}
+
+/** Adds an Expo-related vendor, exhibitor, or sponsor contact with role and program tags. */
+export async function addExpoPartnerToEmailList(input: {
+  applicationId?: number | null;
+  userId?: number | null;
+  email: string;
+  name?: string | null;
+  partnerTypes: readonly string[];
+  requestedScopes: readonly string[];
+  eventFocus?: string | null;
+  status: "pending" | "approved" | "rejected" | "suspended";
+}): Promise<void> {
+  try {
+    const listId = await ensureNamedEmailList("exhibitorsAndSponsors");
+    const participantRoles = getPartnerRoleTags(input.partnerTypes);
+    const programTags = getPartnerProgramTags({
+      requestedScopes: input.requestedScopes,
+      eventFocus: input.eventFocus,
+    });
+    // General AAUS/iHeartEcho partner submissions remain outside this Expo list
+    // unless they selected the shared UltrasoundExpo™ vendor pathway.
+    if (participantRoles.length === 0 || programTags.length === 0) return;
+    await addToEmailList(listId, input.email, input.name, {
+      userId: input.userId ?? undefined,
+      source: "expo_partner_application",
+      sourceId: input.applicationId ? String(input.applicationId) : undefined,
+      metadata: {
+        programTags,
+        participantRoles,
+        sponsorPrograms: input.partnerTypes.includes("sponsor") ? programTags : [],
+        eventFocus: input.eventFocus ?? null,
+        applicationStatus: input.status,
+      },
+      automationScope: "expo",
+    });
+  } catch (error) {
+    console.error("[emailListHelper] Unable to add Expo partner to audience list", error);
+  }
+}
 
 /** Get or create the master "All Contacts" email list. Returns its ID. */
 export async function ensureAllContactsList(): Promise<number> {
@@ -49,6 +189,8 @@ export interface AddToListOptions {
   metadata?: Record<string, unknown>;
   /** Only use after a contact explicitly opts in again. */
   resubscribe?: boolean;
+  /** Limits an automatic list-signup workflow event to its platform area. */
+  automationScope?: EmailAutomationScope;
 }
 
 export type EmailListMembershipAction = "insert" | "update" | "reactivate" | "skip";
@@ -81,12 +223,12 @@ export async function addToEmailList(
 
   try {
     const existing = await db
-      .select({ id: emailListSubscribers.id, status: emailListSubscribers.status })
+      .select({ id: emailListSubscribers.id, status: emailListSubscribers.status, metadata: emailListSubscribers.metadata })
       .from(emailListSubscribers)
       .where(and(eq(emailListSubscribers.listId, listId), eq(emailListSubscribers.email, normalizedEmail)))
       .limit(1);
 
-    const action = resolveEmailListMembershipAction(existing[0]?.status, Boolean(name || options.userId), options.resubscribe);
+    const action = resolveEmailListMembershipAction(existing[0]?.status, Boolean(name || options.userId || options.metadata), options.resubscribe);
     if (action === "skip") return;
 
     if (action === "reactivate" && existing[0]) {
@@ -98,6 +240,7 @@ export async function addToEmailList(
           unsubscribedAt: null,
           ...(name ? { name } : {}),
           ...(options.userId ? { userId: options.userId } : {}),
+          ...(options.metadata ? { metadata: mergeMetadata(existing[0].metadata, options.metadata) } : {}),
         })
         .where(eq(emailListSubscribers.id, existing[0].id));
       await db
@@ -106,7 +249,8 @@ export async function addToEmailList(
         .where(eq(emailLists.id, listId));
       const [list] = await db.select({ name: emailLists.name }).from(emailLists).where(eq(emailLists.id, listId)).limit(1);
       import("./emailAutomation").then(({ fireEmailAutomationEvent }) => {
-        for (const scope of ["learn", "apps", "expo"] as const) {
+        const scopes = options.automationScope ? [options.automationScope] : ["learn", "apps", "expo"] as const;
+        for (const scope of scopes) {
           fireEmailAutomationEvent({
             type: "list_signup", scope, userId: options.userId ?? null, email: normalizedEmail, name: name ?? null,
             targetId: listId, eventName: list?.name ?? "Email list", sourceKey: `email-list:${listId}:${normalizedEmail}:reactivated`,
@@ -122,6 +266,7 @@ export async function addToEmailList(
         .set({
           ...(name ? { name } : {}),
           ...(options.userId ? { userId: options.userId } : {}),
+          ...(options.metadata ? { metadata: mergeMetadata(existing[0].metadata, options.metadata) } : {}),
         })
         .where(eq(emailListSubscribers.id, existing[0].id));
       return;
@@ -143,7 +288,8 @@ export async function addToEmailList(
       .where(eq(emailLists.id, listId));
     const [list] = await db.select({ name: emailLists.name }).from(emailLists).where(eq(emailLists.id, listId)).limit(1);
     import("./emailAutomation").then(({ fireEmailAutomationEvent }) => {
-      for (const scope of ["learn", "apps", "expo"] as const) {
+      const scopes = options.automationScope ? [options.automationScope] : ["learn", "apps", "expo"] as const;
+      for (const scope of scopes) {
         fireEmailAutomationEvent({
           type: "list_signup", scope, userId: options.userId ?? null, email: normalizedEmail, name: name ?? null,
           targetId: listId, eventName: list?.name ?? "Email list", sourceKey: `email-list:${listId}:${normalizedEmail}:${(created as any).insertId ?? "new"}`,

@@ -28,6 +28,7 @@ import { sendEmail } from "../_core/email";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 import { requireApprovedVendorApplication } from "../lib/vendorPartnerAccess";
+import { addExpoPartnerToEmailList } from "../lib/emailListHelper";
 import {
   buildVendorApplicationAdminAlertEmail,
   buildVendorApplicationReceivedEmail,
@@ -157,7 +158,7 @@ export const vendorPortalRouter = router({
       }
 
       try {
-        await db.insert(vendorPartnerApplications).values({
+        const [createdApplication] = await db.insert(vendorPartnerApplications).values({
           organizationName,
           organizationWebsite: input.organizationWebsite?.trim() || null,
           organizationLogoUrl,
@@ -169,6 +170,17 @@ export const vendorPortalRouter = router({
           partnerTypes: JSON.stringify([...new Set(input.partnerTypes)]),
           eventFocus: input.eventFocus ?? null,
           linkedUserId: verifiedSharedUserId,
+          status: "pending",
+        });
+        const applicationId = Number((createdApplication as { insertId?: number }).insertId ?? 0) || null;
+        void addExpoPartnerToEmailList({
+          applicationId,
+          userId: verifiedSharedUserId,
+          email: contactEmail,
+          name: input.contactName.trim(),
+          partnerTypes: [...new Set(input.partnerTypes)],
+          requestedScopes: [...new Set(input.requestedScopes)],
+          eventFocus: input.eventFocus ?? null,
           status: "pending",
         });
       } catch (error) {
@@ -381,6 +393,16 @@ export const vendorPortalRouter = router({
           reviewedByUserId: ctx.user.id,
           reviewedAt: new Date(),
         }).where(eq(vendorPartnerApplications.id, application.id));
+        void addExpoPartnerToEmailList({
+          applicationId: application.id,
+          userId: resolved.user.id,
+          email: application.contactEmail,
+          name: application.contactName,
+          partnerTypes: parseVendorPartnerValues(application.partnerTypes, VENDOR_PARTNER_TYPES),
+          requestedScopes: parseVendorPartnerValues(application.requestedScopes, VENDOR_PARTNER_SCOPES),
+          eventFocus: application.eventFocus,
+          status: "approved",
+        });
         if (application.status !== "approved") {
           const approvedScopes: VendorPartnerScope[] = [aausAccess ? "aaus_ihe" : null, expoAccess ? "ultrasound_expo" : null].filter((value): value is VendorPartnerScope => !!value);
           const email = buildVendorApprovedEmail({ organizationName: application.organizationName, contactName: application.contactName, approvedScopes });
@@ -408,6 +430,16 @@ export const vendorPortalRouter = router({
         reviewedByUserId: ctx.user.id,
         reviewedAt: new Date(),
       }).where(eq(vendorPartnerApplications.id, application.id));
+      void addExpoPartnerToEmailList({
+        applicationId: application.id,
+        userId: application.linkedUserId,
+        email: application.contactEmail,
+        name: application.contactName,
+        partnerTypes: parseVendorPartnerValues(application.partnerTypes, VENDOR_PARTNER_TYPES),
+        requestedScopes: parseVendorPartnerValues(application.requestedScopes, VENDOR_PARTNER_SCOPES),
+        eventFocus: application.eventFocus,
+        status: nextStatus,
+      });
       if (nextStatus === "rejected" && application.status !== "rejected") {
         const email = buildVendorRejectedEmail({ organizationName: application.organizationName, contactName: application.contactName, note: reviewerNotes });
         await sendEmail({ to: { name: application.contactName, email: application.contactEmail }, subject: email.subject, htmlBody: email.htmlBody }).catch(error => console.error("[vendor-partner] Rejection email failed", error));

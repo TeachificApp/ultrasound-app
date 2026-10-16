@@ -45,7 +45,7 @@ import {
   emailAutomationDeliveries,
   ultrasoundExpoEvents,
 } from "../../drizzle/schema";
-import { addToEmailList, ensureAllContactsList } from "../lib/emailListHelper";
+import { addToEmailList, ensureAllContactsList, ensureExpoAudienceLists } from "../lib/emailListHelper";
 import { resolveRecipients } from "../lib/emailCampaignAudienceResolver";
 import {
   AudienceFilterSchema,
@@ -58,6 +58,7 @@ import { randomBytes } from "crypto";
 import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
 import { normalizeCampaignEmailHtml } from "../../shared/emailCampaignLayout";
 import { EMAIL_AUTOMATION_SCOPES, EMAIL_AUTOMATION_TRIGGER_META, EMAIL_AUTOMATION_TRIGGERS } from "../../shared/emailAutomation";
+import { isExpoAudienceListName } from "../../shared/expoEmailAudience";
 import { resolveCampaignTestSubject } from "../../shared/emailCampaignTestSubject";
 import {
   injectTrackingPixel,
@@ -1849,6 +1850,8 @@ Rules:
     await assertAdmin(ctx.user.id);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    await ensureAllContactsList();
+    await ensureExpoAudienceLists();
     return db.select().from(emailLists).orderBy(desc(emailLists.createdAt));
   }),
 
@@ -1881,6 +1884,10 @@ Rules:
       await assertAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [existing] = await db.select({ name: emailLists.name }).from(emailLists).where(eq(emailLists.id, input.id)).limit(1);
+      if (existing && isExpoAudienceListName(existing.name) && input.name !== undefined && input.name !== existing.name) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This automatic Expo audience list keeps its system name." });
+      }
       const updates: Record<string, unknown> = {};
       if (input.name !== undefined) updates.name = input.name;
       if (input.description !== undefined) updates.description = input.description;
@@ -1897,10 +1904,10 @@ Rules:
       await assertFullPlatformAdmin(ctx.user.id);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      // Prevent deleting the master All Contacts list
+      // Prevent deleting the master and system-managed automatic lists.
       const [list] = await db.select({ name: emailLists.name }).from(emailLists).where(eq(emailLists.id, input.id)).limit(1);
-      if (list?.name === "All Contacts") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "The \"All Contacts\" list cannot be deleted." });
+      if (list?.name === "All Contacts" || isExpoAudienceListName(list?.name)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This automatic system list cannot be deleted." });
       }
       await db.delete(emailListSubscribers).where(eq(emailListSubscribers.listId, input.id));
       await db.delete(emailLists).where(eq(emailLists.id, input.id));

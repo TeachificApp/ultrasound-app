@@ -44,6 +44,7 @@ import { buildAdminEventPartnershipAlertEmail, buildEventPartnershipThankYouEmai
 import { buildUltrasoundExpoAdminAlertEmail, buildUltrasoundExpoThankYouEmail } from "../lib/ultrasoundExpoEmail";
 import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 import { grantUltrasoundExpoEventCommunityAccess } from "../lib/ultrasoundExpoCommunity";
+import { addExpoAttendeeToEmailList, addExpoPartnerToEmailList } from "../lib/emailListHelper";
 type CheckoutRecipient = { email: string | null; name: string | null };
 
 /** Recipient metadata takes precedence over the Stripe payment buyer. */
@@ -426,6 +427,8 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
     eventName: ultrasoundExpoEvents.name,
     packageName: ultrasoundExpoPackages.name,
     packageType: ultrasoundExpoPackages.packageType,
+    eventId: ultrasoundExpoEvents.id,
+    eventTenant: ultrasoundExpoEvents.tenant,
   }).from(ultrasoundExpoRegistrations)
     .innerJoin(ultrasoundExpoEvents, eq(ultrasoundExpoRegistrations.eventId, ultrasoundExpoEvents.id))
     .innerJoin(ultrasoundExpoPackages, eq(ultrasoundExpoRegistrations.packageId, ultrasoundExpoPackages.id))
@@ -441,6 +444,28 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
       await grantUltrasoundExpoEventCommunityAccess(db, event, resolved.user.id).catch((error) => {
         console.error("[Stripe][UltrasoundExpo™] Event community enrollment failed", error);
       });
+      if (record.packageType === "registrant") {
+        await addExpoAttendeeToEmailList({
+          tenant: event.tenant === "echo_expo" ? "echo_expo" : "ultrasound_expo",
+          eventId: event.id,
+          eventName: event.name,
+          registrationId,
+          userId: resolved.user.id,
+          email: record.attendeeEmail,
+          name: record.attendeeName,
+        });
+      } else {
+        await addExpoPartnerToEmailList({
+          applicationId: existing.vendorApplicationId,
+          userId: resolved.user.id,
+          email: record.attendeeEmail,
+          name: record.attendeeName,
+          partnerTypes: [record.packageType],
+          requestedScopes: ["ultrasound_expo"],
+          eventFocus: event.tenant === "echo_expo" ? "echo_expo" : "ultrasound_expo",
+          status: "approved",
+        });
+      }
       import("../lib/emailAutomation").then(({ fireEmailAutomationEvent }) =>
         fireEmailAutomationEvent({
           type: "expo_registration", scope: "expo", userId: resolved.user.id,

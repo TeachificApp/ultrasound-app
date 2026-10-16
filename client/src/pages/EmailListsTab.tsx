@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { isExpoAudienceListName } from "@shared/expoEmailAudience";
 import {
   Plus, Trash2, Edit, RefreshCw, Users, Upload, UserPlus,
   Webhook, Zap, Table2, Code, ChevronRight, ChevronLeft,
@@ -28,6 +29,21 @@ import {
 // ─── CSV parsing helpers ──────────────────────────────────────────────────────
 
 interface ParsedRow { email: string; name?: string; }
+
+function subscriberTags(metadata: unknown): string[] {
+  if (!metadata || typeof metadata !== "string") return [];
+  try {
+    const parsed = JSON.parse(metadata) as Record<string, unknown>;
+    const values = [
+      ...(Array.isArray(parsed.programTags) ? parsed.programTags : []),
+      ...(Array.isArray(parsed.participantRoles) ? parsed.participantRoles : []),
+    ].filter((value): value is string => typeof value === "string" && Boolean(value.trim()));
+    if (typeof parsed.applicationStatus === "string" && parsed.applicationStatus) values.push(`Application: ${parsed.applicationStatus}`);
+    return [...new Set(values)];
+  } catch {
+    return [];
+  }
+}
 
 function parseCsvText(text: string): ParsedRow[] {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -671,6 +687,7 @@ function SubscriberTable({ list, onBack }: { list: { id: number; name: string; s
                   </th>
                   <th className="text-left px-3 py-2 font-medium text-gray-500 text-xs">Email</th>
                   <th className="text-left px-3 py-2 font-medium text-gray-500 text-xs">Name</th>
+                  <th className="text-left px-3 py-2 font-medium text-gray-500 text-xs">Tags</th>
                   <th className="text-left px-3 py-2 font-medium text-gray-500 text-xs">Source</th>
                   <th className="text-left px-3 py-2 font-medium text-gray-500 text-xs">Status</th>
                   <th className="text-left px-3 py-2 font-medium text-gray-500 text-xs">Added</th>
@@ -685,6 +702,11 @@ function SubscriberTable({ list, onBack }: { list: { id: number; name: string; s
                     </td>
                     <td className="px-3 py-2 text-gray-700 font-mono text-xs">{s.email}</td>
                     <td className="px-3 py-2 text-gray-600 text-xs">{s.name ?? <span className="text-gray-300">—</span>}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex max-w-[220px] flex-wrap gap-1">
+                        {subscriberTags(s.metadata).length ? subscriberTags(s.metadata).map(tag => <Badge key={tag} variant="outline" className="text-[10px]">{tag}</Badge>) : <span className="text-xs text-gray-300">—</span>}
+                      </div>
+                    </td>
                     <td className="px-3 py-2">
                       <Badge variant="secondary" className="text-xs capitalize">{(s.source ?? "unknown").replace(/_/g, " ")}</Badge>
                     </td>
@@ -807,7 +829,7 @@ export default function EmailListsTab() {
                 <button className="flex-1 text-left min-w-0" onClick={() => setViewingList(list)}>
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-gray-900 truncate">{list.name}</span>
-                    {list.name === "All Contacts" && <Badge variant="secondary" className="text-xs shrink-0">Auto</Badge>}
+                    {(list.name === "All Contacts" || isExpoAudienceListName(list.name)) && <Badge variant="secondary" className="text-xs shrink-0">Auto</Badge>}
                     {!list.isActive && <Badge variant="destructive" className="text-xs shrink-0">Inactive</Badge>}
                   </div>
                   {list.description && <p className="text-xs text-gray-500 mt-0.5 truncate">{list.description}</p>}
@@ -832,10 +854,10 @@ export default function EmailListsTab() {
                   <Button size="sm" variant="ghost" onClick={() => setViewingList(list)} title="View subscribers">
                     <Eye className="w-4 h-4" />
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEditingList(list)} title="Edit list">
+                  {list.name !== "All Contacts" && !isExpoAudienceListName(list.name) && <Button size="sm" variant="ghost" onClick={() => setEditingList(list)} title="Edit list">
                     <Edit className="w-4 h-4" />
-                  </Button>
-                  {list.name !== "All Contacts" && (
+                  </Button>}
+                  {list.name !== "All Contacts" && !isExpoAudienceListName(list.name) && (
                     <Button size="sm" variant="ghost" className="text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => setDeleteConfirmId(list.id)} title="Delete list">
                       <Trash2 className="w-4 h-4" />
                     </Button>
