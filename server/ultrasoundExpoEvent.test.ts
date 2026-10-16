@@ -53,8 +53,8 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(ultrasoundSite).toContain("Inside UltrasoundExpo™");
     expect(ultrasoundSite).toContain("Explore EchoExpo™");
     expect(ultrasoundSite).toContain("https://echoexpo.iheartecho.com/");
-    expect(echoSite).toContain("echoexpo-cardiac-hero_55f85ac1.png");
-    expect(echoSite).toContain("Cardiac sonographer performing an echocardiography examination");
+    expect(echoSite).toContain("echoexpo-cardiac-hero-accurate_fa9f76dd.png");
+    expect(echoSite).toContain("Sonographer performing a transthoracic echocardiography examination with a patient and cart-based ultrasound machine");
   });
 
   it("exports a standards-compatible multi-session event calendar", () => {
