@@ -178,6 +178,14 @@ export const BLOCK_CATALOG: { type: BlockType; label: string; icon: React.ReactN
     } },
   { type: "alert", label: "Alert / Callout", icon: <AlertTriangle size={14} />, category: "Marketing",
     defaultData: { text: "Limited time offer — enroll today!", alertType: "info", icon: "💡" } },
+  { type: "popup", label: "Popup / Overlay", icon: <AlertTriangle size={14} />, category: "Content",
+    defaultData: {
+      enabled: true, title: "Important update", html: "<p>Share an announcement, an offer, or an important update here.</p>",
+      videoUrl: "", videoAutoplay: false, videoMuted: true, videoCaption: "",
+      scheduleMode: "always", startAt: "", endAt: "", displayDurationSeconds: 0, showCountdown: false,
+      closeLabel: "Close popup", closeOnBackdrop: true, cardBgColor: "#ffffff", textColor: "#1e293b",
+      accentColor: "#179ca3", maxWidth: 640, ctaLabel: "", ctaUrl: "",
+    } },
   { type: "flip_cards", label: "Flip Cards", icon: <Layers size={14} />, category: "Marketing",
     defaultData: { headline: "Course Modules", cards: [{ front: "Module 1", back: "Description of module 1 content" }, { front: "Module 2", back: "Description of module 2 content" }], accentColor: "#179ca3", bgColor: "#f8fffe" } },
   // ── Conversion
@@ -456,7 +464,7 @@ export const CATALOG_CATEGORIES = ["Layout", "Content", "Marketing", "Conversion
 
 /** Runtime order for every Content picker. Do not rely on declaration or late push order. */
 export const CONTENT_PICKER_ORDER = [
-  "text", "image", "video", "ai_content", "ai_image",
+  "text", "image", "video", "popup", "ai_content", "ai_image",
   "file_upload", "file_download",
 ] as const;
 
@@ -4407,6 +4415,88 @@ export function BlockSettings({ block, onChange, lessonId, courseId, lessonTitle
     case "text": {
       return <TextBlockEditor d={d} set={set} setMany={setMany} lessonTitle={lessonTitle} courseTitle={courseTitle} />;
     }
+    case "popup": {
+      const scheduleMode = d.scheduleMode ?? "always";
+      return (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-teal-100 bg-teal-50/70 p-3 text-xs leading-relaxed text-teal-900">
+            Popups appear above the page, are always dismissible, and stay out of the page layout. Set a date rule and an optional visibility timer below.
+          </div>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+            <input type="checkbox" checked={d.enabled !== false} onChange={event => set("enabled", event.target.checked)} className="rounded" />
+            Enable this popup
+          </label>
+          <BSTextField data={d} onSet={set} label="Popup title" field="title" placeholder="Important update" />
+          <div>
+            <label className="mb-1 block text-xs text-gray-500">Popup content</label>
+            <RichTextEditor value={d.html ?? ""} onChange={html => set("html", html)} minHeight={180} maxHeight={420} placeholder="Add formatted text, links, media, tables, or other rich content..." />
+          </div>
+          <div className="space-y-2 rounded-lg border border-gray-200 p-3">
+            <p className="text-xs font-semibold text-gray-700">Optional video</p>
+            <div className="flex items-center gap-2">
+              <DebouncedInput value={d.videoUrl ?? ""} onChange={value => set("videoUrl", value)} className="h-8 flex-1 text-xs" placeholder="Video URL or upload a video" />
+              <button onClick={() => bgVideoRef.current?.click()} className="flex items-center gap-1 rounded border border-teal-200 bg-teal-50 px-2 py-1.5 text-xs text-teal-700 hover:bg-teal-100" disabled={uploading === "videoUrl"}>
+                {uploading === "videoUrl" ? "..." : <><Upload size={12} /> Upload</>}
+              </button>
+              <input ref={bgVideoRef} type="file" accept="video/*" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) handleFileUpload(file, "videoUrl", "popup-video"); event.target.value = ""; }} />
+            </div>
+            {d.videoUrl && <>
+              <BSTextField data={d} onSet={set} label="Video caption" field="videoCaption" />
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
+                <label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={d.videoAutoplay ?? false} onChange={event => set("videoAutoplay", event.target.checked)} className="rounded" />Autoplay when supported</label>
+                <label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={d.videoMuted ?? true} onChange={event => set("videoMuted", event.target.checked)} className="rounded" />Start muted</label>
+              </div>
+            </>}
+          </div>
+          <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+            <p className="text-xs font-semibold text-gray-700">Display schedule</p>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">When should it appear?</label>
+              <Select value={scheduleMode} onValueChange={value => set("scheduleMode", value)}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="always">Always</SelectItem>
+                  <SelectItem value="before">Only before a date</SelectItem>
+                  <SelectItem value="after">Only after a date</SelectItem>
+                  <SelectItem value="between">Only between two dates</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {(scheduleMode === "after" || scheduleMode === "between") && <div>
+              <label className="mb-1 block text-xs text-gray-500">{scheduleMode === "after" ? "Show from" : "Show from"}</label>
+              <Input type="datetime-local" value={d.startAt ?? ""} onChange={event => set("startAt", event.target.value)} className="h-8 text-xs" />
+            </div>}
+            {(scheduleMode === "before" || scheduleMode === "between") && <div>
+              <label className="mb-1 block text-xs text-gray-500">{scheduleMode === "before" ? "Show until" : "Show until"}</label>
+              <Input type="datetime-local" value={d.endAt ?? ""} onChange={event => set("endAt", event.target.value)} className="h-8 text-xs" />
+            </div>}
+            <p className="text-[11px] leading-relaxed text-gray-400">Leave a date blank to keep that side of the rule open. Dates use each visitor’s local time zone.</p>
+          </div>
+          <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+            <p className="text-xs font-semibold text-gray-700">Visibility timer</p>
+            <div>
+              <label className="mb-1 block text-xs text-gray-500">Close automatically after (seconds)</label>
+              <Input type="number" min={0} max={86400} value={d.displayDurationSeconds ?? 0} onChange={event => set("displayDurationSeconds", Math.min(86400, Math.max(0, Number(event.target.value) || 0)))} className="h-8 text-xs" />
+              <p className="mt-1 text-[11px] text-gray-400">Set 0 to keep it visible until the visitor closes it.</p>
+            </div>
+            {Number(d.displayDurationSeconds ?? 0) > 0 && <label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={d.showCountdown ?? false} onChange={event => set("showCountdown", event.target.checked)} className="rounded" />Show the seconds remaining</label>}
+          </div>
+          <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+            <p className="text-xs font-semibold text-gray-700">Optional action and appearance</p>
+            <BSTextField data={d} onSet={set} label="Button text" field="ctaLabel" placeholder="Learn more" />
+            <BSTextField data={d} onSet={set} label="Button URL" field="ctaUrl" placeholder="https://..." />
+            <div className="grid grid-cols-2 gap-2">
+              <BSColorField data={d} onSet={set} label="Accent" field="accentColor" />
+              <BSColorField data={d} onSet={set} label="Card background" field="cardBgColor" />
+              <BSColorField data={d} onSet={set} label="Text color" field="textColor" />
+              <div><label className="mb-1 block text-xs text-gray-500">Max width (px)</label><Input type="number" min={320} max={1080} value={d.maxWidth ?? 640} onChange={event => set("maxWidth", Math.min(1080, Math.max(320, Number(event.target.value) || 640)))} className="h-8 text-xs" /></div>
+            </div>
+            <BSTextField data={d} onSet={set} label="Close button label" field="closeLabel" placeholder="Close popup" />
+            <label className="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" checked={d.closeOnBackdrop !== false} onChange={event => set("closeOnBackdrop", event.target.checked)} className="rounded" />Allow click outside to close</label>
+          </div>
+        </div>
+      );
+    }
       case "ai_image":
         return (
           <AiImageBlockSettings d={d} set={set} setMany={setMany} uploading={uploading} bgImageRef={bgImageRef} handleFileUpload={handleFileUpload} productCatalog={productCatalog} orderBumpsList={orderBumpsList} funnelList={funnelList} />
@@ -7969,7 +8059,7 @@ function ColumnChildBlock({ block, isSelected, onSelect, onMoveOut, onMoveToOthe
       )}
       {/* Block preview — pointer-events none so clicks don't fire block interactions */}
       <div className="pointer-events-none" data-col-zone={colZoneId}>
-        <BlockPreview block={block} />
+        <BlockPreview block={block} renderMode="editor" />
       </div>
     </div>
   );
@@ -8070,7 +8160,7 @@ export function SortableBlock({ block, isSelected, onSelect, onDelete, onDuplica
             </div>
           </div>
         ) : (
-          <BlockPreview block={block} coursePrice={coursePrice} courseTitle={courseTitle} />
+          <BlockPreview block={block} coursePrice={coursePrice} courseTitle={courseTitle} renderMode="editor" />
         )}
       </div>
     </div>
@@ -9027,7 +9117,7 @@ export default function LandingPageBuilder() {
                   {activeDragId ? (() => {
                     const b = blocks.find(bl => bl.id === activeDragId) ??
                       blocks.flatMap(bl => bl.type === "column_layout" ? [...(bl.data.leftBlocks ?? []), ...(bl.data.rightBlocks ?? [])] : []).find(bl => bl.id === activeDragId);
-                    return b ? <div className="opacity-80 border-2 border-teal-400 rounded shadow-xl bg-white"><BlockPreview block={b} /></div> : null;
+                    return b ? <div className="opacity-80 border-2 border-teal-400 rounded shadow-xl bg-white"><BlockPreview block={b} renderMode="editor" /></div> : null;
                   })() : null}
                 </DragOverlay>
               </DndContext>

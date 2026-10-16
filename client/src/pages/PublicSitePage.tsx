@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { DEFAULT_SYSTEM_PAGES, RESERVED_SITE_SLUGS } from "@shared/sitePagesConstants";
 import NotFound from "@/pages/NotFound";
 
@@ -15,6 +16,7 @@ function renderBlocks(blocks: Block[]) {
       {blocks.map((block) => (
         <BlockPreview key={block.id} block={block} />
       ))}
+      <PopupModules blocks={blocks} />
     </div>
   );
 }
@@ -61,6 +63,7 @@ export default function PublicSitePage({ slug, domain }: Props) {
         {blocks.map((block) => (
           <BlockPreview key={block.id} block={block} />
         ))}
+        <PopupModules blocks={blocks} />
         <div className="max-w-md mx-auto p-6 text-center text-sm text-gray-500">
           Sign-in form is provided by the app login route.
         </div>

@@ -28,6 +28,7 @@ import { Link } from "wouter";
 import { getLoginUrl } from "@/const";
 import React, { useState, useEffect } from "react";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { handleCtaBtnClick, type DirectCheckoutHandler } from "@/lib/ctaUtils";
 import { useDirectCheckout } from "@/lib/directCheckout";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
@@ -995,6 +996,8 @@ export default function WorkshopLanding() {
         </div>
       )}
 
+      <PopupModules blocks={landingBlocks} />
+
       {/* Waitlist sign-up modal */}
       {(isWaitlistMode || isAllSoldOut || selectedWaitlistInstanceId !== null) && (
         <WaitlistModal
@@ -1191,6 +1194,7 @@ function WorkshopInstanceDetailModal({
           {(data.landingBlocks as any[]).map((block: any) => (
             <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} onRegister={onRegister} onDirectCheckout={onDirectCheckout} />
           ))}
+                  <PopupModules blocks={data.landingBlocks as Block[]} />
                 </div>
               )}
             </>
@@ -1340,6 +1344,7 @@ function WorkshopInstanceEmbedSection({
           {(data.landingBlocks as any[]).map((block: any) => (
             <PublicLandingBlock key={block.id} block={block} instanceId={instanceId} onRegister={onRegister} onDirectCheckout={onDirectCheckout} />
           ))}
+          <PopupModules blocks={data.landingBlocks as Block[]} />
           {showEnrollNow && !instanceIsSoldOut && (
             <div className="text-center py-6">
               <Button className="text-white px-8" style={{ backgroundColor: accentColor }} onClick={onRegister}>

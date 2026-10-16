@@ -13,6 +13,7 @@ import { useRoute, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { BlockPreview } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -205,6 +206,7 @@ export default function AssignmentDetail() {
             ))}
           </div>
         )}
+        <PopupModules blocks={blocks} />
 
         {/* Fallback description */}
         {blocks.length === 0 && assignment.description && (

@@ -292,7 +292,7 @@ export default function CommunityPageEditor({ communityId, pageType = "page" }: 
               <DragOverlay>
                 {activeDragBlock && (
                   <div className="opacity-80 shadow-2xl border-2 border-teal-400 rounded-lg overflow-hidden">
-                    <BlockPreview block={activeDragBlock} />
+                    <BlockPreview block={activeDragBlock} renderMode="editor" />
                   </div>
                 )}
               </DragOverlay>

@@ -16,6 +16,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import type { Block } from "@/components/BlockPreview";
 import { CountdownV2Block, ImageLinkWrapper, WebinarCountdownTimer } from "@/components/BlockPreview";
 import { BlockPreview } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
 import { FunnelWorkflowBlock, InlineOrderBumpBlock, ProductOfferStackBlock } from "@/components/FunnelBlocks";
 import CheckoutFormBlock from "@/components/CheckoutFormBlock";
@@ -1879,6 +1880,8 @@ function FunnelPageContent({ data }: { data: { funnel: any; page: any; nextPage:
           </div>
         );
       })}
+
+      <PopupModules blocks={blocks} />
 
       {/* Next page navigation — only shown when showNavigationButton is explicitly ON */}
       {page.showNavigationButton && branchResolved && resolvedNextUrl && (

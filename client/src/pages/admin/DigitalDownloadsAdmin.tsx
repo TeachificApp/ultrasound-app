@@ -60,6 +60,7 @@ function DownloadMemberPageEditor({ productId, productSlug }: { productId: numbe
     { type: "text", label: "Rich Text", icon: "T" },
     { type: "image", label: "Image", icon: "🖼" },
     { type: "video", label: "Video", icon: "▶" },
+    { type: "popup", label: "Popup / Overlay", icon: "⚠" },
     { type: "audio", label: "Audio", icon: "🔊" },
     { type: "bullets", label: "Bullet List", icon: "•" },
     { type: "alert", label: "Alert / Callout", icon: "⚠" },
@@ -162,7 +163,7 @@ function DownloadMemberPageEditor({ productId, productSlug }: { productId: numbe
               {blocks.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-6">No blocks yet</p>
               ) : blocks.map(block => (
-                <div key={block.id}><BlockPreview block={block} /></div>
+                <div key={block.id}><BlockPreview block={block} renderMode="editor" /></div>
               ))}
             </div>
           ) : (

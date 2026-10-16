@@ -31,6 +31,7 @@ import { useSeoHead } from "@/hooks/useSeoHead";
 import { injectUserParams, injectUserParamsIntoHtml, type UserParamSource } from "@/lib/userUrlParams";
 import { CountdownV2Block, ImageLinkWrapper, CC } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
+import { PopupModules } from "@/components/PopupModule";
 import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { AutoSizingHtmlEmbed } from "@/components/AutoSizingHtmlEmbed";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
@@ -846,6 +847,7 @@ export default function DownloadLanding() {
             </div>
           );
         })}
+        <PopupModules blocks={blocks} />
         {/* Before-checkout order bump */}
         {!hasPurchased && product && (
           <div className="max-w-2xl mx-auto px-4 py-8">

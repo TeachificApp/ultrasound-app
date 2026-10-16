@@ -9,6 +9,7 @@
 import React, { useState, useCallback } from "react";
 import { Plus, Trash2, GripVertical, Type, Image, Video, List, Minus, AlertTriangle, Table2, Upload, Globe, ChevronDown, ChevronUp } from "lucide-react";
 import { BlockPreview, Block, BlockType } from "@/components/BlockPreview";
+import { BlockSettings as SharedBlockSettings } from "@/pages/admin/LandingPageBuilder";
 import { Button } from "@/components/ui/button";
 
 // ─── Block catalog (subset relevant for assignments) ─────────────────────────
@@ -16,6 +17,7 @@ const ASSIGNMENT_BLOCKS: { type: BlockType; label: string; icon: React.ReactNode
   { type: "text", label: "Text / Rich Text", icon: <Type size={14} />, defaultData: { html: "<p>Enter your text here...</p>", bgColor: "#ffffff" } },
   { type: "image", label: "Image", icon: <Image size={14} />, defaultData: { src: "", alt: "", caption: "", bgColor: "#ffffff" } },
   { type: "video", label: "Video", icon: <Video size={14} />, defaultData: { url: "", caption: "", bgColor: "#ffffff" } },
+  { type: "popup", label: "Popup / Overlay", icon: <AlertTriangle size={14} />, defaultData: { enabled: true, title: "Important update", html: "<p>Share an announcement, an offer, or an important update here.</p>", videoUrl: "", videoAutoplay: false, videoMuted: true, videoCaption: "", scheduleMode: "always", startAt: "", endAt: "", displayDurationSeconds: 0, showCountdown: false, closeLabel: "Close popup", closeOnBackdrop: true, cardBgColor: "#ffffff", textColor: "#1e293b", accentColor: "#179ca3", maxWidth: 640, ctaLabel: "", ctaUrl: "" } },
   { type: "bullets", label: "Bullet List", icon: <List size={14} />, defaultData: { headline: "", items: ["Item 1", "Item 2"], bgColor: "#ffffff" } },
   { type: "alert", label: "Alert / Callout", icon: <AlertTriangle size={14} />, defaultData: { type: "info", title: "", message: "Important note for students.", bgColor: "#ffffff" } },
   { type: "divider", label: "Divider", icon: <Minus size={14} />, defaultData: { color: "#e5e7eb", thickness: 1 } },
@@ -30,6 +32,8 @@ function BlockSettings({ block, onUpdate }: { block: Block; onUpdate: (data: Rec
   const set = (key: string, val: any) => onUpdate({ ...d, [key]: val });
 
   switch (block.type) {
+    case "popup":
+      return <SharedBlockSettings block={block} onChange={onUpdate} />;
     case "text":
       return (
         <div className="space-y-2">
@@ -229,7 +233,7 @@ function BlockCard({ block, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, i
       </div>
       {/* Preview */}
       <div className="pointer-events-none select-none overflow-hidden" style={{ maxHeight: 200 }}>
-        <BlockPreview block={block} />
+        <BlockPreview block={block} renderMode="editor" />
       </div>
       {/* Settings */}
       {expanded && (

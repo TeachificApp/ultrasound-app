@@ -34,6 +34,7 @@ import { getVisibleInlineLessonQuizQuestionIndexes, inlineLessonQuizQuestionKey 
 import { resolveQuizAccountFields, type QuizAccountFieldKey } from "../../../shared/quizAccountFields";
 import LessonEffectPlayer, { fireLessonCompleteEffect } from "@/components/LessonEffectPlayer";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { MathContent } from "@/components/MathContent";
 import { MediaEmbedIframe } from "@/components/MediaEmbedIframe";
 import {
@@ -3326,6 +3327,7 @@ export default function CoursePlayer() {
                       ))}
                     </div>
                   )}
+                  <PopupModules blocks={contentBlocks} />
 
 
 

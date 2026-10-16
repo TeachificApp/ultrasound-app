@@ -8,6 +8,7 @@ import {
   AlertTriangle, Globe, Heading, MousePointerClick, GitBranch,
 } from "lucide-react";
 import { BlockPreview, Block, BlockType } from "@/components/BlockPreview";
+import { BlockSettings as SharedBlockSettings } from "@/pages/admin/LandingPageBuilder";
 import { Button } from "@/components/ui/button";
 import RichTextEditor from "@/components/RichTextEditor";
 
@@ -21,6 +22,7 @@ const SUCCESS_PAGE_BLOCKS: {
   { type: "text", label: "Rich Text", icon: <Type size={14} />, defaultData: { html: "<p>Enter your message here. Use merge fields like {{name}} or {{score_percent}}.</p>", bgColor: "#ffffff" } },
   { type: "image", label: "Image", icon: <Image size={14} />, defaultData: { src: "", alt: "", caption: "", bgColor: "#ffffff" } },
   { type: "video", label: "Video", icon: <Video size={14} />, defaultData: { url: "", caption: "", bgColor: "#ffffff" } },
+  { type: "popup", label: "Popup / Overlay", icon: <AlertTriangle size={14} />, defaultData: { enabled: true, title: "Important update", html: "<p>Share an announcement, an offer, or an important update here.</p>", videoUrl: "", videoAutoplay: false, videoMuted: true, videoCaption: "", scheduleMode: "always", startAt: "", endAt: "", displayDurationSeconds: 0, showCountdown: false, closeLabel: "Close popup", closeOnBackdrop: true, cardBgColor: "#ffffff", textColor: "#1e293b", accentColor: "#179ca3", maxWidth: 640, ctaLabel: "", ctaUrl: "" } },
   { type: "bullets", label: "Bullet List", icon: <List size={14} />, defaultData: { headline: "Next steps", items: ["Step 1", "Step 2"], bgColor: "#ffffff" } },
   { type: "cta_standalone", label: "Button / CTA", icon: <MousePointerClick size={14} />, defaultData: { headline: "", ctaText: "Continue", ctaUrl: "/", ctaColor: "#0e7490", bgColor: "#ffffff" } },
   { type: "alert", label: "Alert / Callout", icon: <AlertTriangle size={14} />, defaultData: { type: "info", title: "", message: "Important note.", bgColor: "#ffffff" } },
@@ -32,6 +34,10 @@ const SUCCESS_PAGE_BLOCKS: {
 function BlockSettings({ block, onUpdate }: { block: Block; onUpdate: (data: Record<string, unknown>) => void }) {
   const d = block.data;
   const set = (key: string, val: unknown) => onUpdate({ ...d, [key]: val });
+
+  if (block.type === "popup") {
+    return <SharedBlockSettings block={block} onChange={onUpdate} />;
+  }
 
   if (block.type === "hero") {
     return (
@@ -236,7 +242,7 @@ export default function FormSuccessPageBlockEditor({ blocks, onChange }: FormSuc
                     {block.type === "conditional_text" ? (
                       <p className="text-xs text-gray-500 italic">Conditional blocks render based on submission data at runtime.</p>
                     ) : (
-                      <BlockPreview block={block} />
+                      <BlockPreview block={block} renderMode="editor" />
                     )}
                   </div>
                 </div>

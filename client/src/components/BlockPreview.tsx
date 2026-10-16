@@ -25,6 +25,7 @@ import {
 } from "@shared/mediaRepoDisplay";
 import { parseMediaRepoUrl } from "@/lib/mediaEmbedUrl";
 import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
+import { PopupModuleEditorPreview } from "@/components/PopupModule";
 
 function assetUrl(url?: string | null): string {
   return resolveAssetUrl(url ?? undefined) ?? url ?? "";
@@ -113,7 +114,8 @@ export type BlockType =
   | "remaining_seats"
   | "included_items_auto"
   | "ai_content"
-  | "ai_image";
+  | "ai_image"
+  | "popup";
 
 export interface Block {
   id: string;
@@ -126,7 +128,7 @@ export const CC = ({ children, className = "", ...rest }: React.HTMLAttributes<H
   <div className={`max-w-5xl mx-auto px-4 sm:px-6 ${className}`.trim()} {...rest}>{children}</div>
 );
 
-export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnroll, onCheckoutPage, onDirectCheckout, onFileDownload, onVideoEvent, nestingDepth = 0 }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number; onEnroll?: (...args: any[]) => void; onCheckoutPage?: (...args: any[]) => void; onDirectCheckout?: DirectCheckoutHandler; onFileDownload?: (file: { fileName: string; fileUrl: string }) => void; onVideoEvent?: (eventType: "play" | "complete", video: { positionSec: number; durationSec: number; percentWatched: number }) => void; /** Protect public rendering from malformed recursively nested column data. */ nestingDepth?: number }) {
+export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnroll, onCheckoutPage, onDirectCheckout, onFileDownload, onVideoEvent, nestingDepth = 0, renderMode = "public" }: { block: Block; coursePrice?: number; courseTitle?: string; courseId?: number; onEnroll?: (...args: any[]) => void; onCheckoutPage?: (...args: any[]) => void; onDirectCheckout?: DirectCheckoutHandler; onFileDownload?: (file: { fileName: string; fileUrl: string }) => void; onVideoEvent?: (eventType: "play" | "complete", video: { positionSec: number; durationSec: number; percentWatched: number }) => void; /** Protect public rendering from malformed recursively nested column data. */ nestingDepth?: number; /** Editor previews show a non-blocking card; public popups render through PopupModules. */ renderMode?: "public" | "editor" }) {
   const { user } = useAuth();
   const d = block.data ?? {};
   const handleBlockCtaClick = (e: React.MouseEvent<HTMLElement>) =>
@@ -150,6 +152,8 @@ export function BlockPreview({ block, coursePrice, courseTitle, courseId, onEnro
     bwMaxBP ? <div style={{ maxWidth: bwMaxBP, marginLeft: "auto", marginRight: "auto", width: "100%" }}>{inner}</div> : <>{inner}</>;
 
   switch (block.type) {
+    case "popup":
+      return renderMode === "editor" ? <PopupModuleEditorPreview data={d} /> : null;
     case "ai_content":
       return (
         <div className="py-6 sm:py-8" style={{ backgroundColor: d.bgColor ?? "#fff", color: d.textColor ?? "#1a1a1a" }}>

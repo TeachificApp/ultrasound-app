@@ -31,6 +31,7 @@ import type { Block } from "@/components/BlockPreview";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { SUBSCRIPTION_RESUME_LABEL } from "@/lib/accessCta";
 import { CountdownV2Block, ImageLinkWrapper, FormEmbedBlockPreview, BlockPreview, TickerBlock } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { MathContent } from "@/components/MathContent";
 import { PublicLandingBlock } from "@/components/PublicLandingBlock";
 import { applyVideoTrim, normalizeVideoUrl } from "@/lib/videoTrim";
@@ -2084,6 +2085,7 @@ export default function CourseLanding() {
             </div>
           );
         })}
+        <PopupModules blocks={blocks} />
         {/* Before-checkout order bump */}
         {!enrollment && course && (
           <div className="max-w-2xl mx-auto px-4 py-8">

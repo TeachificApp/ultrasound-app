@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { Calendar, Clock, Users, Video, Bell, CheckCircle } from "lucide-react";
 import type { Block } from "@/components/BlockPreview";
 import { BlockPreview } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { useDirectCheckout } from "@/lib/directCheckout";
 import type { UserParamSource } from "@/lib/userUrlParams";
@@ -427,6 +428,7 @@ export default function WebinarLanding() {
               onDirectCheckout={handleDirectCheckout}
             />
           ))}
+          <PopupModules blocks={blocks} />
         </div>
       ) : (
         <AutoLayout

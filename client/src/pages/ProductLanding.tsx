@@ -26,6 +26,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { ImageLinkWrapper, BlockPreview, type Block } from "@/components/BlockPreview";
 import { useDirectCheckout } from "@/lib/directCheckout";
 import { MathContent } from "@/components/MathContent";
+import { PopupModules } from "@/components/PopupModule";
 import { UnavailableContentPage } from "@/components/UnavailableContentPage";
 import { formatAuthoredDollars } from "@shared/authoredPriceDisplay";
 import { resolveScheduledCountdownTarget } from "@shared/platformTime";
@@ -477,6 +478,7 @@ export default function ProductLanding() {
           <div className="max-w-2xl mx-auto px-4 py-12">
             <ShopifyEmbed embedCode={product.shopifyEmbedCode} />
           </div>
+          <PopupModules blocks={blocks} />
         </div>
       );
     }
@@ -519,6 +521,7 @@ export default function ProductLanding() {
             <RenderBlock block={block} onBuy={handleBuy} buying={buying} price={displayPrice} slug={slug!} hasPurchased={hasPurchased} onDirectCheckout={handleDirectCheckout} />
           </div>
         ))}
+        <PopupModules blocks={blocks} />
         {/* Pricing options selector below blocks if multiple options */}
         {pricingOptions.length > 1 && !product.hidePricingOptions && (
           <div className="max-w-2xl mx-auto px-4 py-8">

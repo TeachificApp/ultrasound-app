@@ -11,6 +11,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BlockPreview } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { toast } from "sonner";
@@ -276,6 +277,7 @@ function MembershipDetail({ entry, onBack, onRefetch }: { entry: any; onBack: ()
             }
             return <BlockPreview key={block.id} block={block} />;
           })}
+          <PopupModules blocks={blocks} />
         </div>
       ) : (
         /* Default member page layout */

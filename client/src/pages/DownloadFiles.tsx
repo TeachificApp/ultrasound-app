@@ -16,6 +16,7 @@ import { getLoginUrl } from "@/const";
 import { useEffect, useState } from "react";
 import { MathContent } from "@/components/MathContent";
 import OrderBumpOffer from "@/components/OrderBumpOffer";
+import { PopupModules } from "@/components/PopupModule";
 
 // ─── Member Page Block Renderer ──────────────────────────────────────────────
 // Renders page-builder blocks (text, image, video, audio, bullets, alert, cta, divider, embed)
@@ -131,6 +132,7 @@ function MemberPageBlocksSection({ blocksJson }: { blocksJson: string | null }) 
       {blocks.map((block: any) => (
         <MemberPageBlock key={block.id ?? Math.random()} block={block} />
       ))}
+      <PopupModules blocks={blocks} />
     </div>
   );
 }

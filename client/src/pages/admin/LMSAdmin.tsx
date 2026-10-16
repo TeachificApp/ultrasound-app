@@ -3618,7 +3618,7 @@ function PlayerSidebarEditor({
               ) : (
                 blocks.map(block => (
                   <div key={block.id}>
-                    <BlockPreview block={block} primaryColor="#189aa1" />
+                    <BlockPreview block={block} primaryColor="#189aa1"  renderMode="editor" />
                   </div>
                 ))
               )}
@@ -3903,7 +3903,7 @@ function CourseOverviewEditor({
               ) : activeZone === "top" ? (
                 previewMode ? (
                   <div>
-                    {topBlocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                    {topBlocks.map(block => <div key={block.id}><BlockPreview block={block}  renderMode="editor" /></div>)}
                     {topBlocks.length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No content blocks yet.</div>}
                   </div>
                 ) : (
@@ -3927,7 +3927,7 @@ function CourseOverviewEditor({
                 )
               ) : (
                 <div>
-                  {topBlocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                  {topBlocks.map(block => <div key={block.id}><BlockPreview block={block}  renderMode="editor" /></div>)}
                 </div>
               )}
             </div>
@@ -3962,7 +3962,7 @@ function CourseOverviewEditor({
               ) : activeZone === "main" ? (
                 previewMode ? (
                   <div>
-                    {blocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                    {blocks.map(block => <div key={block.id}><BlockPreview block={block}  renderMode="editor" /></div>)}
                     {blocks.length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No content blocks yet.</div>}
                   </div>
                 ) : (
@@ -3986,7 +3986,7 @@ function CourseOverviewEditor({
                 )
               ) : (
                 <div>
-                  {blocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                  {blocks.map(block => <div key={block.id}><BlockPreview block={block}  renderMode="editor" /></div>)}
                 </div>
               )}
             </div>
@@ -4044,7 +4044,7 @@ function CourseOverviewEditor({
               ) : activeZone === "bottom" ? (
                 previewMode ? (
                   <div>
-                    {bottomBlocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                    {bottomBlocks.map(block => <div key={block.id}><BlockPreview block={block}  renderMode="editor" /></div>)}
                     {bottomBlocks.length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No content blocks yet.</div>}
                   </div>
                 ) : (
@@ -4068,7 +4068,7 @@ function CourseOverviewEditor({
                 )
               ) : (
                 <div>
-                  {bottomBlocks.map(block => <div key={block.id}><BlockPreview block={block} /></div>)}
+                  {bottomBlocks.map(block => <div key={block.id}><BlockPreview block={block}  renderMode="editor" /></div>)}
                 </div>
               )}
             </div>

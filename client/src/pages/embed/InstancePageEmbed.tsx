@@ -6,6 +6,7 @@
 import { useParams } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { BlockPreview } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { RemainingSeatsBlock } from "@/components/RemainingSeatsBlock";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -85,6 +86,7 @@ export default function InstancePageEmbed() {
               cohortGroupId={cohortGroupId ?? undefined}
             />
           ))}
+          <PopupModules blocks={blocks} />
         </div>
       ) : (
         <div className="max-w-2xl mx-auto p-6 space-y-4">

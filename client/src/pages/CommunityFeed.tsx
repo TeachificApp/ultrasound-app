@@ -37,6 +37,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter
 } from "@/components/ui/dialog";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 
 const REACTIONS = ["❤️", "👍", "🔥", "⭐", "🎉", "🤔", "💡", "👏"];
@@ -623,6 +624,7 @@ function CommunityPageBlocks({ blocksJson }: { blocksJson?: string | null }) {
         }
         return <BlockPreview key={block.id} block={block} />;
       })}
+      <PopupModules blocks={blocks} />
     </div>
   );
 }

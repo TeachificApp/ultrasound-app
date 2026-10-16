@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { BlockPreview } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
@@ -371,6 +372,7 @@ export default function MembershipPage() {
           </Button>
         </div>
       )}
+      <PopupModules blocks={blocks} />
       <AvailabilityWaitlistDialog open={waitlistOpen} onClose={() => setWaitlistOpen(false)} productType="membership" productId={plan.id} title={plan.title} />
     </div>
   );

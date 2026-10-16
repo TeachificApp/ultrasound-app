@@ -879,7 +879,7 @@ const LessonBlockEditor = React.forwardRef<LessonBlockEditorHandle, LessonBlockE
               <div className="space-y-4">
                 {blocks.map(block => (
                   <div key={block.id} className="bg-white rounded-xl overflow-hidden shadow-sm">
-                    <BlockPreview block={block} />
+                    <BlockPreview block={block} renderMode="editor" />
                   </div>
                 ))}
                 {blocks.length === 0 && (

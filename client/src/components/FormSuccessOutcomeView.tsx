@@ -5,6 +5,7 @@
 import React, { useEffect, useMemo } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { BlockPreview, Block } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { RichTextDisplay } from "@/components/RichTextEditor";
 
 export type SuccessOutcomePayload = {
@@ -96,6 +97,7 @@ export function FormSuccessOutcomeView({
             {pageBlocks.map(block => (
               <BlockPreview key={block.id} block={block} />
             ))}
+            <PopupModules blocks={pageBlocks} />
           </div>
         </div>
       </div>

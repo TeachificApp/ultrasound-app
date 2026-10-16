@@ -31,6 +31,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { STUDENT_DASHBOARD_PATH, resolveStudentDashboardHref } from "@shared/studentDashboardUrls";
 import { BlockPreview, type Block } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 import { calendarDateKeyInTimeZone, formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
@@ -738,6 +739,8 @@ export default function CourseOverview() {
           </div>
         )}
       </div>
+
+      <PopupModules blocks={[...overviewTopBlocks, ...overviewBlocks, ...overviewBottomBlocks]} />
 
       {/* Overview Block Editor (admin only) */}
       {showEditor && (

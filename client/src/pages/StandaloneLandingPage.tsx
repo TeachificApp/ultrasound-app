@@ -77,6 +77,7 @@ export default function StandaloneLandingPage() {
           />
         </div>
       ))}
+      <PopupModules blocks={blocks as Block[]} />
       {blocks.length === 0 && (
         <div className="min-h-[60vh] flex items-center justify-center text-gray-400">
           <p>This page is being built. Check back soon!</p>
@@ -101,6 +102,7 @@ import AudioBlockPlayer from "@/components/AudioBlockPlayer";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { ImageLinkWrapper } from "@/components/BlockPreview";
 import { MathContent } from "@/components/MathContent";
+import { PopupModules } from "@/components/PopupModule";
 
 function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block: Block; funnelId: number; pageId: number; funnelSlug: string }) {
   const { data: freeEnrollCatalog } = trpc.funnel.listAllProducts.useQuery(undefined, { staleTime: 60_000 });
@@ -438,6 +440,8 @@ function StandaloneRenderBlock({ block, funnelId, pageId, funnelSlug }: { block:
       return <div className="px-8" style={{ paddingTop: d.spacing || 32, paddingBottom: d.spacing || 32 }}><hr style={{ borderColor: d.color || "#e5e7eb", borderWidth: d.thickness || 1, borderStyle: d.style || "solid" }} /></div>;
     case "related_products":
       return <RelatedProductsBlock data={d} />;
+    case "popup":
+      return null;
     default:
       // For blocks we haven't explicitly handled, render a placeholder
       return (

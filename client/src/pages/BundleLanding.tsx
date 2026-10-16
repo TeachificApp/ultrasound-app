@@ -20,6 +20,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useCheckoutClickGuard } from "@/hooks/useCheckoutClickGuard";
 import { PURCHASE_ACCESS_LABEL, bundleAccessHref } from "@/lib/accessCta";
 import { BlockPreview } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import IncludedItemsBlock from "@/components/IncludedItemsBlock";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import { AvailabilityWaitlistDialog } from "@/components/AvailabilityWaitlistDialog";
@@ -401,6 +402,7 @@ export default function BundleLanding() {
           }))}
         />
       )}
+      <PopupModules blocks={landingBlocks} />
     </div>
     <AvailabilityWaitlistDialog open={waitlistOpen} onClose={() => setWaitlistOpen(false)} productType="bundle" productId={bundle.id} title={bundle.title} />
     </>

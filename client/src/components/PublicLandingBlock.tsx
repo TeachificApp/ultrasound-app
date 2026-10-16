@@ -6,6 +6,7 @@
 
 import type { Block } from "./BlockPreview";
 import { BlockPreview } from "./BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 import { RemainingSeatsBlock } from "./RemainingSeatsBlock";
 import { resolveRemainingSeatsData, type LandingBlockContext } from "@shared/remainingSeats";
 
@@ -59,6 +60,7 @@ export function PublicLandingBlocks({
           onCheckoutPage={onCheckoutPage}
         />
       ))}
+      <PopupModules blocks={blocks} />
     </>
   );
 }

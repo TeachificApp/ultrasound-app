@@ -184,7 +184,7 @@ export default function MembershipPageBuilder({
         </div>
         <div className="flex-1 overflow-y-auto bg-white">
           {blocks.map((block) => (
-            <BlockPreview key={block.id} block={block} />
+            <BlockPreview key={block.id} block={block} renderMode="editor" />
           ))}
           {blocks.length === 0 && (
             <div className="flex items-center justify-center h-48 text-gray-400 text-sm">

@@ -49,6 +49,7 @@ import { DIGITAL_DOWNLOAD_LICENSE_CHECKOUT_TEXT } from "@/../../shared/digitalDo
 import { BlockPreview } from "@/pages/admin/LandingPageBuilder";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import type { Block } from "@/pages/admin/LandingPageBuilder";
+import { PopupModules } from "@/components/PopupModule";
 
 // Initialise Stripe once outside the component to avoid re-creating on every render
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "");
@@ -322,6 +323,13 @@ function CheckoutSections({
   const stats = data?.courseStats ?? courseStats;
 
   if (!config) return null;
+  const popupBlocks: Block[] = config.sections
+    .filter((section) => section.enabled && section.type === "content_block")
+    .map((section, index) => {
+      const content = section as ContentBlockSection;
+      return { id: `checkout-cb-${index}`, type: content.blockType as Block["type"], data: content.blockData ?? {} };
+    })
+    .filter((block) => block.type === "popup");
 
   return (
     <div className="space-y-4">
@@ -365,6 +373,7 @@ function CheckoutSections({
           }
           return null;
         })}
+      <PopupModules blocks={popupBlocks} />
     </div>
   );
 }

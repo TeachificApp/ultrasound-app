@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Video, Lock, ArrowLeft } from "lucide-react";
 import type { Block } from "@/components/BlockPreview";
 import { BlockPreview } from "@/components/BlockPreview";
+import { PopupModules } from "@/components/PopupModule";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function getEmbedUrl(url: string, source: string): string {
@@ -170,6 +171,7 @@ export default function WebinarPlayer() {
           {blocks.map((block) => (
             <BlockPreview key={block.id} block={block} />
           ))}
+          <PopupModules blocks={blocks} />
         </div>
       ) : (
         <AutoPlayer webinar={webinar} />

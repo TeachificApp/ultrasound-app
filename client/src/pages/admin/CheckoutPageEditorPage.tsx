@@ -331,7 +331,7 @@ function CanvasContentBlock({ section }: { section: ContentBlockSection }) {
   const block: Block = { id: `cb-${section.order}`, type: section.blockType as any, data: section.blockData };
   return (
     <div className="pointer-events-none overflow-hidden rounded-lg">
-      <BlockPreview block={block} />
+      <BlockPreview block={block} renderMode="editor" />
     </div>
   );
 }
