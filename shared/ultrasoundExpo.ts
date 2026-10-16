@@ -4,7 +4,7 @@ export const ULTRASOUND_EXPO_NAME = "UltrasoundExpo™";
 export const ULTRASOUND_EXPO_ORGANIZER = "All About Ultrasound™";
 export const ULTRASOUND_EXPO_ORIGIN = "https://ultrasoundexpo.com";
 export const ULTRASOUND_EXPO_EVENT_DATES_LABEL = "January 14–16, 2028";
-export const ULTRASOUND_EXPO_LOCATION_LABEL = "Orlando, Florida";
+export const ULTRASOUND_EXPO_LOCATION_LABEL = "Orlando, Florida · Venue TBD";
 export const ULTRASOUND_EXPO_HERO_IMAGE = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/nmDnyKctfSTBjSLH.jpg";
 export const ULTRASOUND_EXPO_AAUS_LOGO_URL = AAUS_SONO_RING_LOGO_URL;
 // Supplied organizer artwork. The hero photo remains the main page background.
