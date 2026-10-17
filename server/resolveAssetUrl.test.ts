@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractManusStorageKey, legacyCloudFrontUrlForStorageKey, resolveAssetUrl } from "../shared/resolveAssetUrl";
+import { resolveAssetUrls } from "./lib/resolveAssetUrl";
 
 describe("resolveAssetUrl", () => {
   it("builds legacy CloudFront URLs from manus-storage keys", () => {
@@ -41,5 +42,18 @@ describe("resolveAssetUrl", () => {
   it("extracts keys from storage:// refs", () => {
     expect(extractManusStorageKey("storage://uploads/avatar.png")).toBe("uploads/avatar.png");
     expect(resolveAssetUrl("storage://uploads/avatar.png")).toBe("/manus-storage/uploads/avatar.png");
+  });
+
+  it("preserves access-expiry Date values while resolving nested media URLs", () => {
+    const expiry = new Date("2026-11-12T22:49:40.000Z");
+    const resolved = resolveAssetUrls({
+      courseThumbnail: "storage://dashboard/quiz-cover.webp",
+      accessExpiresAt: expiry,
+      nested: { stripePeriodEnd: expiry },
+    });
+
+    expect(resolved.courseThumbnail).toMatch(/\/dashboard\/quiz-cover\.webp$/);
+    expect(resolved.accessExpiresAt).toBe(expiry);
+    expect(resolved.nested.stripePeriodEnd).toBe(expiry);
   });
 });

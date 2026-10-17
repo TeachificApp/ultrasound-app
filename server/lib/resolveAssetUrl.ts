@@ -10,6 +10,11 @@ export function resolveAssetUrls<T>(value: T): T {
     const resolved = resolveAssetUrl(value);
     return (resolved ?? value) as T;
   }
+  // Drizzle returns timestamps as Date objects. They are not asset records and
+  // recursively walking their enumerable properties serializes them as `{}`.
+  // Preserve the Date so tRPC/SuperJSON can carry subscription and access
+  // expiry values to the learner dashboard intact.
+  if (value instanceof Date) return value;
   if (Array.isArray(value)) {
     return value.map((item) => resolveAssetUrls(item)) as T;
   }
