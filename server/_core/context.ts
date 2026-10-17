@@ -21,6 +21,10 @@ export type TrpcContext = {
   demoMode: boolean;
   /** The real admin's user ID when demoMode is true */
   realAdminId: number | null;
+  /** True when a Platform Admin opened this tab as an existing learner. */
+  studentLoginMode?: boolean;
+  /** The Platform Admin who authorized the temporary student-login handoff. */
+  studentLoginAdminId?: number | null;
 };
 
 // ─── Default brand cache (5-minute TTL) ──────────────────────────────────────
@@ -69,11 +73,50 @@ export async function createContext(
   let user: AuthenticatedUser | null = null;
   let demoMode = false;
   let realAdminId: number | null = null;
+  let studentLoginMode = false;
+  let studentLoginAdminId: number | null = null;
+
+  // A student-login handoff is intentionally sent only as a tab-scoped request
+  // header, not as a cookie. That lets an administrator use the full learner
+  // experience in a separate tab without replacing their real admin session.
+  const studentLoginHeader = opts.req.headers["x-student-login"];
+  const studentLoginToken = Array.isArray(studentLoginHeader)
+    ? studentLoginHeader[0]
+    : studentLoginHeader;
+  if (studentLoginToken) {
+    const { verifyStudentLoginToken } = await import("../lib/studentLoginSession");
+    const claims = await verifyStudentLoginToken(studentLoginToken);
+    if (claims) {
+      const { getUserById, getUserRoles } = await import("../db");
+      const [targetUser, realAdmin, realAdminRoles] = await Promise.all([
+        getUserById(claims.targetUserId),
+        getUserById(claims.realAdminId),
+        getUserRoles(claims.realAdminId),
+      ]);
+      const isStillPlatformAdmin = Boolean(
+        realAdmin && (
+          realAdmin.role === "admin" ||
+          realAdminRoles.includes("platform_admin") ||
+          realAdminRoles.includes("platform_owner")
+        ),
+      );
+      const targetRoles = targetUser ? await getUserRoles(targetUser.id) : [];
+      const targetHasAdministrativeAccess = Boolean(
+        targetUser?.role === "admin" ||
+        targetRoles.some((role) => ["platform_admin", "platform_manager", "platform_owner", "platform_moderator"].includes(role)),
+      );
+      if (targetUser && isStillPlatformAdmin && !targetHasAdministrativeAccess) {
+        user = targetUser;
+        studentLoginMode = true;
+        studentLoginAdminId = claims.realAdminId;
+      }
+    }
+  }
 
   // Check for demo session cookie first — takes precedence over normal session
   const rawCookies = parseCookieHeader(opts.req.headers.cookie ?? "");
   const demoCookieValue = rawCookies[DEMO_COOKIE_NAME];
-  if (demoCookieValue) {
+  if (!studentLoginMode && demoCookieValue) {
     try {
       const secretKey = new TextEncoder().encode(ENV.cookieSecret);
       const { payload } = await jwtVerify(demoCookieValue, secretKey, { algorithms: ["HS256"] });
@@ -93,7 +136,7 @@ export async function createContext(
     }
   }
 
-  if (!demoMode) {
+  if (!demoMode && !studentLoginMode) {
     try {
       user = await sdk.authenticateRequest(opts.req);
     } catch {
@@ -169,5 +212,7 @@ export async function createContext(
     brandMode,
     demoMode,
     realAdminId,
+    studentLoginMode,
+    studentLoginAdminId,
   };
 }

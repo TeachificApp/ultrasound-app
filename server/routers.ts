@@ -276,6 +276,17 @@ export const appRouter = router({
         const realAdmin = await getUserById(opts.ctx.realAdminId);
         demoModeInfo = { demoMode: true, realAdminId: opts.ctx.realAdminId, realAdminName: realAdmin?.displayName ?? realAdmin?.name ?? null };
       }
+      let studentLoginInfo:
+        | { studentLoginMode: true; studentLoginAdminId: number; studentLoginAdminName: string | null }
+        | { studentLoginMode: false } = { studentLoginMode: false };
+      if (opts.ctx.studentLoginMode && opts.ctx.studentLoginAdminId) {
+        const realAdmin = await getUserById(opts.ctx.studentLoginAdminId);
+        studentLoginInfo = {
+          studentLoginMode: true,
+          studentLoginAdminId: opts.ctx.studentLoginAdminId,
+          studentLoginAdminName: realAdmin?.displayName ?? realAdmin?.name ?? null,
+        };
+      }
       return {
         ...opts.ctx.user,
         // Override with fresh DB values so profile updates reflect immediately
@@ -292,6 +303,7 @@ export const appRouter = router({
         communityRole: fullUser?.communityRole ?? "member",
         hasPassword: !!(fullUser?.passwordHash),
         ...demoModeInfo,
+        ...studentLoginInfo,
       };
     }),
     logout: publicProcedure.mutation(({ ctx }) => {

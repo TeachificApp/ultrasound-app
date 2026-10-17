@@ -131,6 +131,11 @@ export function useCrossDomainSso() {
   useEffect(() => {
     if (!ssoReady || loading) return;
 
+    // Student Login is a deliberately tab-scoped support session. Never turn
+    // it into first-party cookies across every domain, which could replace the
+    // administrator's normal cross-domain sessions.
+    if ((user as any)?.studentLoginMode) return;
+
     if (!user) {
       lastUserId.current = null;
       return;

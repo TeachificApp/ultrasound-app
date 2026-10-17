@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { LEARN_APP_URL, MEMBERS_APP_URL } from "@/hooks/useSubdomain";
+import { getStudentLoginToken } from "@/lib/studentLoginSession";
 
 export { LEARN_APP_URL, MEMBERS_APP_URL };
 
@@ -26,6 +27,16 @@ export function SsoRedirect({ path, targetOrigin = LEARN_APP_URL }: SsoRedirectP
     if (loading) return; // wait for auth state
 
     const destination = targetOrigin + (path.startsWith("/") ? path : `/${path}`);
+    const studentLoginToken = getStudentLoginToken();
+
+    // Student Login intentionally does not use SSO. Carry its short-lived
+    // signed handoff only to the next app domain and keep the admin's cookies
+    // untouched there as well.
+    if (studentLoginToken) {
+      const separator = destination.includes("?") ? "&" : "?";
+      window.location.replace(`${destination}${separator}student_login=${encodeURIComponent(studentLoginToken)}`);
+      return;
+    }
 
     if (!user) {
       // Not logged in — redirect without SSO token

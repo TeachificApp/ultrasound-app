@@ -971,17 +971,16 @@ function parseDashboardTabs(search: string): { initialTab: Tab; initialContentTa
     };
   }
 
-  return { initialTab: "content", initialContentTab, initialQuizView };
+  return { initialTab: "content", initialContentTab: initialContentTab ?? "all", initialQuizView };
 }
 
 function MyContentTab({ initialContentTab, initialQuizView, hideDateDetails = false }: { initialContentTab?: ContentSubTab; initialQuizView?: QuizContentView; hideDateDetails?: boolean }) {
   const { data: profile } = trpc.dashboard.getProfile.useQuery();
   const { data, isLoading, isError, error, refetch } = trpc.dashboard.getMyContent.useQuery();
-  const [contentTab, setContentTab] = useState<ContentSubTab>(initialContentTab ?? "courses");
+  const [contentTab, setContentTab] = useState<ContentSubTab>(initialContentTab ?? "all");
   const [quizView, setQuizView] = useState<QuizContentView>(initialQuizView ?? "library");
-  const [contentDisplayMode, setContentDisplayMode] = useState<ContentDisplayMode>("cards");
+  const [contentDisplayMode, setContentDisplayMode] = useState<ContentDisplayMode>("list");
   const [contentSearch, setContentSearch] = useState("");
-  const [autoTabSet, setAutoTabSet] = useState(Boolean(initialContentTab));
   const { data: quizResultsSummary } = trpc.standaloneQuizLearner.getMyQuizResultsSummary.useQuery(
     undefined,
     { enabled: contentTab === "quizzes" },
@@ -991,28 +990,6 @@ function MyContentTab({ initialContentTab, initialQuizView, hideDateDetails = fa
   useEffect(() => {
     if (!hasStandaloneSystemQuizResults && quizView === "results") setQuizView("library");
   }, [hasStandaloneSystemQuizResults, quizView]);
-
-  // Auto-select first non-empty tab once data loads
-  useEffect(() => {
-    if (!data || autoTabSet) return;
-    const tabOrder: ContentSubTab[] = ["courses", "quizzes", "downloads", "webinars", "workshops", "products", "bundles", "memberships", "communities"];
-    const counts: Record<ContentSubTab, number> = {
-      courses:      data.courses?.length ?? 0,
-      quizzes:      data.quizzes?.length ?? 0,
-      downloads:    data.downloads?.length ?? 0,
-      webinars:     data.webinars?.length ?? 0,
-      workshops:    (data as any).workshops?.length ?? 0,
-      products:     data.physicalProducts?.length ?? 0,
-      bundles:      data.bundles?.length ?? 0,
-      memberships:  0, // memberships shown in Subscriptions tab
-      communities:  data.communities?.length ?? 0,
-    };
-    const firstNonEmpty = tabOrder.find(t => counts[t] > 0);
-    if (firstNonEmpty) {
-      setContentTab(firstNonEmpty);
-    }
-    setAutoTabSet(true);
-  }, [data, autoTabSet]);
 
   if (isLoading) return <LoadingSpinner />;
 
@@ -1034,7 +1011,18 @@ function MyContentTab({ initialContentTab, initialQuizView, hideDateDetails = fa
 
   const showLegacyThinkificLink = Boolean(profile?.thinkificEnrolledAt) && (data?.courses.length ?? 0) === 0;
 
+  const allContentCount =
+    (data?.courses?.length ?? 0) +
+    (data?.quizzes?.length ?? 0) +
+    (data?.downloads?.length ?? 0) +
+    (data?.webinars?.length ?? 0) +
+    ((data as any)?.workshops?.length ?? 0) +
+    (data?.physicalProducts?.length ?? 0) +
+    (data?.bundles?.length ?? 0) +
+    ((data as any)?.memberships?.length ?? 0) +
+    (data?.communities?.length ?? 0);
   const subTabs: { key: ContentSubTab; label: string; icon: React.ElementType; count: number }[] = [
+    { key: "all",          label: "All Content",  icon: Layers,         count: allContentCount },
     { key: "courses",      label: "Courses",      icon: BookOpen,       count: data?.courses.length ?? 0 },
     { key: "quizzes",      label: "Quizzes",      icon: ClipboardCheck, count: data?.quizzes.length ?? 0 },
     { key: "downloads",    label: "Downloads",    icon: Download,       count: data?.downloads.length ?? 0 },
@@ -1046,9 +1034,9 @@ function MyContentTab({ initialContentTab, initialQuizView, hideDateDetails = fa
     { key: "communities",  label: "Communities",  icon: Users,          count: data?.communities?.length ?? 0 },
   ];
 
-  // Quizzes is always discoverable. Other empty content categories stay hidden
+  // All Content and Quizzes are always discoverable. Other empty content categories stay hidden
   // on small screens unless selected, keeping the dashboard compact.
-  const visibleSubTabs = subTabs.filter(t => t.key === "quizzes" || t.count > 0 || t.key === contentTab);
+  const visibleSubTabs = subTabs.filter(t => t.key === "all" || t.key === "quizzes" || t.count > 0 || t.key === contentTab);
   const normalizedContentSearch = contentSearch.trim().toLocaleLowerCase();
   const contentCollectionClass = contentDisplayMode === "cards"
     ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
@@ -1099,6 +1087,120 @@ function MyContentTab({ initialContentTab, initialQuizView, hideDateDetails = fa
       </div>
     </div>
   );
+  const allContentItems: Array<{
+    key: string;
+    title: string;
+    thumbnail?: string | null;
+    brand?: string | null;
+    subtitle: string;
+    badge: string;
+    badgeColor: "emerald" | "teal" | "blue" | "amber" | "purple" | "red";
+    progressPct?: number | null;
+    completed?: boolean;
+    actions: { label: string; icon: React.ElementType; href: string; secondary?: boolean; external?: boolean }[];
+  }> = [
+    ...(data?.courses ?? []).map((course) => {
+      const completed = Boolean(course.completedAt) || Number(course.progressPct ?? 0) >= 100;
+      return {
+        key: `course-${course.enrollmentId}`,
+        title: course.courseTitle,
+        thumbnail: course.courseThumbnail,
+        brand: course.courseBrand,
+        subtitle: "Course",
+        badge: completed ? "Completed" : "Course",
+        badgeColor: completed ? "emerald" as const : "teal" as const,
+        progressPct: course.progressPct,
+        completed,
+        actions: [{ label: completed ? "Review Course" : "Continue Learning", icon: Play, href: `/courses/${course.courseSlug}/player` }],
+      };
+    }),
+    ...(data?.quizzes ?? []).map((quiz) => ({
+      key: `quiz-${quiz.enrollmentId ?? quiz.courseSlug}`,
+      title: quiz.courseTitle,
+      thumbnail: quiz.courseThumbnail,
+      brand: quiz.courseBrand,
+      subtitle: "Quiz",
+      badge: quiz.completedAt ? "Completed" : "Quiz",
+      badgeColor: quiz.completedAt ? "emerald" as const : "blue" as const,
+      progressPct: quiz.progressPct,
+      completed: Boolean(quiz.completedAt),
+      actions: [{
+        label: quiz.completedAt ? "Retake Quiz" : "Take Quiz",
+        icon: Play,
+        href: (quiz as any).contentKind === "standalone_quiz" && (quiz as any).lessonId
+          ? `/courses/${quiz.courseSlug}/player?lesson=${(quiz as any).lessonId}`
+          : `/courses/${quiz.courseSlug}/player`,
+      }],
+    })),
+    ...(data?.downloads ?? []).map((download: any) => ({
+      key: `download-${download.enrollmentId ?? download.purchaseId ?? download.productSlug}`,
+      title: download.courseTitle ?? download.productTitle,
+      thumbnail: download.courseThumbnail ?? download.productThumbnail,
+      brand: download.courseBrand,
+      subtitle: "Digital Download",
+      badge: "Download",
+      badgeColor: "teal" as const,
+      actions: [{ label: "Access Files", icon: Download, href: download.courseSlug ? `/courses/${download.courseSlug}/player` : `/downloads/${download.productSlug}/files` }],
+    })),
+    ...(data?.physicalProducts ?? []).map((product) => ({
+      key: `product-${product.orderId}`,
+      title: product.productTitle,
+      thumbnail: product.productThumbnail,
+      subtitle: "Physical Product",
+      badge: product.fulfillmentStatus ?? "Ordered",
+      badgeColor: product.fulfillmentStatus === "delivered" ? "emerald" as const : "amber" as const,
+      actions: [{ label: "View Product", icon: ExternalLink, href: `/product/${product.productSlug}` }],
+    })),
+    ...(data?.webinars ?? []).map((webinar) => ({
+      key: `webinar-${webinar.registrationId ?? webinar.webinarSlug}`,
+      title: webinar.webinarTitle,
+      thumbnail: webinar.webinarCover,
+      subtitle: "Webinar",
+      badge: webinar.attended ? "Attended" : webinar.webinarStatus === "ended" ? "Replay Available" : "Registered",
+      badgeColor: webinar.attended ? "emerald" as const : webinar.webinarStatus === "ended" ? "teal" as const : "blue" as const,
+      actions: [{ label: "View Webinar", icon: ExternalLink, href: `/webinar/${webinar.webinarSlug}` }],
+    })),
+    ...((data as any)?.workshops ?? []).map((workshop: any) => ({
+      key: `workshop-${workshop.enrollmentId}`,
+      title: workshop.workshopTitle,
+      thumbnail: workshop.workshopCover,
+      brand: workshop.workshopBrand,
+      subtitle: "Workshop",
+      badge: workshop.attended ? "Attended" : workshop.instanceLocationType === "virtual" ? "Virtual" : "In-Person",
+      badgeColor: workshop.attended ? "emerald" as const : "teal" as const,
+      actions: [{ label: "View Workshop", icon: ExternalLink, href: `/workshops/${workshop.workshopSlug}` }],
+    })),
+    ...(data?.bundles ?? []).map((bundle) => ({
+      key: `bundle-${bundle.enrollmentId}`,
+      title: bundle.bundleTitle,
+      thumbnail: bundle.bundleCover,
+      subtitle: "Bundle",
+      badge: "Available",
+      badgeColor: "emerald" as const,
+      actions: [{ label: "View Bundle", icon: ExternalLink, href: `/bundles/${bundle.bundleSlug}` }],
+    })),
+    ...((data as any)?.memberships ?? []).map((membership: any, index: number) => ({
+      key: `membership-${membership.type}-${membership.id ?? index}`,
+      title: membership.title,
+      thumbnail: membership.coverImage ?? null,
+      subtitle: "Membership",
+      badge: membership.status === "active" ? "Active" : membership.status === "trialing" ? "Trial" : membership.status ?? "Membership",
+      badgeColor: membership.status === "active" || membership.status === "trialing" ? "emerald" as const : "amber" as const,
+      actions: membership.type === "plan" ? [{ label: "View Membership", icon: ExternalLink, href: `/my-memberships/${membership.planId}` }] : [],
+    })),
+    ...(data?.communities ?? []).map((community) => ({
+      key: `community-${community.memberId ?? community.communitySlug}`,
+      title: community.communityTitle,
+      thumbnail: community.communityCover,
+      subtitle: "Community",
+      badge: community.role === "admin" ? "Admin" : community.role === "moderator" ? "Moderator" : "Member",
+      badgeColor: community.role === "admin" ? "purple" as const : community.role === "moderator" ? "blue" as const : "emerald" as const,
+      actions: [{ label: "View Community", icon: ExternalLink, href: `/community/${community.communitySlug}` }],
+    })),
+  ];
+  const filteredAllContentItems = allContentItems.filter((item) =>
+    itemMatchesContentSearch(item, ["title", "subtitle", "badge", "brand"], normalizedContentSearch),
+  );
 
   return (
     <div className="space-y-6">
@@ -1124,6 +1226,35 @@ function MyContentTab({ initialContentTab, initialQuizView, hideDateDetails = fa
         ))}
       </div>
       </div>
+
+      {/* All accessible items, across every content type. This is the default view. */}
+      {contentTab === "all" && (
+        <div className="space-y-4">
+          {contentControls}
+          {allContentItems.length === 0 ? (
+            <EmptyState icon={Layers} title="No content yet" description="Content you purchase, join, or receive through a membership will appear here." />
+          ) : filteredAllContentItems.length === 0 ? noMatchingContent(Layers) : (
+            <div className={contentCollectionClass}>
+              {filteredAllContentItems.map((item) => (
+                <ContentCard
+                  key={item.key}
+                  thumbnail={item.thumbnail}
+                  displayMode={contentDisplayMode}
+                  title={item.title}
+                  brand={item.brand}
+                  subtitle={item.subtitle}
+                  badge={item.badge}
+                  badgeColor={item.badgeColor}
+                  progressPct={item.progressPct}
+                  completed={item.completed}
+                  hideDateDetails={hideDateDetails}
+                  actions={item.actions}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Courses */}
       {contentTab === "courses" && (

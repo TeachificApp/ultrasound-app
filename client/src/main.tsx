@@ -7,7 +7,13 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import { detectBrandFromPath } from "@shared/brandScopedRoutes";
+import { captureStudentLoginTokenFromUrl, getStudentLoginToken } from "./lib/studentLoginSession";
 import "./index.css";
+
+// A Platform Admin can deliberately open a separate tab as a specific learner.
+// Capture the signed, short-lived handoff before any tRPC query runs, then keep
+// it tab-scoped rather than leaving it visible in the URL.
+captureStudentLoginTokenFromUrl();
 
 const queryClient = new QueryClient();
 
@@ -115,9 +121,11 @@ const trpcClient = trpc.createClient({
       headers() {
         // X-App-Brand is re-evaluated on every request so navigating between
         // -aaus and -ihe admin pages sends the correct brand without a reload.
+        const studentLoginToken = getStudentLoginToken();
         return {
           "X-App-Hostname": window.location.hostname,
           "X-App-Brand": getBrandParam(),
+          ...(studentLoginToken ? { "X-Student-Login": studentLoginToken } : {}),
         };
       },
       fetch(input, init) {

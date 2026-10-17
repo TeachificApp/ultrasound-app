@@ -12,6 +12,8 @@ import { useEffect, useState, lazy, Suspense } from "react";
 import { trpc } from "./lib/trpc";
 import ErrorBoundary from "./components/ErrorBoundary";
 import DemoModeBanner from "./components/DemoModeBanner";
+import StudentLoginBanner from "./components/StudentLoginBanner";
+import StudentLoginSessionBridge from "./components/StudentLoginSessionBridge";
 import GetAppBanner from "./components/GetAppBanner";
 import ProfileNameBanner from "./components/ProfileNameBanner";
 import LegacyPasswordSetupRedirect from "./components/LegacyPasswordSetupRedirect";
@@ -1979,6 +1981,8 @@ function App() {
           <MetaPixel />
           <PurchaseSuccessTracker />
           <Toaster />
+          <StudentLoginSessionBridge />
+          <StudentLoginBanner />
           <ActiveDeviceSessionGuard />
           <LegacyPasswordSetupRedirect />
           {onMarketingStaging ? (

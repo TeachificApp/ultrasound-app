@@ -18,7 +18,7 @@ import {
   RefreshCw, Loader2, ChevronRight, ChevronLeft, ShoppingCart,
   UserCog, PlusCircle, Trash2, Shield, ShieldOff, BadgeCheck,
   ClipboardCheck, RotateCcw, DollarSign, Edit3, GitMerge, Mail, X,
-  Users2, Users, Building2, Star, Layers, KeyRound, Eye, EyeOff, Calendar, ShieldCheck,
+  Users2, Users, Building2, Star, Layers, KeyRound, Eye, EyeOff, Calendar, ShieldCheck, LogIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -253,6 +253,7 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
     onSuccess: (res) => { toast.success(`Password updated for ${res.email}`); setSetPwOpen(false); setNewPassword(""); },
     onError: (e) => toast.error(e.message),
   });
+  const startStudentLogin = trpc.adminUser.startStudentLogin.useMutation();
 
   const [setPwOpen, setSetPwOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -292,6 +293,29 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
     setEditOpen(true);
   };
 
+  const handleStudentLogin = () => {
+    // Open the separate tab while this click is still user-initiated so browsers
+    // do not treat the secure handoff as a pop-up. The original admin session is
+    // never altered.
+    const studentWindow = window.open("about:blank", "_blank");
+    try { if (studentWindow) studentWindow.opener = null; } catch { /* ignore */ }
+
+    startStudentLogin.mutate(
+      { userId },
+      {
+        onSuccess: ({ token }) => {
+          const destination = `https://learn.allaboutultrasound.com/my-dashboard?student_login=${encodeURIComponent(token)}`;
+          if (studentWindow) studentWindow.location.replace(destination);
+          else window.open(destination, "_blank", "noopener,noreferrer");
+        },
+        onError: (error) => {
+          try { studentWindow?.close(); } catch { /* ignore */ }
+          toast.error(error.message);
+        },
+      },
+    );
+  };
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Avatar + info card with Edit button */}
@@ -315,6 +339,19 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
               <div className="flex gap-2 flex-shrink-0">
                 <Button size="sm" variant="outline" onClick={handleEditOpen} className="gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50">
                   <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleStudentLogin}
+                  disabled={startStudentLogin.isPending}
+                  className="gap-1.5 text-blue-700 border-blue-200 hover:bg-blue-50"
+                  title="Open a separate, temporary tab as this learner. Your administrator session remains open here."
+                >
+                  {startStudentLogin.isPending
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <LogIn className="w-3.5 h-3.5" />}
+                  Login as Student
                 </Button>
                 <Button
                   size="sm"

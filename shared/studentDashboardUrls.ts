@@ -9,6 +9,7 @@ export type StudentDashboardMainTab =
   | "revenue_partner";
 
 export type StudentDashboardContentTab =
+  | "all"
   | "courses"
   | "quizzes"
   | "downloads"
@@ -31,6 +32,7 @@ export const STUDENT_DASHBOARD_MAIN_TABS = new Set<StudentDashboardMainTab>([
 ]);
 
 export const STUDENT_DASHBOARD_CONTENT_TABS = new Set<StudentDashboardContentTab>([
+  "all",
   "courses",
   "quizzes",
   "downloads",
@@ -43,6 +45,7 @@ export const STUDENT_DASHBOARD_CONTENT_TABS = new Set<StudentDashboardContentTab
 ]);
 
 const LEGACY_CONTENT_TAB_ALIASES: Record<string, StudentDashboardContentTab> = {
+  all: "all",
   quizzes: "quizzes",
   courses: "courses",
   downloads: "downloads",
@@ -107,7 +110,7 @@ export function normalizeLegacyStudentDashboardLocation(pathname: string, search
   params.delete("tab");
 
   let tab: StudentDashboardMainTab = "content";
-  let contentTab = params.get("contentTab") as StudentDashboardContentTab | null;
+  let contentTab = (params.get("contentTab") as StudentDashboardContentTab | null) ?? "all";
 
   if (rawTab) {
     if (STUDENT_DASHBOARD_MAIN_TABS.has(rawTab as StudentDashboardMainTab)) {

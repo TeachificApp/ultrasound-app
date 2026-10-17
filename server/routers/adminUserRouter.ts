@@ -80,6 +80,7 @@ import {
 import { parseBuilderConfig } from "../lib/quizBuilderConfig";
 import { stableBuilderQuestionId } from "../lib/gradeBuilderQuestion";
 import { receiptParticipantSources, resolveReceiptParticipants } from "../lib/receiptParticipants";
+import { createStudentLoginToken } from "../lib/studentLoginSession";
 type AdminAccessScope = "full" | "manager";
 
 async function assertAdmin(ctx: { user: { id: number; role: string } }): Promise<AdminAccessScope> {
@@ -722,6 +723,61 @@ export const adminUserRouter = router({
           brand: r.brand ? String(r.brand) : null,
         })),
       };
+    }),
+
+  /**
+   * Opens a short-lived, tab-scoped learner session. This never replaces the
+   * Platform Admin's cookie, so their administrator tab remains signed in.
+   */
+  startStudentLogin: protectedProcedure
+    .input(z.object({ userId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      if ((await assertAdmin(ctx)) !== "full") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only Platform Admins can sign in as a student.",
+        });
+      }
+      if (input.userId === ctx.user.id) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You are already signed in to this account.",
+        });
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [targetUser] = await db
+        .select({ id: users.id, role: users.role })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!targetUser) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Student not found." });
+      }
+
+      const targetRoles = await getUserRoles(targetUser.id);
+      const targetHasPlatformAccess =
+        targetUser.role === "admin" ||
+        targetRoles.some((role) => ["platform_admin", "platform_manager", "platform_owner", "platform_moderator"].includes(role));
+      if (targetHasPlatformAccess) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "For safety, student login is unavailable for administrative accounts.",
+        });
+      }
+
+      const { token, expiresAt } = await createStudentLoginToken({
+        targetUserId: targetUser.id,
+        realAdminId: ctx.user.id,
+      });
+      await db.insert(userActivityLogs).values({
+        userId: targetUser.id,
+        eventType: "admin_student_login",
+        description: "A Platform Admin opened a temporary student-login support session.",
+        metadata: { authorizedByUserId: ctx.user.id },
+      });
+      return { token, expiresAt };
     }),
 
   /**
