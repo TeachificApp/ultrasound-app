@@ -62,8 +62,8 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(echoSite).toContain("image: ECHO_EXPO_HERO_IMAGE");
     expect(echoSite).toContain("src={ECHO_EXPO_HERO_IMAGE}");
     expect(echoSite).not.toContain("src={ULTRASOUND_EXPO_HERO_IMAGE}");
-    expect(echoSite).toContain("Everything Echo.");
-    expect(echoSite).toContain("One Place.");
+    expect(echoSite).toContain("The Ultimate");
+    expect(echoSite).toContain("Cardiac Ultrasound Experience.");
   });
 
   it("keeps public EchoExpo exhibit content focused on sales copy rather than portal mechanics", async () => {
@@ -84,14 +84,25 @@ describe("UltrasoundExpo™ event instances", () => {
     expect(ultrasoundSite).toContain("More than a conference");
     expect(ultrasoundSite).toContain("PLEASE DO NOT SIT HERE ALL DAY.");
     expect(ultrasoundSite).toContain("ScanLabs, new technology, live demonstrations, SonoGames, Innovation Showcase");
-    expect(ultrasoundSite).toContain("Not Another Conference.");
+    expect(ultrasoundSite).toContain("The Ultimate");
+    expect(ultrasoundSite).toContain("Ultrasound Experience.");
+    expect(ultrasoundSite).toContain("Get ready for the ultrasound experience you've been waiting for.");
+    expect(ultrasoundSite).toContain("Be part of the inaugural UltrasoundExpo™.");
+    expect(ultrasoundSite).toContain("This isn&apos;t another conference.");
+    expect(ultrasoundSite).toContain("This is UltrasoundExpo™.");
+    expect(ultrasoundSite).toContain("Not Just an Expo. THE Ultrasound Experience.");
     expect(ultrasoundSite).not.toContain("You don&apos;t just attend UltrasoundExpo™");
     expect(ultrasoundSite).toContain("text-[#4ad9e0]");
     expect(ultrasoundSite).toContain("You Don&apos;t Just Attend It. You Experience It.");
     expect(echoSite).toContain("More than a cardiac conference");
     expect(echoSite).toContain("immersive echocardiography experience");
     expect(echoSite).toContain("new cardiac imaging technology");
-    expect(echoSite).toContain("A Cardiac Ultrasound Experience.");
+    expect(echoSite).toContain("Cardiac Ultrasound Experience.");
+    expect(echoSite).toContain("Get ready for the cardiac ultrasound experience you've been waiting for.");
+    expect(echoSite).toContain("Be part of the inaugural EchoExpo™.");
+    expect(echoSite).toContain("This isn&apos;t another conference.");
+    expect(echoSite).toContain("This is EchoExpo™.");
+    expect(echoSite).toContain("Not Just an Expo. THE Cardiac Ultrasound Experience.");
     expect(echoSite).not.toContain("You don&apos;t just attend EchoExpo™");
     expect(echoSite).toContain("You Don&apos;t Just Attend It. You Experience It.");
   });
