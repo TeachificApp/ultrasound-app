@@ -1256,7 +1256,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
   const { openLearnLink } = useLearnLink();
   
   const utils = trpc.useUtils();
-  const { data: course, isLoading, refetch } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
+  const { data: course, isLoading, error: courseLoadError, refetch } = trpc.lmsAdmin.getCourse.useQuery({ id: courseId });
   const initialTab = (() => { try { return new URLSearchParams(window.location.search).get("tab") ?? "settings"; } catch { return "settings"; } })();
   const [activeTab, setActiveTab] = useState(initialTab);
   // Track which tabs have been visited to lazy-mount heavy editors
@@ -1525,6 +1525,20 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
   }, [localSections, localTopLessons, reorderLessons, reorderSections, moveLesson, courseId]);
 
   if (isLoading) return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>;
+  if (courseLoadError) {
+    return <div role="alert" className="max-w-xl rounded-xl border border-red-200 bg-red-50 p-5 text-red-900">
+      <h2 className="font-semibold">Unable to load this course</h2>
+      <p className="mt-1 text-sm text-red-800">The course may still exist. Retry the request before making any changes.</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" className="border-red-300 bg-white text-red-800 hover:bg-red-100" onClick={() => void refetch()}>
+          Retry loading course
+        </Button>
+        <Button size="sm" variant="ghost" className="text-red-800 hover:bg-red-100" onClick={onBack}>
+          Back to courses
+        </Button>
+      </div>
+    </div>;
+  }
   if (!course) return <div className="text-gray-500">Course not found</div>;
 
   return (
