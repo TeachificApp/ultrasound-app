@@ -71,8 +71,10 @@ const OUTRO_HOLD_SECONDS = 10;
 const MAX_MP4_CONTENT_SECONDS = MAX_MP4_EXPORT_SECONDS - OUTRO_HOLD_SECONDS;
 const MOTION_DURATION_SECONDS = 20;
 const OUTRO_START_SECONDS = MOTION_DURATION_SECONDS - OUTRO_HOLD_SECONDS;
-/** Combined cards with source video: content ends at video + 6s before the outro. */
-const MAX_COMBINED_SOURCE_VIDEO_SECONDS = MAX_MP4_CONTENT_SECONDS - 6;
+/** Let viewers read the complete native Quiz Card before its animated reveal begins. */
+const COMBINED_QUESTION_CARD_HOLD_SECONDS = 5;
+/** Combined cards with source video: preserve the reading stage and six seconds after video. */
+const MAX_COMBINED_SOURCE_VIDEO_SECONDS = MAX_MP4_CONTENT_SECONDS - COMBINED_QUESTION_CARD_HOLD_SECONDS - 6;
 // Quiz Card clinical-image review pacing: let viewers read the question, then
 // inspect the fully magnified image before answer choices begin entering.
 const IMAGE_QUESTION_HOLD_SECONDS = 7;
@@ -93,6 +95,8 @@ type MotionTimeline = {
   contentEndSeconds: number;
   totalSeconds: number;
   videoDurationSeconds: number;
+  /** Initial undimmed native-card reading stage for combined static cards. */
+  questionCardHoldEndSeconds: number;
   imageZoomStartSeconds: number;
   imageZoomEndSeconds: number;
   imageZoomHoldEndSeconds: number;
@@ -295,36 +299,43 @@ function motionTimeline(motion: CardMotion, video: HTMLVideoElement | null): Mot
     ? clamp(video.duration, 0, MAX_COMBINED_SOURCE_VIDEO_SECONDS)
     : 0;
   const hasImageZoom = motion.kind === "combined" && motion.zoomQuestionImage;
-  const imageZoomStartSeconds = hasImageZoom ? IMAGE_QUESTION_HOLD_SECONDS : 0;
+  // Always introduce a combined reel with the real captured question card. A
+  // zoom-enabled image card gets the longer existing reading stage; source
+  // video cards then begin their media motion after the same clear context.
+  const questionCardHoldEndSeconds = motion.kind === "combined"
+    ? (hasImageZoom ? IMAGE_QUESTION_HOLD_SECONDS : COMBINED_QUESTION_CARD_HOLD_SECONDS)
+    : 0;
+  const imageZoomStartSeconds = hasImageZoom ? questionCardHoldEndSeconds : 0;
   const imageZoomEndSeconds = hasImageZoom ? imageZoomStartSeconds + IMAGE_ZOOM_ANIMATION_SECONDS : 0;
   const imageZoomHoldEndSeconds = hasImageZoom ? imageZoomEndSeconds + IMAGE_ZOOM_HOLD_SECONDS : 0;
   const optionStaggerSeconds = hasImageZoom ? IMAGE_OPTION_STAGGER_SECONDS : 0.68;
   const optionAnimationSeconds = hasImageZoom ? IMAGE_OPTION_ANIMATION_SECONDS : 0.42;
   const optionStartSeconds = videoDurationSeconds > 0
-    ? videoDurationSeconds
+    ? questionCardHoldEndSeconds + videoDurationSeconds
     : imageZoomHoldEndSeconds > 0
       ? imageZoomHoldEndSeconds + 0.25
-      : 1.65;
+      : questionCardHoldEndSeconds + 1.65;
   const answerRevealSeconds = videoDurationSeconds > 0
-    ? videoDurationSeconds + 3
+    ? questionCardHoldEndSeconds + videoDurationSeconds + 3
     : imageZoomHoldEndSeconds > 0
       // Four slowly staggered options complete 3.7 seconds after their first entrance;
       // reserve the requested six full seconds before revealing the answer.
       ? optionStartSeconds + 9.7
-      : COMBINED_ANSWER_REVEAL_SECONDS;
+      : optionStartSeconds + (COMBINED_ANSWER_REVEAL_SECONDS - 1.65);
   // Hold the completed question/options for three seconds before revealing the answer,
   // and keep the answer visible for at least three seconds before the 10-second outro.
   const rawContentEndSeconds = videoDurationSeconds > 0
-    ? Math.max(OUTRO_START_SECONDS, videoDurationSeconds + 6)
+    ? Math.max(OUTRO_START_SECONDS, questionCardHoldEndSeconds + videoDurationSeconds + 6)
     : imageZoomEndSeconds > 0
       ? Math.max(OUTRO_START_SECONDS, answerRevealSeconds + 3)
-    : OUTRO_START_SECONDS;
+      : Math.max(OUTRO_START_SECONDS, answerRevealSeconds + 3);
   const contentEndSeconds = Math.min(rawContentEndSeconds, MAX_MP4_CONTENT_SECONDS);
   const totalSeconds = Math.min(contentEndSeconds + OUTRO_HOLD_SECONDS, MAX_MP4_EXPORT_SECONDS);
   return {
     contentEndSeconds,
     totalSeconds,
     videoDurationSeconds,
+    questionCardHoldEndSeconds,
     imageZoomStartSeconds,
     imageZoomEndSeconds,
     imageZoomHoldEndSeconds,
@@ -456,6 +467,7 @@ function drawZoomedCardImage(
 
 function drawMotionPanel(
   context: CanvasRenderingContext2D,
+  card: RenderedCard,
   motion: CardMotion,
   elapsed: number,
   targetWidth: number,
@@ -513,6 +525,42 @@ function drawMotionPanel(
     const titleHeight = drawWrappedText(context, motion.title, x, y, contentWidth, titleFont * 1.14, motion.kind === "social" ? 4 : 3);
     context.restore();
     y += titleHeight + Math.max(20, Math.round(26 * scaled));
+  }
+
+  // Combined quiz reels retain the exact clinical reference from the complete
+  // source card inside the animated question panel. The patient image is never
+  // replaced by a generic dark modal while viewers consider the options.
+  if (motion.kind === "combined" && card.mediaFrame) {
+    const mediaProgress = easeOut((elapsed - 1.05) / 0.4);
+    const mediaHeight = Math.min(
+      Math.round(targetHeight * (isVertical ? 0.19 : 0.27)),
+      Math.round(contentWidth * 0.58),
+    );
+    const mediaY = y;
+    if (mediaProgress > 0) {
+      const frame = card.mediaFrame;
+      context.save();
+      context.globalAlpha = panelProgress * clamp(mediaProgress, 0, 1);
+      context.fillStyle = "#061217";
+      drawRoundedRect(context, x, mediaY, contentWidth, mediaHeight, Math.max(10, Math.round(13 * scaled)));
+      context.fill();
+      context.clip();
+      // The captured media frame includes the source card's contain-fit image,
+      // preventing any hidden crop of the clinical anatomy or annotations.
+      context.drawImage(card.image, frame.x, frame.y, frame.width, frame.height, x, mediaY, contentWidth, mediaHeight);
+      context.restore();
+
+      context.save();
+      context.globalAlpha = panelProgress * clamp(mediaProgress, 0, 1);
+      context.strokeStyle = `${accent}cc`;
+      context.lineWidth = Math.max(2, Math.round(2 * scaled));
+      drawRoundedRect(context, x, mediaY, contentWidth, mediaHeight, Math.max(10, Math.round(13 * scaled)));
+      context.stroke();
+      context.restore();
+    }
+    // Reserve the reference area even while it enters so answer choices never
+    // cross over the clinical image during its animation.
+    y += mediaHeight + Math.max(18, Math.round(22 * scaled));
   }
 
   if ((motion.kind === "question" || motion.kind === "combined") && motion.options?.length) {
@@ -660,6 +708,7 @@ function drawMotionFrame(
     contentEndSeconds: OUTRO_START_SECONDS,
     totalSeconds: MOTION_DURATION_SECONDS,
     videoDurationSeconds: 0,
+    questionCardHoldEndSeconds: 0,
     imageZoomStartSeconds: 0,
     imageZoomEndSeconds: 0,
     imageZoomHoldEndSeconds: 0,
@@ -670,9 +719,21 @@ function drawMotionFrame(
   },
 ) {
   const outroProgress = clamp((elapsed - timeline.contentEndSeconds) / 0.6, 0, 1);
-  drawExportFrame(context, card, targetWidth, targetHeight, 0.86 * (1 - outroProgress));
+  const isCombinedQuestionReadingStage = motion.kind === "combined"
+    && elapsed < timeline.questionCardHoldEndSeconds;
+  // The initial stage deliberately shows the actual card, including its full
+  // source image and question screenshot, at normal brightness before any
+  // animated layer appears.
+  drawExportFrame(
+    context,
+    card,
+    targetWidth,
+    targetHeight,
+    isCombinedQuestionReadingStage ? 0 : 0.86 * (1 - outroProgress),
+  );
   if (outroProgress < 1) {
-    if (timeline.videoDurationSeconds > 0 && video && elapsed < timeline.videoDurationSeconds) {
+    if (isCombinedQuestionReadingStage) return;
+    if (timeline.videoDurationSeconds > 0 && video && elapsed < timeline.questionCardHoldEndSeconds + timeline.videoDurationSeconds) {
       drawLiveCardVideo(context, card, video, targetWidth, targetHeight);
       return;
     }
@@ -694,12 +755,20 @@ function drawMotionFrame(
     // its staging at the completed-option point, then preserve the three-second
     // pause before the answer reveal.
     const panelElapsed = timeline.videoDurationSeconds > 0
-      ? elapsed - timeline.videoDurationSeconds + 4.11
-      : elapsed;
+      ? elapsed - timeline.questionCardHoldEndSeconds - timeline.videoDurationSeconds + 4.11
+      : timeline.imageZoomHoldEndSeconds > 0
+        ? elapsed
+        : elapsed - timeline.questionCardHoldEndSeconds;
     const panelTimeline = timeline.videoDurationSeconds > 0
       ? { ...timeline, optionStartSeconds: 1.65, answerRevealSeconds: COMBINED_ANSWER_REVEAL_SECONDS }
-      : timeline;
-    drawMotionPanel(context, motion, panelElapsed, targetWidth, targetHeight, panelTimeline);
+      : timeline.imageZoomHoldEndSeconds > 0
+        ? timeline
+        : {
+          ...timeline,
+          optionStartSeconds: timeline.optionStartSeconds - timeline.questionCardHoldEndSeconds,
+          answerRevealSeconds: timeline.answerRevealSeconds - timeline.questionCardHoldEndSeconds,
+        };
+    drawMotionPanel(context, card, motion, panelElapsed, targetWidth, targetHeight, panelTimeline);
     return;
   }
 
@@ -886,10 +955,23 @@ async function runTimelineFrameLoop(
   pacing: FrameLoopPacing,
   captureStream?: MediaStream | null,
 ) {
-  if (ctx.motionVideo) await ctx.motionVideo.play().catch(() => undefined);
+  let motionVideoStarted = false;
   const frames = Math.ceil(ctx.timeline.totalSeconds * FRAME_RATE);
   for (let frame = 0; frame < frames; frame += 1) {
     const elapsed = frame / FRAME_RATE;
+    if (
+      ctx.motionVideo
+      && !motionVideoStarted
+      && elapsed >= ctx.timeline.questionCardHoldEndSeconds
+      && elapsed < ctx.timeline.questionCardHoldEndSeconds + ctx.timeline.videoDurationSeconds
+    ) {
+      // Do not consume the source clip behind the initial static-card reading
+      // stage. It begins at its first frame only once the clinical question has
+      // been visible long enough to read.
+      ctx.motionVideo.currentTime = 0;
+      await ctx.motionVideo.play().catch(() => undefined);
+      motionVideoStarted = true;
+    }
     await drawTimelineFrame(ctx, elapsed);
     await onFrame(elapsed);
     if (captureStream) {
@@ -898,7 +980,11 @@ async function runTimelineFrameLoop(
     }
     if (pacing === "realtime") {
       await waitForMotionFrame();
-    } else if (ctx.motionVideo && elapsed < ctx.timeline.videoDurationSeconds) {
+    } else if (
+      ctx.motionVideo
+      && elapsed >= ctx.timeline.questionCardHoldEndSeconds
+      && elapsed < ctx.timeline.questionCardHoldEndSeconds + ctx.timeline.videoDurationSeconds
+    ) {
       await waitForMotionFrame();
     }
   }

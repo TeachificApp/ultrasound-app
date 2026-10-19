@@ -78,6 +78,12 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("MAX_COMBINED_SOURCE_VIDEO_SECONDS");
     expect(exporter).toContain("OUTRO_HOLD_SECONDS = 10");
     expect(exporter).toContain("COMBINED_ANSWER_REVEAL_SECONDS = 7.11");
+    expect(exporter).toContain("COMBINED_QUESTION_CARD_HOLD_SECONDS = 5");
+    expect(exporter).toContain("questionCardHoldEndSeconds");
+    expect(exporter).toContain("isCombinedQuestionReadingStage");
+    expect(exporter).toContain("drawMotionPanel(context, card, motion");
+    expect(exporter).toContain("Combined quiz reels retain the exact clinical reference");
+    expect(exporter).toContain("context.drawImage(card.image, frame.x, frame.y, frame.width, frame.height");
     expect(exporter).toContain("motion.outroHost");
     expect(exporter).toContain('motion.logoShape === "circle"');
     expect(exporter).toContain("context.arc(centerX, logoCenterY, logoSize / 2");
@@ -93,7 +99,7 @@ describe("social card platform exports", () => {
     expect(exporter).toContain("const IMAGE_QUESTION_HOLD_SECONDS = 7");
     expect(exporter).toContain("const IMAGE_ZOOM_HOLD_SECONDS = 10");
     expect(exporter).toContain("const IMAGE_OPTION_STAGGER_SECONDS = 1");
-    expect(exporter).toContain("imageZoomStartSeconds = hasImageZoom ? IMAGE_QUESTION_HOLD_SECONDS");
+    expect(exporter).toContain("imageZoomStartSeconds = hasImageZoom ? questionCardHoldEndSeconds");
     expect(exporter).toContain("imageZoomHoldEndSeconds = hasImageZoom ? imageZoomEndSeconds + IMAGE_ZOOM_HOLD_SECONDS");
     expect(exporter).toContain("? imageZoomHoldEndSeconds + 0.25");
     expect(exporter).toContain("? optionStartSeconds + 9.7");
@@ -124,6 +130,8 @@ describe("social card platform exports", () => {
     expect(quiz).toContain('questionVideoUrl = media.kind === "video"');
     expect(quiz).toContain("const canZoomQuestionImage");
     expect(quiz).toContain("Magnify the clinical image in the MP4");
+    expect(quiz).toContain("complete question card and clinical image clearly visible");
+    expect(quiz).toContain("animated question panel keeps that same image visible");
     expect(quiz).toContain("zoomQuestionImage: canZoomQuestionImage && zoomQuestionImage");
     for (const page of [challenge, social, quiz]) {
       expect(page).toContain("musicUploadBrand");
