@@ -250,8 +250,10 @@ describe("quickfire.triggerStreakReminders", () => {
     expect(result).toHaveProperty("sent");
     expect(result).toHaveProperty("skipped");
     expect(result).toHaveProperty("total");
+    expect(result).toHaveProperty("scheduledForToday");
     expect(typeof result.sent).toBe("number");
     expect(typeof result.total).toBe("number");
+    expect(typeof result.scheduledForToday).toBe("boolean");
   });
 });
 

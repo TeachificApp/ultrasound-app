@@ -1387,7 +1387,7 @@ Return ONLY the JSON object, no markdown, no explanation, no code fences.`;
 
   // ─── Streak Reminders ────────────────────────────────────────────────────────
 
-  /** Admin: trigger streak reminder emails to all users who haven't completed today's set */
+  /** Admin: trigger Monday-only weekly challenge reminder emails for opted-in learners. */
   triggerStreakReminders: adminProcedure
     .input(z.object({ appUrl: z.string().url().optional() }))
     .mutation(async ({ input }) => {

@@ -1275,16 +1275,15 @@ export default function Profile() {
                     </div>
                   ) : (
                     <>
-                      {/* Daily Challenge Reminder Toggle */}
+                      {/* Weekly Daily Challenge Reminder Toggle */}
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <Bell className="w-4 h-4" style={{ color: "#189aa1" }} />
-                            <span className="text-sm font-semibold text-gray-800">Daily Challenge Reminder</span>
+                            <span className="text-sm font-semibold text-gray-800">Weekly Daily Challenge Reminder</span>
                           </div>
                           <p className="text-xs text-gray-500 leading-relaxed">
-                            Receive a daily email reminder if you haven't completed your Daily Challenge session.
-                            Includes your current streak so you never lose momentum.
+                            Receive one Monday email reminder to play this week&apos;s Daily Challenges and visit the leaderboard. Daily Challenges remain available every day.
                           </p>
                         </div>
                         <button
@@ -1301,71 +1300,8 @@ export default function Profile() {
                         </button>
                       </div>
 
-                      {/* Timezone Selector */}
                       {notifEnabled && (
-                        <div className="flex items-start gap-4 pl-6">
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <Clock className="w-4 h-4 text-gray-400" />
-                            <span className="text-xs font-medium text-gray-700">Your timezone</span>
-                          </div>
-                          <div className="flex-1">
-                            <select
-                              value={notifTimezone}
-                              onChange={(e) => setNotifTimezone(e.target.value)}
-                              className="w-full text-xs border border-gray-200 rounded-md px-2 py-1.5 text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#189aa1] bg-white"
-                            >
-                              <optgroup label="North America">
-                                <option value="America/New_York">Eastern Time (ET) — New York</option>
-                                <option value="America/Chicago">Central Time (CT) — Chicago</option>
-                                <option value="America/Denver">Mountain Time (MT) — Denver</option>
-                                <option value="America/Phoenix">Mountain Time, no DST — Phoenix</option>
-                                <option value="America/Los_Angeles">Pacific Time (PT) — Los Angeles</option>
-                                <option value="America/Anchorage">Alaska Time — Anchorage</option>
-                                <option value="Pacific/Honolulu">Hawaii Time — Honolulu</option>
-                                <option value="America/Toronto">Eastern Time — Toronto</option>
-                                <option value="America/Vancouver">Pacific Time — Vancouver</option>
-                              </optgroup>
-                              <optgroup label="Europe">
-                                <option value="Europe/London">GMT/BST — London</option>
-                                <option value="Europe/Paris">CET/CEST — Paris</option>
-                                <option value="Europe/Berlin">CET/CEST — Berlin</option>
-                                <option value="Europe/Amsterdam">CET/CEST — Amsterdam</option>
-                                <option value="Europe/Stockholm">CET/CEST — Stockholm</option>
-                                <option value="Europe/Helsinki">EET/EEST — Helsinki</option>
-                                <option value="Europe/Athens">EET/EEST — Athens</option>
-                                <option value="Europe/Istanbul">TRT — Istanbul</option>
-                                <option value="Europe/Moscow">MSK — Moscow</option>
-                              </optgroup>
-                              <optgroup label="Asia / Pacific">
-                                <option value="Asia/Dubai">GST — Dubai</option>
-                                <option value="Asia/Karachi">PKT — Karachi</option>
-                                <option value="Asia/Kolkata">IST — India</option>
-                                <option value="Asia/Dhaka">BST — Dhaka</option>
-                                <option value="Asia/Bangkok">ICT — Bangkok</option>
-                                <option value="Asia/Singapore">SGT — Singapore</option>
-                                <option value="Asia/Tokyo">JST — Tokyo</option>
-                                <option value="Asia/Seoul">KST — Seoul</option>
-                                <option value="Asia/Shanghai">CST — Shanghai</option>
-                                <option value="Australia/Sydney">AEST/AEDT — Sydney</option>
-                                <option value="Australia/Melbourne">AEST/AEDT — Melbourne</option>
-                                <option value="Pacific/Auckland">NZST/NZDT — Auckland</option>
-                              </optgroup>
-                              <optgroup label="Middle East / Africa">
-                                <option value="Africa/Cairo">EET — Cairo</option>
-                                <option value="Africa/Johannesburg">SAST — Johannesburg</option>
-                                <option value="Asia/Riyadh">AST — Riyadh</option>
-                                <option value="Asia/Jerusalem">IST/IDT — Jerusalem</option>
-                              </optgroup>
-                              <optgroup label="Latin America">
-                                <option value="America/Sao_Paulo">BRT/BRST — São Paulo</option>
-                                <option value="America/Argentina/Buenos_Aires">ART — Buenos Aires</option>
-                                <option value="America/Mexico_City">CST/CDT — Mexico City</option>
-                                <option value="America/Bogota">COT — Bogotá</option>
-                              </optgroup>
-                            </select>
-                            <p className="text-xs text-gray-400 mt-1">Notifications will be sent at 9:00 AM in your selected timezone.</p>
-                          </div>
-                        </div>
+                        <p className="pl-6 text-xs leading-relaxed text-gray-400">Weekly Daily Challenge reminders are sent on Monday in Eastern Time. Your saved timezone is retained for other platform notifications.</p>
                       )}
 
                       {/* Save Button */}

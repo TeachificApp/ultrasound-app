@@ -843,13 +843,17 @@ export default function QuickFireAdmin() {
     }
   }
 
-  // Streak Reminders
+  // Monday weekly challenge reminders
   const [reminderOpen, setReminderOpen] = useState(false);
-  const [reminderResult, setReminderResult] = useState<{ sent: number; skipped: number; total: number } | null>(null);
+  const [reminderResult, setReminderResult] = useState<{ sent: number; skipped: number; total: number; scheduledForToday: boolean } | null>(null);
   const triggerRemindersMutation = trpc.quickfire.triggerStreakReminders.useMutation({
     onSuccess: (data) => {
       setReminderResult(data);
-      toast.success(`Reminders sent to ${data.sent} user${data.sent !== 1 ? "s" : ""}`);
+      if (data.scheduledForToday) {
+        toast.success(`Monday reminders sent to ${data.sent} user${data.sent !== 1 ? "s" : ""}`);
+      } else {
+        toast.info("Weekly challenge emails are sent on Mondays (Eastern Time); no email was sent today.");
+      }
     },
     onError: (err) => toast.error(`Failed to send reminders: ${err.message}`),
   });
@@ -3961,24 +3965,24 @@ export default function QuickFireAdmin() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-orange-500" />
-              Send Daily Challenge Reminders
+              Send Monday Challenge Reminder
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {!reminderResult ? (
               <>
                 <p className="text-sm text-gray-600">
-                  This will send a reminder email to all users who have opted in to Daily Challenge reminders and have not yet completed today's session. Users who have already completed today's set will be skipped.
+                  This sends a Monday reminder to opted-in users to play the Daily Challenge and see this week&apos;s leaderboard. Daily Challenge email delivery is restricted to Mondays in Eastern Time.
                 </p>
                 <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3">
-                  <p className="text-xs text-orange-700 font-medium">Note: This action sends real emails. Use sparingly — once per day is recommended.</p>
+                  <p className="text-xs text-orange-700 font-medium">Note: This action sends real emails only on Monday. Outside Monday (Eastern Time), no email is sent.</p>
                 </div>
               </>
-            ) : (
+            ) : reminderResult.scheduledForToday ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle2 className="w-5 h-5" />
-                  <span className="font-semibold text-sm">Reminders sent successfully</span>
+                  <span className="font-semibold text-sm">Monday reminders sent successfully</span>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
@@ -3994,7 +3998,12 @@ export default function QuickFireAdmin() {
                     <div className="text-xs text-blue-600">Total Users</div>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">Skipped users either already completed today's set or have opted out of reminders.</p>
+                <p className="text-xs text-gray-500">Skipped users either already completed today&apos;s set or have opted out of weekly reminders.</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <div className="flex items-center gap-2 font-semibold"><AlertCircle className="h-4 w-4" /> No email sent today</div>
+                <p className="mt-1 text-xs leading-relaxed">Weekly Daily Challenge reminders are only delivered on Monday in Eastern Time. The automatic Monday email includes the play and leaderboard links for the current week.</p>
               </div>
             )}
           </div>
@@ -4004,13 +4013,13 @@ export default function QuickFireAdmin() {
               <Button
                 className="text-white gap-2"
                 style={{ background: "#f97316" }}
-                onClick={() => triggerRemindersMutation.mutate({})}
+                onClick={() => triggerRemindersMutation.mutate({ appUrl: window.location.origin })}
                 disabled={triggerRemindersMutation.isPending}
               >
                 {triggerRemindersMutation.isPending ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
                 ) : (
-                  <><Send className="w-4 h-4" /> Send Reminders</>
+                  <><Send className="w-4 h-4" /> Send Monday Reminder</>
                 )}
               </Button>
             )}

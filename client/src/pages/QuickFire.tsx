@@ -428,10 +428,9 @@ export default function QuickFire() {
   const updateNotifPrefsMutation = trpc.quickfire.updateNotificationPrefs.useMutation({
     onSuccess: () => trpc.useUtils().quickfire.getNotificationPrefs.invalidate(),
   });
-  // Show prompt only if user has no timezone set and hasn't dismissed
-  const hasTimezone = !!(notifPrefsQuery.data as any)?.timezone;
+  // Prompt users who have not opted in to the Monday weekly email reminder.
   const notifOptedIn = !!(notifPrefsQuery.data as any)?.quickfireReminder;
-  const shouldShowNotifPrompt = isAuthenticated && showNotifPrompt && !hasTimezone && !notifPrefsQuery.isLoading;
+  const shouldShowNotifPrompt = isAuthenticated && showNotifPrompt && !notifOptedIn && !notifPrefsQuery.isLoading;
 
   // Top-level tab
   const [activeTab, setActiveTab] = useState<"challenge" | "archive" | "performance" | "leaderboard" | "submit">("challenge");
@@ -1140,63 +1139,16 @@ export default function QuickFire() {
           <div className="mb-5 rounded-xl p-4 flex items-start gap-3 bg-[#f0fbfc] border border-[#189aa1]/30">
             <Bell className="w-5 h-5 text-[#189aa1] flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-gray-800">Get notified at 9am every day</p>
-              <p className="text-xs text-gray-500 mt-0.5">Never miss a daily challenge — we'll send you an email reminder at 9am in your timezone.</p>
+              <p className="text-sm font-semibold text-gray-800">Get a Monday Challenge Reminder</p>
+              <p className="text-xs text-gray-500 mt-0.5">Start the week with a Monday email to play the Daily Challenge and check this week&apos;s leaderboard. Daily Challenges remain available every day.</p>
               <div className="flex items-center gap-2 mt-3 flex-wrap">
-                <select
-                  className="text-xs border border-[#189aa1]/40 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#189aa1]/30"
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (!e.target.value) return;
-                    updateNotifPrefsMutation.mutate({ quickfireReminder: true, timezone: e.target.value });
+                <button
+                  onClick={() => {
+                    updateNotifPrefsMutation.mutate({ quickfireReminder: true });
                     setShowNotifPrompt(false);
                   }}
-                >
-                  <option value="" disabled>Select your timezone…</option>
-                  <optgroup label="Americas">
-                    <option value="America/New_York">Eastern (ET)</option>
-                    <option value="America/Chicago">Central (CT)</option>
-                    <option value="America/Denver">Mountain (MT)</option>
-                    <option value="America/Los_Angeles">Pacific (PT)</option>
-                    <option value="America/Anchorage">Alaska (AKT)</option>
-                    <option value="Pacific/Honolulu">Hawaii (HST)</option>
-                    <option value="America/Toronto">Toronto (ET)</option>
-                    <option value="America/Vancouver">Vancouver (PT)</option>
-                    <option value="America/Sao_Paulo">São Paulo (BRT)</option>
-                  </optgroup>
-                  <optgroup label="Europe">
-                    <option value="Europe/London">London (GMT/BST)</option>
-                    <option value="Europe/Paris">Paris (CET)</option>
-                    <option value="Europe/Berlin">Berlin (CET)</option>
-                    <option value="Europe/Madrid">Madrid (CET)</option>
-                    <option value="Europe/Rome">Rome (CET)</option>
-                    <option value="Europe/Amsterdam">Amsterdam (CET)</option>
-                    <option value="Europe/Stockholm">Stockholm (CET)</option>
-                    <option value="Europe/Helsinki">Helsinki (EET)</option>
-                    <option value="Europe/Athens">Athens (EET)</option>
-                    <option value="Europe/Istanbul">Istanbul (TRT)</option>
-                    <option value="Europe/Moscow">Moscow (MSK)</option>
-                  </optgroup>
-                  <optgroup label="Asia / Pacific">
-                    <option value="Asia/Dubai">Dubai (GST)</option>
-                    <option value="Asia/Kolkata">India (IST)</option>
-                    <option value="Asia/Dhaka">Dhaka (BST)</option>
-                    <option value="Asia/Bangkok">Bangkok (ICT)</option>
-                    <option value="Asia/Singapore">Singapore (SGT)</option>
-                    <option value="Asia/Shanghai">China (CST)</option>
-                    <option value="Asia/Tokyo">Tokyo (JST)</option>
-                    <option value="Asia/Seoul">Seoul (KST)</option>
-                    <option value="Australia/Sydney">Sydney (AEDT)</option>
-                    <option value="Australia/Melbourne">Melbourne (AEDT)</option>
-                    <option value="Pacific/Auckland">Auckland (NZST)</option>
-                  </optgroup>
-                  <optgroup label="Africa / Middle East">
-                    <option value="Africa/Cairo">Cairo (EET)</option>
-                    <option value="Africa/Johannesburg">Johannesburg (SAST)</option>
-                    <option value="Africa/Lagos">Lagos (WAT)</option>
-                    <option value="Africa/Nairobi">Nairobi (EAT)</option>
-                  </optgroup>
-                </select>
+                  className="rounded-lg bg-[#189aa1] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#147d83]"
+                >Enable Monday reminders</button>
                 <button
                   onClick={() => setShowNotifPrompt(false)}
                   className="text-xs text-gray-400 hover:text-gray-600 underline"

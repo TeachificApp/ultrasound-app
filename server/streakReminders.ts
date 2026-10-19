@@ -1,8 +1,8 @@
 /**
- * Daily Challenge Streak Reminder Utility
+ * Weekly Challenge Reminder Utility
  *
  * Queries all users who:
- *   1. Have opted in to Daily Challenge reminders (notificationPrefs.quickfireReminder = true)
+ *   1. Have opted in to Weekly Challenge reminders (notificationPrefs.quickfireReminder = true)
  *   2. Have a verified email address
  *   3. Have NOT completed today's Daily Challenge set
  *
@@ -17,6 +17,7 @@ import { and, eq, inArray, ne, notInArray, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { sendEmail, buildStreakReminderEmail } from "./_core/email";
 import { users, quickfireAttempts } from "../drizzle/schema";
+import { isChallengeEmailMonday } from "../shared/challengeEmailSchedule";
 
 function todayDateStr(): string {
   return new Date().toISOString().slice(0, 10);
@@ -49,16 +50,24 @@ export interface StreakReminderSummary {
   skipped: number;
   errors: number;
   total: number;
+  scheduledForToday: boolean;
 }
 
 export async function sendStreakReminders(appUrl: string): Promise<StreakReminderSummary> {
+  const scheduledForToday = isChallengeEmailMonday();
+  if (!scheduledForToday) {
+    console.log("[streakReminders] Weekly challenge reminders are scheduled for Monday ET; no email sent.");
+    return { sent: 0, skipped: 0, errors: 0, total: 0, scheduledForToday };
+  }
+
   const db = await getDb();
   if (!db) {
     console.error("[streakReminders] DB unavailable");
-    return { sent: 0, skipped: 0, errors: 0, total: 0 };
+    return { sent: 0, skipped: 0, errors: 0, total: 0, scheduledForToday };
   }
 
   const today = todayDateStr();
+  const brandMode = appUrl.toLowerCase().includes("iheartecho") ? "iheartecho" : "aaus";
 
   // Find user IDs who have already attempted at least one question today
   const completedRows = await db
@@ -137,13 +146,16 @@ export async function sendStreakReminders(appUrl: string): Promise<StreakReminde
 
     const firstName = getFirstName(user.name);
     const loginUrl = `${appUrl}/quickfire`;
+    const leaderboardUrl = `${appUrl}/leaderboard`;
     const unsubscribeUrl = `${appUrl}/settings/notifications?unsubscribe=quickfire`;
 
     const { subject, htmlBody } = buildStreakReminderEmail({
       firstName,
       currentStreak,
       loginUrl,
+      leaderboardUrl,
       unsubscribeUrl,
+      brandMode,
     });
 
     try {
@@ -166,5 +178,5 @@ export async function sendStreakReminders(appUrl: string): Promise<StreakReminde
   console.log(
     `[streakReminders] Done for ${today}: sent=${sent} skipped=${skipped} errors=${errors} total=${allUsers.length}`
   );
-  return { sent, skipped, errors, total: allUsers.length };
+  return { sent, skipped, errors, total: allUsers.length, scheduledForToday };
 }

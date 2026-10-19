@@ -6,8 +6,8 @@
  *  2. At 6 AM Eastern Time: auto-publish the next queued challenge from EACH
  *     category (Abdominal, Vascular, POCUS, Fetal Echo, etc.) — picking the
  *     lowest queuePosition per category. No publishDate required from admin.
- *  3. Send a SendGrid notification email to opted-in users at 6 AM ET when
- *     new challenges go live.
+ *  3. Send opted-in users one Monday email reminder at 6 AM ET when new
+ *     challenges go live. Challenges continue publishing every day.
  *
  * Admin workflow:
  *  - Set challenge status = "queued", assign a category, set queuePosition.
@@ -30,6 +30,7 @@ import {
 } from "../../shared/quickfireCategories";
 import { getDailyChallengeDate } from "../../shared/dailyChallengeDate";
 import { ensureTodaySet } from "../lib/quickfireDailySet";
+import { isChallengeEmailMonday } from "../../shared/challengeEmailSchedule";
 
 /**
  * Generate a self-contained HMAC-signed unsubscribe token.
@@ -266,6 +267,11 @@ async function sendChallengeNotifications(
   todayStr: string,
   brand: "aaus" | "iheartecho" = "aaus"
 ) {
+  if (!isChallengeEmailMonday()) {
+    console.log("[ChallengeCron] Weekly challenge email is scheduled for Monday ET; skipping notification delivery.");
+    return;
+  }
+
   if (!SENDGRID_API_KEY) {
     console.log("[ChallengeCron] SendGrid not configured, skipping notifications.");
     return;
@@ -327,7 +333,9 @@ async function sendChallengeNotifications(
         const prefs = typeof u.notificationPrefs === "string"
           ? JSON.parse(u.notificationPrefs)
           : u.notificationPrefs;
-        if (prefs.dailyChallenge === false) return false;
+        // Support the legacy dailyChallenge preference and the current
+        // quickfireReminder preference used by the profile controls.
+        if (prefs.dailyChallenge === false || prefs.quickfireReminder === false) return false;
       } catch {
         // malformed prefs, default to opted in
       }
@@ -358,6 +366,7 @@ async function sendChallengeNotifications(
       const brandAppUrl = isIhe ? IHE_APP_URL : APP_URL;
       const unsubscribeUrl = `${brandAppUrl}/api/unsubscribe?token=${unsubToken}`;
       const challengeUrl = `${brandAppUrl}/quickfire`;
+      const leaderboardUrl = `${brandAppUrl}/leaderboard`;
 
       const html = buildEmailHtml({
         userName,
@@ -366,6 +375,7 @@ async function sendChallengeNotifications(
         primaryTitle: primaryChallenge.title,
         primaryCategory: primaryChallenge.category || (isIhe ? "Echocardiography" : "Ultrasound"),
         challengeUrl,
+        leaderboardUrl,
         appUrl: brandAppUrl,
         unsubscribeUrl,
         brand,
@@ -377,8 +387,8 @@ async function sendChallengeNotifications(
           ? { email: IHE_FROM_EMAIL, name: IHE_FROM_NAME }
           : { email: SENDGRID_FROM_EMAIL, name: SENDGRID_FROM_NAME },
         subject: isIhe
-          ? `🫀 Today's Echo Challenges Are Live — ${todayETLong()}`
-          : `🔥 Today's Ultrasound Challenges Are Live — ${todayETLong()}`,
+          ? `🫀 Your Weekly Echo Challenge & Leaderboard — ${todayETLong()}`
+          : `🔥 Your Weekly Ultrasound Challenge & Leaderboard — ${todayETLong()}`,
         html,
         // Disable click tracking so SendGrid does not wrap/mangle the HMAC-signed
         // unsubscribe token URL — a wrapped URL breaks token verification.
@@ -412,6 +422,7 @@ function buildEmailHtml({
   primaryTitle,
   primaryCategory,
   challengeUrl,
+  leaderboardUrl,
   appUrl,
   unsubscribeUrl,
   brand = "aaus",
@@ -422,13 +433,14 @@ function buildEmailHtml({
   primaryTitle: string;
   primaryCategory: string;
   challengeUrl: string;
+  leaderboardUrl: string;
   appUrl: string;
   unsubscribeUrl: string;
   brand?: "aaus" | "iheartecho";
 }) {
   const isIhe = brand === "iheartecho";
   const brandName = isIhe ? "iHeartEcho" : "All About Ultrasound™";
-  const brandSubtitle = isIhe ? "Daily Echo Challenges" : "Daily Challenges";
+  const brandSubtitle = isIhe ? "Weekly Echo Challenge Reminder" : "Weekly Challenge Reminder";
   const brandAccentColor = isIhe ? "#c084fc" : "#4ad9e0";
   const brandPrimaryColor = isIhe ? "#7c3aed" : "#189aa1";
   const brandGradient = isIhe
@@ -437,14 +449,14 @@ function buildEmailHtml({
   const premiumNote = isIhe
     ? "<strong>Premium members</strong> can replay all past echo challenges in the archive — free members access today's challenges only."
     : "<strong>Premium members</strong> can replay all past challenges in the archive — free members access today's challenges only.";
-  const ctaText = isIhe ? "Take Today's Echo Challenges →" : "Take Today's Challenges →";
+  const ctaText = isIhe ? "Play Today's Echo Challenges →" : "Play Today's Challenges →";
   const footerBrandLink = isIhe ? "iHeartEcho" : "All About Ultrasound™";
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily ${isIhe ? "Echo" : "Ultrasound"} Challenges</title>
+  <title>Weekly ${isIhe ? "Echo" : "Ultrasound"} Challenge Reminder</title>
 </head>
 <body style="margin:0;padding:0;background:#f4f7f9;font-family:'Helvetica Neue',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7f9;padding:32px 0;">
@@ -462,14 +474,14 @@ function buildEmailHtml({
           <tr>
             <td style="padding:40px;">
               <p style="margin:0 0 8px;color:#6b7280;font-size:14px;">Hi ${userName},</p>
-              <h2 style="margin:0 0 16px;color:#0e1e2e;font-size:22px;font-weight:800;">🔥 ${challengeCount} new challenge${challengeCount > 1 ? 's are' : ' is'} live today!</h2>
+              <h2 style="margin:0 0 16px;color:#0e1e2e;font-size:22px;font-weight:800;">🔥 Start the week with ${challengeCount} new challenge${challengeCount > 1 ? 's' : ''}.</h2>
               <!-- Challenge summary card -->
               <div style="background:${isIhe ? '#f5f0ff' : '#f0fbfc'};border:1px solid ${brandAccentColor};border-radius:10px;padding:20px 24px;margin-bottom:24px;">
                 <div style="display:inline-block;background:${brandPrimaryColor};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:10px;letter-spacing:0.5px;">${primaryCategory.toUpperCase()}</div>
                 <h3 style="margin:0 0 8px;color:#0e1e2e;font-size:18px;font-weight:800;">${primaryTitle}</h3>
-                ${challengeCount > 1 ? `<p style="margin:0;color:#4b5563;font-size:13px;line-height:1.6;">Also today: ${challengeSummary}</p>` : ""}
+                ${challengeCount > 1 ? `<p style="margin:0;color:#4b5563;font-size:13px;line-height:1.6;">Also available today: ${challengeSummary}</p>` : ""}
               </div>
-              <p style="margin:0 0 8px;color:#4b5563;font-size:14px;">You have <strong>24 hours</strong> to complete today's challenges and make the leaderboard.</p>
+              <p style="margin:0 0 8px;color:#4b5563;font-size:14px;">Play today's challenges, earn points, and see where you stand on this week's leaderboard.</p>
               <p style="margin:0 0 24px;color:#4b5563;font-size:14px;">${premiumNote}</p>
               <!-- CTA -->
               <table cellpadding="0" cellspacing="0">
@@ -481,13 +493,14 @@ function buildEmailHtml({
                   </td>
                 </tr>
               </table>
+              <p style="margin:18px 0 0;font-size:14px;font-weight:700;"><a href="${leaderboardUrl}" style="color:${brandPrimaryColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">View this week's leaderboard →</a></p>
             </td>
           </tr>
           <!-- Footer -->
           <tr>
             <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #e5e7eb;text-align:center;">
               <p style="margin:0;color:#9ca3af;font-size:12px;">
-                You're receiving this because you opted in to Daily Challenge notifications.<br/>
+                You're receiving this because you opted in to Weekly Challenge reminders.<br/>
                 <a href="${appUrl}/profile#notifications" style="color:${brandPrimaryColor};text-decoration:none;" target="_blank" rel="noopener noreferrer">Manage notification preferences</a>
                 &nbsp;·&nbsp;
                 <a href="${unsubscribeUrl}" style="color:#9ca3af;text-decoration:underline;" target="_blank" rel="noopener noreferrer">Unsubscribe</a>
