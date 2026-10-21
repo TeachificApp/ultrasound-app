@@ -36,6 +36,7 @@ import { CohortResourceCard } from "@/components/cohort/CohortResourceCard";
 import { calendarDateKeyInTimeZone, formatInTimeZone, PLATFORM_TIMEZONE } from "@shared/platformTime";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
 import { getCohortRecordingWatchStatus } from "@/lib/cohortRecordingStatus";
+import { getFirstLessonVisibleAfterPurchase, isVisibleAfterPurchase } from "@shared/coursePreviewEligibility";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -249,10 +250,13 @@ export default function CourseOverview() {
     catch { return []; }
   })();
 
-  // Find first incomplete lesson for "Continue Learning"
+  // Preview-only lessons that hide after purchase are intentionally excluded
+  // from every enrolled learner launch target. This matters especially when
+  // the course's first lesson is a free preview introduction.
   const allLessons = [...(topLevelLessons ?? []), ...(sections ?? []).flatMap((s: any) => s.lessons)];
-  const firstIncomplete = allLessons.find((l: any) => !completedIds.has(l.id));
-  const continueLesson = firstIncomplete ?? allLessons[0];
+  const postPurchaseLessons = allLessons.filter(isVisibleAfterPurchase);
+  const firstIncomplete = postPurchaseLessons.find((l: any) => !completedIds.has(l.id));
+  const continueLesson = firstIncomplete ?? getFirstLessonVisibleAfterPurchase(postPurchaseLessons);
 
   // Only count published lessons that are marked to count toward completion
   const countableLessons = allLessons.filter((l: any) =>
@@ -310,8 +314,7 @@ export default function CourseOverview() {
 
   const renderLessonRow = (lesson: any, section?: any) => {
     // Hide "preview_hide_after_purchase" lessons for enrolled users
-    const pm = lesson.previewMode ?? (lesson.isPreview ? "preview" : "none");
-    if (pm === "preview_hide_after_purchase") return null;
+    if (!isVisibleAfterPurchase(lesson)) return null;
     const done = completedIds.has(lesson.id);
     const dripLocked = isDripLocked(lesson, section);
     const prereqLocked = isPrereqLocked(lesson);
@@ -556,8 +559,7 @@ export default function CourseOverview() {
           {sections?.map((section: any) => {
             // If every lesson in the section is hidden after purchase, hide the whole section too
             const visibleLessons = section.lessons.filter((l: any) => {
-              const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
-              return pm !== "preview_hide_after_purchase";
+              return isVisibleAfterPurchase(l);
             });
             if (section.lessons.length > 0 && visibleLessons.length === 0) return null;
 

@@ -34,4 +34,13 @@ describe("course overview and player lesson tree", () => {
     expect(overview).toContain("BlockPreview key={block.id} block={block} courseId={course.id}");
     expect(overview).toContain("isPresale");
   });
+
+  it("uses the post-purchase-visible lesson list for the Start and Continue target", () => {
+    const overview = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/pages/CourseOverview.tsx"),
+      "utf8",
+    );
+    expect(overview).toContain("const postPurchaseLessons = allLessons.filter(isVisibleAfterPurchase)");
+    expect(overview).toContain("getFirstLessonVisibleAfterPurchase(postPurchaseLessons)");
+  });
 });
