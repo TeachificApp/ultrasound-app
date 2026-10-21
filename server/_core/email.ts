@@ -13,6 +13,18 @@ import type { EmailAttachment, EmailRecipient, SendEmailOptions } from "../lib/e
 
 export type { EmailAttachment, EmailRecipient, SendEmailOptions };
 
+/**
+ * Shared transactional-email guidance for every purchaser or account holder.
+ * The learner dashboard keeps both app and Learn billing, subscription, invoice,
+ * and receipt history in one signed-in location.
+ */
+export function dashboardBillingAndReceiptNotice(): string {
+  return `<div style="margin:20px 0;padding:14px 16px;background:${TRANSACTIONAL_EMAIL_TINT};border-left:3px solid ${TRANSACTIONAL_EMAIL_TEAL};border-radius:0 8px 8px 0;">
+    <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:${TRANSACTIONAL_EMAIL_DEEP_TEAL};">Billing, subscriptions &amp; receipts</p>
+    <p style="margin:0;font-size:13px;color:#475569;line-height:1.55;">When you are signed in, open <strong>My Dashboard</strong>. Choose <strong>Subscriptions</strong> to review your billing and subscription information, or <strong>Purchases</strong> to view invoices and save or download your receipts.</p>
+  </div>`;
+}
+
 /** Infer email type from subject line for logging purposes */
 function inferEmailType(subject: string): string {
   const s = subject.toLowerCase();
@@ -526,6 +538,7 @@ export function buildWelcomeEmail(opts: {
         Sign In to ${bc.displayName}
       </a>
     </div>
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       If you have any questions, please contact us at
        <a href="mailto:${bc.supportEmail}" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">${bc.supportEmail}</a>.
@@ -902,6 +915,7 @@ export function buildUltrasoundAssistFreeWelcomeEmail(opts: {
         Sign In to UltrasoundAssist
       </a>
     </div>
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       Questions? Contact us at
       <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
@@ -941,6 +955,7 @@ export function buildUltrasoundAssistPremiumWelcomeEmail(opts: {
         Open UltrasoundAssist
       </a>
     </div>
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       Questions? Contact us at
       <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.
@@ -1039,6 +1054,7 @@ export function buildFunnelPurchaseConfirmationEmail(opts: {
       If the button is not visible or does not work, use this direct access link:<br />
       <a href="${opts.loginUrl}" style="color:${bc.primaryColor};font-weight:700;word-break:break-word;" target="_blank" rel="noopener noreferrer">Access your purchase</a>
     </p>
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.5;">
       Questions? Contact us at
       <a href="mailto:support@allaboutultrasound.com" style="color:${brandColor};" target="_blank" rel="noopener noreferrer">support@allaboutultrasound.com</a>.

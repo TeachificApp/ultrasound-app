@@ -25,7 +25,7 @@ import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
 import { fulfillOrderBumpPurchase } from "../lib/orderBumpCheckout";
 import { fulfillBookvaultOrder } from "../lib/fulfillBookvaultOrder";
 import { fulfillPrintfulOrder } from "../lib/fulfillPrintfulOrder";
-import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail, emailWrapper } from "../_core/email";
+import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildPaymentFailedEmail, dashboardBillingAndReceiptNotice, emailWrapper } from "../_core/email";
 import { generateAutoLoginToken } from "../routes/autoLogin";
 import { buildPersistentAccessUrl, sendBundleAccessEmail, sendPurchaseAccessEmail } from "../lib/enrollmentEmail";
 import { sendPurchaseNotificationOnce } from "../lib/purchaseNotificationDelivery";
@@ -1319,7 +1319,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
             <p style="margin:8px 0 0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
           </div>`
         : "";
-      const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
+      const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}${dashboardBillingAndReceiptNotice()}</body>`);
       await _sendEmail({
         to: { name: customerName || firstName, email: customerEmail },
         subject: `Your ${brandLabel} Premium Membership is ready`,
@@ -1362,6 +1362,7 @@ export async function handleBrandMembershipCheckoutCompleted(session: Record<str
           <p style="margin:0 0 8px;font-size:13px;color:#475569;">Click below to access your content \u2014 no password needed:</p>
           <p style="margin:0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
         </div>
+        ${dashboardBillingAndReceiptNotice()}
         <p style="margin:16px 0 0;font-size:13px;color:#64748b;">If you have any questions, reply to this email or contact support.</p>
       `, brandMode);
       await sendEmail({
@@ -1597,7 +1598,7 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
             <p style="margin:8px 0 0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
           </div>`
         : "";
-      const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}</body>`);
+      const enhancedBody = emailContent.htmlBody.replace("</body>", `${accessNote}${dashboardBillingAndReceiptNotice()}</body>`);
       await _sendEmail({
         to: { name: customerName || firstName, email: customerEmail },
         subject: `Your ${planLabel} is ready`,
@@ -1638,6 +1639,7 @@ export async function handleDualMembershipCheckoutCompleted(session: Record<stri
           <p style="margin:0 0 8px;font-size:13px;color:#475569;">Click below to access your content \u2014 no password needed:</p>
           <p style="margin:0;"><a href="${accessUrl}" style="color:#0d9488;font-weight:600;">${accessUrl}</a></p>
         </div>
+        ${dashboardBillingAndReceiptNotice()}
         <p style="margin:16px 0 0;font-size:13px;color:#64748b;">If you have any questions, reply to this email or contact support.</p>
       `, "aaus");
       await sendEmail({

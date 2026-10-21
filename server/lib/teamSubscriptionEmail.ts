@@ -1,4 +1,4 @@
-import { emailWrapper } from "../_core/email";
+import { dashboardBillingAndReceiptNotice, emailWrapper } from "../_core/email";
 
 export type TeamSubscriptionEmailInput = {
   recipientName: string;
@@ -36,6 +36,7 @@ export function renderTeamSubscriptionConfirmationEmail(input: TeamSubscriptionE
     <p>Head to your team dashboard to invite members and manage seats:</p>
     <p style="margin:20px 0;"><a href="${input.dashboardUrl}" style="background:#0d9488;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Manage Team →</a></p>
     <p style="color:#64748b;font-size:13px;">Each member you invite will receive an email with a link to activate their access.</p>
+    ${dashboardBillingAndReceiptNotice()}
   `);
   return { subject, htmlBody };
 }

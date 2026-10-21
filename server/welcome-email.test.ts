@@ -69,23 +69,22 @@ describe("buildWelcomeEmail", () => {
     expect(result.htmlBody).not.toContain("unknown_role");
   });
 
-  it("includes the All About Ultrasound™ brand logo in the email header", () => {
+  it("includes the current All About Ultrasound™ brand logo in the email header", () => {
     const result = buildWelcomeEmail({
       firstName: "Jane",
       loginUrl: "https://app.iheartecho.com/login",
       roles: [],
     });
-    // The circular logo CDN URL should be present
-    expect(result.htmlBody).toContain("aaus_logo_ring_01cc7ccd.webp");
+    expect(result.htmlBody).toContain("sono-ring4_orig.png");
   });
 
-  it("includes the circular logo with border-radius:50%", () => {
+  it("includes explicit dimensions for the email-safe header logo", () => {
     const result = buildWelcomeEmail({
       firstName: "Jane",
       loginUrl: "https://app.iheartecho.com/login",
       roles: [],
     });
-    expect(result.htmlBody).toContain("border-radius:50%");
+    expect(result.htmlBody).toContain('width="76" height="76"');
   });
 
   it("includes the All About Ultrasound™ copyright in the footer", () => {
@@ -113,6 +112,19 @@ describe("buildWelcomeEmail", () => {
       roles: [],
     });
     expect(result.htmlBody).toContain("Sign In to All About Ultrasound™");
+  });
+
+  it("explains where signed-in users manage billing, subscriptions, and downloadable receipts", () => {
+    const result = buildWelcomeEmail({
+      firstName: "Jane",
+      loginUrl: "https://app.iheartecho.com/login",
+      roles: [],
+    });
+    expect(result.htmlBody).toContain("Billing, subscriptions &amp; receipts");
+    expect(result.htmlBody).toContain("My Dashboard");
+    expect(result.htmlBody).toContain("Subscriptions");
+    expect(result.htmlBody).toContain("Purchases");
+    expect(result.htmlBody).toContain("save or download your receipts");
   });
 
   it("handles diy_admin role label correctly", () => {

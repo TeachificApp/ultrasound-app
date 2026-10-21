@@ -10,6 +10,7 @@
 
 import {
   buildTransactionalEmailCta,
+  dashboardBillingAndReceiptNotice,
   emailWrapper as transactionalEmailWrapper,
   sendEmail,
 } from "../_core/email";
@@ -168,6 +169,7 @@ export async function renderEnrollmentEmail(opts: EnrollmentEmailOptions): Promi
       </ul>
     </div>
     ${accessCtaWithFallback(courseUrl, "Start Learning Now")}
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
       If you have any questions, reply to this email or visit our help center.
     </p>
@@ -307,6 +309,7 @@ export async function renderDownloadAccessEmail(opts: DownloadAccessEmailOptions
       </ul>
     </div>
     ${accessCtaWithFallback(filesUrl, "Access Your Files")}
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
       If you have any questions, reply to this email or visit our help center.
     </p>
@@ -377,6 +380,7 @@ export async function renderBundleAccessEmail(opts: BundleAccessEmailOptions): P
       </ul>
     </div>
     ${accessCtaWithFallback(bundleUrl, "Access Your Bundle")}
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
       If you have any questions, reply to this email or visit our help center.
     </p>
@@ -448,6 +452,7 @@ export async function renderQuizAccessEmail(opts: QuizAccessEmailOptions): Promi
       </ul>
     </div>
     ${accessCtaWithFallback(appUrl, opts.courseSlug ? "Start Quiz Now" : "Access My Quiz")}
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">
       If you have any questions, reply to this email or visit our help center.
     </p>
@@ -499,6 +504,7 @@ export async function renderPurchaseAccessEmail(opts: PurchaseAccessEmailOptions
     ${opts.detailsHtml ?? ""}
     ${passwordSetupCta(opts.setPasswordUrl)}
     ${accessCtaWithFallback(accessUrl, opts.accessLabel)}
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:0;font-size:13px;color:#94a3b8;text-align:center;">If you have questions, reply to this email or contact support.</p>
   `, opts.brandMode ?? "combined");
   return { subject: opts.subject, htmlBody };

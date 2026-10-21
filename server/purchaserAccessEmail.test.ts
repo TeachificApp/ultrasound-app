@@ -11,6 +11,7 @@ vi.mock("./lib/ensureTransactionalEmailDelivery", () => ({
 
 import { buildFunnelPurchaseConfirmationEmail, buildTransactionalEmailCta, sendEmail } from "./_core/email";
 import { sendEnrollmentEmail, sendPurchaseAccessEmail } from "./lib/enrollmentEmail";
+import { renderNewBrandMembershipAccessEmail } from "./lib/brandMembershipPurchaseEmail";
 
 describe("purchaser access email CTA", () => {
   const accessUrl = "https://learn.allaboutultrasound.com/api/auth/auto-login?token=test-token";
@@ -53,6 +54,8 @@ describe("purchaser access email CTA", () => {
     expect(payload?.htmlBody).toContain('bgcolor="#0b8fa8"');
     expect(payload?.htmlBody).toContain(`href="${courseUrl}"`);
     expect(payload?.htmlBody).toContain("If the button is not visible or does not work");
+    expect(payload?.htmlBody).toContain("Billing, subscriptions &amp; receipts");
+    expect(payload?.htmlBody).toContain("save or download your receipts");
   });
 
   it("keeps iHeartEcho course access and combined Learn email identity on the iHeartEcho domain", async () => {
@@ -88,5 +91,23 @@ describe("purchaser access email CTA", () => {
     expect(payload?.brandMode).toBe("combined");
     expect(payload?.htmlBody).toContain("View Workshop Details");
     expect(payload?.htmlBody).toContain("learn.iheartecho.com/auth/access?token=workshop-token");
+    expect(payload?.htmlBody).toContain("Billing, subscriptions &amp; receipts");
+    expect(payload?.htmlBody).toContain("Subscriptions");
+    expect(payload?.htmlBody).toContain("Purchases");
+  });
+
+  it("includes dashboard billing, subscription, and receipt guidance in a new app membership welcome", () => {
+    const email = renderNewBrandMembershipAccessEmail({
+      firstName: "App Learner",
+      brand: "iheartecho",
+      accessUrl: "https://app.iheartecho.com/my-dashboard",
+      setPasswordUrl: "https://app.iheartecho.com/reset-password?token=sample",
+      isLifetime: false,
+      isTrial: false,
+    });
+
+    expect(email.htmlBody).toContain("Billing, subscriptions &amp; receipts");
+    expect(email.htmlBody).toContain("My Dashboard");
+    expect(email.htmlBody).toContain("save or download your receipts");
   });
 });

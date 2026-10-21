@@ -1,4 +1,4 @@
-import { buildPasswordResetEmail, emailWrapper } from "../_core/email";
+import { buildPasswordResetEmail, dashboardBillingAndReceiptNotice, emailWrapper } from "../_core/email";
 import { getBrandDisplayConfig } from "@shared/brands";
 import { TRANSACTIONAL_EMAIL_DEEP_TEAL, TRANSACTIONAL_EMAIL_TEAL, TRANSACTIONAL_EMAIL_TINT } from "../../shared/transactionalEmailPalette";
 
@@ -37,7 +37,7 @@ export function renderNewBrandMembershipAccessEmail(input: {
   </div>`;
   return {
     subject: `Your ${brandLabel} Premium Membership is ready`,
-    htmlBody: emailContent.htmlBody.replace("</body>", `${accessNote}</body>`),
+    htmlBody: emailContent.htmlBody.replace("</body>", `${accessNote}${dashboardBillingAndReceiptNotice()}</body>`),
     previewText: `Access your ${brandLabel} premium membership on ${getBrandDisplayConfig(brandMode).shortName}`,
   };
 }
@@ -59,6 +59,7 @@ export function renderExistingBrandMembershipAccessEmail(input: {
       <p style="margin:0 0 8px;font-size:13px;color:#475569;">Click below to access your content — no password needed:</p>
       <p style="margin:0;"><a href="${input.accessUrl}" style="color:${TRANSACTIONAL_EMAIL_TEAL};font-weight:600;">${input.accessUrl}</a></p>
     </div>
+    ${dashboardBillingAndReceiptNotice()}
     <p style="margin:16px 0 0;font-size:13px;color:#64748b;">If you have any questions, reply to this email or contact support.</p>
   `, brandMode);
   return {
