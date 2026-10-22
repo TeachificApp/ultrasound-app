@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isEnrollmentAccessActive, hasCourseEnrollmentAccess } from "./lib/enrollmentAccess";
+import { isCmeCreditRestrictedForCourse, isEnrollmentAccessActive, hasCourseEnrollmentAccess } from "./lib/enrollmentAccess";
 
 describe("enrollmentAccess", () => {
   it("treats enrollment without expiry as active", () => {
@@ -12,6 +12,20 @@ describe("enrollmentAccess", () => {
       accessExpiresAt: null,
     };
     expect(isEnrollmentAccessActive(cmeEnrollment)).toBe(true);
+  });
+
+  it("applies CME credit restriction only to the enrollment's own course", () => {
+    const restrictedCourseEnrollment = {
+      id: 81,
+      userId: 14,
+      courseId: 101,
+      enrollmentType: "full",
+      cmeCreditRestricted: true,
+    };
+
+    expect(isCmeCreditRestrictedForCourse(restrictedCourseEnrollment, 101)).toBe(true);
+    expect(isCmeCreditRestrictedForCourse(restrictedCourseEnrollment, 202)).toBe(false);
+    expect(isCmeCreditRestrictedForCourse({ ...restrictedCourseEnrollment, courseId: 202, cmeCreditRestricted: false }, 202)).toBe(false);
   });
 
   it("treats future expiry as active", () => {

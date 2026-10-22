@@ -43,4 +43,24 @@ describe("course overview and player lesson tree", () => {
     expect(overview).toContain("const postPurchaseLessons = allLessons.filter(isVisibleAfterPurchase)");
     expect(overview).toContain("getFirstLessonVisibleAfterPurchase(postPurchaseLessons)");
   });
+
+  it("keys CME-restricted lesson filtering to the active course enrollment", () => {
+    const router = fs.readFileSync(
+      path.resolve(process.cwd(), "server/routers/lmsRouter.ts"),
+      "utf8",
+    );
+    expect(router).toContain("isCmeCreditRestrictedForCourse(enrollment, course.id)");
+    expect(router).toContain("isCmeCreditRestrictedForCourse(enrollmentAccess, course.id)");
+    expect(router).not.toContain("Boolean(enrollment?.cmeCreditRestricted)");
+  });
+
+  it("resets the Member Hub CME restriction choice when a different product is selected", () => {
+    const memberHub = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/pages/admin/AdminUserDetailPage.tsx"),
+      "utf8",
+    );
+    expect(memberHub).toContain("setSelectedCourseId(value);");
+    expect(memberHub).toContain("setEnrollCmeCreditRestricted(false);");
+    expect(memberHub).toContain("Other course enrollments are unaffected.");
+  });
 });

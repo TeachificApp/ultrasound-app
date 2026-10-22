@@ -1724,7 +1724,11 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                 onChange={(e) => setCourseSearch(e.target.value)}
                 className="mb-1"
               />
-              <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+              <Select value={selectedCourseId} onValueChange={(value) => {
+                setSelectedCourseId(value);
+                // The restriction is scoped to the selected course enrollment.
+                setEnrollCmeCreditRestricted(false);
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a product...">
                     {selectedCourseId
@@ -1779,7 +1783,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
               return courseHasCertificate ? (
                 <label className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
                   <input type="checkbox" checked={enrollCmeCreditRestricted} onChange={(event) => setEnrollCmeCreditRestricted(event.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-600" />
-                  <span><span className="font-semibold">Restrict CME credit for this learner</span><span className="mt-0.5 block text-xs text-amber-800">Course access remains active; CME credit and certificates are withheld for this learner only.</span></span>
+                  <span><span className="font-semibold">Restrict CME credit for this course</span><span className="mt-0.5 block text-xs text-amber-800">Course access remains active; CME credit and certificates are withheld only for this selected course enrollment. Other course enrollments are unaffected.</span></span>
                 </label>
               ) : null;
             })()}

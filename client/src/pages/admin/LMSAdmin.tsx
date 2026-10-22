@@ -5642,7 +5642,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
           {courseData?.hasCertificate && (
             <label className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
               <input type="checkbox" checked={hideForCmeRestricted} onChange={(event) => { setHideForCmeRestricted(event.target.checked); setIsDirty(true); }} className="mt-0.5 h-4 w-4 accent-amber-600" />
-              <span><span className="font-semibold">Hide for individually CME-credit-restricted learners</span><span className="mt-0.5 block text-xs text-amber-800">This does not change course access for anyone else. It applies only to learners whose CME credit is restricted in the Students tab.</span></span>
+              <span><span className="font-semibold">Hide for individually CME-credit-restricted learners</span><span className="mt-0.5 block text-xs text-amber-800">This does not change course access for anyone else. It applies only to learners restricted from CME credit in this course’s Students tab.</span></span>
             </label>
           )}
 
@@ -10702,7 +10702,7 @@ function EnrollStudentDialog({ open, courseId, cohortGroups = [], defaultGroupId
         {courseHasCertificate && (
           <label className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
             <input type="checkbox" checked={cmeCreditRestricted} onChange={(event) => setCmeCreditRestricted(event.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-600" />
-            <span><span className="font-semibold">Restrict CME credit for this learner</span><span className="mt-0.5 block text-xs text-amber-800">They retain course access, but cannot receive CME credit or a certificate. Lessons marked for restricted CME learners are also hidden only for this learner.</span></span>
+            <span><span className="font-semibold">Restrict CME credit for this course enrollment</span><span className="mt-0.5 block text-xs text-amber-800">They retain access to this course, but cannot receive CME credit or a certificate for this course only. Other course enrollments are unaffected.</span></span>
           </label>
         )}
 

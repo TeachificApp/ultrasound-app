@@ -53,7 +53,7 @@ import { loadLinkedLessonMediaAsset } from "../lib/mediaAssetCourseAccess";
 import { loadPublishedCourseLessonTree } from "../lib/courseLessonTree";
 import { daysSinceEnrollment, isLessonDripOutExpired } from "../lib/lessonDripAccess";
 import { maybeRefreshLearnerLmsAccessFromStripe } from "../lib/learnerLmsAccessRefresh";
-import { resolveEnrollmentForCourse } from "../lib/enrollmentAccess";
+import { isCmeCreditRestrictedForCourse, resolveEnrollmentForCourse } from "../lib/enrollmentAccess";
 import { extractJson, parseLandingBlocks } from "../lib/extractJson";
 import { countRenderedWords, extendFullLessonDraft, fullLessonWordsRemaining, isCompleteFullLesson, MIN_FULL_LESSON_WORDS, TARGET_FULL_LESSON_WORDS } from "../lib/lessonContentGeneration";
 import {
@@ -2234,7 +2234,7 @@ export const lmsLearnerRouter = router({
       // Fetch sections + lessons via section join (includes section-owned rows with null course_id)
       const lessonTree = await loadPublishedCourseLessonTree(db as any, course.id, {
         hideEmptySections: !isAdminPreview,
-        excludeCmeRestrictedLessons: Boolean(enrollment?.cmeCreditRestricted) && !isAdminPreview,
+        excludeCmeRestrictedLessons: isCmeCreditRestrictedForCourse(enrollment, course.id) && !isAdminPreview,
       });
       const allCourseLessons = lessonTree.allLessons;
       const toSidebarLesson = (lesson: (typeof allCourseLessons)[number]) => {
@@ -2376,7 +2376,7 @@ export const lmsLearnerRouter = router({
           previewMode: pm,
           hasActiveEnrollment: Boolean(enrollment),
           enrollmentType: enrollment?.enrollmentType,
-          cmeCreditRestricted: enrollment?.cmeCreditRestricted,
+          cmeCreditRestricted: isCmeCreditRestrictedForCourse(enrollment, resolvedCourseId),
           hideForCmeRestricted: lesson.hideForCmeRestricted,
         });
         if (!accessDecision.allowed) {
@@ -2483,7 +2483,7 @@ export const lmsLearnerRouter = router({
       }
       if (lessonCourseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (!input.isAdminPreview && enrollment.cmeCreditRestricted && lesson.hideForCmeRestricted) {
+      if (!input.isAdminPreview && isCmeCreditRestrictedForCourse(enrollment, course.id) && lesson.hideForCmeRestricted) {
         throw new TRPCError({ code: "FORBIDDEN", message: "This lesson is unavailable because CME access is restricted for this enrollment." });
       }
 
@@ -2548,7 +2548,7 @@ export const lmsLearnerRouter = router({
       }
       if (lessonCourseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
       const enrollmentWithRestriction = await resolveEnrollmentForCourse(db as any, ctx.user.id, course.id);
-      if (enrollmentWithRestriction?.cmeCreditRestricted && lesson.hideForCmeRestricted) {
+      if (isCmeCreditRestrictedForCourse(enrollmentWithRestriction, course.id) && lesson.hideForCmeRestricted) {
         throw new TRPCError({ code: "FORBIDDEN", message: "This lesson is unavailable because CME access is restricted for this enrollment." });
       }
       const fileName = input.fileName?.trim() || lesson.title || `Lesson file #${lesson.id}`;
@@ -2610,7 +2610,7 @@ export const lmsLearnerRouter = router({
       }
       if (lessonCourseId !== course.id) throw new TRPCError({ code: "NOT_FOUND" });
 
-      if (!input.isAdminPreview && enrollment.cmeCreditRestricted && lesson.hideForCmeRestricted) {
+      if (!input.isAdminPreview && isCmeCreditRestrictedForCourse(enrollment, course.id) && lesson.hideForCmeRestricted) {
         throw new TRPCError({ code: "FORBIDDEN", message: "This lesson is unavailable because CME access is restricted for this enrollment." });
       }
 
@@ -4079,7 +4079,7 @@ export const lmsLearnerRouter = router({
       .orderBy(desc(lmsCertificates.issuedAt));
     const visible = await Promise.all(certs.map(async (cert) => {
       const enrollment = await resolveEnrollmentForCourse(db as any, ctx.user.id, cert.courseId);
-      return enrollment?.cmeCreditRestricted ? null : cert;
+      return isCmeCreditRestrictedForCourse(enrollment, cert.courseId) ? null : cert;
     }));
     return visible.filter((cert): cert is NonNullable<typeof cert> => cert !== null);
   }),
@@ -4097,7 +4097,7 @@ export const lmsLearnerRouter = router({
       }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) return null;
       const enrollment = await resolveEnrollmentForCourse(db as any, ctx.user.id, course.id);
-      if (enrollment?.cmeCreditRestricted) return null;
+      if (isCmeCreditRestrictedForCourse(enrollment, course.id)) return null;
       let [cert] = await db.select().from(lmsCertificates)
         .where(and(eq(lmsCertificates.userId, ctx.user.id), eq(lmsCertificates.courseId, course.id))).limit(1);
 
@@ -4134,7 +4134,7 @@ export const lmsLearnerRouter = router({
       }).from(lmsCourses).where(eq(lmsCourses.slug, input.courseSlug)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND" });
       const enrollment = await resolveEnrollmentForCourse(db as any, ctx.user.id, course.id);
-      if (enrollment?.cmeCreditRestricted) {
+      if (isCmeCreditRestrictedForCourse(enrollment, course.id)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "CME credit is restricted for this enrollment." });
       }
 
@@ -4404,7 +4404,7 @@ export const lmsLearnerRouter = router({
 
       const lessonTree = await loadPublishedCourseLessonTree(db as any, course.id, {
         hideEmptySections: !isAdminPreview,
-        excludeCmeRestrictedLessons: Boolean(enrollment?.cmeCreditRestricted) && !isAdminPreview,
+        excludeCmeRestrictedLessons: isCmeCreditRestrictedForCourse(enrollmentAccess, course.id) && !isAdminPreview,
       });
       const allLessons = lessonTree.allLessons;
       const toOverviewLesson = (lesson: (typeof allLessons)[number]) => {

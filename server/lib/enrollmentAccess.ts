@@ -25,6 +25,18 @@ export type EnrollmentRow = {
   cmeCreditRestricted?: boolean | null;
 };
 
+/**
+ * CME credit restrictions are tied to a single enrollment record, never to the
+ * learner account. Require the active course ID at every consumer boundary so
+ * a restriction on one course cannot affect another course's access or credit.
+ */
+export function isCmeCreditRestrictedForCourse(
+  enrollment: Pick<EnrollmentRow, "courseId" | "cmeCreditRestricted"> | null | undefined,
+  courseId: number,
+): boolean {
+  return enrollment?.courseId === courseId && enrollment.cmeCreditRestricted === true;
+}
+
 const enrollmentSelect = {
   id: lmsEnrollments.id,
   userId: lmsEnrollments.userId,
