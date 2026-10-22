@@ -2603,7 +2603,14 @@ export default function CoursePlayer() {
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="relative flex flex-1 overflow-hidden">
+        {data?.enrollment?.cmeCreditRestricted && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 mx-auto w-full max-w-4xl px-4 pt-3">
+            <div className="pointer-events-auto rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
+              <strong>CME credit restricted:</strong> You retain access to this course, but CME credit and a certificate are not available for this enrollment.
+            </div>
+          </div>
+        )}
         <CertificateDialog
           open={showCertDialog}
           onClose={() => setShowCertDialog(false)}

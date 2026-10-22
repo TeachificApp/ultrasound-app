@@ -4,6 +4,7 @@ export type CmeLearnerReport = {
   enrolledAt: Date | string | null;
   completedAt: Date | string | null;
   progressPct: number;
+  cmeCreditRestricted?: boolean;
   certificateIssuedAt: Date | string | null;
   quizAttempts: Array<{
     kind: "standard" | "inline";
@@ -36,7 +37,7 @@ function escapeCsv(value: unknown): string {
 export function buildCmeActivityCsv(report: CmeActivityReportForCsv): string {
   const headers = [
     "CME Activity", "Course ID", "Credit Hours", "Learner Name", "Learner Email",
-    "Enrollment Date", "Completion Date", "Completion Progress (%)", "Certificate Issued", "Certificate Issued Date",
+    "Enrollment Date", "Completion Date", "Completion Progress (%)", "CME Credit Restricted", "Certificate Issued", "Certificate Issued Date",
     "Quiz Type", "Lesson", "Quiz Score (%)", "Quiz Passed", "Quiz Submitted Date",
     "Survey Question", "Survey Response Type", "Survey Response",
   ];
@@ -46,7 +47,7 @@ export function buildCmeActivityCsv(report: CmeActivityReportForCsv): string {
     const base = [
       report.activityTitle, report.courseId, report.creditHours ?? "", learner.learnerName, learner.learnerEmail,
       toIso(learner.enrolledAt), toIso(learner.completedAt), learner.progressPct,
-      learner.certificateIssuedAt ? "Yes" : "No", toIso(learner.certificateIssuedAt),
+      learner.cmeCreditRestricted ? "Yes" : "No", learner.certificateIssuedAt ? "Yes" : "No", toIso(learner.certificateIssuedAt),
     ];
     const attempts = learner.quizAttempts.length > 0 ? learner.quizAttempts : [null];
     attempts.forEach(attempt => {

@@ -22,6 +22,7 @@ export type EnrollmentRow = {
   enrolledAt?: Date;
   completedAt?: Date | null;
   progressPct?: number | null;
+  cmeCreditRestricted?: boolean | null;
 };
 
 const enrollmentSelect = {
@@ -33,6 +34,7 @@ const enrollmentSelect = {
   enrolledAt: lmsEnrollments.enrolledAt,
   completedAt: lmsEnrollments.completedAt,
   progressPct: lmsEnrollments.progressPct,
+  cmeCreditRestricted: lmsEnrollments.cmeCreditRestricted,
 };
 
 /** True when the learner finished the course (certificate / review access). */
@@ -105,6 +107,7 @@ export async function resolveEnrollmentByCourseSlug(
       enrolledAt: lmsEnrollments.enrolledAt,
       completedAt: lmsEnrollments.completedAt,
       progressPct: lmsEnrollments.progressPct,
+      cmeCreditRestricted: lmsEnrollments.cmeCreditRestricted,
     })
     .from(lmsEnrollments)
     .innerJoin(lmsCourses, eq(lmsCourses.id, lmsEnrollments.courseId))

@@ -138,17 +138,21 @@ export async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enro
   // 3. Exclude lessons explicitly marked as not counting toward completion
   let totalCount = 0;
   const excludeHiddenPreview = sql`(${lmsLessons.previewMode} != 'preview_hide_after_purchase' OR ${lmsLessons.previewMode} IS NULL) AND ${lmsLessons.lessonStatus} = 'published' AND ${lmsLessons.countTowardCompletion} = 1`;
+  const excludeCmeRestrictedLessons = enrollRow.cmeCreditRestricted
+    ? eq(lmsLessons.hideForCmeRestricted, false)
+    : undefined;
   if (sectionIds.length > 0) {
     const [totalRows] = await db.select({ count: sql<number>`count(*)` }).from(lmsLessons).where(
       and(
         sql`(${lmsLessons.courseId} = ${courseId} OR ${lmsLessons.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)}))`,
-        excludeHiddenPreview
+        excludeHiddenPreview,
+        excludeCmeRestrictedLessons
       )
     );
     totalCount = Number(totalRows?.count ?? 0);
   } else {
     const [totalRows] = await db.select({ count: sql<number>`count(*)` }).from(lmsLessons).where(
-      and(eq(lmsLessons.courseId, courseId), excludeHiddenPreview)
+      and(eq(lmsLessons.courseId, courseId), excludeHiddenPreview, excludeCmeRestrictedLessons)
     );
     totalCount = Number(totalRows?.count ?? 0);
   }
@@ -172,9 +176,10 @@ export async function recalcProgress(db: Awaited<ReturnType<typeof getDb>>, enro
       sectionIds.length > 0
         ? and(
             sql`(${lmsLessons.courseId} = ${courseId} OR ${lmsLessons.sectionId} IN (${sql.join(sectionIds.map(id => sql`${id}`), sql`, `)}))`,
-            excludeHiddenPreview
+            excludeHiddenPreview,
+            excludeCmeRestrictedLessons
           )
-        : and(eq(lmsLessons.courseId, courseId), excludeHiddenPreview)
+        : and(eq(lmsLessons.courseId, courseId), excludeHiddenPreview, excludeCmeRestrictedLessons)
     );
   const countableIdSet = countableIds.map(r => r.id);
   const completedRows = countableIdSet.length > 0
@@ -270,12 +275,20 @@ export async function issueCertificateIfEnabled(
 
   if (!db) return;
 
+  const [enroll] = await db.select({
+    completedAt: lmsEnrollments.completedAt,
+    cmeCreditRestricted: lmsEnrollments.cmeCreditRestricted,
+  })
+    .from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollmentId)).limit(1);
+  // This restriction is intentionally never bypassed, including for an
+  // administrator-triggered reissue. Access remains active; only CME credit
+  // and certificates are withheld for this individual enrollment.
+  if (enroll?.cmeCreditRestricted) return;
+
   // Enforce completion cutoff: skip certificate for enrollments completed before CERT_CUTOFF_DATE.
   // Only explicit admin manual re-issue (adminBypass=true) bypasses this guard.
   // Automatic reissue triggered by course settings changes does NOT bypass it.
   if (!adminBypass && !completedCmeRecovery) {
-    const [enroll] = await db.select({ completedAt: lmsEnrollments.completedAt })
-      .from(lmsEnrollments).where(eq(lmsEnrollments.id, enrollmentId)).limit(1);
     if (enroll?.completedAt && new Date(enroll.completedAt) < CERT_CUTOFF_DATE) {
       console.log(`[certificate] Skipping cert for enrollment ${enrollmentId} — completedAt ${new Date(enroll.completedAt).toISOString()} is before cutoff ${CERT_CUTOFF_DATE.toISOString()}`);
       return;

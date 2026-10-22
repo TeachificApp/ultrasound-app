@@ -36,7 +36,7 @@ describe("CME course player video gate", () => {
   });
 
   it("persists opened state for initial and auto-advanced lessons so normal CME progression survives refresh", () => {
-    expect(coursePlayer).toContain("A lesson can be selected from the initial course route");
+    expect(coursePlayer).toContain("trpc.lmsLearner.recordLessonOpened.useMutation");
     expect(coursePlayer).toContain("recordLessonOpened.mutate({");
     expect(coursePlayer).toContain("setTimeout(() => handleLessonSelect(nextLesson.id), navDelay)");
   });

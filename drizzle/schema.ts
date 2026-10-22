@@ -3241,6 +3241,8 @@ export const lmsLessons = mysqlTable("lms_lessons", {
   //   'preview'                     = free preview, always visible to non-enrolled users
   //   'preview_hide_after_purchase' = free preview for non-enrolled, hidden once user purchases
   previewMode: mysqlEnum("preview_mode", ["none", "preview", "preview_hide_after_purchase"]).default("none").notNull(),
+  /** When enabled on a CME course, hide this lesson only from learners restricted from CME credit. */
+  hideForCmeRestricted: boolean("hide_for_cme_restricted").default(false).notNull(),
   dripDays: int("drip_days").default(0).notNull(), // days after enrollment to unlock
   dripDate: timestamp("drip_date"), // explicit UTC unlock date; takes precedence over dripDays
   dripOutDays: int("drip_out_days"), // days after enrollment after which lesson expires (null = never expires)
@@ -3411,6 +3413,8 @@ export const lmsEnrollments = mysqlTable("lms_enrollments", {
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 128 }),
   /** Timestamp when the Stripe subscription first went past_due — used for the 3-day grace period */
   paymentFailedAt: timestamp("payment_failed_at"),
+  /** Individual administrative restriction: retain course access but do not award CME credit or certificates. */
+  cmeCreditRestricted: boolean("cme_credit_restricted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({
   /** Prevent duplicate enrollments for the same user+course (webhook double-fire guard) */

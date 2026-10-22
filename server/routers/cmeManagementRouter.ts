@@ -156,6 +156,7 @@ async function getCmeActivityReport(courseId: number, options: CmeActivityReport
     enrolledAt: lmsEnrollments.enrolledAt,
     completedAt: lmsEnrollments.completedAt,
     progressPct: lmsEnrollments.progressPct,
+    cmeCreditRestricted: lmsEnrollments.cmeCreditRestricted,
     userName: users.name,
     firstName: users.firstName,
     lastName: users.lastName,
@@ -241,6 +242,7 @@ async function getCmeActivityReport(courseId: number, options: CmeActivityReport
       enrolledAt: enrollment.enrolledAt,
       completedAt: enrollment.completedAt ?? completionByEnrollment.get(enrollment.enrollmentId) ?? null,
       progressPct: enrollment.progressPct,
+      cmeCreditRestricted: Boolean(enrollment.cmeCreditRestricted),
       certificateIssuedAt: certificateByUser.get(enrollment.userId) ?? null,
       quizAttempts: [
         ...(standardByUser.get(enrollment.userId) ?? []).map(attempt => ({

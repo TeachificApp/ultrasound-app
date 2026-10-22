@@ -1814,7 +1814,7 @@ function CourseEditor({ courseId, onBack, onTypeChangedToWorkshop }: { courseId:
 
         {/* Students Tab */}
         <TabsContent value="users" className="mt-4">
-          <CourseUsersTab courseId={courseId} courseType={course.type} />
+          <CourseUsersTab courseId={courseId} courseType={course.type} courseHasCertificate={!!course.hasCertificate} />
         </TabsContent>
 
         {/* Analytics Tab */}
@@ -5237,6 +5237,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
   const [previewMode, setPreviewMode] = useState<"none" | "preview" | "preview_hide_after_purchase">(
     (lesson as any).previewMode ?? (lesson.isPreview ? "preview" : "none")
   );
+  const [hideForCmeRestricted, setHideForCmeRestricted] = useState<boolean>(!!(lesson as any).hideForCmeRestricted);
   const [durationMinutes, setDurationMinutes] = useState(String(lesson.durationMinutes ?? ""));
     const [requireVideoCompletion, setRequireVideoCompletion] = useState(lesson.requireVideoCompletion === 1);
   // null = inherit from course default, true = always show, false = always hide
@@ -5272,6 +5273,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
     setVideoContent(lessonShallow.videoContent ?? "");
     setEmbedUrl(lessonShallow.embedUrl ?? "");
     setPreviewMode((lessonShallow as any).previewMode ?? (lessonShallow.isPreview ? "preview" : "none"));
+    setHideForCmeRestricted(!!(lessonShallow as any).hideForCmeRestricted);
     setDurationMinutes(String(lessonShallow.durationMinutes ?? ""));
     setRequireVideoCompletion(lessonShallow.requireVideoCompletion === 1);
     setRequireManualComplete(
@@ -5311,6 +5313,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       );
       setIsPrerequisite(!!(fullLesson as any).isPrerequisite);
       setPreviewMode((fullLesson as any).previewMode ?? (fullLesson.isPreview ? "preview" : "none"));
+      setHideForCmeRestricted(!!(fullLesson as any).hideForCmeRestricted);
       setDurationMinutes(String(fullLesson.durationMinutes ?? ""));
       setDripDays(String(fullLesson.dripDays ?? ""));
       setDripDate((fullLesson as any).dripDate ? new Date(new Date((fullLesson as any).dripDate).getTime() - new Date((fullLesson as any).dripDate).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
@@ -5363,6 +5366,7 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
       title: title.trim(),
       type: lessonType,
       previewMode,
+      hideForCmeRestricted: hideForCmeRestricted,
       durationMinutes: durationMinutes ? parseInt(durationMinutes) : null,
       // Auto-enable requireVideoCompletion when lesson is a prerequisite gate (video lessons only)
       requireVideoCompletion: (isPrerequisite && (lessonType === "video" || lessonType === "video_text")) ? true : requireVideoCompletion,
@@ -5635,6 +5639,12 @@ function LessonEditorPage({ lesson: lessonShallow, onClose, onSaved, onSavedAndC
             )}
           </div>
 
+          {courseData?.hasCertificate && (
+            <label className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <input type="checkbox" checked={hideForCmeRestricted} onChange={(event) => { setHideForCmeRestricted(event.target.checked); setIsDirty(true); }} className="mt-0.5 h-4 w-4 accent-amber-600" />
+              <span><span className="font-semibold">Hide for individually CME-credit-restricted learners</span><span className="mt-0.5 block text-xs text-amber-800">This does not change course access for anyone else. It applies only to learners whose CME credit is restricted in the Students tab.</span></span>
+            </label>
+          )}
 
                     {/* Mark Complete override — 3-state: inherit / show / hide */}
           <div className="space-y-1">
@@ -10207,7 +10217,7 @@ function CollectionFormDialog({
 
 // ─── Course Users Tab ─────────────────────────────────────────────────────────
 
-function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType?: string }) {
+function CourseUsersTab({ courseId, courseType, courseHasCertificate = false }: { courseId: number; courseType?: string; courseHasCertificate?: boolean }) {
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -10227,6 +10237,13 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
     onError: e => toast.error(e.message),
   });
   const [certTarget, setCertTarget] = useState<{ enrollmentId: number; name: string; hasCert: boolean } | null>(null);
+  const setCmeCreditRestriction = trpc.lmsAdmin.setCmeCreditRestriction.useMutation({
+    onSuccess: (result) => {
+      toast.success(result.cmeCreditRestricted ? "CME credit restricted for this learner." : "CME credit restored for this learner.");
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const manualIssueCertificate = trpc.lmsEnrollmentAdmin.manualIssueCertificate.useMutation({
     onSuccess: (result) => {
       if (result.alreadyExisted) {
@@ -10289,6 +10306,11 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
                             <Eye className="w-2.5 h-2.5" /> Preview
                           </span>
                         )}
+                        {courseHasCertificate && e.cmeCreditRestricted && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+                            CME credit restricted
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-gray-400">{e.user?.email ?? "—"}</p>
                     </div>
@@ -10340,14 +10362,27 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
                           <ExternalLink className="w-3.5 h-3.5" />
                         </Button>
                       )}
-                      <Button
-                        size="sm" variant="ghost"
-                        className="h-7 w-7 p-0 text-amber-500 hover:bg-amber-50 hover:text-amber-700"
-                        title="Issue / re-issue certificate"
-                        onClick={() => setCertTarget({ enrollmentId: e.id, name: e.user?.displayName || e.user?.name || e.user?.email || "this student", hasCert: !!e.certificateIssuedAt })}
-                      >
-                        <Award className="w-3.5 h-3.5" />
-                      </Button>
+                      {courseHasCertificate && (
+                        <Button
+                          size="sm" variant="ghost"
+                          className={`h-7 px-1.5 text-[10px] font-semibold ${e.cmeCreditRestricted ? "text-emerald-700 hover:bg-emerald-50" : "text-amber-700 hover:bg-amber-50"}`}
+                          title={e.cmeCreditRestricted ? "Restore CME credit eligibility" : "Restrict CME credit for this learner"}
+                          onClick={() => setCmeCreditRestriction.mutate({ enrollmentId: e.id, cmeCreditRestricted: !e.cmeCreditRestricted })}
+                          disabled={setCmeCreditRestriction.isPending}
+                        >
+                          {e.cmeCreditRestricted ? "Restore CME" : "Restrict CME"}
+                        </Button>
+                      )}
+                      {courseHasCertificate && !e.cmeCreditRestricted && (
+                        <Button
+                          size="sm" variant="ghost"
+                          className="h-7 w-7 p-0 text-amber-500 hover:bg-amber-50 hover:text-amber-700"
+                          title="Issue / re-issue certificate"
+                          onClick={() => setCertTarget({ enrollmentId: e.id, name: e.user?.displayName || e.user?.name || e.user?.email || "this student", hasCert: !!e.certificateIssuedAt })}
+                        >
+                          <Award className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                       <Button
                         size="sm" variant="ghost"
                         className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
@@ -10384,6 +10419,7 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
         open={enrollDialogOpen}
         courseId={courseId}
         cohortGroups={courseType === "cohort" ? (cohortGroupsForEnroll as any[]) : []}
+        courseHasCertificate={courseHasCertificate}
         onClose={() => setEnrollDialogOpen(false)}
         onEnrolled={() => { setEnrollDialogOpen(false); refetch(); }}
       />
@@ -10468,7 +10504,7 @@ function CourseUsersTab({ courseId, courseType }: { courseId: number; courseType
   );
 }
 
-function EnrollStudentDialog({ open, courseId, cohortGroups = [], defaultGroupId, lockGroupSelection = false, onClose, onEnrolled }: { open: boolean; courseId: number; cohortGroups?: any[]; defaultGroupId?: number; lockGroupSelection?: boolean; onClose: () => void; onEnrolled: () => void }) {
+function EnrollStudentDialog({ open, courseId, cohortGroups = [], defaultGroupId, lockGroupSelection = false, courseHasCertificate = false, onClose, onEnrolled }: { open: boolean; courseId: number; cohortGroups?: any[]; defaultGroupId?: number; lockGroupSelection?: boolean; courseHasCertificate?: boolean; onClose: () => void; onEnrolled: () => void }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -10478,6 +10514,7 @@ function EnrollStudentDialog({ open, courseId, cohortGroups = [], defaultGroupId
   const [newUserEmail, setNewUserEmail] = useState("");
   // Cohort group selection
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const [cmeCreditRestricted, setCmeCreditRestricted] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 400);
@@ -10539,12 +10576,12 @@ function EnrollStudentDialog({ open, courseId, cohortGroups = [], defaultGroupId
 
   const handleEnroll = () => {
     if (!selectedUser) return;
-    addEnrollment.mutate({ userId: selectedUser.id, courseId });
+    addEnrollment.mutate({ userId: selectedUser.id, courseId, cmeCreditRestricted });
   };
 
   const handleCreateAndEnroll = () => {
     if (!newUserName.trim() || !newUserEmail.trim()) return;
-    createAndEnroll.mutate({ courseId, name: newUserName.trim(), email: newUserEmail.trim() });
+    createAndEnroll.mutate({ courseId, name: newUserName.trim(), email: newUserEmail.trim(), cmeCreditRestricted });
   };
 
   const handleClose = () => {
@@ -10555,6 +10592,7 @@ function EnrollStudentDialog({ open, courseId, cohortGroups = [], defaultGroupId
     setNewUserName("");
     setNewUserEmail("");
     setSelectedGroupId("");
+    setCmeCreditRestricted(false);
     onClose();
   };
 
@@ -10659,6 +10697,13 @@ function EnrollStudentDialog({ open, courseId, cohortGroups = [], defaultGroupId
               If an account already exists with this email, the existing user will be enrolled instead of creating a duplicate. The user can sign in via OAuth using the same email.
             </p>
           </div>
+        )}
+
+        {courseHasCertificate && (
+          <label className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <input type="checkbox" checked={cmeCreditRestricted} onChange={(event) => setCmeCreditRestricted(event.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-600" />
+            <span><span className="font-semibold">Restrict CME credit for this learner</span><span className="mt-0.5 block text-xs text-amber-800">They retain course access, but cannot receive CME credit or a certificate. Lessons marked for restricted CME learners are also hidden only for this learner.</span></span>
+          </label>
         )}
 
         {/* Cohort group picker — shown when cohortGroups are available */}

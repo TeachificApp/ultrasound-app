@@ -317,10 +317,10 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-6">
       {/* Avatar + info card with Edit button */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <div className="flex items-start gap-5">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
           {user.avatarUrl ? (
             <img src={user.avatarUrl} alt="Avatar" className="w-20 h-20 rounded-full object-cover border-4 border-[#189aa1]/20 shadow flex-shrink-0" />
           ) : (
@@ -329,14 +329,14 @@ function ProfileTab({ userId, data, refetch }: { userId: number; data: any; refe
               {(user.displayName ?? user.name ?? "?").charAt(0).toUpperCase()}
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
                 <h2 className="text-xl font-bold text-gray-800">{user.displayName ?? user.name ?? "—"}</h2>
                 <p className="text-sm text-gray-500">{user.email}</p>
                 <p className="text-xs text-gray-400 mt-0.5">Member since {formatDate(user.createdAt)}</p>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-5">
                 <Button size="sm" variant="outline" onClick={handleEditOpen} className="gap-1.5 text-teal-700 border-teal-200 hover:bg-teal-50">
                   <Edit3 className="w-3.5 h-3.5" /> Edit Profile
                 </Button>
@@ -742,6 +742,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
   const [enrollAmountCents, setEnrollAmountCents] = useState("");
   const [enrollNote, setEnrollNote] = useState("");
   const [enrollExpiresAt, setEnrollExpiresAt] = useState("");
+  const [enrollCmeCreditRestricted, setEnrollCmeCreditRestricted] = useState(false);
   const [unenrollConfirm, setUnenrollConfirm] = useState<number | null>(null);
   const [cancelEnrollSubConfirm, setCancelEnrollSubConfirm] = useState<{ enrollmentId: number; title: string } | null>(null);
   const [removeAccessNowConfirm, setRemoveAccessNowConfirm] = useState<{ enrollmentId: number; title: string } | null>(null);
@@ -771,6 +772,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
       setEnrollAmountCents("");
       setEnrollNote("");
       setEnrollExpiresAt("");
+      setEnrollCmeCreditRestricted(false);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -1704,7 +1706,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
         setEnrollOpen(open);
         if (!open) {
           setSelectedCourseId(""); setCourseSearch(""); setEnrollPaymentMode("free");
-          setEnrollStripePI(""); setEnrollCardToken(""); setEnrollAmountCents(""); setEnrollNote(""); setEnrollExpiresAt("");
+          setEnrollStripePI(""); setEnrollCardToken(""); setEnrollAmountCents(""); setEnrollNote(""); setEnrollExpiresAt(""); setEnrollCmeCreditRestricted(false);
         }
       }}>
         <DialogContent className="max-w-lg">
@@ -1769,6 +1771,18 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                 </SelectContent>
               </Select>
             </div>
+
+            {(() => {
+              const [selectedType, selectedId] = selectedCourseId.split(":");
+              const selectedProduct = (allCourses ?? []).find((item: any) => String(item.id) === selectedId && (item.productType ?? item.type) === selectedType);
+              const courseHasCertificate = (selectedProduct as { hasCertificate?: boolean } | undefined)?.hasCertificate === true;
+              return courseHasCertificate ? (
+                <label className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+                  <input type="checkbox" checked={enrollCmeCreditRestricted} onChange={(event) => setEnrollCmeCreditRestricted(event.target.checked)} className="mt-0.5 h-4 w-4 accent-amber-600" />
+                  <span><span className="font-semibold">Restrict CME credit for this learner</span><span className="mt-0.5 block text-xs text-amber-800">Course access remains active; CME credit and certificates are withheld for this learner only.</span></span>
+                </label>
+              ) : null;
+            })()}
 
             {/* Payment mode */}
             <div className="space-y-1.5">
@@ -1882,6 +1896,7 @@ function ContentTab({ userId, data, refetch }: { userId: number; data: any; refe
                   amountCents: enrollPaymentMode === "charge" ? amountCents : undefined,
                   note: enrollNote || undefined,
                   expiresAt: enrollExpiresAt ? new Date(enrollExpiresAt).toISOString() : null,
+                  cmeCreditRestricted: enrollCmeCreditRestricted,
                 });
               }}
               disabled={enroll.isPending || !selectedCourseId ||

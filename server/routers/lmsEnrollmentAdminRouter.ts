@@ -202,14 +202,21 @@ export const lmsEnrollmentAdminRouter = router({
     }),
 
   addEnrollment: protectedProcedure
-    .input(z.object({ userId: z.number(), courseId: z.number() }))
+    .input(z.object({ userId: z.number(), courseId: z.number(), cmeCreditRestricted: z.boolean().optional().default(false) }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [courseForRestriction] = await db.select({ hasCertificate: lmsCourses.hasCertificate }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (input.cmeCreditRestricted && !courseForRestriction?.hasCertificate) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "CME credit can only be restricted on a CME-enabled course." });
+      }
       const [existing] = await db.select().from(lmsEnrollments).where(and(eq(lmsEnrollments.userId, input.userId), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
-      if (existing) return { enrollmentId: existing.id, alreadyEnrolled: true };
-      const [result] = await db.insert(lmsEnrollments).values({ userId: input.userId, courseId: input.courseId }).$returningId();
+      if (existing) {
+        await db.update(lmsEnrollments).set({ cmeCreditRestricted: input.cmeCreditRestricted }).where(eq(lmsEnrollments.id, existing.id));
+        return { enrollmentId: existing.id, alreadyEnrolled: true };
+      }
+      const [result] = await db.insert(lmsEnrollments).values({ userId: input.userId, courseId: input.courseId, cmeCreditRestricted: input.cmeCreditRestricted }).$returningId();
       // Fire enrollment email asynchronously (non-blocking)
       void (async () => {
         try {
@@ -257,6 +264,20 @@ export const lmsEnrollmentAdminRouter = router({
         } catch { /* ignore */ }
       })();
       return { enrollmentId: result.id, alreadyEnrolled: false };
+    }),
+
+    setCmeCreditRestriction: protectedProcedure
+    .input(z.object({ enrollmentId: z.number().int().positive(), cmeCreditRestricted: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [enrollment] = await db.select({ courseId: lmsEnrollments.courseId }).from(lmsEnrollments).where(eq(lmsEnrollments.id, input.enrollmentId)).limit(1);
+      if (!enrollment) throw new TRPCError({ code: "NOT_FOUND", message: "Enrollment not found" });
+      const [course] = await db.select({ hasCertificate: lmsCourses.hasCertificate }).from(lmsCourses).where(eq(lmsCourses.id, enrollment.courseId)).limit(1);
+      if (!course?.hasCertificate) throw new TRPCError({ code: "BAD_REQUEST", message: "This learner is not enrolled in a CME-enabled course." });
+      await db.update(lmsEnrollments).set({ cmeCreditRestricted: input.cmeCreditRestricted }).where(eq(lmsEnrollments.id, input.enrollmentId));
+      return { success: true, cmeCreditRestricted: input.cmeCreditRestricted };
     }),
 
     removeEnrollment: protectedProcedure
@@ -1812,11 +1833,16 @@ CRITICAL REQUIREMENTS:
       courseId: z.number(),
       name: z.string().min(1).max(100),
       email: z.string().email(),
+      cmeCreditRestricted: z.boolean().optional().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       await assertAdmin(ctx);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [courseForRestriction] = await db.select({ hasCertificate: lmsCourses.hasCertificate }).from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (input.cmeCreditRestricted && !courseForRestriction?.hasCertificate) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "CME credit can only be restricted on a CME-enabled course." });
+      }
       const member = await createOrReuseAdminMember(db, input);
       const { userId, isNewUser } = member;
       if (isNewUser) {
@@ -1825,8 +1851,11 @@ CRITICAL REQUIREMENTS:
       // Enroll the user
       const [existingEnrollment] = await db.select().from(lmsEnrollments)
         .where(and(eq(lmsEnrollments.userId, userId), eq(lmsEnrollments.courseId, input.courseId))).limit(1);
-      if (existingEnrollment) return { enrollmentId: existingEnrollment.id, alreadyEnrolled: true, isNewUser, userId };
-      const [result] = await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId }).$returningId();
+      if (existingEnrollment) {
+        await db.update(lmsEnrollments).set({ cmeCreditRestricted: input.cmeCreditRestricted }).where(eq(lmsEnrollments.id, existingEnrollment.id));
+        return { enrollmentId: existingEnrollment.id, alreadyEnrolled: true, isNewUser, userId };
+      }
+      const [result] = await db.insert(lmsEnrollments).values({ userId, courseId: input.courseId, cmeCreditRestricted: input.cmeCreditRestricted }).$returningId();
       void ensureFreeMembership(userId, { db });
       // Fire enrollment email asynchronously (non-blocking)
       void (async () => {
@@ -3641,6 +3670,7 @@ CRITICAL REQUIREMENTS:
         .from(lmsCourses).where(eq(lmsCourses.id, enrollment.courseId)).limit(1);
       if (!course) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
       if (!course.hasCertificate) throw new TRPCError({ code: "BAD_REQUEST", message: "This course does not have certificates enabled" });
+      if (enrollment.cmeCreditRestricted) throw new TRPCError({ code: "FORBIDDEN", message: "This learner is restricted from CME credit and cannot receive a certificate." });
 
       const [existing] = await db.select({ id: lmsCertificates.id, certificateUrl: lmsCertificates.certificateUrl })
         .from(lmsCertificates)

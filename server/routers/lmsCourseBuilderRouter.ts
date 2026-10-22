@@ -1389,6 +1389,7 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
       isPreview: z.boolean().optional(),
       standaloneQuizId: z.number().int().nullable().optional(),
       previewMode: z.enum(["none", "preview", "preview_hide_after_purchase"]).optional(),
+      hideForCmeRestricted: z.boolean().optional(),
       dripDays: z.number().int().nullable().optional(),
       dripDate: z.string().datetime().nullable().optional(),
       dripOutDays: z.number().int().min(1).nullable().optional(),
@@ -1445,6 +1446,23 @@ ${courseUrl ? `<p>Course URL: <a href="${courseUrl}">${courseUrl}</a></p>` : ""}
         updates.isPreview = updates.previewMode !== "none";
       } else if (updates.isPreview !== undefined) {
         updates.previewMode = updates.isPreview ? "preview" : "none";
+      }
+      // This individualized visibility rule is meaningful only for CME-enabled courses.
+      if (input.hideForCmeRestricted === true) {
+        const [lessonForCme] = await db.select({ courseId: lmsLessons.courseId, sectionId: lmsLessons.sectionId })
+          .from(lmsLessons).where(eq(lmsLessons.id, id)).limit(1);
+        let cmeCourseId = lessonForCme?.courseId ?? null;
+        if (!cmeCourseId && lessonForCme?.sectionId) {
+          const [sectionForCme] = await db.select({ courseId: lmsSections.courseId })
+            .from(lmsSections).where(eq(lmsSections.id, lessonForCme.sectionId)).limit(1);
+          cmeCourseId = sectionForCme?.courseId ?? null;
+        }
+        const [cmeCourse] = cmeCourseId
+          ? await db.select({ hasCertificate: lmsCourses.hasCertificate }).from(lmsCourses).where(eq(lmsCourses.id, cmeCourseId)).limit(1)
+          : [];
+        if (!cmeCourse?.hasCertificate) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Individual CME learner visibility is available only for CME-enabled courses." });
+        }
       }
       if (Object.keys(updates).length > 0) await db.update(lmsLessons).set(updates as any).where(eq(lmsLessons.id, id));
 

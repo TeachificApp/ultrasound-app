@@ -41,4 +41,18 @@ describe("buildCmeActivityCsv", () => {
     expect(csv).toContain('"Pending Learner"');
     expect(csv).toContain('"No"');
   });
+
+  it("makes a learner-specific CME credit restriction auditable in the export", () => {
+    const csv = buildCmeActivityCsv({
+      activityTitle: "CME", courseId: 2, creditHours: "1",
+      learners: [{
+        learnerName: "Restricted Learner", learnerEmail: "restricted@example.org",
+        enrolledAt: null, completedAt: null, progressPct: 20,
+        cmeCreditRestricted: true, certificateIssuedAt: null, quizAttempts: [],
+      }],
+    });
+    expect(csv).toContain('"CME Credit Restricted"');
+    expect(csv).toContain('"Restricted Learner"');
+    expect(csv).toContain('"Yes"');
+  });
 });

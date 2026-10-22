@@ -72,13 +72,15 @@ export function groupCourseLessonsBySection(
 export async function loadPublishedCourseLessonTree(
   db: MySql2Database<typeof schema>,
   courseId: number,
-  options?: { hideEmptySections?: boolean },
+  options?: { hideEmptySections?: boolean; excludeCmeRestrictedLessons?: boolean },
 ): Promise<CourseLessonTree> {
   const sections = await db
     .select()
     .from(lmsSections)
     .where(eq(lmsSections.courseId, courseId))
     .orderBy(asc(lmsSections.position));
-  const lessons = await fetchPublishedCourseLessons(db, courseId);
+  const lessons = (await fetchPublishedCourseLessons(db, courseId)).filter((lesson) => (
+    !options?.excludeCmeRestrictedLessons || !lesson.hideForCmeRestricted
+  ));
   return groupCourseLessonsBySection(sections, lessons, options);
 }

@@ -7,6 +7,7 @@ import { Router, type Request, type Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { sdk } from "../_core/sdk";
 import { getDb } from "../db";
+import { resolveEnrollmentForCourse } from "../lib/enrollmentAccess";
 import { ensureFreeMembership } from "../lib/ensureFreeMembership";
 import {
   digitalProductFiles,
@@ -187,6 +188,12 @@ router.get(
         .limit(1);
       if (!course) {
         res.status(404).json({ error: "Course not found" });
+        return;
+      }
+
+      const enrollment = await resolveEnrollmentForCourse(db as any, user.id, course.id);
+      if (enrollment?.cmeCreditRestricted) {
+        res.status(403).json({ error: "CME credit is restricted for this enrollment" });
         return;
       }
 

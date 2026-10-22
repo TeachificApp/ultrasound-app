@@ -14,4 +14,15 @@ describe("protected course lesson access", () => {
     expect(getCourseLessonAccessDecision({ previewMode: "none", hasActiveEnrollment: false })).toMatchObject({ allowed: false, reason: "enrollment_required" });
     expect(getCourseLessonAccessDecision({ previewMode: "none", hasActiveEnrollment: true, enrollmentType: "free_preview" })).toMatchObject({ allowed: false, reason: "full_enrollment_required" });
   });
+
+  it("hides only configured CME lessons for a learner whose CME credit is restricted", () => {
+    expect(getCourseLessonAccessDecision({
+      previewMode: "none", hasActiveEnrollment: true, enrollmentType: "full",
+      cmeCreditRestricted: true, hideForCmeRestricted: true,
+    })).toEqual({ allowed: false, reason: "cme_restricted_lesson" });
+    expect(getCourseLessonAccessDecision({
+      previewMode: "none", hasActiveEnrollment: true, enrollmentType: "full",
+      cmeCreditRestricted: true, hideForCmeRestricted: false,
+    })).toEqual({ allowed: true, reason: null });
+  });
 });

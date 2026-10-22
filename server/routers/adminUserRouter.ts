@@ -948,7 +948,7 @@ export const adminUserRouter = router({
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
     const [lmsRows, dpRows, dbRows, bundleRows, mpRows, webinarRows, communityRows] = await Promise.all([
-      db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, status: lmsCourses.status })
+      db.select({ id: lmsCourses.id, title: lmsCourses.title, slug: lmsCourses.slug, type: lmsCourses.type, status: lmsCourses.status, hasCertificate: lmsCourses.hasCertificate })
         .from(lmsCourses).orderBy(lmsCourses.title),
       db.select({ id: digitalProducts.id, title: digitalProducts.title, slug: digitalProducts.slug, status: digitalProducts.status })
         .from(digitalProducts).orderBy(digitalProducts.title),
@@ -1014,6 +1014,8 @@ export const adminUserRouter = router({
       note: z.string().optional(),
       /** Optional access expiry date (ISO string). Null = never expires. */
       expiresAt: z.string().datetime().optional().nullable(),
+      /** Individual CME restriction is accepted only for a CME-enabled LMS course. */
+      cmeCreditRestricted: z.boolean().optional().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       const accessScope = await assertAdmin(ctx);
@@ -1112,6 +1114,12 @@ export const adminUserRouter = router({
       }
 
       // ── LMS enrollment (create or upgrade) ────────────────────────────────
+      const [courseForRestriction] = await db.select({ hasCertificate: lmsCourses.hasCertificate })
+        .from(lmsCourses).where(eq(lmsCourses.id, input.courseId)).limit(1);
+      if (!courseForRestriction) throw new TRPCError({ code: "NOT_FOUND", message: "Course not found" });
+      if (input.cmeCreditRestricted && !courseForRestriction.hasCertificate) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "CME credit can only be restricted on a CME-enabled course." });
+      }
       const [existing] = await db
         .select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
         .from(lmsEnrollments)
@@ -1126,18 +1134,18 @@ export const adminUserRouter = router({
       if (existing) {
         if (existing.enrollmentType === "free_preview") {
           await db.update(lmsEnrollments)
-            .set({ enrollmentType: "full", ...(lmsExpiresAt ? { accessExpiresAt: lmsExpiresAt } : {}) })
+            .set({ enrollmentType: "full", cmeCreditRestricted: input.cmeCreditRestricted, ...(lmsExpiresAt ? { accessExpiresAt: lmsExpiresAt } : {}) })
             .where(eq(lmsEnrollments.id, existing.id));
           enrollmentId = existing.id;
         } else {
           enrollmentId = existing.id;
           alreadyEnrolled = true;
-          if (lmsExpiresAt) await db.update(lmsEnrollments).set({ accessExpiresAt: lmsExpiresAt }).where(eq(lmsEnrollments.id, existing.id));
+          await db.update(lmsEnrollments).set({ cmeCreditRestricted: input.cmeCreditRestricted, ...(lmsExpiresAt ? { accessExpiresAt: lmsExpiresAt } : {}) }).where(eq(lmsEnrollments.id, existing.id));
         }
       } else {
         const [result] = await db
           .insert(lmsEnrollments)
-          .values({ userId: input.userId, courseId: input.courseId, enrollmentType: "full", ...(lmsExpiresAt ? { accessExpiresAt: lmsExpiresAt } : {}) })
+          .values({ userId: input.userId, courseId: input.courseId, enrollmentType: "full", cmeCreditRestricted: input.cmeCreditRestricted, ...(lmsExpiresAt ? { accessExpiresAt: lmsExpiresAt } : {}) })
           .$returningId();
         enrollmentId = result.id;
       }
