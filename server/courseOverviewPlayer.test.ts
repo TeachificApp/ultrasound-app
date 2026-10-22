@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  filterCourseLessonsForLearner,
+  groupCourseLessonsBySection,
+} from "./lib/courseLessonTree";
 
 describe("course overview and player lesson tree", () => {
   it("loads published lessons through a shared section join helper", () => {
@@ -42,6 +46,42 @@ describe("course overview and player lesson tree", () => {
     );
     expect(overview).toContain("const postPurchaseLessons = allLessons.filter(isVisibleAfterPurchase)");
     expect(overview).toContain("getFirstLessonVisibleAfterPurchase(postPurchaseLessons)");
+  });
+
+  it("filters preview-only lessons before sections are numbered, removing an empty preview module", () => {
+    const helper = fs.readFileSync(
+      path.resolve(process.cwd(), "server/lib/courseLessonTree.ts"),
+      "utf8",
+    );
+    const router = fs.readFileSync(
+      path.resolve(process.cwd(), "server/routers/lmsRouter.ts"),
+      "utf8",
+    );
+    const player = fs.readFileSync(
+      path.resolve(process.cwd(), "client/src/pages/CoursePlayer.tsx"),
+      "utf8",
+    );
+    expect(helper).toContain("excludePreviewOnlyAfterPurchase");
+    expect(helper).toContain("!isVisibleAfterPurchase(lesson)");
+    expect(router).toContain('enrollment?.enrollmentType === "full"');
+    expect(router).toContain('enrollmentAccess?.enrollmentType === "full"');
+    expect(player).toContain(".filter((section: any) => section.lessons.length > 0)");
+  });
+
+  it("removes an empty free-preview module from a full learner's curriculum tree", () => {
+    const sections = [{ id: 10, title: "Free sample" }, { id: 20, title: "Coursework" }] as any[];
+    const lessons = [
+      { id: 1, sectionId: 10, previewMode: "preview_hide_after_purchase" },
+      { id: 2, sectionId: 20, previewMode: "none" },
+    ] as any[];
+
+    const learnerLessons = filterCourseLessonsForLearner(lessons, {
+      excludePreviewOnlyAfterPurchase: true,
+    });
+    const tree = groupCourseLessonsBySection(sections, learnerLessons, { hideEmptySections: true });
+
+    expect(tree.sections.map((section) => section.id)).toEqual([20]);
+    expect(tree.allLessons.map((lesson) => lesson.id)).toEqual([2]);
   });
 
   it("keys CME-restricted lesson filtering to the active course enrollment", () => {

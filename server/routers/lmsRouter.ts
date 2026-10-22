@@ -2235,6 +2235,9 @@ export const lmsLearnerRouter = router({
       const lessonTree = await loadPublishedCourseLessonTree(db as any, course.id, {
         hideEmptySections: !isAdminPreview,
         excludeCmeRestrictedLessons: isCmeCreditRestrictedForCourse(enrollment, course.id) && !isAdminPreview,
+        // A full enrollment replaces the free preview. Filter these lessons before
+        // sections are numbered so an emptied preview module cannot remain visible.
+        excludePreviewOnlyAfterPurchase: enrollment?.enrollmentType === "full" && !isAdminPreview,
       });
       const allCourseLessons = lessonTree.allLessons;
       const toSidebarLesson = (lesson: (typeof allCourseLessons)[number]) => {
@@ -4405,6 +4408,7 @@ export const lmsLearnerRouter = router({
       const lessonTree = await loadPublishedCourseLessonTree(db as any, course.id, {
         hideEmptySections: !isAdminPreview,
         excludeCmeRestrictedLessons: isCmeCreditRestrictedForCourse(enrollmentAccess, course.id) && !isAdminPreview,
+        excludePreviewOnlyAfterPurchase: enrollmentAccess?.enrollmentType === "full" && !isAdminPreview,
       });
       const allLessons = lessonTree.allLessons;
       const toOverviewLesson = (lesson: (typeof allLessons)[number]) => {

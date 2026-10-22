@@ -27,6 +27,7 @@ import {
   User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { formatCmeCreditPhrase } from "@shared/cmeCreditLabel";
+import { isVisibleAfterPurchase } from "@shared/coursePreviewEligibility";
 import { hasReachedCmeVideoCompletionThreshold, shouldAutoCompleteCmeLessonOnAdvance, isCertificateCourse } from "../../../shared/cmeLessonCompletion";
 import { lessonHasRequiredInlineQuiz } from "../../../shared/inlineLessonQuizCompletion";
 import { buildPrereqLockedIds } from "../../../shared/lessonAccessGating";
@@ -1624,19 +1625,14 @@ function MobileSidebarContent({
   slug: string; course: any; prereqLockedIds: Set<number>; lbl: Record<string, string>;
 }) {
   const [collapsedSections, setCollapsedSections] = useState<Set<number>>(new Set());
-  const topLevelLessons = (data?.topLevelLessons ?? []).filter((l: any) => {
-    if (!data?.enrollment) return true;
-    const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
-    return pm !== "preview_hide_after_purchase";
-  });
+  const hidePreviewOnlyAfterPurchase = data?.enrollment?.enrollmentType === "full" && !data?.isAdminPreview;
+  const topLevelLessons = (data?.topLevelLessons ?? []).filter((lesson: any) => (
+    !hidePreviewOnlyAfterPurchase || isVisibleAfterPurchase(lesson)
+  ));
   const sections = (data?.sections ?? []).map((s: any) => ({
     ...s,
-    lessons: s.lessons.filter((l: any) => {
-      if (!data?.enrollment) return true;
-      const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
-      return pm !== "preview_hide_after_purchase";
-    }),
-  }));
+    lessons: s.lessons.filter((lesson: any) => !hidePreviewOnlyAfterPurchase || isVisibleAfterPurchase(lesson)),
+  })).filter((section: any) => section.lessons.length > 0);
   const enrollment = data?.enrollment;
   const enrolledAt = enrollment?.enrolledAt ? new Date(enrollment.enrolledAt) : new Date();
   const daysSinceEnroll = Math.floor((Date.now() - enrolledAt.getTime()) / 86400000);
@@ -2237,15 +2233,13 @@ export default function CoursePlayer() {
       </main>
     );
   }
-  // Filter out preview_hide_after_purchase lessons for enrolled students
+  // The server returns the authoritative learner curriculum. Keep this local
+  // safeguard for a previously cached response while pruning emptied modules.
+  const hidePreviewOnlyAfterPurchase = data.enrollment?.enrollmentType === "full" && !data.isAdminPreview;
   const sections: any[] = (data.sections ?? []).map((s: any) => ({
     ...s,
-    lessons: s.lessons.filter((l: any) => {
-      if (!data.enrollment) return true;
-      const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
-      return pm !== "preview_hide_after_purchase";
-    }),
-  }));
+    lessons: s.lessons.filter((lesson: any) => !hidePreviewOnlyAfterPurchase || isVisibleAfterPurchase(lesson)),
+  })).filter((section: any) => section.lessons.length > 0);
   // ── Course Color Scheme ──────────────────────────────────────────────────────
   const primaryColor = course.primaryColor ?? "#0d9488";
   const accentColor = course.accentColor ?? "#0f766e";
@@ -2274,11 +2268,9 @@ export default function CoursePlayer() {
     submitQuiz: (_cl.submitQuiz as string) || "Submit Quiz",
   };
   const progress = data.progress ?? [];
-  const topLevelLessons: any[] = ((data as any).topLevelLessons ?? []).filter((l: any) => {
-    if (!data.enrollment) return true;
-    const pm = l.previewMode ?? (l.isPreview ? "preview" : "none");
-    return pm !== "preview_hide_after_purchase";
-  });
+  const topLevelLessons: any[] = ((data as any).topLevelLessons ?? []).filter((lesson: any) => (
+    !hidePreviewOnlyAfterPurchase || isVisibleAfterPurchase(lesson)
+  ));
   const completedIds = new Set([...progress.filter((p: any) => p.completedAt).map((p: any) => p.lessonId), ...optimisticCompleted]);
   const bookmarkedIds = new Set((bookmarksData ?? []).map((b: any) => b.lessonId));
   const notesByLesson = new Map((notesData ?? []).map((n: any) => [n.lessonId, n]));

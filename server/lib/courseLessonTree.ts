@@ -6,6 +6,7 @@ import { and, asc, eq, or } from "drizzle-orm";
 import type { MySql2Database } from "drizzle-orm/mysql2";
 import type * as schema from "../../drizzle/schema";
 import { lmsLessons, lmsSections } from "../../drizzle/schema";
+import { isVisibleAfterPurchase } from "../../shared/coursePreviewEligibility";
 
 export type CourseLessonTreeLesson = typeof lmsLessons.$inferSelect;
 
@@ -17,6 +18,13 @@ export type CourseLessonTree = {
   sections: CourseLessonTreeSection[];
   topLevelLessons: CourseLessonTreeLesson[];
   allLessons: CourseLessonTreeLesson[];
+};
+
+export type CourseLessonTreeOptions = {
+  hideEmptySections?: boolean;
+  excludeCmeRestrictedLessons?: boolean;
+  /** Omit free-preview-only lessons after a learner has full course access. */
+  excludePreviewOnlyAfterPurchase?: boolean;
 };
 
 /** Published lessons belonging to a course (direct or via section). */
@@ -39,10 +47,22 @@ export async function fetchPublishedCourseLessons(
   return rows.map((row) => row.lesson);
 }
 
+/** Apply learner-specific curriculum visibility before module grouping/counting. */
+export function filterCourseLessonsForLearner(
+  lessons: CourseLessonTreeLesson[],
+  options?: CourseLessonTreeOptions,
+): CourseLessonTreeLesson[] {
+  return lessons.filter((lesson) => {
+    if (options?.excludeCmeRestrictedLessons && lesson.hideForCmeRestricted) return false;
+    if (options?.excludePreviewOnlyAfterPurchase && !isVisibleAfterPurchase(lesson)) return false;
+    return true;
+  });
+}
+
 export function groupCourseLessonsBySection(
   sections: typeof lmsSections.$inferSelect[],
   lessons: CourseLessonTreeLesson[],
-  options?: { hideEmptySections?: boolean },
+  options?: CourseLessonTreeOptions,
 ): CourseLessonTree {
   const lessonsBySectionId = new Map<number, CourseLessonTreeLesson[]>();
   const topLevelLessons: CourseLessonTreeLesson[] = [];
@@ -72,15 +92,16 @@ export function groupCourseLessonsBySection(
 export async function loadPublishedCourseLessonTree(
   db: MySql2Database<typeof schema>,
   courseId: number,
-  options?: { hideEmptySections?: boolean; excludeCmeRestrictedLessons?: boolean },
+  options?: CourseLessonTreeOptions,
 ): Promise<CourseLessonTree> {
   const sections = await db
     .select()
     .from(lmsSections)
     .where(eq(lmsSections.courseId, courseId))
     .orderBy(asc(lmsSections.position));
-  const lessons = (await fetchPublishedCourseLessons(db, courseId)).filter((lesson) => (
-    !options?.excludeCmeRestrictedLessons || !lesson.hideForCmeRestricted
-  ));
+  const lessons = filterCourseLessonsForLearner(
+    await fetchPublishedCourseLessons(db, courseId),
+    options,
+  );
   return groupCourseLessonsBySection(sections, lessons, options);
 }

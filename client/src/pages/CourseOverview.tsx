@@ -313,8 +313,9 @@ export default function CourseOverview() {
   };
 
   const renderLessonRow = (lesson: any, section?: any) => {
-    // Hide "preview_hide_after_purchase" lessons for enrolled users
-    if (!isVisibleAfterPurchase(lesson)) return null;
+    // The server removes preview-only lessons for full enrollments before
+    // grouping modules. Free-preview enrollments retain those lessons.
+    if (data?.enrollment?.enrollmentType === "full" && !isVisibleAfterPurchase(lesson)) return null;
     const done = completedIds.has(lesson.id);
     const dripLocked = isDripLocked(lesson, section);
     const prereqLocked = isPrereqLocked(lesson);
