@@ -1150,6 +1150,20 @@ async function startServer() {
     console.error("[Startup] ensureSsoTokenSessionSchema error:", err);
   }
 
+  // Railway can run the current learner-access code before the additive CME
+  // restriction columns are present. Reconcile them before an enrollment query
+  // can fail and be surfaced to a paid learner as a missing enrollment.
+  try {
+    const db = await getDb();
+    const { ensureCmeLearnerRestrictionsSchema } = await import("../lib/ensureCmeLearnerRestrictionsSchema");
+    const result = await ensureCmeLearnerRestrictionsSchema(db);
+    if (result.errors.length > 0 || result.missingAfter.length > 0) {
+      console.error("[Startup] ensureCmeLearnerRestrictionsSchema incomplete:", result);
+    }
+  } catch (err) {
+    console.error("[Startup] ensureCmeLearnerRestrictionsSchema error:", err);
+  }
+
   // Railway can lag the additive 0066 IP-location migration. Reconcile the
   // operational log fields before a learner access request can write a row.
   try {

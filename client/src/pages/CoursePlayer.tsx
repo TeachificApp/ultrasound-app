@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  Award, BookOpen, Bookmark, BookmarkCheck, CalendarDays, CheckCircle, ChevronLeft, ChevronRight,
+  AlertTriangle, Award, BookOpen, Bookmark, BookmarkCheck, CalendarDays, CheckCircle, ChevronLeft, ChevronRight,
   Download, Eye, FileText, HelpCircle, Lock, Loader2, Menu, Maximize2, Minimize2, Monitor, PlayCircle, StickyNote, X,
   User, ListChecks, ChevronDown, ChevronUp,
 } from "lucide-react";
@@ -1866,7 +1866,7 @@ export default function CoursePlayer() {
     navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`, { replace: true });
   }, [authLoading, navigate, user]);
 
-  const { data, isLoading } = trpc.lmsLearner.getCoursePlayer.useQuery(
+  const { data, isLoading, isError: coursePlayerError, refetch: refetchCoursePlayer } = trpc.lmsLearner.getCoursePlayer.useQuery(
     { slug: slug!, preview: isPreviewMode || adminPreviewStudent || isAdmin },
     { enabled: !!slug && !!user }
   );
@@ -2162,6 +2162,31 @@ export default function CoursePlayer() {
   }
   if (!user) return null;
   // adminBypass is now defined above (before hooks) via useMemo
+
+  // A database or network failure must never be presented as a missing
+  // enrollment. Only a successful player response may reach the not-enrolled
+  // state below.
+  if (coursePlayerError) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-16">
+        <section role="alert" className="w-full max-w-lg rounded-2xl border border-amber-200 bg-white p-7 text-center shadow-sm">
+          <AlertTriangle className="mx-auto mb-3 h-10 w-10 text-amber-500" aria-hidden="true" />
+          <h1 className="text-lg font-semibold text-gray-900">We could not load your course access</h1>
+          <p className="mt-2 text-sm leading-6 text-gray-600">
+            Your enrollment may still be active. Please try again before assuming that access has changed.
+          </p>
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <Button className="bg-teal-600 text-white hover:bg-teal-700" onClick={() => void refetchCoursePlayer()}>
+              Try Again
+            </Button>
+            <Button variant="outline" onClick={() => navigate(STUDENT_DASHBOARD_PATH)}>
+              Return to My Dashboard
+            </Button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   // Check if course has any preview lessons — unenrolled registered users can access the player in preview mode
   const hasPreviewLessons = data ? [
