@@ -1,5 +1,5 @@
 /**
- * Unsubscribe page — one-click opt-out from platform emails.
+ * Unsubscribe page — one-click opt-out from marketing and optional reminders.
  *
  * Three flows:
  *  1. Server-side HMAC redirect (challenge cron emails):
@@ -82,8 +82,8 @@ export default function Unsubscribe() {
       ? "You have already unsubscribed from our newsletter. You will not receive any further marketing emails from All About Ultrasound™ or iHeartEcho™."
       : "You have been removed from our newsletter mailing list. You will no longer receive marketing emails from All About Ultrasound™ or iHeartEcho™."
     : alreadyDone
-      ? "You have already opted out of platform emails. You will not receive any further marketing emails from All About Ultrasound™."
-      : "You have been removed from our email list. You will no longer receive daily challenge notifications or campaign emails from All About Ultrasound™.";
+      ? "You have already opted out of promotional emails. You will not receive further campaign emails or optional Daily Challenge reminders from All About Ultrasound™."
+      : "You have been removed from promotional email lists. You will no longer receive campaign emails or optional Daily Challenge reminders from All About Ultrasound™.";
 
   return (
     <div
@@ -136,8 +136,7 @@ export default function Unsubscribe() {
                 {successBody}
               </p>
               <p className="text-xs text-gray-400 mb-6">
-                Note: You will still receive transactional emails such as password resets,
-                purchase receipts, and account notifications.
+                Your account, access, purchase, billing, receipt, and security emails remain enabled while your account is active.
               </p>
               <div className="flex flex-col gap-3">
                 <Link href="/">

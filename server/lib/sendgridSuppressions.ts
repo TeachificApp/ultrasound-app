@@ -109,8 +109,9 @@ export function isSendGridDeliveryBlocked(status: SendGridSuppressionStatus): bo
 }
 
 /**
- * Remove an address from all SendGrid suppression lists so transactional mail can deliver.
- * Use when the user explicitly requests magic-link or password-reset email.
+ * Administrative recovery utility for a deliberate, consented re-subscription.
+ * Normal transactional delivery must use provider list-management bypass instead
+ * so this function never needs to alter a member's marketing preferences.
  */
 export async function clearSendGridSuppressionLists(
   email: string,

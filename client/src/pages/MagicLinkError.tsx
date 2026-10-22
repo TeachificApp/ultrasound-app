@@ -1,10 +1,11 @@
 import { Link } from "wouter";
 import { XCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { MAGIC_LINK_VALIDITY_LABEL } from "@shared/magicLinkValidity";
 
 const REASON_MESSAGES: Record<string, string> = {
   invalid: "This sign-in link is invalid or has already been used.",
-  expired: "This sign-in link has expired. Magic links are valid for 15 minutes.",
+  expired: `This sign-in link has expired. Magic links are valid for ${MAGIC_LINK_VALIDITY_LABEL}.`,
   missing_token: "No sign-in token was found in this link.",
   db_unavailable: "Service temporarily unavailable. Please try again in a moment.",
   server_error: "An unexpected error occurred. Please try again.",

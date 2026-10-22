@@ -30,10 +30,10 @@ export interface SendEmailOptions {
   /** List-Unsubscribe header value (RFC 8058 one-click) */
   listUnsubscribeUrl?: string;
   /**
-   * Security or access email explicitly requested by the recipient (for example,
-   * a magic sign-in link). These messages must not inherit marketing-list
-   * suppression behavior.
-  */
+   * Marks a message as transactional when an unusual sender needs to override
+   * automatic classification. Outbound messages are transactional by default;
+   * a campaign ID or List-Unsubscribe header marks a message as marketing.
+   */
   transactional?: boolean;
   /** Optional file attachments */
   attachments?: EmailAttachment[];

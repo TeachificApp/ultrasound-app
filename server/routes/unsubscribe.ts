@@ -6,8 +6,9 @@
  * HMAC uses JWT_SECRET so tokens cannot be forged.
  * Tokens expire after 30 days.
  *
- * On success: sets unsubscribedAt + disables dailyChallenge in notificationPrefs,
- * then redirects to /unsubscribe?status=success (React page shows confirmation UI).
+ * On success: opts the member out of promotional campaigns and optional
+ * challenges, then redirects to /unsubscribe?status=success. Account, access,
+ * billing, receipt, and security messages remain enabled while the account exists.
  *
  * NOTE: iHeartEcho and UltrasoundAssist share the same database, so any unsubscribe
  * here is automatically respected across both apps.
@@ -18,7 +19,6 @@ import { getDb } from "../db";
 import { users } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { ENV } from "../_core/env";
-import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
 
 const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -103,13 +103,6 @@ export function registerUnsubscribeRoute(app: Express) {
       }
       prefs.dailyChallenge = false;
 
-      // Fetch email before updating (needed for SendGrid)
-      const [fullUser] = await db
-        .select({ email: users.email })
-        .from(users)
-        .where(eq(users.id, userRow.id))
-        .limit(1);
-
       await db
         .update(users)
         .set({
@@ -117,11 +110,6 @@ export function registerUnsubscribeRoute(app: Express) {
           notificationPrefs: JSON.stringify(prefs),
         })
         .where(eq(users.id, userRow.id));
-
-      // Add to SendGrid Global Unsubscribe list — blocks delivery across all apps
-      if (fullUser?.email) {
-        await addToSendGridGlobalUnsubscribes([fullUser.email]);
-      }
 
       return res.redirect(302, "/unsubscribe?status=success");
     } catch (err) {

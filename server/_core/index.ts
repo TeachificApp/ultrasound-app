@@ -47,6 +47,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { detectBrandFromHostname, detectBrandMode } from "../../shared/brands";
+import { MAGIC_LINK_VALIDITY_MS } from "../../shared/magicLinkValidity";
 import { normalizeLegacyStudentDashboardLocation } from "../../shared/studentDashboardUrls";
 import { resolveAssetUrls } from "../lib/resolveAssetUrl";
 import { startChallengeCron } from "../jobs/challengeCron";
@@ -444,7 +445,7 @@ async function startServer() {
     const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
     const deliveryPrep = await ensureTransactionalEmailDelivery(deliveryEmail);
     const token = crypto.randomBytes(48).toString("hex");
-    const expiry = new Date(Date.now() + 15 * 60 * 1000);
+    const expiry = new Date(Date.now() + MAGIC_LINK_VALIDITY_MS);
     await setMagicLinkToken(user.id, token, expiry);
     const brandMode = detectBrandMode(new URL(origin).hostname);
     const magicUrl = `${origin}/api/auth/magic-verify?token=${token}&returnTo=${encodeURIComponent("/my-dashboard")}&host=${encodeURIComponent(new URL(origin).hostname)}`;

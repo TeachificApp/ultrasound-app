@@ -41,14 +41,9 @@ vi.mock("../drizzle/schema", () => ({
   webhookEvents: {},
 }));
 
-vi.mock("./lib/sendgridSuppressions", () => ({
-  addToSendGridGlobalUnsubscribes: vi.fn().mockResolvedValue(undefined),
-}));
-
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { registerSendGridWebhook } from "./webhooks/sendgrid";
-import { addToSendGridGlobalUnsubscribes } from "./lib/sendgridSuppressions";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -141,24 +136,18 @@ describe("SendGrid Event Webhook", () => {
     expect(res.body.received).toBe(3);
   });
 
-  it("calls addToSendGridGlobalUnsubscribes for unsubscribe events after processing", async () => {
+  it("records an unsubscribe without creating a global provider suppression", async () => {
     await request(buildApp())
       .post("/api/webhooks/sendgrid")
       .set("Content-Type", "application/json")
       .send(JSON.stringify(makeEvent("unsubscribe", "test@example.com")));
 
-    // Allow async processing to complete
+    // Allow async processing to complete; future promotional sends use the
+    // local opt-out flag while required account messages stay deliverable.
     await new Promise((r) => setTimeout(r, 150));
-    expect(addToSendGridGlobalUnsubscribes).toHaveBeenCalledWith(["test@example.com"]);
-  });
-
-  it("does NOT call addToSendGridGlobalUnsubscribes for open events", async () => {
-    await request(buildApp())
-      .post("/api/webhooks/sendgrid")
-      .set("Content-Type", "application/json")
-      .send(JSON.stringify(makeEvent("open", "open@example.com")));
-
-    await new Promise((r) => setTimeout(r, 150));
-    expect(addToSendGridGlobalUnsubscribes).not.toHaveBeenCalled();
+    const webhookSource = await import("node:fs/promises").then(({ readFile }) =>
+      readFile(new URL("./webhooks/sendgrid.ts", import.meta.url), "utf8"),
+    );
+    expect(webhookSource).not.toContain("addToSendGridGlobalUnsubscribes");
   });
 });

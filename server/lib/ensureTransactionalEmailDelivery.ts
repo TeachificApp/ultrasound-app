@@ -1,7 +1,5 @@
 import {
-  clearSendGridSuppressionLists,
   getSendGridSuppressionStatus,
-  isSendGridDeliveryBlocked,
   type SendGridSuppressionStatus,
 } from "./sendgridSuppressions";
 import { isSendGridProvider } from "./email/providerConfig";
@@ -22,10 +20,10 @@ const emptySuppressionStatus = (): SendGridSuppressionStatus => ({
 });
 
 /**
- * Auth emails (magic link, password reset) must deliver even if the address was
- * previously unsubscribed or bounced. Clear SendGrid suppressions when the user
- * explicitly requests a sign-in email when SendGrid is the effective provider
- * (including SendGrid fallback when SMTP.com is preferred but not configured).
+ * Auth emails (magic link, password reset) must deliver despite a marketing
+ * opt-out. The SendGrid provider sends all non-marketing messages with
+ * list-management bypass enabled, so this probe never clears a member's
+ * promotional-email preference or provider suppression record.
  */
 export async function ensureTransactionalEmailDelivery(
   deliveryEmail: string,
@@ -36,15 +34,5 @@ export async function ensureTransactionalEmailDelivery(
   }
 
   const before = await getSendGridSuppressionStatus(deliveryEmail);
-  if (!isSendGridDeliveryBlocked(before)) {
-    return { deliveryEmail, before, cleared: false, after: before };
-  }
-
-  console.warn(
-    `[auth-email] SendGrid suppressions blocked delivery to ${deliveryEmail}:`,
-    before,
-  );
-  await clearSendGridSuppressionLists(deliveryEmail);
-  const after = await getSendGridSuppressionStatus(deliveryEmail);
-  return { deliveryEmail, before, cleared: true, after };
+  return { deliveryEmail, before, cleared: false, after: before };
 }

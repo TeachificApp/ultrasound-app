@@ -55,7 +55,6 @@ import {
 } from "../../shared/emailCampaignAudience";
 import { sendEmail } from "../_core/email";
 import { randomBytes } from "crypto";
-import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
 import { normalizeCampaignEmailHtml } from "../../shared/emailCampaignLayout";
 import { EMAIL_AUTOMATION_SCOPES, EMAIL_AUTOMATION_TRIGGER_META, EMAIL_AUTOMATION_TRIGGERS } from "../../shared/emailAutomation";
 import { isExpoAudienceListName } from "../../shared/expoEmailAudience";
@@ -696,9 +695,6 @@ Rules:
           .update(users)
           .set({ unsubscribedAt: new Date() })
           .where(eq(users.id, u.id));
-        if (u.email) {
-          await addToSendGridGlobalUnsubscribes([u.email]);
-        }
       }
       if (input.campaignId) {
         try {

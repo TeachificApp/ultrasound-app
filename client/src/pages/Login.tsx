@@ -21,6 +21,7 @@ import { isCombinedBrandingDomain, isIHeartEchoDomain, isLearnDomain, MEMBERS_AP
 import { clearSsoSessionLocks } from "@/lib/ssoSession";
 import { toast } from "sonner";
 import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
+import { MAGIC_LINK_VALIDITY_LABEL } from "@shared/magicLinkValidity";
 import { getAuthPageBrandName, getAuthPageLogoUrl } from "@/lib/authPageBrand";
 import { getOrCreateDeviceId } from "@/lib/deviceSession";
 
@@ -375,7 +376,7 @@ export default function Login() {
               <div className="inline-flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-left w-full">
                 <Zap className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-700 leading-relaxed space-y-1">
-                  {magicLinkDeliveryStatus === "sent" && <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>}
+                  {magicLinkDeliveryStatus === "sent" && <p>The link expires in <strong>{MAGIC_LINK_VALIDITY_LABEL}</strong> and can only be used once.</p>}
                   <p>Didn't request this? Someone may have entered your email by mistake — you can ignore the message.</p>
                   <p>&#128236; <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder &mdash; the email comes from <span className="font-medium">{BRAND_NAME}</span>.</p>
                 </div>
@@ -451,7 +452,7 @@ export default function Login() {
               <div className="mt-5 flex items-start gap-2 bg-[#f0fbfc] border border-[#189aa1]/20 rounded-xl px-4 py-3">
                 <Zap className="w-4 h-4 text-[#189aa1] flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-gray-600 leading-relaxed space-y-1">
-                  <p>The link expires in <strong>15 minutes</strong> and can only be used once.</p>
+                  <p>The link expires in <strong>{MAGIC_LINK_VALIDITY_LABEL}</strong> and can only be used once.</p>
                   <p>&#128236; <strong>Don't see it?</strong> Check your <strong>spam</strong> or <strong>junk</strong> folder.</p>
                 </div>
               </div>

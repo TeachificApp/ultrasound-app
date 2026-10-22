@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
+import { MAGIC_LINK_VALIDITY_LABEL } from "@shared/magicLinkValidity";
 
 const LOGO = import.meta.env.VITE_APP_LOGO as string;
 
@@ -162,7 +163,7 @@ export default function MagicLinkRequest() {
                   <div className="mt-3 inline-flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                     <Zap className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
                     <p className="text-xs text-amber-700">
-                      {deliveryStatus === "sent" ? <>The link expires in <strong>15 minutes</strong> and can only be used once.</> : <>The existing device session remains unchanged.</>}
+                      {deliveryStatus === "sent" ? <>The link expires in <strong>{MAGIC_LINK_VALIDITY_LABEL}</strong> and can only be used once.</> : <>The existing device session remains unchanged.</>}
                     </p>
                   </div>
                   <p className="text-xs text-gray-400 mt-2">

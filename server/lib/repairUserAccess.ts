@@ -2,7 +2,6 @@ import { getDb, getUserByEmail, regenerateAccessToken } from "../db";
 import { diagnoseUserAccess } from "./userAccessDiagnosis";
 import { sendEnrollmentEmailForUser } from "./enrollmentEmail";
 import { ensureTransactionalEmailDelivery } from "./ensureTransactionalEmailDelivery";
-import { clearSendGridSuppressionLists } from "./sendgridSuppressions";
 import { ensureUserOpenId } from "./ensureUserOpenId";
 
 export type RepairUserAccessResult = {
@@ -14,7 +13,7 @@ export type RepairUserAccessResult = {
   openIdFixed: boolean;
 };
 
-/** Fix login/access for a student: SendGrid suppressions, openId, access token, enrollment emails. */
+/** Fix login/access for a student without changing marketing-email preferences. */
 export async function repairUserAccess(
   email: string,
   options: { resendEnrollment?: boolean } = {},
@@ -30,7 +29,6 @@ export async function repairUserAccess(
   const user = await getUserByEmail(normalized);
   if (!user) throw new Error(`User not found: ${normalized}`);
 
-  await clearSendGridSuppressionLists(normalized);
   await ensureTransactionalEmailDelivery(normalized);
 
   const priorOpenId = user.openId;
@@ -58,7 +56,7 @@ export async function repairUserAccess(
     userId: user.id,
     accessTokenRegenerated: true,
     enrollmentEmailsSent,
-    sendGridCleared: true,
+    sendGridCleared: false,
     openIdFixed,
   };
 }

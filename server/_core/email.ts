@@ -4,6 +4,7 @@
  */
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
+import { MAGIC_LINK_VALIDITY_LABEL } from "@shared/magicLinkValidity";
 import { TRANSACTIONAL_EMAIL_AQUA, TRANSACTIONAL_EMAIL_DEEP_TEAL, TRANSACTIONAL_EMAIL_TEAL, TRANSACTIONAL_EMAIL_TINT } from "@shared/transactionalEmailPalette";
 import { getDb } from "../db";
 import { eq } from "drizzle-orm";
@@ -73,11 +74,18 @@ async function deliverSingleEmail(opts: SendEmailOptions): Promise<boolean> {
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<boolean> {
-  if (opts.purchaseAccess !== undefined) {
+  // Only campaign/list mail is marketing. Service, account, access, receipt,
+  // billing, security, and operational notices must remain deliverable even
+  // when a member opts out of promotional messages.
+  const deliveryOptions: SendEmailOptions = {
+    ...opts,
+    transactional: opts.transactional ?? !(opts.listUnsubscribeUrl || opts.campaignId),
+  };
+  if (deliveryOptions.purchaseAccess !== undefined) {
     const { deliverPurchaseAccessEmail } = await import("../lib/purchaseAccessEmailDelivery");
-    return deliverPurchaseAccessEmail(opts, deliverSingleEmail);
+    return deliverPurchaseAccessEmail(deliveryOptions, deliverSingleEmail);
   }
-  return deliverSingleEmail(opts);
+  return deliverSingleEmail(deliveryOptions);
 }
 
 // Legacy block removed — provider dispatch lives in server/lib/email/
@@ -337,7 +345,7 @@ export function buildMagicLinkEmail(opts: {
 }): { subject: string; htmlBody: string; previewText: string } {
   const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
   const subject = `Your ${bc.displayName} sign-in link`;
-  const previewText = `Click to sign in to ${bc.displayName} \u2014 link expires in 15 minutes`;
+  const previewText = `Click to sign in to ${bc.displayName} \u2014 link expires in ${MAGIC_LINK_VALIDITY_LABEL}`;
   const htmlBody = emailWrapper(`
     <h2 style="margin:0 0 8px;font-size:20px;color:${brandDark};font-family:Georgia,serif;">
       Sign in to ${bc.displayName}
@@ -353,7 +361,7 @@ export function buildMagicLinkEmail(opts: {
     </div>
     <div style="background:#fff8ed;border-left:3px solid #f59e0b;padding:12px 16px;border-radius:0 8px 8px 0;margin:0 0 20px;">
       <p style="margin:0;font-size:13px;color:#92400e;">
-        <strong>This link expires in 15 minutes</strong> and can only be used once.
+        <strong>This link expires in ${MAGIC_LINK_VALIDITY_LABEL}</strong> and can only be used once.
         If you did not request this link, you can safely ignore this email.
       </p>
     </div>

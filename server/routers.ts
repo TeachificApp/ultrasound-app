@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { COOKIE_NAME, DEMO_COOKIE_NAME, TWO_HOURS_MS } from "@shared/const";
 import { authEmailField } from "@shared/authEmailField";
+import { MAGIC_LINK_VALIDITY_MS } from "@shared/magicLinkValidity";
 import { clearSessionCookies, getSessionCookieOptions, resolveAuthHostname } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -667,8 +668,19 @@ export const appRouter = router({
         // cannot complete, so the endpoint never exposes account existence.
         if (!user) return { success: true, deliveryStatus: "unavailable" as const };
 
-        const token = crypto.randomBytes(48).toString('hex');
-        const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+        const now = Date.now();
+        const existingExpiryMs = user.magicLinkExpiry ? new Date(user.magicLinkExpiry).getTime() : NaN;
+        const canReuseExistingToken = Boolean(
+          user.magicLinkToken
+          && Number.isFinite(existingExpiryMs)
+          && existingExpiryMs > now,
+        );
+        // Do not invalidate a delayed email when a learner asks again. The token
+        // remains one-time: successful verification always clears it immediately.
+        const token = canReuseExistingToken
+          ? String(user.magicLinkToken)
+          : crypto.randomBytes(48).toString('hex');
+        const expiry = new Date(now + MAGIC_LINK_VALIDITY_MS);
 
         await setMagicLinkToken(user.id, token, expiry);
 

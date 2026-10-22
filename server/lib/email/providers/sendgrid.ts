@@ -11,6 +11,10 @@ export async function sendViaSendGrid(
     return { ok: false, error: "SENDGRID_API_KEY not set" };
   }
 
+  const isMarketingMessage = Boolean(opts.listUnsubscribeUrl || opts.campaignId);
+  // Transactional is the safe default. Only messages intentionally carrying
+  // campaign/list-unsubscribe controls may honor marketing suppression.
+  const bypassListManagement = opts.transactional ?? !isMarketingMessage;
   const payload = {
     personalizations: [
       {
@@ -57,10 +61,9 @@ export async function sendViaSendGrid(
           },
         }
       : {}),
-    // A person who actively requests a security/access email must receive it
-    // even if they previously opted out of marketing messages. This is limited
-    // to explicitly marked transactional messages, not campaigns or newsletters.
-    ...(opts.transactional
+    // Service messages do not inherit marketing opt-outs. This includes
+    // security, access, purchase, billing, receipt, and account notices.
+    ...(bypassListManagement
       ? {
           mail_settings: {
             bypass_list_management: { enable: true },

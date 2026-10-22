@@ -34,13 +34,12 @@ describe("sendgridSuppressions", () => {
     expect(isSendGridDeliveryBlocked(status)).toBe(true);
   });
 
-  it("clears all suppression lists for transactional resubscribe", async () => {
+  it("clears only the legacy global marketing suppression when explicitly requested", async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 204 }));
 
-    const result = await clearSendGridSuppressionLists("user@example.com");
+    const result = await clearSendGridSuppressionLists("user@example.com", ["global_unsubscribe"]);
     expect(result.global_unsubscribe.removed).toBe(true);
-    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(fetch).toHaveBeenCalledTimes(1);
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain("/asm/suppressions/global/");
-    expect(String(vi.mocked(fetch).mock.calls[1][0])).toContain("/suppression/bounces/");
   });
 });

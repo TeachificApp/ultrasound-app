@@ -12,7 +12,7 @@
  * For each event, this handler:
  *  1. Verifies the SendGrid webhook signature (ECDSA, using SENDGRID_WEBHOOK_PUBLIC_KEY)
  *  2. Finds the matching user by email in the DB
- *  3. Sets unsubscribedAt + disables dailyChallenge in notificationPrefs
+ *  3. Opts the member out of marketing + optional challenge messages only
  *  4. Logs the event to the webhookEvents table
  *
  * SendGrid signature verification:
@@ -36,7 +36,6 @@ import crypto from "crypto";
 import { getDb } from "../db";
 import { users, webhookEvents } from "../../drizzle/schema";
 import { eq, sql } from "drizzle-orm";
-import { addToSendGridGlobalUnsubscribes } from "../lib/sendgridSuppressions";
 import { recordEmailCampaignEvent, type CampaignEventType } from "../lib/emailCampaignTracking";
 import { buildRecipientTrackingKey } from "../../shared/emailCampaignAudience";
 
@@ -180,10 +179,7 @@ async function processUnsubscribeEvent(event: SendGridEvent): Promise<void> {
     })
     .where(eq(users.id, user.id));
 
-  // Also ensure they're on the SendGrid global suppression list
-  await addToSendGridGlobalUnsubscribes([email]);
-
-  console.log(`[SendGridWebhook] ${event.event} — unsubscribed user #${user.id}: ${email}`);
+  console.log(`[SendGridWebhook] ${event.event} — marketing preference updated for user #${user.id}: ${email}`);
 }
 
 /**

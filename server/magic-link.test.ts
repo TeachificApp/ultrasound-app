@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import { z } from "zod";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { MAGIC_LINK_VALIDITY_MS } from "../shared/magicLinkValidity";
 
 // ─── Input schemas (mirrors routers.ts) ──────────────────────────────────────
 
@@ -27,8 +28,8 @@ function generateToken(): string {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function magicLinkExpiry(minutesFromNow = 15): Date {
-  return new Date(Date.now() + minutesFromNow * 60 * 1000);
+function magicLinkExpiry(validityMs = MAGIC_LINK_VALIDITY_MS): Date {
+  return new Date(Date.now() + validityMs);
 }
 
 function isExpired(expiry: Date): boolean {
@@ -113,16 +114,16 @@ describe("Magic Link — token generation", () => {
 });
 
 describe("Magic Link — expiry logic", () => {
-  it("creates a token that expires 15 minutes from now", () => {
-    const expiry = magicLinkExpiry(15);
+  it("creates a token that expires 24 hours from now", () => {
+    const expiry = magicLinkExpiry();
     const diffMs = expiry.getTime() - Date.now();
     // Allow ±2 seconds tolerance
-    expect(diffMs).toBeGreaterThan(14 * 60 * 1000 - 2000);
-    expect(diffMs).toBeLessThan(15 * 60 * 1000 + 2000);
+    expect(diffMs).toBeGreaterThan(MAGIC_LINK_VALIDITY_MS - 2000);
+    expect(diffMs).toBeLessThan(MAGIC_LINK_VALIDITY_MS + 2000);
   });
 
   it("correctly identifies a non-expired token", () => {
-    const expiry = magicLinkExpiry(15);
+    const expiry = magicLinkExpiry();
     expect(isExpired(expiry)).toBe(false);
   });
 
@@ -136,7 +137,7 @@ describe("Magic Link — expiry logic", () => {
     expect(isExpired(expiry)).toBe(true);
   });
 
-  it("a 15-minute token is not yet expired after 14 minutes (simulated)", () => {
+  it("a 24-hour token is not yet expired before its validity window closes", () => {
     const expiry = new Date(Date.now() + 60 * 1000); // 1 minute remaining
     expect(isExpired(expiry)).toBe(false);
   });
@@ -168,7 +169,7 @@ describe("Magic Link — email enumeration protection", () => {
   it("creates a passwordless account when required without exposing registration status", () => {
     const routerSource = readFileSync(resolve(process.cwd(), "server/routers.ts"), "utf8");
     expect(routerSource).toContain("openId: `email:${email}`");
-    expect(routerSource).toContain("if (!user) return { success: true }");
+    expect(routerSource).toContain('if (!user) return { success: true, deliveryStatus: "unavailable" as const }');
   });
 
   it("returns a visible service error when email delivery is not accepted", () => {
@@ -177,7 +178,13 @@ describe("Magic Link — email enumeration protection", () => {
     expect(routerSource).toContain("const deliveryAccepted = await sendEmail");
     expect(routerSource).toContain("We could not send your sign-in email");
     expect(routerSource).toContain("code: 'SERVICE_UNAVAILABLE'");
-    expect(emailSource).toContain('_logEmailSend(opts.to, opts.subject, "failed")');
+    expect(emailSource).toContain('_logEmailSend(opts.to, opts.subject, sent ? "sent" : "failed")');
+  });
+
+  it("reuses an unexpired one-time token so delayed email remains usable", () => {
+    const routerSource = readFileSync(resolve(process.cwd(), "server/routers.ts"), "utf8");
+    expect(routerSource).toContain("canReuseExistingToken");
+    expect(routerSource).toContain("MAGIC_LINK_VALIDITY_MS");
   });
 });
 

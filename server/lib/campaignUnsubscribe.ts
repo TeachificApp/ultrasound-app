@@ -5,7 +5,6 @@ import { eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { users } from "../../drizzle/schema";
 import type { getDb } from "../db";
-import { addToSendGridGlobalUnsubscribes } from "./sendgridSuppressions";
 import {
   getEmailCampaignAppUrl,
   recordEmailCampaignEvent,
@@ -79,11 +78,6 @@ export async function processCampaignUnsubscribe(
       .update(users)
       .set({ unsubscribedAt: new Date() })
       .where(eq(users.id, u.id));
-    if (u.email) {
-      await addToSendGridGlobalUnsubscribes([u.email]).catch((err) =>
-        console.error("[CampaignUnsubscribe] SendGrid error:", err),
-      );
-    }
   }
 
   if (campaignId) {

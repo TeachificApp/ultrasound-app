@@ -136,6 +136,28 @@ describe("sendTransactionalEmail", () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.sendgrid.com/v3/mail/send");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer SG.test-key");
+    const payload = JSON.parse(String(init.body));
+    expect(payload.mail_settings.bypass_list_management.enable).toBe(true);
+  });
+
+  it("does not bypass a deliberate campaign opt-out", async () => {
+    process.env.EMAIL_PROVIDER = "sendgrid";
+    process.env.SENDGRID_API_KEY = "SG.test-key";
+    process.env.SENDGRID_FROM_EMAIL = "noreply@example.com";
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" });
+    global.fetch = fetchMock as typeof fetch;
+
+    await sendTransactionalEmail({
+      to: { name: "Member", email: "member@example.com" },
+      subject: "Monthly news",
+      htmlBody: "<p>News</p>",
+      campaignId: 42,
+      listUnsubscribeUrl: "https://example.com/unsubscribe",
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const payload = JSON.parse(String(init.body));
+    expect(payload.mail_settings?.bypass_list_management).toBeUndefined();
   });
 
   it("sends iHeartEcho account email with the iHeartEcho mailbox display name", async () => {
