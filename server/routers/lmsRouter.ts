@@ -5350,6 +5350,83 @@ export const lmsLearnerRouter = router({
         }
       }
 
+      // Free offers must never be sent to Stripe: Stripe Checkout requires a
+      // payment amount, while this route needs to remain available to guests.
+      // Mirror the existing free-course behavior by creating/reusing the learner
+      // account, enrolling that learner, and giving a same-learner guest a
+      // session cookie for immediate access. A purchaser registering another
+      // learner receives the existing enrollment/access email flow instead.
+      const grantEmbeddedFreeCourseAccess = async () => {
+        const learnerEmail = recipientEmail || payerEmail || ctx.user?.email?.trim().toLowerCase();
+        if (!learnerEmail) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Enter the learner's email to access this free course." });
+        }
+
+        const learner = isDifferentRecipient || !ctx.user
+          ? (await import("../db")).then(({ getOrCreateUserByEmail }) => getOrCreateUserByEmail({
+              email: learnerEmail,
+              name: input.recipientName?.trim() || undefined,
+            })).then(({ user }) => user)
+          : ctx.user;
+        const isSameLearnerSession = !isDifferentRecipient && learner.id === ctx.user?.id;
+
+        if (!ctx.user && !isDifferentRecipient) {
+          const { sdk } = await import("../_core/sdk");
+          const { COOKIE_NAME, ONE_YEAR_MS } = await import("@shared/const");
+          const { getSessionCookieOptions } = await import("../_core/cookies");
+          const openId = `email:${learnerEmail}`;
+          await db.update(users).set({ openId }).where(and(eq(users.id, learner.id), isNull(users.openId)));
+          const sessionToken = await sdk.createSessionToken(openId, {
+            name: learner.name ?? input.recipientName ?? undefined,
+            expiresInMs: ONE_YEAR_MS,
+          });
+          ctx.res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+        }
+
+        const [existing] = await db.select({ id: lmsEnrollments.id, enrollmentType: lmsEnrollments.enrollmentType })
+          .from(lmsEnrollments)
+          .where(and(eq(lmsEnrollments.userId, learner.id), eq(lmsEnrollments.courseId, course.id)))
+          .limit(1);
+        if (!existing) {
+          await db.insert(lmsEnrollments).values({
+            userId: learner.id,
+            courseId: course.id,
+            enrollmentType: (course.status as string) === "presale" ? "presale" : "full",
+          });
+          db.insert(userActivityLogs).values({
+            userId: learner.id,
+            eventType: "course_enroll",
+            description: `Enrolled in free course: ${course.title}`,
+            courseId: course.id,
+            contentTitle: course.title,
+            metadata: { courseSlug: course.slug, enrollmentType: "free" },
+          }).catch(() => {});
+          sendEnrollmentEmailForUser({ userId: learner.id, courseId: course.id, db }).catch(() => {});
+        } else if (existing.enrollmentType === "free_preview") {
+          await db.update(lmsEnrollments)
+            .set({ enrollmentType: (course.status as string) === "presale" ? "presale" : "full" })
+            .where(eq(lmsEnrollments.id, existing.id));
+        }
+        void ensureFreeMembership(learner.id, { db });
+
+        return {
+          free: true,
+          courseSlug: course.slug,
+          alreadyEnrolled: Boolean(existing && existing.enrollmentType !== "free_preview"),
+          accessUrl: isSameLearnerSession || (!ctx.user && !isDifferentRecipient) ? `/courses/${course.slug}/player` : null,
+          message: isDifferentRecipient
+            ? "The learner has been enrolled. They will receive course access by email."
+            : "You now have access to this free course.",
+        };
+      };
+
+      const primaryPricingType = course.isFree
+        ? "free"
+        : (course.pricingType ?? "one_time");
+      if (!input.teamTierId && !input.pricingOptionId && primaryPricingType === "free") {
+        return grantEmbeddedFreeCourseAccess();
+      }
+
       // Fetch org-level legal URLs and checkout terms from platform_settings
       const [orgSettings] = await db.select(checkoutPlatformTermsSelection).from(platformSettings).where(eq(platformSettings.id, 1)).limit(1);
 
@@ -5399,26 +5476,40 @@ export const lmsLearnerRouter = router({
       let isSubscription = false;
       let billingLabel: string | null = null;
 
-      // ── Create a pending order row so the webhook can link the payment ──────────
-      // We create this before the Stripe session so we can embed order_id in metadata.
-      // If the user is not logged in (guest), we'll use 0 as a placeholder and update
-      // it in the webhook once the user is resolved.
-      const pendingUserId = ctx.user?.id ?? 0;
+      // Create a provisional order only after the selected offer is known to be
+      // paid. This keeps free enrollment entirely outside the payment ledger and
+      // records the exact amount and seat count actually offered to Stripe.
       let pendingOrderId: number | null = null;
-      if (pendingUserId > 0) {
+      const createPendingOrder = async (amountDollars: number, seats: number) => {
+        if (!ctx.user) return null;
         try {
           const [orderRow] = await db.insert(lmsOrders).values({
-            userId: pendingUserId,
+            userId: ctx.user.id,
             courseId: course.id,
-            amount: Math.round(Number(course.price ?? 0) * 100),
+            amount: toCheckoutAmountCents(amountDollars),
             currency: course.currency ?? "usd",
             status: "pending",
-            seats: 1,
+            seats,
           }).$returningId();
-          pendingOrderId = orderRow?.id ?? null;
-        } catch { /* non-fatal — webhook will still enroll via fallback */ }
-      }
+          return orderRow?.id ?? null;
+        } catch {
+          // Non-fatal — Stripe metadata and its fulfillment fallback can still
+          // identify a guest or signed-in learner when local order storage is unavailable.
+          return null;
+        }
+      };
+      const attachPendingOrderToEmbeddedSession = async (sessionId: string) => {
+        if (!pendingOrderId) return;
+        await db.update(lmsOrders).set({ stripeSessionId: sessionId })
+          .where(and(eq(lmsOrders.id, pendingOrderId), eq(lmsOrders.status, "pending")));
+      };
+      const failPendingEmbeddedOrder = async () => {
+        if (!pendingOrderId) return;
+        await db.update(lmsOrders).set({ status: "failed" })
+          .where(and(eq(lmsOrders.id, pendingOrderId), eq(lmsOrders.status, "pending")));
+      };
 
+      try {
       // ── TEAM TIER MODE ────────────────────────────────────────────────────────
       if (input.teamTierId) {
         const [tier] = await db.select().from(lmsDefaultTeamTiers).where(eq(lmsDefaultTeamTiers.id, input.teamTierId)).limit(1);
@@ -5444,6 +5535,7 @@ export const lmsLearnerRouter = router({
         }
 
         const requestedSeats = input.seatCount && input.seatCount >= tier.minSeats ? input.seatCount : tier.minSeats;
+        pendingOrderId = await createPendingOrder(perSeatPrice * requestedSeats, requestedSeats);
         const session = await stripe.checkout.sessions.create({
           ui_mode: "embedded",
           mode: "payment",
@@ -5454,6 +5546,7 @@ export const lmsLearnerRouter = router({
           metadata: { course_id: String(course.id), team_tier_id: String(tier.id), source: "hosted_checkout_team_tier", user_id: ctx.user ? String(ctx.user.id) : "", order_id: pendingOrderId ? String(pendingOrderId) : "", seats: String(requestedSeats), ...(input.recipientEmail ? { recipient_name: input.recipientName ?? "", recipient_email: input.recipientEmail.toLowerCase(), payer_email: payerEmail, customer_email: payerEmail, user_id: "" } : (payerEmail ? { payer_email: payerEmail, customer_email: payerEmail } : {})) },
           payment_intent_data: { description: `${course.title} — Team License — ${requestedSeats} seats` },
         });
+        await attachPendingOrderToEmbeddedSession(session.id);
         const terms0 = resolveCheckoutTerms(course, orgSettings);
         return {
           clientSecret: session.client_secret!,
@@ -5489,6 +5582,7 @@ export const lmsLearnerRouter = router({
         subscriptionInterval = opt.subscriptionInterval ?? null;
         productName = `${course.title}${opt.label ? ` — ${opt.label}` : ""}`;
         isSubscription = pricingType === "subscription" || pricingType === "payment_plan";
+        if (pricingType === "free") return grantEmbeddedFreeCourseAccess();
         stripePriceId = await validateCompatiblePriceId(opt.stripePriceId ?? null, {
           currency,
           pricingType,
@@ -5529,6 +5623,7 @@ export const lmsLearnerRouter = router({
           billingLabel = `${opt.installmentCount ?? ""} payments of $${Number(opt.installmentAmount ?? displayPrice).toFixed(2)}`;
         }
 
+        pendingOrderId = await createPendingOrder(displayPrice, 1);
         const sessionMode = (pricingType === "subscription" || pricingType === "payment_plan") ? "subscription" : "payment";
         const embeddedOptionShare = sessionMode === "payment"
           ? await (await import("../lib/revenueShareEngine")).applyRevenueShareToCheckoutSession({
@@ -5548,6 +5643,7 @@ export const lmsLearnerRouter = router({
             ? { payment_intent_data: { description: `${course.title} — One-Time Purchase`, ...embeddedOptionShare.paymentIntentData } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
         });
+        await attachPendingOrderToEmbeddedSession(session.id);
         const terms1 = resolveCheckoutTerms(course, orgSettings);
         return {
           clientSecret: session.client_secret!,
@@ -5575,10 +5671,11 @@ export const lmsLearnerRouter = router({
       }
 
       // ── PRIMARY PRICING MODE (default) ────────────────────────────────────────
-      pricingType = course.pricingType ?? "one_time";
+      pricingType = primaryPricingType;
       displayPrice = Number(course.price ?? 0);
       subscriptionInterval = course.subscriptionInterval ?? null;
       isSubscription = pricingType === "subscription" || pricingType === "payment_plan";
+      if (pricingType === "free") return grantEmbeddedFreeCourseAccess();
       stripePriceId = await validateCompatiblePriceId(course.stripePriceId ?? null, {
         currency,
         pricingType,
@@ -5623,6 +5720,7 @@ export const lmsLearnerRouter = router({
         billingLabel = `${course.installmentCount ?? ""} payments of $${Number(course.installmentAmount ?? displayPrice).toFixed(2)}`;
       }
 
+      pendingOrderId = await createPendingOrder(displayPrice, 1);
       const sessionMode = (pricingType === "subscription" || pricingType === "payment_plan") ? "subscription" : "payment";
       const embeddedPrimaryShare = sessionMode === "payment"
         ? await (await import("../lib/revenueShareEngine")).applyRevenueShareToCheckoutSession({
@@ -5642,6 +5740,7 @@ export const lmsLearnerRouter = router({
             ? { payment_intent_data: { description: `${course.title} — One-Time Purchase`, ...embeddedPrimaryShare.paymentIntentData } }
             : { subscription_data: { description: `${course.title} — Subscription — Initial` } }),
       });
+      await attachPendingOrderToEmbeddedSession(session.id);
       const terms2 = resolveCheckoutTerms(course, orgSettings);
       return {
         clientSecret: session.client_secret!,
@@ -5664,8 +5763,17 @@ export const lmsLearnerRouter = router({
         currency,
         minSeats: null,
         discountPercent: null,
-        brand: course.brand ?? "aaus",
-      };
+          brand: course.brand ?? "aaus",
+        };
+      } catch (checkoutError: any) {
+        await failPendingEmbeddedOrder();
+        console.error("[EmbeddedCourseCheckout] Failed to create checkout session", {
+          courseSlug: course.slug,
+          pricingType,
+          errorCode: checkoutError?.code ?? "checkout_session_creation_failed",
+        });
+        throw checkoutError;
+      }
     }),
 
   /**

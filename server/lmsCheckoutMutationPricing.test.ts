@@ -111,4 +111,34 @@ describe("lms.createCheckout one-time price payload", () => {
       }),
     ]));
   });
+
+  it("enrolls an explicitly free embedded course without creating a Stripe session, even with legacy one-time metadata", async () => {
+    getDbMock.mockResolvedValue(createDb({
+      id: 45,
+      slug: "free-pediatric-preview",
+      title: "Free Pediatric Preview",
+      subtitle: null,
+      status: "public",
+      enrollmentCloseDate: null,
+      pricingType: "one_time",
+      price: "0.00",
+      isFree: true,
+      currency: "usd",
+      stripePriceId: null,
+    }));
+
+    const caller = lmsLearnerRouter.createCaller(makeContext());
+    const result = await caller.createEmbeddedCheckoutSession({
+      courseSlug: "free-pediatric-preview",
+      origin: "https://learn.allaboutultrasound.com",
+      payerEmail: "learner@example.com",
+    });
+
+    expect(result).toMatchObject({
+      free: true,
+      courseSlug: "free-pediatric-preview",
+      accessUrl: "/courses/free-pediatric-preview/player",
+    });
+    expect(stripeCheckoutCreateMock).not.toHaveBeenCalled();
+  });
 });

@@ -403,6 +403,7 @@ export default function Checkout() {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [activeSessionKey, setActiveSessionKey] = useState<string | null>(null);
   const activeSessionKeyRef = useRef<string | null>(null);
+  const [freeEnrollmentMessage, setFreeEnrollmentMessage] = useState<string | null>(null);
   const [seatCount, setSeatCount] = useState<number>(searchParams.teamTierId ? 3 : 1);
   const [sessionMeta, setSessionMeta] = useState<{
     courseTitle: string;
@@ -459,12 +460,16 @@ export default function Checkout() {
       window.location.href = data.accessUrl;
       return;
     }
-    // Free plan: enrollment already completed server-side, redirect to member area
+    // Free content: enrollment already completed server-side, without asking
+    // Stripe to create an invalid $0 payment session.
     if (data.free === true && !data.clientSecret) {
-      const dest = entityType === "membership" && slug
-        ? `/my-memberships/${slug}`
-        : "/my-dashboard";
-      window.location.href = dest;
+      if (data.accessUrl) {
+        window.location.href = data.accessUrl;
+      } else if (entityType === "membership" && slug) {
+        window.location.href = `/my-memberships/${slug}`;
+      } else {
+        setFreeEnrollmentMessage(data.message ?? "Enrollment is complete. The learner will receive access by email.");
+      }
       return;
     }
     const { clientSecret: cs, ...meta } = data;
@@ -497,6 +502,7 @@ export default function Checkout() {
     setActiveSessionKey(null);
     setClientSecret(null);
     setSessionMeta(null);
+    setFreeEnrollmentMessage(null);
   };
   // Show payment as soon as the page opens. Selecting another learner refreshes
   // the unused session in place instead of adding a separate checkout step.
@@ -913,7 +919,14 @@ export default function Checkout() {
               </div>
             )}
           </div>
-          {!hasValidLearnerDetails ? (
+          {freeEnrollmentMessage ? (
+            <div className="flex min-h-[280px] flex-col items-center justify-center p-8 text-center">
+              <CheckCircle2 className="h-10 w-10" style={{ color: primary }} />
+              <h4 className={`mt-4 text-base font-semibold ${isDark ? "text-white" : "text-gray-800"}`}>Enrollment complete</h4>
+              <p className={`mt-2 max-w-sm text-sm leading-relaxed ${isDark ? "text-gray-400" : "text-gray-500"}`}>{freeEnrollmentMessage}</p>
+              <Link href="/my-dashboard" className="mt-5 inline-flex items-center rounded-lg px-4 py-2 text-sm font-semibold text-white" style={btnStyle}>Go to My Dashboard</Link>
+            </div>
+          ) : !hasValidLearnerDetails ? (
             <div className="flex min-h-[280px] flex-col items-center justify-center p-8 text-center">
               <ShieldCheck className="h-10 w-10" style={{ color: primary }} />
               <h4 className={`mt-4 text-base font-semibold ${isDark ? "text-white" : "text-gray-800"}`}>Add the learner’s details</h4>
