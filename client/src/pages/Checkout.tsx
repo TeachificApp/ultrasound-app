@@ -573,13 +573,18 @@ export default function Checkout() {
   // guest checkout — sign-in is NEVER required before payment. Stripe collects the
   // email and the webhook auto-creates the account after purchase.
   if (createSession.isError) {
+    const rawErrorMessage = createSession.error?.message ?? "";
+    const isSafeConfigurationMessage = rawErrorMessage.startsWith("This download is temporarily unavailable because its checkout price has not been configured.");
+    const checkoutErrorMessage = isSafeConfigurationMessage
+      ? rawErrorMessage
+      : "Something went wrong loading the checkout. Please try again — no sign-in required.";
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-8 max-w-md w-full text-center">
           <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Checkout Unavailable</h2>
           <p className="text-gray-500 text-sm mb-6">
-            Something went wrong loading the checkout. Please try again — no sign-in required.
+            {checkoutErrorMessage}
           </p>
           <div className="flex flex-col gap-3">
             <button

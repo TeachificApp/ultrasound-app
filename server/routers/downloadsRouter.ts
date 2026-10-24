@@ -5,7 +5,7 @@ import { z } from "zod";
 import { and, desc, eq, sql, asc, or, like, gte, lte, count } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { storagePut } from "../storage";
-import { getDb, getUserById, getOrCreateAccessToken } from "../db";
+import { getDb, getUserByEmail, getUserById, getOrCreateAccessToken } from "../db";
 import { canPreviewDraftContent, throwUnavailableDraftContent } from "../lib/draftContentAccess";
 import {
   digitalProducts,
@@ -31,6 +31,29 @@ import { DIGITAL_DOWNLOAD_STRIPE_CUSTOM_TEXT } from "../../shared/digitalDownloa
 
 function assertAdmin(ctx: any) {
   if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+}
+
+/**
+ * Stripe requires a positive payment amount for a paid Checkout Session.
+ * A zero-dollar download must be marked free and use the free-access path;
+ * otherwise it is an incomplete catalog configuration rather than a customer
+ * checkout error.
+ */
+export const MINIMUM_PAID_DOWNLOAD_CHECKOUT_CENTS = 50;
+export function getPaidDownloadCheckoutCents(price: number | string | null | undefined) {
+  const cents = Math.round(Number(price ?? 0) * 100);
+  return Number.isFinite(cents) ? cents : 0;
+}
+
+export function assertPaidDownloadCheckoutPrice(price: number | string | null | undefined) {
+  const cents = getPaidDownloadCheckoutCents(price);
+  if (cents < MINIMUM_PAID_DOWNLOAD_CHECKOUT_CENTS) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "This download is temporarily unavailable because its checkout price has not been configured. Please contact support@allaboutultrasound.com for assistance.",
+    });
+  }
+  return cents;
 }
 
 // ─── Public Router ──────────────────────────────────────────────────────────
@@ -258,6 +281,7 @@ export const downloadsLearnerRouter = router({
       if ((product as any).bundleOnly) throw new TRPCError({ code: "FORBIDDEN", message: "This product is only available as part of a bundle." });
       if (product.status === "waitlist") throw new TRPCError({ code: "FORBIDDEN", message: "This download is currently accepting Waitlist signups." });
       if (product.status === "enrollment_closed") throw new TRPCError({ code: "FORBIDDEN", message: "Enrollment Closed" });
+      const paidDownloadCents = product.isFree ? 0 : assertPaidDownloadCheckoutPrice(product.price);
       const orderBumpCheckout = await buildOrderBumpCheckoutLine(db, {
         orderBumpId: input.orderBumpId,
         triggerType: "download",
@@ -300,7 +324,7 @@ export const downloadsLearnerRouter = router({
                 description: product.subtitle ?? undefined,
                 images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
               } }),
-          unit_amount: Math.round(Number(product.price) * 100),
+          unit_amount: paidDownloadCents,
         },
         quantity: 1,
       }];
@@ -322,7 +346,7 @@ export const downloadsLearnerRouter = router({
         try {
           const pc = await stripe.promotionCodes.retrieve(discounts[0].promotion_code);
           const coupon = (pc as any).coupon as any;
-          const priceCents = Math.round(Number(product.price) * 100);
+          const priceCents = paidDownloadCents;
           const discountedCents = coupon.percent_off === 100 ? 0 : coupon.amount_off ? Math.max(0, priceCents - coupon.amount_off) : priceCents;
           if (discountedCents === 0) {
             await db.insert(digitalPurchases).values({ userId: ctx.user.id, productId: product.id });
@@ -620,6 +644,7 @@ export const downloadsLearnerRouter = router({
         }
         return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null, brand: "aaus" };
       }
+      const paidDownloadCents = assertPaidDownloadCheckoutPrice(product.price);
       if (userId) {
         const [existing] = await db.select().from(digitalPurchases)
           .where(and(eq(digitalPurchases.userId, userId), eq(digitalPurchases.productId, product.id))).limit(1);
@@ -644,7 +669,7 @@ export const downloadsLearnerRouter = router({
               description: product.subtitle ?? undefined,
               images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
             },
-            unit_amount: Math.round(Number(product.price) * 100),
+            unit_amount: paidDownloadCents,
           },
           quantity: 1,
         }],
@@ -2174,6 +2199,7 @@ Make ALL content specific and compelling based on the product title and descript
         }
         return { clientSecret: null, free: true, courseTitle: product.title, courseSubtitle: product.subtitle ?? null, courseDescription: product.description ?? null, courseThumbnail: product.thumbnailUrl ?? null, primaryColor: "#189aa1", accentColor: "#4ad9e0", gradientFrom: "#189aa1", gradientTo: "#4ad9e0", gradientDirection: "135deg", playerTheme: "light", termsUrl: "", privacyUrl: "", productName: product.title, displayPrice: 0, pricingType: "free", isSubscription: false, billingLabel: null, currency: product.currency, minSeats: null, discountPercent: null, brand: "aaus" };
       }
+      const paidDownloadCents = assertPaidDownloadCheckoutPrice(product.price);
       const [existing] = await db.select().from(digitalPurchases)
         .where(and(eq(digitalPurchases.userId, ctx.user.id), eq(digitalPurchases.productId, product.id))).limit(1);
       if (existing) throw new TRPCError({ code: "CONFLICT", message: "You already own this product." });
@@ -2197,7 +2223,7 @@ Make ALL content specific and compelling based on the product title and descript
               description: product.subtitle ?? undefined,
               images: product.thumbnailUrl ? [product.thumbnailUrl] : undefined,
             },
-            unit_amount: Math.round(Number(product.price) * 100),
+            unit_amount: paidDownloadCents,
           },
           quantity: 1,
         }],
