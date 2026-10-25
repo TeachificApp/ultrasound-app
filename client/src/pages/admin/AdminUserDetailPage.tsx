@@ -3356,11 +3356,20 @@ const COMM_TYPE_COLORS: Record<string, string> = {
 function CommunicationsTab({ userId }: { userId: number }) {
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [testRecipientEmail, setTestRecipientEmail] = useState("");
+  const [testEmailType, setTestEmailType] = useState<
+    "welcome" | "password_reset" | "magic_link" | "course_access" | "quiz_access" | "download_access" | "bundle_access" | "membership_access" | "purchase_confirmation"
+  >("welcome");
+  const [testBrandMode, setTestBrandMode] = useState<"aaus" | "iheartecho" | "combined">("combined");
   const { data, isLoading } = trpc.adminUser.getUserEmailHistory.useQuery({ userId, page, pageSize: 25 });
   const emails = data?.emails ?? [];
 
   const resendEmail = trpc.adminUser.resendEmailFromLog.useMutation({
     onSuccess: () => toast.success("Email resent successfully."),
+    onError: (e) => toast.error(e.message),
+  });
+  const sendSystemEmailTest = trpc.adminUser.sendMemberSystemEmailTest.useMutation({
+    onSuccess: (result) => toast.success(`${result.templateLabel} test sent to ${result.sentTo}.`),
     onError: (e) => toast.error(e.message),
   });
 
@@ -3371,6 +3380,80 @@ function CommunicationsTab({ userId }: { userId: number }) {
 
   return (
     <div className="space-y-4">
+      <section className="rounded-xl border border-teal-200 bg-teal-50/60 p-4">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-teal-900">Send member system email test</h3>
+            <p className="mt-1 text-xs leading-5 text-teal-800">
+              Renders the selected member-email template with this member’s name, but sends it only to the designated address below.
+            </p>
+          </div>
+          <span className="mt-1 inline-flex w-fit rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800 sm:mt-0">
+            Safe test links
+          </span>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="space-y-1.5 md:col-span-1">
+            <Label htmlFor="member-system-test-recipient" className="text-xs text-slate-700">Send test to</Label>
+            <Input
+              id="member-system-test-recipient"
+              type="email"
+              value={testRecipientEmail}
+              onChange={(event) => setTestRecipientEmail(event.target.value)}
+              placeholder="your@email.com"
+              className="h-9 bg-white text-sm"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-slate-700">System email</Label>
+            <Select value={testEmailType} onValueChange={(value) => setTestEmailType(value as typeof testEmailType)}>
+              <SelectTrigger className="h-9 bg-white text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="welcome">Account welcome</SelectItem>
+                <SelectItem value="password_reset">Password reset</SelectItem>
+                <SelectItem value="magic_link">Magic sign-in link</SelectItem>
+                <SelectItem value="course_access">Course access</SelectItem>
+                <SelectItem value="quiz_access">Quiz access</SelectItem>
+                <SelectItem value="download_access">Download access</SelectItem>
+                <SelectItem value="bundle_access">Bundle access</SelectItem>
+                <SelectItem value="membership_access">Membership access</SelectItem>
+                <SelectItem value="purchase_confirmation">Purchase confirmation</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-slate-700">Brand appearance</Label>
+            <Select value={testBrandMode} onValueChange={(value) => setTestBrandMode(value as typeof testBrandMode)}>
+              <SelectTrigger className="h-9 bg-white text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="combined">All About Ultrasound™ | iHeartEcho™</SelectItem>
+                <SelectItem value="aaus">All About Ultrasound™</SelectItem>
+                <SelectItem value="iheartecho">iHeartEcho™</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[11px] leading-4 text-slate-600">
+            The subject is marked <strong>[TEST]</strong>. Password, sign-in, access, and purchase buttons use non-working preview links, so no member account or entitlement can change.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            className="shrink-0 bg-[#189aa1] text-white hover:bg-[#127b81]"
+            disabled={!testRecipientEmail.trim() || sendSystemEmailTest.isPending}
+            onClick={() => sendSystemEmailTest.mutate({
+              userId,
+              toEmail: testRecipientEmail,
+              emailType: testEmailType,
+              brandMode: testBrandMode,
+            })}
+          >
+            {sendSystemEmailTest.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Mail className="mr-1.5 h-3.5 w-3.5" />}
+            Send test email
+          </Button>
+        </div>
+      </section>
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-700">Email History</h3>
         <span className="text-xs text-slate-400">{(data?.total ?? 0).toLocaleString()} total emails sent</span>

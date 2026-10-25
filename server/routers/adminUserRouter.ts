@@ -65,6 +65,7 @@ import { and, eq, desc, sql, count } from "drizzle-orm";
 import { issueCertificateIfEnabled } from "./lmsHelpers";
 import { sendEmail, buildFunnelPurchaseConfirmationEmail, buildAccessGrantedEmail, buildAccessRevokedEmail, emailWrapper } from "../_core/email";
 import { sendEnrollmentEmail, sendDownloadAccessEmail, sendQuizAccessEmail, buildPersistentAccessUrl } from "../lib/enrollmentEmail";
+import { renderMemberSystemEmailTest } from "../lib/memberSystemEmailTest";
 import { getOrCreateAccessToken } from "../db";
 import { getBrandDisplayConfig } from "../../shared/brands";
 import { generateAutoLoginToken } from "../routes/autoLogin";
@@ -2668,6 +2669,61 @@ export const adminUserRouter = router({
         pageSize: input.pageSize,
         totalPages: Math.ceil(total / input.pageSize),
       };
+    }),
+
+  /**
+   * Render a member-system email with the selected member's name, but deliver it
+   * only to the designated administrator test address. The renderer replaces all
+   * security and access actions with non-working test links.
+   */
+  sendMemberSystemEmailTest: protectedProcedure
+    .input(z.object({
+      userId: z.number().int().positive(),
+      toEmail: z.string().trim().email().max(320),
+      emailType: z.enum([
+        "welcome",
+        "password_reset",
+        "magic_link",
+        "course_access",
+        "quiz_access",
+        "download_access",
+        "bundle_access",
+        "membership_access",
+        "purchase_confirmation",
+      ]),
+      brandMode: z.enum(["aaus", "iheartecho", "combined"]),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertAdmin(ctx);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+
+      const [member] = await db
+        .select({ name: users.name, firstName: users.firstName })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
+
+      const firstName = member.firstName?.trim() || member.name?.trim().split(/\s+/)[0] || "Member";
+      const rendered = await renderMemberSystemEmailTest({
+        type: input.emailType,
+        memberFirstName: firstName,
+        brandMode: input.brandMode,
+      });
+      const testAddress = input.toEmail.trim().toLowerCase();
+      const sent = await sendEmail({
+        to: { email: testAddress },
+        subject: rendered.subject,
+        htmlBody: rendered.htmlBody,
+        previewText: rendered.previewText,
+        brandMode: input.brandMode,
+        transactional: true,
+      });
+      if (!sent) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Test email could not be sent. Check the transactional email provider configuration." });
+      }
+      return { success: true, sentTo: testAddress, templateLabel: rendered.templateLabel };
     }),
 
   /** Platform-wide email send log with filters */

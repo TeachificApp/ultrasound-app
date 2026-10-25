@@ -55,6 +55,40 @@ function createUnpricedDownloadDb() {
   };
 }
 
+function createPaidEmbeddedDownloadDb() {
+  let selectCall = 0;
+  return {
+    select: vi.fn(() => {
+      selectCall += 1;
+      const result = selectCall === 1
+        ? [{
+          id: 33,
+          title: "Configured Download",
+          slug: "configured-download",
+          status: "published",
+          bundleOnly: false,
+          isFree: false,
+          price: "29.97",
+          currency: "usd",
+          subtitle: null,
+          thumbnailUrl: null,
+        }]
+        : [{
+          checkoutTermsText: null,
+          checkoutTermsLinkText1: null,
+          checkoutTermsLinkUrl1: null,
+          checkoutTermsLinkText2: null,
+          checkoutTermsLinkUrl2: null,
+        }];
+      const tableQuery = {
+        where: vi.fn(() => ({ limit: vi.fn().mockResolvedValue(result) })),
+        limit: vi.fn().mockResolvedValue(result),
+      };
+      return { from: vi.fn(() => tableQuery) };
+    }),
+  };
+}
+
 function makeContext(): TrpcContext {
   return {
     user: null,
@@ -99,5 +133,21 @@ describe("downloads.createCheckout Stripe payload", () => {
     })).rejects.toThrow(/checkout price has not been configured/i);
 
     expect(stripeCheckoutCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("creates a guest embedded session for a configured paid download", async () => {
+    getDbMock.mockResolvedValue(createPaidEmbeddedDownloadDb());
+    stripeCheckoutCreateMock.mockResolvedValue({ client_secret: "cs_test_embedded_download" });
+    const caller = downloadsLearnerRouter.createCaller(makeContext());
+
+    const result = await caller.createEmbeddedCheckoutSession({
+      productSlug: "configured-download",
+      origin: "https://learn.allaboutultrasound.com",
+      payerEmail: "payer@example.test",
+    });
+
+    expect(result.clientSecret).toBe("cs_test_embedded_download");
+    const [payload] = stripeCheckoutCreateMock.mock.calls[0];
+    expect(payload.line_items[0].price_data.unit_amount).toBe(2997);
   });
 });
