@@ -1,5 +1,5 @@
 import { getStripeClient } from "../lib/stripeClient";
-import { resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_OPTIONS } from "./checkoutTermsHelper";
+import { checkoutPlatformTermsSelection, resolveCheckoutTerms, STANDARD_STRIPE_CHECKOUT_OPTIONS } from "./checkoutTermsHelper";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { and, desc, eq, sql, asc } from "drizzle-orm";
