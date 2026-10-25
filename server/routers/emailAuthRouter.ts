@@ -25,6 +25,10 @@ import { getDb, ensureUserRole, getUsersByEmail } from "../db";
 import { sendEmail, buildWelcomeEmail, buildVerificationEmail, buildPasswordResetEmail } from "../_core/email";
 import { type BrandMode, detectBrandMode, getBrandDisplayConfig, BRAND_DOMAINS } from "@shared/brands";
 import { authEmailField } from "@shared/authEmailField";
+import {
+  canReusePasswordResetToken,
+  getPasswordResetExpiry,
+} from "@shared/passwordResetValidity";
 import { users, userEmailAliases } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 
@@ -440,8 +444,13 @@ export const emailAuthRouter = router({
       // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)
       // — this allows OAuth users to set a password for the first time via the reset flow
       if (user) {
-        const resetToken = generateToken();
-        const resetExpiry = tokenExpiry(1); // 1 hour
+        // Reuse an active one-time link so a delayed first email remains usable
+        // when the learner requests another copy. The expiry is renewed to the
+        // shared 24-hour policy; successful password reset consumes the token.
+        const resetToken = canReusePasswordResetToken(user.passwordResetToken, user.passwordResetExpiry)
+          ? user.passwordResetToken!
+          : generateToken();
+        const resetExpiry = getPasswordResetExpiry();
         await db
           .update(users)
           .set({ passwordResetToken: resetToken, passwordResetExpiry: resetExpiry })

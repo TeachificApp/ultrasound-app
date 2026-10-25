@@ -19,18 +19,42 @@ describe("sendgridSuppressions", () => {
     vi.restoreAllMocks();
   });
 
-  it("reports blocked when any suppression list contains the email", async () => {
+  it("treats SendGrid's empty 200 lookup payloads as unsuppressed", async () => {
     vi.mocked(fetch).mockImplementation(async (url) => {
       const path = String(url);
       if (path.includes("/asm/suppressions/global/")) {
         return new Response(JSON.stringify({}), { status: 200 });
       }
-      return new Response(null, { status: 404 });
+      return new Response(JSON.stringify([]), { status: 200 });
+    });
+
+    const status = await getSendGridSuppressionStatus("user@example.com");
+    expect(status).toEqual({
+      global_unsubscribe: false,
+      bounces: false,
+      blocks: false,
+      spam_reports: false,
+      invalid_emails: false,
+    });
+    expect(isSendGridDeliveryBlocked(status)).toBe(false);
+  });
+
+  it("reports blocked only when a suppression response contains the queried address", async () => {
+    vi.mocked(fetch).mockImplementation(async (url) => {
+      const path = String(url);
+      if (path.includes("/asm/suppressions/global/")) {
+        return new Response(JSON.stringify({ recipient_email: "user@example.com" }), { status: 200 });
+      }
+      if (path.includes("/suppression/bounces/")) {
+        return new Response(JSON.stringify([{ email: "user@example.com" }]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
     });
 
     const status = await getSendGridSuppressionStatus("user@example.com");
     expect(status.global_unsubscribe).toBe(true);
-    expect(status.bounces).toBe(false);
+    expect(status.bounces).toBe(true);
+    expect(status.blocks).toBe(false);
     expect(isSendGridDeliveryBlocked(status)).toBe(true);
   });
 

@@ -5,6 +5,7 @@
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
 import { MAGIC_LINK_VALIDITY_LABEL } from "@shared/magicLinkValidity";
+import { PASSWORD_RESET_VALIDITY_LABEL } from "@shared/passwordResetValidity";
 import { TRANSACTIONAL_EMAIL_AQUA, TRANSACTIONAL_EMAIL_DEEP_TEAL, TRANSACTIONAL_EMAIL_TEAL, TRANSACTIONAL_EMAIL_TINT } from "@shared/transactionalEmailPalette";
 import { getDb } from "../db";
 import { eq } from "drizzle-orm";
@@ -256,12 +257,12 @@ export function buildPasswordResetEmail(opts: {
   brandMode?: BrandMode;
   /** "reset" (default) or "welcome" for new accounts created on purchase */
   purpose?: "reset" | "welcome";
-  /** Human-readable expiry, e.g. "1 hour" or "7 days" — must match token TTL in DB */
+  /** Human-readable expiry, e.g. "24 hours" or "7 days" — must match token TTL in DB */
   expiresInLabel?: string;
 }): { subject: string; htmlBody: string; previewText: string } {
   const bc = getBrandDisplayConfig(opts.brandMode || "aaus");
   const isWelcome = opts.purpose === "welcome";
-  const expiresIn = opts.expiresInLabel ?? (isWelcome ? "7 days" : "1 hour");
+  const expiresIn = opts.expiresInLabel ?? (isWelcome ? "7 days" : PASSWORD_RESET_VALIDITY_LABEL);
   const subject = isWelcome
     ? `Set your ${bc.displayName} password`
     : `Reset your ${bc.displayName} password`;

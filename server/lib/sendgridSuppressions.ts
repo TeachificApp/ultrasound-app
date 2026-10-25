@@ -47,6 +47,21 @@ function suppressionPath(list: SendGridSuppressionList, email: string): string {
   }
 }
 
+function isGlobalSuppressionRecord(payload: unknown, email: string): boolean {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return false;
+  const recipientEmail = (payload as { recipient_email?: unknown }).recipient_email;
+  return typeof recipientEmail === "string" && normalizeEmail(recipientEmail) === normalizeEmail(email);
+}
+
+function isAddressSuppressionRecord(payload: unknown, email: string): boolean {
+  if (!Array.isArray(payload)) return false;
+  return payload.some((entry) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return false;
+    const recordEmail = (entry as { email?: unknown }).email;
+    return typeof recordEmail === "string" && normalizeEmail(recordEmail) === normalizeEmail(email);
+  });
+}
+
 async function isOnSuppressionList(
   list: SendGridSuppressionList,
   email: string,
@@ -56,7 +71,15 @@ async function isOnSuppressionList(
     const res = await fetch(suppressionPath(list, email), {
       headers: { Authorization: `Bearer ${getSendGridApiKey()}` },
     });
-    if (res.status === 200) return true;
+    if (res.status === 200) {
+      // SendGrid returns `{}` for a clean global-suppression lookup and `[]`
+      // for a clean bounce/block/spam/invalid lookup. A 200 response alone is
+      // therefore not evidence that the recipient is suppressed.
+      const body = await res.json().catch(() => null);
+      return list === "global_unsubscribe"
+        ? isGlobalSuppressionRecord(body, email)
+        : isAddressSuppressionRecord(body, email);
+    }
     if (res.status === 404) return false;
     console.warn(
       `[SendGridSuppressions] Unexpected status checking ${list} for ${email}: HTTP ${res.status}`,

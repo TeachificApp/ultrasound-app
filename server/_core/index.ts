@@ -48,6 +48,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { detectBrandFromHostname, detectBrandMode } from "../../shared/brands";
 import { MAGIC_LINK_VALIDITY_MS } from "../../shared/magicLinkValidity";
+import { getPasswordResetExpiry } from "../../shared/passwordResetValidity";
 import { normalizeLegacyStudentDashboardLocation } from "../../shared/studentDashboardUrls";
 import { resolveAssetUrls } from "../lib/resolveAssetUrl";
 import { startChallengeCron } from "../jobs/challengeCron";
@@ -381,7 +382,7 @@ async function startServer() {
     const { ensureTransactionalEmailDelivery } = await import("../lib/ensureTransactionalEmailDelivery");
     const deliveryPrep = await ensureTransactionalEmailDelivery(deliveryEmail);
     const token = crypto.randomBytes(48).toString("hex");
-    const expiry = new Date(Date.now() + 60 * 60 * 1000);
+    const expiry = getPasswordResetExpiry();
     try {
       await setPasswordResetToken(user.id, token, expiry);
     } catch (err) {

@@ -3,6 +3,10 @@ import { z } from "zod";
 import { COOKIE_NAME, DEMO_COOKIE_NAME, TWO_HOURS_MS } from "@shared/const";
 import { authEmailField } from "@shared/authEmailField";
 import { MAGIC_LINK_VALIDITY_MS } from "@shared/magicLinkValidity";
+import {
+  canReusePasswordResetToken,
+  getPasswordResetExpiry,
+} from "@shared/passwordResetValidity";
 import { clearSessionCookies, getSessionCookieOptions, resolveAuthHostname } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -549,8 +553,13 @@ export const appRouter = router({
         }
         const { ensureTransactionalEmailDelivery } = await import('./lib/ensureTransactionalEmailDelivery');
         await ensureTransactionalEmailDelivery(deliveryEmail);
-        const token = crypto.randomBytes(48).toString('hex');
-        const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+        // Retain an active token when the learner requests another email. This
+        // keeps the earlier message usable if a mailbox delays delivery while
+        // the renewed 24-hour expiry remains securely one-time-use.
+        const token = canReusePasswordResetToken(user.passwordResetToken, user.passwordResetExpiry)
+          ? user.passwordResetToken!
+          : crypto.randomBytes(48).toString('hex');
+        const expiry = getPasswordResetExpiry();
         try {
           await setPasswordResetToken(user.id, token, expiry);
         } catch (err) {
