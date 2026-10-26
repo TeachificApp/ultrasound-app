@@ -28,6 +28,7 @@ import { sendEmail } from "../_core/email";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 import { requireApprovedVendorApplication } from "../lib/vendorPartnerAccess";
+import { listCompatibleExpoEvents } from "../lib/expoEventSchemaCompatibility";
 import { addExpoPartnerToEmailList } from "../lib/emailListHelper";
 import {
   buildVendorApplicationAdminAlertEmail,
@@ -278,7 +279,7 @@ export const vendorPortalRouter = router({
           .orderBy(asc(eventPartnershipPackages.targetType), asc(eventPartnershipPackages.sortOrder), asc(eventPartnershipPackages.id))
         : Promise.resolve([]),
       expoApplication
-        ? db.select().from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.status, "published")).orderBy(asc(ultrasoundExpoEvents.startsAt))
+        ? listCompatibleExpoEvents(db, { publishedOnly: true })
         : Promise.resolve([]),
     ]);
 

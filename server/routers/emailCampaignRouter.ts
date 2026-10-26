@@ -47,6 +47,7 @@ import {
 } from "../../drizzle/schema";
 import { addToEmailList, ensureAllContactsList, ensureExpoAudienceLists } from "../lib/emailListHelper";
 import { resolveRecipients } from "../lib/emailCampaignAudienceResolver";
+import { listCompatibleExpoEvents } from "../lib/expoEventSchemaCompatibility";
 import {
   AudienceFilterSchema,
   buildRecipientTrackingKey,
@@ -720,7 +721,7 @@ Rules:
       db.select({ id: lmsCourses.id, name: lmsCourses.title, kind: lmsCourses.type }).from(lmsCourses).orderBy(asc(lmsCourses.title)).limit(1000),
       db.select({ id: emailLists.id, name: emailLists.name }).from(emailLists).orderBy(asc(emailLists.name)).limit(1000),
       db.select({ id: emailTemplates.id, name: emailTemplates.name, subject: emailTemplates.subject }).from(emailTemplates).orderBy(desc(emailTemplates.updatedAt)).limit(1000),
-      db.select({ id: ultrasoundExpoEvents.id, name: ultrasoundExpoEvents.name, tenant: ultrasoundExpoEvents.tenant }).from(ultrasoundExpoEvents).orderBy(desc(ultrasoundExpoEvents.startsAt)).limit(1000),
+      listCompatibleExpoEvents(db).then(events => events.slice(0, 1000).map(event => ({ id: event.id, name: event.name, tenant: event.tenant }))),
       db.select({ id: workshops.id, name: workshops.title }).from(workshops).orderBy(asc(workshops.title)).limit(1000),
       db.select({ id: webinars.id, name: webinars.title }).from(webinars).orderBy(asc(webinars.title)).limit(1000),
       db.select({ id: digitalProducts.id, name: digitalProducts.title }).from(digitalProducts).orderBy(asc(digitalProducts.title)).limit(1000),

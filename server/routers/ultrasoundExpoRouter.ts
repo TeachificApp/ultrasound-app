@@ -14,6 +14,11 @@ import { EXPO_EVENT_TENANTS } from "../../shared/expoTenant";
 import { getDb, getUserRoles } from "../db";
 import { getStripeClient } from "../lib/stripeClient";
 import { requireApprovedVendorApplication } from "../lib/vendorPartnerAccess";
+import {
+  expoTenantSchemaAvailable,
+  getCompatibleExpoEventById,
+  listCompatibleExpoEvents,
+} from "../lib/expoEventSchemaCompatibility";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
 const EXPO_ORIGINS = new Set([
@@ -87,10 +92,7 @@ export const ultrasoundExpoRouter = router({
   publicLaunch: publicProcedure.query(async () => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "UltrasoundExpo™ is temporarily unavailable." });
-    const [event] = await db.select().from(ultrasoundExpoEvents)
-      .where(eq(ultrasoundExpoEvents.status, "published"))
-      .orderBy(asc(ultrasoundExpoEvents.startsAt))
-      .limit(1);
+    const [event] = await listCompatibleExpoEvents(db, { publishedOnly: true });
     if (!event) return { event: null, packages: [] };
     // Attendee registration is intentionally paused. Partner pricing is available only
     // through the separately authorized partner portal and never through this endpoint.
@@ -208,7 +210,9 @@ export const ultrasoundExpoRouter = router({
   myDashboard: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Your UltrasoundExpo™ Dashboard is temporarily unavailable." });
-    const rows = await db.select({
+    const events = await listCompatibleExpoEvents(db);
+    const eventById = new Map(events.map(event => [event.id, event]));
+    const registrationRows = await db.select({
       id: ultrasoundExpoRegistrations.id,
       attendeeName: ultrasoundExpoRegistrations.attendeeName,
       attendeeEmail: ultrasoundExpoRegistrations.attendeeEmail,
@@ -220,29 +224,38 @@ export const ultrasoundExpoRouter = router({
       paymentStatus: ultrasoundExpoRegistrations.paymentStatus,
       paidAt: ultrasoundExpoRegistrations.paidAt,
       createdAt: ultrasoundExpoRegistrations.createdAt,
-      eventName: ultrasoundExpoEvents.name,
-      eventSlug: ultrasoundExpoEvents.slug,
-      startsAt: ultrasoundExpoEvents.startsAt,
-      endsAt: ultrasoundExpoEvents.endsAt,
-      eventTenant: ultrasoundExpoEvents.tenant,
-      locationLabel: ultrasoundExpoEvents.locationLabel,
+      eventId: ultrasoundExpoRegistrations.eventId,
       packageName: ultrasoundExpoPackages.name,
       packageType: ultrasoundExpoPackages.packageType,
     }).from(ultrasoundExpoRegistrations)
-      .innerJoin(ultrasoundExpoEvents, eq(ultrasoundExpoRegistrations.eventId, ultrasoundExpoEvents.id))
       .innerJoin(ultrasoundExpoPackages, eq(ultrasoundExpoRegistrations.packageId, ultrasoundExpoPackages.id))
       .where(and(eq(ultrasoundExpoRegistrations.userId, ctx.user.id), eq(ultrasoundExpoPackages.packageType, "registrant")))
       .orderBy(desc(ultrasoundExpoRegistrations.createdAt));
-    return rows;
+    return registrationRows.map(row => {
+      const event = eventById.get(row.eventId);
+      return {
+        ...row,
+        eventName: event?.name ?? "UltrasoundExpo™ event",
+        eventSlug: event?.slug ?? "ultrasoundexpo",
+        startsAt: event?.startsAt ?? null,
+        endsAt: event?.endsAt ?? null,
+        eventTenant: event?.tenant ?? "ultrasound_expo",
+        locationLabel: event?.locationLabel ?? null,
+      };
+    });
   }),
 
   adminSnapshot: protectedProcedure.query(async ({ ctx }) => {
     await assertExpoAdmin(ctx.user);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const events = await db.select().from(ultrasoundExpoEvents).orderBy(asc(ultrasoundExpoEvents.startsAt));
+    const [events, tenantSchemaAvailable] = await Promise.all([
+      listCompatibleExpoEvents(db),
+      expoTenantSchemaAvailable(db),
+    ]);
+    const eventById = new Map(events.map(event => [event.id, event]));
     const packages = await db.select().from(ultrasoundExpoPackages).orderBy(asc(ultrasoundExpoPackages.eventId), asc(ultrasoundExpoPackages.sortOrder));
-    const registrations = await db.select({
+    const registrationRows = await db.select({
       id: ultrasoundExpoRegistrations.id,
       attendeeName: ultrasoundExpoRegistrations.attendeeName,
       attendeeEmail: ultrasoundExpoRegistrations.attendeeEmail,
@@ -254,26 +267,30 @@ export const ultrasoundExpoRouter = router({
       status: ultrasoundExpoRegistrations.status,
       paidAt: ultrasoundExpoRegistrations.paidAt,
       createdAt: ultrasoundExpoRegistrations.createdAt,
-      eventId: ultrasoundExpoEvents.id,
-      eventName: ultrasoundExpoEvents.name,
-      eventTenant: ultrasoundExpoEvents.tenant,
+      eventId: ultrasoundExpoRegistrations.eventId,
       packageName: ultrasoundExpoPackages.name,
       packageType: ultrasoundExpoPackages.packageType,
     }).from(ultrasoundExpoRegistrations)
-      .innerJoin(ultrasoundExpoEvents, eq(ultrasoundExpoRegistrations.eventId, ultrasoundExpoEvents.id))
       .innerJoin(ultrasoundExpoPackages, eq(ultrasoundExpoRegistrations.packageId, ultrasoundExpoPackages.id))
       .orderBy(desc(ultrasoundExpoRegistrations.createdAt))
       .limit(1000);
+    const registrations = registrationRows.map(row => {
+      const event = eventById.get(row.eventId);
+      return { ...row, eventName: event?.name ?? "UltrasoundExpo™ event", eventTenant: event?.tenant ?? "ultrasound_expo" };
+    });
     const paidTotal = registrations.filter(row => row.paymentStatus === "paid").reduce((sum, row) => sum + Number(row.amountCents), 0);
-    return { events, packages, registrations, paidTotal };
+    return { events, packages, registrations, paidTotal, tenantSchemaAvailable };
   }),
 
   createEvent: protectedProcedure.input(eventCreateInput).mutation(async ({ ctx, input }) => {
     await assertExpoAdmin(ctx.user);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const created = await db.insert(ultrasoundExpoEvents).values({
-      tenant: input.tenant,
+    const hasTenant = await expoTenantSchemaAvailable(db);
+    if (!hasTenant && input.tenant === "echo_expo") {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "EchoExpo™ event instances require the pending additive Railway database migration. Existing UltrasoundExpo™ events remain available." });
+    }
+    const eventValues = {
       name: input.name,
       slug: input.slug,
       startsAt: input.startsAt,
@@ -286,7 +303,8 @@ export const ultrasoundExpoRouter = router({
       attendeeInstructions: input.attendeeInstructions || null,
       partnerInstructions: input.partnerInstructions || null,
       status: input.status,
-    }).$returningId();
+    };
+    const created = await db.insert(ultrasoundExpoEvents).values(hasTenant ? { ...eventValues, tenant: input.tenant } : eventValues).$returningId();
     return { id: created[0]?.id ?? null };
   }),
 
@@ -301,10 +319,13 @@ export const ultrasoundExpoRouter = router({
     await assertExpoAdmin(ctx.user);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const [source] = await db.select().from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.id, input.sourceEventId)).limit(1);
+    const source = await getCompatibleExpoEventById(db, input.sourceEventId);
     if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "The source UltrasoundExpo™ event no longer exists." });
-    const created = await db.insert(ultrasoundExpoEvents).values({
-      tenant: source.tenant,
+    const hasTenant = await expoTenantSchemaAvailable(db);
+    if (!hasTenant && source.tenant === "echo_expo") {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "EchoExpo™ event instances require the pending additive Railway database migration." });
+    }
+    const duplicateValues = {
       name: input.name,
       slug: input.slug,
       startsAt: input.startsAt,
@@ -317,7 +338,8 @@ export const ultrasoundExpoRouter = router({
       attendeeInstructions: source.attendeeInstructions,
       partnerInstructions: source.partnerInstructions,
       status: input.status,
-    }).$returningId();
+    };
+    const created = await db.insert(ultrasoundExpoEvents).values(hasTenant ? { ...duplicateValues, tenant: source.tenant } : duplicateValues).$returningId();
     const newEventId = created[0]?.id;
     if (!newEventId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to duplicate this UltrasoundExpo™ event." });
     const packages = await db.select().from(ultrasoundExpoPackages).where(eq(ultrasoundExpoPackages.eventId, source.id));

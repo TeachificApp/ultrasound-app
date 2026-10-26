@@ -44,6 +44,7 @@ import { buildAdminEventPartnershipAlertEmail, buildEventPartnershipThankYouEmai
 import { buildUltrasoundExpoAdminAlertEmail, buildUltrasoundExpoThankYouEmail } from "../lib/ultrasoundExpoEmail";
 import { getPlatformAdminRecipient } from "../lib/platformAdminNotification";
 import { grantUltrasoundExpoEventCommunityAccess } from "../lib/ultrasoundExpoCommunity";
+import { getCompatibleExpoEventById } from "../lib/expoEventSchemaCompatibility";
 import { addExpoAttendeeToEmailList, addExpoPartnerToEmailList } from "../lib/emailListHelper";
 type CheckoutRecipient = { email: string | null; name: string | null };
 
@@ -428,7 +429,6 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
     packageName: ultrasoundExpoPackages.name,
     packageType: ultrasoundExpoPackages.packageType,
     eventId: ultrasoundExpoEvents.id,
-    eventTenant: ultrasoundExpoEvents.tenant,
   }).from(ultrasoundExpoRegistrations)
     .innerJoin(ultrasoundExpoEvents, eq(ultrasoundExpoRegistrations.eventId, ultrasoundExpoEvents.id))
     .innerJoin(ultrasoundExpoPackages, eq(ultrasoundExpoRegistrations.packageId, ultrasoundExpoPackages.id))
@@ -438,8 +438,7 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
   // An approved vendor application does not open the attendee community. The
   // event-specific paid registration is the only automatic enrollment signal.
   if (record.packageType === "registrant" || record.packageType === "exhibitor" || record.packageType === "sponsor") {
-    const [event] = await db.select().from(ultrasoundExpoEvents)
-      .where(eq(ultrasoundExpoEvents.id, existing.eventId)).limit(1);
+    const event = await getCompatibleExpoEventById(db, existing.eventId);
     if (event) {
       await grantUltrasoundExpoEventCommunityAccess(db, event, resolved.user.id).catch((error) => {
         console.error("[Stripe][UltrasoundExpo™] Event community enrollment failed", error);

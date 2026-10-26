@@ -22,6 +22,10 @@ import {
 import { getDb, getUserRoles } from "../db";
 import { getStripeClient } from "../lib/stripeClient";
 import { grantUltrasoundExpoEventCommunityAccess } from "../lib/ultrasoundExpoCommunity";
+import {
+  getCompatibleExpoEventById,
+  getCompatibleExpoEventBySlug,
+} from "../lib/expoEventSchemaCompatibility";
 import { storagePut } from "../storage";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
@@ -66,14 +70,13 @@ function safeExpoOrigin(origin: string) {
 }
 
 async function getEventById(db: any, eventId: number) {
-  const [event] = await db.select().from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.id, eventId)).limit(1);
+  const event = await getCompatibleExpoEventById(db, eventId);
   if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "The UltrasoundExpo™ event was not found." });
   return event;
 }
 
 async function getEventBySlug(db: any, eventSlug: string) {
-  const [event] = await db.select().from(ultrasoundExpoEvents)
-    .where(and(eq(ultrasoundExpoEvents.slug, eventSlug), eq(ultrasoundExpoEvents.status, "published"))).limit(1);
+  const event = await getCompatibleExpoEventBySlug(db, eventSlug, { publishedOnly: true });
   if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "This UltrasoundExpo™ event is not currently available." });
   return event;
 }
@@ -215,7 +218,7 @@ export const ultrasoundExpoEventRouter = router({
   getEventPage: publicProcedure.input(z.object({ eventSlug: z.string().min(2).max(255), pageSlug: z.string().min(2).max(255) })).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const [event] = await db.select().from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.slug, input.eventSlug)).limit(1);
+    const event = await getCompatibleExpoEventBySlug(db, input.eventSlug);
     if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "This UltrasoundExpo™ event is not currently available." });
     const admin = ctx.user ? await isExpoAdmin(ctx.user) : false;
     if (event.status !== "published" && !admin) throw new TRPCError({ code: "NOT_FOUND", message: "This UltrasoundExpo™ event is not currently available." });

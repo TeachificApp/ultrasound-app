@@ -23,6 +23,7 @@ import {
 } from "../../shared/expoPoints";
 import { getDb, getUserRoles } from "../db";
 import { getExpoPointsBalance, getExpoPointsParticipant } from "../lib/expoPoints";
+import { getCompatibleExpoEventById, listCompatibleExpoEvents } from "../lib/expoEventSchemaCompatibility";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
 const programScopeInput = z.enum(EXPO_POINTS_LEADERBOARD_SCOPES);
@@ -182,9 +183,9 @@ export const expoPointsRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const [event, program, allEvents] = await Promise.all([
-      db.select().from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.id, input.eventId)).limit(1).then((rows: any[]) => rows[0]),
+      getCompatibleExpoEventById(db, input.eventId),
       db.select().from(expoPointsPrograms).where(eq(expoPointsPrograms.hostEventId, input.eventId)).limit(1).then((rows: any[]) => rows[0] ?? null),
-      db.select().from(ultrasoundExpoEvents).orderBy(asc(ultrasoundExpoEvents.startsAt)),
+      listCompatibleExpoEvents(db),
     ]);
     if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "The Expo event was not found." });
     if (!program) return { event, program: null, includedEventIds: [event.id], availableEvents: allEvents, participants: [], rewards: [], redemptions: [], leaderboard: [] };
@@ -203,7 +204,7 @@ export const expoPointsRouter = router({
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     if (!input.includedEventIds.includes(input.eventId)) throw new TRPCError({ code: "BAD_REQUEST", message: "The current event instance must be included in its ExpoPoints program." });
-    const available = await db.select({ id: ultrasoundExpoEvents.id, tenant: ultrasoundExpoEvents.tenant }).from(ultrasoundExpoEvents).where(inArray(ultrasoundExpoEvents.id, input.includedEventIds));
+    const available = (await Promise.all(input.includedEventIds.map(eventId => getCompatibleExpoEventById(db, eventId)))).filter(Boolean) as Array<{ id: number; tenant: string }>;
     if (available.length !== input.includedEventIds.length) throw new TRPCError({ code: "BAD_REQUEST", message: "One or more selected Expo event instances no longer exist." });
     if (input.leaderboardScope === "ultrasound_expo" && available.some((event: any) => event.tenant !== "ultrasound_expo")) throw new TRPCError({ code: "BAD_REQUEST", message: "An UltrasoundExpo leaderboard can include only UltrasoundExpo event instances." });
     if (input.leaderboardScope === "echo_expo" && available.some((event: any) => event.tenant !== "echo_expo")) throw new TRPCError({ code: "BAD_REQUEST", message: "An EchoExpo leaderboard can include only EchoExpo event instances." });
