@@ -1,5 +1,6 @@
 import { emailWrapper } from "../_core/email";
 import { VENDOR_PARTNER_SCOPE_LABELS, VENDOR_PARTNER_TYPE_LABELS, type VendorPartnerScope, type VendorPartnerType } from "../../shared/vendorPartner";
+import { formatExpoEventInterests, type ExpoEventTenant } from "../../shared/expoTenant";
 
 export type VendorApplicationEmailRecord = {
   organizationName: string;
@@ -10,6 +11,7 @@ export type VendorApplicationEmailRecord = {
   message?: string | null;
   requestedScopes: VendorPartnerScope[];
   partnerTypes: VendorPartnerType[];
+  eventInterests?: ExpoEventTenant[];
 };
 
 function escapeHtml(value: string | null | undefined): string {
@@ -29,12 +31,17 @@ function typeText(types: VendorPartnerType[]) {
   return types.map(type => VENDOR_PARTNER_TYPE_LABELS[type]).join(" · ") || "Partner";
 }
 
+function eventInterestText(interests?: ExpoEventTenant[]) {
+  return interests?.length ? formatExpoEventInterests(interests) : null;
+}
+
 export function buildVendorApplicationReceivedEmail(record: VendorApplicationEmailRecord) {
   const content = `
     <h1 style="margin:0 0 14px;font-family:Georgia,serif;font-size:27px;line-height:1.2;color:#0b4f59;">Thank you for your partnership application</h1>
     <p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#334155;">Hi ${escapeHtml(record.contactName)},</p>
     <p style="margin:0 0 18px;font-size:16px;line-height:1.65;color:#334155;">We received ${escapeHtml(record.organizationName)}’s application to participate as a ${escapeHtml(typeText(record.partnerTypes).toLowerCase())}. The All About Ultrasound™ team will review the request before partner resources, pricing, or payment are made available.</p>
     <p style="margin:0 0 18px;font-size:15px;line-height:1.65;color:#475569;"><strong>Requested area:</strong> ${escapeHtml(scopeText(record.requestedScopes))}</p>
+    ${eventInterestText(record.eventInterests) ? `<p style="margin:0 0 18px;font-size:15px;line-height:1.65;color:#475569;"><strong>Requested Expo event${record.eventInterests?.length === 1 ? "" : "s"}:</strong> ${escapeHtml(eventInterestText(record.eventInterests))}</p>` : ""}
     <p style="margin:0;font-size:15px;line-height:1.65;color:#475569;">If your application is approved, we will send next steps for signing in with the same email address. Questions? Contact <a href="mailto:support@allaboutultrasound.com" style="color:#087f8c;">support@allaboutultrasound.com</a>.</p>
   `;
   return {
@@ -53,6 +60,7 @@ export function buildVendorApplicationAdminAlertEmail(record: VendorApplicationE
       <tr><td style="padding:9px 0;border-bottom:1px solid #dceff1;font-weight:700;">Phone</td><td style="padding:9px 0;border-bottom:1px solid #dceff1;">${escapeHtml(record.contactPhone || "Not provided")}</td></tr>
       <tr><td style="padding:9px 0;border-bottom:1px solid #dceff1;font-weight:700;">Partner type</td><td style="padding:9px 0;border-bottom:1px solid #dceff1;">${escapeHtml(typeText(record.partnerTypes))}</td></tr>
       <tr><td style="padding:9px 0;border-bottom:1px solid #dceff1;font-weight:700;">Requested area</td><td style="padding:9px 0;border-bottom:1px solid #dceff1;">${escapeHtml(scopeText(record.requestedScopes))}</td></tr>
+      ${eventInterestText(record.eventInterests) ? `<tr><td style="padding:9px 0;border-bottom:1px solid #dceff1;font-weight:700;">Requested Expo events</td><td style="padding:9px 0;border-bottom:1px solid #dceff1;">${escapeHtml(eventInterestText(record.eventInterests))}</td></tr>` : ""}
       <tr><td style="padding:9px 0;font-weight:700;vertical-align:top;">Message</td><td style="padding:9px 0;white-space:pre-wrap;">${escapeHtml(record.message || "No message provided")}</td></tr>
     </table>
   `;

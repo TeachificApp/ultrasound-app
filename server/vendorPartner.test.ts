@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isApprovedVendorForScope, parseVendorPartnerValues } from "../shared/vendorPartner";
+import { formatExpoEventInterests, normalizeExpoEventInterests } from "../shared/expoTenant";
 import { isExpoPublicRegistrationType } from "../shared/ultrasoundExpo";
 import { getVerifiedSharedAccountLink, normalizeOrganizationWebsiteInput } from "./routers/vendorPortalRouter";
 
@@ -29,6 +30,14 @@ describe("approved vendor partner access", () => {
       .toEqual(["aaus_ihe", "ultrasound_expo"]);
     expect(parseVendorPartnerValues('["vendor","exhibitor","sponsor"]', ["vendor", "exhibitor", "sponsor"] as const))
       .toEqual(["vendor", "exhibitor", "sponsor"]);
+  });
+
+  it("retains both distinct Expo interests while preserving legacy single-focus applications", () => {
+    expect(normalizeExpoEventInterests('["ultrasound_expo","echo_expo","untrusted"]'))
+      .toEqual(["ultrasound_expo", "echo_expo"]);
+    expect(normalizeExpoEventInterests(null, "echo_expo")).toEqual(["echo_expo"]);
+    expect(formatExpoEventInterests(["ultrasound_expo", "echo_expo"]))
+      .toBe("UltrasoundExpo™ · EchoExpo™");
   });
 
   it("accepts a domain-only organization website and normalizes it for storage", () => {

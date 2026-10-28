@@ -9244,6 +9244,10 @@ export const vendorPartnerApplications = mysqlTable("vendor_partner_applications
   // Optional pathway preference for a registered companion event; approval remains
   // controlled by the parent UltrasoundExpo™ scope.
   eventFocus: varchar("event_focus", { length: 40 }),
+  // JSON array of one or both ExpoEventTenant values. eventFocus remains for
+  // backward compatibility with applications submitted before EchoExpo™ became
+  // a separate back-to-back event.
+  eventInterests: text("event_interests"),
   status: mysqlEnum("status", ["pending", "approved", "rejected", "suspended"]).default("pending").notNull(),
   // A server-side approval always associates an exact shared account user ID.
   linkedUserId: int("linked_user_id"),

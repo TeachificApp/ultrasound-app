@@ -23,6 +23,7 @@ import {
   parseVendorPartnerValues,
   type VendorPartnerScope,
 } from "../../shared/vendorPartner";
+import { EXPO_EVENT_TENANTS, normalizeExpoEventInterests } from "../../shared/expoTenant";
 import { getDb, getOrCreateUserByEmail, getUserRoles } from "../db";
 import { sendEmail } from "../_core/email";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
@@ -80,10 +81,14 @@ async function assertPartnerAdmin(user: { id: number; role: string }) {
 }
 
 function asApplication(row: typeof vendorPartnerApplications.$inferSelect) {
+  const requestedScopes = parseVendorPartnerValues(row.requestedScopes, VENDOR_PARTNER_SCOPES);
   return {
     ...row,
-    requestedScopes: parseVendorPartnerValues(row.requestedScopes, VENDOR_PARTNER_SCOPES),
+    requestedScopes,
     partnerTypes: parseVendorPartnerValues(row.partnerTypes, VENDOR_PARTNER_TYPES),
+    eventInterests: requestedScopes.includes("ultrasound_expo")
+      ? normalizeExpoEventInterests(row.eventInterests, row.eventFocus)
+      : [],
   };
 }
 
@@ -109,6 +114,9 @@ const applicationInput = z.object({
   message: z.string().trim().max(4_000).optional(),
   requestedScopes: z.array(scopeInput).min(1).max(2),
   partnerTypes: z.array(partnerTypeInput).min(1).max(3),
+  eventInterests: z.array(z.enum(EXPO_EVENT_TENANTS)).min(1).max(2).optional(),
+  // Legacy callers may still submit one focus while they transition to the
+  // additive eventInterests array.
   eventFocus: z.enum(["ultrasound_expo", "echo_expo"]).optional(),
 });
 
@@ -121,6 +129,14 @@ export const vendorPortalRouter = router({
 
       const contactEmail = input.contactEmail.trim().toLowerCase();
       const organizationName = input.organizationName.trim();
+      const requestedScopes = [...new Set(input.requestedScopes)];
+      const partnerTypes = [...new Set(input.partnerTypes)];
+      const eventInterests = requestedScopes.includes("ultrasound_expo")
+        ? normalizeExpoEventInterests(input.eventInterests, input.eventFocus)
+        : [];
+      if (requestedScopes.includes("ultrasound_expo") && eventInterests.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Choose UltrasoundExpo™, EchoExpo™, or both event interests." });
+      }
       // A signed-in Learn/app member may apply as an attendee and an exhibitor.
       // Link only an exact, authenticated mailbox match; approval is still required
       // before this application grants any vendor, exhibitor, or sponsor access.
@@ -167,9 +183,10 @@ export const vendorPortalRouter = router({
           contactEmail,
           contactPhone: input.contactPhone.trim(),
           message: input.message?.trim() || null,
-          requestedScopes: JSON.stringify([...new Set(input.requestedScopes)]),
-          partnerTypes: JSON.stringify([...new Set(input.partnerTypes)]),
-          eventFocus: input.eventFocus ?? null,
+          requestedScopes: JSON.stringify(requestedScopes),
+          partnerTypes: JSON.stringify(partnerTypes),
+          eventFocus: eventInterests.length === 1 ? eventInterests[0] : null,
+          eventInterests: eventInterests.length ? JSON.stringify(eventInterests) : null,
           linkedUserId: verifiedSharedUserId,
           status: "pending",
         });
@@ -179,9 +196,10 @@ export const vendorPortalRouter = router({
           userId: verifiedSharedUserId,
           email: contactEmail,
           name: input.contactName.trim(),
-          partnerTypes: [...new Set(input.partnerTypes)],
-          requestedScopes: [...new Set(input.requestedScopes)],
-          eventFocus: input.eventFocus ?? null,
+          partnerTypes,
+          requestedScopes,
+          eventFocus: eventInterests.length === 1 ? eventInterests[0] : null,
+          eventInterests,
           status: "pending",
         });
       } catch (error) {
@@ -196,8 +214,9 @@ export const vendorPortalRouter = router({
         contactPhone: input.contactPhone.trim(),
         organizationWebsite: input.organizationWebsite?.trim() || null,
         message: input.message?.trim() || null,
-        requestedScopes: [...new Set(input.requestedScopes)],
-        partnerTypes: [...new Set(input.partnerTypes)],
+        requestedScopes,
+        partnerTypes,
+        eventInterests,
       };
       const receivedEmail = buildVendorApplicationReceivedEmail(record);
       const adminAlertEmail = buildVendorApplicationAdminAlertEmail(record);
@@ -402,6 +421,7 @@ export const vendorPortalRouter = router({
           partnerTypes: parseVendorPartnerValues(application.partnerTypes, VENDOR_PARTNER_TYPES),
           requestedScopes: parseVendorPartnerValues(application.requestedScopes, VENDOR_PARTNER_SCOPES),
           eventFocus: application.eventFocus,
+          eventInterests: application.eventInterests,
           status: "approved",
         });
         if (application.status !== "approved") {
@@ -439,6 +459,7 @@ export const vendorPortalRouter = router({
         partnerTypes: parseVendorPartnerValues(application.partnerTypes, VENDOR_PARTNER_TYPES),
         requestedScopes: parseVendorPartnerValues(application.requestedScopes, VENDOR_PARTNER_SCOPES),
         eventFocus: application.eventFocus,
+        eventInterests: application.eventInterests,
         status: nextStatus,
       });
       if (nextStatus === "rejected" && application.status !== "rejected") {

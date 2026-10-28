@@ -18,7 +18,7 @@ import {
   getPartnerProgramTags,
   getPartnerRoleTags,
 } from "../../shared/expoEmailAudience";
-import type { ExpoEventTenant } from "../../shared/expoTenant";
+import { normalizeExpoEventInterests, type ExpoEventTenant } from "../../shared/expoTenant";
 import type { EmailAutomationScope } from "../../shared/emailAutomation";
 
 // Cache the All Contacts list ID so we don't query on every call.
@@ -125,14 +125,19 @@ export async function addExpoPartnerToEmailList(input: {
   partnerTypes: readonly string[];
   requestedScopes: readonly string[];
   eventFocus?: string | null;
+  eventInterests?: unknown;
   status: "pending" | "approved" | "rejected" | "suspended";
 }): Promise<void> {
   try {
     const listId = await ensureNamedEmailList("exhibitorsAndSponsors");
     const participantRoles = getPartnerRoleTags(input.partnerTypes);
+    const eventInterests = input.requestedScopes.includes("ultrasound_expo")
+      ? normalizeExpoEventInterests(input.eventInterests, input.eventFocus)
+      : [];
     const programTags = getPartnerProgramTags({
       requestedScopes: input.requestedScopes,
       eventFocus: input.eventFocus,
+      eventInterests,
     });
     // General AAUS/iHeartEcho partner submissions remain outside this Expo list
     // unless they selected the shared UltrasoundExpo™ vendor pathway.
@@ -146,6 +151,7 @@ export async function addExpoPartnerToEmailList(input: {
         participantRoles,
         sponsorPrograms: input.partnerTypes.includes("sponsor") ? programTags : [],
         eventFocus: input.eventFocus ?? null,
+        eventInterests,
         applicationStatus: input.status,
       },
       automationScope: "expo",

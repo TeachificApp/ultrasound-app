@@ -1,4 +1,4 @@
-import type { ExpoEventTenant } from "./expoTenant";
+import { normalizeExpoEventInterests, type ExpoEventTenant } from "./expoTenant";
 
 /**
  * System-managed lists used by the Expo journeys. The names are deliberately
@@ -40,13 +40,16 @@ export function getExpoProgramLabel(tenant: ExpoEventTenant | "aaus_ihe"): strin
 export function getPartnerProgramTags(input: {
   requestedScopes?: readonly string[] | null;
   eventFocus?: string | null;
+  eventInterests?: unknown;
 }): string[] {
   const tags = new Set<string>();
   const scopes = input.requestedScopes ?? [];
 
   if (scopes.includes("aaus_ihe")) tags.add(getExpoProgramLabel("aaus_ihe"));
   if (scopes.includes("ultrasound_expo")) {
-    tags.add(input.eventFocus === "echo_expo" ? getExpoProgramLabel("echo_expo") : getExpoProgramLabel("ultrasound_expo"));
+    for (const eventInterest of normalizeExpoEventInterests(input.eventInterests, input.eventFocus)) {
+      tags.add(getExpoProgramLabel(eventInterest));
+    }
   }
   return [...tags];
 }

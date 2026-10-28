@@ -21,6 +21,10 @@ describe("Expo email audiences", () => {
       .toEqual(["All About Ultrasound™", "EchoExpo™"]);
     expect(getPartnerProgramTags({ requestedScopes: ["ultrasound_expo"], eventFocus: "ultrasound_expo" }))
       .toEqual(["UltrasoundExpo™"]);
+    expect(getPartnerProgramTags({
+      requestedScopes: ["ultrasound_expo"],
+      eventInterests: ["ultrasound_expo", "echo_expo"],
+    })).toEqual(["UltrasoundExpo™", "EchoExpo™"]);
   });
 
   it("wires new Expo applications and registrations into automatic list membership", async () => {

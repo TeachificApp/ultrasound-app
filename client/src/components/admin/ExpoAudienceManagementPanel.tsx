@@ -25,8 +25,8 @@ export function ExpoAudienceManagementPanel() {
     .filter((application: any) => application.expoAccess || application.requestedScopes?.includes("ultrasound_expo"))
     .map((application: any) => ({
       ...application,
-      ultrasound: application.eventFocus !== "echo_expo",
-      echo: application.eventFocus === "echo_expo",
+      ultrasound: application.eventInterests?.includes("ultrasound_expo") ?? application.eventFocus !== "echo_expo",
+      echo: application.eventInterests?.includes("echo_expo") ?? application.eventFocus === "echo_expo",
     })), [applications.data]);
 
   const busy = snapshot.isLoading || applications.isLoading;

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { VENDOR_PARTNER_SCOPE_LABELS, VENDOR_PARTNER_TYPE_LABELS, type VendorPartnerScope, type VendorPartnerType } from "@shared/vendorPartner";
+import { EXPO_EVENT_INTEREST_LABELS, type ExpoEventTenant } from "@shared/expoTenant";
 
 const scopes: VendorPartnerScope[] = ["aaus_ihe", "ultrasound_expo"];
 const partnerTypes: VendorPartnerType[] = ["vendor", "exhibitor", "sponsor"];
@@ -17,11 +18,21 @@ function queryDefaults(location: string) {
   const params = new URLSearchParams(location.split("?")[1] ?? "");
   const scope = params.get("scope") as VendorPartnerScope | null;
   const type = params.get("type") as VendorPartnerType | null;
-  const eventFocus: "" | "ultrasound_expo" | "echo_expo" = params.get("event") === "echoexpo" ? "echo_expo" : params.get("event") === "ultrasoundexpo" ? "ultrasound_expo" : "";
+  const selectedScopes = scope && scopes.includes(scope) ? [scope] : ["aaus_ihe", "ultrasound_expo"] as VendorPartnerScope[];
+  const requestedEvents = [...params.getAll("event"), ...params.getAll("events").flatMap(value => value.split(","))];
+  const eventInterests = [...new Set(requestedEvents.flatMap(value => {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "echoexpo" || normalized === "echo_expo") return ["echo_expo" as const];
+    if (normalized === "ultrasoundexpo" || normalized === "ultrasound_expo") return ["ultrasound_expo" as const];
+    if (normalized === "both") return ["ultrasound_expo" as const, "echo_expo" as const];
+    return [];
+  }))];
   return {
-    scopes: scope && scopes.includes(scope) ? [scope] : ["aaus_ihe", "ultrasound_expo"] as VendorPartnerScope[],
+    scopes: selectedScopes,
     types: type && partnerTypes.includes(type) ? [type] : ["vendor"] as VendorPartnerType[],
-    eventFocus,
+    eventInterests: eventInterests.length > 0
+      ? eventInterests
+      : selectedScopes.includes("ultrasound_expo") ? ["ultrasound_expo"] as ExpoEventTenant[] : [],
   };
 }
 
@@ -37,7 +48,7 @@ export default function PartnerApplication() {
   const [message, setMessage] = useState("");
   const [selectedScopes, setSelectedScopes] = useState<VendorPartnerScope[]>(defaults.scopes);
   const [selectedTypes, setSelectedTypes] = useState<VendorPartnerType[]>(defaults.types);
-  const [eventFocus, setEventFocus] = useState<"" | "ultrasound_expo" | "echo_expo">(defaults.eventFocus);
+  const [eventInterests, setEventInterests] = useState<ExpoEventTenant[]>(defaults.eventInterests);
   const [logo, setLogo] = useState<{ dataUri: string; mimeType: string; fileName: string } | null>(null);
   const [submitted, setSubmitted] = useState(false);
   useEffect(() => {
@@ -59,10 +70,15 @@ export default function PartnerApplication() {
 
   const toggleScope = (scope: VendorPartnerScope) => setSelectedScopes(previous => previous.includes(scope) ? previous.filter(value => value !== scope) : [...previous, scope]);
   const toggleType = (type: VendorPartnerType) => setSelectedTypes(previous => previous.includes(type) ? previous.filter(value => value !== type) : [...previous, type]);
+  const toggleEventInterest = (eventInterest: ExpoEventTenant) => setEventInterests(previous => previous.includes(eventInterest) ? previous.filter(value => value !== eventInterest) : [...previous, eventInterest]);
   const onSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedScopes.length || !selectedTypes.length) {
       toast.error("Choose at least one partner area and partner type.");
+      return;
+    }
+    if (selectedScopes.includes("ultrasound_expo") && !eventInterests.length) {
+      toast.error("Choose UltrasoundExpo™, EchoExpo™, or both event interests.");
       return;
     }
     submit.mutate({
@@ -77,7 +93,7 @@ export default function PartnerApplication() {
       message: message || undefined,
       requestedScopes: selectedScopes,
       partnerTypes: selectedTypes,
-      eventFocus: eventFocus || undefined,
+      eventInterests: selectedScopes.includes("ultrasound_expo") ? eventInterests : undefined,
     });
   };
 
@@ -101,7 +117,7 @@ export default function PartnerApplication() {
             {isAuthenticated && !authLoading && <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm leading-6 text-slate-700"><strong className="text-[#062634]">Shared Learn account detected.</strong> Submit with your account email to keep your future attendee registration and approved exhibitor access connected to this same profile.</div>}
             <div className="grid gap-4 sm:grid-cols-2"><Field label="Organization name"><Input required value={organizationName} onChange={e => setOrganizationName(e.target.value)} autoComplete="organization" /></Field><Field label="Organization website (optional)"><Input type="text" inputMode="url" value={organizationWebsite} onChange={e => setOrganizationWebsite(e.target.value)} placeholder="yourorganization.com" autoComplete="url" /></Field><Field label="Contact name"><Input required value={contactName} onChange={e => setContactName(e.target.value)} autoComplete="name" /></Field><Field label="Email address"><Input required type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} autoComplete="email" /></Field><Field label="Phone"><Input required type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} autoComplete="tel" /></Field><Field label="Organization logo"><div className="flex items-center gap-3"><label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-bold text-[#087f8c] hover:bg-cyan-50"><ImagePlus className="h-4 w-4" />{logo ? "Replace logo" : "Upload logo"}<input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (!file) return; if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 3 * 1024 * 1024) { toast.error("Choose a PNG, JPEG, or WebP logo no larger than 3 MB."); return; } const reader = new FileReader(); reader.onload = () => setLogo({ dataUri: String(reader.result), mimeType: file.type, fileName: file.name }); reader.readAsDataURL(file); }} /></label>{logo && <span className="max-w-[160px] truncate text-xs text-slate-500">{logo.fileName}</span>}</div></Field></div>
             <fieldset><legend className="text-sm font-bold text-slate-700">Where would you like to participate?</legend><div className="mt-3 grid gap-3 sm:grid-cols-2">{scopes.map(scope => <label key={scope} className={`cursor-pointer rounded-xl border p-4 transition ${selectedScopes.includes(scope) ? "border-[#087f8c] bg-[#ebfbfb]" : "border-slate-200 hover:border-cyan-300"}`}><input className="sr-only" type="checkbox" checked={selectedScopes.includes(scope)} onChange={() => toggleScope(scope)} /><span className="block font-bold text-[#062634]">{VENDOR_PARTNER_SCOPE_LABELS[scope]}</span><span className="mt-1 block text-xs leading-5 text-slate-500">{scope === "aaus_ihe" ? "General sponsorship, workshop exhibit, and webinar partner opportunities." : "Annual event exhibit, sponsor, resource, and booth request access."}</span></label>)}</div></fieldset>
-            {selectedScopes.includes("ultrasound_expo") && <label className="grid gap-1.5 text-sm font-bold text-slate-700">UltrasoundExpo™ event pathway <select value={eventFocus} onChange={event => setEventFocus(event.target.value as typeof eventFocus)} className="h-10 rounded-md border border-slate-200 bg-white px-3 font-normal"><option value="">UltrasoundExpo™ (general event)</option><option value="echo_expo">EchoExpo™ (cardiac ultrasound / echocardiography)</option></select></label>}
+            {selectedScopes.includes("ultrasound_expo") && <fieldset><legend className="text-sm font-bold text-slate-700">Which separate Expo event opportunities interest your organization?</legend><p className="mt-1 text-xs leading-5 text-slate-500">Select UltrasoundExpo™, EchoExpo™, or both. These are distinct back-to-back events, and your selections help the team route your exhibitor, vendor, or sponsor application.</p><div className="mt-3 grid gap-3 sm:grid-cols-2">{(["ultrasound_expo", "echo_expo"] as const).map(eventInterest => { const selected = eventInterests.includes(eventInterest); const detail = eventInterest === "ultrasound_expo" ? "The broader ultrasound event, January 11–13, 2028." : "The dedicated cardiac ultrasound and echocardiography event, January 14–16, 2028."; return <label key={eventInterest} className={`cursor-pointer rounded-xl border p-4 transition ${selected ? "border-[#087f8c] bg-[#ebfbfb] shadow-sm" : "border-slate-200 hover:border-cyan-300 hover:bg-cyan-50/40"}`}><input className="sr-only" type="checkbox" checked={selected} onChange={() => toggleEventInterest(eventInterest)} /><span className="flex items-center justify-between gap-2"><span className="font-bold text-[#062634]">{EXPO_EVENT_INTEREST_LABELS[eventInterest]}</span><span aria-hidden="true" className={`flex h-5 w-5 items-center justify-center rounded border text-xs font-black ${selected ? "border-[#087f8c] bg-[#087f8c] text-white" : "border-slate-300 bg-white text-transparent"}`}>✓</span></span><span className="mt-2 block text-xs leading-5 text-slate-500">{detail}</span></label>; })}</div></fieldset>}
             <fieldset><legend className="text-sm font-bold text-slate-700">How would you like to participate?</legend><p className="mt-1 text-xs leading-5 text-slate-500">Select all that apply. An organization may be a vendor, exhibitor, sponsor, or any combination.</p><div className="mt-3 grid gap-3 sm:grid-cols-3">{partnerTypes.map(type => {
               const details: Record<VendorPartnerType, string> = {
                 vendor: "Provides products, services, or solutions for the ultrasound community.",
