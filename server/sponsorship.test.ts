@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   formatSponsorshipAmount,
@@ -8,6 +9,15 @@ import {
 import { buildAdminSponsorshipAlertEmail, buildSponsorThankYouEmail } from "./lib/sponsorshipEmail";
 
 describe("sponsorship definitions", () => {
+  it("mounts the public sponsorship and partner routes within the Learn router", () => {
+    const app = readFileSync(new URL("../client/src/App.tsx", import.meta.url), "utf8");
+    const learnRouter = app.slice(app.indexOf("function LMSRouter()"), app.indexOf("function IHeartEchoRouter()"));
+
+    expect(learnRouter).toContain('<Route path="/sponsorships" component={SponsorshipsPage} />');
+    expect(learnRouter).toContain('<Route path="/partner-application" component={PartnerApplication} />');
+    expect(learnRouter).toContain('<Route path="/vendor-portal" component={ApprovedPartnerPortal} />');
+  });
+
   it("keeps the published workshop sponsorship tiers at their approved amounts", () => {
     expect(SPONSORSHIP_TIERS.silver.amountCents).toBe(250_000);
     expect(SPONSORSHIP_TIERS.gold.amountCents).toBe(500_000);

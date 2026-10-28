@@ -1071,6 +1071,12 @@ function LMSRouter() {
         {/* Workshops */}
         <Route path="/workshops" component={WorkshopsBrowse} />
         <Route path="/workshops/:slug" component={WorkshopLanding} />
+        {/* Partnership routes are public on Learn; pricing and payment remain
+            limited to approved organizations in the protected portal. */}
+        <Route path="/partner-application" component={PartnerApplication} />
+        <Route path="/vendor-portal" component={ApprovedPartnerPortal} />
+        <Route path="/sponsorships" component={SponsorshipsPage} />
+        <Route path="/event-partnerships/:targetType/:id" component={EventPartnershipsPage} />
         {/* Cross-Training */}
         <Route path="/cross-training" component={CrossTrainingBrowse} />
         {/* Webinars */}
