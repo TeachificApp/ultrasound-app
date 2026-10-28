@@ -59,6 +59,7 @@ import { getDb } from "../db";
 import { sql as drizzleSql } from "drizzle-orm";
 import { initSonoQuizHub } from "../sonoQuizHub";
 import { startSharingMonitor } from "../jobs/sharingMonitor";
+import { shouldRunPrimaryHostMaintenance } from "../lib/primaryHostMaintenance";
 import { scormExtractHeartbeatHandler, scormHealthCheckHandler } from "../routes/scormExtractor";
 import { healStuckScormVersions } from "../scheduled/scormHealthCheck";
 import { registerFormEmbedRoutes } from "../routes/formEmbedRoutes";
@@ -1180,6 +1181,11 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    if (!shouldRunPrimaryHostMaintenance()) {
+      console.log("[Startup] Primary-host maintenance is disabled for this managed web container.");
+      return;
+    }
+
     // Start the Daily Challenge lifecycle cron (archive expired, publish next)
     startChallengeCron();
     // Start the email campaign scheduler (sends scheduled campaigns every 5 minutes)
