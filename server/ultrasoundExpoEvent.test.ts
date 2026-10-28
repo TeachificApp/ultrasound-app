@@ -51,7 +51,7 @@ describe("UltrasoundExpo™ event instances", () => {
       import("node:fs/promises").then(fs => fs.readFile("client/src/pages/UltrasoundExpoSite.tsx", "utf8")),
       import("node:fs/promises").then(fs => fs.readFile("client/src/pages/EchoExpoSite.tsx", "utf8")),
     ]);
-    expect(ultrasoundSite).toContain("Inside UltrasoundExpo™");
+    expect(ultrasoundSite).toContain("Following UltrasoundExpo™");
     expect(ultrasoundSite).toContain("Explore EchoExpo™");
     expect(ultrasoundSite).toContain("https://www.echocardiographyexpo.com/");
     expect(echoSite).toContain("by iHeartEcho™");

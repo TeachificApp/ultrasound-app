@@ -11,7 +11,7 @@ export const EXPO_EMAIL_LISTS = {
   },
   echoExpoAttendees: {
     name: "EchoExpo™ Attendees",
-    description: "Automatically includes confirmed attendee registrations for EchoExpo™ event instances within UltrasoundExpo™.",
+    description: "Automatically includes confirmed attendee registrations for standalone EchoExpo™ event instances.",
   },
   exhibitorsAndSponsors: {
     name: "Exhibitors & Sponsors — UltrasoundExpo™ | EchoExpo™",

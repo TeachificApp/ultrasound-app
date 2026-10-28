@@ -18,7 +18,7 @@ import type { Express, Request, Response } from "express";
 import { getStripeClient } from "../lib/stripeClient";
 import { handleStudyGroupCheckoutCompleted, handleStudyGroupSubscriptionLifecycle } from "../routers/studyGroupsRouter";
 import { getDb, getUserByEmail, getOrCreateUserByEmail, getOrCreateAccessToken } from "../db";
-import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users, pendingFulfillments, sponsorships, eventPartnershipOrders, eventPartnershipPackages, ultrasoundExpoEvents, ultrasoundExpoPackages, ultrasoundExpoRegistrations } from "../../drizzle/schema";
+import { diySubscriptions, diyOrganizations, diyOrgMembers, userRoles, webhookEvents, lmsOrders, lmsEnrollments, lmsAffiliates, lmsAffiliateConversions, digitalPurchases, digitalProducts, digitalBundlePurchases, digitalBundleItems, digitalBundles, brandMemberships, physicalProductOrders, physicalProducts, funnelPurchases, lmsCourses, userActivityLogs, membershipSubscriptions, membershipPlans, membershipDiscountCodes, membershipPlanAccess, employerProfiles, employerSubscriptions, workshops, workshopInstances, webinarRegistrations, webinars, teamSubscriptions, teamMembers, deferredCheckoutSessions, revenueShareLedger, users, pendingFulfillments, sponsorships, eventPartnershipOrders, eventPartnershipPackages, ultrasoundExpoCheckoutGroups, ultrasoundExpoEvents, ultrasoundExpoPackages, ultrasoundExpoRegistrations } from "../../drizzle/schema";
 import { and, eq, sql, count } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
 import { sendPurchaseConfirmationEmail } from "../routers/downloadsRouter";
@@ -374,11 +374,11 @@ async function handleEventPartnershipCheckoutCompleted(session: Record<string, u
  * from the AAUS/iHeartEcho sponsorship and workshop-exhibit handlers: Expo
  * registrations have their own records, ticket code, dashboard, and reporting.
  */
-async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unknown>) {
-  const metadata = (session.metadata as Record<string, string>) ?? {};
-  if (metadata.type !== "ultrasound_expo") return;
-
-  const registrationId = Number.parseInt(metadata.ultrasound_expo_registration_id ?? "", 10);
+async function fulfillUltrasoundExpoRegistration(
+  session: Record<string, unknown>,
+  registrationId: number,
+  checkoutGroupId: number | null = null,
+) {
   const sessionId = typeof session.id === "string" ? session.id : null;
   if (!Number.isInteger(registrationId) || registrationId <= 0 || !sessionId) {
     console.warn("[Stripe][UltrasoundExpo™] Checkout is missing its registration identifier.");
@@ -393,7 +393,11 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
     await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "A paid UltrasoundExpo™ checkout did not have a matching registration record in Railway MySQL." });
     return;
   }
-  if (existing.stripeSessionId && existing.stripeSessionId !== sessionId) {
+  if (checkoutGroupId !== null && existing.checkoutGroupId !== checkoutGroupId) {
+    await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "A combined Expo checkout did not match the stored registration group. No automatic fulfillment was performed." });
+    return;
+  }
+  if (checkoutGroupId === null && existing.stripeSessionId && existing.stripeSessionId !== sessionId) {
     await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "An UltrasoundExpo™ registration record was presented by more than one checkout session. No automatic reassignment was made." });
     return;
   }
@@ -408,9 +412,11 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
   const ticketCode = existing.ticketCode ?? `UEX-${existing.eventId}-${existing.id}`;
   await db.update(ultrasoundExpoRegistrations).set({
     userId: resolved.user.id,
-    stripeSessionId: sessionId,
+    // Grouped registrations share their checkout session through the durable
+    // checkout group, while individual registrations retain the legacy link.
+    stripeSessionId: checkoutGroupId === null ? sessionId : existing.stripeSessionId,
     stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
-    amountCents: typeof session.amount_total === "number" ? session.amount_total : existing.amountCents,
+    amountCents: checkoutGroupId === null && typeof session.amount_total === "number" ? session.amount_total : existing.amountCents,
     currency: typeof session.currency === "string" ? session.currency.toLowerCase() : existing.currency,
     ticketCode,
     paymentStatus: "paid",
@@ -489,21 +495,62 @@ async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unk
   };
   const thankYouEmail = buildUltrasoundExpoThankYouEmail(emailRecord);
   const adminAlertEmail = buildUltrasoundExpoAdminAlertEmail(emailRecord);
+  const notificationSuffix = checkoutGroupId === null ? "" : `:${registrationId}`;
   const [thankYou, alert] = await Promise.all([
     sendPurchaseNotificationOnce(db, {
       checkoutSessionId: sessionId,
-      notificationType: "ultrasound_expo_thank_you",
+      notificationType: `ultrasound_expo_thank_you${notificationSuffix}`,
       send: () => sendEmail({ to: { name: record.attendeeName, email: record.attendeeEmail }, subject: thankYouEmail.subject, htmlBody: thankYouEmail.htmlBody }),
     }),
     sendPurchaseNotificationOnce(db, {
       checkoutSessionId: sessionId,
-      notificationType: "ultrasound_expo_admin_alert",
+      notificationType: `ultrasound_expo_admin_alert${notificationSuffix}`,
       send: () => sendEmail({ to: getPlatformAdminRecipient("UltrasoundExpo™ Team"), subject: adminAlertEmail.subject, htmlBody: adminAlertEmail.htmlBody }),
     }),
   ]);
   if ((thankYou.attempted && !thankYou.delivered) || (alert.attempted && !alert.delivered)) {
     await notifyOwner({ title: "UltrasoundExpo™ email delivery needs review", content: "A paid UltrasoundExpo™ registration was saved, but one or more confirmation notifications could not be delivered. The durable delivery log will retry safely." });
   }
+}
+
+async function handleUltrasoundExpoCheckoutCompleted(session: Record<string, unknown>) {
+  const metadata = (session.metadata as Record<string, string>) ?? {};
+  const isIndividualCheckout = metadata.type === "ultrasound_expo";
+  const isCombinedCheckout = metadata.type === "ultrasound_expo_combined";
+  if (!isIndividualCheckout && !isCombinedCheckout) return;
+
+  const registrationId = Number.parseInt(metadata.ultrasound_expo_registration_id ?? "", 10);
+  if (!isCombinedCheckout) {
+    await fulfillUltrasoundExpoRegistration(session, registrationId);
+    return;
+  }
+
+  const companionRegistrationId = Number.parseInt(metadata.ultrasound_expo_companion_registration_id ?? "", 10);
+  const checkoutGroupId = Number.parseInt(metadata.ultrasound_expo_checkout_group_id ?? "", 10);
+  const sessionId = typeof session.id === "string" ? session.id : null;
+  if (![registrationId, companionRegistrationId, checkoutGroupId].every(id => Number.isInteger(id) && id > 0) || !sessionId) {
+    console.warn("[Stripe][UltrasoundExpo™] Combined checkout is missing a registration or group identifier.");
+    return;
+  }
+
+  const db = await getDb();
+  if (!db) throw new Error("Combined UltrasoundExpo™ payment could not reach the MySQL database.");
+  const [group] = await db.select().from(ultrasoundExpoCheckoutGroups).where(eq(ultrasoundExpoCheckoutGroups.id, checkoutGroupId)).limit(1);
+  if (!group || (group.stripeSessionId && group.stripeSessionId !== sessionId)) {
+    await notifyOwner({ title: "UltrasoundExpo™ payment needs review", content: "A combined Expo payment did not match its stored checkout group. No automatic access was granted." });
+    return;
+  }
+  await db.update(ultrasoundExpoCheckoutGroups).set({
+    stripeSessionId: sessionId,
+    stripePaymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : null,
+    amountCents: typeof session.amount_total === "number" ? session.amount_total : group.amountCents,
+    currency: typeof session.currency === "string" ? session.currency.toLowerCase() : group.currency,
+    paymentStatus: "paid",
+    paidAt: group.paidAt ?? new Date(),
+  }).where(eq(ultrasoundExpoCheckoutGroups.id, checkoutGroupId));
+
+  await fulfillUltrasoundExpoRegistration(session, registrationId, checkoutGroupId);
+  await fulfillUltrasoundExpoRegistration(session, companionRegistrationId, checkoutGroupId);
 }
 
 async function handleMembershipCheckoutCompleted(session: Record<string, unknown>) {

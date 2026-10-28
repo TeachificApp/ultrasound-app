@@ -3,7 +3,7 @@ import { AAUS_SONO_RING_LOGO_URL } from "./brands";
 export const ULTRASOUND_EXPO_NAME = "UltrasoundExpo™";
 export const ULTRASOUND_EXPO_ORGANIZER = "All About Ultrasound™";
 export const ULTRASOUND_EXPO_ORIGIN = "https://ultrasoundexpo.com";
-export const ULTRASOUND_EXPO_EVENT_DATES_LABEL = "January 14–16, 2028";
+export const ULTRASOUND_EXPO_EVENT_DATES_LABEL = "January 11–13, 2028";
 export const ULTRASOUND_EXPO_LOCATION_LABEL = "Orlando, Florida · Venue TBD";
 export const ULTRASOUND_EXPO_HERO_IMAGE = "https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/nmDnyKctfSTBjSLH.jpg";
 export const ULTRASOUND_EXPO_AAUS_LOGO_URL = AAUS_SONO_RING_LOGO_URL;
@@ -222,54 +222,28 @@ export function getUltrasoundExpoPageSeo(slug: string): ExpoPageSeo {
 
 export const ULTRASOUND_EXPO_SCHEDULE = {
   heading: "The UltrasoundExpo™ Schedule",
-  introduction: "Pre-event exhibitor setup begins Wednesday and continues Thursday, followed by UltrasoundExpo™ from Friday, January 14 through Sunday, January 16, 2028. All scheduled program times are Eastern Time.",
+  introduction: "UltrasoundExpo™ runs Tuesday, January 11 through Thursday, January 13, 2028, immediately before the standalone EchoExpo™ cardiac ultrasound event. All scheduled program times are Eastern Time.",
   days: [
     {
-      key: "wednesday_schedule",
-      label: "Wednesday, January 12",
-      title: "Pre-Event Exhibitor Setup",
-      summary: "Dedicated exhibitor setup and installation day.",
-      items: ["Exhibitor setup"],
-    },
-    {
-      key: "thursday_schedule",
-      label: "Thursday, January 13",
-      title: "Pre-Event Exhibitor Setup",
-      summary: "Continued exhibitor setup and installation day.",
-      items: ["Exhibitor setup"],
-    },
-    {
+      // Reuses the existing editable opening-day content rather than dropping
+      // any administrator-entered program items when dates change.
       key: "friday_schedule",
-      label: "Friday, January 14",
-      title: "Grand Opening & Destination Evening",
-      summary: "Friday night becomes the destination event at UltrasoundExpo™.",
-      items: [
-        "12 PM – All exhibitor setup complete",
-        "3 PM – Workshops / ScanLabs",
-        "5 PM – UltrasoundExpo™ Grand Opening",
-        "5–8 PM – Expo + Opening Reception",
-      ],
+      label: "Tuesday, January 11",
+      title: "Opening Day & Destination Evening",
+      summary: "UltrasoundExpo™ opens with hands-on learning, discovery, and a destination evening for the ultrasound community.",
+      items: ["12 PM – Exhibitor setup complete", "3 PM – Workshops / ScanLabs", "5 PM – UltrasoundExpo™ Grand Opening", "5–8 PM – Expo + Opening Reception"],
     },
     {
+      // Reuses the established second-day editor field.
       key: "saturday_schedule",
-      label: "Saturday, January 15",
+      label: "Wednesday, January 12",
       title: "Education, Expo & Innovation",
-      items: [
-        "8 AM – Keynote",
-        "9 AM – Education",
-        "10 AM – Expo",
-        "11 AM – CME Tracks / ScanLabs",
-        "12 PM – Lunch in Expo",
-        "1:30 PM – Education",
-        "3 PM – Expo",
-        "4 PM – Innovation Stage",
-        "5 PM – Career sessions",
-        "6 PM – Expo Social",
-      ],
+      items: ["8 AM – Keynote", "9 AM – Education", "10 AM – Expo", "11 AM – CME Tracks / ScanLabs", "12 PM – Lunch in Expo", "1:30 PM – Education", "3 PM – Expo", "4 PM – Innovation Stage", "5 PM – Career sessions", "6 PM – Expo Social"],
     },
     {
+      // Reuses the established final-day editor field.
       key: "sunday_schedule",
-      label: "Sunday, January 16",
+      label: "Thursday, January 13",
       title: "CME, ScanLabs & Closing Celebration",
       items: [
         "8 AM – CME",
@@ -285,8 +259,8 @@ export const ULTRASOUND_EXPO_SCHEDULE = {
 export const ULTRASOUND_EXPO_LAUNCH_EVENT = {
   name: "UltrasoundExpo™ 2028",
   slug: "ultrasoundexpo-2028",
-  startsAtIso: "2028-01-14T12:00:00-05:00",
-  endsAtIso: "2028-01-16T14:00:00-05:00",
+  startsAtIso: "2028-01-11T12:00:00-05:00",
+  endsAtIso: "2028-01-13T14:00:00-05:00",
   timezone: "America/New_York",
   locationLabel: ULTRASOUND_EXPO_LOCATION_LABEL,
   shortDescription: "The annual ultrasound event for education, innovation, ScanLabs, exhibits, and connection — with a destination Grand Opening and Opening Reception on Friday evening.",

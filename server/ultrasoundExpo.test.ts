@@ -24,38 +24,34 @@ import { ultrasoundExpoRouter } from "./routers/ultrasoundExpoRouter";
 import { getPageSeoForRequest, injectPageSeoIntoHtml } from "./routes/funnelOgMeta";
 
 describe("UltrasoundExpo™ annual-event platform", () => {
-  it("keeps the inaugural annual event configured for Orlando with venue TBD on January 14–16, 2028", () => {
+  it("keeps the inaugural annual event configured for Orlando with venue TBD on January 11–13, 2028", () => {
     expect(ULTRASOUND_EXPO_NAME).toBe("UltrasoundExpo™");
     expect(ULTRASOUND_EXPO_AAUS_LOGO_URL).toContain("sono-ring4_orig.png");
-    expect(ULTRASOUND_EXPO_EVENT_DATES_LABEL).toBe("January 14–16, 2028");
+    expect(ULTRASOUND_EXPO_EVENT_DATES_LABEL).toBe("January 11–13, 2028");
     expect(ULTRASOUND_EXPO_LOCATION_LABEL).toBe("Orlando, Florida · Venue TBD");
-    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.startsAtIso).toContain("2028-01-14");
-    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.endsAtIso).toContain("2028-01-16");
+    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.startsAtIso).toContain("2028-01-11");
+    expect(ULTRASOUND_EXPO_LAUNCH_EVENT.endsAtIso).toContain("2028-01-13");
     expect(ULTRASOUND_EXPO_LAUNCH_EVENT.locationLabel).toBe("Orlando, Florida · Venue TBD");
   });
 
-  it("publishes the Friday destination opening and the complete editable annual schedule", () => {
+  it("publishes the Tuesday-through-Thursday standalone schedule before EchoExpo™ begins", () => {
     expect(ULTRASOUND_EXPO_SCHEDULE.days[0]).toMatchObject({
-      label: "Wednesday, January 12",
-      title: "Pre-Event Exhibitor Setup",
-      items: ["Exhibitor setup"],
+      label: "Tuesday, January 11",
+      title: "Opening Day & Destination Evening",
     });
     expect(ULTRASOUND_EXPO_SCHEDULE.days[1]).toMatchObject({
-      label: "Thursday, January 13",
-      title: "Pre-Event Exhibitor Setup",
-      items: ["Exhibitor setup"],
+      label: "Wednesday, January 12",
+      title: "Education, Expo & Innovation",
     });
     expect(ULTRASOUND_EXPO_SCHEDULE.days[2]).toMatchObject({
-      label: "Friday, January 14",
-      title: "Grand Opening & Destination Evening",
-      summary: "Friday night becomes the destination event at UltrasoundExpo™.",
+      label: "Thursday, January 13",
+      title: "CME, ScanLabs & Closing Celebration",
     });
-    expect(ULTRASOUND_EXPO_SCHEDULE.days[2].items).toContain("12 PM – All exhibitor setup complete");
-    expect(ULTRASOUND_EXPO_SCHEDULE.days[2].items).toContain("5–8 PM – Expo + Opening Reception");
-    expect(ULTRASOUND_EXPO_SCHEDULE.days[3].items).toContain("4 PM – Innovation Stage");
-    expect(ULTRASOUND_EXPO_SCHEDULE.days[4].items).toContain("12:30 PM – Closing keynote / awards");
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[0].items).toContain("5–8 PM – Expo + Opening Reception");
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[1].items).toContain("4 PM – Innovation Stage");
+    expect(ULTRASOUND_EXPO_SCHEDULE.days[2].items).toContain("12:30 PM – Closing keynote / awards");
     expect(getUltrasoundExpoEditorPage("program")?.zones.map((zone) => zone.key)).toEqual(expect.arrayContaining([
-      "schedule_heading", "schedule_introduction", "wednesday_schedule", "thursday_schedule", "friday_schedule", "saturday_schedule", "sunday_schedule",
+      "schedule_heading", "schedule_introduction", "friday_schedule", "saturday_schedule", "sunday_schedule",
     ]));
   });
 
@@ -127,6 +123,7 @@ describe("UltrasoundExpo™ annual-event platform", () => {
 
   it("recognizes Expo Stripe checkouts as deliberate fulfillment routes", () => {
     expect(hasKnownStripeCheckoutRoute({}, { type: "ultrasound_expo" })).toBe(true);
+    expect(hasKnownStripeCheckoutRoute({}, { type: "ultrasound_expo_combined" })).toBe(true);
     expect(formatExpoMoney(1000000)).toBe("$10,000.00");
   });
 

@@ -21,6 +21,7 @@ const KNOWN_CHECKOUT_TYPES = new Set([
   "sponsorship",
   "event_partnership",
   "ultrasound_expo",
+  "ultrasound_expo_combined",
 ]);
 
 const KNOWN_PRODUCT_TYPES = new Set([

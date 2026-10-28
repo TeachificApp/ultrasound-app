@@ -1,14 +1,16 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   ultrasoundExpoAgendaItems,
+  ultrasoundExpoCheckoutGroups,
   ultrasoundExpoEvents,
   ultrasoundExpoEventPages,
   ultrasoundExpoPackages,
   ultrasoundExpoRecordings,
   ultrasoundExpoRegistrations,
 } from "../../drizzle/schema";
+import { calculateExpoCombinedOfferPricing } from "../../shared/expoCombinedOffer";
 import { ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
 import { EXPO_EVENT_TENANTS } from "../../shared/expoTenant";
 import { getDb, getUserRoles } from "../db";
@@ -86,6 +88,7 @@ const packageInput = z.object({
   currency: z.string().trim().toLowerCase().length(3).default("usd"),
   sortOrder: z.number().int().min(0).max(10_000).default(0),
   isActive: z.boolean().default(true),
+  combinedWithPackageId: z.number().int().positive().nullable().optional(),
 });
 
 export const ultrasoundExpoRouter = router({
@@ -204,6 +207,163 @@ export const ultrasoundExpoRouter = router({
       } catch {
         await db.update(ultrasoundExpoRegistrations).set({ paymentStatus: "failed", status: "payment_failed" }).where(eq(ultrasoundExpoRegistrations.id, registrationId));
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to start secure UltrasoundExpo™ checkout. Please try again." });
+      }
+    }),
+
+  /**
+   * Creates one Stripe Checkout Session for two explicitly paired exhibitor or
+   * sponsor packages. The user receives an independent registration/access
+   * record for each event after Stripe confirms payment.
+   */
+  createCombinedPartnerCheckout: protectedProcedure
+    .input(z.object({
+      primaryPackageId: z.number().int().positive(),
+      companionPackageId: z.number().int().positive(),
+      notes: z.string().trim().max(4_000).optional().or(z.literal("")),
+      origin: z.string().max(2_048),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.primaryPackageId === input.companionPackageId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Choose one package from each event for the combined Expo offer." });
+      }
+      const application = await requireApprovedVendorApplication(ctx.user.id, "ultrasound_expo");
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "UltrasoundExpo™ checkout is temporarily unavailable." });
+
+      const selections = await db.select({
+        packageId: ultrasoundExpoPackages.id,
+        combinedWithPackageId: ultrasoundExpoPackages.combinedWithPackageId,
+        eventId: ultrasoundExpoEvents.id,
+        eventName: ultrasoundExpoEvents.name,
+        eventTenant: ultrasoundExpoEvents.tenant,
+        eventStatus: ultrasoundExpoEvents.status,
+        eventStartsAt: ultrasoundExpoEvents.startsAt,
+        eventEndsAt: ultrasoundExpoEvents.endsAt,
+        packageType: ultrasoundExpoPackages.packageType,
+        packageName: ultrasoundExpoPackages.name,
+        amountCents: ultrasoundExpoPackages.amountCents,
+        currency: ultrasoundExpoPackages.currency,
+        isActive: ultrasoundExpoPackages.isActive,
+      }).from(ultrasoundExpoPackages)
+        .innerJoin(ultrasoundExpoEvents, eq(ultrasoundExpoPackages.eventId, ultrasoundExpoEvents.id))
+        .where(inArray(ultrasoundExpoPackages.id, [input.primaryPackageId, input.companionPackageId]));
+      if (selections.length !== 2) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "One or both selected Expo opportunities are no longer available." });
+      }
+      const primary = selections.find(item => item.packageId === input.primaryPackageId)!;
+      const companion = selections.find(item => item.packageId === input.companionPackageId)!;
+      const allowedTypes = ["exhibitor", "sponsor"] as const;
+      const isConfiguredPair = primary.combinedWithPackageId === companion.packageId || companion.combinedWithPackageId === primary.packageId;
+      const [firstEvent, secondEvent] = [primary, companion].sort((left, right) => left.eventStartsAt.getTime() - right.eventStartsAt.getTime());
+      const hoursBetweenEvents = firstEvent.eventEndsAt
+        ? (secondEvent.eventStartsAt.getTime() - firstEvent.eventEndsAt.getTime()) / 3_600_000
+        : Number.POSITIVE_INFINITY;
+      if (
+        !primary.isActive || !companion.isActive ||
+        primary.eventStatus !== "published" || companion.eventStatus !== "published" ||
+        !allowedTypes.includes(primary.packageType as typeof allowedTypes[number]) ||
+        primary.packageType !== companion.packageType ||
+        primary.eventId === companion.eventId ||
+        primary.eventTenant === companion.eventTenant ||
+        primary.currency.toLowerCase() !== companion.currency.toLowerCase() ||
+        !isConfiguredPair ||
+        hoursBetweenEvents < 0 || hoursBetweenEvents > 48
+      ) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "These Expo packages are not configured as an eligible combined event offer." });
+      }
+
+      let pricing;
+      try {
+        pricing = calculateExpoCombinedOfferPricing(primary.amountCents, companion.amountCents);
+      } catch (error) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "The combined Expo offer cannot be priced securely." });
+      }
+
+      const groupInsert = await db.insert(ultrasoundExpoCheckoutGroups).values({
+        userId: ctx.user.id,
+        vendorApplicationId: application.id,
+        packageType: primary.packageType as "exhibitor" | "sponsor",
+        subtotalCents: pricing.baseTotalCents,
+        discountCents: pricing.discountCents,
+        amountCents: pricing.totalCents,
+        currency: primary.currency.toLowerCase(),
+        paymentStatus: "pending",
+      }).$returningId();
+      const checkoutGroupId = groupInsert[0]?.id;
+      if (!checkoutGroupId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the combined Expo selection." });
+
+      const registrationRows = [primary, companion].map((selection, index) => ({
+        eventId: selection.eventId,
+        packageId: selection.packageId,
+        userId: ctx.user.id,
+        vendorApplicationId: application.id,
+        checkoutGroupId,
+        attendeeName: application.contactName,
+        attendeeEmail: application.contactEmail,
+        attendeePhone: application.contactPhone,
+        organizationName: application.organizationName,
+        organizationWebsite: application.organizationWebsite,
+        notes: input.notes?.trim() || null,
+        amountCents: pricing.discountedLineAmounts[index],
+        currency: selection.currency.toLowerCase(),
+        paymentStatus: "pending" as const,
+        status: "pending" as const,
+      }));
+      const registrations = await db.insert(ultrasoundExpoRegistrations).values(registrationRows).$returningId();
+      const primaryRegistrationId = registrations[0]?.id;
+      const companionRegistrationId = registrations[1]?.id;
+      if (!primaryRegistrationId || !companionRegistrationId) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the combined Expo registrations." });
+      }
+
+      try {
+        const origin = safeExpoOrigin(input.origin);
+        const session = await getStripeClient().checkout.sessions.create({
+          mode: "payment",
+          customer_email: application.contactEmail,
+          client_reference_id: String(ctx.user.id),
+          billing_address_collection: "auto",
+          allow_promotion_codes: false,
+          line_items: [primary, companion].map((selection, index) => ({
+            price_data: {
+              currency: selection.currency.toLowerCase(),
+              product_data: {
+                name: `${selection.eventName} — ${selection.packageName}`,
+                description: `Combined Expo offer · 20% off when attending or exhibiting at both events`,
+              },
+              unit_amount: pricing.discountedLineAmounts[index],
+            },
+            quantity: 1,
+          })),
+          metadata: {
+            type: "ultrasound_expo_combined",
+            ultrasound_expo_checkout_group_id: String(checkoutGroupId),
+            ultrasound_expo_registration_id: String(primaryRegistrationId),
+            ultrasound_expo_companion_registration_id: String(companionRegistrationId),
+            ultrasound_expo_package_type: primary.packageType,
+            ultrasound_expo_discount_basis_points: "2000",
+            vendor_application_id: String(application.id),
+            user_id: String(ctx.user.id),
+            attendee_email: application.contactEmail,
+          },
+          payment_intent_data: { description: `Combined Expo offer — ${primary.eventName} + ${companion.eventName}` },
+          success_url: `${origin}/vendor-portal?status=complete&session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${origin}/vendor-portal?status=cancelled`,
+        }, { idempotencyKey: `ultrasound-expo-combined:${checkoutGroupId}` });
+        if (!session.url) throw new Error("Stripe did not return a checkout URL.");
+        await db.update(ultrasoundExpoCheckoutGroups).set({ stripeSessionId: session.id }).where(eq(ultrasoundExpoCheckoutGroups.id, checkoutGroupId));
+        return {
+          checkoutUrl: session.url,
+          subtotalCents: pricing.baseTotalCents,
+          discountCents: pricing.discountCents,
+          totalCents: pricing.totalCents,
+        };
+      } catch {
+        await Promise.all([
+          db.update(ultrasoundExpoCheckoutGroups).set({ paymentStatus: "failed" }).where(eq(ultrasoundExpoCheckoutGroups.id, checkoutGroupId)),
+          db.update(ultrasoundExpoRegistrations).set({ paymentStatus: "failed", status: "payment_failed" }).where(eq(ultrasoundExpoRegistrations.checkoutGroupId, checkoutGroupId)),
+        ]);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to start secure combined Expo checkout. Please try again." });
       }
     }),
 
@@ -359,6 +519,9 @@ export const ultrasoundExpoRouter = router({
         currency: item.currency,
         sortOrder: item.sortOrder,
         isActive: false,
+        // Pairing is an intentional relationship between the two current-year
+        // events and must be configured anew after an annual event is copied.
+        combinedWithPackageId: null,
       })));
     }
     if (agenda.length) {
@@ -411,6 +574,30 @@ export const ultrasoundExpoRouter = router({
     await assertExpoAdmin(ctx.user);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const combinedWithPackageId = input.combinedWithPackageId ?? null;
+    if (combinedWithPackageId) {
+      if (input.id === combinedWithPackageId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "An Expo package cannot be paired with itself." });
+      }
+      const [[sourceEvent], [companion]] = await Promise.all([
+        db.select({ id: ultrasoundExpoEvents.id, tenant: ultrasoundExpoEvents.tenant }).from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.id, input.eventId)).limit(1),
+        db.select().from(ultrasoundExpoPackages).where(eq(ultrasoundExpoPackages.id, combinedWithPackageId)).limit(1),
+      ]);
+      if (!sourceEvent || !companion) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "The selected companion Expo package no longer exists." });
+      }
+      const [companionEvent] = await db.select({ id: ultrasoundExpoEvents.id, tenant: ultrasoundExpoEvents.tenant })
+        .from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.id, companion.eventId)).limit(1);
+      if (
+        !companionEvent ||
+        companion.eventId === input.eventId ||
+        companionEvent.tenant === sourceEvent.tenant ||
+        companion.packageType !== input.packageType ||
+        companion.currency.toLowerCase() !== input.currency.toLowerCase()
+      ) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A combined Expo offer must pair matching package types and currencies across UltrasoundExpo™ and EchoExpo™." });
+      }
+    }
     const values = {
       eventId: input.eventId,
       packageType: input.packageType,
@@ -421,6 +608,7 @@ export const ultrasoundExpoRouter = router({
       currency: input.currency,
       sortOrder: input.sortOrder,
       isActive: input.isActive,
+      combinedWithPackageId,
     };
     if (input.id) {
       await db.update(ultrasoundExpoPackages).set(values).where(eq(ultrasoundExpoPackages.id, input.id));

@@ -34,7 +34,7 @@ const ULTRASOUND_EXPO_METADATA: SiteMetadata = {
   siteName: "UltrasoundExpo™",
   title: "UltrasoundExpo™ | The Annual Event for Ultrasound Professionals",
   description:
-    "UltrasoundExpo™ by All About Ultrasound™ brings education, innovation, hands-on learning, exhibitors, and connection together in Orlando, January 14–16, 2028.",
+    "UltrasoundExpo™ by All About Ultrasound™ brings education, innovation, hands-on learning, exhibitors, and connection together in Orlando, January 11–13, 2028.",
   image: ULTRASOUND_EXPO_HERO_IMAGE,
   favicon: ULTRASOUND_EXPO_LOGO_URL,
   themeColor: "#087f8c",
@@ -43,9 +43,9 @@ const ULTRASOUND_EXPO_METADATA: SiteMetadata = {
 
 const ECHO_EXPO_METADATA: SiteMetadata = {
   siteName: "EchoExpo™",
-  title: "EchoExpo™ | The Echocardiography Experience at UltrasoundExpo™",
+  title: "EchoExpo™ | The Standalone Echocardiography Event",
   description:
-    "EchoExpo™ is the cardiac ultrasound and echocardiography experience at UltrasoundExpo™, with education, Echo Skills, Echo Games, hands-on CME, innovation, and a dedicated exhibit hall in Orlando, January 14–16, 2028.",
+    "EchoExpo™ by iHeartEcho™ is the standalone cardiac ultrasound and echocardiography event immediately following UltrasoundExpo™, with education, Echo Skills, Echo Games, hands-on CME, innovation, and its own dedicated exhibit hall in Orlando, January 14–16, 2028.",
   image: ECHO_EXPO_HERO_IMAGE,
   favicon: ECHO_EXPO_FAVICON,
   themeColor: "#0b9fa5",

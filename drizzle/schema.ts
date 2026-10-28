@@ -9297,13 +9297,43 @@ export const ultrasoundExpoPackages = mysqlTable("ultrasound_expo_packages", {
   currency: varchar("currency", { length: 8 }).default("usd").notNull(),
   sortOrder: int("sort_order").default(0).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  // An admin-configured, like-for-like package in the back-to-back event.
+  // Checkout revalidates both package/event records before calculating the 20% offer.
+  combinedWithPackageId: int("combined_with_package_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
 }, (table) => [
   index("ultrasound_expo_packages_event_active_idx").on(table.eventId, table.isActive),
   index("ultrasound_expo_packages_event_type_idx").on(table.eventId, table.packageType),
+  index("ultrasound_expo_packages_combined_with_idx").on(table.combinedWithPackageId),
 ]);
 export type UltrasoundExpoPackage = typeof ultrasoundExpoPackages.$inferSelect;
+
+/**
+ * A single Stripe session can pay for two independently-accessible Expo events.
+ * The group is the Stripe reconciliation source; its child registrations retain
+ * the event-specific fulfillment and access records.
+ */
+export const ultrasoundExpoCheckoutGroups = mysqlTable("ultrasound_expo_checkout_groups", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(),
+  vendorApplicationId: int("vendor_application_id"),
+  packageType: mysqlEnum("package_type", ["registrant", "exhibitor", "sponsor"]).notNull(),
+  subtotalCents: int("subtotal_cents").notNull(),
+  discountCents: int("discount_cents").notNull(),
+  amountCents: int("amount_cents").notNull(),
+  currency: varchar("currency", { length: 8 }).default("usd").notNull(),
+  stripeSessionId: varchar("stripe_session_id", { length: 255 }).unique(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  paymentStatus: mysqlEnum("payment_status", ["pending", "paid", "failed", "cancelled"]).default("pending").notNull(),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("ultrasound_expo_checkout_groups_user_status_idx").on(table.userId, table.paymentStatus),
+  index("ultrasound_expo_checkout_groups_vendor_application_idx").on(table.vendorApplicationId),
+]);
+export type UltrasoundExpoCheckoutGroup = typeof ultrasoundExpoCheckoutGroups.$inferSelect;
 
 export const ultrasoundExpoRegistrations = mysqlTable("ultrasound_expo_registrations", {
   id: int("id").autoincrement().primaryKey(),
@@ -9312,6 +9342,7 @@ export const ultrasoundExpoRegistrations = mysqlTable("ultrasound_expo_registrat
   userId: int("user_id"),
   // Exhibitor and sponsor registrations require an approved vendor application.
   vendorApplicationId: int("vendor_application_id"),
+  checkoutGroupId: int("checkout_group_id"),
   attendeeName: varchar("attendee_name", { length: 255 }).notNull(),
   attendeeEmail: varchar("attendee_email", { length: 320 }).notNull(),
   attendeePhone: varchar("attendee_phone", { length: 60 }),
@@ -9333,6 +9364,7 @@ export const ultrasoundExpoRegistrations = mysqlTable("ultrasound_expo_registrat
   index("ultrasound_expo_registrations_event_status_idx").on(table.eventId, table.status),
   index("ultrasound_expo_registrations_email_idx").on(table.attendeeEmail),
   index("ultrasound_expo_registrations_vendor_application_idx").on(table.vendorApplicationId),
+  index("ultrasound_expo_registrations_checkout_group_idx").on(table.checkoutGroupId),
 ]);
 export type UltrasoundExpoRegistration = typeof ultrasoundExpoRegistrations.$inferSelect;
 

@@ -508,9 +508,9 @@ const ECHO_EXPO_PAGE_SEO: Record<
   { title: string; description: string }
 > = {
   home: {
-    title: "EchoExpo™ | The Echocardiography Experience at UltrasoundExpo™",
+    title: "EchoExpo™ | The Standalone Echocardiography Event",
     description:
-      "EchoExpo™ brings cardiac ultrasound education, Echo Skills, Echo Games, hands-on CME, innovation, and a dedicated exhibit hall to Orlando, January 14–16, 2028.",
+      "EchoExpo™ by iHeartEcho™ is the standalone cardiac ultrasound event immediately following UltrasoundExpo™, bringing Echo Skills, Echo Games, hands-on CME, innovation, and its own exhibit hall to Orlando, January 14–16, 2028.",
   },
   attend: {
     title: "Attend EchoExpo™ | Cardiac Ultrasound Event Information",
@@ -543,9 +543,9 @@ const ECHO_EXPO_PAGE_SEO: Record<
       "Meet the cardiac ultrasound professionals, educators, innovators, and organizations shaping what comes next at EchoExpo™.",
   },
   about: {
-    title: "About EchoExpo™ | The Cardiac Experience at UltrasoundExpo™",
+    title: "About EchoExpo™ | The Standalone Cardiac Ultrasound Event",
     description:
-      "Learn about EchoExpo™, the dedicated echocardiography and cardiac ultrasound experience within UltrasoundExpo™.",
+      "Learn about EchoExpo™, the dedicated echocardiography and cardiac ultrasound event held immediately after UltrasoundExpo™.",
   },
   register: {
     title: "EchoExpo™ Attendee Registration Coming Soon",
