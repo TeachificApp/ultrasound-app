@@ -1138,7 +1138,7 @@ export const lmsPublicRouter = router({
 
       // Sections + preview lessons
       // Batch all sub-queries in parallel to avoid sequential round-trips
-      const [sections, allLessonsRaw, cis, landingPageRow, pricingOptions, cohortSessions, cohortGroupsRaw] = await Promise.all([
+      const [sections, allLessonsRaw, cis, landingPageRow, pricingOptions, cohortSessions, cohortGroupsRaw, teamTiers] = await Promise.all([
         db.select().from(lmsSections).where(eq(lmsSections.courseId, course.id)).orderBy(asc(lmsSections.position)),
         db.select({
           id: lmsLessons.id, title: lmsLessons.title, type: lmsLessons.type,
@@ -1191,6 +1191,15 @@ export const lmsPublicRouter = router({
           enrollmentCount: sql<number>`(SELECT COUNT(*) FROM lms_cohort_group_enrollments WHERE cohort_group_id = ${lmsCohortGroups.id})`,
         }).from(lmsCohortGroups)
           .where(and(eq(lmsCohortGroups.courseId, course.id), sql`${lmsCohortGroups.status} NOT IN ('archived', 'draft')`)),
+        // Team checkout needs only public pricing inputs before payment. Do not
+        // return cached Stripe identifiers on the public course page.
+        db.select({
+          id: lmsDefaultTeamTiers.id,
+          minSeats: lmsDefaultTeamTiers.minSeats,
+          discountPercent: lmsDefaultTeamTiers.discountPercent,
+        }).from(lmsDefaultTeamTiers)
+          .where(eq(lmsDefaultTeamTiers.courseId, course.id))
+          .orderBy(asc(lmsDefaultTeamTiers.minSeats)),
       ]);
 
       // Group lessons by sectionId
@@ -1263,7 +1272,7 @@ export const lmsPublicRouter = router({
       const soldOutGroups = visibleCohortGroups.filter(isCohortGroupSoldOut);
       // Include all non-archived cohort groups so the Live Sessions Auto block can show them
       const cohortGroups = visibleCohortGroups;
-      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions, featuredGroup, hasOpenGroup, soldOutGroups, cohortGroups };
+      return { ...course, sections: sectionsWithLessons, instructors: instructors.filter(Boolean), landingPage, pricingOptions, cohortSessions, featuredGroup, hasOpenGroup, soldOutGroups, cohortGroups, teamTiers };
     }),
 
   /** Get instructor public profile */

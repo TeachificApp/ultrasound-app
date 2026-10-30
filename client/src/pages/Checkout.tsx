@@ -50,6 +50,7 @@ import { BlockPreview } from "@/pages/admin/LandingPageBuilder";
 import { RelatedProductsBlock } from "@/components/RelatedProductsBlock";
 import type { Block } from "@/pages/admin/LandingPageBuilder";
 import { PopupModules } from "@/components/PopupModule";
+import { buildPublicCheckoutPreview, type CheckoutPreviewMeta } from "@shared/checkoutPreview";
 
 // Initialise Stripe once outside the component to avoid re-creating on every render
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? "");
@@ -405,35 +406,64 @@ export default function Checkout() {
   const activeSessionKeyRef = useRef<string | null>(null);
   const [freeEnrollmentMessage, setFreeEnrollmentMessage] = useState<string | null>(null);
   const [seatCount, setSeatCount] = useState<number>(searchParams.teamTierId ? 3 : 1);
-  const [sessionMeta, setSessionMeta] = useState<{
-    courseTitle: string;
-    courseSubtitle: string | null;
-    courseDescription: string | null;
-    courseThumbnail: string | null;
-    primaryColor: string;
-    accentColor: string;
-    gradientFrom: string;
-    gradientTo: string;
-    gradientDirection: string;
-    playerTheme: string;
-    termsUrl: string;
-    privacyUrl: string;
-    checkoutTermsText: string;
-    checkoutTermsLink1Text: string;
-    checkoutTermsLink1Url: string;
-    checkoutTermsLink2Text: string;
-    checkoutTermsLink2Url: string;
-    productName: string;
-    displayPrice: number;
-    pricingType: string;
-    isSubscription: boolean;
-    billingLabel: string | null;
-    currency: string;
-    minSeats: number | null;
-    discountPercent: number | null;
-  } | null>(null);
+  const [sessionMeta, setSessionMeta] = useState<CheckoutPreviewMeta | null>(null);
 
   const entityType = searchParams.entityType;
+  // Public catalog data is intentionally separate from the Stripe session. It is
+  // safe to display before an email is entered, while the payment session still
+  // waits for payer/learner details so duplicate-purchase protections remain in
+  // force before Stripe can create a charge or subscription.
+  const coursePreviewQuery = trpc.lms.getCourse.useQuery(
+    { slug: slug ?? "" },
+    { enabled: entityType === "course" && !!slug, retry: false },
+  );
+  const downloadPreviewQuery = trpc.downloads.getBySlug.useQuery(
+    { slug: slug ?? "" },
+    { enabled: entityType === "download" && !!slug, retry: false },
+  );
+  const physicalPreviewQuery = trpc.products.getBySlug.useQuery(
+    { slug: slug ?? "" },
+    { enabled: entityType === "physical" && !!slug, retry: false },
+  );
+  const webinarPreviewQuery = trpc.webinar.getBySlug.useQuery(
+    { slug: slug ?? "" },
+    { enabled: entityType === "webinar" && !!slug, retry: false },
+  );
+  const membershipPreviewQuery = trpc.membership.getBySlug.useQuery(
+    { slug: slug ?? "" },
+    { enabled: entityType === "membership" && !!slug, retry: false },
+  );
+  const publicPreviewMeta = useMemo(() => buildPublicCheckoutPreview({
+    entityType,
+    course: coursePreviewQuery.data as Record<string, unknown> | null | undefined,
+    download: downloadPreviewQuery.data as Record<string, unknown> | null | undefined,
+    physical: physicalPreviewQuery.data?.product as Record<string, unknown> | null | undefined,
+    webinar: webinarPreviewQuery.data?.webinar as Record<string, unknown> | null | undefined,
+    membership: membershipPreviewQuery.data?.plan as Record<string, unknown> | null | undefined,
+    pricingOptionId: searchParams.pricingOptionId,
+    teamTierId: searchParams.teamTierId,
+  }), [
+    entityType,
+    coursePreviewQuery.data,
+    downloadPreviewQuery.data,
+    physicalPreviewQuery.data,
+    webinarPreviewQuery.data,
+    membershipPreviewQuery.data,
+    searchParams.pricingOptionId,
+    searchParams.teamTierId,
+  ]);
+  // A live checkout session remains authoritative for payment, but its item
+  // metadata should never be required merely to show the public offer details.
+  const checkoutMeta = sessionMeta ?? publicPreviewMeta;
+  const isPublicPreviewLoading = entityType === "course"
+    ? coursePreviewQuery.isLoading
+    : entityType === "download"
+      ? downloadPreviewQuery.isLoading
+      : entityType === "physical"
+        ? physicalPreviewQuery.isLoading
+        : entityType === "webinar"
+          ? webinarPreviewQuery.isLoading
+          : membershipPreviewQuery.isLoading;
 
   // A signed-in learner should not have to re-enter their email. Guests enter
   // it once on this same checkout screen so the server can prevent duplicate
@@ -534,16 +564,16 @@ export default function Checkout() {
   }, [slug, entityType, searchParams.pricingOptionId, searchParams.teamTierId, seatCount, learnerIsPayee, learnerName, learnerEmail, hasValidLearnerDetails, checkoutSessionKey, activeSessionKey]);
 
   // ── Derived theme values ──────────────────────────────────────────────────
-  const primary = sessionMeta?.primaryColor ?? "#179ca3";
-  const accent = sessionMeta?.accentColor ?? "#0d9488";
-  const gradFrom = sessionMeta?.gradientFrom ?? primary;
-  const gradTo = sessionMeta?.gradientTo ?? accent;
-  const gradDir = sessionMeta?.gradientDirection ?? "135deg";
+  const primary = checkoutMeta?.primaryColor ?? "#179ca3";
+  const accent = checkoutMeta?.accentColor ?? "#0d9488";
+  const gradFrom = checkoutMeta?.gradientFrom ?? primary;
+  const gradTo = checkoutMeta?.gradientTo ?? accent;
+  const gradDir = checkoutMeta?.gradientDirection ?? "135deg";
   const primaryText = contrastText(primary);
   const primaryLight = lighten(primary, 0.88);
-  const isDark = sessionMeta?.playerTheme === "dark";
+  const isDark = checkoutMeta?.playerTheme === "dark";
 
-  const isSubscription = sessionMeta?.isSubscription ?? false;
+  const isSubscription = checkoutMeta?.isSubscription ?? false;
   const requiresSubscriptionAck = isSubscription;
   const canProceed = termsAccepted && (!requiresSubscriptionAck || subscriptionAcknowledged);
 
@@ -636,11 +666,11 @@ export default function Checkout() {
           <div className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? "bg-gray-900 border border-gray-800" : "bg-white border border-gray-100"}`}>
 
             {/* Cover image with gradient overlay */}
-            {sessionMeta?.courseThumbnail ? (
+            {checkoutMeta?.courseThumbnail ? (
               <div className="relative">
                 <img
-                  src={sessionMeta.courseThumbnail}
-                  alt={sessionMeta.courseTitle}
+                  src={checkoutMeta.courseThumbnail}
+                  alt={checkoutMeta.courseTitle}
                   className="w-full h-48 object-cover"
                 />
                 <div
@@ -654,14 +684,14 @@ export default function Checkout() {
             )}
 
             <div className="p-5">
-              {createSession.isPending && !sessionMeta ? (
+              {isPublicPreviewLoading && !checkoutMeta ? (
                 <div className="space-y-3 animate-pulse">
                   <div className="h-5 bg-gray-100 rounded w-3/4" />
                   <div className="h-4 bg-gray-100 rounded w-1/2" />
                   <div className="h-16 bg-gray-100 rounded w-full mt-3" />
                   <div className="h-8 bg-gray-100 rounded w-1/3 mt-4" />
                 </div>
-              ) : sessionMeta ? (
+              ) : checkoutMeta ? (
                 <>
                   {/* Brand label */}
                   <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: primary }}>
@@ -670,23 +700,23 @@ export default function Checkout() {
 
                   {/* Title */}
                   <h1 className={`text-xl font-bold leading-snug mb-1 ${isDark ? "text-white" : "text-gray-900"}`}>
-                    {sessionMeta.courseTitle}
+                    {checkoutMeta.courseTitle}
                   </h1>
 
                   {/* Subtitle */}
-                  {sessionMeta.courseSubtitle && (
+                  {checkoutMeta.courseSubtitle && (
                     <p className={`text-sm mb-3 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                      {sessionMeta.courseSubtitle}
+                      {checkoutMeta.courseSubtitle}
                     </p>
                   )}
 
                   {/* Description */}
-                  {sessionMeta.courseDescription && (
+                  {checkoutMeta.courseDescription && (
                     <>
                       <Separator className={`my-3 ${isDark ? "bg-gray-800" : ""}`} />
                       <div
                         className={`text-sm leading-relaxed line-clamp-6 ${isDark ? "text-gray-300" : "text-gray-600"}`}
-                        dangerouslySetInnerHTML={{ __html: sessionMeta.courseDescription }}
+                        dangerouslySetInnerHTML={{ __html: checkoutMeta.courseDescription }}
                       />
                     </>
                   )}
@@ -697,27 +727,27 @@ export default function Checkout() {
                   <div className="flex items-end justify-between gap-3">
                     <div>
                       <span className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-                        {formatPrice(sessionMeta.displayPrice, sessionMeta.currency)}
+                        {formatPrice(checkoutMeta.displayPrice, checkoutMeta.currency)}
                       </span>
-                      {searchParams.teamTierId && sessionMeta.minSeats ? (
+                      {searchParams.teamTierId && checkoutMeta.minSeats ? (
                         <span className="ml-2 text-base font-semibold" style={{ color: primary }}>
-                          per seat{sessionMeta.pricingType === "subscription" && sessionMeta.billingLabel
-                            ? ` / ${sessionMeta.billingLabel.split("/")[1]?.split("—")[0]?.trim() ?? "month"}`
+                          per seat{checkoutMeta.pricingType === "subscription" && checkoutMeta.billingLabel
+                            ? ` / ${checkoutMeta.billingLabel.split("/")[1]?.split("—")[0]?.trim() ?? "month"}`
                             : ""}
                         </span>
-                      ) : sessionMeta.pricingType === "subscription" && sessionMeta.billingLabel ? (
+                      ) : checkoutMeta.pricingType === "subscription" && checkoutMeta.billingLabel ? (
                         <span className="ml-2 text-base font-semibold" style={{ color: primary }}>
-                          / {sessionMeta.billingLabel.split("/")[1]?.split("—")[0]?.trim() ?? "month"}
+                          / {checkoutMeta.billingLabel.split("/")[1]?.split("—")[0]?.trim() ?? "month"}
                         </span>
                       ) : null}
                     </div>
-                    {sessionMeta.pricingType === "subscription" && (
+                    {checkoutMeta.pricingType === "subscription" && (
                       <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full" style={badgeStyle}>
                         <RefreshCw className="h-3 w-3" />
                         Recurring
                       </span>
                     )}
-                    {sessionMeta.pricingType === "payment_plan" && (
+                    {checkoutMeta.pricingType === "payment_plan" && (
                       <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full" style={badgeStyle}>
                         Payment plan
                       </span>
@@ -725,18 +755,18 @@ export default function Checkout() {
                   </div>
 
                   {/* Team tier seat stepper */}
-                  {sessionMeta.minSeats && searchParams.teamTierId && (
+                  {checkoutMeta.minSeats && searchParams.teamTierId && (
                     <div className={`mt-3 p-3 rounded-xl border ${isDark ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
                       <p className={`text-xs font-semibold mb-2 ${isDark ? "text-gray-300" : "text-gray-600"}`}>
                         Number of seats
-                        {sessionMeta.discountPercent ? (
-                          <span className="ml-2 font-normal" style={{ color: primary }}>{sessionMeta.discountPercent}% team discount applied</span>
+                        {checkoutMeta.discountPercent ? (
+                          <span className="ml-2 font-normal" style={{ color: primary }}>{checkoutMeta.discountPercent}% team discount applied</span>
                         ) : null}
                       </p>
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => {
-                            const next = Math.max(sessionMeta.minSeats!, seatCount - 1);
+                            const next = Math.max(checkoutMeta.minSeats!, seatCount - 1);
                             if (next === seatCount) return;
                             setSeatCount(next);
                             setClientSecret(null);
@@ -745,7 +775,7 @@ export default function Checkout() {
                           }}
                           className="w-8 h-8 rounded-lg border flex items-center justify-center text-lg font-bold transition-colors hover:bg-gray-200 disabled:opacity-40"
                           style={{ borderColor: primary, color: primary }}
-                          disabled={seatCount <= sessionMeta.minSeats}
+                          disabled={seatCount <= checkoutMeta.minSeats}
                         >
                           −
                         </button>
@@ -764,11 +794,11 @@ export default function Checkout() {
                           +
                         </button>
                         <span className={`text-xs ml-1 ${isDark ? "text-gray-400" : "text-gray-500"}`}>
-                          × {formatPrice(sessionMeta.displayPrice, sessionMeta.currency)}/seat
-                          {sessionMeta.pricingType === "subscription" && sessionMeta.billingLabel
-                            ? `/${sessionMeta.billingLabel.split("/")[1]?.split("—")[0]?.trim() ?? "month"}`
+                          × {formatPrice(checkoutMeta.displayPrice, checkoutMeta.currency)}/seat
+                          {checkoutMeta.pricingType === "subscription" && checkoutMeta.billingLabel
+                            ? `/${checkoutMeta.billingLabel.split("/")[1]?.split("—")[0]?.trim() ?? "month"}`
                             : ""}
-                          {sessionMeta.minSeats > 1 ? ` (min ${sessionMeta.minSeats})` : ""}
+                          {checkoutMeta.minSeats > 1 ? ` (min ${checkoutMeta.minSeats})` : ""}
                         </span>
                       </div>
                     </div>
@@ -779,7 +809,7 @@ export default function Checkout() {
           </div>
 
           {/* Subscription billing disclosure */}
-          {isSubscription && sessionMeta?.billingLabel && (
+          {isSubscription && checkoutMeta?.billingLabel && (
             <div
               className="rounded-xl p-4 flex gap-3"
               style={{ backgroundColor: lighten(primary, 0.92), border: `1px solid ${primary}44` }}
@@ -788,7 +818,7 @@ export default function Checkout() {
               <div>
                 <p className="text-sm font-semibold mb-1" style={{ color: primary }}>Recurring Subscription</p>
                 <p className={`text-xs leading-relaxed ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-                  {sessionMeta.billingLabel}. Your payment method will be charged automatically each billing period
+                  {checkoutMeta.billingLabel}. Your payment method will be charged automatically each billing period
                   until you cancel. You can cancel anytime from your account settings.
                 </p>
               </div>

@@ -644,7 +644,7 @@ export const webinarSessionRouter = router({
         playerTheme: "light",
         ...webTerms,
         productName: webinar.title,
-        displayPrice: priceCents,
+        displayPrice: priceCents / 100,
         pricingType: "one_time",
         isSubscription: false,
         billingLabel: null,

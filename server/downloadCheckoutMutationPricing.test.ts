@@ -147,6 +147,7 @@ describe("downloads.createCheckout Stripe payload", () => {
     });
 
     expect(result.clientSecret).toBe("cs_test_embedded_download");
+    expect(result.displayPrice).toBe(29.97);
     const [payload] = stripeCheckoutCreateMock.mock.calls[0];
     expect(payload.line_items[0].price_data.unit_amount).toBe(2997);
   });
