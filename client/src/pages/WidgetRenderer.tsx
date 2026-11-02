@@ -414,9 +414,10 @@ export default function WidgetRenderer() {
     { enabled: !!token, retry: false }
   );
 
-  // Report the complete rendered height to the containing iframe. This is
-  // deliberately scheduled after layout so image loads, compact-card wrapping,
-  // and dynamically supplied content cannot leave a scrollable iframe behind.
+  // Report the intrinsic widget content height to the containing iframe. Do
+  // not include document/body scrollHeight: in an iframe those values can
+  // mirror the host-controlled viewport height and create a resize feedback
+  // loop where every resize request makes the host frame taller.
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!containerRef.current) return;
@@ -426,9 +427,7 @@ export default function WidgetRenderer() {
       if (!container) return;
       const height = Math.ceil(Math.max(
         container.scrollHeight,
-        container.offsetHeight,
-        document.documentElement.scrollHeight,
-        document.body.scrollHeight,
+        container.getBoundingClientRect().height,
       ));
       window.parent?.postMessage({ type: "ultrasound-widget-resize", height }, "*");
     };

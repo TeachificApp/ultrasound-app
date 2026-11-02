@@ -10,8 +10,11 @@ describe("content widget automatic iframe sizing", () => {
     const renderer = read("client/src/pages/WidgetRenderer.tsx");
 
     expect(renderer).toContain("const reportHeight = () => {");
-    expect(renderer).toContain("document.documentElement.scrollHeight");
-    expect(renderer).toContain("document.body.scrollHeight");
+    expect(renderer).toContain("container.scrollHeight");
+    expect(renderer).toContain("container.getBoundingClientRect().height");
+    expect(renderer).not.toContain("document.documentElement.scrollHeight");
+    expect(renderer).not.toContain("document.body.scrollHeight");
+    expect(renderer).toContain("resize feedback");
     expect(renderer).toContain('window.parent?.postMessage({ type: "ultrasound-widget-resize", height }, "*")');
     expect(renderer).toContain("const delayedReport = window.setTimeout(scheduleHeightReport, 150)");
   });
