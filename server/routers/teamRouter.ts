@@ -31,7 +31,7 @@ import { and, eq, count, desc, isNull, or } from "drizzle-orm";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { teamSubscriptions, teamMembers, brandMemberships, users } from "../../drizzle/schema";
-import { sendEmail } from "../_core/email";
+import { emailWrapper, sendEmail } from "../_core/email";
 import { notifyOwner } from "../_core/notification";
 
 // ─── Pricing Constants ────────────────────────────────────────────────────────
@@ -71,6 +71,35 @@ function brandLabel(brand: string): string {
   if (brand === "aaus") return "UltrasoundAssist™";
   if (brand === "iheartecho") return "EchoAssist™";
   return "UltrasoundAssist™ + EchoAssist™";
+}
+
+export const TEAM_INQUIRY_INTEREST_TYPES = [
+  "professional_access",
+  "course_quiz_access",
+  "organization_workspace",
+  "group_learning",
+  "onsite_hands_on_training",
+] as const;
+
+const TEAM_INQUIRY_INTEREST_LABELS: Record<(typeof TEAM_INQUIRY_INTEREST_TYPES)[number], string> = {
+  professional_access: "Professional access for a team",
+  course_quiz_access: "Group access to courses and quizzes",
+  organization_workspace: "Organization learning space",
+  group_learning: "Group learning or cohort support",
+  onsite_hands_on_training: "Hands-on training at the organization’s facility",
+};
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function safeSubjectValue(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").trim();
 }
 
 // ─── Grant premium access to a team member ────────────────────────────────────
@@ -375,9 +404,9 @@ export const teamRouter = router({
       const brandName = brandLabel(team.brand);
       const planLabel = team.plan === "lifetime" ? "Lifetime Access" : "Monthly Subscription";
       await sendEmail({
-        to: input.email,
+        to: { name: input.displayName ?? "Team member", email: input.email },
         subject: `You've been invited to ${team.orgName} — ${brandName} Team Access`,
-        html: `
+        htmlBody: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #189aa1;">You've been invited!</h2>
             <p>${ctx.user.name ?? "Your team admin"} has invited you to join <strong>${team.orgName}</strong> with access to <strong>${brandName}</strong> (${planLabel}).</p>
@@ -436,9 +465,9 @@ export const teamRouter = router({
       const planLabel = team.plan === "lifetime" ? "Lifetime Access" : "Monthly Subscription";
 
       await sendEmail({
-        to: member.inviteEmail,
+        to: { name: member.displayName ?? "Team member", email: member.inviteEmail },
         subject: `Reminder: You've been invited to ${team.orgName} — ${brandName} Team Access`,
-        html: `
+        htmlBody: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #189aa1;">Reminder: Your invitation is waiting</h2>
             <p>You have a pending invitation to join <strong>${team.orgName}</strong> with access to <strong>${brandName}</strong> (${planLabel}).</p>
@@ -676,7 +705,8 @@ export const teamRouter = router({
       contactPhone: z.string().max(30).optional(),
       seatEstimate: z.number().int().min(1).max(10000),
       brand: z.enum(["aaus", "iheartecho", "dual"]),
-      plan: z.enum(["monthly", "lifetime"]),
+      plan: z.enum(["monthly", "lifetime", "custom"]),
+      interests: z.array(z.enum(TEAM_INQUIRY_INTEREST_TYPES)).min(1).max(TEAM_INQUIRY_INTEREST_TYPES.length).optional(),
       message: z.string().max(2000).optional(),
     }))
     .mutation(async ({ input }) => {
@@ -685,42 +715,56 @@ export const teamRouter = router({
         input.brand === "aaus" ? "UltrasoundAssist\u2122" :
         input.brand === "iheartecho" ? "EchoAssist\u2122" :
         "Both Apps (UltrasoundAssist\u2122 + EchoAssist\u2122)";
-      const planLabel = input.plan === "monthly" ? "Monthly" : "Lifetime";
+      const planLabel = input.plan === "monthly" ? "Monthly" : input.plan === "lifetime" ? "Lifetime" : "Custom / discuss options";
+      const interestLabels = input.interests?.map((interest) => TEAM_INQUIRY_INTEREST_LABELS[interest]) ?? [];
+      const interestSummary = interestLabels.length > 0 ? interestLabels.join("; ") : "Team premium access";
+      const organizationName = safeSubjectValue(input.orgName);
+      const safeContactName = escapeHtml(input.contactName);
+      const safeOrganizationName = escapeHtml(input.orgName);
+      const safeContactEmail = escapeHtml(input.contactEmail);
+      const safeContactPhone = input.contactPhone ? escapeHtml(input.contactPhone) : null;
+      const safeMessage = input.message ? escapeHtml(input.message).replace(/\n/g, "<br />") : "(none)";
+      const safeInterestList = interestLabels.length > 0
+        ? interestLabels.map((label) => `<li style="margin:4px 0;">${escapeHtml(label)}</li>`).join("")
+        : "<li style=\"margin:4px 0;\">Team premium access</li>";
 
       await notifyOwner({
-        title: `New Team Inquiry: ${input.orgName}`,
-        content: `**${input.contactName}** (${input.contactEmail}) from **${input.orgName}** is interested in a team subscription.\n\n- **App:** ${bLabel}\n- **Plan:** ${planLabel}\n- **Estimated seats:** ${input.seatEstimate}\n- **Message:** ${input.message || "(none)"}`,
-      });
+        title: `New Group / Organization Inquiry: ${organizationName}`,
+        content: `${input.contactName} (${input.contactEmail}) from ${input.orgName} is interested in group or organization learning.\n\n- Interests: ${interestSummary}\n- App preference: ${bLabel}\n- Plan preference: ${planLabel}\n- Estimated seats: ${input.seatEstimate}\n- Phone: ${input.contactPhone || "(none)"}\n- Message: ${input.message || "(none)"}`,
+      }, { skipAdminEmail: true });
 
       await sendEmail({
-        to: env.platformAdminEmail,
-        subject: `[Team Inquiry] ${input.orgName} \u2014 ${input.seatEstimate} seats (${bLabel})`,
-        html: `
-          <h2>New Team / University Membership Inquiry</h2>
+        to: { name: "Platform Administrator", email: env.platformAdminEmail },
+        subject: `[Group / Organization Inquiry] ${organizationName} — ${input.seatEstimate} seats (${bLabel})`,
+        htmlBody: emailWrapper(`
+          <h2 style="margin:0 0 16px;color:#0e4a50;font-family:Georgia,serif;">New Group / Organization Learning Inquiry</h2>
+          <p style="margin:0 0 18px;color:#475569;line-height:1.6;">A prospective organization requested information about group learning, team access, or custom training.</p>
           <table style="border-collapse:collapse;width:100%;max-width:600px">
-            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Organization</td><td style="padding:8px">${input.orgName}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Contact Name</td><td style="padding:8px">${input.contactName}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Contact Email</td><td style="padding:8px"><a href="mailto:${input.contactEmail}">${input.contactEmail}</a></td></tr>
-            ${input.contactPhone ? `<tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Phone</td><td style="padding:8px">${input.contactPhone}</td></tr>` : ""}
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Organization</td><td style="padding:8px">${safeOrganizationName}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Contact Name</td><td style="padding:8px">${safeContactName}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Contact Email</td><td style="padding:8px"><a href="mailto:${safeContactEmail}">${safeContactEmail}</a></td></tr>
+            ${safeContactPhone ? `<tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Phone</td><td style="padding:8px">${safeContactPhone}</td></tr>` : ""}
             <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">App Interest</td><td style="padding:8px">${bLabel}</td></tr>
             <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Plan Preference</td><td style="padding:8px">${planLabel}</td></tr>
             <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Estimated Seats</td><td style="padding:8px">${input.seatEstimate}</td></tr>
-            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5">Message</td><td style="padding:8px">${input.message || "(none)"}</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5;vertical-align:top">Interests</td><td style="padding:8px"><ul style="margin:0;padding-left:18px">${safeInterestList}</ul></td></tr>
+            <tr><td style="padding:8px;font-weight:bold;background:#f5f5f5;vertical-align:top">Message</td><td style="padding:8px">${safeMessage}</td></tr>
           </table>
-          <p style="margin-top:16px">Reply directly to <a href="mailto:${input.contactEmail}">${input.contactEmail}</a> to follow up.</p>
-        `,
+          <p style="margin-top:18px">Reply directly to <a href="mailto:${safeContactEmail}">${safeContactEmail}</a> to follow up.</p>
+        `, "combined", "This is a response to a Group / Organization Sales inquiry submitted at All About Ultrasound™ | iHeartEcho™."),
       });
 
       await sendEmail({
-        to: input.contactEmail,
-        subject: `We received your team membership inquiry \u2014 ${input.orgName}`,
-        html: `
-          <h2>Thanks for your interest, ${input.contactName}!</h2>
-          <p>We've received your inquiry for a <strong>${bLabel}</strong> team subscription (${planLabel}) for <strong>${input.orgName}</strong>.</p>
-          <p>Our team will be in touch within 1\u20132 business days to discuss pricing, onboarding, and next steps.</p>
-          <p>In the meantime, feel free to reply to this email with any questions.</p>
-          <br/><p>\u2014 The All About Ultrasound Team</p>
-        `,
+        to: { name: input.contactName, email: input.contactEmail },
+        subject: `We received your group learning inquiry — ${organizationName}`,
+        htmlBody: emailWrapper(`
+          <h2 style="margin:0 0 12px;color:#0e4a50;font-family:Georgia,serif;">Thanks for your interest, ${safeContactName}!</h2>
+          <p style="margin:0 0 16px;color:#475569;line-height:1.6;">We received your request from <strong>${safeOrganizationName}</strong> for group and organization learning options.</p>
+          <p style="margin:0 0 10px;color:#475569;line-height:1.6;">You asked about:</p>
+          <ul style="margin:0 0 18px;padding-left:20px;color:#475569;line-height:1.6;">${safeInterestList}</ul>
+          <p style="margin:0 0 16px;color:#475569;line-height:1.6;">Our team will be in touch within 1–2 business days to discuss the right access, group learning, course, or training approach for your organization.</p>
+          <p style="margin:0;color:#475569;line-height:1.6;">For questions in the meantime, contact <a href="mailto:support@allaboutultrasound.com" style="color:#189aa1;">support@allaboutultrasound.com</a>.</p>
+        `, "combined", "You received this confirmation because you submitted a Group / Organization Sales inquiry."),
       });
 
       return { success: true };

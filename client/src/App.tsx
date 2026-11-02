@@ -115,6 +115,7 @@ const DownloadsBrowse = lazy(() => import("./pages/DownloadsBrowse"));
 // ── Workshops ────────────────────────────────────────────────────────────────
 const WorkshopsBrowse = lazy(() => import("./pages/WorkshopsBrowse"));
 const SponsorshipsPage = lazy(() => import("./pages/SponsorshipsPage"));
+const GroupOrganizationSales = lazy(() => import("./pages/GroupOrganizationSales"));
 const SponsorshipAdmin = lazy(() => import("./pages/admin/SponsorshipAdmin"));
 const EventPartnershipsPage = lazy(() => import("./pages/EventPartnershipsPage"));
 const CrossTrainingBrowse = lazy(() => import("./pages/CrossTrainingBrowse"));
@@ -447,6 +448,8 @@ function Router() {
         <Route path="/subscribe" component={NewsletterSubscribe} />
         <Route path="/upgrade-success" component={UpgradeSuccess} />
         <Route path="/premium" component={Premium} />
+        <Route path="/group-sales" component={GroupOrganizationSales} />
+        <Route path="/organization-sales" component={GroupOrganizationSales} />
         <Route path="/profile" component={Profile} />
         <Route path="/dashboard/:rest*" component={LegacyStudentDashboardRedirect} />
         <Route path="/dashboard" component={LegacyStudentDashboardRedirect} />
@@ -818,6 +821,8 @@ function MembersRouter() {
       <Route path="/partner-application">{() => <Suspense fallback={pageFallback}><PartnerApplication /></Suspense>}</Route>
       <Route path="/vendor-portal">{() => <Suspense fallback={pageFallback}><ApprovedPartnerPortal /></Suspense>}</Route>
       <Route path="/sponsorships">{() => <Suspense fallback={pageFallback}><SponsorshipsPage /></Suspense>}</Route>
+      <Route path="/group-sales">{() => <Suspense fallback={pageFallback}><GroupOrganizationSales /></Suspense>}</Route>
+      <Route path="/organization-sales">{() => <Suspense fallback={pageFallback}><GroupOrganizationSales /></Suspense>}</Route>
       <Route path="/event-partnerships/:targetType/:id">{() => <Suspense fallback={pageFallback}><EventPartnershipsPage /></Suspense>}</Route>
       <Route path="/downloads/:slug/files">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/downloads/${params.slug}/files`); return null; }}</Route>
       <Route path="/courses/:slug/player">{(params: { slug: string }) => { window.location.replace(`${LEARN_APP_URL}/courses/${params.slug}/player`); return null; }}</Route>
@@ -1060,6 +1065,8 @@ function LMSRouter() {
             <Route path="/study-groups/join" component={StudyGroupShareJoin} />
             <Route path="/study-groups/:groupId" component={StudyGroupWorkspace} />
             <Route path="/study-groups" component={StudyGroupsPage} />
+            <Route path="/group-sales" component={GroupOrganizationSales} />
+            <Route path="/organization-sales" component={GroupOrganizationSales} />
             <Route path="/education-library" component={EducationLibrary} />
             <Route path="/collections/:id" component={CollectionDetail} />
             <Route path="/courses/:slug/overview" component={CourseOverview} />
@@ -1076,6 +1083,8 @@ function LMSRouter() {
         <Route path="/partner-application" component={PartnerApplication} />
         <Route path="/vendor-portal" component={ApprovedPartnerPortal} />
         <Route path="/sponsorships" component={SponsorshipsPage} />
+        <Route path="/group-sales" component={GroupOrganizationSales} />
+        <Route path="/organization-sales" component={GroupOrganizationSales} />
         <Route path="/event-partnerships/:targetType/:id" component={EventPartnershipsPage} />
         {/* Cross-Training */}
         <Route path="/cross-training" component={CrossTrainingBrowse} />
@@ -1521,7 +1530,7 @@ const RESERVED_FUNNEL_SLUGS = new Set([
   "educator-assist", "educator-admin", "student-dashboard", "image-quality-review",
   "accreditation-manager", "accreditation-navigator", "diy-accreditation-plans",
   "memberships", "my-memberships", "404", "terms", "privacy", "contact",
-  "cme-disclosure", "partner-signup", "sponsorships",
+  "cme-disclosure", "partner-signup", "sponsorships", "group-sales", "organization-sales",
 ]);
 
 /** Guards /:slug/:pageSlug — never treat reserved or /admin paths as funnels. */
@@ -1883,6 +1892,8 @@ function MarketingSiteRouter() {
         <Route path="/magic-link" component={MagicLinkRequest} />
         <Route path="/auth/magic" component={MagicLinkCallback} />
         <Route path="/auth/access" component={AccessLinkCallback} />
+        <Route path="/group-sales" component={GroupOrganizationSales} />
+        <Route path="/organization-sales" component={GroupOrganizationSales} />
         <Route path="/admin/marketing-site">{() => <RoleGuard roles={["platform_admin"]} allowAdmin={true}><PublicSiteAdmin /></RoleGuard>}</Route>
         <Route component={PublicMarketingSitePage} />
       </Switch>
@@ -1919,6 +1930,8 @@ function PublicWebsiteRouter() {
         <Route path="/partner-application">{() => <PartnerApplication />}</Route>
         <Route path="/vendor-portal">{() => <ApprovedPartnerPortal />}</Route>
         <Route path="/sponsorships">{() => <SponsorshipsPage />}</Route>
+        <Route path="/group-sales">{() => <GroupOrganizationSales />}</Route>
+        <Route path="/organization-sales">{() => <GroupOrganizationSales />}</Route>
         <Route path="/event-partnerships/:targetType/:id">{() => <EventPartnershipsPage />}</Route>
         {/* Learning, purchased content, and every checkout flow always use the
             brand-matched Learn tenant, even when the original link was opened
