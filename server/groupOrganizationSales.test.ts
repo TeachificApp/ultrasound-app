@@ -108,5 +108,8 @@ describe("Group and Organization Sales", () => {
     expect(pageSource).toContain("Group course access");
     expect(pageSource).toContain("Organization access");
     expect(pageSource).toContain("trpc.team.submitInquiry.useMutation");
+    expect(pageSource).toContain("TooltipTrigger asChild");
+    expect(pageSource).toContain("aria-label={`${label}. ${description}`}");
+    expect(pageSource).toContain("Coordinated learning for a defined group");
   });
 });

@@ -7,6 +7,7 @@ import {
   Building2,
   CheckCircle2,
   ChevronRight,
+  CircleHelp,
   GraduationCap,
   HeartHandshake,
   Loader2,
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc";
 
 const SALES_OPTIONS = [
@@ -67,6 +69,7 @@ const SALES_OPTIONS = [
 const ADDITIONAL_INTEREST = {
   id: "group_learning" as const,
   label: "Group learning or cohort support",
+  description: "Coordinated learning for a defined group, including cohort-style support and scheduled learning experiences.",
 };
 
 type InterestId = (typeof SALES_OPTIONS)[number]["id"] | typeof ADDITIONAL_INTEREST.id;
@@ -298,14 +301,22 @@ export default function GroupOrganizationSales() {
                   <legend className="text-sm font-semibold text-slate-700">What would you like to explore? <span className="text-rose-600">*</span></legend>
                   <p className="mt-1 text-xs text-slate-500">Select every area that applies.</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {[...SALES_OPTIONS.map(({ id, icon: Icon, eyebrow }) => ({ id, label: eyebrow, icon: Icon })), { id: ADDITIONAL_INTEREST.id, label: ADDITIONAL_INTEREST.label, icon: GraduationCap }].map(({ id, label, icon: Icon }) => {
+                    {[...SALES_OPTIONS.map(({ id, icon: Icon, eyebrow, description }) => ({ id, label: eyebrow, description, icon: Icon })), { id: ADDITIONAL_INTEREST.id, label: ADDITIONAL_INTEREST.label, description: ADDITIONAL_INTEREST.description, icon: GraduationCap }].map(({ id, label, description, icon: Icon }) => {
                       const selected = interests.includes(id);
                       return (
-                        <button key={id} type="button" onClick={() => toggleInterest(id)} aria-pressed={selected} className={`flex items-center gap-3 rounded-xl border p-3 text-left text-sm font-semibold transition ${selected ? "border-[#14999d] bg-[#effbfc] text-[#076a73] ring-1 ring-[#14999d]/20" : "border-slate-200 bg-white text-slate-700 hover:border-[#14999d]/50 hover:bg-slate-50"}`}>
-                          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${selected ? "bg-[#14999d] text-white" : "bg-slate-100 text-slate-500"}`}><Icon className="h-4 w-4" /></span>
-                          <span>{label}</span>
-                          {selected && <CheckCircle2 className="ml-auto h-4 w-4" />}
-                        </button>
+                        <Tooltip key={id}>
+                          <TooltipTrigger asChild>
+                            <button type="button" onClick={() => toggleInterest(id)} aria-pressed={selected} aria-label={`${label}. ${description}`} className={`flex items-center gap-3 rounded-xl border p-3 text-left text-sm font-semibold transition ${selected ? "border-[#14999d] bg-[#effbfc] text-[#076a73] ring-1 ring-[#14999d]/20" : "border-slate-200 bg-white text-slate-700 hover:border-[#14999d]/50 hover:bg-slate-50"}`}>
+                              <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${selected ? "bg-[#14999d] text-white" : "bg-slate-100 text-slate-500"}`}><Icon className="h-4 w-4" /></span>
+                              <span>{label}</span>
+                              <CircleHelp className={`ml-auto h-4 w-4 shrink-0 ${selected ? "text-[#087f8c]" : "text-slate-400"}`} aria-hidden="true" />
+                              {selected && <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={8} className="max-w-xs bg-[#062634] px-3 py-2 text-left text-xs leading-5 text-white shadow-lg">
+                            {description}
+                          </TooltipContent>
+                        </Tooltip>
                       );
                     })}
                   </div>
