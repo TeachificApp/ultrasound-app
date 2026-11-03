@@ -256,11 +256,12 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
     const result = await fetchExport();
     const rows = result.data?.rows ?? [];
     if (rows.length === 0) { toast.error("No campaign events to export."); return; }
-    const header = ["Recipient Name", "Email", "Event", "Destination URL", "Variant", "Timestamp", "Country", "Region", "City"];
+    const header = ["Recipient Name", "Email", "Event", "Provider", "Destination URL", "Variant", "Timestamp", "Country", "Region", "City"];
     const csvRows = rows.map((r) => [
       csvCell(r.displayName),
       csvCell(r.email),
       csvCell(r.eventType),
+      csvCell("provider" in r ? (r as { provider?: string }).provider : ""),
       csvCell(r.destinationUrl),
       csvCell(r.variant),
       csvCell(r.timestamp ? new Date(r.timestamp).toLocaleString() : ""),
