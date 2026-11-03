@@ -405,10 +405,22 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
                 <div className="rounded-lg border border-teal-100 bg-teal-50/40 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-semibold text-teal-900">DELIVERY STATUS</p>
-                    <p className="text-[11px] text-teal-700">Confirmed by SendGrid&apos;s Event Webhook.</p>
+                    <p className="text-[11px] text-teal-700">
+                      SendGrid Event Webhook + SMTP.com send confirmations (unique recipients).
+                    </p>
                   </div>
+                  {"deliveryByProvider" in analytics && analytics.deliveryByProvider && (
+                    <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-teal-800">
+                      <span>
+                        SendGrid: {(analytics.deliveryByProvider as { sendgrid?: { uniqueDelivered?: number } }).sendgrid?.uniqueDelivered?.toLocaleString() ?? "0"} delivered
+                      </span>
+                      <span>
+                        SMTP.com: {(analytics.deliveryByProvider as { smtpcom?: { uniqueDelivered?: number } }).smtpcom?.uniqueDelivered?.toLocaleString() ?? "0"} delivered
+                      </span>
+                    </div>
+                  )}
                   <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5 text-center">
-                    <div><p className="text-sm font-bold text-teal-800">{analytics.totalDelivered.toLocaleString()}</p><p className="text-[10px] text-teal-700">delivered</p></div>
+                    <div><p className="text-sm font-bold text-teal-800">{analytics.uniqueDelivered.toLocaleString()}</p><p className="text-[10px] text-teal-700">unique delivered</p></div>
                     <div><p className="text-sm font-bold text-amber-700">{analytics.totalDeferred.toLocaleString()}</p><p className="text-[10px] text-amber-700">deferred</p></div>
                     <div><p className="text-sm font-bold text-orange-700">{analytics.totalBlocked.toLocaleString()}</p><p className="text-[10px] text-orange-700">blocked</p></div>
                     <div><p className="text-sm font-bold text-red-700">{analytics.totalBounces.toLocaleString()}</p><p className="text-[10px] text-red-700">bounced</p></div>

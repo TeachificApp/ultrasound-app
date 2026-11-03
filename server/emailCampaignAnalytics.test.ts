@@ -4,7 +4,9 @@ import {
   CAMPAIGN_DESTINATION_UNAVAILABLE,
   campaignEventDestination,
   escapeCampaignCsvCell,
+  inferCampaignEventProvider,
   parseCampaignEventMetadata,
+  summarizeCampaignDeliveryByProvider,
 } from "./lib/emailCampaignAnalytics";
 
 describe("campaign analytics event normalization", () => {
@@ -13,7 +15,25 @@ describe("campaign analytics event normalization", () => {
       destinationUrl: "https://example.test/course",
       variant: "B",
       recipientEmail: "reader@example.test",
+      provider: null,
+      source: null,
     });
+  });
+
+  it("attributes delivery events to SendGrid or SMTP.com while keeping opens as first-party tracking", () => {
+    expect(inferCampaignEventProvider("delivered", '{"provider":"sendgrid"}')).toBe("sendgrid");
+    expect(inferCampaignEventProvider("delivered", '{"provider":"smtpcom","source":"outbound_accept"}')).toBe("smtpcom");
+    expect(inferCampaignEventProvider("delivered", null)).toBe("sendgrid");
+    expect(inferCampaignEventProvider("open", '{"variant":"A"}')).toBe("tracking");
+
+    const summary = summarizeCampaignDeliveryByProvider([
+      { eventType: "delivered", metadata: '{"provider":"sendgrid"}', recipientKey: "u1" },
+      { eventType: "delivered", metadata: '{"provider":"smtpcom"}', recipientKey: "u2" },
+      { eventType: "bounce", metadata: '{"provider":"sendgrid"}', recipientKey: "u3" },
+    ]);
+    expect(summary.sendgrid.uniqueDelivered).toBe(1);
+    expect(summary.smtpcom.uniqueDelivered).toBe(1);
+    expect(summary.sendgrid.bounces).toBe(1);
   });
 
   it("keeps legacy destination URLs visible and groups recipient-only metadata as unavailable", () => {

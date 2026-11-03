@@ -25,6 +25,9 @@ export async function sendViaSmtpCom(
     customHeaders["List-Unsubscribe"] = `<${opts.listUnsubscribeUrl}>`;
     customHeaders["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
   }
+  if (opts.campaignId) {
+    customHeaders["X-AAUS-Campaign-Id"] = String(opts.campaignId);
+  }
 
   const payload: Record<string, unknown> = {
     channel,

@@ -64,10 +64,13 @@ import {
   injectTrackingPixel,
   wrapLinksForTracking,
   recordEmailCampaignEvent,
+  recordCampaignProviderAcceptedDelivery,
+  recordCampaignProviderSendFailure,
 } from "../lib/emailCampaignTracking";
 import {
   campaignEventDestination,
   parseCampaignEventMetadata,
+  summarizeCampaignDeliveryByProvider,
 } from "../lib/emailCampaignAnalytics";
 import {
   buildListUnsubscribeApiUrl,
@@ -90,6 +93,7 @@ type CampaignMetricsRow = {
   uniqueOpenCount: number;
   uniqueClickCount: number;
   uniqueUnsubscribeCount: number;
+  uniqueDeliveredCount: number;
 };
 
 /** Load engagement metrics; never throw — campaigns list must still render if events table is missing. */
@@ -114,7 +118,8 @@ async function loadCampaignMetricsMap(
         SUM(CASE WHEN eventType = 'dropped' THEN 1 ELSE 0 END) as droppedCount,
         COUNT(DISTINCT CASE WHEN eventType = 'open' THEN recipientKey END) as uniqueOpenCount,
         COUNT(DISTINCT CASE WHEN eventType = 'click' THEN recipientKey END) as uniqueClickCount,
-        COUNT(DISTINCT CASE WHEN eventType = 'unsubscribe' THEN recipientKey END) as uniqueUnsubscribeCount
+        COUNT(DISTINCT CASE WHEN eventType = 'unsubscribe' THEN recipientKey END) as uniqueUnsubscribeCount,
+        COUNT(DISTINCT CASE WHEN eventType = 'delivered' THEN recipientKey END) as uniqueDeliveredCount
       FROM emailCampaignEvents
       WHERE campaignId IN (${sql.join(campaignIds.map((id) => sql`${id}`), sql`, `)})
       GROUP BY campaignId
@@ -336,6 +341,18 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     });
     if (ok) {
       sent++;
+      try {
+        const { resolveEffectiveCampaignProvider } = await import("../lib/email/providerConfig");
+        if (resolveEffectiveCampaignProvider() === "smtpcom") {
+          await recordCampaignProviderAcceptedDelivery(db, {
+            campaignId,
+            recipientKey,
+            provider: "smtpcom",
+          });
+        }
+      } catch (err) {
+        console.error("[EmailCampaign] Failed to record SMTP.com delivery event:", err);
+      }
       // Tag this log entry with the campaign ID
       try {
         await db.execute(sql`
@@ -344,7 +361,22 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
           ORDER BY sent_at DESC LIMIT 1
         `);
       } catch { /* ignore */ }
-    } else failed++;
+    } else {
+      failed++;
+      try {
+        const { resolveEffectiveCampaignProvider } = await import("../lib/email/providerConfig");
+        if (resolveEffectiveCampaignProvider() === "smtpcom") {
+          await recordCampaignProviderSendFailure(db, {
+            campaignId,
+            recipientKey,
+            provider: "smtpcom",
+            reason: "Campaign send API returned failure",
+          });
+        }
+      } catch (err) {
+        console.error("[EmailCampaign] Failed to record SMTP.com failure event:", err);
+      }
+    }
   }
 
   await db
@@ -1477,6 +1509,7 @@ Rules:
       const uniqueClickCount = Number(m?.uniqueClickCount ?? 0);
       const unsubscribeCount = Number(m?.unsubscribeCount ?? 0);
       const deliveredCount = Number(m?.deliveredCount ?? 0);
+      const uniqueDeliveredCount = Number(m?.uniqueDeliveredCount ?? 0);
       const deferredCount = Number(m?.deferredCount ?? 0);
       const bounceCount = Number(m?.bounceCount ?? 0);
       const blockedCount = Number(m?.blockedCount ?? 0);
@@ -1489,11 +1522,12 @@ Rules:
         uniqueClickCount,
         unsubscribeCount,
         deliveredCount,
+        uniqueDeliveredCount,
         deferredCount,
         bounceCount,
         blockedCount,
         droppedCount,
-        deliveryRate: sent > 0 ? Math.round((deliveredCount / sent) * 100) : 0,
+        deliveryRate: sent > 0 ? Math.round((uniqueDeliveredCount / sent) * 100) : 0,
         openRate: sent > 0 ? Math.round((uniqueOpenCount / sent) * 100) : 0,
         clickRate: sent > 0 ? Math.round((uniqueClickCount / sent) * 100) : 0,
       };
@@ -1566,10 +1600,10 @@ Rules:
       }
 
       const [variantEventsRaw] = (await db.execute(sql`
-        SELECT eventType, metadata
+        SELECT eventType, metadata, recipientKey
         FROM emailCampaignEvents
         WHERE campaignId = ${input.campaignId}
-      `)) as [{ eventType: string; metadata: string | null }[], unknown];
+      `)) as [{ eventType: string; metadata: string | null; recipientKey: string }[], unknown];
 
       const events = Array.isArray(eventsRaw) ? eventsRaw : [];
       const uniqueEvents = Array.isArray(uniqueRaw) ? uniqueRaw : [];
@@ -1602,6 +1636,9 @@ Rules:
       const clickRate = sent > 0 ? Math.round((uniqueClicks / sent) * 100) : 0;
       const unsubscribeRate = sent > 0 ? Math.round((uniqueUnsubscribes / sent) * 100) : 0;
       const deliveryRate = sent > 0 ? Math.round((uniqueDelivered / sent) * 100) : 0;
+
+      const allEvents = Array.isArray(variantEventsRaw) ? variantEventsRaw : [];
+      const deliveryByProvider = summarizeCampaignDeliveryByProvider(allEvents);
 
       return {
         campaignId: campaign.id,
@@ -1638,6 +1675,7 @@ Rules:
             revenueCents: Number(ordersRaw[0]?.revenueCents ?? 0),
           } }),
         variantStats,
+        deliveryByProvider,
       };
     }),
 
@@ -2312,6 +2350,7 @@ Rules:
             email: email ?? "",
             destinationUrl: metadata.destinationUrl ?? "",
             variant: metadata.variant ?? "",
+            provider: metadata.provider ?? "",
             timestamp: row.createdAt,
             country: row.country ?? "",
             region: row.region ?? "",
