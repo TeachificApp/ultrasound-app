@@ -9,7 +9,7 @@ const SMTPCOM_API_URL = "https://api.smtp.com/v4/messages";
 export async function sendViaSmtpCom(
   opts: SendEmailOptions,
   sender: ResolvedEmailSender,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; messageId?: string }> {
   const apiKey = process.env.SMTPCOM_API_KEY?.trim();
   const channel = process.env.SMTPCOM_CHANNEL?.trim();
   if (!apiKey) {
@@ -23,6 +23,10 @@ export async function sendViaSmtpCom(
   if (opts.listUnsubscribeUrl) {
     customHeaders["List-Unsubscribe"] = `<${opts.listUnsubscribeUrl}>`;
     customHeaders["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+  }
+  if (opts.campaignId) {
+    customHeaders["X-Job"] = `platform-campaign-${opts.campaignId}`;
+    customHeaders["X-SMTPAPI"] = JSON.stringify({ unique_args: { campaignId: String(opts.campaignId) } });
   }
 
   const payload: Record<string, unknown> = {
@@ -90,21 +94,22 @@ export async function sendViaSmtpCom(
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      "X-SMTPCOM-API": apiKey,
     },
     body: JSON.stringify(payload),
   });
 
   const text = await res.text();
   if (!res.ok) {
-    return { ok: false, error: `SMTP.com API error ${res.status}: ${text}` };
+    return { ok: false, error: `SMTP.com API error ${res.status}` };
   }
 
   try {
-    const parsed = JSON.parse(text) as { status?: string; data?: { error_key?: string } };
-    if (parsed.status === "fail") {
-      return { ok: false, error: `SMTP.com API rejected message: ${text}` };
+    const parsed = JSON.parse(text) as { status?: string; data?: { msg_id?: string } };
+    if (parsed.status === "fail" || parsed.status === "error") {
+      return { ok: false, error: "SMTP.com API rejected message" };
     }
+    return { ok: true, ...(typeof parsed.data?.msg_id === "string" ? { messageId: parsed.data.msg_id } : {}) };
   } catch {
     // Non-JSON success bodies are acceptable for 200 responses.
   }

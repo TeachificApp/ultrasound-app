@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   getEmailProviderId,
   isEmailProviderConfigured,
+  isSmtpComConfigured,
+  emailProviderStatus,
   resolveEffectiveEmailProvider,
   resolveEmailSender,
 } from "./lib/email/providerConfig";
@@ -14,9 +16,9 @@ describe("email provider config", () => {
     process.env = { ...originalEnv };
   });
 
-  it("defaults to smtpcom", () => {
+  it("defaults the legacy transactional preference to SendGrid", () => {
     delete process.env.EMAIL_PROVIDER;
-    expect(getEmailProviderId()).toBe("smtpcom");
+    expect(getEmailProviderId()).toBe("sendgrid");
   });
 
   it("accepts sendgrid when explicitly set", () => {
@@ -39,19 +41,21 @@ describe("email provider config", () => {
     expect(isEmailProviderConfigured()).toBe(true);
   });
 
-  it("requires SMTPCOM_API_KEY and SMTPCOM_CHANNEL when smtpcom is preferred and no fallback", () => {
+  it("requires both SMTP.com campaign credentials but never treats them as transactional readiness", () => {
     process.env.EMAIL_PROVIDER = "smtpcom";
     delete process.env.SMTPCOM_API_KEY;
     delete process.env.SMTPCOM_CHANNEL;
     delete process.env.SENDGRID_API_KEY;
     expect(isEmailProviderConfigured()).toBe(false);
     process.env.SMTPCOM_API_KEY = "key";
-    expect(isEmailProviderConfigured()).toBe(false);
+    expect(isSmtpComConfigured()).toBe(false);
     process.env.SMTPCOM_CHANNEL = "main";
-    expect(isEmailProviderConfigured()).toBe(true);
+    expect(isSmtpComConfigured()).toBe(true);
+    expect(isEmailProviderConfigured()).toBe(false);
+    expect(emailProviderStatus()).toMatchObject({ transactionalProvider: "sendgrid", transactionalConfigured: false, campaignProvider: "smtpcom", campaignConfigured: true, configured: false });
   });
 
-  it("falls back to sendgrid when smtpcom is preferred but not configured", () => {
+  it("uses SendGrid for transactional readiness regardless of the legacy preference", () => {
     process.env.EMAIL_PROVIDER = "smtpcom";
     delete process.env.SMTPCOM_API_KEY;
     delete process.env.SMTPCOM_CHANNEL;
@@ -66,7 +70,7 @@ describe("email provider config", () => {
     process.env.SMTPCOM_CHANNEL = "transactional";
     process.env.SMTPCOM_FROM_EMAIL = "smtp@example.com";
     process.env.SMTPCOM_FROM_NAME = "SMTP Sender";
-    const sender = resolveEmailSender({});
+    const sender = resolveEmailSender({ provider: "smtpcom" });
     expect(sender.email).toBe("smtp@example.com");
     expect(sender.name).toBe("SMTP Sender");
   });
@@ -144,6 +148,8 @@ describe("sendTransactionalEmail", () => {
     process.env.EMAIL_PROVIDER = "sendgrid";
     process.env.SENDGRID_API_KEY = "SG.test-key";
     process.env.SENDGRID_FROM_EMAIL = "noreply@example.com";
+    process.env.SMTPCOM_API_KEY = "smtp-test-key";
+    process.env.SMTPCOM_CHANNEL = "marketing";
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" });
     global.fetch = fetchMock as typeof fetch;
 
@@ -198,13 +204,14 @@ describe("sendTransactionalEmail", () => {
       to: { name: "User", email: "user@example.com" },
       subject: "Hello",
       htmlBody: "<p>Hi</p>",
+      transactional: false,
     });
 
     expect(ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.smtp.com/v4/messages");
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer smtp-test-key");
+    expect((init.headers as Record<string, string>)["X-SMTPCOM-API"]).toBe("smtp-test-key");
     const body = JSON.parse(String(init.body));
     expect(body.channel).toBe("transactional");
     expect(body.subject).toBe("Hello");
@@ -244,6 +251,42 @@ describe("sendTransactionalEmail", () => {
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://api.sendgrid.com/v3/mail/send");
+  });
+
+  it("keeps transactional messages on SendGrid even when SMTP.com is globally preferred", async () => {
+    process.env.EMAIL_PROVIDER = "smtpcom";
+    process.env.SMTPCOM_API_KEY = "smtp-test-key";
+    process.env.SMTPCOM_CHANNEL = "marketing";
+    process.env.SENDGRID_API_KEY = "SG.test-key";
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" });
+    global.fetch = fetchMock as typeof fetch;
+    await sendTransactionalEmail({ to: { name: "Member", email: "member@example.com" }, subject: "Reset your password", htmlBody: "<p>Reset</p>", transactional: true });
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.sendgrid.com/v3/mail/send");
+  });
+
+  it("never silently falls back to SendGrid for a campaign without SMTP.com credentials", async () => {
+    delete process.env.SMTPCOM_API_KEY;
+    delete process.env.SMTPCOM_CHANNEL;
+    process.env.SENDGRID_API_KEY = "SG.test-key";
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as typeof fetch;
+    expect(await sendTransactionalEmail({ to: { name: "Member", email: "member@example.com" }, subject: "Campaign", htmlBody: "<p>News</p>", campaignId: 20 })).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("retains the SMTP.com acceptance ID and non-PII campaign attribution headers", async () => {
+    process.env.SMTPCOM_API_KEY = "smtp-test-key";
+    process.env.SMTPCOM_CHANNEL = "marketing";
+    const accepted = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => JSON.stringify({ status: "success", data: { msg_id: "message-test-1" } }) });
+    global.fetch = fetchMock as typeof fetch;
+    expect(await sendTransactionalEmail({ to: { name: "Member", email: "member@example.com" }, subject: "Campaign", htmlBody: "<p>News</p>", campaignId: 21, onProviderAccepted: accepted })).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).not.toContain("smtp-test-key");
+    const payload = JSON.parse(String(init.body));
+    expect(JSON.parse(payload.custom_headers["X-SMTPAPI"])).toEqual({ unique_args: { campaignId: "21" } });
+    expect(payload.custom_headers["X-Job"]).toBe("platform-campaign-21");
+    expect(accepted).toHaveBeenCalledWith({ provider: "smtpcom", messageId: "message-test-1", channel: "marketing" });
   });
 });
 

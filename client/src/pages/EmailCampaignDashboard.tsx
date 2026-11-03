@@ -31,6 +31,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EmailCampaignEditor from "./EmailCampaignEditor";
 import EmailListsTab from "./EmailListsTab";
 import EmailAutomationTab from "./EmailAutomationTab";
+import SmtpCampaignAnalyticsPanel from "@/components/admin/SmtpCampaignAnalyticsPanel";
+import { usesSmtpCampaignAnalytics } from "@shared/smtpCampaignReport";
+import type { SmtpCampaignReport } from "@shared/smtpCampaignReport";
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({ icon, label, value, sub, color }: { icon: React.ReactNode; label: string; value: string | number; sub?: string; color?: string }) {
@@ -228,7 +231,24 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
   const [showSegmentForm, setShowSegmentForm] = useState(false);
   const utils = trpc.useUtils();
 
-  const { data: analytics, isLoading } = trpc.emailCampaign.getCampaignAnalytics.useQuery({ campaignId });
+  const { data: analytics, isLoading, isError: analyticsError, refetch: refetchAnalytics } = trpc.emailCampaign.getCampaignAnalytics.useQuery({ campaignId });
+  const isSmtpCampaign = analytics != null && usesSmtpCampaignAnalytics(analytics);
+  const [smtpPeriod, setSmtpPeriod] = useState<SmtpCampaignReport["period"]>("this_day");
+  // This read-only query bypasses server report caching on explicit refresh.
+  // No polling, focus/reconnect refetches, or email mutations are involved.
+  const smtpReportInput = useMemo(() => ({ campaignId, period: smtpPeriod, refresh: true }), [campaignId, smtpPeriod]);
+  const smtpQuery = trpc.emailCampaign.getSmtpCampaignReport.useQuery(smtpReportInput, {
+    enabled: isSmtpCampaign,
+    staleTime: 60_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: false,
+  });
+  const smtpReport: SmtpCampaignReport | undefined = smtpQuery.data;
+  const smtpCampaign = !smtpQuery.isError && smtpReport?.status === "ready" ? smtpReport.campaign : null;
+  const smtpDeliveryCounts = smtpCampaign?.counts;
+  const providerCount = (value: number | null | undefined) => value == null ? "—" : value.toLocaleString();
   const { data: recipientsData, isLoading: recipientsLoading } = trpc.emailCampaign.getCampaignRecipients.useQuery(
     { campaignId, eventType: recipientFilter, limit: 200, offset: 0 },
     { enabled: activeTab === "recipients" }
@@ -303,46 +323,6 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
             <BarChart2 className="w-5 h-5 text-[#189aa1]" />
             <span className="truncate">{subject}</span>
           </DialogTitle>
-          {/* Campaign summary banner */}
-          {analytics && !isLoading && (
-            <div className="mt-2 mb-1 rounded-lg border bg-gradient-to-r from-[#189aa1]/8 to-[#189aa1]/4 px-4 py-3">
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-                <div>
-                  <div className="text-lg font-bold text-gray-900">{analytics.totalSent.toLocaleString()}</div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Sent</div>
-                  {analytics.sentAt && (
-                    <div className="text-[10px] text-gray-400 mt-0.5">{new Date(analytics.sentAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
-                  )}
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-blue-700">{analytics.uniqueOpens.toLocaleString()}</div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unique Opens</div>
-                  <div className="text-[10px] text-blue-500 mt-0.5">{analytics.openRate}% rate</div>
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-green-700">{analytics.uniqueClicks.toLocaleString()}</div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unique Clicks</div>
-                  <div className="text-[10px] text-green-500 mt-0.5">{analytics.clickRate}% rate · {analytics.totalClicks.toLocaleString()} total</div>
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-red-600">{analytics.totalUnsubscribes.toLocaleString()}</div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unsubscribes</div>
-                  <div className="text-[10px] text-red-400 mt-0.5">{analytics.unsubscribeRate}% rate</div>
-                </div>
-                <div>
-                  <div className="text-lg font-bold text-teal-700">{analytics.uniqueDelivered.toLocaleString()}</div>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Delivered</div>
-                  <div className="text-[10px] text-teal-500 mt-0.5">{analytics.deliveryRate}% confirmed</div>
-                </div>
-              </div>
-              {!hideFinancials && analytics.orders && analytics.orders.count > 0 && (
-                <div className="mt-2 pt-2 border-t border-[#189aa1]/20 flex items-center gap-4 text-xs text-amber-700">
-                  <span className="font-semibold">💰 {analytics.orders.count} attributed order{analytics.orders.count !== 1 ? "s" : ""}</span>
-                  <span>${(analytics.orders.revenueCents / 100).toFixed(2)} revenue</span>
-                </div>
-              )}
-            </div>
-          )}
           {/* Tab bar */}
           <div className="flex gap-1 mt-3 border-b">
             {(["overview", "recipients", "geo", "links"] as const).map((tab) => (
@@ -366,20 +346,88 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto py-3">
+          {isSmtpCampaign && (
+            <div className="mb-4">
+              <SmtpCampaignAnalyticsPanel
+                report={smtpReport}
+                period={smtpPeriod}
+                onPeriodChange={setSmtpPeriod}
+                onRefresh={() => { void smtpQuery.refetch(); }}
+                isLoading={smtpQuery.isLoading}
+                isFetching={smtpQuery.isFetching}
+                isError={smtpQuery.isError}
+                errorMessage={smtpQuery.error?.message}
+              />
+            </div>
+          )}
+          {/* Preserved summary, after the provider report so sources stay distinct. */}
+          {analytics && !isLoading && (
+            <div className="mb-4 rounded-lg border bg-gradient-to-r from-[#189aa1]/8 to-[#189aa1]/4 px-4 py-3">
+              <p className="mb-2 text-xs font-semibold text-gray-700">Platform tracking / unique recipients</p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                <div>
+                  <div className="text-lg font-bold text-gray-900">{analytics.recipientCount.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Audience</div>
+                  {analytics.sentAt && (
+                    <div className="text-[10px] text-gray-400 mt-0.5">{new Date(analytics.sentAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-blue-700">{analytics.uniqueOpens.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unique Opens</div>
+                  <div className="text-[10px] text-blue-500 mt-0.5">{analytics.openRate}% of audience</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-green-700">{analytics.uniqueClicks.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unique Clicks</div>
+                  <div className="text-[10px] text-green-500 mt-0.5">{analytics.clickRate}% of audience · {analytics.totalClicks.toLocaleString()} total events</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-red-600">{analytics.totalUnsubscribes.toLocaleString()}</div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">Unsubscribe events</div>
+                  <div className="text-[10px] text-red-400 mt-0.5">{analytics.unsubscribeRate}% of audience (unique)</div>
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-teal-700" aria-label={isSmtpCampaign && smtpDeliveryCounts?.delivered == null ? "Unavailable" : undefined}>
+                    {isSmtpCampaign ? providerCount(smtpDeliveryCounts?.delivered) : analytics.uniqueDelivered.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wide">{isSmtpCampaign ? "SMTP.com delivered" : "Delivered"}</div>
+                  <div className="text-[10px] text-teal-500 mt-0.5">
+                    {isSmtpCampaign
+                      ? smtpDeliveryCounts?.delivered == null ? "Unavailable" : `Matched provider records${smtpCampaign?.partial ? " · partial" : ""}`
+                      : `${analytics.deliveryRate}% of audience · confirmed`}
+                  </div>
+                </div>
+              </div>
+              {isSmtpCampaign && <p className="mt-2 text-[11px] text-gray-500">SMTP.com delivery is a separate count from available campaign-matched provider records, not a platform unique-recipient metric or channel-period total.</p>}
+              {!hideFinancials && analytics.orders && analytics.orders.count > 0 && (
+                <div className="mt-2 pt-2 border-t border-[#189aa1]/20 flex items-center gap-4 text-xs text-amber-700">
+                  <span className="font-semibold">💰 {analytics.orders.count} attributed order{analytics.orders.count !== 1 ? "s" : ""}</span>
+                  <span>${(analytics.orders.revenueCents / 100).toFixed(2)} revenue</span>
+                </div>
+              )}
+            </div>
+          )}
           {/* ── OVERVIEW TAB ── */}
           {activeTab === "overview" && (
             isLoading ? (
-              <div className="flex items-center justify-center py-12"><RefreshCw className="w-6 h-6 animate-spin text-[#189aa1]" /></div>
+              <div role="status" className="flex items-center justify-center gap-2 py-12"><RefreshCw className="w-6 h-6 animate-spin text-[#189aa1]" aria-hidden="true" /><span className="sr-only">Loading campaign analytics…</span></div>
+            ) : analyticsError ? (
+              <div role="alert" className="space-y-3 py-8 text-center">
+                <p className="text-sm text-gray-600">Campaign analytics are unavailable.</p>
+                <Button type="button" size="sm" variant="outline" onClick={() => { void refetchAnalytics(); }}>Retry analytics</Button>
+              </div>
             ) : analytics ? (
               <div className="space-y-4">
+                <p className="text-xs font-semibold text-gray-700">Platform tracking / unique recipients</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="text-center p-3 bg-gray-50 rounded-lg">
-                    <div className="text-xl font-bold text-gray-900">{analytics.totalSent.toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Sent</div>
+                    <div className="text-xl font-bold text-gray-900">{analytics.recipientCount.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">Audience</div>
                   </div>
                   <div className="text-center p-3 bg-blue-50 rounded-lg">
                     <div className="text-xl font-bold text-blue-700">{analytics.uniqueOpens.toLocaleString()}</div>
-                    <div className="text-xs text-blue-500 font-medium">{analytics.openRate}% open rate</div>
+                    <div className="text-xs text-blue-500 font-medium">{analytics.openRate}% of audience opened</div>
                     <div className="text-[10px] text-blue-400 mt-0.5">
                       {analytics.totalOpens > analytics.uniqueOpens
                         ? `${analytics.totalOpens.toLocaleString()} total · ${analytics.uniqueOpens.toLocaleString()} unique`
@@ -388,7 +436,7 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
                   </div>
                   <div className="text-center p-3 bg-green-50 rounded-lg">
                     <div className="text-xl font-bold text-green-700">{analytics.uniqueClicks.toLocaleString()}</div>
-                    <div className="text-xs text-green-500 font-medium">{analytics.clickRate}% click rate</div>
+                    <div className="text-xs text-green-500 font-medium">{analytics.clickRate}% of audience clicked</div>
                     <div className="text-[10px] text-green-400 mt-0.5">
                       {analytics.totalClicks > analytics.uniqueClicks
                         ? `${analytics.totalClicks.toLocaleString()} total · ${analytics.uniqueClicks.toLocaleString()} unique`
@@ -397,11 +445,32 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
                   </div>
                   <div className="text-center p-3 bg-red-50 rounded-lg">
                     <div className="text-xl font-bold text-red-700">{analytics.totalUnsubscribes.toLocaleString()}</div>
-                    <div className="text-xs text-red-500 font-medium">{analytics.unsubscribeRate}% unsub rate</div>
-                    <div className="text-[10px] text-red-400 mt-0.5">unsubscribes</div>
+                    <div className="text-xs text-red-500 font-medium">{analytics.unsubscribeRate}% of audience unsubscribed</div>
+                    <div className="text-[10px] text-red-400 mt-0.5">unsubscribe events · rate uses unique recipients</div>
                   </div>
                 </div>
 
+                {isSmtpCampaign ? (
+                  <div className="rounded-lg border border-teal-100 bg-teal-50/40 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-teal-900">DELIVERY STATUS · SMTP.COM</p>
+                      <p className="text-[11px] text-teal-700">Campaign-matched provider records · available reporting window</p>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4 text-center">
+                      {(["accepted", "delivered", "failed", "queued"] as const).map((key) => (
+                        <div key={key}>
+                          <p className="text-sm font-bold text-teal-800" aria-label={smtpDeliveryCounts?.[key] == null ? `${key}: Unavailable` : undefined}>{providerCount(smtpDeliveryCounts?.[key])}</p>
+                          <p className="text-[10px] text-teal-700">{key}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-[11px] text-gray-600">
+                      {smtpCampaign
+                        ? smtpCampaign.partial ? "Partial matched results; not all campaign messages may be covered." : "Provider message counts, not unique recipients. No SendGrid delivery totals are substituted."
+                        : smtpQuery.isLoading ? "Loading campaign delivery data…" : smtpQuery.isError ? "Unavailable: the SMTP.com report could not be loaded. Use Retry above." : smtpReport?.campaignNotice || "Campaign delivery counts are unavailable; channel totals are not substituted."}
+                    </p>
+                  </div>
+                ) : (
                 <div className="rounded-lg border border-teal-100 bg-teal-50/40 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-semibold text-teal-900">DELIVERY STATUS</p>
@@ -415,6 +484,7 @@ function AnalyticsModal({ campaignId, subject, onClose, hideFinancials = false }
                     <div><p className="text-sm font-bold text-red-800">{analytics.totalDropped.toLocaleString()}</p><p className="text-[10px] text-red-800">dropped</p></div>
                   </div>
                 </div>
+                )}
 
                 {analytics.topLinks && analytics.topLinks.length > 0 && (
                   <div>
@@ -1046,11 +1116,12 @@ export default function EmailCampaignDashboard() {
         </div>
 
         {/* Stats */}
+        <p className="mb-2 text-xs font-medium text-gray-500">Platform tracking / unique recipients · provider reports are available in campaign analytics.</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <StatCard icon={<Send className="w-5 h-5" />} label="Total Sent" value={totalSent.toLocaleString()} sub={`${sentCampaigns.length} campaigns`} />
-          <StatCard icon={<Eye className="w-5 h-5" />} label="Avg Open Rate" value={`${avgOpenRate}%`} sub="across all sent campaigns" color="#3b82f6" />
-          <StatCard icon={<MousePointer className="w-5 h-5" />} label="Avg Click Rate" value={`${avgClickRate}%`} sub="across all sent campaigns" color="#10b981" />
-          <StatCard icon={<UserMinus className="w-5 h-5" />} label="Unsubscribes" value={totalUnsubscribes.toLocaleString()} sub="total unsubscribes" color="#ef4444" />
+          <StatCard icon={<Users className="w-5 h-5" />} label="Audience" value={totalSent.toLocaleString()} sub={`${sentCampaigns.length} sent campaigns · summed audiences`} />
+          <StatCard icon={<Eye className="w-5 h-5" />} label="Avg Open Rate" value={`${avgOpenRate}%`} sub="of audience · average across sent campaigns" color="#3b82f6" />
+          <StatCard icon={<MousePointer className="w-5 h-5" />} label="Avg Click Rate" value={`${avgClickRate}%`} sub="of audience · average across sent campaigns" color="#10b981" />
+          <StatCard icon={<UserMinus className="w-5 h-5" />} label="Unsubscribes" value={totalUnsubscribes.toLocaleString()} sub="platform unsubscribe events" color="#ef4444" />
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1107,9 +1178,9 @@ export default function EmailCampaignDashboard() {
                     <tr>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">CAMPAIGN</th>
                       <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500">STATUS</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">SENT</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">OPENS</th>
-                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">CLICKS</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">AUDIENCE</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">OPENS <span className="block text-[10px] font-normal">unique · of audience</span></th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">CLICKS <span className="block text-[10px] font-normal">unique · of audience</span></th>
                       <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">UNSUBS</th>
                       <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500">DATE</th>
                       <th className="sticky right-0 bg-gray-50 px-3 py-3 text-xs font-semibold text-gray-500 border-l border-gray-100"></th>

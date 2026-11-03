@@ -1,6 +1,6 @@
 /**
- * Transactional email helper with SendGrid or SMTP.com provider support.
- * Set EMAIL_PROVIDER=smtpcom (default) or EMAIL_PROVIDER=sendgrid.
+ * Shared email helper: campaigns use SMTP.com; transactional email stays on SendGrid.
+ * Each send records its actual provider and campaign attribution separately.
  */
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
@@ -11,6 +11,7 @@ import { getDb } from "../db";
 import { eq } from "drizzle-orm";
 import { users, emailSendLog as emailSendLogTable } from "../../drizzle/schema";
 import { sendTransactionalEmail } from "../lib/email/sendTransactionalEmail";
+import { getMessageEmailProvider } from "../lib/email/providerConfig";
 import type { EmailAttachment, EmailRecipient, SendEmailOptions } from "../lib/email/types";
 
 export type { EmailAttachment, EmailRecipient, SendEmailOptions };
@@ -41,8 +42,9 @@ function inferEmailType(subject: string): string {
 }
 
 /** Silently log a sent email to email_send_log. Never throws. */
-async function _logEmailSend(to: EmailRecipient, subject: string, status: "sent" | "failed"): Promise<void> {
+async function _logEmailSend(opts: SendEmailOptions, status: "sent" | "failed", receipt?: Parameters<NonNullable<SendEmailOptions["onProviderAccepted"]>>[0]): Promise<void> {
   try {
+    const { to, subject } = opts;
     const db = await getDb();
     if (!db) { console.warn("[email-log] db not available"); return; }
     // Look up userId by email using Drizzle ORM (avoids mysql2 tuple destructuring issues)
@@ -50,13 +52,20 @@ async function _logEmailSend(to: EmailRecipient, subject: string, status: "sent"
     const user = userRows[0] ?? null;
     const userId = user?.id ? Number(user.id) : null;
     const recipientName = to.name || user?.name || null;
-    const emailType = inferEmailType(subject);
+    const emailType = opts.campaignId ? "campaign" : inferEmailType(subject);
     await db.insert(emailSendLogTable).values({
       userId,
       recipientEmail: to.email,
       recipientName,
       emailType,
       subject,
+      campaignId: opts.campaignId ?? null,
+      metadata: JSON.stringify({
+        provider: receipt?.provider ?? getMessageEmailProvider(opts),
+        ...(receipt?.messageId ? { providerMessageId: receipt.messageId } : {}),
+        ...(receipt?.channel ? { channel: receipt.channel } : {}),
+        acceptance: status === "sent" ? "provider_accepted" : "failed",
+      }),
       status,
       sentAt: new Date(),
       createdAt: new Date(),
@@ -69,8 +78,14 @@ async function _logEmailSend(to: EmailRecipient, subject: string, status: "sent"
 }
 
 async function deliverSingleEmail(opts: SendEmailOptions): Promise<boolean> {
-  const sent = await sendTransactionalEmail(opts);
-  _logEmailSend(opts.to, opts.subject, sent ? "sent" : "failed").catch(() => {});
+  let receipt: Parameters<NonNullable<SendEmailOptions["onProviderAccepted"]>>[0] | undefined;
+  const sent = await sendTransactionalEmail({ ...opts, onProviderAccepted: accepted => {
+    receipt = accepted;
+    opts.onProviderAccepted?.(accepted);
+  } });
+  const logged = _logEmailSend(opts, sent ? "sent" : "failed", receipt);
+  if (opts.campaignId) await logged;
+  else logged.catch(() => {});
   return sent;
 }
 

@@ -39,6 +39,8 @@ export interface SendEmailOptions {
   attachments?: EmailAttachment[];
   cc?: EmailRecipient[];
   bcc?: EmailRecipient[];
+  /** Server-only acceptance hook. Never contains API keys or authentication/access tokens. */
+  onProviderAccepted?: (receipt: { provider: EmailProviderId; messageId?: string; channel?: string }) => void;
   /** Routes secure learner access plus token-free payer/admin purchase receipts. */
   purchaseAccess?: {
     /** Purchaser when access is assigned to a different learner. */
@@ -50,9 +52,9 @@ export interface SendEmailOptions {
     currency?: string | null;
   };
   /**
-   * Non-PII campaign identifier forwarded to SendGrid as a custom argument.
-   * It associates Event Webhook delivery outcomes with the originating
-   * platform campaign without transmitting recipient identity as metadata.
+   * Non-PII campaign identifier forwarded in provider campaign metadata.
+   * SMTP.com echoes it in smtp_vars for read-only campaign attribution;
+   * historical SendGrid delivery events retain their original custom argument.
    */
   campaignId?: number;
 }

@@ -1,52 +1,31 @@
-import {
-  getEmailProviderId,
-  isEmailProviderConfigured,
-  resolveEffectiveEmailProvider,
-  resolveEmailSender,
-} from "./providerConfig";
+import { getMessageEmailProvider, isSendGridConfigured, isSmtpComConfigured, resolveEmailSender } from "./providerConfig";
 import { sendViaSendGrid } from "./providers/sendgrid";
 import { sendViaSmtpCom } from "./providers/smtpcom";
 import type { SendEmailOptions } from "./types";
 
+/** Legacy entry point for both classes; campaigns never silently fall back to the transactional provider. */
 export async function sendTransactionalEmail(opts: SendEmailOptions): Promise<boolean> {
-  const preferred = getEmailProviderId();
-  const provider = resolveEffectiveEmailProvider();
-
-  if (!isEmailProviderConfigured() || !provider) {
-    const hint =
-      preferred === "smtpcom"
-        ? "SMTPCOM_API_KEY and SMTPCOM_CHANNEL (or SENDGRID_API_KEY fallback)"
-        : "SENDGRID_API_KEY (or SMTPCOM credentials fallback)";
-    console.warn(`[email] No email provider configured — skipping send (preferred=${preferred})`);
-    console.warn(`[email] Set ${hint}`);
+  const provider = getMessageEmailProvider(opts);
+  const configured = provider === "smtpcom" ? isSmtpComConfigured() : isSendGridConfigured();
+  if (!configured) {
+    console.warn(`[email] ${provider} is not configured for this delivery class — skipping send (no cross-provider fallback).`);
     return false;
   }
-
-  if (provider !== preferred) {
-    console.warn(
-      `[email] Preferred provider "${preferred}" is not fully configured — falling back to "${provider}"`,
-    );
-  }
-
   const sender = resolveEmailSender({ ...opts, provider });
-
   try {
-    const result =
-      provider === "smtpcom"
-        ? await sendViaSmtpCom(opts, sender)
-        : await sendViaSendGrid(opts, sender);
-
+    const result = provider === "smtpcom" ? await sendViaSmtpCom(opts, sender) : await sendViaSendGrid(opts, sender);
     if (!result.ok) {
       console.error(`[email] ${provider} send failed: ${result.error}`);
       return false;
     }
-
-    console.log(
-      `[email] Sent "${opts.subject}" to ${opts.to.email} via ${provider} [brand=${opts.brandMode || "aaus"}]`,
-    );
+    const messageId = "messageId" in result && typeof result.messageId === "string" ? result.messageId : undefined;
+    // A logging hook must never make an accepted send look failed (and invite a duplicate retry).
+    try { opts.onProviderAccepted?.({ provider, messageId, ...(provider === "smtpcom" ? { channel: process.env.SMTPCOM_CHANNEL?.trim() } : {}) }); }
+    catch { console.warn("[email] Provider acceptance logging hook failed; message was accepted."); }
+    console.log(`[email] Message accepted via ${provider} [brand=${opts.brandMode || "aaus"}]`);
     return true;
-  } catch (err) {
-    console.error(`[email] Failed to send email via ${provider}:`, err);
+  } catch {
+    console.error(`[email] Failed to send email via ${provider}.`);
     return false;
   }
 }

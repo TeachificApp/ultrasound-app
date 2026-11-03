@@ -74,6 +74,9 @@ import {
   buildUnsubscribePageUrl,
   ensureEmailCampaignEventsTable,
 } from "../lib/campaignUnsubscribe";
+import { getSmtpCampaignReport } from "../lib/email/smtpCampaignReporting";
+import { isSmtpComConfigured } from "../lib/email/providerConfig";
+import { usesSmtpCampaignAnalytics } from "../../shared/smtpCampaignReport";
 
 // ─── Campaign metrics helper ──────────────────────────────────────────────────
 
@@ -241,6 +244,10 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     .where(eq(emailCampaigns.id, campaignId))
     .limit(1);
   if (!campaign) return;
+  if (!isSmtpComConfigured()) {
+    await db.update(emailCampaigns).set({ status: "failed", errorMessage: "SMTP.com campaign delivery is not configured. Set the marketing API key and channel before sending. Transactional email remains on SendGrid." }).where(eq(emailCampaigns.id, campaignId));
+    return;
+  }
 
   let filter: AudienceFilter;
   try {
@@ -336,14 +343,8 @@ export async function executeCampaignSend(campaignId: number): Promise<void> {
     });
     if (ok) {
       sent++;
-      // Tag this log entry with the campaign ID
-      try {
-        await db.execute(sql`
-          UPDATE email_send_log SET campaign_id = ${campaignId}
-          WHERE recipient_email = ${recipient.email} AND campaign_id IS NULL
-          ORDER BY sent_at DESC LIMIT 1
-        `);
-      } catch { /* ignore */ }
+      // sendEmail logs this exact campaign/provider receipt atomically with its log insert.
+      // Never retroactively tag another message to the same recipient as a campaign send.
     } else failed++;
   }
 
@@ -1502,6 +1503,33 @@ Rules:
 
   // ── Admin: campaign analytics ─────────────────────────────────────────────
 
+  getSmtpCampaignReport: protectedProcedure
+    .input(z.object({ campaignId: z.number().int().positive(), period: z.enum(["this_day", "this_week"]).default("this_day"), refresh: z.boolean().optional() }))
+    .query(async ({ ctx, input }) => {
+      await assertAdmin(ctx.user.id);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const [campaign] = await db.select().from(emailCampaigns).where(eq(emailCampaigns.id, input.campaignId)).limit(1);
+      if (!campaign) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!usesSmtpCampaignAnalytics(campaign)) throw new TRPCError({ code: "BAD_REQUEST", message: "Historical campaigns retain their original provider analytics." });
+      const sentDate = campaign.sentAt ?? campaign.createdAt;
+      const start = new Date(sentDate);
+      start.setUTCHours(0, 0, 0, 0);
+      const knownMessageIds: string[] = [];
+      try {
+        const [rows] = await db.execute(sql`SELECT metadata, sent_at FROM email_send_log WHERE campaign_id = ${input.campaignId} ORDER BY sent_at ASC LIMIT 50000`) as unknown as [{ metadata: string | null; sent_at: Date | string }[], unknown];
+        for (const row of Array.isArray(rows) ? rows : []) {
+          const date = new Date(row.sent_at);
+          if (date.getTime() < start.getTime()) start.setTime(date.getTime());
+          try {
+            const meta = JSON.parse(row.metadata ?? "{}");
+            if (meta.provider === "smtpcom" && meta.channel === process.env.SMTPCOM_CHANNEL?.trim() && typeof meta.providerMessageId === "string") knownMessageIds.push(meta.providerMessageId);
+          } catch { /* Legacy logs without provider metadata remain unchanged and unattributed. */ }
+        }
+      } catch { /* Provider headers may still supply exact attribution when legacy logging is unavailable. */ }
+      return getSmtpCampaignReport({ ...input, start, knownMessageIds });
+    }),
+
   getCampaignAnalytics: protectedProcedure
     .input(z.object({ campaignId: z.number() }))
     .query(async ({ ctx, input }) => {
@@ -2430,10 +2458,11 @@ Rules:
       const html = normalizeCampaignEmailHtml(input.htmlBody);
       const subject = resolveCampaignTestSubject(input.subject);
       const ok = await sendEmail({
-        to: { email: input.toEmail },
+        to: { name: "Campaign test recipient", email: input.toEmail },
         subject: `[TEST] ${subject}`,
         htmlBody: html,
         previewText: input.previewText ?? undefined,
+        transactional: false,
       });
       if (!ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to send test email." });
       return { ok: true };
