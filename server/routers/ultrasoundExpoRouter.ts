@@ -19,6 +19,7 @@ import { requireApprovedVendorApplication } from "../lib/vendorPartnerAccess";
 import {
   expoTenantSchemaAvailable,
   getCompatibleExpoEventById,
+  insertCompatibleExpoEvent,
   listCompatibleExpoEvents,
   listCompatibleExpoPackages,
 } from "../lib/expoEventSchemaCompatibility";
@@ -447,10 +448,6 @@ export const ultrasoundExpoRouter = router({
     await assertExpoAdmin(ctx.user);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const hasTenant = await expoTenantSchemaAvailable(db);
-    if (!hasTenant && input.tenant === "echo_expo") {
-      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "EchoExpo™ event instances require the pending additive Railway database migration. Existing UltrasoundExpo™ events remain available." });
-    }
     const eventValues = {
       name: input.name,
       slug: input.slug,
@@ -465,8 +462,8 @@ export const ultrasoundExpoRouter = router({
       partnerInstructions: input.partnerInstructions || null,
       status: input.status,
     };
-    const created = await db.insert(ultrasoundExpoEvents).values(hasTenant ? { ...eventValues, tenant: input.tenant } : eventValues).$returningId();
-    return { id: created[0]?.id ?? null };
+    const id = await insertCompatibleExpoEvent(db, { ...eventValues, tenant: input.tenant });
+    return { id };
   }),
 
   duplicateEvent: protectedProcedure.input(z.object({

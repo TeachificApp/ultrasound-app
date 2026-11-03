@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { asc, eq, getTableColumns, sql } from "drizzle-orm";
 import { ultrasoundExpoEvents, ultrasoundExpoPackages } from "../../drizzle/schema";
 import { type ExpoEventTenant } from "../../shared/expoTenant";
@@ -63,10 +64,19 @@ async function hasExpoTenantColumn(db: Db): Promise<boolean> {
 }
 
 function asLegacyExpoEvent(row: Record<string, unknown>): CompatibleExpoEvent {
+  // Raw execute returns timezone-less MySQL strings, unlike a typed Drizzle
+  // select. Apply the same UTC timestamp mapper so browsers cannot reinterpret
+  // the event's end instant in their own timezone (Jan 13 ET becoming Jan 14).
+  const timestamp = (value: unknown, column: Pick<typeof ultrasoundExpoEvents.startsAt, "mapFromDriverValue">) =>
+    typeof value === "string" ? column.mapFromDriverValue(value) : value;
   return {
     ...row,
     id: Number(row.id),
     tenant: "ultrasound_expo",
+    startsAt: timestamp(row.startsAt, ultrasoundExpoEvents.startsAt),
+    endsAt: timestamp(row.endsAt, ultrasoundExpoEvents.endsAt),
+    createdAt: timestamp(row.createdAt, ultrasoundExpoEvents.createdAt),
+    updatedAt: timestamp(row.updatedAt, ultrasoundExpoEvents.updatedAt),
   } as CompatibleExpoEvent;
 }
 
@@ -77,6 +87,51 @@ async function legacyRows(db: Db, statement: ReturnType<typeof sql>): Promise<Co
 
 export async function expoTenantSchemaAvailable(db: Db): Promise<boolean> {
   return hasExpoTenantColumn(db);
+}
+
+/** Omitting a value is not enough: Drizzle still inserts every schema column. */
+export async function insertCompatibleExpoEvent(
+  db: Db,
+  values: Omit<typeof ultrasoundExpoEvents.$inferInsert, "id" | "createdAt" | "updatedAt" | "tenant"> & { tenant: ExpoEventTenant },
+): Promise<number> {
+  const hasTenant = await hasExpoTenantColumn(db);
+  if (!hasTenant && values.tenant === "echo_expo") {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "EchoExpo™ event instances require the pending additive Railway database migration for ultrasound_expo_events.tenant. No event was created; EchoExpo™ cannot be saved as UltrasoundExpo™." });
+  }
+  let id: number | undefined;
+  try {
+    if (hasTenant) {
+      const created = await db.insert(ultrasoundExpoEvents).values(values).$returningId();
+      id = created[0]?.id;
+    } else {
+      // Use only established columns, with parameterized values and the same
+      // UTC serialization as the normal typed insert. No runtime DDL or fallback
+      // that could erase an explicit EchoExpo™ distinction is permitted.
+      const result = await db.execute(sql`
+        INSERT INTO ultrasound_expo_events
+          (name, slug, starts_at, ends_at, timezone, location_label, description,
+           hero_image_url, registration_terms, attendee_instructions, partner_instructions, status)
+        VALUES (${values.name}, ${values.slug}, ${ultrasoundExpoEvents.startsAt.mapToDriverValue(values.startsAt)},
+          ${values.endsAt ? ultrasoundExpoEvents.endsAt.mapToDriverValue(values.endsAt) : null},
+          ${values.timezone ?? "America/New_York"}, ${values.locationLabel ?? null}, ${values.description ?? null},
+          ${values.heroImageUrl ?? null}, ${values.registrationTerms ?? null}, ${values.attendeeInstructions ?? null},
+          ${values.partnerInstructions ?? null}, ${values.status ?? "draft"})
+      `);
+      id = Number(result?.[0]?.insertId);
+    }
+  } catch (error) {
+    // Drizzle may wrap mysql2 errors in a query error. Never expose its SQL or
+    // authored values; a reused slug should explain why a new instance failed.
+    const failure = error as { code?: string; cause?: { code?: string } };
+    if (failure.code === "ER_DUP_ENTRY" || failure.cause?.code === "ER_DUP_ENTRY") {
+      throw new TRPCError({ code: "CONFLICT", message: "An Expo event already uses this URL slug. Choose a unique slug for the new instance, such as one including its year." });
+    }
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to create the Expo event instance. No existing event was changed." });
+  }
+  if (!id || !Number.isSafeInteger(id) || id < 1) {
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The Expo event save did not return an instance ID. Reload the event list before retrying." });
+  }
+  return id;
 }
 
 export async function listCompatibleExpoEvents(db: Db, options: { publishedOnly?: boolean } = {}): Promise<CompatibleExpoEvent[]> {
