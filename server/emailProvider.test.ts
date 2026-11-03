@@ -12,11 +12,14 @@ describe("email provider config", () => {
 
   afterEach(() => {
     process.env = { ...originalEnv };
+    delete process.env.SMPTCOM_API_KEY;
+    delete process.env.SMPTCOM_FROM_EMAIL;
   });
 
-  it("defaults to smtpcom", () => {
+  it("defaults transactional mail to sendgrid", () => {
     delete process.env.EMAIL_PROVIDER;
-    expect(getEmailProviderId()).toBe("smtpcom");
+    delete process.env.TRANSACTIONAL_EMAIL_PROVIDER;
+    expect(getEmailProviderId()).toBe("sendgrid");
   });
 
   it("accepts sendgrid when explicitly set", () => {
@@ -34,39 +37,26 @@ describe("email provider config", () => {
   it("requires SENDGRID_API_KEY for sendgrid provider", () => {
     process.env.EMAIL_PROVIDER = "sendgrid";
     delete process.env.SENDGRID_API_KEY;
+    delete process.env.SMTPCOM_API_KEY;
+    delete process.env.SMPTCOM_API_KEY;
+    delete process.env.SMTPCOM_CHANNEL;
     expect(isEmailProviderConfigured()).toBe(false);
     process.env.SENDGRID_API_KEY = "SG.test";
     expect(isEmailProviderConfigured()).toBe(true);
   });
 
-  it("requires SMTPCOM_API_KEY and SMTPCOM_CHANNEL when smtpcom is preferred and no fallback", () => {
-    process.env.EMAIL_PROVIDER = "smtpcom";
-    delete process.env.SMTPCOM_API_KEY;
-    delete process.env.SMTPCOM_CHANNEL;
-    delete process.env.SENDGRID_API_KEY;
-    expect(isEmailProviderConfigured()).toBe(false);
-    process.env.SMTPCOM_API_KEY = "key";
-    expect(isEmailProviderConfigured()).toBe(false);
-    process.env.SMTPCOM_CHANNEL = "main";
-    expect(isEmailProviderConfigured()).toBe(true);
-  });
-
-  it("falls back to sendgrid when smtpcom is preferred but not configured", () => {
-    process.env.EMAIL_PROVIDER = "smtpcom";
-    delete process.env.SMTPCOM_API_KEY;
-    delete process.env.SMTPCOM_CHANNEL;
-    process.env.SENDGRID_API_KEY = "SG.test";
-    expect(resolveEffectiveEmailProvider()).toBe("sendgrid");
-    expect(isEmailProviderConfigured()).toBe(true);
+  it("defaults campaign mail to smtpcom", async () => {
+    const { getCampaignEmailProviderId } = await import("./lib/email/providerConfig");
+    delete process.env.CAMPAIGN_EMAIL_PROVIDER;
+    expect(getCampaignEmailProviderId()).toBe("smtpcom");
   });
 
   it("uses smtpcom-specific from env when provider is smtpcom", () => {
-    process.env.EMAIL_PROVIDER = "smtpcom";
     process.env.SMTPCOM_API_KEY = "smtp-test-key";
-    process.env.SMTPCOM_CHANNEL = "transactional";
+    process.env.SMTPCOM_CHANNEL = "campaign";
     process.env.SMTPCOM_FROM_EMAIL = "smtp@example.com";
     process.env.SMTPCOM_FROM_NAME = "SMTP Sender";
-    const sender = resolveEmailSender({});
+    const sender = resolveEmailSender({ provider: "smtpcom" });
     expect(sender.email).toBe("smtp@example.com");
     expect(sender.name).toBe("SMTP Sender");
   });
@@ -140,14 +130,19 @@ describe("sendTransactionalEmail", () => {
     expect(payload.mail_settings.bypass_list_management.enable).toBe(true);
   });
 
-  it("does not bypass a deliberate campaign opt-out", async () => {
+  it("routes campaign mail through SMTP.com, not transactional SendGrid", async () => {
     process.env.EMAIL_PROVIDER = "sendgrid";
     process.env.SENDGRID_API_KEY = "SG.test-key";
     process.env.SENDGRID_FROM_EMAIL = "noreply@example.com";
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" });
+    process.env.SMTPCOM_API_KEY = "smtp-test-key";
+    process.env.SMTPCOM_CHANNEL = "campaign";
+    process.env.SMTPCOM_FROM_EMAIL = "news@example.com";
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => '{"status":"success"}' });
     global.fetch = fetchMock as typeof fetch;
 
-    await sendTransactionalEmail({
+    const { sendEmail } = await import("./_core/email");
+    await sendEmail({
       to: { name: "Member", email: "member@example.com" },
       subject: "Monthly news",
       htmlBody: "<p>News</p>",
@@ -155,9 +150,9 @@ describe("sendTransactionalEmail", () => {
       listUnsubscribeUrl: "https://example.com/unsubscribe",
     });
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const payload = JSON.parse(String(init.body));
-    expect(payload.mail_settings?.bypass_list_management).toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.smtp.com/v4/messages");
   });
 
   it("sends iHeartEcho account email with the iHeartEcho mailbox display name", async () => {
@@ -184,38 +179,11 @@ describe("sendTransactionalEmail", () => {
     expect(payload.reply_to.name).toBe("iHeartEcho™");
   });
 
-  it("posts to SMTP.com when provider is smtpcom", async () => {
-    process.env.EMAIL_PROVIDER = "smtpcom";
-    process.env.SMTPCOM_API_KEY = "smtp-test-key";
-    process.env.SMTPCOM_CHANNEL = "transactional";
-    process.env.SMTPCOM_FROM_EMAIL = "noreply@example.com";
-    process.env.SMTPCOM_FROM_NAME = "Example";
-
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => '{"status":"success"}' });
-    global.fetch = fetchMock as typeof fetch;
-
-    const ok = await sendTransactionalEmail({
-      to: { name: "User", email: "user@example.com" },
-      subject: "Hello",
-      htmlBody: "<p>Hi</p>",
-    });
-
-    expect(ok).toBe(true);
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.smtp.com/v4/messages");
-    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer smtp-test-key");
-    const body = JSON.parse(String(init.body));
-    expect(body.channel).toBe("transactional");
-    expect(body.subject).toBe("Hello");
-    expect(body.recipients.to[0].address).toBe("user@example.com");
-  });
-
-  it("returns false when no provider credentials are available", async () => {
-    process.env.EMAIL_PROVIDER = "smtpcom";
+  it("returns false when no transactional provider credentials are available", async () => {
+    process.env.EMAIL_PROVIDER = "sendgrid";
+    delete process.env.SENDGRID_API_KEY;
     delete process.env.SMTPCOM_API_KEY;
     delete process.env.SMTPCOM_CHANNEL;
-    delete process.env.SENDGRID_API_KEY;
     const ok = await sendTransactionalEmail({
       to: { name: "User", email: "user@example.com" },
       subject: "Hello",
@@ -223,27 +191,41 @@ describe("sendTransactionalEmail", () => {
     });
     expect(ok).toBe(false);
   });
+});
 
-  it("falls back to sendgrid when smtpcom preferred but not configured", async () => {
-    process.env.EMAIL_PROVIDER = "smtpcom";
-    delete process.env.SMTPCOM_API_KEY;
-    delete process.env.SMTPCOM_CHANNEL;
+describe("sendCampaignEmail", () => {
+  const originalEnv = { ...process.env };
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    global.fetch = originalFetch;
+  });
+
+  it("posts to SMTP.com for campaigns by default", async () => {
     process.env.SENDGRID_API_KEY = "SG.test-key";
-    process.env.SENDGRID_FROM_EMAIL = "noreply@example.com";
+    process.env.SMTPCOM_API_KEY = "smtp-test-key";
+    process.env.SMTPCOM_CHANNEL = "campaign";
+    process.env.SMTPCOM_FROM_EMAIL = "news@example.com";
 
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => "" });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => '{"status":"success"}' });
     global.fetch = fetchMock as typeof fetch;
 
-    const ok = await sendTransactionalEmail({
+    const { sendCampaignEmail } = await import("./lib/email/sendCampaignEmail");
+    const ok = await sendCampaignEmail({
       to: { name: "User", email: "user@example.com" },
-      subject: "Magic link",
-      htmlBody: "<p>Sign in</p>",
+      subject: "Newsletter",
+      htmlBody: "<p>Hi</p>",
+      campaignId: 1,
+      listUnsubscribeUrl: "https://example.com/u",
     });
 
     expect(ok).toBe(true);
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.sendgrid.com/v3/mail/send");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.smtp.com/v4/messages");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer smtp-test-key");
+    const body = JSON.parse(String(init.body));
+    expect(body.channel).toBe("campaign");
   });
 });
 
@@ -259,6 +241,7 @@ describe("listSmtpComChannels", () => {
   it("returns error when API key is missing", async () => {
     const { listSmtpComChannels } = await import("./lib/email/providers/smtpcomChannels");
     delete process.env.SMTPCOM_API_KEY;
+    delete process.env.SMPTCOM_API_KEY;
     const result = await listSmtpComChannels();
     expect(result.ok).toBe(false);
     expect(result.channels).toEqual([]);

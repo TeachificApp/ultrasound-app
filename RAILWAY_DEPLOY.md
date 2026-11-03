@@ -126,11 +126,13 @@ Set these in your Railway service's **Variables** tab:
 
 ### Email provider
 
-Set `EMAIL_PROVIDER` to override the transactional email backend. **SMTP.com is the default** when unset. Marketing contacts, suppressions, and webhooks still use SendGrid when configured.
+**Transactional** mail (auth, purchases, enrollments) defaults to **SendGrid**. **Platform email campaigns** default to **SMTP.com**. SendGrid marketing suppressions and event webhooks remain on SendGrid when configured.
 
 | Variable | Description |
 |----------|-------------|
-| `EMAIL_PROVIDER` | `smtpcom` (default) or `sendgrid` |
+| `TRANSACTIONAL_EMAIL_PROVIDER` | `sendgrid` (default) or `smtpcom` |
+| `EMAIL_PROVIDER` | Legacy alias for `TRANSACTIONAL_EMAIL_PROVIDER` |
+| `CAMPAIGN_EMAIL_PROVIDER` | `smtpcom` (default) or `sendgrid` |
 
 ### SendGrid
 
@@ -143,7 +145,7 @@ Set `EMAIL_PROVIDER` to override the transactional email backend. **SMTP.com is 
 
 ### SMTP.com
 
-Used by default (or when `EMAIL_PROVIDER=smtpcom`). Sender defaults fall back to `SENDGRID_FROM_*` if `SMTPCOM_FROM_*` are unset.
+Used for platform **email campaigns** by default (`CAMPAIGN_EMAIL_PROVIDER=smtpcom`). Sender defaults fall back to `SENDGRID_FROM_*` if `SMTPCOM_FROM_*` are unset.
 
 | Variable | Description |
 |----------|-------------|

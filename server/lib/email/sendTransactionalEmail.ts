@@ -1,7 +1,7 @@
 import {
-  getEmailProviderId,
+  getTransactionalEmailProviderId,
   isEmailProviderConfigured,
-  resolveEffectiveEmailProvider,
+  resolveEffectiveTransactionalProvider,
   resolveEmailSender,
 } from "./providerConfig";
 import { sendViaSendGrid } from "./providers/sendgrid";
@@ -9,22 +9,22 @@ import { sendViaSmtpCom } from "./providers/smtpcom";
 import type { SendEmailOptions } from "./types";
 
 export async function sendTransactionalEmail(opts: SendEmailOptions): Promise<boolean> {
-  const preferred = getEmailProviderId();
-  const provider = resolveEffectiveEmailProvider();
+  const preferred = getTransactionalEmailProviderId();
+  const provider = resolveEffectiveTransactionalProvider();
 
   if (!isEmailProviderConfigured() || !provider) {
     const hint =
       preferred === "smtpcom"
         ? "SMTPCOM_API_KEY and SMTPCOM_CHANNEL (or SENDGRID_API_KEY fallback)"
         : "SENDGRID_API_KEY (or SMTPCOM credentials fallback)";
-    console.warn(`[email] No email provider configured — skipping send (preferred=${preferred})`);
+    console.warn(`[email] No transactional email provider configured — skipping send (preferred=${preferred})`);
     console.warn(`[email] Set ${hint}`);
     return false;
   }
 
   if (provider !== preferred) {
     console.warn(
-      `[email] Preferred provider "${preferred}" is not fully configured — falling back to "${provider}"`,
+      `[email] Preferred transactional provider "${preferred}" is not fully configured — falling back to "${provider}"`,
     );
   }
 
