@@ -1,6 +1,7 @@
 /**
- * Transactional email helper with SendGrid or SMTP.com provider support.
- * Set EMAIL_PROVIDER=smtpcom (default) or EMAIL_PROVIDER=sendgrid.
+ * Email dispatch: transactional (SendGrid by default) vs campaigns (SMTP.com by default).
+ * TRANSACTIONAL_EMAIL_PROVIDER / EMAIL_PROVIDER — service mail (default sendgrid).
+ * CAMPAIGN_EMAIL_PROVIDER — platform campaigns (default smtpcom).
  */
 
 import { type BrandMode, getBrandDisplayConfig } from "@shared/brands";
@@ -11,7 +12,14 @@ import { getDb } from "../db";
 import { eq } from "drizzle-orm";
 import { users, emailSendLog as emailSendLogTable } from "../../drizzle/schema";
 import { sendTransactionalEmail } from "../lib/email/sendTransactionalEmail";
+import { sendCampaignEmail } from "../lib/email/sendCampaignEmail";
 import type { EmailAttachment, EmailRecipient, SendEmailOptions } from "../lib/email/types";
+
+export function isMarketingEmail(opts: SendEmailOptions): boolean {
+  if (opts.transactional === true) return false;
+  if (opts.transactional === false) return true;
+  return !!(opts.listUnsubscribeUrl || opts.campaignId);
+}
 
 export type { EmailAttachment, EmailRecipient, SendEmailOptions };
 
@@ -69,7 +77,9 @@ async function _logEmailSend(to: EmailRecipient, subject: string, status: "sent"
 }
 
 async function deliverSingleEmail(opts: SendEmailOptions): Promise<boolean> {
-  const sent = await sendTransactionalEmail(opts);
+  const sent = isMarketingEmail(opts)
+    ? await sendCampaignEmail(opts)
+    : await sendTransactionalEmail(opts);
   _logEmailSend(opts.to, opts.subject, sent ? "sent" : "failed").catch(() => {});
   return sent;
 }

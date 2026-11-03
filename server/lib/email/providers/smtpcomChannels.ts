@@ -1,4 +1,7 @@
-const SMTPCOM_CHANNELS_URL = "https://api.smtp.com/v4/channels/";
+import { getSmtpComApiKey } from "../providerConfig";
+
+// Trailing slash hits the wrong route (404 "sender not found").
+const SMTPCOM_CHANNELS_URL = "https://api.smtp.com/v4/channels";
 
 export type SmtpComChannelSummary = {
   name: string;
@@ -11,7 +14,7 @@ export async function listSmtpComChannels(): Promise<{
   channels: SmtpComChannelSummary[];
   error?: string;
 }> {
-  const apiKey = process.env.SMTPCOM_API_KEY?.trim();
+  const apiKey = getSmtpComApiKey();
   if (!apiKey) {
     return { ok: false, channels: [], error: "SMTPCOM_API_KEY not set" };
   }

@@ -147,6 +147,60 @@ function parseRecipientFromKey(recipientKey: string) {
 }
 
 /** Persist a campaign engagement event. Opens are deduped per recipient per campaign. */
+/** Record SMTP.com API-accepted delivery (SendGrid campaigns use Event Webhook instead). */
+export async function recordCampaignProviderAcceptedDelivery(
+  db: DbClient,
+  input: {
+    campaignId: number;
+    recipientKey: string;
+    provider: "smtpcom";
+    messageId?: string | null;
+  },
+): Promise<void> {
+  const baseMeta = {
+    provider: input.provider,
+    source: "outbound_accept",
+    ...(input.messageId ? { messageId: input.messageId } : {}),
+  };
+  const idBase = `${input.provider}:accept:${input.campaignId}:${input.recipientKey}`;
+  await recordEmailCampaignEvent(db, {
+    campaignId: input.campaignId,
+    recipientKey: input.recipientKey,
+    eventType: "processed",
+    providerEventId: `${idBase}:processed`,
+    metadata: baseMeta,
+  });
+  await recordEmailCampaignEvent(db, {
+    campaignId: input.campaignId,
+    recipientKey: input.recipientKey,
+    eventType: "delivered",
+    providerEventId: `${idBase}:delivered`,
+    metadata: baseMeta,
+  });
+}
+
+export async function recordCampaignProviderSendFailure(
+  db: DbClient,
+  input: {
+    campaignId: number;
+    recipientKey: string;
+    provider: "smtpcom";
+    reason?: string;
+  },
+): Promise<void> {
+  await recordEmailCampaignEvent(db, {
+    campaignId: input.campaignId,
+    recipientKey: input.recipientKey,
+    eventType: "dropped",
+    providerEventId: `${input.provider}:fail:${input.campaignId}:${input.recipientKey}`,
+    metadata: {
+      provider: input.provider,
+      source: "outbound_reject",
+      ...(input.reason ? { reason: input.reason } : {}),
+    },
+  });
+}
+
 export async function recordEmailCampaignEvent(
   db: DbClient,
   input: RecordCampaignEventInput,

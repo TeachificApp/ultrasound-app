@@ -23,10 +23,15 @@ describe("campaign delivery analytics", () => {
     const provider = read("server/lib/email/providers/sendgrid.ts");
     const router = read("server/routers/emailCampaignRouter.ts");
     const webhook = read("server/webhooks/sendgrid.ts");
+    const tracking = read("server/lib/emailCampaignTracking.ts");
     expect(provider).toContain("custom_args: { campaignId: String(opts.campaignId) }");
     expect(router).toContain("campaignId,");
     expect(webhook).toContain("recordCampaignDeliveryEvent(event)");
     expect(webhook).toContain("getCampaignId(event)");
+    expect(tracking).toContain("recordCampaignProviderAcceptedDelivery");
+    expect(router).toContain("recordCampaignProviderAcceptedDelivery");
+    expect(router).toContain("deliveryByProvider");
+    expect(router).toContain("uniqueDeliveredCount");
   });
 
   it("keeps dashboard click metrics explicitly unique while showing total engagement", () => {

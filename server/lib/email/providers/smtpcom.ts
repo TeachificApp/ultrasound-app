@@ -1,3 +1,4 @@
+import { getSmtpComApiKey } from "../providerConfig";
 import type { ResolvedEmailSender, SendEmailOptions } from "../types";
 
 const SMTPCOM_API_URL = "https://api.smtp.com/v4/messages";
@@ -10,7 +11,7 @@ export async function sendViaSmtpCom(
   opts: SendEmailOptions,
   sender: ResolvedEmailSender,
 ): Promise<{ ok: boolean; error?: string }> {
-  const apiKey = process.env.SMTPCOM_API_KEY?.trim();
+  const apiKey = getSmtpComApiKey();
   const channel = process.env.SMTPCOM_CHANNEL?.trim();
   if (!apiKey) {
     return { ok: false, error: "SMTPCOM_API_KEY not set" };
@@ -23,6 +24,9 @@ export async function sendViaSmtpCom(
   if (opts.listUnsubscribeUrl) {
     customHeaders["List-Unsubscribe"] = `<${opts.listUnsubscribeUrl}>`;
     customHeaders["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click";
+  }
+  if (opts.campaignId) {
+    customHeaders["X-AAUS-Campaign-Id"] = String(opts.campaignId);
   }
 
   const payload: Record<string, unknown> = {

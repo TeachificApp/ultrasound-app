@@ -9,6 +9,8 @@ describe("transactional email policy", () => {
   it("classifies service messages as transactional unless they deliberately identify a campaign", () => {
     const emailSource = source("server/_core/email.ts");
     expect(emailSource).toContain("transactional: opts.transactional ?? !(opts.listUnsubscribeUrl || opts.campaignId)");
+    expect(emailSource).toContain("sendCampaignEmail");
+    expect(emailSource).toContain("isMarketingEmail");
   });
 
   it("does not allow campaign opt-outs to create a global provider suppression", () => {
