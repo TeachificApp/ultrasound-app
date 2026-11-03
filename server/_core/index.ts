@@ -1193,6 +1193,19 @@ async function startServer() {
     })
     .catch(() => console.error("[Startup] Unable to run the Expo event identity migration."));
 
+  // Owner-approved paired-package + grouped-payment structures only. Do not run
+  // the historical migration's date/copy updates or unlock partially migrated checkout.
+  import("../lib/ensureExpoCombinedOfferSchema")
+    .then(async ({ ensureExpoCombinedOfferSchema }) => {
+      const result = await ensureExpoCombinedOfferSchema(await getDb());
+      if (result.status === "failed") {
+        console.error("[Startup] Combined Expo migration failed:", result.error);
+      } else if (result.status === "ready") {
+        console.log(`[Startup] Combined Expo migration verified (${result.applied ? "missing structures added" : "already present"}).`);
+      }
+    })
+    .catch(() => console.error("[Startup] Unable to run the combined Expo migration."));
+
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
     if (!shouldRunPrimaryHostMaintenance()) {

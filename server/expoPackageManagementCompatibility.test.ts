@@ -3,6 +3,7 @@ import { getTableColumns } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ultrasoundExpoEvents, ultrasoundExpoPackages } from "../drizzle/schema";
 import { expoCombinedOfferSchemaAvailable, listCompatibleExpoPackages } from "./lib/expoEventSchemaCompatibility";
+import { EXPO_COMBINED_GROUP_COLUMNS, EXPO_COMBINED_SCHEMA_ADDITIONS } from "./lib/expoCombinedOfferSchema";
 import { ultrasoundExpoRouter } from "./routers/ultrasoundExpoRouter";
 
 const mocks = vi.hoisted(() => ({ getDb: vi.fn(), getUserRoles: vi.fn() }));
@@ -47,6 +48,14 @@ function mockDatabase(options: {
     query: vi.fn(async (query: { sql: string; rowsAsArray?: boolean }, params: unknown[] = []) => {
       const text = query.sql.trim();
       statements.push({ sql: text, params });
+      if (text.includes("INFORMATION_SCHEMA.STATISTICS")) {
+        const indexes = [{ TABLE_NAME: "ultrasound_expo_checkout_groups", INDEX_NAME: "PRIMARY", COLUMN_NAME: "id", SEQ_IN_INDEX: 1, NON_UNIQUE: 0 }, ...EXPO_COMBINED_SCHEMA_ADDITIONS.flatMap(addition => addition.kind === "index" ? addition.columns.map((column, index) => ({ TABLE_NAME: addition.table, INDEX_NAME: addition.index, COLUMN_NAME: column, SEQ_IN_INDEX: index + 1, NON_UNIQUE: addition.unique ? 0 : 1 })) : [])];
+        return [hasCombined ? indexes : [], []];
+      }
+      if (text.includes("INFORMATION_SCHEMA.COLUMNS") && text.includes("DATA_TYPE")) {
+        const columns = [...EXPO_COMBINED_GROUP_COLUMNS.map(([column, type, nullable]) => ({ TABLE_NAME: "ultrasound_expo_checkout_groups", COLUMN_NAME: column, DATA_TYPE: type, IS_NULLABLE: nullable })), ...EXPO_COMBINED_SCHEMA_ADDITIONS.flatMap(addition => addition.kind === "column" ? [{ TABLE_NAME: addition.table, COLUMN_NAME: addition.column, DATA_TYPE: "int", IS_NULLABLE: "YES" }] : [])];
+        return [hasCombined ? columns : [], []];
+      }
       if (text.includes("INFORMATION_SCHEMA.COLUMNS")) {
         const column = text.includes("combined_with_package_id") ? "combined_with_package_id" : "tenant";
         if (options.readError && column === "combined_with_package_id") throw new Error("Synthetic metadata failure: sensitive SQL and authored values");

@@ -1381,8 +1381,8 @@ export default function UltrasoundExpoAdmin() {
                               false && (
                               <span className="text-xs font-normal text-amber-700">
                                 Individual options can be edited now. Combined
-                                offers need the separate paired-package database
-                                migration.
+                                offers will become available once the automatic
+                                Railway database setup is verified. Reload after deployment.
                               </span>
                             )}
                             <span className="text-xs font-normal leading-5 text-slate-500">

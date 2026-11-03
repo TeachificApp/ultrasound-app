@@ -20,6 +20,7 @@ import { parseVendorPartnerValues, VENDOR_PARTNER_TYPES } from "../../shared/ven
 import { getDb, getUserRoles } from "../db";
 import { getStripeClient } from "../lib/stripeClient";
 import { requireApprovedVendorApplication } from "../lib/vendorPartnerAccess";
+import { expoCombinedCheckoutSchemaAvailable } from "../lib/expoCombinedOfferSchema";
 import {
   expoCombinedOfferSchemaAvailable,
   expoTenantSchemaAvailable,
@@ -264,6 +265,9 @@ export const ultrasoundExpoRouter = router({
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "UltrasoundExpo™ checkout is temporarily unavailable." });
 
+      if (!(await expoCombinedCheckoutSchemaAvailable(db)) || !(await expoTenantSchemaAvailable(db))) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Combined Expo offers are waiting for the automatic database setup to finish. Individual event options remain available. No payment was started." });
+      }
       const selections = await db.select({
         packageId: ultrasoundExpoPackages.id,
         combinedWithPackageId: ultrasoundExpoPackages.combinedWithPackageId,
@@ -447,7 +451,7 @@ export const ultrasoundExpoRouter = router({
       listCompatibleExpoEvents(db),
       expoTenantSchemaAvailable(db),
       listCompatibleExpoPackages(db),
-      expoCombinedOfferSchemaAvailable(db),
+      expoCombinedCheckoutSchemaAvailable(db),
     ]);
     const eventById = new Map(events.map(event => [event.id, event]));
     const registrationRows = await db.select({
