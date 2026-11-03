@@ -37,6 +37,11 @@ const legacyEventColumns = sql.raw(`
 
 const tenantColumnCache = new WeakMap<object, Promise<boolean>>();
 
+/** Refresh the reader after the owner-approved startup migration has been verified. */
+export function invalidateExpoTenantSchemaCache(db: object): void {
+  tenantColumnCache.delete(db);
+}
+
 async function hasExpoTenantColumn(db: Db): Promise<boolean> {
   if (!db || typeof db !== "object") return false;
   const cached = tenantColumnCache.get(db);
@@ -105,8 +110,8 @@ export async function insertCompatibleExpoEvent(
       id = created[0]?.id;
     } else {
       // Use only established columns, with parameterized values and the same
-      // UTC serialization as the normal typed insert. No runtime DDL or fallback
-      // that could erase an explicit EchoExpo™ distinction is permitted.
+      // UTC serialization as the normal typed insert. Event creation performs
+      // no DDL or fallback that could erase an explicit EchoExpo™ distinction.
       const result = await db.execute(sql`
         INSERT INTO ultrasound_expo_events
           (name, slug, starts_at, ends_at, timezone, location_label, description,

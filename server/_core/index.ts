@@ -1179,6 +1179,20 @@ async function startServer() {
     console.error("[Startup] ensureIpAccessLogLocationSchema error:", err);
   }
 
+  // Owner-approved, additive-only Railway repair. Run independently of email
+  // and maintenance jobs; previews skip it and repeated deployments are no-ops.
+  // Do not hold HTTP health readiness on a database metadata lock.
+  import("../lib/ensureExpoTenantSchema")
+    .then(async ({ ensureExpoTenantSchema }) => {
+      const result = await ensureExpoTenantSchema(await getDb());
+      if (result.status === "failed") {
+        console.error("[Startup] Expo event identity migration failed:", result.error);
+      } else if (result.status === "ready") {
+        console.log(`[Startup] Expo event identity migration verified (${result.applied ? "column added" : "already present"}).`);
+      }
+    })
+    .catch(() => console.error("[Startup] Unable to run the Expo event identity migration."));
+
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
     if (!shouldRunPrimaryHostMaintenance()) {
