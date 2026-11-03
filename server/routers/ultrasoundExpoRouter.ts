@@ -20,6 +20,7 @@ import {
   expoTenantSchemaAvailable,
   getCompatibleExpoEventById,
   listCompatibleExpoEvents,
+  listCompatibleExpoPackages,
 } from "../lib/expoEventSchemaCompatibility";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 
@@ -414,7 +415,7 @@ export const ultrasoundExpoRouter = router({
       expoTenantSchemaAvailable(db),
     ]);
     const eventById = new Map(events.map(event => [event.id, event]));
-    const packages = await db.select().from(ultrasoundExpoPackages).orderBy(asc(ultrasoundExpoPackages.eventId), asc(ultrasoundExpoPackages.sortOrder));
+    const packages = await listCompatibleExpoPackages(db);
     const registrationRows = await db.select({
       id: ultrasoundExpoRegistrations.id,
       attendeeName: ultrasoundExpoRegistrations.attendeeName,

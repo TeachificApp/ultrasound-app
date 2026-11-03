@@ -1,5 +1,5 @@
-import { asc, eq, sql } from "drizzle-orm";
-import { ultrasoundExpoEvents } from "../../drizzle/schema";
+import { asc, eq, getTableColumns, sql } from "drizzle-orm";
+import { ultrasoundExpoEvents, ultrasoundExpoPackages } from "../../drizzle/schema";
 import { type ExpoEventTenant } from "../../shared/expoTenant";
 import { extractExecuteRows } from "./ensureLmsCoursesSchema";
 
@@ -126,4 +126,23 @@ export function normalizeLegacyExpoEvent<T extends Record<string, unknown>>(even
     ...event,
     tenant: schemaHasTenant && event.tenant === "echo_expo" ? "echo_expo" : "ultrasound_expo",
   };
+}
+
+/** A pending combined-offer migration must not prevent editing event dates. */
+export async function listCompatibleExpoPackages(db: Db): Promise<typeof ultrasoundExpoPackages.$inferSelect[]> {
+  const result = await db.execute(sql`
+    SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'ultrasound_expo_packages'
+      AND COLUMN_NAME = 'combined_with_package_id'
+    LIMIT 1
+  `);
+  const hasCombinedColumn = extractExecuteRows<{ COLUMN_NAME?: string; column_name?: string }>(result)
+    .some(row => (row.COLUMN_NAME ?? row.column_name) === "combined_with_package_id");
+  const { combinedWithPackageId, ...existingColumns } = getTableColumns(ultrasoundExpoPackages);
+  return db.select({
+    ...existingColumns,
+    combinedWithPackageId: hasCombinedColumn ? combinedWithPackageId : sql<number | null>`NULL`,
+  }).from(ultrasoundExpoPackages)
+    .orderBy(asc(ultrasoundExpoPackages.eventId), asc(ultrasoundExpoPackages.sortOrder));
 }
