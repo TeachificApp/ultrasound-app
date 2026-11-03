@@ -1,22 +1,27 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   ultrasoundExpoAgendaItems,
+  ultrasoundExpoBooths,
   ultrasoundExpoCheckoutGroups,
   ultrasoundExpoEvents,
   ultrasoundExpoEventPages,
   ultrasoundExpoPackages,
+  ultrasoundExpoPartnerResources,
   ultrasoundExpoRecordings,
   ultrasoundExpoRegistrations,
+  vendorPartnerApplications,
 } from "../../drizzle/schema";
 import { calculateExpoCombinedOfferPricing } from "../../shared/expoCombinedOffer";
 import { ULTRASOUND_EXPO_ORIGIN } from "../../shared/ultrasoundExpo";
 import { EXPO_EVENT_TENANTS } from "../../shared/expoTenant";
+import { parseVendorPartnerValues, VENDOR_PARTNER_TYPES } from "../../shared/vendorPartner";
 import { getDb, getUserRoles } from "../db";
 import { getStripeClient } from "../lib/stripeClient";
 import { requireApprovedVendorApplication } from "../lib/vendorPartnerAccess";
 import {
+  expoCombinedOfferSchemaAvailable,
   expoTenantSchemaAvailable,
   getCompatibleExpoEventById,
   insertCompatibleExpoEvent,
@@ -40,6 +45,18 @@ const EXPO_ORIGINS = new Set([
 const packageTypeInput = z.enum(["registrant", "exhibitor", "sponsor", "product", "other"]);
 const eventTenantInput = z.enum(EXPO_EVENT_TENANTS);
 
+const eventImageInput = z.string().trim().max(2048).refine(value => {
+  if (value === "") return true;
+  if (/^\/manus-storage\/[a-zA-Z0-9][a-zA-Z0-9/_.-]*$/.test(value)) {
+    return !value.split("/").some(segment => segment === "." || segment === "..");
+  }
+  try {
+    return ["http:", "https:"].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}, "Use an HTTP(S) image URL or a /manus-storage/ asset path.").optional();
+
 function safeExpoOrigin(origin: string): string {
   try {
     const url = new URL(origin);
@@ -59,19 +76,34 @@ async function assertExpoAdmin(user: { id: number; role: string }) {
   }
 }
 
+function validateEventSchedule(startsAt: Date, endsAt: Date | null | undefined, timezone: string): void {
+  if (!Number.isFinite(startsAt.getTime()) || (endsAt && !Number.isFinite(endsAt.getTime()))) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Choose valid event dates." });
+  }
+  if (endsAt && endsAt.getTime() < startsAt.getTime()) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "The event end must be on or after its start." });
+  }
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: timezone });
+  } catch {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a valid event timezone, such as America/New_York." });
+  }
+}
+
 const eventUpdateInput = z.object({
   id: z.number().int().positive(),
+  tenant: eventTenantInput.optional(),
   name: z.string().trim().min(2).max(255),
   slug: z.string().trim().min(2).max(255).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens only."),
   startsAt: z.date(),
   endsAt: z.date().nullable().optional(),
   timezone: z.string().trim().min(2).max(64),
   locationLabel: z.string().trim().max(512).optional().or(z.literal("")),
-  description: z.string().trim().max(8_000).optional().or(z.literal("")),
-  heroImageUrl: z.string().trim().url().max(2048).optional().or(z.literal("")),
-  registrationTerms: z.string().trim().max(12_000).optional().or(z.literal("")),
-  attendeeInstructions: z.string().trim().max(12_000).optional().or(z.literal("")),
-  partnerInstructions: z.string().trim().max(12_000).optional().or(z.literal("")),
+  description: z.string().max(8_000).optional(),
+  heroImageUrl: eventImageInput,
+  registrationTerms: z.string().max(12_000).optional(),
+  attendeeInstructions: z.string().max(12_000).optional(),
+  partnerInstructions: z.string().max(12_000).optional(),
   status: z.enum(["draft", "published", "archived"]),
 });
 
@@ -411,14 +443,17 @@ export const ultrasoundExpoRouter = router({
     await assertExpoAdmin(ctx.user);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const [events, tenantSchemaAvailable] = await Promise.all([
+    const [events, tenantSchemaAvailable, packages, combinedOfferSchemaAvailable] = await Promise.all([
       listCompatibleExpoEvents(db),
       expoTenantSchemaAvailable(db),
+      listCompatibleExpoPackages(db),
+      expoCombinedOfferSchemaAvailable(db),
     ]);
     const eventById = new Map(events.map(event => [event.id, event]));
-    const packages = await listCompatibleExpoPackages(db);
     const registrationRows = await db.select({
       id: ultrasoundExpoRegistrations.id,
+      vendorApplicationId: ultrasoundExpoRegistrations.vendorApplicationId,
+      partnerTypes: vendorPartnerApplications.partnerTypes,
       attendeeName: ultrasoundExpoRegistrations.attendeeName,
       attendeeEmail: ultrasoundExpoRegistrations.attendeeEmail,
       organizationName: ultrasoundExpoRegistrations.organizationName,
@@ -434,18 +469,20 @@ export const ultrasoundExpoRouter = router({
       packageType: ultrasoundExpoPackages.packageType,
     }).from(ultrasoundExpoRegistrations)
       .innerJoin(ultrasoundExpoPackages, eq(ultrasoundExpoRegistrations.packageId, ultrasoundExpoPackages.id))
+      .leftJoin(vendorPartnerApplications, eq(ultrasoundExpoRegistrations.vendorApplicationId, vendorPartnerApplications.id))
       .orderBy(desc(ultrasoundExpoRegistrations.createdAt))
       .limit(1000);
     const registrations = registrationRows.map(row => {
       const event = eventById.get(row.eventId);
-      return { ...row, eventName: event?.name ?? "UltrasoundExpo™ event", eventTenant: event?.tenant ?? "ultrasound_expo" };
+      return { ...row, partnerTypes: parseVendorPartnerValues(row.partnerTypes, VENDOR_PARTNER_TYPES), eventName: event?.name ?? "UltrasoundExpo™ event", eventTenant: event?.tenant ?? "ultrasound_expo" };
     });
     const paidTotal = registrations.filter(row => row.paymentStatus === "paid").reduce((sum, row) => sum + Number(row.amountCents), 0);
-    return { events, packages, registrations, paidTotal, tenantSchemaAvailable };
+    return { events, packages, registrations, paidTotal, tenantSchemaAvailable, combinedOfferSchemaAvailable };
   }),
 
   createEvent: protectedProcedure.input(eventCreateInput).mutation(async ({ ctx, input }) => {
     await assertExpoAdmin(ctx.user);
+    validateEventSchedule(input.startsAt, input.endsAt, input.timezone);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
     const eventValues = {
@@ -468,6 +505,8 @@ export const ultrasoundExpoRouter = router({
 
   duplicateEvent: protectedProcedure.input(z.object({
     sourceEventId: z.number().int().positive(),
+    tenant: eventTenantInput.optional(),
+    timezone: z.string().trim().min(2).max(64).optional(),
     name: z.string().trim().min(2).max(255),
     slug: z.string().trim().min(2).max(255).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens only."),
     startsAt: z.date(),
@@ -477,142 +516,263 @@ export const ultrasoundExpoRouter = router({
     await assertExpoAdmin(ctx.user);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const source = await getCompatibleExpoEventById(db, input.sourceEventId);
-    if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "The source UltrasoundExpo™ event no longer exists." });
-    const hasTenant = await expoTenantSchemaAvailable(db);
-    if (!hasTenant && source.tenant === "echo_expo") {
-      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "EchoExpo™ event instances require the pending additive Railway database migration." });
+    try {
+      return await db.transaction(async tx => {
+        const source = await getCompatibleExpoEventById(tx, input.sourceEventId);
+        if (!source) throw new TRPCError({ code: "NOT_FOUND", message: "The source Expo event no longer exists." });
+        const timezone = input.timezone ?? source.timezone;
+        // Dates arrive as UTC instants from the timezone-aware editor. Do not
+        // reinterpret them in the server timezone or shift the existing event.
+        validateEventSchedule(input.startsAt, input.endsAt, timezone);
+        const packages = (await listCompatibleExpoPackages(tx)).filter(item => item.eventId === source.id);
+        const [agenda, pages, recordings, resources, booths] = await Promise.all([
+          tx.select().from(ultrasoundExpoAgendaItems).where(eq(ultrasoundExpoAgendaItems.eventId, source.id)),
+          tx.select().from(ultrasoundExpoEventPages).where(eq(ultrasoundExpoEventPages.eventId, source.id)),
+          tx.select().from(ultrasoundExpoRecordings).where(eq(ultrasoundExpoRecordings.eventId, source.id)),
+          tx.select().from(ultrasoundExpoPartnerResources).where(and(eq(ultrasoundExpoPartnerResources.eventId, source.id), eq(ultrasoundExpoPartnerResources.isPublished, true))),
+          tx.select().from(ultrasoundExpoBooths).where(eq(ultrasoundExpoBooths.eventId, source.id)),
+        ]);
+        const agendaOffset = input.startsAt.getTime() - source.startsAt.getTime();
+        const copiedAgenda = agenda.map(item => ({
+          title: item.title, description: item.description,
+          startsAt: new Date(item.startsAt.getTime() + agendaOffset),
+          endsAt: item.endsAt ? new Date(item.endsAt.getTime() + agendaOffset) : null,
+          locationLabel: item.locationLabel, speakerNames: item.speakerNames,
+          category: item.category, status: "draft" as const, sortOrder: item.sortOrder,
+        }));
+        for (const item of copiedAgenda) validateEventSchedule(item.startsAt, item.endsAt, timezone);
+        const newEventId = await insertCompatibleExpoEvent(tx, {
+          tenant: input.tenant ?? source.tenant,
+          name: input.name,
+          slug: input.slug,
+          startsAt: input.startsAt,
+          endsAt: input.endsAt ?? null,
+          timezone,
+          locationLabel: source.locationLabel,
+          description: source.description,
+          heroImageUrl: source.heroImageUrl,
+          registrationTerms: source.registrationTerms,
+          attendeeInstructions: source.attendeeInstructions,
+          partnerInstructions: source.partnerInstructions,
+          status: input.status,
+        });
+        if (packages.length) {
+          // Drizzle inserts ALL schema columns even if a value is omitted.
+          // Explicit established columns support a pending combined-offer
+          // migration. New rows use combinedWithPackageId: null by default when
+          // that nullable column exists; stale annual pairings are never copied.
+          await tx.execute(sql`
+            INSERT INTO ultrasound_expo_packages
+              (event_id, package_type, name, description, benefits, amount_cents, currency, sort_order, is_active)
+            VALUES ${sql.join(packages.map(item => sql`(
+              ${newEventId}, ${item.packageType}, ${item.name}, ${item.description}, ${item.benefits},
+              ${item.amountCents}, ${item.currency}, ${item.sortOrder}, ${false}
+            )`), sql`, `)}
+          `);
+        }
+        if (agenda.length) {
+          await tx.insert(ultrasoundExpoAgendaItems).values(copiedAgenda.map(item => ({ ...item, eventId: newEventId })));
+        }
+        if (pages.length) {
+          await tx.insert(ultrasoundExpoEventPages).values(pages.map(item => ({
+            eventId: newEventId, title: item.title, slug: item.slug, pageType: item.pageType,
+            accessLevel: item.accessLevel, blocksJson: item.blocksJson, status: "draft" as const,
+            seoTitle: item.seoTitle, seoDescription: item.seoDescription, seoKeywords: item.seoKeywords,
+            seoImage: item.seoImage, createdByUserId: ctx.user.id, updatedByUserId: ctx.user.id,
+          })));
+        }
+        if (recordings.length) {
+          await tx.insert(ultrasoundExpoRecordings).values(recordings.map(item => ({
+            eventId: newEventId, title: item.title, description: item.description, videoUrl: null,
+            thumbnailUrl: item.thumbnailUrl, durationSeconds: item.durationSeconds, status: "draft" as const,
+            sortOrder: item.sortOrder, createdByUserId: ctx.user.id,
+          })));
+        }
+        if (resources.length) {
+          await tx.insert(ultrasoundExpoPartnerResources).values(resources.map(item => ({
+            eventId: newEventId, resourceType: item.resourceType, title: item.title,
+            description: item.description, resourceUrl: item.resourceUrl,
+            isPublished: false, sortOrder: item.sortOrder,
+          })));
+        }
+        if (booths.length) {
+          await tx.insert(ultrasoundExpoBooths).values(booths.map(item => ({
+            eventId: newEventId, boothCode: item.boothCode, zoneLabel: item.zoneLabel,
+            dimensions: item.dimensions, description: item.description, mapReference: item.mapReference,
+            availabilityStatus: "available" as const, sortOrder: item.sortOrder,
+          })));
+        }
+        // Registrations, attendees, purchases, partner identities and booth
+        // assignments belong to their original event and are never copied.
+        return { id: newEventId, copiedPackages: packages.length, copiedAgendaItems: agenda.length, copiedPages: pages.length, copiedRecordingShells: recordings.length, copiedPartnerResources: resources.length, copiedBooths: booths.length };
+      });
+    } catch (error) {
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to duplicate the Expo event. No duplicate was saved; the source and its records were not changed." });
     }
-    const duplicateValues = {
-      name: input.name,
-      slug: input.slug,
-      startsAt: input.startsAt,
-      endsAt: input.endsAt ?? null,
-      timezone: source.timezone,
-      locationLabel: source.locationLabel,
-      description: source.description,
-      heroImageUrl: source.heroImageUrl,
-      registrationTerms: source.registrationTerms,
-      attendeeInstructions: source.attendeeInstructions,
-      partnerInstructions: source.partnerInstructions,
-      status: input.status,
-    };
-    const created = await db.insert(ultrasoundExpoEvents).values(hasTenant ? { ...duplicateValues, tenant: source.tenant } : duplicateValues).$returningId();
-    const newEventId = created[0]?.id;
-    if (!newEventId) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to duplicate this UltrasoundExpo™ event." });
-    const packages = await db.select().from(ultrasoundExpoPackages).where(eq(ultrasoundExpoPackages.eventId, source.id));
-    const [agenda, pages, recordings] = await Promise.all([
-      db.select().from(ultrasoundExpoAgendaItems).where(eq(ultrasoundExpoAgendaItems.eventId, source.id)),
-      db.select().from(ultrasoundExpoEventPages).where(eq(ultrasoundExpoEventPages.eventId, source.id)),
-      db.select().from(ultrasoundExpoRecordings).where(eq(ultrasoundExpoRecordings.eventId, source.id)),
-    ]);
-    if (packages.length) {
-      await db.insert(ultrasoundExpoPackages).values(packages.map(item => ({
-        eventId: newEventId,
-        packageType: item.packageType,
-        name: item.name,
-        description: item.description,
-        benefits: item.benefits,
-        amountCents: item.amountCents,
-        currency: item.currency,
-        sortOrder: item.sortOrder,
-        isActive: false,
-        // Pairing is an intentional relationship between the two current-year
-        // events and must be configured anew after an annual event is copied.
-        combinedWithPackageId: null,
-      })));
-    }
-    if (agenda.length) {
-      await db.insert(ultrasoundExpoAgendaItems).values(agenda.map(item => ({
-        eventId: newEventId, title: item.title, description: item.description,
-        startsAt: input.startsAt, endsAt: null, locationLabel: source.locationLabel,
-        speakerNames: item.speakerNames, category: item.category, status: "draft" as const, sortOrder: item.sortOrder,
-      })));
-    }
-    if (pages.length) {
-      await db.insert(ultrasoundExpoEventPages).values(pages.map(item => ({
-        eventId: newEventId, title: item.title, slug: item.slug, pageType: item.pageType,
-        accessLevel: item.accessLevel, blocksJson: item.blocksJson, status: "draft" as const,
-        seoTitle: item.seoTitle, seoDescription: item.seoDescription, seoKeywords: item.seoKeywords,
-        seoImage: item.seoImage, createdByUserId: ctx.user.id, updatedByUserId: ctx.user.id,
-      })));
-    }
-    if (recordings.length) {
-      await db.insert(ultrasoundExpoRecordings).values(recordings.map(item => ({
-        eventId: newEventId, title: item.title, description: item.description, videoUrl: null,
-        thumbnailUrl: item.thumbnailUrl, durationSeconds: item.durationSeconds, status: "draft" as const,
-        sortOrder: item.sortOrder, createdByUserId: ctx.user.id,
-      })));
-    }
-    return { id: newEventId, copiedPackages: packages.length, copiedAgendaItems: agenda.length, copiedPages: pages.length, copiedRecordingShells: recordings.length };
   }),
 
   updateEvent: protectedProcedure.input(eventUpdateInput).mutation(async ({ ctx, input }) => {
     await assertExpoAdmin(ctx.user);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    await db.update(ultrasoundExpoEvents).set({
-      name: input.name,
-      slug: input.slug,
-      startsAt: input.startsAt,
-      endsAt: input.endsAt ?? null,
-      timezone: input.timezone,
-      locationLabel: input.locationLabel || null,
-      description: input.description || null,
-      heroImageUrl: input.heroImageUrl || null,
-      registrationTerms: input.registrationTerms || null,
-      attendeeInstructions: input.attendeeInstructions || null,
-      partnerInstructions: input.partnerInstructions || null,
-      status: input.status,
-    }).where(eq(ultrasoundExpoEvents.id, input.id));
+    const existing = await getCompatibleExpoEventById(db, input.id);
+    if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "The Expo event no longer exists." });
+    const endsAt = input.endsAt === undefined ? existing.endsAt : input.endsAt;
+    validateEventSchedule(input.startsAt, endsAt, input.timezone);
+    const hasTenant = await expoTenantSchemaAvailable(db);
+    if (!hasTenant && (input.tenant ?? existing.tenant) === "echo_expo") {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "EchoExpo™ requires ultrasound_expo_events.tenant to be available. No event was changed; EchoExpo™ cannot be saved as UltrasoundExpo™." });
+    }
+    try {
+      await db.update(ultrasoundExpoEvents).set({
+        ...(hasTenant && input.tenant !== undefined ? { tenant: input.tenant } : {}),
+        name: input.name,
+        slug: input.slug,
+        startsAt: input.startsAt,
+        endsAt,
+        timezone: input.timezone,
+        locationLabel: input.locationLabel === undefined ? existing.locationLabel : input.locationLabel || null,
+        description: input.description === undefined ? existing.description : input.description || null,
+        heroImageUrl: input.heroImageUrl === undefined ? existing.heroImageUrl : input.heroImageUrl || null,
+        registrationTerms: input.registrationTerms === undefined ? existing.registrationTerms : input.registrationTerms || null,
+        attendeeInstructions: input.attendeeInstructions === undefined ? existing.attendeeInstructions : input.attendeeInstructions || null,
+        partnerInstructions: input.partnerInstructions === undefined ? existing.partnerInstructions : input.partnerInstructions || null,
+        status: input.status,
+      }).where(eq(ultrasoundExpoEvents.id, input.id));
+    } catch (error) {
+      const failure = error as { code?: string; cause?: { code?: string } };
+      if (failure.code === "ER_DUP_ENTRY" || failure.cause?.code === "ER_DUP_ENTRY") {
+        throw new TRPCError({ code: "CONFLICT", message: "Another Expo event already uses this URL slug. Choose a unique slug." });
+      }
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to update the Expo event. Its attached records were not changed." });
+    }
     return { success: true };
+  }),
+
+  /** Delete is reversible archival only; all registrations and content remain attached. */
+  deleteEvent: protectedProcedure.input(z.object({
+    id: z.number().int().positive(),
+    confirmName: z.string().min(1).max(255),
+  })).mutation(async ({ ctx, input }) => {
+    await assertExpoAdmin(ctx.user);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const event = await getCompatibleExpoEventById(db, input.id);
+    if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "The Expo event no longer exists." });
+    if (input.confirmName !== event.name) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Type the exact event name to move it to Archived." });
+    }
+    if (event.status !== "archived") {
+      try {
+        await db.update(ultrasoundExpoEvents).set({ status: "archived" }).where(eq(ultrasoundExpoEvents.id, input.id));
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to move the Expo event to Archived. Its attached records were not changed." });
+      }
+    }
+    return { success: true, archived: true } as const;
+  }),
+
+  restoreEvent: protectedProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+    await assertExpoAdmin(ctx.user);
+    const db = await getDb();
+    if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+    const event = await getCompatibleExpoEventById(db, input.id);
+    if (!event) throw new TRPCError({ code: "NOT_FOUND", message: "The Expo event no longer exists." });
+    if (event.status !== "archived") {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Only archived Expo events can be restored to Draft." });
+    }
+    try {
+      await db.update(ultrasoundExpoEvents).set({ status: "draft" })
+        .where(and(eq(ultrasoundExpoEvents.id, input.id), eq(ultrasoundExpoEvents.status, "archived")));
+    } catch {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to restore the Expo event to Draft. Its attached records were not changed." });
+    }
+    return { success: true, restored: true } as const;
   }),
 
   savePackage: protectedProcedure.input(packageInput).mutation(async ({ ctx, input }) => {
     await assertExpoAdmin(ctx.user);
     const db = await getDb();
     if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-    const combinedWithPackageId = input.combinedWithPackageId ?? null;
-    if (combinedWithPackageId) {
-      if (input.id === combinedWithPackageId) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "An Expo package cannot be paired with itself." });
-      }
-      const [[sourceEvent], [companion]] = await Promise.all([
-        db.select({ id: ultrasoundExpoEvents.id, tenant: ultrasoundExpoEvents.tenant }).from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.id, input.eventId)).limit(1),
-        db.select().from(ultrasoundExpoPackages).where(eq(ultrasoundExpoPackages.id, combinedWithPackageId)).limit(1),
+    try {
+      const [sourceEvent, packages, hasCombinedColumn] = await Promise.all([
+        getCompatibleExpoEventById(db, input.eventId),
+        listCompatibleExpoPackages(db),
+        expoCombinedOfferSchemaAvailable(db),
       ]);
-      if (!sourceEvent || !companion) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "The selected companion Expo package no longer exists." });
+      if (!sourceEvent) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "The Expo event no longer exists. Reload the event list before saving its options." });
       }
-      const [companionEvent] = await db.select({ id: ultrasoundExpoEvents.id, tenant: ultrasoundExpoEvents.tenant })
-        .from(ultrasoundExpoEvents).where(eq(ultrasoundExpoEvents.id, companion.eventId)).limit(1);
-      if (
-        !companionEvent ||
-        companion.eventId === input.eventId ||
-        companionEvent.tenant === sourceEvent.tenant ||
-        companion.packageType !== input.packageType ||
-        companion.currency.toLowerCase() !== input.currency.toLowerCase()
-      ) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "A combined Expo offer must pair matching package types and currencies across UltrasoundExpo™ and EchoExpo™." });
+      if (input.id && !packages.some(item => item.id === input.id && item.eventId === input.eventId)) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "That Expo option does not belong to the selected event or no longer exists. Reload its options; existing options cannot be moved to another event." });
       }
+      const combinedWithPackageId = input.combinedWithPackageId;
+      if (combinedWithPackageId) {
+        if (!hasCombinedColumn) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Combined Expo offers require the pending additive Railway migration for ultrasound_expo_packages.combined_with_package_id. No option was saved. Clear the companion selection to save a standalone option, or ask the platform owner to approve and apply the migration." });
+        }
+        if (input.id === combinedWithPackageId) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "An Expo package cannot be paired with itself." });
+        }
+        const companion = packages.find(item => item.id === combinedWithPackageId);
+        if (!companion) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "The selected companion Expo package no longer exists." });
+        }
+        const companionEvent = await getCompatibleExpoEventById(db, companion.eventId);
+        if (
+          !companionEvent ||
+          companion.eventId === input.eventId ||
+          companionEvent.tenant === sourceEvent.tenant ||
+          companion.packageType !== input.packageType ||
+          companion.currency.toLowerCase() !== input.currency.toLowerCase()
+        ) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "A combined Expo offer must pair matching package types and currencies across UltrasoundExpo™ and EchoExpo™." });
+        }
+      }
+      const values = {
+        packageType: input.packageType,
+        name: input.name,
+        description: input.description || null,
+        benefits: input.benefits || null,
+        amountCents: input.amountCents,
+        currency: input.currency,
+        sortOrder: input.sortOrder,
+        isActive: input.isActive,
+        // Omitted pairing preserves an existing relationship. Explicit null
+        // clears it only when the column exists; legacy writes never mention it.
+        ...(hasCombinedColumn && combinedWithPackageId !== undefined ? { combinedWithPackageId } : {}),
+      };
+      if (input.id) {
+        await db.update(ultrasoundExpoPackages).set(values).where(and(
+          eq(ultrasoundExpoPackages.id, input.id),
+          eq(ultrasoundExpoPackages.eventId, input.eventId),
+        ));
+        return { id: input.id, updated: true };
+      }
+      let id: number | undefined;
+      if (hasCombinedColumn) {
+        const created = await db.insert(ultrasoundExpoPackages).values({ ...values, eventId: input.eventId }).$returningId();
+        id = created[0]?.id;
+      } else {
+        // Drizzle inserts every schema column even if its value is omitted.
+        // Use only established columns on legacy Railway, without any DDL.
+        const result = await db.execute(sql`
+          INSERT INTO ultrasound_expo_packages
+            (event_id, package_type, name, description, benefits, amount_cents, currency, sort_order, is_active)
+          VALUES (${input.eventId}, ${values.packageType}, ${values.name}, ${values.description},
+            ${values.benefits}, ${values.amountCents}, ${values.currency}, ${values.sortOrder},
+            ${ultrasoundExpoPackages.isActive.mapToDriverValue(values.isActive)})
+        `);
+        id = Number(result?.[0]?.insertId);
+      }
+      if (!id || !Number.isSafeInteger(id) || id < 1) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The Expo option save did not return an ID. Reload the event options before retrying." });
+      }
+      return { id, updated: false };
+    } catch (error) {
+      if (error instanceof TRPCError) throw error;
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Unable to save the Expo option. Reload the event options before retrying." });
     }
-    const values = {
-      eventId: input.eventId,
-      packageType: input.packageType,
-      name: input.name,
-      description: input.description || null,
-      benefits: input.benefits || null,
-      amountCents: input.amountCents,
-      currency: input.currency,
-      sortOrder: input.sortOrder,
-      isActive: input.isActive,
-      combinedWithPackageId,
-    };
-    if (input.id) {
-      await db.update(ultrasoundExpoPackages).set(values).where(eq(ultrasoundExpoPackages.id, input.id));
-      return { id: input.id, updated: true };
-    }
-    const created = await db.insert(ultrasoundExpoPackages).values(values).$returningId();
-    return { id: created[0]?.id ?? null, updated: false };
   }),
 });

@@ -188,8 +188,8 @@ export function normalizeLegacyExpoEvent<T extends Record<string, unknown>>(even
   };
 }
 
-/** A pending combined-offer migration must not prevent editing event dates. */
-export async function listCompatibleExpoPackages(db: Db): Promise<typeof ultrasoundExpoPackages.$inferSelect[]> {
+/** Read-only availability check; never applies the pending combined-offer migration. */
+export async function expoCombinedOfferSchemaAvailable(db: Db): Promise<boolean> {
   const result = await db.execute(sql`
     SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
@@ -197,8 +197,13 @@ export async function listCompatibleExpoPackages(db: Db): Promise<typeof ultraso
       AND COLUMN_NAME = 'combined_with_package_id'
     LIMIT 1
   `);
-  const hasCombinedColumn = extractExecuteRows<{ COLUMN_NAME?: string; column_name?: string }>(result)
+  return extractExecuteRows<{ COLUMN_NAME?: string; column_name?: string }>(result)
     .some(row => (row.COLUMN_NAME ?? row.column_name) === "combined_with_package_id");
+}
+
+/** A pending combined-offer migration must not prevent editing event dates. */
+export async function listCompatibleExpoPackages(db: Db): Promise<typeof ultrasoundExpoPackages.$inferSelect[]> {
+  const hasCombinedColumn = await expoCombinedOfferSchemaAvailable(db);
   const { combinedWithPackageId, ...existingColumns } = getTableColumns(ultrasoundExpoPackages);
   return db.select({
     ...existingColumns,

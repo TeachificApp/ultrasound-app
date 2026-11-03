@@ -38,10 +38,44 @@ import {
   buildVendorRejectedEmail,
 } from "../lib/vendorPartnerEmail";
 import { storagePut } from "../storage";
+import { EXPO_RESOURCE_MAX_BYTES, expoResourceFileError } from "../../shared/expoPartnerResourceUpload";
 
 const scopeInput = z.enum(VENDOR_PARTNER_SCOPES);
 const partnerTypeInput = z.enum(VENDOR_PARTNER_TYPES);
 const logoMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+const expoResourceTypes = z.enum(["floor_plan", "booth_setup", "logistics", "document", "other"]);
+const expoResourceUrlInput = z.string().trim().max(2_048).refine(value => {
+  if (!value || /^\/manus-storage\/[a-zA-Z0-9/_\-.]+$/.test(value)) return true;
+  try { return ["http:", "https:"].includes(new URL(value).protocol); } catch { return false; }
+}, "Enter an HTTP(S) resource URL.").optional();
+
+function decodeExpoResourceFile(fileName: string, mimeType: string, dataUri: string): Buffer {
+  const prefix = `data:${mimeType};base64,`;
+  if (!dataUri.startsWith(prefix)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "The resource upload data is invalid." });
+  }
+  const encoded = dataUri.slice(prefix.length);
+  // Buffer.from is permissive: reject malformed/padded base64 explicitly before decoding.
+  if (!encoded || encoded.length > Math.ceil(EXPO_RESOURCE_MAX_BYTES / 3) * 4 ||
+      encoded.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Choose a valid file no larger than 10 MB." });
+  }
+  const file = Buffer.from(encoded, "base64");
+  const error = expoResourceFileError(fileName, mimeType, file.length);
+  if (error) throw new TRPCError({ code: "BAD_REQUEST", message: error });
+  const startsWith = (signature: number[]) => file.subarray(0, signature.length).equals(Buffer.from(signature));
+  const validSignature = mimeType === "application/pdf" ? file.subarray(0, 5).toString("ascii") === "%PDF-"
+    : mimeType === "image/png" ? startsWith([137, 80, 78, 71, 13, 10, 26, 10])
+    : mimeType === "image/jpeg" ? startsWith([255, 216, 255])
+    : mimeType === "image/webp" ? file.subarray(0, 4).toString("ascii") === "RIFF" && file.subarray(8, 12).toString("ascii") === "WEBP"
+    : mimeType.includes("openxmlformats") ? startsWith([80, 75, 3, 4])
+    : startsWith([208, 207, 17, 224, 161, 177, 26, 225]);
+  if (!validSignature || file.toString("base64") !== encoded) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "The file content does not match its supported file type." });
+  }
+  return file;
+}
 
 export function normalizeOrganizationWebsiteInput(value: unknown) {
   if (typeof value !== "string") return value;
@@ -469,14 +503,63 @@ export const vendorPortalRouter = router({
       return { success: true, status: nextStatus };
     }),
 
+  adminUploadExpoResource: protectedProcedure
+    .input(z.object({
+      eventId: z.number().int().positive(),
+      title: z.string().trim().min(2).max(255),
+      description: z.string().trim().max(8_000).optional(),
+      resourceType: expoResourceTypes,
+      fileName: z.string().trim().min(1).max(255),
+      mimeType: z.string().max(150),
+      dataUri: z.string().min(1).max(Math.ceil(EXPO_RESOURCE_MAX_BYTES / 3) * 4 + 200),
+      isPublished: z.boolean(),
+      sortOrder: z.number().int().min(0).max(10_000).default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await assertPartnerAdmin(ctx.user);
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [event] = await db.select({ id: ultrasoundExpoEvents.id }).from(ultrasoundExpoEvents)
+        .where(eq(ultrasoundExpoEvents.id, input.eventId)).limit(1);
+      if (!event || event.id !== input.eventId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Expo event not found." });
+      }
+      const file = decodeExpoResourceFile(input.fileName, input.mimeType, input.dataUri);
+      const extension = input.fileName.split(".").pop()!.toLowerCase();
+      let url: string;
+      try {
+        // Random keys omit the supplied filename and always add a new version.
+        ({ url } = await storagePut(`expo-partner-resources/${input.eventId}/${randomBytes(16).toString("hex")}.${extension}`, file, input.mimeType));
+      } catch {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The resource could not be uploaded. Please try again." });
+      }
+      try {
+        const created = await db.insert(ultrasoundExpoPartnerResources).values({
+          eventId: input.eventId,
+          title: input.title,
+          description: input.description || null,
+          resourceType: input.resourceType,
+          resourceUrl: url,
+          isPublished: input.isPublished,
+          sortOrder: input.sortOrder,
+        }).$returningId();
+        const id = created[0]?.id;
+        if (!id) throw new Error("Missing resource ID");
+        return { id, url };
+      } catch {
+        // Never expose storage URLs, uploaded data, or provider errors in logs/errors.
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The uploaded resource could not be saved. Please try again." });
+      }
+    }),
+
   adminSaveExpoResource: protectedProcedure
     .input(z.object({
       id: z.number().int().positive().optional(),
       eventId: z.number().int().positive(),
-      resourceType: z.enum(["floor_plan", "booth_setup", "logistics", "document", "other"]),
+      resourceType: expoResourceTypes,
       title: z.string().trim().min(2).max(255),
       description: z.string().trim().max(8_000).optional().or(z.literal("")),
-      resourceUrl: z.string().trim().url().max(2_048).optional().or(z.literal("")),
+      resourceUrl: expoResourceUrlInput,
       isPublished: z.boolean(),
       sortOrder: z.number().int().min(0).max(10_000),
     }))
@@ -484,6 +567,19 @@ export const vendorPortalRouter = router({
       await assertPartnerAdmin(ctx.user);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      const [event] = await db.select({ id: ultrasoundExpoEvents.id }).from(ultrasoundExpoEvents)
+        .where(eq(ultrasoundExpoEvents.id, input.eventId)).limit(1);
+      if (!event || event.id !== input.eventId) throw new TRPCError({ code: "NOT_FOUND", message: "Expo event not found." });
+      if (input.id) {
+        const [resource] = await db.select({ id: ultrasoundExpoPartnerResources.id, eventId: ultrasoundExpoPartnerResources.eventId })
+          .from(ultrasoundExpoPartnerResources).where(and(
+            eq(ultrasoundExpoPartnerResources.id, input.id),
+            eq(ultrasoundExpoPartnerResources.eventId, input.eventId),
+          )).limit(1);
+        if (!resource || resource.id !== input.id || resource.eventId !== input.eventId) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Resource not found for this event." });
+        }
+      }
       const values = {
         eventId: input.eventId,
         resourceType: input.resourceType,
@@ -494,7 +590,10 @@ export const vendorPortalRouter = router({
         sortOrder: input.sortOrder,
       };
       if (input.id) {
-        await db.update(ultrasoundExpoPartnerResources).set(values).where(eq(ultrasoundExpoPartnerResources.id, input.id));
+        await db.update(ultrasoundExpoPartnerResources).set(values).where(and(
+          eq(ultrasoundExpoPartnerResources.id, input.id),
+          eq(ultrasoundExpoPartnerResources.eventId, input.eventId),
+        ));
         return { id: input.id, updated: true };
       }
       const created = await db.insert(ultrasoundExpoPartnerResources).values(values).$returningId();
