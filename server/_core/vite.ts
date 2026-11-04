@@ -72,7 +72,7 @@ export async function setupVite(app: Express, server: Server) {
       // Inject per-page SEO (course/workshop/download landing pages)
       template = await injectPageSeo(template, req);
       const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      res.status(200).set({ "Content-Type": "text/html", "Cache-Control": "private, no-cache, must-revalidate" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -142,7 +142,7 @@ export function serveStatic(app: Express) {
       if (err) return res.sendFile(indexHtmlPath);
       if (hasBrand) html = injectSiteMetadataIntoHtml(html, host, req.path);
       if (pageSeo) html = injectPageSeoIntoHtml(html, pageSeo, req);
-      res.status(200).set({ "Content-Type": "text/html" }).end(html);
+      res.status(200).set({ "Content-Type": "text/html", "Cache-Control": "private, no-cache, must-revalidate" }).end(html);
     });
   });
 }

@@ -23,80 +23,8 @@
     <meta name="apple-mobile-web-app-title" content="UltrasoundAssist™" />
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
-    <!-- Brand-aware meta swap (runs before React mount) -->
-    <script>
-      (function(){
-        var h=location.hostname;
-        // The public marketing tenants own their own server-rendered canonical,
-        // Open Graph, and structured-data metadata. Do not replace that with an
-        // app-host canonical merely because an iHeartEcho public hostname contains
-        // the brand word.
-        var isPublicBrandSite=h==='www.allaboutultrasound.net'||h==='allaboutultrasound.net'||h==='www.allaboutultrasound.com'||h==='allaboutultrasound.com'||h==='www.iheartecho.net'||h==='iheartecho.net'||h==='www.iheartecho.com'||h==='iheartecho.com';
-        if(isPublicBrandSite) return;
-        var isExpo=h==='ultrasoundexpo.com'||h==='www.ultrasoundexpo.com';
-        var isEchoExpo=h==='echocardiographyexpo.com'||h==='www.echocardiographyexpo.com'||h==='echoexpo.iheartecho.com';
-        var hasPageSeo=document.documentElement.getAttribute('data-page-seo')==='1';
-        var d=document;
-        function setAttr(sel,attr,val){var el=d.querySelector(sel);if(el)el.setAttribute(attr,val);}
-        function setContent(sel,val){var el=d.querySelector(sel);if(el)el.setAttribute('content',val);}
-        if(isExpo){
-          if(!hasPageSeo){
-            d.title='UltrasoundExpo™ | The Annual Event for Ultrasound Professionals';
-            setContent('meta[property="og:title"]','UltrasoundExpo™ | The Annual Event for Ultrasound Professionals');
-            setContent('meta[property="og:description"]','UltrasoundExpo™ by All About Ultrasound™ is the annual meeting for sonographers, physicians, educators, innovators, and the ultrasound industry.');
-            setContent('meta[name="description"]','UltrasoundExpo™ by All About Ultrasound™ is the annual meeting for sonographers, physicians, educators, innovators, and the ultrasound industry.');
-          }
-          setAttr('link[rel="icon"]','href','https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/qyAMKKVMmuCLxwRU.png');
-          setAttr('link[rel="apple-touch-icon"]','href','https://files.manuscdn.com/user_upload_by_module/session_file/310519663401463434/qyAMKKVMmuCLxwRU.png');
-          setContent('meta[name="apple-mobile-web-app-title"]','UltrasoundExpo™');
-          setContent('meta[name="theme-color"]','#087f8c');
-          return;
-        }
-        if(isEchoExpo){
-          if(!hasPageSeo){
-            d.title='EchoExpo™ | The Echocardiography Experience at UltrasoundExpo™';
-            setContent('meta[property="og:title"]','EchoExpo™ | The Echocardiography Experience at UltrasoundExpo™');
-            setContent('meta[property="og:description"]','EchoExpo™ is the cardiac ultrasound and echocardiography experience at UltrasoundExpo™, with education, Echo Skills, Echo Games, hands-on CME, innovation, and a dedicated exhibit hall in Orlando, January 14–16, 2028.');
-            setContent('meta[name="description"]','EchoExpo™ is the cardiac ultrasound and echocardiography experience at UltrasoundExpo™, with education, Echo Skills, Echo Games, hands-on CME, innovation, and a dedicated exhibit hall in Orlando, January 14–16, 2028.');
-            setContent('meta[property="og:image"]','https://echocardiographyexpo.com/manus-storage/echoexpo-supplied-tradeshow-hero_e230df63.png');
-          }
-          setAttr('link[rel="icon"]','href','https://echocardiographyexpo.com/manus-storage/echoexpo-logo_535dff69.png');
-          setAttr('link[rel="apple-touch-icon"]','href','https://echocardiographyexpo.com/manus-storage/echoexpo-logo_535dff69.png');
-          setContent('meta[name="apple-mobile-web-app-title"]','EchoExpo™');
-          setContent('meta[name="theme-color"]','#0b9fa5');
-          return;
-        }
-        var isIHE=h.indexOf('iheartecho')!==-1;
-        var isCombo=h.indexOf('learn.')!==-1||h.indexOf('members.')!==-1||h.indexOf('member.')!==-1;
-        if(!isIHE&&!isCombo) return;
-        // If the server injected page-specific SEO (e.g. for a course/workshop landing page),
-        // skip the brand override so the page-level tags win.
-        if(isIHE){
-          // Canonical URL: app.iheartecho.com is the preferred domain for SEO
-          var canonicalEl=d.createElement('link');canonicalEl.rel='canonical';canonicalEl.href='https://app.iheartecho.com'+location.pathname+(location.search||'');d.head.appendChild(canonicalEl);
-          d.title='iHeartEcho \u2014 Echocardiography Clinical Intelligence';
-          setAttr('link[rel="icon"]','href','https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png');
-          setAttr('link[rel="apple-touch-icon"]','href','https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-192_df958e9b.png');
-          if(!hasPageSeo){
-            setContent('meta[property="og:title"]','iHeartEcho \u2014 Echocardiography Clinical Intelligence');
-            setContent('meta[property="og:description"]','Real-time echo interpretation and measurement assistant for cardiac ultrasound professionals.');
-            setContent('meta[property="og:image"]','https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/etVPnUidWNWG8W4GHnRqzv/icon-512_79ee0572.png');
-            setContent('meta[name="description"]','iHeartEcho \u2014 Echocardiography clinical intelligence for cardiac ultrasound students, sonographers, echocardiographers, and cardiologists.');
-            d.title='iHeartEcho \u2014 Echocardiography Clinical Intelligence';
-          }
-          setContent('meta[name="apple-mobile-web-app-title"]','iHeartEcho');
-          setContent('meta[name="theme-color"]','#0e1e2e');
-        } else if(isCombo){
-          if(!hasPageSeo){
-            d.title='All About Ultrasound | iHeartEcho';
-            setContent('meta[property="og:title"]','All About Ultrasound | iHeartEcho');
-            setContent('meta[property="og:description"]','Ultrasound Clinical Intelligence learning platform.');
-            setContent('meta[name="description"]','All About Ultrasound | iHeartEcho \u2014 Ultrasound Clinical Intelligence.');
-          }
-          setContent('meta[name="apple-mobile-web-app-title"]','AAUS | iHeartEcho');
-        }
-      })();
-    </script>
+    <!-- Host defaults come from shared/siteMetadata.ts; saved page SEO wins. -->
+    <!-- domain-metadata-bootstrap -->
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

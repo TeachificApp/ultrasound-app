@@ -2,21 +2,28 @@ import { ArrowLeft, CalendarClock } from "lucide-react";
 import { Link } from "wouter";
 import { useSeoHead } from "@/hooks/useSeoHead";
 import { isEchoExpoDomain } from "@/hooks/useSubdomain";
-import { getUltrasoundExpoPageSeo, ULTRASOUND_EXPO_EVENT_DATES_LABEL, ULTRASOUND_EXPO_LOCATION_LABEL, ULTRASOUND_EXPO_NAME, ULTRASOUND_EXPO_ORIGIN } from "@shared/ultrasoundExpo";
+import { getUltrasoundExpoPageSeo, ULTRASOUND_EXPO_EVENT_DATES_LABEL, ULTRASOUND_EXPO_LOCATION_LABEL } from "@shared/ultrasoundExpo";
+import { getSiteMetadataForHostname } from "@shared/siteMetadata";
 
 export default function UltrasoundExpoRegister() {
   const isEchoExpo = isEchoExpoDomain() || new URLSearchParams(window.location.search).get("event") === "echoexpo";
   const eventName = isEchoExpo ? "EchoExpo™" : "UltrasoundExpo™";
   const eventDates = isEchoExpo ? "January 14–16, 2028" : ULTRASOUND_EXPO_EVENT_DATES_LABEL;
-  const seo = getUltrasoundExpoPageSeo("register");
+  const siteMetadata = getSiteMetadataForHostname(isEchoExpo ? "echocardiographyexpo.com" : "ultrasoundexpo.com")!;
+  const seo = isEchoExpo
+    ? {
+        title: `${siteMetadata.siteName} Attendee Registration Coming Soon`,
+        description: `Attendee registration for ${siteMetadata.siteName} on ${eventDates} is coming soon.`,
+        image: siteMetadata.image,
+      }
+    : getUltrasoundExpoPageSeo("register");
+  // The event selector is meaningful when this shared page is on the ultrasound host.
+  const canonicalEventQuery = isEchoExpo && !isEchoExpoDomain() ? "?event=echoexpo" : "";
   useSeoHead({
-    title: seo.title,
-    description: seo.description,
-    image: seo.image,
-    canonical: isEchoExpo ? "https://echoexpo.iheartecho.com/register" : `${ULTRASOUND_EXPO_ORIGIN}/register`,
-    siteName: eventName,
+    ...siteMetadata,
+    ...seo,
+    canonical: `${window.location.origin}${window.location.pathname}${canonicalEventQuery}`,
     appendSiteName: false,
-    keywords: "UltrasoundExpo attendee registration, ultrasound conference",
   });
 
   return <div className="min-h-screen bg-[#f3fafb] text-slate-900">

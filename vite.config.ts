@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type PluginOption, type ViteDevServer, type Plugin } from "vite";
+import { injectSiteMetadataBootstrap } from "./shared/siteMetadataBootstrap";
 
 // Manus-specific plugins (optional, only available in Manus sandbox)
 let jsxLocPlugin: any;
@@ -187,7 +188,15 @@ function vitePluginAnalyticsHtml(): Plugin {
   };
 }
 
-const plugins: PluginOption[] = [react(), tailwindcss(), vitePluginAnalyticsHtml()];
+const domainMetadataHtmlPlugin: Plugin = {
+  name: "domain-metadata-html",
+  transformIndexHtml: {
+    order: "pre",
+    handler: injectSiteMetadataBootstrap,
+  },
+};
+
+const plugins: PluginOption[] = [react(), tailwindcss(), vitePluginAnalyticsHtml(), domainMetadataHtmlPlugin];
 if (jsxLocPlugin) plugins.push(jsxLocPlugin());
 if (vitePluginManusRuntime) plugins.push(vitePluginManusRuntime());
 if (process.env.NODE_ENV !== "production") plugins.push(vitePluginManusDebugCollector());

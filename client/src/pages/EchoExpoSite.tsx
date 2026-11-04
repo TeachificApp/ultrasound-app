@@ -20,9 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { useSeoHead } from "@/hooks/useSeoHead";
 import { ExpoAccountMenu, ExpoMobileAccountLinks } from "@/components/ExpoAccountMenu";
+import { getSiteMetadataForHostname } from "@shared/siteMetadata";
 
 const ULTRASOUND_EXPO_ORIGIN = "https://ultrasoundexpo.com";
-const ECHO_EXPO_ORIGIN = "https://echoexpo.iheartecho.com";
 const ECHO_EXPO_HERO_IMAGE = "/manus-storage/echoexpo-hero-approved_2a95e8a5.png";
 const ECHO_EXPO_EXHIBIT_PATH = "/partner-application?scope=ultrasound_expo&type=exhibitor&event=echoexpo";
 const ECHO_EXPO_SPONSOR_PATH = "/partner-application?scope=ultrasound_expo&type=sponsor&event=echoexpo";
@@ -163,18 +163,17 @@ export default function EchoExpoSite() {
   const [location] = useLocation();
   const path = location.split("?")[0];
   const page = path === "/" ? "home" : path.replace(/^\//, "");
-  const pageTitle = page === "home" ? "EchoExpo™ | The Standalone Echocardiography Event" : `${PAGE_COPY[page]?.eyebrow ?? "EchoExpo™"} | EchoExpo™`;
+  const siteMetadata = getSiteMetadataForHostname("echocardiographyexpo.com")!;
+  const pageTitle = page === "home" ? siteMetadata.title : `${PAGE_COPY[page]?.eyebrow ?? siteMetadata.siteName} | ${siteMetadata.siteName}`;
   const pageDescription = page === "home"
-    ? "EchoExpo™ by iHeartEcho™ is the standalone cardiac ultrasound and echocardiography event held immediately after UltrasoundExpo™, featuring cardiac education, Echo Games, Echo Skills, hands-on CME workshops, and its own exhibit hall destination."
+    ? siteMetadata.description
     : PAGE_COPY[page]?.body ?? PAGE_COPY.about.body;
   useSeoHead({
+    ...siteMetadata,
     title: pageTitle,
     description: pageDescription,
-    image: ECHO_EXPO_HERO_IMAGE,
-    canonical: `${ECHO_EXPO_ORIGIN}${page === "home" ? "/" : path}`,
-    siteName: "EchoExpo™",
+    canonical: `${window.location.origin}${path}`,
     appendSiteName: false,
-    keywords: "echo conference, echocardiography event, cardiac ultrasound, Echo Games, Echo Skills, echocardiography exhibitors",
   });
 
   if (page !== "home") return <div className="min-h-screen bg-[#f4f9fb] text-[#092638]"><EchoExpoHeader /><EchoInfoPage page={page} /><EchoFooter /></div>;

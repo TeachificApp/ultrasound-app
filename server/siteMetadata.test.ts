@@ -6,6 +6,7 @@ import {
   getSiteMetadataForHostname,
   injectSiteMetadataIntoHtml,
 } from "./lib/siteMetadata";
+import { injectSiteMetadataBootstrap } from "../shared/siteMetadataBootstrap";
 
 const BASE_HTML = `<!doctype html><html><head>
   <title>UltrasoundAssist™ — Clinical Ultrasound App</title>
@@ -55,10 +56,10 @@ describe("domain-specific social metadata", () => {
 
   it("injects EchoExpo's separate title, description, image, and canonical preview", () => {
     const rendered = injectSiteMetadataIntoHtml(BASE_HTML, "echocardiographyexpo.com", "/");
-    expect(rendered).toContain("EchoExpo™ | The Echocardiography Experience at UltrasoundExpo™");
+    expect(rendered).toContain("EchoExpo™ | The Standalone Echocardiography Event");
     expect(rendered).toContain('property="og:url" content="https://echocardiographyexpo.com/"');
     expect(rendered).toContain('property="og:site_name" content="EchoExpo™"');
-    expect(rendered).toContain("echoexpo-supplied-tradeshow-hero_e230df63.png");
+    expect(rendered).toContain("echoexpo-hero-approved_2a95e8a5.png");
     expect(rendered).toContain('link rel="icon" href="https://echocardiographyexpo.com/manus-storage/echoexpo-logo_535dff69.png"');
     expect(rendered).toContain('link rel="apple-touch-icon" href="https://echocardiographyexpo.com/manus-storage/echoexpo-logo_535dff69.png"');
   });
@@ -70,7 +71,7 @@ describe("domain-specific social metadata", () => {
     const accreditation = injectSiteMetadataIntoHtml(BASE_HTML, "accreditation.iheartecho.com", "/");
 
     expect(app).toContain("UltrasoundAssist™ | All About Ultrasound™");
-    expect(ihe).toContain("iHeartEcho™ | Echocardiography Clinical Intelligence");
+    expect(ihe).toContain("EchoAssist™ by iHeartEcho™ | Echocardiography Clinical Intelligence");
     expect(learn).toContain("Learn | All About Ultrasound™ + iHeartEcho™");
     expect(accreditation).toContain("Accreditation | iHeartEcho™");
     expect(accreditation).toContain('property="og:url" content="https://accreditation.iheartecho.com/"');
@@ -78,9 +79,11 @@ describe("domain-specific social metadata", () => {
 
   it("sets independent browser favicon fallbacks for both Expo hosts", () => {
     const indexHtml = readFileSync(resolve(process.cwd(), "client/index.html"), "utf8");
-    expect(indexHtml).toContain("isExpo=h==='ultrasoundexpo.com'");
-    expect(indexHtml).toContain("qyAMKKVMmuCLxwRU.png");
-    expect(indexHtml).toContain("isEchoExpo=h==='echocardiographyexpo.com'");
-    expect(indexHtml).toContain("echoexpo-logo_535dff69.png");
+    const transformed = injectSiteMetadataBootstrap(indexHtml);
+    expect(transformed).toContain('data-domain-metadata-bootstrap');
+    expect(transformed).toContain("qyAMKKVMmuCLxwRU.png");
+    expect(transformed).toContain("echoexpo-logo_535dff69.png");
+    expect(transformed).toContain('"learn.iheartecho.com"');
+    expect(transformed).not.toContain('canonicalEl');
   });
 });

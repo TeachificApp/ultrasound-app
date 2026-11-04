@@ -43,6 +43,7 @@ import {
 import {
   getMetadataRequestHostname,
   getSiteMetadataForHostname,
+  injectSiteMetadataIntoHtml,
 } from "../lib/siteMetadata";
 import { getPublicSiteTenantForHost } from "../../shared/publicSiteTenants";
 
@@ -82,7 +83,12 @@ function getCanonicalHost(req: Request): string {
     requestHost === "www.echocardiographyexpo.com" ||
     requestHost === "echoexpo.iheartecho.com"
   ) {
-    return "echoexpo.iheartecho.com";
+    return requestHost;
+  }
+  // Dedicated learning, app and account surfaces retain their public identity.
+  // A global marketing/app root must never redirect Learn metadata to the app.
+  if (getSiteMetadataForHostname(requestHost) && /^(learn|app|members?|accreditation)\./.test(requestHost)) {
+    return requestHost;
   }
   const cfHeader = req.headers["x-canonical-host"];
   if (cfHeader && typeof cfHeader === "string" && cfHeader.trim()) {
@@ -122,8 +128,6 @@ function buildMetaTags(opts: {
     `<meta property="og:url" content="${ogUrl}" />`,
     `<meta property="og:type" content="website" />`,
     img ? `<meta property="og:image" content="${img}" />` : "",
-    img ? `<meta property="og:image:width" content="1200" />` : "",
-    img ? `<meta property="og:image:height" content="630" />` : "",
     `<meta name="twitter:card" content="${img ? "summary_large_image" : "summary"}" />`,
     `<meta name="twitter:title" content="${t}" />`,
     `<meta name="twitter:description" content="${d}" />`,
@@ -232,15 +236,14 @@ function injectSeoIntoHtml(
   req: Request,
   pathOverride?: string
 ): string {
+  // Earlier course/funnel crawler routes also need the correct domain identity.
+  html = injectSiteMetadataIntoHtml(html, getMetadataRequestHostname(req), req.path);
   const canonicalHost = getCanonicalHost(req);
   const actualPath = pathOverride ?? req.originalUrl;
   // Canonical URL always uses https on the canonical host
   const canonicalUrl = `https://${canonicalHost}${actualPath}`;
-  // OG URL reflects the actual request (may be the subdomain or root)
-  const pageUrl =
-    canonicalHost === ULTRASOUND_EXPO_SITE_DOMAIN
-      ? canonicalUrl
-      : `${req.protocol}://${req.get("host")}${req.originalUrl}`;
+  // Social cards must retain the public host, never a proxy's internal address.
+  const pageUrl = canonicalUrl;
 
   const metaTags = buildMetaTags({
     title: seo.title,
@@ -286,6 +289,9 @@ function injectSeoIntoHtml(
   );
   const absoluteImage = absoluteAssetUrl(seo.image, req);
   if (absoluteImage) {
+    if (absoluteImage !== getSiteMetadataForHostname(getMetadataRequestHostname(req))?.image) {
+      html = html.replace(/<meta\s+[^>]*\bproperty="og:image:(width|height)"[^>]*>/gi, "");
+    }
     html = html.replace(
       /(<meta\s+property="og:image"\s+content=")[^"]*("[^>]*>)/g,
       `$1${escapeHtml(absoluteImage)}$2`

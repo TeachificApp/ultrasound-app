@@ -16,7 +16,7 @@
  */
 
 import { useEffect } from "react";
-import { resolveAssetUrl } from "@/lib/resolveAssetUrl";
+import { getSiteMetadataForHostname } from "@shared/siteMetadata";
 
 export interface SeoHeadOptions {
   /** Page title — appended with site name automatically */
@@ -39,50 +39,44 @@ export interface SeoHeadOptions {
   keywords?: string;
   /** Twitter card type — defaults to "summary_large_image" */
   twitterCard?: "summary" | "summary_large_image";
+  /** Use an explicit account for a page identity on a shared host. */
+  twitterSite?: string;
   /** noindex — set true for draft/private pages */
   noindex?: boolean;
 }
 
-const SITE_NAME = "All About Ultrasound™ | iHeartEcho™";
-const DEFAULT_IMAGE = resolveAssetUrl(
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663401463434/UrcfdRVE8J6mpMNR48QuFe/aaus_logo_e47ffb71.png",
-)!;
-const DEFAULT_TITLE = "UltrasoundAssist™ — Clinical Ultrasound App";
-const DEFAULT_DESC = "UltrasoundAssist™ by All About Ultrasound — clinical protocols, ScanCoach, Navigator, POCUS-Assist, Fetal Echo, flashcards, and case library for ultrasound professionals.";
+// Organization-logo default is retained for structured-data builders, not social cards.
+const DEFAULT_IMAGE = getSiteMetadataForHostname("app.allaboutultrasound.com")!.favicon;
 
 function setMeta(selector: string, attr: string, value: string) {
-  let el = document.querySelector<HTMLMetaElement>(selector);
+  const nodes = document.querySelectorAll<HTMLMetaElement>(selector);
+  let el = nodes[0];
   if (!el) {
     el = document.createElement("meta");
     const parts = selector.match(/\[([^=]+)="([^"]+)"\]/);
     if (parts) el.setAttribute(parts[1], parts[2]);
     document.head.appendChild(el);
   }
+  nodes.forEach((node, index) => { if (index > 0) node.remove(); });
   el.setAttribute(attr, value);
 }
 
 function setLink(rel: string, value: string, id?: string) {
-  const selector = id ? `link[data-seo-id="${id}"]` : `link[rel="${rel}"]`;
-  let el = document.querySelector<HTMLLinkElement>(selector);
+  const nodes = document.querySelectorAll<HTMLLinkElement>(`link[rel="${rel}"]`);
+  let el = nodes[0];
   if (!el) {
     el = document.createElement("link");
     el.rel = rel;
-    if (id) el.setAttribute("data-seo-id", id);
     document.head.appendChild(el);
   }
+  nodes.forEach((node, index) => { if (index > 0) node.remove(); });
+  if (id) el.setAttribute("data-seo-id", id);
   el.href = value;
-}
-
-function removeLink(id: string) {
-  document.querySelector(`link[data-seo-id="${id}"]`)?.remove();
 }
 
 function setJsonLd(data: Record<string, unknown> | null, id: string) {
   const existing = document.querySelector(`script[data-seo-id="${id}"]`);
-  if (!data) {
-    existing?.remove();
-    return;
-  }
+  if (!data) { existing?.remove(); return; }
   const el = existing ?? document.createElement("script");
   el.setAttribute("type", "application/ld+json");
   el.setAttribute("data-seo-id", id);
@@ -90,83 +84,63 @@ function setJsonLd(data: Record<string, unknown> | null, id: string) {
   if (!existing) document.head.appendChild(el);
 }
 
+/** Shared server/browser identity; preview query aliases only apply on unknown hosts. */
+function getHostMetadata() {
+  const hostMetadata = getSiteMetadataForHostname(window.location.hostname);
+  if (hostMetadata) return hostMetadata;
+  const preview = new URLSearchParams(window.location.search).get("subdomain");
+  const previewHosts: Record<string, string> = {
+    ultrasoundexpo: "ultrasoundexpo.com", echoexpo: "echocardiographyexpo.com",
+    learn: "learn.allaboutultrasound.com", iheartecho: "app.iheartecho.com",
+  };
+  return getSiteMetadataForHostname(previewHosts[preview ?? ""] ?? "app.allaboutultrasound.com")!;
+}
+
+/** Apply a complete, consistent set so navigation cannot leave a mixed-brand card. */
+export function applySeoHead(opts: SeoHeadOptions) {
+  const defaults = getHostMetadata();
+  const siteName = opts.siteName ?? defaults.siteName;
+  const fullTitle = opts.title
+    ? opts.appendSiteName !== false && siteName ? `${opts.title} | ${siteName}` : opts.title
+    : defaults.title;
+  const description = opts.description ?? defaults.description;
+  const image = new URL(opts.image || defaults.image, window.location.origin).href;
+  const canonical = opts.canonical || window.location.origin + window.location.pathname;
+  const keywords = opts.keywords ?? defaults.keywords ?? "";
+  document.title = fullTitle;
+  setMeta('meta[name="description"]', "content", description);
+  setMeta('meta[name="keywords"]', "content", keywords);
+  setMeta('meta[name="robots"]', "content", opts.noindex ? "noindex,nofollow" : "index,follow");
+  setMeta('meta[property="og:title"]', "content", fullTitle);
+  setMeta('meta[property="og:description"]', "content", description);
+  setMeta('meta[property="og:type"]', "content", opts.type ?? "website");
+  setMeta('meta[property="og:image"]', "content", image);
+  setMeta('meta[property="og:site_name"]', "content", siteName);
+  setMeta('meta[property="og:url"]', "content", canonical);
+  for (const [key, value] of [["width", defaults.imageWidth], ["height", defaults.imageHeight]] as const) {
+    const selector = `meta[property="og:image:${key}"]`;
+    if (value && (!opts.image || opts.image === defaults.image)) setMeta(selector, "content", String(value));
+    else document.querySelectorAll(selector).forEach(el => el.remove());
+  }
+  setMeta('meta[name="twitter:card"]', "content", opts.twitterCard ?? "summary_large_image");
+  setMeta('meta[name="twitter:title"]', "content", fullTitle);
+  setMeta('meta[name="twitter:description"]', "content", description);
+  setMeta('meta[name="twitter:image"]', "content", image);
+  const twitterSite = opts.twitterSite ?? (siteName === defaults.siteName ? defaults.twitterSite : undefined);
+  if (twitterSite) setMeta('meta[name="twitter:site"]', "content", twitterSite);
+  else document.querySelectorAll('meta[name="twitter:site"]').forEach(el => el.remove());
+  setLink("canonical", canonical, "seo-canonical");
+  setJsonLd(opts.jsonLd ?? null, "seo-jsonld");
+}
+
 export function useSeoHead(opts: SeoHeadOptions) {
   useEffect(() => {
-    const {
-      title,
-      siteName = SITE_NAME,
-      appendSiteName = true,
-      description = DEFAULT_DESC,
-      image = DEFAULT_IMAGE,
-      canonical,
-      type = "website",
-      jsonLd = null,
-      keywords,
-      twitterCard = "summary_large_image",
-      noindex = false,
-    } = opts;
-
-    // ── Title ────────────────────────────────────────────────────────────────
-    const fullTitle = title
-      ? appendSiteName && siteName
-        ? `${title} | ${siteName}`
-        : title
-      : DEFAULT_TITLE;
-    document.title = fullTitle;
-
-    // ── Basic meta ───────────────────────────────────────────────────────────
-    setMeta('meta[name="description"]', "content", description);
-    if (keywords) setMeta('meta[name="keywords"]', "content", keywords);
-    if (noindex) {
-      setMeta('meta[name="robots"]', "content", "noindex,nofollow");
-    } else {
-      setMeta('meta[name="robots"]', "content", "index,follow");
-    }
-
-    // ── Open Graph ───────────────────────────────────────────────────────────
-    setMeta('meta[property="og:title"]', "content", fullTitle);
-    setMeta('meta[property="og:description"]', "content", description);
-    setMeta('meta[property="og:type"]', "content", type);
-    setMeta('meta[property="og:image"]', "content", image);
-    setMeta('meta[property="og:image:width"]', "content", "1200");
-    setMeta('meta[property="og:image:height"]', "content", "630");
-    setMeta('meta[property="og:site_name"]', "content", siteName || SITE_NAME);
-    if (canonical) setMeta('meta[property="og:url"]', "content", canonical);
-
-    // ── Twitter Card ─────────────────────────────────────────────────────────
-    setMeta('meta[name="twitter:card"]', "content", twitterCard);
-    setMeta('meta[name="twitter:title"]', "content", fullTitle);
-    setMeta('meta[name="twitter:description"]', "content", description);
-    setMeta('meta[name="twitter:image"]', "content", image);
-    setMeta('meta[name="twitter:site"]', "content", "@allaboutultrasound");
-
-    // ── Canonical ────────────────────────────────────────────────────────────
-    if (canonical) {
-      setLink("canonical", canonical, "seo-canonical");
-    } else {
-      removeLink("seo-canonical");
-    }
-
-    // ── JSON-LD ──────────────────────────────────────────────────────────────
-    setJsonLd(jsonLd, "seo-jsonld");
-
-    // ── Cleanup: restore defaults on unmount ─────────────────────────────────
-    return () => {
-      document.title = DEFAULT_TITLE;
-      setMeta('meta[name="description"]', "content", DEFAULT_DESC);
-      setMeta('meta[property="og:title"]', "content", DEFAULT_TITLE);
-      setMeta('meta[property="og:description"]', "content", DEFAULT_DESC);
-      setMeta('meta[property="og:type"]', "content", "website");
-      setMeta('meta[property="og:image"]', "content", DEFAULT_IMAGE);
-      setMeta('meta[name="robots"]', "content", "index,follow");
-      removeLink("seo-canonical");
-      setJsonLd(null, "seo-jsonld");
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    applySeoHead(opts);
+    return () => { applySeoHead({}); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     opts.title, opts.siteName, opts.appendSiteName, opts.description, opts.image, opts.canonical,
-    opts.type, opts.keywords, opts.noindex, opts.twitterCard,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    opts.type, opts.keywords, opts.noindex, opts.twitterCard, opts.twitterSite,
     JSON.stringify(opts.jsonLd),
   ]);
 }

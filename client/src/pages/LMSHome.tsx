@@ -7,6 +7,8 @@ import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import { useSeoHead } from "@/hooks/useSeoHead";
+import { getSiteMetadataForHostname } from "@shared/siteMetadata";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +26,13 @@ import {
 } from "lucide-react";
 
 export default function LMSHome() {
+  const siteMetadata = getSiteMetadataForHostname("learn.allaboutultrasound.com")!;
+  useSeoHead({
+    ...siteMetadata,
+    canonical: `${window.location.origin}${window.location.pathname}`,
+    appendSiteName: false,
+  });
+
   const { user, isAuthenticated } = useAuth();
   const { data: featuredCourses, isLoading: loadingFeatured } = trpc.lms.listFeatured.useQuery();
   const { data: collections, isLoading: loadingCollections } = trpc.lms.listCollections.useQuery();

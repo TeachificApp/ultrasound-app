@@ -27,7 +27,7 @@ describe("transformAnalyticsIndexHtml", () => {
 
     expect(out).toContain('id="root"');
     expect(out).toContain('src="/src/main.tsx"');
-    expect(out).toContain("Brand-aware meta swap");
+    expect(out).toContain("domain-metadata-bootstrap");
     expect(out).not.toContain("%VITE_ANALYTICS_ENDPOINT%");
   });
 
