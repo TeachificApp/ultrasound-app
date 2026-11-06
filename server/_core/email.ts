@@ -31,7 +31,7 @@ export function dashboardBillingAndReceiptNotice(): string {
 /** Infer email type from subject line for logging purposes */
 function inferEmailType(subject: string): string {
   const s = subject.toLowerCase();
-  if (s.includes("magic link") || s.includes("sign in") || s.includes("log in") || s.includes("login link")) return "magic_link";
+  if (s.includes("magic link") || /sign[\s-]in/.test(s) || s.includes("log in") || s.includes("login link")) return "magic_link";
   if (s.includes("welcome")) return "welcome";
   if (s.includes("certificate")) return "certificate";
   if (s.includes("enroll") || s.includes("course access")) return "enrollment";

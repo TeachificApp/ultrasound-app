@@ -25,6 +25,7 @@ import { getDb, ensureUserRole, getUsersByEmail } from "../db";
 import { sendEmail, buildWelcomeEmail, buildVerificationEmail, buildPasswordResetEmail } from "../_core/email";
 import { type BrandMode, detectBrandMode, getBrandDisplayConfig, BRAND_DOMAINS } from "@shared/brands";
 import { authEmailField } from "@shared/authEmailField";
+import { getAuthEmailRetryAfterMs } from "@shared/authEmailRateLimit";
 import {
   canReusePasswordResetToken,
   getPasswordResetExpiry,
@@ -113,7 +114,7 @@ async function sendPasswordResetEmail(to: string, token: string, name: string, b
   const resetUrl = `${appUrl}/reset-password?token=${token}`;
   const firstName = name || "there";
   const { subject, htmlBody, previewText } = buildPasswordResetEmail({ firstName, resetUrl, brandMode });
-  const sent = await sendEmail({ to: { name: firstName, email: to }, subject, htmlBody, previewText, brandMode });
+  const sent = await sendEmail({ to: { name: firstName, email: to }, subject, htmlBody, previewText, brandMode, transactional: true });
   if (!sent) {
     console.warn(`[EmailAuth] Password reset email to ${to} could not be sent (SendGrid unavailable)`);
   }
@@ -421,58 +422,72 @@ export const emailAuthRouter = router({
   forgotPassword: publicProcedure
     .input(z.object({ email: authEmailField, origin: z.string().url().optional() }))
     .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+      try {
+        const db = await getDb();
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
-      const email = input.email;
-      const { getUserByEmail } = await import("../db");
-      const { resolveAuthDeliveryEmail } = await import("../lib/authEmailDelivery");
-      const { shouldSendAuthEmail, markAuthEmailSent } = await import("../lib/authEmailRateLimit");
-      const { getRequestClientInfo } = await import("../lib/recordUserLogin");
-      const { ipAddress } = getRequestClientInfo(ctx.req);
-      const rateLimit = await shouldSendAuthEmail({
-        email,
-        type: "password_reset",
-        ipAddress,
-      });
-      if (!rateLimit.allowed) {
-        return { success: true };
-      }
-      const user = await getUserByEmail(email);
+        const email = input.email;
+        const { getUserByEmail } = await import("../db");
+        const { resolveAuthDeliveryEmail } = await import("../lib/authEmailDelivery");
+        const { shouldSendAuthEmail, markAuthEmailSent } = await import("../lib/authEmailRateLimit");
+        const { getRequestClientInfo } = await import("../lib/recordUserLogin");
+        const { ipAddress } = getRequestClientInfo(ctx.req);
+        const rateLimit = await shouldSendAuthEmail({
+          email,
+          type: "password_reset",
+          ipAddress,
+        });
+        if (!rateLimit.allowed) {
+          const retryAfterMs = getAuthEmailRetryAfterMs("password_reset", rateLimit);
+          if (rateLimit.reason === "cooldown") {
+            return { success: true, deliveryStatus: "cooldown" as const, retryAfterMs };
+          }
+          return { success: true, deliveryStatus: "hourly_limit" as const, retryAfterMs };
+        }
+        const user = await getUserByEmail(email);
 
-      // Always return success to avoid email enumeration
-      // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)
-      // — this allows OAuth users to set a password for the first time via the reset flow
-      if (user) {
-        // Reuse an active one-time link so a delayed first email remains usable
-        // when the learner requests another copy. The expiry is renewed to the
-        // shared 24-hour policy; successful password reset consumes the token.
-        const resetToken = canReusePasswordResetToken(user.passwordResetToken, user.passwordResetExpiry)
-          ? user.passwordResetToken!
-          : generateToken();
-        const resetExpiry = getPasswordResetExpiry();
-        await db
-          .update(users)
-          .set({ passwordResetToken: resetToken, passwordResetExpiry: resetExpiry })
-          .where(eq(users.id, user.id));
-        const firstName = (user.name ?? "").split(" ")[0] ?? "there";
-        const bm = detectBrandMode(ctx.req.hostname || "");
-        const deliveryEmail = resolveAuthDeliveryEmail(user, email);
+        // Unknown accounts receive the same generic acknowledgment as accepted sends.
+        // Send reset email to any registered account (including OAuth-only accounts without a passwordHash)
+        // — this allows OAuth users to set a password for the first time via the reset flow
+        if (user) {
+          // Reuse an active one-time link so a delayed first email remains usable
+          // when the learner requests another copy. The expiry is renewed to the
+          // shared 24-hour policy; successful password reset consumes the token.
+          const resetToken = canReusePasswordResetToken(user.passwordResetToken, user.passwordResetExpiry)
+            ? user.passwordResetToken!
+            : generateToken();
+          const resetExpiry = getPasswordResetExpiry();
+          await db
+            .update(users)
+            .set({ passwordResetToken: resetToken, passwordResetExpiry: resetExpiry })
+            .where(eq(users.id, user.id));
+          const firstName = (user.name ?? "").split(" ")[0] ?? "there";
+          const bm = detectBrandMode(ctx.req.hostname || "");
+          const deliveryEmail = resolveAuthDeliveryEmail(user, email);
 
-        if (deliveryEmail) {
+          if (!deliveryEmail) throw new Error("No deliverable reset email");
           const sent = await sendPasswordResetEmail(deliveryEmail, resetToken, firstName, bm, input.origin);
-          if (sent) {
+          if (!sent) throw new Error("Password reset email was not accepted");
+          try {
             await markAuthEmailSent({
               email: deliveryEmail,
               type: "password_reset",
               ipAddress,
               userId: user.id,
             });
+          } catch (error) {
+            console.error("[EmailAuth] Accepted password reset email could not be rate-limit logged:", error);
           }
         }
-      }
 
-      return { success: true };
+        return { success: true, deliveryStatus: "acknowledged" as const };
+      } catch (error) {
+        console.error("[EmailAuth] Password reset email unavailable:", error);
+        throw new TRPCError({
+          code: "SERVICE_UNAVAILABLE",
+          message: "Password reset email is temporarily unavailable. Please try again shortly or contact support.",
+        });
+      }
     }),
 
   /**

@@ -11,16 +11,23 @@ import { Loader2, Heart, CheckCircle2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
 import { getAuthPageBrandName, getAuthPageLogoUrl } from "@/lib/authPageBrand";
+import { getAuthEmailThrottleMessage, type AuthEmailDeliveryStatus } from "@shared/authEmailRateLimit";
+import { useAuthEmailRetry } from "@/lib/useAuthEmailRetry";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [deliveryStatus, setDeliveryStatus] = useState<AuthEmailDeliveryStatus | null>(null);
+  const { retryAfterMs, setRetryAfterMs } = useAuthEmailRetry();
+  const throttleMessage = getAuthEmailThrottleMessage(deliveryStatus, retryAfterMs);
   const brandName = getAuthPageBrandName();
   const logo = getAuthPageLogoUrl();
 
   const forgotMutation = trpc.auth.requestPasswordReset.useMutation({
-    onSuccess: () => {
-      setSent(true);
+    onSuccess: (result) => {
+      setDeliveryStatus(result.deliveryStatus);
+      setRetryAfterMs(result.retryAfterMs ?? 0);
+      setSent(result.deliveryStatus === "acknowledged");
     },
     onError: (err) => {
       toast.error(err.message || "Failed to send reset email");
@@ -29,7 +36,7 @@ export default function ForgotPassword() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return;
+    if (!email || forgotMutation.isPending || retryAfterMs > 0) return;
     forgotMutation.mutate({ email: normalizeAuthEmail(email), origin: window.location.origin });
   };
 
@@ -80,10 +87,12 @@ export default function ForgotPassword() {
                   className="h-11"
                 />
               </div>
+              {throttleMessage && <p role="status" className="text-sm text-amber-700">{throttleMessage}</p>}
+              {forgotMutation.isError && <p role="alert" className="text-sm text-red-500">{forgotMutation.error?.message || "Password reset email is temporarily unavailable. Please try again shortly."}</p>}
 
               <Button
                 type="submit"
-                disabled={forgotMutation.isPending || !email}
+                disabled={forgotMutation.isPending || !email || retryAfterMs > 0}
                 className="w-full h-11 font-semibold text-white"
                 style={{ background: "linear-gradient(135deg, #189aa1 0%, #0e7a80 100%)" }}
               >

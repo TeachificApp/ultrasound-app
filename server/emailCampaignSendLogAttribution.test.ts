@@ -29,4 +29,12 @@ describe("exact campaign send-log attribution", () => {
     expect(JSON.parse(log.metadata).provider).toBe("sendgrid");
     expect(mocks.send.mock.calls[0][0].transactional).toBe(true);
   });
+
+  it("classifies a branded hyphenated sign-in subject as a magic link", async () => {
+    mocks.send.mockResolvedValue(true);
+    await sendEmail({ to: { email: "member@example.test" }, subject: "Your iHeartEcho™ sign-in link", htmlBody: "<p>Sign in</p>" });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(mocks.values.mock.calls[0][0]).toMatchObject({ campaignId: null, emailType: "magic_link", status: "sent" });
+    expect(mocks.send.mock.calls[0][0].transactional).toBe(true);
+  });
 });

@@ -24,6 +24,8 @@ import { normalizeAuthEmail } from "@shared/normalizeAuthEmail";
 import { MAGIC_LINK_VALIDITY_LABEL } from "@shared/magicLinkValidity";
 import { getAuthPageBrandName, getAuthPageLogoUrl } from "@/lib/authPageBrand";
 import { getOrCreateDeviceId } from "@/lib/deviceSession";
+import { getAuthEmailThrottleMessage, type AuthEmailDeliveryStatus } from "@shared/authEmailRateLimit";
+import { useAuthEmailRetry } from "@/lib/useAuthEmailRetry";
 
 type LoginMode = "magic" | "password" | "register";
 
@@ -69,7 +71,9 @@ export default function Login() {
   const [lastName, setLastName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [sent, setSent] = useState(false);
-  const [magicLinkDeliveryStatus, setMagicLinkDeliveryStatus] = useState<"sent" | "cooldown" | "unavailable" | null>(null);
+  const [magicLinkDeliveryStatus, setMagicLinkDeliveryStatus] = useState<AuthEmailDeliveryStatus | null>(null);
+  const { retryAfterMs, setRetryAfterMs } = useAuthEmailRetry();
+  const throttleMessage = getAuthEmailThrottleMessage(magicLinkDeliveryStatus, retryAfterMs);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [sessionReplacementToken, setSessionReplacementToken] = useState<string | null>(null);
@@ -137,7 +141,8 @@ export default function Login() {
   const requestMutation = trpc.auth.requestMagicLink.useMutation({
     onSuccess: (result) => {
       setMagicLinkDeliveryStatus(result.deliveryStatus);
-      setSent(true);
+      setRetryAfterMs(result.retryAfterMs ?? 0);
+      setSent(result.deliveryStatus === "sent");
     },
   });
 
@@ -155,7 +160,7 @@ export default function Login() {
   const handleMagicSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = normalizeAuthEmail(email);
-    if (!trimmed || requestMutation.isPending) return;
+    if (!trimmed || requestMutation.isPending || retryAfterMs > 0) return;
     setMagicLinkDeliveryStatus(null);
     requestMutation.mutate({ email: trimmed, origin: window.location.origin, returnTo });
   };
@@ -367,7 +372,7 @@ export default function Login() {
                   {magicLinkDeliveryStatus === "sent" ? (
                     <>If <span className="font-semibold text-gray-700">{email.trim()}</span> is registered, a sign-in link is on its way.</>
                   ) : magicLinkDeliveryStatus === "cooldown" ? (
-                    <>A sign-in link was requested recently. For security, please wait about <span className="font-semibold text-gray-700">one minute</span> before requesting another link.</>
+                    <>{throttleMessage}</>
                   ) : (
                     <>We could not prepare a sign-in email right now. Please try again shortly.</>
                   )}
@@ -435,9 +440,11 @@ export default function Login() {
                     </p>
                   )}
                 </div>
+                {throttleMessage && <p role="status" className="text-sm text-amber-700">{throttleMessage}</p>}
+                {magicLinkDeliveryStatus === "unavailable" && <p role="alert" className="text-sm text-red-500">We could not prepare a sign-in email right now. Please try again shortly.</p>}
                 <Button
                   type="submit"
-                  disabled={requestMutation.isPending || !email.trim()}
+                  disabled={requestMutation.isPending || !email.trim() || retryAfterMs > 0}
                   className="w-full h-11 font-semibold text-white"
                   style={{ background: "linear-gradient(135deg, #189aa1 0%, #0e7a80 100%)" }}
                 >
